@@ -6,6 +6,7 @@ import { ownsSlug } from "../lib/nav-model.ts";
 import type { NavItem } from "../lib/nav-model.ts";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+const METHOD_PALETTE: Record<string, string> = { GET: "green", POST: "blue", PUT: "yellow", PATCH: "yellow", DELETE: "red" };
 
 function methodOf({ slug }: { slug: string }): string | null {
   const first = nav.pages[slug]?.openapi.split(/\s+/)[0]?.toUpperCase() ?? "";
@@ -14,6 +15,28 @@ function methodOf({ slug }: { slug: string }): string | null {
 
 function indent({ depth }: { depth: number }) {
   return `calc(0.75rem + ${Math.min(Math.max(depth - 1, 0), 3) * 0.75}rem)`;
+}
+
+function NavMethod({ method }: { method: string }) {
+  const palette = METHOD_PALETTE[method] ?? "gray";
+  return (
+    <Text
+      as="span"
+      flexShrink={0}
+      minWidth="2.75rem"
+      textAlign="center"
+      paddingX="1"
+      borderRadius="xs"
+      bg={`${palette}.subtle`}
+      color={`${palette}.fg`}
+      fontFamily="mono"
+      fontSize="10px"
+      lineHeight="16px"
+      fontWeight="600"
+    >
+      {method === "DELETE" ? "DEL" : method}
+    </Text>
+  );
 }
 
 function PageRow({ item, current, depth }: { item: Extract<NavItem, { type: "page" }>; current: string; depth: number }) {
@@ -28,25 +51,20 @@ function PageRow({ item, current, depth }: { item: Extract<NavItem, { type: "pag
         display="flex"
         gap="2"
         alignItems="baseline"
-        minHeight="36px"
+        minHeight={{ base: "44px", lg: "36px" }}
         paddingY="2"
         paddingX="3"
         paddingInlineStart={indent({ depth })}
-        borderRadius="md"
+        borderRadius="full"
         fontSize="14px"
         lineHeight="20px"
         textDecoration="none"
-        color={active ? "fg" : "nav.fg"}
+        color={active ? "accent.fg" : "nav.fg"}
         fontWeight={active ? "600" : "400"}
-        bg={active ? "nav.bgActive" : undefined}
-        boxShadow={active ? "inset 2px 0 0 var(--chakra-colors-accent-solid)" : undefined}
-        _hover={{ bg: "nav.bgHover", textDecoration: "none" }}
+        bg={active ? "accent.subtle" : undefined}
+        _hover={{ bg: active ? "accent.subtle" : "bg.hover", textDecoration: "none" }}
       >
-        {method ? (
-          <Text as="span" fontFamily="mono" fontSize="10px" fontWeight="600" color="fg.muted" flexShrink={0} minWidth="2.4em">
-            {method === "DELETE" ? "DEL" : method}
-          </Text>
-        ) : null}
+        {method ? <NavMethod method={method} /> : null}
         <span>{item.title}</span>
       </Box>
     </Box>
@@ -59,7 +77,7 @@ function GroupRow({ item, current, depth }: { item: Extract<NavItem, { type: "gr
   if (depth === 0) {
     return (
       <Box as="li" listStyleType="none" marginTop="6" css={{ "&:first-of-type": { marginTop: "0" } }}>
-        <Text as="h2" margin="0" paddingX="3" paddingBottom="2" fontSize="12px" lineHeight="20px" fontWeight="600" color="fg.muted">
+        <Text as="h2" margin="0" paddingX="3" paddingBottom="2" fontSize="12px" lineHeight="16px" fontWeight="600" color="fg">
           {item.title}
         </Text>
         <NavList items={item.children} current={current} depth={1} />
@@ -75,22 +93,23 @@ function GroupRow({ item, current, depth }: { item: Extract<NavItem, { type: "gr
         onClick={() => setOpen((value) => !value)}
         width="100%"
         alignItems="center"
+        justifyContent="space-between"
         gap="2"
-        minHeight="36px"
+        minHeight={{ base: "44px", lg: "36px" }}
         paddingY="2"
         paddingX="3"
         paddingInlineStart={indent({ depth })}
-        borderRadius="md"
+        borderRadius="full"
         fontSize="14px"
         lineHeight="20px"
         fontWeight="500"
         color="nav.fg"
         textAlign="start"
         cursor="pointer"
-        _hover={{ bg: "nav.bgHover" }}
+        _hover={{ bg: "bg.hover" }}
       >
-        <ChevronRight size={14} aria-hidden="true" style={{ transform: open ? "rotate(90deg)" : undefined, flexShrink: 0 }} />
         <span>{item.title}</span>
+        <ChevronRight size={14} aria-hidden="true" style={{ transform: open ? "rotate(90deg)" : undefined, flexShrink: 0 }} />
       </Flex>
       <Box hidden={!open} data-docs-panel="">
         <NavList items={item.children} current={current} depth={depth + 1} />
@@ -114,7 +133,7 @@ function NavList({ items, current, depth }: { items: NavItem[]; current: string;
 }
 
 /** The active section's tree; only groups holding the current page start open. */
-export function NavTree({ items, current }: { items: NavItem[]; current: string }) {
+export function NavTree({ items, current, id }: { items: NavItem[]; current: string; id?: string }) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const scroller = ref.current?.closest<HTMLElement>("[data-docs-scroll]");
@@ -124,7 +143,7 @@ export function NavTree({ items, current }: { items: NavItem[]; current: string 
     if (offset > scroller.clientHeight - 80 || offset < 0) scroller.scrollTop += offset - scroller.clientHeight / 3;
   }, []);
   return (
-    <Box as="nav" aria-label="Page navigation" ref={ref}>
+    <Box as="nav" id={id} tabIndex={id ? -1 : undefined} aria-label="Page navigation" ref={ref}>
       <NavList items={items} current={current} depth={0} />
     </Box>
   );

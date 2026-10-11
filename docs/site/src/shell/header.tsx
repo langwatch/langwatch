@@ -1,13 +1,12 @@
 import { FullLogo } from "@langwatch/design-system/full-logo";
-import { GitHubIcon } from "@langwatch/design-system/icons";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, Button, Flex, IconButton, Link, Text } from "@langwatch/design-system/primitives";
 import { Menu as MenuIcon, Search } from "lucide-react";
 import { useEffect, useState } from "react";
-import { firstSlug, site, sections } from "../lib/nav-model.ts";
-import type { Section } from "../lib/nav-model.ts";
+import { site } from "../lib/nav-model.ts";
 import { FRAME_MAX, GUTTER } from "./layout.ts";
 import type { PageKind } from "./layout.ts";
+import { GithubLink } from "./github-link.tsx";
 import { ThemeMenu } from "./theme-menu.tsx";
 
 function useShortcutLabel() {
@@ -18,82 +17,50 @@ function useShortcutLabel() {
   return label;
 }
 
-function SectionTabs({ active, frameMax }: { active: Section | undefined; frameMax: string }) {
-  useEffect(() => {
-    document.querySelector('[data-docs-section][aria-current="page"]')?.scrollIntoView({ inline: "center", block: "nearest" });
-  }, []);
-  return (
-    <Box as="nav" aria-label="Documentation sections" borderBottomWidth="1px" borderColor="border.muted">
-      <Flex
-        maxWidth={frameMax}
-        marginX="auto"
-        paddingX={GUTTER}
-        tabIndex={-1}
-        overflowX="auto"
-        css={{ scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}
-      >
-        {sections.map((section) => {
-          const current = section === active;
-          return (
-            <Link
-              key={section.title}
-              href={`/${firstSlug({ items: section.children })}`}
-              data-docs-section=""
-              aria-current={current ? "page" : undefined}
-              display="inline-flex"
-              alignItems="center"
-              flexShrink={0}
-              minHeight="44px"
-              paddingX="3"
-              fontSize="14px"
-              lineHeight="20px"
-              whiteSpace="nowrap"
-              textDecoration="none"
-              fontWeight={current ? "600" : "500"}
-              color={current ? "fg" : "fg.muted"}
-              boxShadow={current ? "inset 0 -2px 0 var(--chakra-colors-accent-solid)" : undefined}
-              _hover={{ color: "fg", bg: "bg.hover", textDecoration: "none" }}
-            >
-              {section.title}
-            </Link>
-          );
-        })}
-      </Flex>
-    </Box>
-  );
-}
-
-export function Header({ active, kind, onSearch, onMenu }: { active: Section | undefined; kind: PageKind; onSearch: () => void; onMenu: () => void }) {
+export function Header({ kind, onSearch, onMenu }: { kind: PageKind; onSearch: () => void; onMenu: () => void }) {
   const shortcut = useShortcutLabel();
+  const quiet = { color: "fg.muted", textDecoration: "none", _hover: { color: "fg", textDecoration: "none" } } as const;
   return (
-    <Box as="header" position="sticky" top="0" zIndex="sticky" bg="bg.surface" data-kind={kind}>
-      <Flex
+    <Box
+      as="header"
+      position="sticky"
+      top="0"
+      zIndex="sticky"
+      data-kind={kind}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      css={{
+        backgroundColor: "color-mix(in srgb, var(--chakra-colors-bg-surface) 84%, transparent)",
+        backdropFilter: "blur(24px)",
+        "@media (forced-colors: active), (prefers-reduced-transparency: reduce)": { backgroundColor: "var(--chakra-colors-bg-surface)", backdropFilter: "none" },
+      }}
+    >
+      <Box
+        display={{ base: "flex", lg: "grid" }}
         alignItems="center"
-        gap="3"
-        maxWidth={FRAME_MAX[kind]}
+        gap={{ base: "2", lg: "6" }}
+        maxWidth={FRAME_MAX.endpoint}
         marginX="auto"
         paddingX={GUTTER}
         height={{ base: "56px", lg: "64px" }}
+        gridTemplateColumns={{ lg: "1fr minmax(15rem, 27.5rem) 1fr" }}
       >
-        <IconButton
-          variant="ghost"
-          colorPalette="gray"
-          aria-label="Open navigation"
-          display={{ base: "inline-flex", lg: "none" }}
-          minWidth="44px"
-          height="44px"
-          marginInlineStart="-2"
-          onClick={onMenu}
-        >
-          <MenuIcon size={20} aria-hidden="true" />
-        </IconButton>
-        <Flex alignItems="center" gap="2" flexShrink={0}>
+        <Flex alignItems="center" gap="1">
+          <IconButton
+            variant="ghost"
+            colorPalette="gray"
+            aria-label="Open navigation"
+            display={{ base: "inline-flex", lg: "none" }}
+            minWidth="44px"
+            height="44px"
+            marginInlineStart="-2"
+            onClick={onMenu}
+          >
+            <MenuIcon size={20} aria-hidden="true" />
+          </IconButton>
           <Link href="/introduction" aria-label="LangWatch documentation" display="inline-flex" alignItems="center" minHeight="44px" _hover={{ textDecoration: "none" }}>
-            <FullLogo width={128} height={31} />
+            <FullLogo width={128} height={31.38} />
           </Link>
-          <Text display={{ base: "none", xl: "block" }} fontSize="14px" color="fg.muted">
-            Docs
-          </Text>
         </Flex>
         <Button
           type="button"
@@ -105,12 +72,11 @@ export function Header({ active, kind, onSearch, onMenu }: { active: Section | u
           justifyContent="flex-start"
           gap="2"
           height="40px"
-          width={{ lg: "15rem", xl: "22.5rem" }}
-          maxWidth="100%"
+          width="100%"
           paddingX="3"
           fontWeight="400"
           color="fg.muted"
-          marginInlineStart={{ lg: "4", xl: "8" }}
+          bg="bg.subtle"
         >
           <Search size={16} aria-hidden="true" />
           <Text as="span" flex="1" textAlign="start" fontSize="14px">
@@ -118,44 +84,30 @@ export function Header({ active, kind, onSearch, onMenu }: { active: Section | u
           </Text>
           <Kbd>{shortcut}</Kbd>
         </Button>
-        <Box flex="1" />
-        <IconButton
-          variant="ghost"
-          colorPalette="gray"
-          aria-label="Search the docs"
-          display={{ base: "inline-flex", lg: "none" }}
-          minWidth="44px"
-          height="44px"
-          onClick={onSearch}
-        >
-          <Search size={20} aria-hidden="true" />
-        </IconButton>
-        <Link
-          href={site.github}
-          display={{ base: "none", lg: "inline-flex" }}
-          alignItems="center"
-          gap="2"
-          minHeight="44px"
-          fontSize="14px"
-          color="fg.muted"
-          aria-label="GitHub"
-          textDecoration="none"
-          _hover={{ color: "fg", textDecoration: "none" }}
-        >
-          <GitHubIcon size={20} />
-          <Text as="span" display={{ base: "none", xl: "inline" }}>
-            GitHub
-          </Text>
-        </Link>
-        <Link href={site.signIn} display={{ base: "none", lg: "inline-flex" }} alignItems="center" minHeight="44px" fontSize="14px" color="fg.muted" textDecoration="none" _hover={{ color: "fg", textDecoration: "none" }}>
-          Sign in
-        </Link>
-        <Button asChild variant="outline" colorPalette="gray" size="sm" display={{ base: "none", lg: "inline-flex" }}>
-          <a href="https://app.langwatch.ai">Open app</a>
-        </Button>
-        <ThemeMenu />
-      </Flex>
-      <SectionTabs active={active} frameMax={FRAME_MAX[kind]} />
+        <Flex alignItems="center" justifyContent="flex-end" gap={{ base: "1", lg: "5" }} marginInlineStart={{ base: "auto", lg: "0" }}>
+          <IconButton
+            variant="ghost"
+            colorPalette="gray"
+            aria-label="Search the docs"
+            display={{ base: "inline-flex", lg: "none" }}
+            minWidth="44px"
+            height="44px"
+            onClick={onSearch}
+          >
+            <Search size={20} aria-hidden="true" />
+          </IconButton>
+          <Link href={site.llms} display={{ base: "none", lg: "inline-flex" }} alignItems="center" minHeight="44px" fontSize="13px" {...quiet}>
+            llms.txt
+          </Link>
+          <Link href={site.signIn} display={{ base: "none", lg: "inline-flex" }} alignItems="center" minHeight="44px" fontSize="13px" {...quiet}>
+            Sign In
+          </Link>
+          <Box display={{ base: "none", lg: "block" }}>
+            <GithubLink compact />
+          </Box>
+          <ThemeMenu />
+        </Flex>
+      </Box>
     </Box>
   );
 }

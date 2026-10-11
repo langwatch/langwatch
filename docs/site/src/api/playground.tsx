@@ -6,10 +6,11 @@ import { CodeBody, CopyAction } from "../code/code-parts.tsx";
 import type { CodeSource } from "../code/code-parts.tsx";
 import { readingTabList, readingTabTrigger } from "../mdx-components/tabs.tsx";
 import { usePreference, writePreference } from "../lib/storage.ts";
-import { generateExample, initialBodyOf, liveRequest, paramKey } from "./codegen.ts";
+import { exampleFromSchema, generateExample, initialBodyOf, liveRequest, paramKey } from "./codegen.ts";
+import { useEndpointState } from "./endpoint-state.tsx";
+import { Panel } from "./panel.tsx";
 import { EXAMPLE_LANGUAGES } from "./operation.ts";
 import type { ExampleLanguage, HighlightedExamples, Operation, Parameter } from "./operation.ts";
-import { MethodBadge } from "./method-badge.tsx";
 
 type Outcome =
   | { kind: "idle" }
@@ -21,6 +22,10 @@ const REQUEST_TIMEOUT_MS = 30000;
 
 function plainLines({ code }: { code: string }): string[] {
   return code.split("\n").map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+}
+
+function plainSource({ code }: { code: string }): CodeSource {
+  return { lang: "json", title: "Example", code, lines: plainLines({ code }), highlight: [], numbered: false };
 }
 
 function ParamInput({ param, value, error, onChange }: { param: Parameter; value: string; error?: string; onChange: (value: string) => void }) {
@@ -97,6 +102,9 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const controller = useRef<AbortController | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const { tryOpen, setTryOpen, status, setStatus } = useEndpointState();
+  const statuses = operation.responses.map((response) => response.status);
   const stored = usePreference({ key: "api-language" });
   const language = EXAMPLE_LANGUAGES.find((entry) => entry.label.toLowerCase() === stored?.toLowerCase())?.id ?? "python";
   const languageLabel = EXAMPLE_LANGUAGES.find((entry) => entry.id === language)?.label ?? "Python";
@@ -125,6 +133,12 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
   );
 
   useEffect(() => () => controller.current?.abort(), []);
+
+  useEffect(() => {
+    if (!tryOpen) return;
+    formRef.current?.scrollIntoView({ block: "nearest" });
+    formRef.current?.querySelector<HTMLElement>("input, select, textarea")?.focus();
+  }, [tryOpen]);
 
   const edit = ({ location, name, value }: { location: string; name: string; value: string }) => {
     setTouched(true);
@@ -189,156 +203,197 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
     />
   );
 
+  const closeForm = () => {
+    setTryOpen(false);
+    window.setTimeout(() => document.getElementById("try-it-button")?.focus(), 0);
+  };
+  const chosen = operation.responses.find((response) => response.status === status) ?? operation.responses[0];
+  const chosenContent = chosen?.contents[0];
+  const declared = chosenContent?.example;
+  const example = declared ?? (chosenContent?.schema ? exampleFromSchema({ schema: chosenContent.schema }) : undefined);
+  const exampleCode = example === undefined || example === null ? "" : JSON.stringify(example, null, 2);
+
   return (
-    <Box as="section" aria-label="Try this endpoint" borderWidth="1px" borderColor="border" borderRadius="showcase" bg="bg.panel" padding="4" display="flex" flexDirection="column" gap="4" minWidth="0">
-      <Box>
-        <Text as="h2" margin="0" fontSize="16px" lineHeight="24px" fontWeight="600">
-          Try this endpoint
-        </Text>
-        <Flex alignItems="center" gap="2" marginTop="2" wrap="wrap">
-          <MethodBadge method={operation.method} />
-          <Box as="code" fontFamily="mono" fontSize="12px" overflowWrap="anywhere" color="fg.muted">
-            {operation.path}
-          </Box>
+    <Flex direction="column" gap="6" minWidth="0" data-type-mode="productive">
+      {tryOpen ? (
+        <Panel
+          id="try-it-form"
+          title="Try this endpoint"
+          aside={
+            <Button type="button" size="xs" variant="ghost" colorPalette="gray" minHeight="40px" flexShrink={0} aria-label="Close request form" onClick={closeForm}>
+              Close
+            </Button>
+          }
+        >
+          <Flex direction="column" gap="4" padding="4" ref={formRef}>
+            <Text margin="0" fontSize="12px" color="fg.muted">
+              {host}
+            </Text>
+    {scheme ? (
+      <Box as="details" open={required.length === 0 || undefined} css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", fontWeight: 600 } }}>
+        <summary>Authorisation: {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
+        <Flex gap="2" marginTop="1">
+          <Input
+            size="sm"
+            type={reveal ? "text" : "password"}
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+            placeholder={scheme.type === "apiKey" ? "API key" : "Bearer token"}
+            aria-label={scheme.type === "apiKey" ? `${scheme.name} value` : "Bearer token"}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <Button type="button" size="sm" variant="outline" colorPalette="gray" aria-label={reveal ? "Hide key" : "Reveal key"} onClick={() => setReveal((value) => !value)}>
+            {reveal ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" colorPalette="gray" onClick={() => setKey("")}>
+            Clear
+          </Button>
         </Flex>
         <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
-          {host}
+          Kept in this tab. Cleared when you reload.
         </Text>
       </Box>
+    ) : null}
 
-      {scheme ? (
-        <Box as="details" open={required.length === 0 || undefined} css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", fontWeight: 600 } }}>
-          <summary>Authorisation: {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
-          <Flex gap="2" marginTop="1">
-            <Input
-              size="sm"
-              type={reveal ? "text" : "password"}
-              value={key}
-              onChange={(event) => setKey(event.target.value)}
-              placeholder={scheme.type === "apiKey" ? "API key" : "Bearer token"}
-              aria-label={scheme.type === "apiKey" ? `${scheme.name} value` : "Bearer token"}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <Button type="button" size="sm" variant="outline" colorPalette="gray" aria-label={reveal ? "Hide key" : "Reveal key"} onClick={() => setReveal((value) => !value)}>
-              {reveal ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-            </Button>
-            <Button type="button" size="sm" variant="ghost" colorPalette="gray" onClick={() => setKey("")}>
-              Clear
-            </Button>
-          </Flex>
-          <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
-            Kept in this tab. Cleared when you reload.
-          </Text>
-        </Box>
-      ) : null}
-
-      {required.length > 0 ? <Flex direction="column" gap="3">{required.map(renderParam)}</Flex> : null}
-      {optional.length > 0 ? (
-        <Flex direction="column" gap="3">
-          {optional.map(renderParam)}
+    {required.length > 0 ? <Flex direction="column" gap="3">{required.map(renderParam)}</Flex> : null}
+    {optional.length > 0 ? (
+      <Flex direction="column" gap="3">
+        {optional.map(renderParam)}
+      </Flex>
+    ) : null}
+    {deprecated.length > 0 ? (
+      <Box as="details" css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", color: "var(--chakra-colors-fg-muted)" } }}>
+        <summary>Optional fields (deprecated)</summary>
+        <Flex direction="column" gap="3" marginTop="2">
+          {deprecated.map(renderParam)}
         </Flex>
-      ) : null}
-      {deprecated.length > 0 ? (
-        <Box as="details" css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", color: "var(--chakra-colors-fg-muted)" } }}>
-          <summary>Optional fields (deprecated)</summary>
-          <Flex direction="column" gap="3" marginTop="2">
-            {deprecated.map(renderParam)}
-          </Flex>
-        </Box>
-      ) : null}
+      </Box>
+    ) : null}
 
-      {operation.body && bodyContent ? (
-        <Box>
-          <Text as="label" htmlFor="pg-body" display="block" fontSize="13px" fontWeight="600" marginBottom="1">
-            Body <Text as="span" fontWeight="400" color="fg.muted">(application/json)</Text>
-          </Text>
-          <Textarea
-            id="pg-body"
-            size="sm"
-            rows={Math.min(14, Math.max(4, body.split("\n").length))}
-            fontFamily="mono"
-            fontSize="12px"
-            value={body}
-            spellCheck={false}
-            aria-invalid={errors.body ? true : undefined}
-            aria-describedby={errors.body ? "pg-body-error" : undefined}
-            onChange={(event) => {
-              setTouched(true);
-              setBody(event.target.value);
-            }}
-          />
-          {errors.body ? (
-            <Text id="pg-body-error" margin="0" marginTop="1" fontSize="12px" color="red.fg">
-              {errors.body}
-            </Text>
-          ) : null}
-        </Box>
-      ) : null}
-
+    {operation.body && bodyContent ? (
       <Box>
-        {mutating ? (
-          <Text margin="0" marginBottom="2" fontSize="12px" color="fg.muted">
-            This sends a live request to {host}.
+        <Text as="label" htmlFor="pg-body" display="block" fontSize="13px" fontWeight="600" marginBottom="1">
+          Body <Text as="span" fontWeight="400" color="fg.muted">(application/json)</Text>
+        </Text>
+        <Textarea
+          id="pg-body"
+          size="sm"
+          rows={Math.min(14, Math.max(4, body.split("\n").length))}
+          fontFamily="mono"
+          fontSize="12px"
+          value={body}
+          spellCheck={false}
+          aria-invalid={errors.body ? true : undefined}
+          aria-describedby={errors.body ? "pg-body-error" : undefined}
+          onChange={(event) => {
+            setTouched(true);
+            setBody(event.target.value);
+          }}
+        />
+        {errors.body ? (
+          <Text id="pg-body-error" margin="0" marginTop="1" fontSize="12px" color="red.fg">
+            {errors.body}
           </Text>
         ) : null}
-        {jsonOnly ? (
-          <Flex gap="2">
-            <Button type="button" variant="solid" colorPalette="gray" flex="1" height="44px" disabled={outcome.kind === "sending"} onClick={send}>
-              {outcome.kind === "sending" ? (
-                <>
-                  <Spinner size="sm" /> Sending...
-                </>
-              ) : (
-                "Send request"
-              )}
-            </Button>
+      </Box>
+    ) : null}
+
+    <Box>
+      {mutating ? (
+        <Text margin="0" marginBottom="2" fontSize="12px" color="fg.muted">
+          This sends a live request to {host}.
+        </Text>
+      ) : null}
+      {jsonOnly ? (
+        <Flex gap="2">
+          <Button type="button" variant="solid" colorPalette="gray" flex="1" height="44px" borderRadius="full" bg="fg" color="fg.inverted" _hover={{ bg: "fg", opacity: 0.9 }} disabled={outcome.kind === "sending"} onClick={send}>
             {outcome.kind === "sending" ? (
-              <Button type="button" variant="outline" colorPalette="gray" height="44px" onClick={() => controller.current?.abort("cancel")}>
-                Cancel
-              </Button>
-            ) : null}
-          </Flex>
-        ) : (
-          <Text margin="0" fontSize="13px" color="fg.muted">
-            This request cannot be sent from the browser. Run this request in your terminal.
-          </Text>
-        )}
-      </Box>
-
-      <Box>
-        <Text as="h3" margin="0" fontSize="13px" lineHeight="20px" fontWeight="600" marginBottom="2">
-          Request example
+              <>
+                <Spinner size="sm" /> Sending...
+              </>
+            ) : (
+              "Send request"
+            )}
+          </Button>
+          {outcome.kind === "sending" ? (
+            <Button type="button" variant="outline" colorPalette="gray" height="44px" onClick={() => controller.current?.abort("cancel")}>
+              Cancel
+            </Button>
+          ) : null}
+        </Flex>
+      ) : (
+        <Text margin="0" fontSize="13px" color="fg.muted">
+          This request cannot be sent from the browser. Run this request in your terminal.
         </Text>
-        <Tabs.Root value={languageLabel} onValueChange={({ value }) => writePreference({ key: "api-language", value })} variant="line" colorPalette="accent">
-          <CodeFrame>
-            <Flex alignItems="center" borderBottomWidth="1px" borderColor="border.nested" paddingX="2">
-              <Tabs.List css={{ ...readingTabList, flex: 1, minWidth: 0, borderBottomWidth: 0, boxShadow: "none" }}>
-                {EXAMPLE_LANGUAGES.map((entry) => (
-                  <Tabs.Trigger key={entry.id} value={entry.label} css={readingTabTrigger}>
-                    {entry.label}
-                  </Tabs.Trigger>
-                ))}
-              </Tabs.List>
-              <CopyAction code={examples[language].code} />
-            </Flex>
-            {EXAMPLE_LANGUAGES.map((entry) => (
-              <Tabs.Content key={entry.id} value={entry.label} padding="0" data-docs-panel="">
-                <CodeBody source={examples[entry.id]} expanded />
-              </Tabs.Content>
-            ))}
-          </CodeFrame>
-        </Tabs.Root>
-      </Box>
-
-      <Box aria-live="polite">
-        <Text as="h3" margin="0" fontSize="13px" lineHeight="20px" fontWeight="600" marginBottom="2">
-          Response
-        </Text>
-        <ResponseArea outcome={outcome} onRetry={send} curl={examples.curl.code} />
-      </Box>
-      <span className="docs-sr-only">{slug}</span>
+      )}
     </Box>
+
+          </Flex>
+        </Panel>
+      ) : null}
+
+      <Panel title="Request example" aside={<Text as="span" fontSize="12px" fontWeight="500" color="fg.muted">{operation.method}</Text>}>
+        <Tabs.Root value={languageLabel} onValueChange={({ value }) => writePreference({ key: "api-language", value })} variant="line" colorPalette="accent">
+          <Flex alignItems="center" borderBottomWidth="1px" borderColor="border.nested" paddingX="2">
+            <Tabs.List css={{ ...readingTabList, flex: 1, minWidth: 0, borderBottomWidth: 0, boxShadow: "none" }}>
+              {EXAMPLE_LANGUAGES.map((entry) => (
+                <Tabs.Trigger key={entry.id} value={entry.label} css={readingTabTrigger}>
+                  {entry.label}
+                </Tabs.Trigger>
+              ))}
+            </Tabs.List>
+            <CopyAction code={examples[language].code} />
+          </Flex>
+          {EXAMPLE_LANGUAGES.map((entry) => (
+            <Tabs.Content key={entry.id} value={entry.label} padding="0" data-docs-panel="" bg="bg.nested">
+              <CodeBody source={examples[entry.id]} expanded />
+            </Tabs.Content>
+          ))}
+        </Tabs.Root>
+      </Panel>
+
+      {statuses.length > 0 ? (
+        <Panel title="Documented response" aside={exampleCode ? <CopyAction code={exampleCode} label="Copy example" /> : undefined}>
+          <Tabs.Root value={status} onValueChange={({ value }) => setStatus(value)} variant="line" colorPalette="accent">
+            <Tabs.List aria-label="Response status" css={{ ...readingTabList, paddingInline: "8px", borderBottomWidth: "1px" }}>
+              {statuses.map((entry) => (
+                <Tabs.Trigger key={entry} value={entry} css={readingTabTrigger}>
+                  {entry}
+                </Tabs.Trigger>
+              ))}
+            </Tabs.List>
+          </Tabs.Root>
+          <Box paddingX="4" paddingTop="3" fontSize="12px" lineHeight="18px" color="fg.muted">
+            <Text margin="0">{chosen?.description}</Text>
+            {chosenContent ? (
+              <Text margin="0">
+                {exampleCode ? (declared !== undefined ? "Declared example" : "Example from schema") : "No example supplied"} · {chosenContent.type}
+              </Text>
+            ) : null}
+          </Box>
+          {exampleCode ? (
+            <Box marginTop="3" bg="bg.nested" borderTopWidth="1px" borderColor="border.nested">
+              <CodeBody source={plainSource({ code: exampleCode })} expanded={false} />
+            </Box>
+          ) : (
+            <Box height="3" />
+          )}
+        </Panel>
+      ) : null}
+      <Text margin="0" fontSize="12px" lineHeight="18px" color="fg.muted">
+        Examples are generated from the schema. These are not live responses.
+      </Text>
+
+      {outcome.kind !== "idle" ? (
+        <Panel title="Live response">
+          <Box padding="4" aria-live="polite">
+            <ResponseArea outcome={outcome} onRetry={send} curl={examples.curl.code} />
+          </Box>
+        </Panel>
+      ) : null}
+      <span className="docs-sr-only">{slug}</span>
+    </Flex>
   );
 }
 

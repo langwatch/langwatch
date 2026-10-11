@@ -1,22 +1,19 @@
 import { Box } from "@langwatch/design-system/primitives";
-import type { ReactNode } from "react";
+import { GROUND_HEIGHT } from "./layout.ts";
 import "../../../../packages/design-system/src/components/brand/ambient-ground.css";
 
 /**
- * The design system's ambient ground in static, quiet form: its CSS floor and protection, no shader.
- * To move into AmbientGround as `motion="static"` and `intensity="quiet"`.
+ * The design system's ambient ground at the top of the page: its static CSS floor, no shader,
+ * fading into the surface. To move into AmbientGround as `motion="static"` with a page-top height.
  */
-export function StaticGround({ children }: { children: ReactNode }) {
+export function PageGround() {
   return (
-    <Box position="relative" isolation="isolate" overflow="clip">
-      <div className="lw-ambient-ground docs-ground" aria-hidden="true">
+    <Box position="absolute" top="0" left="0" right="0" height={GROUND_HEIGHT} pointerEvents="none" aria-hidden="true" zIndex="0">
+      <div className="lw-ambient-ground docs-ground">
         <div className="lw-ambient-ground-static" />
-        <div className="lw-ambient-ground-protect docs-ground-protect" />
+        <div className="lw-ambient-ground-static docs-ground-boost" />
         <div className="docs-ground-cover" />
       </div>
-      <Box position="relative" zIndex={1}>
-        {children}
-      </Box>
     </Box>
   );
 }

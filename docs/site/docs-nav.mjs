@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parse } from "yaml";
 
@@ -111,8 +111,13 @@ export function buildNav({ docsRoot }) {
     const children = [...(anchor.groups ?? []), ...(anchor.pages ?? [])]
       .map((item) => buildItem({ item, docsRoot, pages }))
       .filter(Boolean);
-    return { title: String(anchor.anchor), children };
+    return { title: String(anchor.anchor), icon: String(anchor.icon ?? ""), children };
   });
+  const support = (config.navigation?.global?.anchors ?? []).map((anchor) => ({
+    title: String(anchor.anchor),
+    icon: String(anchor.icon ?? ""),
+    href: String(anchor.href ?? ""),
+  }));
   const apiIndex = anchors.findIndex((anchor) => anchor.title === "API Reference");
   if (apiIndex >= 0) anchors[apiIndex] = apiAnchor({ anchor: anchors[apiIndex], docsRoot, pages });
   const banner = config.banner?.content ? { content: String(config.banner.content), dismissible: config.banner.dismissible !== false } : null;
@@ -123,14 +128,44 @@ export function buildNav({ docsRoot }) {
     searchPrompt: String(config.search?.prompt ?? "Search the LangWatch docs"),
     signIn: String(links.find((link) => /sign ?in/i.test(link.label))?.href ?? "https://app.langwatch.ai"),
     github: String(config.navbar?.primary?.href ?? "https://github.com/langwatch/langwatch"),
+    llms: String(links.find((link) => /llms/i.test(link.label))?.href ?? "https://docs.langwatch.ai/llms.txt"),
+    stars: null,
     notFound: { title: String(config.errors?.["404"]?.title ?? "Page not found"), description: String(config.errors?.["404"]?.description ?? "") },
   };
-  return { anchors, pages, site };
+  return { anchors, support, pages, site };
 }
 
 export function openapiPages({ docsRoot }) {
   const { pages } = buildNav({ docsRoot });
   return Object.fromEntries(Object.entries(pages).filter(([, meta]) => meta.openapi).map(([slug, meta]) => [slug, meta.openapi]));
+}
+
+const STARS_URL = "https://api.github.com/repos/langwatch/langwatch";
+
+/** The public star count at build time; the last known value is kept when GitHub cannot be reached. */
+let starsRead;
+function readStars({ docsRoot }) {
+  starsRead ??= fetchStars({ docsRoot });
+  return starsRead;
+}
+
+async function fetchStars({ docsRoot }) {
+  const cacheDir = path.join(docsRoot, "site/node_modules/.cache/docs-site");
+  const cacheFile = path.join(cacheDir, "stars.json");
+  try {
+    const response = await fetch(STARS_URL, { signal: AbortSignal.timeout(4000), headers: { accept: "application/vnd.github+json" } });
+    const count = (await response.json()).stargazers_count;
+    if (response.ok && Number.isInteger(count)) {
+      mkdirSync(cacheDir, { recursive: true });
+      writeFileSync(cacheFile, JSON.stringify({ count }));
+      return count;
+    }
+  } catch {}
+  try {
+    return JSON.parse(readFileSync(cacheFile, "utf8")).count ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function docsNavPlugin({ docsRoot }) {
@@ -139,10 +174,12 @@ export function docsNavPlugin({ docsRoot }) {
     resolveId(id) {
       return id === VIRTUAL_ID ? RESOLVED_ID : null;
     },
-    load(id) {
+    async load(id) {
       if (id !== RESOLVED_ID) return null;
       this.addWatchFile(path.join(docsRoot, "docs.json"));
-      return `export default ${JSON.stringify(buildNav({ docsRoot }))};`;
+      const nav = buildNav({ docsRoot });
+      nav.site.stars = await readStars({ docsRoot });
+      return `export default ${JSON.stringify(nav)};`;
     },
   };
 }

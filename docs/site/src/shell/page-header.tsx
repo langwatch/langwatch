@@ -71,6 +71,25 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
   );
 }
 
+function Breadcrumb({ trail }: { trail: string[] }) {
+  return (
+    <Text as="nav" aria-label="Breadcrumb" fontSize="12px" lineHeight="16px" color="fg.muted" margin="0">
+      {trail.map((part, index) => (
+        <span key={`${part}-${index}`}>
+          {index > 0 ? (
+            <Box as="span" aria-hidden="true" paddingX="2">
+              /
+            </Box>
+          ) : null}
+          <Box as="span" color={index > 0 && index === trail.length - 1 ? "accent.fg" : undefined} fontWeight={index > 0 && index === trail.length - 1 ? "500" : undefined}>
+            {part}
+          </Box>
+        </span>
+      ))}
+    </Text>
+  );
+}
+
 export function PageHeader({
   slug,
   title,
@@ -84,37 +103,46 @@ export function PageHeader({
   breadcrumb: string[];
   kind: PageKind;
 }) {
-  const home = kind === "home";
+  const endpoint = kind === "endpoint";
   return (
-    <Box paddingTop={{ base: "8", xl: "12" }} paddingBottom={home ? { base: "6", md: "8" } : "0"}>
-      <Flex alignItems="center" justifyContent="space-between" gap="4" wrap="wrap" marginBottom="3">
-        <Text as="nav" aria-label="Breadcrumb" fontSize="13px" lineHeight="20px" color="fg.muted" margin="0">
-          {breadcrumb.join(" / ")}
-        </Text>
-        <Box display={{ base: "none", xl: "block" }}>
+    <Box paddingTop={{ base: "6", xl: "12" }} paddingBottom={endpoint ? "0" : { base: "6", md: "8" }}>
+      <Box className={endpoint ? undefined : "docs-glass-card"}>
+        <Flex alignItems="center" justifyContent="space-between" gap="4" wrap="wrap" marginBottom="3" position="relative">
+          <Breadcrumb trail={breadcrumb} />
+          <Box display={{ base: "none", xl: "block" }}>
+            <CopyPageMenu slug={slug} title={title} />
+          </Box>
+        </Flex>
+        <Heading
+          as="h1"
+          margin="0"
+          position="relative"
+          fontFamily={endpoint ? "heading" : "display"}
+          fontWeight={endpoint ? "600" : "400"}
+          fontSize={endpoint ? { base: "30px", md: "36px" } : { base: "36px", md: "48px" }}
+          lineHeight={endpoint ? { base: "38px", md: "44px" } : { base: "44px", md: "60px" }}
+          letterSpacing="-0.025em"
+          maxWidth={kind === "home" ? "24ch" : undefined}
+          textWrap="balance"
+        >
+          {title}
+        </Heading>
+        {description ? (
+          <Text
+            marginTop="4"
+            marginBottom="0"
+            position="relative"
+            fontSize={endpoint ? "18px" : { base: "18px", md: "20px" }}
+            lineHeight={endpoint ? "28px" : { base: "28px", md: "30px" }}
+            color="fg.muted"
+            maxWidth="60ch"
+          >
+            {description}
+          </Text>
+        ) : null}
+        <Box display={{ base: "block", xl: "none" }} marginTop="6" position="relative">
           <CopyPageMenu slug={slug} title={title} />
         </Box>
-      </Flex>
-      <Heading
-        as="h1"
-        margin="0"
-        fontFamily={home ? "display" : "heading"}
-        fontWeight={home ? "400" : "600"}
-        fontSize={home ? { base: "36px", md: "48px" } : { base: "30px", md: "36px" }}
-        lineHeight={home ? { base: "44px", md: "56px" } : { base: "38px", md: "44px" }}
-        letterSpacing="-0.02em"
-        maxWidth={home ? "24ch" : undefined}
-        textWrap="balance"
-      >
-        {title}
-      </Heading>
-      {description ? (
-        <Text marginTop="4" marginBottom="0" fontSize="18px" lineHeight="28px" color="fg.muted" maxWidth="60ch">
-          {description}
-        </Text>
-      ) : null}
-      <Box display={{ base: "block", xl: "none" }} marginTop="6">
-        <CopyPageMenu slug={slug} title={title} />
       </Box>
     </Box>
   );

@@ -1,33 +1,44 @@
-import { Alert } from "@langwatch/design-system/primitives";
+import { Box, Flex } from "@langwatch/design-system/primitives";
 import { CircleCheck, Info as InfoGlyph, Lightbulb, StickyNote, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
-type Kind = { heading: string; status: "neutral" | "info" | "success" | "warning"; glyph: typeof InfoGlyph };
+type Kind = { heading: string; rule: string; glyph: typeof InfoGlyph; visibleLabel?: boolean };
 
 const KINDS = {
-  note: { heading: "Note", status: "neutral", glyph: StickyNote },
-  info: { heading: "Info", status: "info", glyph: InfoGlyph },
-  tip: { heading: "Tip", status: "success", glyph: Lightbulb },
-  warning: { heading: "Warning", status: "warning", glyph: TriangleAlert },
-  check: { heading: "Check", status: "success", glyph: CircleCheck },
+  note: { heading: "Note", rule: "border.emphasized", glyph: StickyNote },
+  info: { heading: "Info", rule: "blue.fg", glyph: InfoGlyph },
+  tip: { heading: "Tip", rule: "green.fg", glyph: Lightbulb },
+  warning: { heading: "Warning", rule: "yellow.fg", glyph: TriangleAlert, visibleLabel: true },
+  check: { heading: "Check", rule: "green.fg", glyph: CircleCheck },
 } satisfies Record<string, Kind>;
 
+/** A quiet callout: a left rule, a status glyph and the article's own reading body. */
 function Callout({ kind, children }: { kind: keyof typeof KINDS; children?: ReactNode }) {
-  const { heading, status, glyph: Glyph } = KINDS[kind];
+  const { heading, rule, glyph: Glyph, visibleLabel } = KINDS[kind] as Kind;
   return (
-    <Alert.Root status={status} variant="outline" size="lg" role="note" marginY="6" alignItems="flex-start">
-      <Alert.Indicator>
-        <Glyph size={18} aria-hidden="true" />
-      </Alert.Indicator>
-      <Alert.Content minWidth="0" color="fg" fontSize="16px" lineHeight="28px" className="docs-callout">
-        <Alert.Title fontSize="14px" lineHeight="24px" fontWeight="600">
+    <Flex
+      role="note"
+      className="docs-callout"
+      gap="3"
+      alignItems="flex-start"
+      marginY="6"
+      paddingY="1"
+      paddingInlineStart="4"
+      borderInlineStartWidth="2px"
+      borderInlineStartColor={rule}
+      color="fg"
+    >
+      <Box as="span" color={rule === "border.emphasized" ? "fg.muted" : rule} marginTop="1" flexShrink={0} display="inline-flex">
+        <Glyph size={20} aria-hidden="true" />
+      </Box>
+      <Box minWidth="0" flex="1">
+        <Box as="span" className={visibleLabel ? undefined : "docs-sr-only"} display={visibleLabel ? "block" : undefined} fontFamily="body" fontSize="14px" lineHeight="20px" fontWeight="600" css={{ color: "inherit" }}>
           {heading}
-        </Alert.Title>
-        <Alert.Description asChild>
-          <div>{children}</div>
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+          {visibleLabel ? null : ": "}
+        </Box>
+        <div>{children}</div>
+      </Box>
+    </Flex>
   );
 }
 

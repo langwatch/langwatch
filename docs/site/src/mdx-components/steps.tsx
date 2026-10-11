@@ -11,31 +11,33 @@ const STEPS_CSS = {
     position: "relative",
     counterIncrement: "docs-step",
     paddingInlineStart: "11",
-    paddingBottom: "6",
+    paddingBottom: "8",
     margin: "0",
     "&::before": {
       content: "counter(docs-step)",
       position: "absolute",
       insetInlineStart: "0",
-      top: "0",
+      top: "21px",
       width: "28px",
       height: "28px",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       borderRadius: "full",
-      bg: "bg.muted",
+      bg: "bg.surface",
       color: "fg",
       borderWidth: "1px",
       borderColor: "border",
-      fontSize: "13px",
+      fontFamily: "body",
+      fontSize: "14px",
+      lineHeight: "20px",
       fontWeight: "600",
     },
     "&:not(:last-of-type)::after": {
       content: '""',
       position: "absolute",
       insetInlineStart: "13.5px",
-      top: "36px",
+      top: "57px",
       bottom: "8px",
       width: "1px",
       bg: "border.muted",
@@ -63,11 +65,14 @@ export function Step({ title, icon, id, children }: { title?: string; icon?: str
           alignItems="center"
           gap="2"
           margin="0"
-          marginBottom="2"
-          fontSize="18px"
-          lineHeight="28px"
-          fontWeight="600"
-          fontFamily="heading"
+          marginBottom="3"
+          paddingTop="5"
+          borderTopWidth="1px"
+          borderColor="border.muted"
+          fontSize="var(--docs-h3-size)"
+          lineHeight="var(--docs-h3-line)"
+          fontWeight="var(--docs-weight-heading)"
+          fontFamily="var(--docs-font-heading)"
         >
           {icon ? <Icon icon={icon} size={18} /> : null}
           {title}

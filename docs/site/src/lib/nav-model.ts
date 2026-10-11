@@ -6,6 +6,7 @@ export type Section = (typeof nav.anchors)[number];
 
 export const sections = nav.anchors;
 export const site = nav.site;
+export const support = nav.support;
 
 export function flatPages({ items }: { items: NavItem[] }): { slug: string; title: string }[] {
   return items.flatMap((item) => (item.type === "page" ? [{ slug: item.slug, title: item.title }] : flatPages({ items: item.children })));

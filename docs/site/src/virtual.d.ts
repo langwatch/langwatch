@@ -16,10 +16,13 @@ declare module "virtual:docs-nav" {
     searchPrompt: string;
     signIn: string;
     github: string;
+    llms: string;
+    stars: number | null;
     notFound: { title: string; description: string };
   };
   const nav: {
-    anchors: { title: string; children: NavItem[] }[];
+    anchors: { title: string; icon: string; children: NavItem[] }[];
+    support: { title: string; icon: string; href: string }[];
     pages: Record<string, PageMeta>;
     site: SiteMeta;
   };

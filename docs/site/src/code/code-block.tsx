@@ -3,6 +3,8 @@ import { useState } from "react";
 import { CodeBody, CopyAction, ExpandControl, sourceFromProps } from "./code-parts.tsx";
 import { languageName } from "./languages.ts";
 
+const TERMINAL_LANGUAGES = ["bash", "sh", "shell", "zsh", "console", "terminal", "shellscript"];
+
 export function CodeFrame({ children }: { children: React.ReactNode }) {
   return (
     <Box
@@ -22,7 +24,7 @@ export function CodeFrame({ children }: { children: React.ReactNode }) {
 
 export function CodeBar({ children }: { children: React.ReactNode }) {
   return (
-    <Flex alignItems="center" gap="2" minHeight="44px" paddingX="3" borderBottomWidth="1px" borderColor="border.nested">
+    <Flex alignItems="center" gap="2" minHeight="44px" paddingX="3" bg="bg.subtle" borderBottomWidth="1px" borderColor="border.nested">
       {children}
     </Flex>
   );
@@ -33,10 +35,12 @@ export function DocsCodeBlock(props: Record<string, unknown>) {
   const source = sourceFromProps(props);
   const [expanded, setExpanded] = useState(false);
   if (source.lang === "mermaid") return <DocsMermaid {...props} />;
-  const title = source.title || languageName({ lang: source.lang });
+  const terminal = TERMINAL_LANGUAGES.includes(source.lang.toLowerCase());
+  const title = source.title || (terminal ? "Terminal" : languageName({ lang: source.lang }));
   return (
     <CodeFrame>
       <CodeBar>
+        {terminal ? <span className="docs-terminal-dots" aria-hidden="true"><i /><i /><i /></span> : null}
         <Text as="span" flex="1" minWidth="0" fontSize="12px" lineHeight="20px" color="fg.muted" fontFamily={source.title ? "mono" : "body"}>
           {title}
         </Text>

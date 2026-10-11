@@ -7,7 +7,7 @@
 }
 
 html {
-  scroll-padding-top: calc(var(--docs-header-h, 108px) + 1.5rem);
+  scroll-padding-top: calc(var(--docs-header-h, 64px) + 1.5rem);
 }
 
 body {
@@ -45,7 +45,7 @@ body {
 }
 
 [id] {
-  scroll-margin-top: calc(var(--docs-header-h, 108px) + 1.5rem);
+  scroll-margin-top: calc(var(--docs-header-h, 64px) + 1.5rem);
 }
 
 .docs-light-only {
@@ -61,7 +61,7 @@ body {
   display: block;
 }
 
-/* Article typography: body 16/28, headings per DESIGN.md section 5. */
+/* Article typography: sizes come from the type region's variables (DESIGN.md section 5). */
 .docs-prose {
   font-size: var(--docs-body-size, 16px);
   line-height: var(--docs-body-line, 28px);
@@ -73,13 +73,13 @@ body {
 }
 .docs-prose p {
   margin: 0 0 16px;
-  max-width: 72ch;
+  max-width: 68ch;
 }
 .docs-prose ul,
 .docs-prose ol {
   margin: 16px 0;
   padding-inline-start: 24px;
-  max-width: 72ch;
+  max-width: 68ch;
 }
 .docs-prose li {
   margin: 0 0 8px;
@@ -113,6 +113,14 @@ body {
   font-size: var(--docs-h2-size, 24px);
   line-height: var(--docs-h2-line, 32px);
 }
+[data-type-mode="expressive"] > h2.docs-heading {
+  padding-top: 20px;
+  border-top: 1px solid var(--chakra-colors-border-muted);
+}
+[data-type-mode="expressive"] > h2.docs-heading:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
 .docs-prose h3.docs-heading {
   margin: 32px 0 12px;
   font-size: var(--docs-h3-size, 20px);
@@ -122,8 +130,8 @@ body {
 .docs-prose h5.docs-heading,
 .docs-prose h6.docs-heading {
   margin: 24px 0 8px;
-  font-size: 16px;
-  line-height: 24px;
+  font-size: calc(var(--docs-body-size, 16px) + 2px);
+  line-height: calc(var(--docs-body-line, 28px) - 1px);
 }
 .docs-heading + .docs-heading {
   margin-top: 12px;
@@ -224,24 +232,70 @@ body {
   user-select: none;
 }
 
-/* The static home ground: the design system's floor, quieter, with a fade into the page. */
+/* The page-top ground: the design system's floor, boosted a little, fading into the surface. */
 .docs-ground {
-  opacity: 0.6;
+  opacity: 0.9;
 }
 .dark .docs-ground {
-  opacity: 0.45;
+  opacity: 0.85;
 }
-.docs-ground-protect {
-  background: radial-gradient(
-    circle 50vw at 20% 45%,
-    var(--chakra-colors-bg-surface) 0%,
-    var(--chakra-colors-bg-surface) 26%,
-    color-mix(in srgb, var(--chakra-colors-bg-surface) 68%, transparent) 54%,
-    transparent 90%
-  );
+.dark .docs-ground-boost {
+  display: none;
 }
 .docs-ground-cover {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent 65%, var(--chakra-colors-bg-surface) 100%);
+  background: linear-gradient(to bottom, transparent 40%, var(--chakra-colors-bg-surface) 100%);
+}
+
+/* The glass page-header card: a translucent surface over the ground, with a faint grid at one edge. */
+.docs-glass-card {
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-2xl);
+  background: color-mix(in srgb, var(--chakra-colors-bg-surface) 70%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.docs-glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  background-image:
+    linear-gradient(var(--chakra-colors-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--chakra-colors-border) 1px, transparent 1px);
+  background-size: 48px 48px;
+  -webkit-mask-image: linear-gradient(to left, black, transparent 75%);
+  mask-image: linear-gradient(to left, black, transparent 75%);
+}
+@media (min-width: 48rem) {
+  .docs-glass-card {
+    padding: 30px 28px;
+    margin-inline: -28px;
+  }
+}
+@media (forced-colors: active), (prefers-reduced-transparency: reduce) {
+  .docs-glass-card {
+    background: var(--chakra-colors-bg-surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Terminal windows: three dots before the title of a shell block. */
+.docs-terminal-dots {
+  display: inline-flex;
+  gap: 6px;
+  margin-inline-end: 4px;
+}
+.docs-terminal-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chakra-colors-fg-subtle);
+  opacity: 0.6;
 }

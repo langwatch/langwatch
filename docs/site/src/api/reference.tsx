@@ -1,10 +1,7 @@
 import { TypeRegion } from "../lib/type-mode.tsx";
-import { Box, Flex, Tabs, Text } from "@langwatch/design-system/primitives";
-import { useState } from "react";
-import { CodeFrame } from "../code/code-block.tsx";
-import { CodeBody } from "../code/code-parts.tsx";
-import type { CodeSource } from "../code/code-parts.tsx";
-import { exampleFromSchema } from "./codegen.ts";
+import { Box, Button, Flex, Tabs, Text } from "@langwatch/design-system/primitives";
+import { Play } from "lucide-react";
+import { useEndpointState } from "./endpoint-state.tsx";
 import { MethodBadge } from "./method-badge.tsx";
 import type { Operation } from "./operation.ts";
 import { ParameterFields, SchemaFields, SchemaNote } from "./schema.tsx";
@@ -13,7 +10,7 @@ import { readingTabList, readingTabTrigger } from "../mdx-components/tabs.tsx";
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Box as="section" marginTop="10">
-      <Text as="h2" margin="0" paddingBottom="2" fontSize="var(--docs-h2-size)" lineHeight="var(--docs-h2-line)" fontWeight="var(--docs-weight-heading)" fontFamily="var(--docs-font-heading)" borderBottomWidth="1px" borderColor="border.muted">
+      <Text as="h2" margin="0" paddingBottom="3" fontSize="var(--docs-h2-size)" lineHeight="var(--docs-h2-line)" fontWeight="var(--docs-weight-heading)" fontFamily="var(--docs-font-heading)" letterSpacing="var(--docs-heading-tracking)" borderBottomWidth="1px" borderColor="border.muted">
         {title}
       </Text>
       {children}
@@ -22,37 +19,49 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function EndpointSummary({ operation }: { operation: Operation }) {
+  const { tryOpen, setTryOpen } = useEndpointState();
   return (
-    <Flex alignItems="center" gap="3" wrap="wrap" marginTop="6">
+    <Flex
+      alignItems="center"
+      gap="3"
+      wrap="wrap"
+      marginTop="6"
+      padding="2"
+      paddingInlineStart="3"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="xl"
+      bg="bg.panel"
+    >
       <MethodBadge method={operation.method} />
-      <Box as="code" fontFamily="mono" fontSize="14px" lineHeight="24px" overflowWrap="anywhere" wordBreak="break-word" css={{ userSelect: "all" }}>
+      <Box as="code" flex="1" minWidth="0" fontFamily="mono" fontSize="13px" lineHeight="20px" overflowWrap="anywhere" wordBreak="break-word" css={{ userSelect: "all" }}>
         {operation.path}
       </Box>
+      <Button
+        id="try-it-button"
+        type="button"
+        aria-expanded={tryOpen}
+        aria-controls="try-it-form"
+        onClick={() => setTryOpen(!tryOpen)}
+        height="40px"
+        paddingX="4"
+        borderRadius="full"
+        bg="fg"
+        color="fg.inverted"
+        fontWeight="500"
+        fontSize="13px"
+        _hover={{ bg: "fg", opacity: 0.9 }}
+        width={{ base: "100%", md: "auto" }}
+      >
+        Try it <Play size={12} aria-hidden="true" />
+      </Button>
     </Flex>
   );
 }
 
-function ResponseExample({ source }: { source: CodeSource }) {
-  return (
-    <Box marginTop="3">
-      <Text margin="0" marginBottom="1" fontSize="12px" color="fg.muted">
-        Example from schema
-      </Text>
-      <CodeFrame>
-        <CodeBody source={source} expanded={false} />
-      </CodeFrame>
-    </Box>
-  );
-}
-
-function plain({ code }: { code: string }): CodeSource {
-  return { lang: "json", title: "Example", code, lines: code.split("\n").map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;")), highlight: [], numbered: false };
-}
-
 export function Responses({ operation }: { operation: Operation }) {
   const statuses = operation.responses.map((response) => response.status);
-  const first = statuses.find((status) => status.startsWith("2")) ?? statuses[0] ?? "";
-  const [active, setActive] = useState(first);
+  const { status: active, setStatus: setActive } = useEndpointState();
   if (statuses.length === 0) return null;
   return (
     <Section title="Responses">
@@ -66,7 +75,6 @@ export function Responses({ operation }: { operation: Operation }) {
         </Tabs.List>
         {operation.responses.map((response) => {
           const content = response.contents[0];
-          const example = content?.example ?? (content?.schema && Object.keys(content.schema.properties ?? {}).length > 0 ? exampleFromSchema({ schema: content.schema }) : undefined);
           return (
             <Tabs.Content key={response.status} value={response.status} paddingX="0" paddingTop="4" data-docs-panel="">
               <Text margin="0" fontSize="16px" lineHeight="28px">
@@ -79,9 +87,6 @@ export function Responses({ operation }: { operation: Operation }) {
                 ) : (
                   <SchemaNote schema={content.schema} />
                 )
-              ) : null}
-              {example !== undefined && content?.schema && Object.keys(content.schema.properties ?? {}).length > 0 ? (
-                <ResponseExample source={plain({ code: JSON.stringify(example, null, 2) })} />
               ) : null}
             </Tabs.Content>
           );

@@ -51,7 +51,11 @@ export function Card({ title, description, icon, href, horizontal, arrow, childr
       minWidth="0"
       css={href ? { "&:hover": { borderColor: "border.emphasized" } } : undefined}
     >
-      {icon ? <Icon icon={icon} size={20} /> : null}
+      {icon ? (
+        <Flex alignItems="center" justifyContent="center" flexShrink={0} width="2rem" height="2rem" borderRadius="lg" bg="bg.subtle">
+          <Icon icon={icon} size={20} />
+        </Flex>
+      ) : null}
       <Flex direction="column" gap="1" minWidth="0" flex="1">
         {title ? (
           href ? (

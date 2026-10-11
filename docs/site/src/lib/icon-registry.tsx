@@ -6,7 +6,7 @@ import {
   Link2, List, ListChecks, ListTodo, Lock, Mail, MessagesSquare, Mic, Network, Pencil, Play, Plug, Puzzle,
   ReceiptText, RefreshCw, Rocket, Route, Scale, ScrollText, Settings, Shield, ShieldHalf, Ship,
   SlidersHorizontal, SquareCheck, Table, TableProperties, Tags, Telescope, Terminal, TrendingUp,
-  TriangleAlert, Undo2, User, UserCheck, Users, Wallet, WandSparkles, Workflow, Wrench, Zap,
+  TriangleAlert, Undo2, LifeBuoy, ShieldCheck, Server, SquareTerminal, User, UserCheck, Users, Wallet, WandSparkles, Workflow, Wrench, Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -29,6 +29,7 @@ export const ICONS: Record<string, LucideIcon> = {
   "shield-halved": ShieldHalf, ship: Ship, sliders: SlidersHorizontal, "square-check": SquareCheck, "square-js": Braces,
   table: Table, "table-list": TableProperties, tags: Tags, telescope: Telescope, terminal: Terminal,
   "triangle-exclamation": TriangleAlert, user: User, "user-shield": UserCheck, users: Users, wallet: Wallet,
+  "book-open": BookOpen, "life-ring": LifeBuoy, "shield-check": ShieldCheck, server: Server, "square-terminal": SquareTerminal,
   "wand-magic-sparkles": WandSparkles, window: AppWindow, wrench: Wrench, dharmachakra: Ship,
 };
 export const GenericIcon = FileText;

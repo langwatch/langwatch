@@ -2,6 +2,7 @@ import { MDXProvider } from "@mdx-js/react";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { Box, Heading, Link, Text } from "@langwatch/design-system/primitives";
 import nav from "virtual:docs-nav";
+import { EndpointStateProvider } from "./api/endpoint-state.tsx";
 import { EndpointReference, EndpointSummary } from "./api/reference.tsx";
 import type { HighlightedExamples, Operation } from "./api/operation.ts";
 import { Playground } from "./api/playground.tsx";
@@ -27,6 +28,7 @@ export function App({ slug, page, operation, examples }: AppProps) {
       <MDXProvider components={mdxComponents}>
         {Content && meta ? (
           operation ? (
+            <EndpointStateProvider operation={operation}>
             <DocsShell
               slug={slug}
               kind="endpoint"
@@ -47,6 +49,7 @@ export function App({ slug, page, operation, examples }: AppProps) {
                 ),
               }}
             />
+            </EndpointStateProvider>
           ) : (
             <DocsShell slug={slug} kind={slug === "introduction" ? "home" : "guide"} title={meta.title} description={meta.description} toc={toc}>
               <Content />
