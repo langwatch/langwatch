@@ -317,13 +317,38 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     // resolves a predecessor within the hour.
     expect(bucketParams).toHaveLength(2);
     expect(Object.keys(bucketParams[0] ?? {}).toSorted()).toEqual(
-      ["bucketMs", "from0", "lookbackFromMs", "lookbackToMs", "series0", "tenantId"].toSorted(),
+      ["bucketMs", "from0", "lookbackMs", "series0", "tenantId", "to0"].toSorted(),
     );
-    // The bucket end and both lookback bounds are the same arithmetic on
-    // either side of the wire, so they travel once as shared scalars.
+    // The bucket end and the lookback are the same arithmetic on either side
+    // of the wire, so they travel once as shared scalars.
     expect(bucketParams[0]?.bucketMs).toBe(METRIC_ROLLUP_INTERVAL_MS);
-    expect(bucketParams[0]?.lookbackFromMs).toBe(60 * 60 * 1000);
-    expect(bucketParams[0]?.lookbackToMs).toBe(0);
+    expect(bucketParams[0]?.lookbackMs).toBe(60 * 60 * 1000);
+  });
+
+  it("reads a run of adjacent buckets as one key range in one statement", async () => {
+    const reads: { sql: string; params: Record<string, unknown> }[] = [];
+    const query: MetricClickHouseClient["query"] = async (request) => {
+      if (!isSuccessorRead(request.query)) {
+        reads.push({ sql: request.query, params: request.query_params ?? {} });
+      }
+      return response([]);
+    };
+    const points = Array.from({ length: 31 }, (_, index) =>
+      pointAt({
+        pointId: `${index}`.padStart(64, "0"),
+        timeUnixMs: base + index * METRIC_ROLLUP_INTERVAL_MS,
+      }),
+    );
+
+    await repository(client({ query })).recomputeAffectedRollupsMany({ points });
+
+    // T6-F2: a UNION ALL of a FINAL seek per bucket ran ~1 GiB per statement.
+    const near = reads[0]!;
+    expect(near.sql).not.toContain("UNION ALL");
+    expect(near.sql.match(/FINAL/g)).toHaveLength(1);
+    expect(near.params.from0).toBe(base);
+    expect(near.params.to0).toBe(base + 30 * METRIC_ROLLUP_INTERVAL_MS);
+    expect(near.params).not.toHaveProperty("series1");
   });
 
   /** @scenario "A rollup bucket read asks only for the columns a rollup uses" */
@@ -406,9 +431,8 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     // The two windows abut and do not overlap, so together they are the one
     // retention-wide window this replaced: no row is read twice and none is
     // missed.
-    expect(near!.params.lookbackToMs).toBe(0);
-    expect(near!.params.lookbackFromMs).toBe(60 * 60 * 1000);
-    expect(far!.params.lookbackToMs).toBe(near!.params.lookbackFromMs);
+    expect(near!.params.lookbackMs).toBe(60 * 60 * 1000);
+    expect(far!.params.lookbackToMs).toBe(near!.params.lookbackMs);
     expect(far!.params.lookbackFromMs).toBe(49 * 24 * 60 * 60 * 1000);
     // The far pass is only ever looking for a predecessor: the bucket's own
     // rows came back in the near pass, and asking again would double the

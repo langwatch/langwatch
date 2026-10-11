@@ -13,6 +13,12 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 import {
+  type BucketReadRange,
+  type BucketSeek,
+  bucketReadRanges,
+  pointsForBucketSeeks,
+} from "../../rules/metric-rollup-bucket-reads.rules.ts";
+import {
   MetricDataPointAppendRepository,
   type MetricDataPointBulkWrite,
   type MetricDataPointWrite,
@@ -379,14 +385,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     // retention does and the far pass has nothing left to cover.
     const nearMs = Math.min(PREDECESSOR_LOOKBACK_MS, retentionMs);
 
-    await this.readAffectedBuckets({
-      client,
-      tenantId,
-      seeks,
-      unique,
-      predecessor: { fromMs: nearMs, toMs: 0 },
-      shouldReadBucketRows: true,
-    });
+    await this.readBucketRanges({ client, tenantId, seeks, unique, lookbackMs: nearMs });
 
     const unresolved =
       nearMs >= retentionMs
@@ -397,13 +396,12 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
             lookbackMs: nearMs,
           });
     if (unresolved.length > 0) {
-      await this.readAffectedBuckets({
+      await this.readFarPredecessors({
         client,
         tenantId,
         seeks: unresolved,
         unique,
         predecessor: { fromMs: retentionMs, toMs: nearMs },
-        shouldReadBucketRows: false,
       });
     }
 
@@ -416,65 +414,160 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * One pass of the affected-bucket read, collecting into `unique`. `predecessor` is the
-   * half-open window behind each bucket start the reverse seek may look in, as distances rather
-   * than instants so both bounds stay shared scalars however many buckets the chunk holds.
+   * The near pass: each series' affected buckets as merged key ranges in one FINAL statement,
+   * so the server reads each row once; the per-bucket predecessor and bucket rows are picked
+   * here. Rows read stay within what a seek per bucket scanned (T6-F2).
    */
-  private async readAffectedBuckets({
+  private async readBucketRanges({
+    client,
+    tenantId,
+    seeks,
+    unique,
+    lookbackMs,
+  }: {
+    client: MetricClickHouseClient;
+    tenantId: string;
+    seeks: readonly BucketSeek[];
+    unique: Map<string, MetricRollupSourcePoint>;
+    lookbackMs: number;
+  }): Promise<void> {
+    for (const ranges of ClickHouseMetricDataPointAppendRepository.bucketRangeChunks({
+      tenantId,
+      lookbackMs,
+      ranges: bucketReadRanges({ seeks, lookbackMs }),
+    })) {
+      const result = await client.query({
+        query: ClickHouseMetricDataPointAppendRepository.bucketRangeQuery(ranges.length),
+        query_params: ClickHouseMetricDataPointAppendRepository.bucketRangeParams({
+          tenantId,
+          lookbackMs,
+          ranges,
+        }),
+        format: "JSONEachRow",
+      });
+      for (const point of pointsForBucketSeeks({
+        seeks: seeks.filter((seek) =>
+          ranges.some(
+            (range) =>
+              range.seriesId === seek.seriesId &&
+              range.from <= seek.start &&
+              seek.start <= range.to,
+          ),
+        ),
+        points: (await result.json<RollupSourceRow>()).map(metricRollupSourceFromRow),
+        lookbackMs,
+      })) {
+        unique.set(`${point.seriesId}\u0000${point.pointId}`, point);
+      }
+    }
+  }
+
+  /** One OR'd key-range predicate per range, so the primary key prunes to exactly those ranges. */
+  private static bucketRangeQuery(rangeCount: number): string {
+    const ranges = Array.from(
+      { length: rangeCount },
+      (_, index) => `(SeriesId = {series${index}:String}
+          AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackMs:Int64})
+          AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({to${index}:Int64} + {bucketMs:Int64}))`,
+    );
+    return `SELECT ${ROLLUP_SELECT}
+      FROM metric_data_points FINAL
+      WHERE TenantId = {tenantId:String}
+        AND (${ranges.join("\n        OR ")})`;
+  }
+
+  private static bucketRangeParams({
+    tenantId,
+    lookbackMs,
+    ranges,
+  }: {
+    tenantId: string;
+    lookbackMs: number;
+    ranges: readonly BucketReadRange[];
+  }): Record<string, unknown> {
+    const params: Record<string, unknown> = {
+      tenantId,
+      bucketMs: METRIC_ROLLUP_INTERVAL_MS,
+      lookbackMs,
+    };
+    ranges.forEach(({ seriesId, from, to }, index) => {
+      params[`series${index}`] = seriesId;
+      params[`from${index}`] = from;
+      params[`to${index}`] = to;
+    });
+    return params;
+  }
+
+  /** Splits ranges by encoded parameter bytes first, half of {@link SEEKS_PER_QUERY} as the cap. */
+  private static bucketRangeChunks({
+    tenantId,
+    lookbackMs,
+    ranges,
+  }: {
+    tenantId: string;
+    lookbackMs: number;
+    ranges: readonly BucketReadRange[];
+  }): BucketReadRange[][] {
+    const chunks: BucketReadRange[][] = [];
+    let current: BucketReadRange[] = [];
+    for (const range of ranges) {
+      const candidate = [...current, range];
+      const outgrown =
+        candidate.length > Math.floor(SEEKS_PER_QUERY / 2) ||
+        ClickHouseMetricDataPointAppendRepository.encodedParamLength(
+          ClickHouseMetricDataPointAppendRepository.bucketRangeParams({
+            tenantId,
+            lookbackMs,
+            ranges: candidate,
+          }),
+        ) > SUCCESSOR_PARAM_BUDGET_CHARS;
+      if (outgrown && current.length > 0) {
+        chunks.push(current);
+        current = [range];
+      } else {
+        current = candidate;
+      }
+    }
+    if (current.length > 0) chunks.push(current);
+    return chunks;
+  }
+
+  /**
+   * The far pass, for buckets with no point in the near lookback: a reverse seek per bucket,
+   * since a range read here could span all of retention. `predecessor` is the half-open window
+   * behind each bucket start, as distances so both bounds stay shared scalars.
+   */
+  private async readFarPredecessors({
     client,
     tenantId,
     seeks,
     unique,
     predecessor,
-    shouldReadBucketRows,
   }: {
     client: MetricClickHouseClient;
     tenantId: string;
-    seeks: readonly { seriesId: string; start: number }[];
+    seeks: readonly BucketSeek[];
     unique: Map<string, MetricRollupSourcePoint>;
     predecessor: { fromMs: number; toMs: number };
-    shouldReadBucketRows: boolean;
   }): Promise<void> {
-    // Half the cap, and the divisor is a size bound rather than a statement-count one: the
-    // successor read emits one statement whatever its chunk holds, so there is no statement
-    // ceiling left here to match.
     for (const chunk of ClickHouseMetricDataPointAppendRepository.chunked(
       seeks,
       Math.floor(SEEKS_PER_QUERY / 2),
     )) {
-      // Shared scalars replace the per-seek end and cutoff bounds: all were
-      // derived from the bucket start, so the server can derive them too and
-      // the parameter fan-out stays at two per bucket whatever the chunk holds.
       const params: Record<string, unknown> = {
         tenantId,
-        bucketMs: METRIC_ROLLUP_INTERVAL_MS,
         lookbackFromMs: predecessor.fromMs,
         lookbackToMs: predecessor.toMs,
       };
-      const selects = chunk.flatMap(({ seriesId, start }, index) => {
+      const selects = chunk.map(({ seriesId, start }, index) => {
         params[`series${index}`] = seriesId;
         params[`from${index}`] = start;
-        // Both branches keep a seek per bucket rather than folding into one joined statement
-        // the way the successor read does. The predecessor branch is why: its bounds are
-        // per-seek, and a join can only apply those after the rows are read, so the single-row
-        // reverse index seek would become a read of every point in the series across the whole
-        // window - the memory class #6493 fixed.
-        const predecessorSeek = `(SELECT ${ROLLUP_SELECT}
+        return `(SELECT ${ROLLUP_SELECT}
             FROM metric_data_points FINAL
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
               AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackToMs:Int64})
               AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackFromMs:Int64})
             ORDER BY metric_data_points.TimeUnixMs DESC, TimeUnixNano DESC, PointId DESC LIMIT 1)`;
-        if (!shouldReadBucketRows) return [predecessorSeek];
-        return [
-          predecessorSeek,
-          `(SELECT ${ROLLUP_SELECT}
-            FROM metric_data_points FINAL
-            WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
-              AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64})
-              AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} + {bucketMs:Int64})
-            ORDER BY metric_data_points.TimeUnixMs ASC, TimeUnixNano ASC, PointId ASC)`,
-        ];
       });
       const result = await client.query({
         query: selects.join("\n UNION ALL\n"),
