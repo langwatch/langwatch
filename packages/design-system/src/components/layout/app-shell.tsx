@@ -444,7 +444,7 @@ export function CommandBarItem({
         ) : null}
       </HStack>
       {meta ? (
-        <Text textStyle="micro" color="fg.muted" flexShrink={0}>
+        <Text textStyle="caption" color="fg.muted" flexShrink={0}>
           {meta}
         </Text>
       ) : null}

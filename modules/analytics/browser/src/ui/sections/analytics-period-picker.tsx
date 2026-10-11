@@ -61,11 +61,13 @@ export function AnalyticsPeriodPicker({
 }) {
   const matchedPreset = () => {
     if (mode !== "relative") return undefined;
-    const matchedByDays = presetForRange(startDate, endDate, nowInstant());
-    if (matchedByDays) return matchedByDays;
-
     const minutes = Math.round((endDate.epochMilliseconds - startDate.epochMilliseconds) / 60000);
-    return ANALYTICS_RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
+    const matchedByMinutes = ANALYTICS_RELATIVE_PRESETS.find(
+      (preset) => preset.minutes === minutes,
+    );
+    if (matchedByMinutes) return matchedByMinutes;
+
+    return presetForRange(startDate, endDate, nowInstant());
   };
   const preset = matchedPreset();
 

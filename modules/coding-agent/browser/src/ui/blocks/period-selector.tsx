@@ -122,11 +122,11 @@ export function PeriodSelector({
 }) {
   const matchedPreset = () => {
     if (mode !== "relative") return undefined;
-    const matchedByDays = getPresetForRange(startDate, endDate, nowInstant().epochMilliseconds);
-    if (matchedByDays) return matchedByDays;
-
     const minutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
-    return RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
+    const matchedByMinutes = RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
+    if (matchedByMinutes) return matchedByMinutes;
+
+    return getPresetForRange(startDate, endDate, nowInstant().epochMilliseconds);
   };
   const preset = matchedPreset();
 

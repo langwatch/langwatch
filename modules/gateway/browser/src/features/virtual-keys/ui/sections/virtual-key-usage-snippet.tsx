@@ -213,6 +213,7 @@ func main() {
                   bg="transparent"
                   borderWidth="0"
                   overflow="hidden"
+                  minWidth={0}
                 >
                   <CodeBlock.Header borderBottomWidth="1px" borderColor="border">
                     <Tabs.List w="full" border="0" ms="-1">
@@ -239,6 +240,8 @@ func main() {
                     css={{
                       "& pre, & code": {
                         transition: "background-color 0.3s ease, color 0.3s ease",
+                        whiteSpace: "pre-wrap",
+                        overflowWrap: "anywhere",
                       },
                     }}
                     overflow="scroll"

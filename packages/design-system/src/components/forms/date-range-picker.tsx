@@ -105,6 +105,7 @@ export function DateRangePicker<Key extends string>({
                   key={preset.key}
                   aria-current={preset.key === activePresetKey ? "true" : undefined}
                   data-selected={preset.key === activePresetKey ? "" : undefined}
+                  fontWeight={preset.key === activePresetKey ? "semibold" : undefined}
                   onClick={() => {
                     onPresetSelect(preset.key);
                     onClose();

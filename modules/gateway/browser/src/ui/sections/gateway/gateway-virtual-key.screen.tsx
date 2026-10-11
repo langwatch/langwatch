@@ -472,7 +472,11 @@ function VirtualKeyDetailPage() {
             )
           }
         >
-          <Box flex="1 1 12rem" minWidth={0}>
+          <Box
+            flex="1 1 0"
+            minWidth="8rem"
+            css={{ "& h1": { overflow: "hidden", textOverflow: "ellipsis" } }}
+          >
             <PageLayout.Heading>{vk?.name ?? "Virtual key"}</PageLayout.Heading>
           </Box>
         </PageLayout.Header>
