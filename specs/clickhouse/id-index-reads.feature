@@ -114,12 +114,31 @@ Feature: A lookup by id reads only the partitions its id index names
     Then the first read finds nothing and the lookup falls back to the existing path
     And the fallback is recorded
 
+  @unit @unimplemented
+  Scenario: readers trust the index only once its flag is on
+    Given the owner's id index flag is on for this ClickHouse target and off for another
+    When tenants on each target are looked up by id alone
+    Then only the tenant on the flagged target reads through the index
+    And no lookup waits on reading the flag
+
+  @unit @unimplemented
+  Scenario: a failed batch backs off and resumes from its cursor
+    Given a backfill whose next batch fails twice and then succeeds
+    When the backfill step runs
+    Then it retries that batch after a growing pause
+    And after a restart it resumes from the last committed batch, not the start
+
   @integration @unimplemented
-  Scenario: readers trust the index only once its backfill has completed
-    Given an index whose backfill has written its complete marker on this ClickHouse target
-    When a process starts
-    Then it reads the marker once and keeps the answer in memory
-    And lookups by id read no marker
+  Scenario: a trace opens with no time
+    Given a trace stored eight weeks ago and its owner's id index flag on
+    When its summary and spans are read with no time given
+    Then each read is bounded to the partitions the index names
+
+  @integration @unimplemented
+  Scenario: the browser opens a trace by id alone
+    Given a trace drawer opened from a link that carries no time
+    When the drawer loads
+    Then every read starts at once, without waiting for a time to be found
 
   @integration @unimplemented
   Scenario: a retention change during the backfill does not leave stale index rows
