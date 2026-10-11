@@ -1,6 +1,6 @@
 import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Button, Spinner, Text } from "@langwatch/design-system/primitives";
+import { Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type LocalPromptConfig,
@@ -296,34 +296,23 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
         </PageLayout.HeaderButton>
       </Tooltip>
 
-      <Dialog.Root open={isDialogOpen} onOpenChange={({ open }) => setIsDialogOpen(open)}>
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Create experiment</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text>
-              {!isComparing || promptCount === 1
-                ? "Create new experiment with this prompt?"
-                : `Create new experiment with these prompts? (${promptCount} prompts)`}
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isCreating}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              onClick={handleCreate}
-              disabled={isCreating || isLoadingSavedPrompts}
-            >
-              {(isCreating || isLoadingSavedPrompts) && <Spinner size="sm" marginRight={2} />}
-              {isLoadingSavedPrompts ? "Loading..." : "Create"}
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
+      <Dialog
+        open={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        title="Create experiment"
+        busy={isCreating}
+        primaryAction={{
+          label: isLoadingSavedPrompts ? "Loading..." : "Create",
+          onClick: handleCreate,
+          loading: isCreating || isLoadingSavedPrompts,
+        }}
+      >
+        <Text>
+          {!isComparing || promptCount === 1
+            ? "Create new experiment with this prompt?"
+            : `Create new experiment with these prompts? (${promptCount} prompts)`}
+        </Text>
+      </Dialog>
     </>
   );
 }
