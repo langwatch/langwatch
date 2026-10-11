@@ -4,15 +4,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Banner } from "@langwatch/design-system/banner";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -85,6 +77,7 @@ import { PullCadenceField } from "../../../features/ingestion-sources/ui/element
 import { SourceTypeIconGlyph } from "../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
 import { TraceDestinationField } from "../../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
 import { EnterpriseOttlEditor as OttlEditor } from "../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
+import { useGovernanceHost } from "../../../model/governance-host.ts";
 import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
@@ -1423,108 +1416,81 @@ export function SourceComposerDrawer({
   // gate lives (see gatedSourceTypeOptions) — the composer is committed to
   // it. Changing type means closing and picking again, exactly like the
   // model-provider drawer.
+  const createBlockedReason = composer.name.trim()
+    ? (composerCadenceError({
+        sourceType: composer.sourceType,
+        pullSchedule: composer.pullSchedule,
+      }) ?? undefined)
+    : "Give the source a display name";
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      placement="end"
-      size="md"
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
+      onClose={onClose}
+      title={`Add ${meta?.label ?? "ingestion source"}`}
+      icon={<SourceTypeIconGlyph sourceType={composer.sourceType} size="24px" />}
+      headerTools={
+        meta?.blurb ? (
+          <FieldInfoTooltip description={meta.blurb} testId="source-type-blurb" />
+        ) : null
+      }
+      footer={{
+        cancel: { onClick: onClose },
+        primaryAction: {
+          label: "Create source",
+          onClick: onSubmit,
+          loading: isPending,
+          disabledReason: createBlockedReason,
+        },
       }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.CloseTrigger />
-          <HStack gap={3}>
-            <SourceTypeIconGlyph sourceType={composer.sourceType} size="24px" />
-            <Drawer.Title>Add {meta?.label ?? "ingestion source"}</Drawer.Title>
-            {/* What this source reads and what it needs granted, behind the
-                (i) rather than as a paragraph under the first input. It is
-                three or four sentences of prerequisites, and printed in the
-                body it pushed the fields it describes below the fold and was
-                scrolled past by everyone who had already read it once. See
-                dev/docs/best_practices/copywriting.md — the same rule the
-                per-field hints beside it already follow. */}
-            {meta?.blurb && (
-              <FieldInfoTooltip description={meta.blurb} testId="source-type-blurb" />
-            )}
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={3}>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Display name
-              </Text>
-              <Input
-                size="sm"
-                value={composer.name}
-                onChange={(e) => setComposer({ ...composer, name: e.target.value })}
-                placeholder="Display name for this source"
-              />
-            </VStack>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Description (optional)
-              </Text>
-              <Textarea
-                size="sm"
-                rows={2}
-                value={composer.description}
-                onChange={(e) => setComposer({ ...composer, description: e.target.value })}
-                // Asks in the same shape as the display name directly above
-                // it. The old prompt asked for two particular facts and used a
-                // word ("fleet") that appears nowhere else an admin can see.
-                placeholder="Description for this source"
-              />
-            </VStack>
+      <VStack align="stretch" gap={3}>
+        <VStack align="stretch" gap={1}>
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+            Display name
+          </Text>
+          <Input
+            size="sm"
+            value={composer.name}
+            onChange={(e) => setComposer({ ...composer, name: e.target.value })}
+            placeholder="Display name for this source"
+          />
+        </VStack>
+        <VStack align="stretch" gap={1}>
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+            Description (optional)
+          </Text>
+          <Textarea
+            size="sm"
+            rows={2}
+            value={composer.description}
+            onChange={(e) => setComposer({ ...composer, description: e.target.value })}
+            // Asks in the same shape as the display name directly above
+            // it. The old prompt asked for two particular facts and used a
+            // word ("fleet") that appears nowhere else an admin can see.
+            placeholder="Description for this source"
+          />
+        </VStack>
 
-            <ParserConfigFields
-              sourceType={composer.sourceType}
-              values={composer.parserConfig}
-              onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
-              invalidKeys={invalidFieldKeys}
-              advancedExtras={advancedExtras}
-            />
+        <ParserConfigFields
+          sourceType={composer.sourceType}
+          values={composer.parserConfig}
+          onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
+          invalidKeys={invalidFieldKeys}
+          advancedExtras={advancedExtras}
+        />
 
-            <ComposerDestinationHint composer={composer} destinationCtx={destinationCtx} />
+        <ComposerDestinationHint composer={composer} destinationCtx={destinationCtx} />
 
-            <OttlEditor
-              organizationId={organizationId}
-              sourceType={composer.sourceType}
-              statements={composer.ottlStatements}
-              onChange={(ottlStatements) => setComposer({ ...composer, ottlStatements })}
-              enabled={isOttlEnabledSourceType(composer.sourceType)}
-              refusal={refusal}
-            />
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack gap={3} width="full">
-            <Spacer />
-            <Button size="sm" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              colorPalette="orange"
-              variant="solid"
-              onClick={onSubmit}
-              loading={isPending}
-              disabled={
-                !composer.name.trim() ||
-                composerCadenceError({
-                  sourceType: composer.sourceType,
-                  pullSchedule: composer.pullSchedule,
-                }) !== null
-              }
-            >
-              Create source
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        <OttlEditor
+          organizationId={organizationId}
+          sourceType={composer.sourceType}
+          statements={composer.ottlStatements}
+          onChange={(ottlStatements) => setComposer({ ...composer, ottlStatements })}
+          enabled={isOttlEnabledSourceType(composer.sourceType)}
+          refusal={refusal}
+        />
+      </VStack>
+    </Drawer>
   );
 }
 
@@ -1828,6 +1794,17 @@ export function isEditSaveBlocked({
   return composerCadenceError({ sourceType, pullSchedule }) !== null;
 }
 
+/** Why Save is off, in words; `isEditSaveBlocked` keeps deciding whether it is. */
+function editSaveBlockedReason(input: {
+  name: string;
+  sourceType: SourceType | undefined;
+  pullSchedule: string;
+}): string | undefined {
+  if (!input.name.trim()) return "Give the source a display name";
+  if (isEditSaveBlocked(input)) return "Fix the pull schedule to save";
+  return undefined;
+}
+
 export function SourceEditDrawer({
   organizationId,
   destinationCtx,
@@ -1879,13 +1856,7 @@ export function SourceEditDrawer({
     report: form.parserConfig.report,
   });
 
-  if (!source) {
-    return (
-      <Drawer.Root open={false} placement="end" onOpenChange={() => onClose()}>
-        <Drawer.Content />
-      </Drawer.Root>
-    );
-  }
+  if (!source) return null;
 
   const handleSubmit = () => {
     const submission = buildEditSubmission({
@@ -1905,75 +1876,47 @@ export function SourceEditDrawer({
     onSubmit(submission);
   };
 
+  const saveBlockedReason = editSaveBlockedReason({
+    name: form.name,
+    sourceType,
+    pullSchedule: form.pullSchedule,
+  });
+
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      placement="end"
-      size="md"
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
+      onClose={onClose}
+      title={`Edit ${editLabel}`}
+      icon={
+        sourceType ? (
+          <SourceTypeIconGlyph sourceType={sourceType} size="24px" testId="source-type-icon" />
+        ) : undefined
+      }
+      headerTools={
+        lockNotes.length > 0 ? (
+          <FieldInfoTooltip description={lockNotes.join(" ")} testId="edit-source-notes" />
+        ) : null
+      }
+      footer={{
+        cancel: { onClick: onClose },
+        primaryAction: {
+          label: "Save changes",
+          onClick: handleSubmit,
+          loading: isPending,
+          disabledReason: saveBlockedReason,
+        },
       }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.CloseTrigger />
-          {/* The same header shape the create composer uses, for the same
-              reason: an admin reaching this drawer from a row action, a detail
-              page or a restored browser tab had nothing telling them which of
-              their sources they were about to change. The fallback covers a
-              row written by a newer deploy, whose type misses every lookup
-              here — a missed lookup has to leave a title rather than "Edit
-              undefined". */}
-          <HStack gap={3}>
-            {sourceType && (
-              <SourceTypeIconGlyph sourceType={sourceType} size="24px" testId="source-type-icon" />
-            )}
-            <Drawer.Title>Edit {editLabel}</Drawer.Title>
-            {/* Why a setting is locked, behind the (i) rather than printed
-                above the fields it describes. Rendered only when something
-                actually is: an empty marker promises an explanation that is
-                not there. */}
-            {lockNotes.length > 0 && (
-              <FieldInfoTooltip description={lockNotes.join(" ")} testId="edit-source-notes" />
-            )}
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <SourceEditBody
-            form={form}
-            source={source}
-            sourceType={sourceType}
-            hasPulled={hasPulled}
-            organizationId={organizationId}
-            destinationCtx={destinationCtx}
-            refusal={refusal}
-          />
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack gap={3} width="full">
-            <Spacer />
-            <Button size="sm" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              colorPalette="orange"
-              variant="solid"
-              onClick={handleSubmit}
-              loading={isPending}
-              // The same gate the create drawer uses. The server already
-              disabled={isEditSaveBlocked({
-                name: form.name,
-                sourceType,
-                pullSchedule: form.pullSchedule,
-              })}
-            >
-              Save changes
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      <SourceEditBody
+        form={form}
+        source={source}
+        sourceType={sourceType}
+        hasPulled={hasPulled}
+        organizationId={organizationId}
+        destinationCtx={destinationCtx}
+        refusal={refusal}
+      />
+    </Drawer>
   );
 }
 
@@ -4810,7 +4753,14 @@ function secretModalTargets(details: SecretDetails | null) {
   };
 }
 
-function SecretModal({ details, onClose }: { details: SecretDetails | null; onClose: () => void }) {
+export function SecretModal({
+  details,
+  onClose,
+}: {
+  details: SecretDetails | null;
+  onClose: () => void;
+}) {
+  const host = useGovernanceHost();
   const [copied, setCopied] = useState(false);
   const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
     secretModalTargets(details);
@@ -4837,54 +4787,43 @@ function SecretModal({ details, onClose }: { details: SecretDetails | null; onCl
   };
 
   return (
-    <DialogRoot open onOpenChange={(e) => !e.open && onClose()} closeOnInteractOutside={false}>
-      <DialogContent maxWidth="2xl">
-        <DialogHeader>
-          <DialogTitle>
-            <HStack gap={2}>
-              <KeyRound size={16} />
-              <Text>{details.title}</Text>
-            </HStack>
-          </DialogTitle>
-        </DialogHeader>
-        <DialogCloseTrigger />
-        <DialogBody>
-          <VStack align="stretch" gap={4}>
-            <Text fontSize="sm" color="fg.muted">
-              This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
-              into the upstream platform&apos;s admin console. We store only its hash.
-            </Text>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Source name
-              </Text>
-              <Text fontSize="sm" fontWeight="medium">
-                {details.sourceName}{" "}
-                <Badge size="sm" variant="surface" marginLeft={2}>
-                  {SOURCE_TYPE_LABEL[details.sourceType]}
-                </Badge>
-              </Text>
-            </VStack>
-            <IngestSecretPanel secret={details.secret} copied={copied} onCopy={copy} />
-            {usesPushUrl && <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />}
-            {usesWebhookUrl && <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />}
-            {isClaudeCode && (
-              <ClaudeCodeEnvBlockPanel envBlock={claudeCodeEnvBlock} onCopy={copy} />
-            )}
-            {testCurl && <TestCurlPanel curl={testCurl} />}
-            <SecretGraceNotice />
-          </VStack>
-        </DialogBody>
-        <DialogFooter>
-          <Link href={`/governance/inventory/${details.sourceId}`}>
-            <Button variant="outline">View source page →</Button>
-          </Link>
-          <Button colorPalette="accent" onClick={onClose}>
-            I&apos;ve saved it
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      title={details.title}
+      icon={<KeyRound size={16} />}
+      closeOnInteractOutside={false}
+      secondaryAction={{
+        label: "View source page →",
+        onClick: () => host.navigate(`/governance/inventory/${details.sourceId}`),
+      }}
+      primaryAction={{ label: "I've saved it", onClick: onClose }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Text fontSize="sm" color="fg.muted">
+          This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
+          into the upstream platform&apos;s admin console. We store only its hash.
+        </Text>
+        <VStack align="stretch" gap={1}>
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+            Source name
+          </Text>
+          <Text fontSize="sm" fontWeight="medium">
+            {details.sourceName}{" "}
+            <Badge size="sm" variant="surface" marginLeft={2}>
+              {SOURCE_TYPE_LABEL[details.sourceType]}
+            </Badge>
+          </Text>
+        </VStack>
+        <IngestSecretPanel secret={details.secret} copied={copied} onCopy={copy} />
+        {usesPushUrl && <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />}
+        {usesWebhookUrl && <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />}
+        {isClaudeCode && <ClaudeCodeEnvBlockPanel envBlock={claudeCodeEnvBlock} onCopy={copy} />}
+        {testCurl && <TestCurlPanel curl={testCurl} />}
+        <SecretGraceNotice />
+      </VStack>
+    </Dialog>
   );
 }
 
