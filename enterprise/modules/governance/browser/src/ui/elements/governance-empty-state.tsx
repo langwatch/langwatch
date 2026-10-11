@@ -5,8 +5,8 @@
 
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Button, type ButtonProps, HStack } from "@langwatch/design-system/primitives";
-import type { ComponentType, PropsWithChildren, ReactNode } from "react";
+import { Button, HStack } from "@langwatch/design-system/primitives";
+import type { ComponentType, MouseEventHandler, ReactNode } from "react";
 
 /** Structural, so a lucide glyph and any other icon library both satisfy it. */
 export type GovernanceEmptyStateIcon = ComponentType<{
@@ -19,22 +19,26 @@ export type GovernanceEmptyStateIcon = ComponentType<{
 export function GovernanceEmptyStateAction({
   children,
   emphasis = "primary",
-  ...props
-}: PropsWithChildren<
-  ButtonProps & {
-    emphasis?: "primary" | "secondary";
-  }
->) {
+  loading,
+  disabled,
+  onClick,
+}: {
+  children: ReactNode;
+  emphasis?: "primary" | "secondary";
+  loading?: boolean;
+  disabled?: boolean;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+}) {
   if (emphasis === "primary") {
     return (
-      <PageLayout.HeaderButton primary {...props}>
+      <PageLayout.HeaderButton primary loading={loading} disabled={disabled} onClick={onClick}>
         {children}
       </PageLayout.HeaderButton>
     );
   }
 
   return (
-    <Button size="sm" variant="ghost" {...props}>
+    <Button size="sm" variant="ghost" loading={loading} disabled={disabled} onClick={onClick}>
       {children}
     </Button>
   );

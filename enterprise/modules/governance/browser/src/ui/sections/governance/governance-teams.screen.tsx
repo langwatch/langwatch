@@ -3,7 +3,7 @@ import { Card } from "@langwatch/design-system/card";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Button, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
@@ -29,33 +29,6 @@ const SORT_LABEL: Record<SortField, string> = {
 
 function isSortField(v: string | string[] | undefined): v is SortField {
   return v === "spend" || v === "requests" || v === "lastActivity";
-}
-
-/**
- * Real <button> for keyboard nav + screen-reader announcement (Ariana QA
- * finding G13 — sort chips were unfocusable divs). Avoids Chakra v3's
- * polymorphic Box `as="button"` typing pitfall while staying token-driven.
- */
-function SortChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Button
-      size="sm"
-      variant={active ? "subtle" : "outline"}
-      colorPalette={active ? "accent" : "gray"}
-      aria-pressed={active}
-      onClick={onClick}
-    >
-      {label}
-    </Button>
-  );
 }
 
 const fmtUsd = (n: number | string) => {
@@ -163,13 +136,6 @@ function TeamSpendPanel({
 
   return (
     <>
-      <HStack gap={2}>
-        <Text fontSize="sm" color="fg.muted" id="sort-by-label">
-          Sort by:
-        </Text>
-        <SortChips value={sortBy} onChange={onSortChange} ariaLabelledBy="sort-by-label" />
-      </HStack>
-
       {teamsQuery.error ? (
         <HandledErrorAlert error={teamsQuery.error} fallbackTitle="Couldn't load team activity" />
       ) : null}
@@ -192,13 +158,13 @@ function TeamSpendPanel({
           />
         )}
         {hasRows && (
-          <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
-            <Header />
-            <Table.Body>
+          <ListTable variant="embedded" scroll="x" scrollLabel="Teams">
+            <Header sortBy={sortBy} onSortChange={onSortChange} />
+            <ListTable.Body>
               {teams.map((team) => (
                 <Row key={team.teamId ?? "org-wide"} team={team} />
               ))}
-            </Table.Body>
+            </ListTable.Body>
           </ListTable>
         )}
       </Card>
@@ -209,45 +175,35 @@ function TeamSpendPanel({
   );
 }
 
-function SortChips({
-  value,
-  onChange,
-  ariaLabelledBy,
+/** The server ranks high to low by the chosen column; a header click picks the column. */
+function Header({
+  sortBy,
+  onSortChange,
 }: {
-  value: SortField;
-  onChange: (v: SortField) => void;
-  ariaLabelledBy?: string;
+  sortBy: SortField;
+  onSortChange: (next: SortField) => void;
 }) {
-  const opts: { key: SortField; label: string }[] = [
-    { key: "spend", label: "Spend" },
-    { key: "requests", label: "Requests" },
-    { key: "lastActivity", label: "Last active" },
-  ];
+  const sorted = (field: SortField) => (sortBy === field ? "desc" : false);
   return (
-    <HStack as="fieldset" gap={1} aria-labelledby={ariaLabelledBy}>
-      {opts.map((o) => (
-        <SortChip
-          key={o.key}
-          label={o.label}
-          active={o.key === value}
-          onClick={() => onChange(o.key)}
-        />
-      ))}
-    </HStack>
-  );
-}
-
-function Header() {
-  return (
-    <Table.Header>
-      <Table.Row>
-        {["Team", "Spend", "Requests", "Last active", "Trend", "Sources"].map((label) => (
-          <Table.ColumnHeader key={label} whiteSpace="nowrap">
-            {label}
-          </Table.ColumnHeader>
-        ))}
-      </Table.Row>
-    </Table.Header>
+    <ListTable.Header>
+      <ListTable.Row>
+        <ListTable.ColumnHeader>Team</ListTable.ColumnHeader>
+        <ListTable.SortHeader sorted={sorted("spend")} onSort={() => onSortChange("spend")}>
+          Spend
+        </ListTable.SortHeader>
+        <ListTable.SortHeader sorted={sorted("requests")} onSort={() => onSortChange("requests")}>
+          Requests
+        </ListTable.SortHeader>
+        <ListTable.SortHeader
+          sorted={sorted("lastActivity")}
+          onSort={() => onSortChange("lastActivity")}
+        >
+          Last active
+        </ListTable.SortHeader>
+        <ListTable.ColumnHeader>Trend</ListTable.ColumnHeader>
+        <ListTable.ColumnHeader>Sources</ListTable.ColumnHeader>
+      </ListTable.Row>
+    </ListTable.Header>
   );
 }
 
@@ -285,22 +241,24 @@ function Row({ team }: { team: SpendByTeam }) {
     </HStack>
   );
   return (
-    <Table.Row>
-      <Table.Cell>
+    <ListTable.Row>
+      <ListTable.Cell>
         {isOrgWide ? name : <Link href={`/governance/teams/${team.teamId}`}>{name}</Link>}
-      </Table.Cell>
-      <Table.Cell whiteSpace="nowrap">{fmtUsd(team.spendUsd)}</Table.Cell>
-      <Table.Cell>{numeral(team.requestCount).format("0,0")}</Table.Cell>
-      <Table.Cell whiteSpace="nowrap" color="fg.muted">
+      </ListTable.Cell>
+      <ListTable.Cell nowrap>{fmtUsd(team.spendUsd)}</ListTable.Cell>
+      <ListTable.Cell>{numeral(team.requestCount).format("0,0")}</ListTable.Cell>
+      <ListTable.Cell nowrap tone="muted">
         {fmtRelative(team.lastActivityIso)}
-      </Table.Cell>
-      <Table.Cell whiteSpace="nowrap" color={trendColor}>
-        {team.hasPriorBaseline ? `${arrow} ${fmtTrendPct(team.deltaPctVsPriorWindow)}` : "—"}
-      </Table.Cell>
-      <Table.Cell whiteSpace="nowrap" color="fg.muted">
+      </ListTable.Cell>
+      <ListTable.Cell nowrap>
+        <Text as="span" color={trendColor}>
+          {team.hasPriorBaseline ? `${arrow} ${fmtTrendPct(team.deltaPctVsPriorWindow)}` : "—"}
+        </Text>
+      </ListTable.Cell>
+      <ListTable.Cell nowrap tone="muted">
         {team.sourceCount} {team.sourceCount === 1 ? "source" : "sources"}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
