@@ -1,5 +1,5 @@
 import { type ExportResult } from "@opentelemetry/core";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
 import { buildAuthHeaders } from "../../internal/api/auth";

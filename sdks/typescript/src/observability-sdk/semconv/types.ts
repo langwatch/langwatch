@@ -2,10 +2,9 @@
 
 import { type AttributeValue } from "@opentelemetry/api";
 import { type AnyValue } from "@opentelemetry/api-logs";
-import type * as semconvAttributes from "@opentelemetry/semantic-conventions";
-import type * as semconvIncubatingAttributes from "@opentelemetry/semantic-conventions/incubating";
 
 import type * as langwatchAttributes from "./attributes";
+import type * as otelAttributes from "./otel";
 
 // are strings, while preserving the auto-completion of the keys.
 type OnlyStringValues<T> = {
@@ -13,12 +12,11 @@ type OnlyStringValues<T> = {
 }[keyof T];
 
 /**
- * All attribute keys usable on a span: OpenTelemetry semantic-convention keys, LangWatch's
+ * All attribute keys usable on a span: OpenTelemetry keys the SDK writes, LangWatch's
  * own attributes, or any custom string.
  */
 export type SemConvAttributeKey =
-  | OnlyStringValues<typeof semconvIncubatingAttributes>
-  | OnlyStringValues<typeof semconvAttributes>
+  | OnlyStringValues<typeof otelAttributes>
   | OnlyStringValues<typeof langwatchAttributes>
   | (string & {});
 

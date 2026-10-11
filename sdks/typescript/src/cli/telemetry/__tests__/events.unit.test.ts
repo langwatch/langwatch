@@ -32,7 +32,7 @@ vi.mock("@opentelemetry/sdk-logs", () => ({
   },
 }));
 
-vi.mock("@opentelemetry/exporter-logs-otlp-http", () => ({
+vi.mock("@opentelemetry/exporter-logs-otlp-proto", () => ({
   OTLPLogExporter: class {
     constructor(config: Record<string, unknown>) {
       exporterConstructed(config);

@@ -1,6 +1,5 @@
 import { trace } from "@opentelemetry/api";
 import type * as apiModule from "@opentelemetry/api";
-import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { type Resource } from "@opentelemetry/resources";
 import {
   SimpleLogRecordProcessor,
@@ -31,6 +30,7 @@ import {
   readMember,
 } from "../utils";
 import { NodeSdk } from "./node-sdk";
+import { loadInstrumentation } from "./optional-peers";
 import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
 
 // Helper functions
@@ -408,7 +408,7 @@ function setupDedicatedProvider(
 
   let unregisterInstrumentations: (() => void) | undefined;
   if (options.instrumentations?.length) {
-    unregisterInstrumentations = registerInstrumentations({
+    unregisterInstrumentations = loadInstrumentation().registerInstrumentations({
       tracerProvider: provider,
       instrumentations: options.instrumentations,
     });

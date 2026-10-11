@@ -40,6 +40,8 @@ LangWatch helps you monitor, debug, and optimize your LLM/GenAI applications. Th
 npm install langwatch
 ```
 
+`@opentelemetry/api` is a peer dependency (npm installs it for you). A custom `metricReader` or `instrumentations` needs `@opentelemetry/sdk-metrics` or `@opentelemetry/instrumentation` installed in your app.
+
 ---
 
 ## 🚀 Getting Started

@@ -148,7 +148,7 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
   const [{ LoggerProvider, SimpleLogRecordProcessor }, { OTLPLogExporter }, resources] =
     await Promise.all([
       import("@opentelemetry/sdk-logs"),
-      import("@opentelemetry/exporter-logs-otlp-http"),
+      import("@opentelemetry/exporter-logs-otlp-proto"),
       import("@opentelemetry/resources"),
     ]);
 

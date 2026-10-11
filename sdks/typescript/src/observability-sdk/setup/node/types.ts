@@ -3,10 +3,10 @@ import {
   type TextMapPropagator,
   type TracerProvider,
 } from "@opentelemetry/api";
-import { type Instrumentation } from "@opentelemetry/instrumentation";
+import type { Instrumentation } from "@opentelemetry/instrumentation";
 import { type Resource, type ResourceDetector } from "@opentelemetry/resources";
 import { type LogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { type IMetricReader, type ViewOptions } from "@opentelemetry/sdk-metrics";
+import type { IMetricReader, ViewOptions } from "@opentelemetry/sdk-metrics";
 import {
   type SpanExporter,
   type SpanProcessor,

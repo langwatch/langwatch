@@ -76,19 +76,15 @@
     "generate:server-types": "./copy-types.sh"
   },
   "dependencies": {
-    "@opentelemetry/api": "catalog:",
     "@opentelemetry/api-logs": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
-    "@opentelemetry/exporter-logs-otlp-http": "catalog:",
-    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
-    "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/exporter-logs-otlp-proto": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-proto": "catalog:",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-logs": "catalog:",
-    "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
     "@opentelemetry/sdk-trace-node": "catalog:",
-    "@opentelemetry/semantic-conventions": "catalog:",
     "chalk": "catalog:",
     "cloudflared": "0.7.1",
     "commander": "catalog:",
@@ -111,6 +107,9 @@
     "@langchain/openai": ">=0.6.0 <1.0.0",
     "@langwatch/e2e-stack": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
     "@opentelemetry/sdk-trace-web": "catalog:",
     "@types/debug": "catalog:",
     "@types/js-yaml": "catalog:",
@@ -142,8 +141,11 @@
     "@langchain/core": ">=0.3.0 <2.0.0",
     "@langchain/langgraph": ">=0.4.0 <2.0.0",
     "@langchain/openai": ">=0.6.0 <2.0.0",
+    "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/context-zone": ">=1.19.0 <3.0.0",
     "@opentelemetry/exporter-trace-otlp-grpc": ">=0.221.0 <1.0.0",
+    "@opentelemetry/instrumentation": ">=0.200.0 <1.0.0",
+    "@opentelemetry/sdk-metrics": ">=2.0.0 <3.0.0",
     "@opentelemetry/sdk-trace-web": ">=1.19.0 <3.0.0",
     "langchain": ">=0.3.0 <2.0.0"
   },
@@ -164,6 +166,12 @@
       "optional": true
     },
     "@opentelemetry/exporter-trace-otlp-grpc": {
+      "optional": true
+    },
+    "@opentelemetry/instrumentation": {
+      "optional": true
+    },
+    "@opentelemetry/sdk-metrics": {
       "optional": true
     },
     "@opentelemetry/sdk-trace-web": {
