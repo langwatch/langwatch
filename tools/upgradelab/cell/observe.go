@@ -142,8 +142,9 @@ func PhaseAt(timeline []PhaseChange, atMs int64) string {
 
 // QueueSample is one reading of the group queues' waiting jobs.
 type QueueSample struct {
-	AtMs  int64 `json:"atMs"`
-	Depth int   `json:"depth"`
+	AtMs   int64 `json:"atMs"`
+	Depth  int   `json:"depth"`            // jobs due now
+	NotDue int   `json:"notDue,omitempty"` // jobs scheduled later, left out of Depth
 }
 
 type queueKind struct {

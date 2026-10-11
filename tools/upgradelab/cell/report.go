@@ -82,7 +82,8 @@ type QueueSummary struct {
 	PeakAtMs    int64         `json:"peakAtMs"`
 	DrainedMs   int64         `json:"drainedAfterWorkerMs"` // -1: never within the limit and staying
 	SlopePerMin float64       `json:"slopeLast10MinPerMin"`
-	Final       int           `json:"finalDepth"` // -1: no reading
+	Final       int           `json:"finalDepth"`  // -1: no reading
+	FinalNotDue int           `json:"finalNotDue"` // jobs scheduled later at the last reading, left out of Final
 	ReadErrors  int           `json:"readErrors"`
 	FirstError  string        `json:"firstReadError,omitempty"`
 	ByQueue     string        `json:"byQueueAtEnd"`
@@ -154,6 +155,7 @@ var invariantNames = map[string]string{
 	"E13": "a custom role made on main keeps its permissions and bindings on head",
 	"E14": "SCIM: users and a group provisioned on main keep their membership on head through main's token, and a push on head lands",
 	"E11": "an organization on main's old per-organization SSO (legacy columns, no connection) is grandfathered onto a connection, its member signs in on head and Ops shows the migration inventory",
+	"E15": "the mixed legacy-SSO organization's administrator sees the hint to move its legacy domain in SSO settings",
 	"F1":  "empty origin: every data step ends done over zero rows (or not-needed)",
 	"R2":  "the oldest aged trace each organization keeps reads back through head's API",
 	"R1":  "aged data: no organization's age slice loses rows across the upgrade beyond what main's own retention TTL expires",

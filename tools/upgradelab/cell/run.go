@@ -551,19 +551,19 @@ func sleep(ctx context.Context, span time.Duration) error {
 }
 
 func (cell *run) sampleQueueOnce(ctx context.Context) {
-	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
+	depth, notDue, err := QueueDueDepth(ctx, cell.stores.RedisPort, drainLimit(queueBase))
 	cell.queueMu.Lock()
 	defer cell.queueMu.Unlock()
 	if err != nil {
 		cell.queueReads.fail(err)
 		return
 	}
-	cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth})
+	cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth, NotDue: notDue})
 }
 
 // queueDrained reads the depth now and asks whether it is within the slack of the baseline.
 func (cell *run) queueDrained(ctx context.Context) bool {
-	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
+	depth, _, err := QueueDueDepth(ctx, cell.stores.RedisPort, drainLimit(queueBase))
 	return err == nil && depth <= drainLimit(queueBase)
 }
 

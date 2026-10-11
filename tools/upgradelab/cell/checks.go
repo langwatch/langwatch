@@ -420,7 +420,7 @@ func summariseQueue(samples []QueueSample, pausedAt, workerAt int64) QueueSummar
 		}
 	}
 	if len(samples) > 0 {
-		summary.Final = samples[len(samples)-1].Depth
+		summary.Final, summary.FinalNotDue = samples[len(samples)-1].Depth, samples[len(samples)-1].NotDue
 	}
 	return summary
 }
@@ -430,8 +430,8 @@ func summariseQueue(samples []QueueSample, pausedAt, workerAt int64) QueueSummar
 func queueVerdict(queue QueueSummary) Verdict {
 	drained := queue.DrainedMs >= 0 && queue.Final >= 0 && queue.Final <= queue.Limit
 	return verdict("N4", drained,
-		fmt.Sprintf("group-queue jobs: baseline %d (limit %d), %d at the cut (-1: unread), peak %d at %d ms, at baseline and staying there %d ms after head's worker started (-1: never), %d at the end (-1: no reading), slope over the last 10 min %.1f jobs/min; %d of %d reads failed%s",
-			queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.SlopePerMin, queue.ReadErrors, queue.ReadErrors+len(queue.Samples), errSuffix(queue.FirstError)))
+		fmt.Sprintf("group-queue jobs: baseline %d (limit %d), %d at the cut (-1: unread), peak %d at %d ms, at baseline and staying there %d ms after head's worker started (-1: never), %d due at the end (-1: no reading; %d more scheduled later, not counted), slope over the last 10 min %.1f jobs/min; %d of %d reads failed%s",
+			queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.FinalNotDue, queue.SlopePerMin, queue.ReadErrors, queue.ReadErrors+len(queue.Samples), errSuffix(queue.FirstError)))
 }
 
 // opsVerdict: the Upgrades page answered a state, and after settle a finished one.

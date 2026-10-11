@@ -26,6 +26,8 @@ const (
 	legacyOrgDoor      = "legacy-org"
 	grandfatherStep    = "identity-d04-connection-grandfather"
 	migrationInventory = "Migration inventory"
+	ssoSettingsPath    = "/settings/authentication/provider"
+	legacyHint         = "onto your connection"
 )
 
 // legacyOrgSeed is the legacy organization as main left it: who it is, its member's standing and main's sign-in.
@@ -122,7 +124,20 @@ func (cell *run) legacyOrgVerdict(ctx context.Context, final []LedgerRow) []Verd
 	input.After, input.AfterErr = cell.legacyOrgStanding(ctx, `SELECT ou."organizationId" || ':' || ou.role FROM mydb."OrganizationUser" ou JOIN mydb."User" u ON u.id = ou."userId" WHERE u.email = '`+legacyOrgMember+`' ORDER BY 1`)
 	input.AccountsAfter, _ = cell.legacyOrgStanding(ctx, `SELECT a.provider || ':' || a."providerAccountId" FROM mydb."Account" a JOIN mydb."User" u ON u.id = a."userId" WHERE u.email = '`+legacyOrgMember+`' ORDER BY 1`)
 	input.Ops, input.OpsErr = cell.opsPage(ctx, "ops-sso-connections-legacy", "/ops/sso-connections", seed.name, migrationInventory)
-	return []Verdict{judgeLegacyOrg(input)}
+	hint, hintErr := cell.opsPage(ctx, "sso-settings-legacy-hint", ssoSettingsPath, "", "")
+	return []Verdict{judgeLegacyOrg(input), judgeLegacyHint(hint, hintErr)}
+}
+
+// judgeLegacyHint (E15): the seed organization is the mixed shape (main's deployment-wide pin beside its own
+// connection); its administrator sees, in SSO settings, the hint to move the legacy domain onto the connection.
+func judgeLegacyHint(text string, err error) Verdict {
+	switch {
+	case err != nil:
+		return verdict("E15", false, ssoSettingsPath+": "+err.Error())
+	case !strings.Contains(text, legacyHint):
+		return verdict("E15", false, fmt.Sprintf("%s shows no %q (shots/sso-settings-legacy-hint.png)", ssoSettingsPath, legacyHint))
+	}
+	return verdict("E15", true, fmt.Sprintf("the seed account sees %q on %s", legacyHint, ssoSettingsPath))
 }
 
 // opsPage screenshots one Ops page as the seed account (an operator on head), opening the row showing open; it
