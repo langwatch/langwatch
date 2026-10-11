@@ -9,7 +9,7 @@ Feature: Field editor
     Then both rows place type, name and remove in the same grid areas
     And an output with no value leaves the value column empty
 
-  @browser
+  @integration
   Scenario: Field editor rows fit a narrow drawer
     Given a Variables and an Outputs section 320px wide
     Then the value moves below the name and the page does not scroll sideways

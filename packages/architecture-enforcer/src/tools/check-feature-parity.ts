@@ -551,8 +551,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/monitor-execution-backend.feature",
   "specs/monitors/monitor-trace-mappings.feature",
   "specs/monitors/new-evaluation-menu.feature",
-  "specs/monitors/online-evaluation-drawer-flow.feature",
-  "specs/monitors/pending-mappings-validation.feature",
   "specs/monitors/replicate-monitor-to-project.feature",
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",

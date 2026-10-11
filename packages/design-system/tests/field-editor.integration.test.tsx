@@ -57,8 +57,8 @@ function Harness({
 }
 
 describe("FieldEditor", () => {
-  /** @scenario "Field editor sections share aligned columns" */
   describe("given a Variables and an Outputs row", () => {
+    /** @scenario "Field editor sections share aligned columns" */
     it("places the type, name and remove controls in the same grid areas", () => {
       renderWithDesignSystem(
         <>
@@ -91,9 +91,8 @@ describe("FieldEditor", () => {
       expect(outputs.children[3]).toHaveTextContent("");
     });
   });
-
-  /** @scenario "A name can be edited entirely with the keyboard" */
   describe("given an editable name", () => {
+    /** @scenario "A name can be edited entirely with the keyboard" */
     it("commits once on Enter and cancels once on Escape", async () => {
       const onCommit = vi.fn();
       const onCancel = vi.fn();
@@ -112,9 +111,8 @@ describe("FieldEditor", () => {
       await waitFor(() => expect(screen.getByTestId("name")).toHaveFocus());
     });
   });
-
-  /** @scenario "Long names keep their adjacent information reachable" */
   describe("given a very long name with an information icon", () => {
+    /** @scenario "Long names keep their adjacent information reachable" */
     it("names the button in full and keeps the icon in the same group", () => {
       const long = "an_extremely_long_unbroken_variable_name_for_the_grid";
       renderWithDesignSystem(<Harness id={long} />);
@@ -124,9 +122,8 @@ describe("FieldEditor", () => {
       expect(name.parentElement).toContainElement(screen.getByTestId("info"));
     });
   });
-
-  /** @scenario "Field editor stories render in light and dark" */
   describe("given an empty section", () => {
+    /** @scenario "Field editor stories render in light and dark" */
     it("shows the heading and the empty message", () => {
       renderWithDesignSystem(
         <FieldEditor label="Outputs" empty emptyMessage="No outputs defined" />,
