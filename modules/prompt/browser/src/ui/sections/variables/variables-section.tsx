@@ -1,17 +1,14 @@
-import { Menu } from "@langwatch/design-system/menu";
 import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@langwatch/design-system/primitives";
+  FieldEditor,
+  FieldEditorName,
+  FieldEditorRemove,
+  FieldEditorRow,
+} from "@langwatch/design-system/field-editor";
+import { Menu } from "@langwatch/design-system/menu";
+import { Button, chakra, HStack, Text, Textarea } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
-import { Info, Plus, X } from "lucide-react";
+import { Info, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import {
@@ -179,17 +176,21 @@ export const VariablesSection = ({
   );
 
   return (
-    <VStack align="stretch" gap={3} width="full">
-      {/* Header */}
-      <HStack width="full">
-        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
-          {title}
-        </Text>
-        <Spacer />
-        {shouldShowAddButton && !readOnly && (
+    <FieldEditor
+      label={title}
+      empty={variables.length === 0}
+      emptyMessage="No variables defined"
+      addAction={
+        shouldShowAddButton && !readOnly ? (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button size="xs" variant="outline" data-testid="add-variable-button">
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                aria-label="Add variable"
+                data-testid="add-variable-button"
+              >
                 <Plus size={14} />
                 Add
               </Button>
@@ -209,9 +210,16 @@ export const VariablesSection = ({
               ))}
             </Menu.Content>
           </Menu.Root>
-        )}
-      </HStack>
-
+        ) : undefined
+      }
+      message={
+        showMissingMappingsError && showMappings && missingMappingIds.size > 0 ? (
+          <Text data-testid="missing-mappings-error" color="fg.error" fontSize="xs">
+            Please map all required fields: {Array.from(missingMappingIds).join(", ")}
+          </Text>
+        ) : undefined
+      }
+    >
       <VariableList
         variables={variables}
         mappings={mappings}
@@ -234,14 +242,7 @@ export const VariablesSection = ({
         onRemove={handleRemoveVariable}
         renderSourceIcon={renderSourceIcon}
       />
-
-      {/* Validation error for missing mappings */}
-      {showMissingMappingsError && showMappings && missingMappingIds.size > 0 && (
-        <Text data-testid="missing-mappings-error" color="fg.error" fontSize="xs">
-          Please map all required fields: {Array.from(missingMappingIds).join(", ")}
-        </Text>
-      )}
-    </VStack>
+    </FieldEditor>
   );
 };
 
@@ -292,12 +293,8 @@ function VariableList({
   onRemove,
   renderSourceIcon,
 }: VariableListProps) {
-  return variables.length === 0 ? (
-    <Text textStyle="bodySm" color="fg.subtle">
-      No variables defined
-    </Text>
-  ) : (
-    <VStack align="stretch" gap={2}>
+  return (
+    <>
       {variables.map((variable) => {
         const isLocked = lockedVariables.has(variable.identifier);
         const infoTooltip = variableInfo[variable.identifier];
@@ -335,7 +332,7 @@ function VariableList({
           />
         );
       })}
-    </VStack>
+    </>
   );
 }
 
@@ -426,20 +423,47 @@ const VariableRow = ({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave();
-    } else if (e.key === "Escape") {
-      setEditValue(variable.identifier);
-      onEndEdit();
-    }
+  const handleCancel = () => {
+    setEditValue(variable.identifier);
+    onEndEdit();
   };
 
+  const valueControl = showMappings ? (
+    <VariableMappingInput
+      mapping={mapping}
+      availableSources={availableSources}
+      onMappingChange={onMappingChange}
+      disabled={readOnly && !onMappingChange}
+      placeholder=""
+      isMissing={isMissing}
+      optionalHighlighting={optionalHighlighting}
+      inputTestId={`mapping-input-${variable.identifier}`}
+      renderSourceIcon={renderSourceIcon}
+    />
+  ) : (
+    <Textarea
+      value={defaultValue ?? ""}
+      onChange={(e) => onDefaultValueChange?.(e.target.value)}
+      size="sm"
+      width="full"
+      fontFamily="mono"
+      textStyle="bodySm"
+      lineHeight="20px"
+      paddingY="1.5"
+      variant="flushed"
+      borderColor="border"
+      autoresize
+      resize="none"
+      rows={1}
+      minHeight={ROW_HEIGHT}
+      maxHeight="240px"
+      data-testid={`variable-value-input-${variable.identifier}`}
+    />
+  );
+
   return (
-    // Every cell is one row tall and centred on it, and the type and name
-    // columns hold a fixed minimum width, so read-only and editable rows line up.
-    <HStack gap={2} width="full" align="flex-start">
-      <HStack height={ROW_HEIGHT} width="104px" flexShrink={0}>
+    <FieldEditorRow
+      typeControl={
         <FieldTypeSelect
           value={variable.type}
           options={INPUT_TYPE_OPTIONS}
@@ -447,135 +471,58 @@ const VariableRow = ({
           readOnly={readOnly}
           testId={`variable-type-select-${variable.identifier}`}
         />
-      </HStack>
-
-      {/* Variable Name */}
-      {isEditing && !readOnly ? (
-        <Input
-          value={editValue}
-          onChange={(e) => setEditValue(normalizeIdentifier(e.target.value))}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          size="sm"
-          width="120px"
-          height={ROW_HEIGHT}
-          flexShrink={0}
-          fontFamily="mono"
-          textStyle="bodySm"
-
-          borderColor={hasError ? "border.error" : undefined}
-          data-testid={`variable-name-input-${variable.identifier}`}
+      }
+      nameControl={
+        <FieldEditorName
+          value={variable.identifier}
+          editing={isEditing && !readOnly}
+          draft={editValue}
+          readOnly={readOnly}
+          invalid={hasError}
+          ariaLabel={`Variable name ${variable.identifier}`}
+          onStartEdit={onStartEdit}
+          onDraftChange={(draft) => setEditValue(normalizeIdentifier(draft))}
+          onCommit={handleSave}
+          onCancel={handleCancel}
+          displayTestId={`variable-name-${variable.identifier}`}
+          inputTestId={`variable-name-input-${variable.identifier}`}
         />
-      ) : (
-        <HStack gap={1} height={ROW_HEIGHT} minWidth="120px" flexShrink={0}>
-          <Text
-            fontFamily="mono"
-            textStyle="bodySm"
-            cursor={readOnly ? "default" : "pointer"}
-            onClick={readOnly ? undefined : onStartEdit}
-            border="1px solid"
-            borderColor="transparent"
-            paddingX={2}
-            paddingY={1}
-            marginX={-2}
-            marginY={-1}
-            borderRadius="lg"
-            _hover={readOnly ? undefined : { borderColor: "border" }}
-            minWidth="60px"
-            data-testid={`variable-name-${variable.identifier}`}
-          >
-            {variable.identifier}
-          </Text>
-          {infoTooltip && (
-            <Tooltip content={infoTooltip} positioning={{ placement: "top" }}>
-              <Box
-                color="fg.subtle"
-                cursor="help"
-                data-testid={`variable-info-${variable.identifier}`}
-              >
-                <Info size={14} />
-              </Box>
-            </Tooltip>
-          )}
-        </HStack>
-      )}
-
-      {!isMappingDisabled ? (
-        <>
-          {/* = sign and value/mapping input */}
-          <Text
-            color="fg.subtle"
-            fontFamily="mono"
-            textStyle="bodySm"
-            lineHeight={ROW_HEIGHT}
-            flexShrink={0}
-          >
-            =
-          </Text>
-
-          {showMappings ? (
-            // Mapping input with source dropdown
-            <Box flex={1} minWidth={0}>
-              <VariableMappingInput
-                mapping={mapping}
-                availableSources={availableSources}
-                onMappingChange={onMappingChange}
-                disabled={readOnly && !onMappingChange}
-                placeholder=""
-                isMissing={isMissing}
-                optionalHighlighting={optionalHighlighting}
-                inputTestId={`mapping-input-${variable.identifier}`}
-                renderSourceIcon={renderSourceIcon}
-              />
-            </Box>
-          ) : (
-            // The value typed in the Prompt Playground. It opens one row tall
-            // (centred with the type, name and "=") and grows with the text up
-            // to a limit, then scrolls, so a long value never pushes rows off.
-            <Textarea
-              value={defaultValue ?? ""}
-              onChange={(e) => onDefaultValueChange?.(e.target.value)}
-              size="sm"
-              flex={1}
-              minWidth={0}
-              fontFamily="mono"
-              textStyle="bodySm"
-              lineHeight="20px"
-              paddingY="1.5"
-              variant="flushed"
-              borderColor="border"
-              autoresize
-              resize="none"
-              rows={1}
-              minHeight={ROW_HEIGHT}
-              maxHeight="240px"
-              data-testid={`variable-value-input-${variable.identifier}`}
-            />
-          )}
-        </>
-      ) : (
-        // No value column (e.g. End node results): push the remove button to
-        // the right edge so the row fills its width, matching the Outputs rows.
-        <Spacer />
-      )}
-
-      {/* Delete Button */}
-      {canRemove && !readOnly && (
-        <Tooltip content="Remove variable" positioning={{ placement: "top" }}>
-          <Button
-            size="xs"
-            variant="ghost"
-            colorPalette="gray"
-            marginTop="1"
+      }
+      info={
+        infoTooltip ? (
+          <Tooltip content={infoTooltip} positioning={{ placement: "top" }}>
+            <chakra.button
+              type="button"
+              tabIndex={0}
+              aria-label={infoTooltip}
+              color="fg.subtle"
+              cursor="help"
+              flexShrink={0}
+              display="inline-flex"
+              data-testid={`variable-info-${variable.identifier}`}
+            >
+              <Info size={14} />
+            </chakra.button>
+          </Tooltip>
+        ) : undefined
+      }
+      separator={
+        <Text color="fg.subtle" fontFamily="mono" textStyle="bodySm">
+          =
+        </Text>
+      }
+      valueLabel={showMappings ? "Mapping" : "Value"}
+      value={isMappingDisabled ? undefined : valueControl}
+      removeAction={
+        canRemove && !readOnly ? (
+          <FieldEditorRemove
+            label={`Remove input variable ${variable.identifier}`}
+            tooltip="Remove variable"
             onClick={onRemove}
-            flexShrink={0}
-            color="fg.subtle"
             data-testid={`remove-variable-${variable.identifier}`}
-          >
-            <X size={14} />
-          </Button>
-        </Tooltip>
-      )}
-    </HStack>
+          />
+        ) : undefined
+      }
+    />
   );
 };
