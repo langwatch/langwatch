@@ -9,7 +9,9 @@ import (
 	"time"
 )
 
-func (s *Server) routes() *http.ServeMux {
+// routes is the GitHub surface twice: at the root (how the github module calls it) and under
+// /api/v3 with /api/graphql (how gh calls a GitHub Enterprise host), plus git smart-HTTP.
+func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	api := func(pattern string, h http.HandlerFunc) { mux.HandleFunc(pattern, s.wrap(h)) }
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -29,13 +31,44 @@ func (s *Server) routes() *http.ServeMux {
 	api("GET /user/emails", s.handleUserEmails)
 	api("GET /apps/{slug}/installations/new", s.handleInstallPage)
 	api("GET /github-apps/{slug}/installations/new", s.handleInstallPage)
+	api("POST /api/graphql", s.handleGraphQL)
+	api("GET /meta", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"installed_version": "3.17.0", "verifiable_password_authentication": false})
+	})
 	s.controlRoutes(mux)
 	mux.HandleFunc("GET /{$}", s.handlePage)
 	// A GitHub path githubsim does not fake is GitHub's own 404 JSON, never the page.
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeMessage(w, http.StatusNotFound, "githubsim does not fake "+r.Method+" "+r.URL.Path)
 	})
-	return mux
+	git := s.wrap(s.handleGit)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if owner, repo, ok := gitPath(r.URL.Path); ok {
+			r.SetPathValue("owner", owner)
+			r.SetPathValue("repo", repo)
+			git(w, r)
+			return
+		}
+		if rest, ok := strings.CutPrefix(r.URL.Path, "/api/v3/"); ok {
+			r.URL.Path, r.URL.RawPath = "/"+rest, ""
+		}
+		mux.ServeHTTP(w, r)
+	})
+}
+
+// gitPath matches /{owner}/{repo}/info/refs, /git-upload-pack and /git-receive-pack (repo with or without .git).
+func gitPath(path string) (owner, repo string, ok bool) {
+	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	switch {
+	case len(parts) == 4 && parts[2] == "info" && parts[3] == "refs":
+	case len(parts) == 3 && (parts[2] == "git-upload-pack" || parts[2] == "git-receive-pack"):
+	default:
+		return "", "", false
+	}
+	if parts[0] == "" || parts[1] == "" {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
 }
 
 // statusWriter remembers the status so the call history can record it.
@@ -76,7 +109,11 @@ func authKind(r *http.Request) string {
 	}
 }
 
+// bearer is the token of a Bearer/token header, or the password of Basic auth (how git sends it).
 func bearer(r *http.Request) string {
+	if _, password, ok := r.BasicAuth(); ok {
+		return password
+	}
 	header := r.Header.Get("Authorization")
 	for _, prefix := range []string{"Bearer ", "bearer ", "token "} {
 		if strings.HasPrefix(header, prefix) {

@@ -39,6 +39,12 @@ GET  /login/oauth/authorize | POST /login/oauth/access_token | GET /user, /user/
 
 `/github-apps/{slug}/installations/new` is the same page. Without `account` it lists accounts.
 
+For gh and git (what Langy's worker runs): every REST route above also answers under `/api/v3`;
+`POST /api/graphql` answers gh's `RepositoryInfo`, `PullRequestForBranch` and `PullRequestCreate`
+(a repo outside the token's installation is GitHub's `NOT_FOUND`); `GET /{o}/{r}.git/info/refs`,
+`git-upload-pack` and `git-receive-pack` serve clone and push over a bare repo per repository
+(README on `main`; token as the Basic password; `GITHUBSIM_GIT_ROOT`, default a temp dir).
+
 ## Drive it
 
 ```bash
@@ -71,5 +77,8 @@ makes every minted token answer 401. Without haven: `make service svc=githubsim`
 - CA-21/CA-37/CA-38/CA-40/CA-42: a PR whose `--head` equals the coding session's branch,
   opened with `--deliver`, binds usage to the project. Pass `host=github.com` to the PR usage APIs
   when PRs were stored before `+github`: the default host is now the githubsim host.
-- LANGY-09: the minted token only lists the installation's repos; `pr open` without
-  `--deliver` is what the agent itself would call.
+- LANGY-09/LANGY-45: with `+github +langy` haven sets `LANGY_GITHUB_HOST` to the sim, so the
+  worker's gh and git reach it (GH_HOST, GH_ENTERPRISE_TOKEN, a git rewrite of github.com).
+  Script the turn with llmsim `/tool bash` lines (gpt-5-mini in the composer). gh drops the port
+  from a git remote, so in a clone run `gh pr create -R "$GH_HOST/<owner>/<repo>" --head <branch>`.
+  The worker's `$HOME/work` goes when the worker idles out (2 min on the host tier): one turn per flow.

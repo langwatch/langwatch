@@ -45,6 +45,8 @@ type Config struct {
 	Seed bool
 	// MaxRecords bounds the call and delivery history (GITHUBSIM_MAX_RECORDS).
 	MaxRecords int
+	// GitRoot holds the bare repositories git clones and pushes reach (GITHUBSIM_GIT_ROOT, default a temp dir).
+	GitRoot string
 }
 
 // LoadConfig reads githubsim's configuration from the environment.
@@ -54,7 +56,7 @@ func LoadConfig() Config {
 		PublicURL: os.Getenv("GITHUBSIM_PUBLIC_URL"), AppID: os.Getenv("GITHUBSIM_APP_ID"),
 		AppSlug: os.Getenv("GITHUBSIM_APP_SLUG"), WebhookURL: os.Getenv("GITHUBSIM_WEBHOOK_URL"),
 		WebhookSecret: os.Getenv("GITHUBSIM_WEBHOOK_SECRET"), SetupURL: os.Getenv("GITHUBSIM_SETUP_URL"),
-		Seed: os.Getenv("GITHUBSIM_SEED") == "1",
+		Seed: os.Getenv("GITHUBSIM_SEED") == "1", GitRoot: os.Getenv("GITHUBSIM_GIT_ROOT"),
 	}
 	if n, err := strconv.Atoi(os.Getenv("GITHUBSIM_MAX_RECORDS")); err == nil && n > 0 {
 		cfg.MaxRecords = n
@@ -68,7 +70,7 @@ func LoadConfig() Config {
 // Server answers the GitHub, control and page calls.
 type Server struct {
 	cfg    Config
-	mux    *http.ServeMux
+	mux    http.Handler
 	client *http.Client
 	now    func() time.Time
 
@@ -84,6 +86,11 @@ type Server struct {
 	faults   []*fault
 	calls    []callRecord
 	sent     []delivery
+
+	gitOnce sync.Once
+	gitMu   sync.Mutex
+	gitDir  string
+	gitErr  error
 }
 
 // NewServer builds the server, seeded when cfg.Seed is set.

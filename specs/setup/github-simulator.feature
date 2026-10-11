@@ -7,7 +7,8 @@ Feature: githubsim, a local stand-in for GitHub
   the OAuth authorize, token and user calls, and sends HMAC-signed webhooks to
   the stack. It checks no JWT signature.
 
-  # Bound by Go tests in services/githubsim/githubsim_test.go,
+  # Bound by Go tests in services/githubsim/githubsim_test.go and gh_test.go,
+  # services/langyagent/adapters/github and adapters/pi,
   # tools/thuishaven/domain/overlay_github_test.go and
   # tools/thuishaven/app/plan_github_test.go, and by the host-origin tests in
   # modules/github/process/src/rules/__tests__/github-host.rules.unit.test.ts and
@@ -86,3 +87,23 @@ Feature: githubsim, a local stand-in for GitHub
     Given GITHUB_LANGY_API_BASE and GITHUB_LANGY_WEB_BASE name a stand-in
     Then the API, web and install URLs use them in place of the host's
     And a blank value means GitHub itself, and a value that is not a URL is refused at boot
+
+  Scenario: git clones and pushes a seeded repository over smart HTTP
+    Given githubsim seeds langwatch-demo/app
+    When git clones it with an installation token as the password
+    Then the clone holds a README on main
+    And a branch pushed with the same token is in the sim's repository
+    And a clone without a token is refused, and a repository outside the installation is not found
+
+  Scenario: gh opens a pull request against githubsim over its enterprise-host API
+    Given gh names githubsim as its host, with the installation token
+    When gh looks up the repository, checks the branch for a pull request and creates one
+    Then each answer has the shape gh 2.100 reads
+    And the new pull request is in the sim's list, and a second one for the same branch is refused
+    And a repository outside the installation answers GitHub's NOT_FOUND error
+
+  Scenario: Langy's worker reaches githubsim when the stack names it as the GitHub host
+    Given the stack runs +github and +langy
+    Then the langyagent lane gets LANGY_GITHUB_HOST, the sim's host and port
+    And the worker's env carries GH_HOST, GH_ENTERPRISE_TOKEN, a git rewrite of github.com to the sim and a NO_PROXY entry for it
+    And with the host blank the worker gets GH_TOKEN for github.com as before
