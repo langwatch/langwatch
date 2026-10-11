@@ -39,8 +39,13 @@ export class LiveAnalyticsRepositories {
       sessions,
       analytics: ClickHouseAnalyticsRepository.create({ resolveClient }),
       evaluations: {
-        open: ({ defaultRetentionDays }) =>
-          ClickHouseAnalyticsEvaluationRepository.create({ resolveClient, defaultRetentionDays }),
+        open: ({ defaultRetentionDays, idIndex }) =>
+          ClickHouseAnalyticsEvaluationRepository.create({
+            resolveClient,
+            defaultRetentionDays,
+            clickhouse,
+            ...(idIndex === undefined ? {} : { idIndex }),
+          }),
       },
       appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
       recency: ClickHouseAnalyticsRecencyRepository.create(clickhouse),

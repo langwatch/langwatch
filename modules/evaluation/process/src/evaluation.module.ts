@@ -1,5 +1,6 @@
 import type { EvaluationApi, EvaluationServerConfig } from "@langwatch/evaluation-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { EvaluationModule } from "./app/evaluation.app.ts";
 import { evaluationChannels } from "./channels/evaluation-channels.registry.ts";
@@ -19,4 +20,17 @@ export const evaluationProcessModule: PublishedProcessModule<
   .withApi(EvaluationModule)
   .withTransports(evaluationTrpcTransport, evaluationsLegacyRest)
   .withEventing(evaluationProcessingEventing)
-  .withEventing(evaluationLifecycleEventing);
+  .withEventing(evaluationLifecycleEventing)
+  .withMigrations(({ app }) => [
+    defineMigrationStep({
+      id: "evaluation:fill-id-indexes",
+      kind: "data",
+      mode: "background",
+      description:
+        "Fills the evaluation run id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+      // Old releases fire the same server-side view, so nothing waits for them to leave.
+      needsOldWritersGone: false,
+      // Level-triggered: min/max merge, so a rerun changes no range and resumes at its cursor.
+      run: ({ checkpoint, dryRun, signal }) => app.fillIdIndexes({ checkpoint, dryRun, signal }),
+    }),
+  ]);

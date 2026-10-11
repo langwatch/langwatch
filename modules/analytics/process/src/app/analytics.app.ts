@@ -47,6 +47,7 @@ import {
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
 import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { IdIndexFillCheckpoint, IdIndexFillReport } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -98,6 +99,8 @@ import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-quest
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
 import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
+import { AnalyticsIdIndexFillService } from "../services/analytics-id-index-fill.service.ts";
+import { AnalyticsIdIndexFlagsService } from "../services/analytics-id-index-flags.service.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
@@ -202,6 +205,8 @@ interface AnalyticsAppDependencies {
   lwqlProvisioning: LwqlProvisioningOperations;
   /** A new project's key-map row, written on project's created event; no-op without LangWatchQL. */
   lwqlKeyMap: LwqlKeyMapService;
+  /** The `analytics:fill-id-indexes` step's body. */
+  idIndexFill: AnalyticsIdIndexFillService;
 }
 
 /** The peer modules the Workbench's access rules read, resolved through their own tokens. */
@@ -407,11 +412,13 @@ export class AnalyticsModule
     const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
       sessions.resolve(tenantId);
     // Data retention owns the default retention days; a second claim refuses the process.
+    const evaluationRepository = evaluations.open({
+      defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+      idIndex: AnalyticsIdIndexFlagsService.create({ flags: setup.dependencies.featureFlags }),
+    });
     const analytics = AnalyticsServiceClass.create({
       repository: setup.repositories.analytics,
-      evaluationRepository: evaluations.open({
-        defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
-      }),
+      evaluationRepository,
       tenantLimiter: new InProcessTenantStatementLimiter({
         maxConcurrent: setup.config.tenantAnalyticsConcurrency,
         maxQueued: TENANT_ANALYTICS_MAX_QUEUED,
@@ -493,6 +500,11 @@ export class AnalyticsModule
         authz: setup.dependencies.authz,
         dataPrivacy: setup.dependencies.dataPrivacy,
         projects: setup.dependencies.projects,
+        idIndexFill: AnalyticsIdIndexFillService.create({
+          repository: evaluationRepository,
+          flags: setup.dependencies.featureFlags,
+          retention: setup.dependencies.retention,
+        }),
         lwqlBounds: LangWatchQLBoundsService.create({
           entitlement: setup.dependencies.plans,
           projects: setup.dependencies.projects,
@@ -555,6 +567,15 @@ export class AnalyticsModule
   /** Converges the halves the drift names, never the config store's entities; throws on failure. */
   convergeLwqlAppOwnedObjects(drift: LwqlAppOwnedDrift): Promise<void> {
     return this.#dependencies.lwqlProvisioning.convergeAppOwned(drift);
+  }
+
+  /** The `analytics:fill-id-indexes` step's body: the evaluation id index, then each flag. */
+  fillIdIndexes(input: {
+    checkpoint: IdIndexFillCheckpoint;
+    dryRun: boolean;
+    signal: AbortSignal;
+  }): Promise<IdIndexFillReport> {
+    return this.#dependencies.idIndexFill.fill(input);
   }
 
   /** The `analytics:fill-lwql-project-keys` step's body: each project's missing key-map row. */

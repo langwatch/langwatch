@@ -1,5 +1,10 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
+import type {
+  FillIdIndexesOptions,
+  IdIndexFillReport,
+  IdIndexFlags,
+  RetentionDaysProvider,
+} from "@langwatch/clickhouse-client";
 import type { EvaluationRunData, EvaluationRunLookup } from "@langwatch/evaluation-contract";
 
 /** A run lookup fenced by a proof instead of a bare tenant id (ruling AGG-EVAL-PROOF). */
@@ -8,7 +13,23 @@ export type EvaluationRunProofLookup = Omit<EvaluationRunLookup, "tenantId"> &
 
 /** A fenced run lookup with the tenant retention its unbounded fallback is floored at. */
 export type EvaluationRunFloorLookup = EvaluationRunProofLookup &
-  Readonly<{ retention: EvaluationRetentionLookup }>;
+  Readonly<{
+    retention: EvaluationRetentionLookup;
+    /** Whether the run id index may bound a lookup with no time; absent reads as off. */
+    idIndex?: IdIndexFlags | undefined;
+  }>;
+
+/** What a fill of Evaluation's id indexes takes; the repository supplies its own statements. */
+export type EvaluationIdIndexFill = Omit<
+  FillIdIndexesOptions,
+  "statements" | "targets" | "indexes" | "beforeFlag"
+> & {
+  /** Runs once a target is filled, before its flags, with the index tables retention copies to. */
+  beforeFlag: (input: {
+    target: Parameters<FillIdIndexesOptions["beforeFlag"]>[0]["target"];
+    indexes: readonly string[];
+  }) => Promise<void>;
+};
 
 /** Private persistence port for the Evaluation server package. */
 export abstract class EvaluationRunRepository {
@@ -30,7 +51,10 @@ export abstract class EvaluationRunRepository {
   abstract findInputs(input: {
     authorization: Authorization;
     evaluationId: string;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationInputsRead | null>;
+  /** Fills the run id index from rows older than its view, on every ClickHouse target. */
+  abstract fillIdIndexes(input: EvaluationIdIndexFill): Promise<IdIndexFillReport>;
 }
 
 /** One run's inputs and the project its row was read from (the member, on an aggregate). */

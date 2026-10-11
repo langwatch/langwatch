@@ -215,7 +215,7 @@ describe("AnalyticsEvaluationRepository", () => {
     expect(client.query).toHaveBeenCalledWith(
       expect.objectContaining({
         query: expect.stringContaining(
-          "ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,\n            length(AppliedEventIds) DESC",
+          "ORDER BY OccurredAt DESC, CompletedAt DESC, StartedAt DESC,\n          length(AppliedEventIds) DESC",
         ),
       }),
     );

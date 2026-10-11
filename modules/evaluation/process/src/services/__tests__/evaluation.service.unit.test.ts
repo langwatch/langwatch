@@ -1,4 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { IdIndexFillReport } from "@langwatch/clickhouse-client";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -60,6 +61,9 @@ class FakeRepository extends EvaluationRunRepository {
   }
   async findInputs(): Promise<EvaluationInputsRead | null> {
     return null;
+  }
+  async fillIdIndexes(): Promise<IdIndexFillReport> {
+    throw new Error("This suite does not fill id indexes.");
   }
 }
 

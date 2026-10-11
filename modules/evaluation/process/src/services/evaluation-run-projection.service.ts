@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   EvaluationNotFoundError,
   evaluationRunDataSchema,
@@ -21,13 +22,20 @@ export class EvaluationRunProjectionService extends EvaluationRunProjectionRepos
   static create(options: {
     repository: EvaluationRunRepository;
     retention: EvaluationRetentionLookup;
+    /** Whether the run id index bounds a read-back with no time; absent reads as off. */
+    idIndex?: IdIndexFlags | undefined;
   }): EvaluationRunProjectionService {
-    return new EvaluationRunProjectionService(options.repository, options.retention);
+    return new EvaluationRunProjectionService(
+      options.repository,
+      options.retention,
+      options.idIndex,
+    );
   }
 
   private constructor(
     private readonly repository: EvaluationRunRepository,
     private readonly retention: EvaluationRetentionLookup,
+    private readonly idIndex: IdIndexFlags | undefined,
   ) {
     super();
   }
@@ -54,7 +62,11 @@ export class EvaluationRunProjectionService extends EvaluationRunProjectionRepos
 
   async findRunByEvaluationId(input: EvaluationRunProofLookup): Promise<EvaluationRunData | null> {
     try {
-      return await this.repository.getByEvaluationId({ ...input, retention: this.retention });
+      return await this.repository.getByEvaluationId({
+        ...input,
+        retention: this.retention,
+        idIndex: this.idIndex,
+      });
     } catch (error) {
       if (error instanceof EvaluationNotFoundError) return null;
       throw error;

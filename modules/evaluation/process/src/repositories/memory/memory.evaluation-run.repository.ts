@@ -1,4 +1,5 @@
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
+import type { IdIndexFillReport } from "@langwatch/clickhouse-client";
 import { EvaluationNotFoundError, type EvaluationRunData } from "@langwatch/evaluation-contract";
 
 import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
@@ -58,6 +59,19 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
       .flatMap((projectId) => this.#tenantRuns(projectId))
       .filter((run) => run.traceId === input.traceId)
       .toSorted((left, right) => right.updatedAt - left.updatedAt);
+  }
+
+  /** Runs over a map have no partitions to index, so there is nothing to fill. */
+  async fillIdIndexes(): Promise<IdIndexFillReport> {
+    return {
+      targetsDone: [],
+      targetsFailed: [],
+      cursor: null,
+      done: 0,
+      total: 0,
+      batches: 0,
+      retries: 0,
+    };
   }
 
   async findInputs(input: {

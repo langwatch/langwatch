@@ -44,6 +44,17 @@ export const analyticsProcessModule: PublishedProcessModule<
       // Level-triggered: a rerun reads the map again and inserts only what is still missing.
       run: ({ dryRun }) => app.fillLwqlProjectKeys({ dryRun }),
     }),
+    defineMigrationStep({
+      id: "analytics:fill-id-indexes",
+      kind: "data",
+      mode: "background",
+      description:
+        "Fills the evaluation analytics id index from rows older than its view, then turns the lookup on per ClickHouse target.",
+      // Old releases fire the same server-side view, so nothing waits for them to leave.
+      needsOldWritersGone: false,
+      // Level-triggered: min/max merge, so a rerun changes no range and resumes at its cursor.
+      run: ({ checkpoint, dryRun, signal }) => app.fillIdIndexes({ checkpoint, dryRun, signal }),
+    }),
   ]);
 
 /** Where the window immediately before a requested period begins. */
