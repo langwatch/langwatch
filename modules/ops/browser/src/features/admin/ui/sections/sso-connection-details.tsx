@@ -1,10 +1,10 @@
-import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ResourceRow } from "@langwatch/design-system/resource-row";
 import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 import type { AdminSsoConnection } from "@langwatch/enterprise-sso-contract";
-import { Building2, Check, Globe, ShieldCheck, Users } from "lucide-react";
+import { Building2, Check, Globe, Users } from "lucide-react";
 
 import { useAdminOne } from "../../behavior/use-admin-resource.ts";
 import type { AdminUser } from "./users-view.tsx";
@@ -32,15 +32,12 @@ const JOIN_POLICY = {
   refuse: "Existing members only",
 } as const;
 
-export function ConnectionHeader({ connection }: { connection: AdminSsoConnection }) {
+/** The context chips under the drawer title: organization, protocol and state. */
+export function ConnectionHeaderBadges({ connection }: { connection: AdminSsoConnection }) {
   const state = connection.state.replaceAll("_", " ").toLowerCase();
 
   return (
-    <DetailDrawerHeader
-      icon={<ShieldCheck size={14} aria-hidden />}
-      kind="SSO connection"
-      title={connection.providerId}
-    >
+    <>
       <HStack gap={1.5} color="fg.muted" fontSize="sm" minWidth={0}>
         <Building2 size={14} aria-hidden />
         <Text overflowWrap="anywhere">
@@ -54,7 +51,7 @@ export function ConnectionHeader({ connection }: { connection: AdminSsoConnectio
         <Box boxSize="1.5" borderRadius="full" bg="colorPalette.solid" aria-hidden />
         {state.charAt(0).toUpperCase() + state.slice(1)}
       </Badge>
-    </DetailDrawerHeader>
+    </>
   );
 }
 
@@ -137,9 +134,7 @@ export function ConnectionDomains({ connection }: { connection: AdminSsoConnecti
           />
         ))}
         {connection.domainVerifications.length === 0 && (
-          <Text color="fg.muted" fontSize="sm">
-            No domain has been proved yet.
-          </Text>
+          <NoDataInfoBlock size="line" title="No domain has been proved yet." />
         )}
         {connection.claimedDomains.map((domain) => (
           <PendingDomain key={domain} domain={domain} status="Awaiting approval" />

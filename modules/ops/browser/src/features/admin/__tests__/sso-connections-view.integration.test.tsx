@@ -323,8 +323,9 @@ describe("the admin single sign-on list", () => {
         target: { value: "   " },
       });
 
-      expect(confirmButton().hasAttribute("disabled")).toBe(true);
+      expect(confirmButton().hasAttribute("disabled")).toBe(false);
       fireEvent.click(confirmButton());
+      expect(await screen.findByText("Explain why this evidence proves domain control.")).toBeTruthy();
       expect(mutations.attestDomain).not.toHaveBeenCalled();
     });
   });

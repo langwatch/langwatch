@@ -6,14 +6,12 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
-  Button,
   Field,
   Heading,
   HStack,
   Input,
   Separator,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -87,62 +85,54 @@ export default function ProjectsView() {
           onPageChange: setPage,
         }}
       >
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          width="full"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>ID</Table.ColumnHeader>
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Slug</Table.ColumnHeader>
-              <Table.ColumnHeader>Language</Table.ColumnHeader>
-              <Table.ColumnHeader>Framework</Table.ColumnHeader>
-              <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader>Created</Table.ColumnHeader>
-              <Table.ColumnHeader width="60px" textAlign="right" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel="Projects table">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>ID</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Slug</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Language</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Framework</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width={60} align="end" label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {list.data?.data.length === 0 && (
-              <Table.Row>
-                <Table.Cell colSpan={8}>
-                  <NoDataInfoBlock
-                    icon={<SearchX />}
-                    title="No projects match your search."
-                    description="Try a different search or clear the filter to see all records."
-                  />
-                </Table.Cell>
-              </Table.Row>
+              <ListTable.SpanRow columns={8}>
+                <NoDataInfoBlock
+                  icon={<SearchX />}
+                  title="No projects match your search."
+                  description="Try a different search or clear the filter to see all records."
+                />
+              </ListTable.SpanRow>
             )}
             {list.data?.data.map((project) => (
-              <Table.Row key={project.id}>
+              <ListTable.Row key={project.id}>
                 <ListTable.IdCell value={project.id} label="project ID" />
-                <Table.Cell maxWidth="280px">
+                <ListTable.Cell maxWidth={280}>
                   <Text truncate title={project.name}>
                     {project.name}
                   </Text>
-                </Table.Cell>
-                <Table.Cell maxWidth="200px">
+                </ListTable.Cell>
+                <ListTable.Cell maxWidth={200}>
                   <Text truncate title={project.slug}>
                     {project.slug}
                   </Text>
-                </Table.Cell>
-                <Table.Cell>{project.language ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>{project.framework ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>{project.language ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>{project.framework ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>
                   <ProjectStatusBadge
                     archivedAt={project.archivedAt}
                     integrated={project.integrated}
                   />
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <AdminDate value={project.createdAt} display="date" />
-                </Table.Cell>
-                <Table.Cell textAlign="right">
+                </ListTable.Cell>
+                <ListTable.Cell align="end">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
@@ -156,10 +146,10 @@ export default function ProjectsView() {
                       </Menu.Content>
                     </Menu.Root>
                   </Box>
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       </AdminTable>
 
@@ -283,48 +273,28 @@ function ProjectEditDrawer({
 
   return (
     <>
-      <Dialog.Root
+      <Dialog
         open={revokeQuestion !== null}
-        onOpenChange={({ open }) => {
-          if (!open) setRevokeQuestion(null);
+        onClose={() => setRevokeQuestion(null)}
+        title="Turn off sharing"
+        secondaryAction={{
+          label: "Keep links paused",
+          onClick: () => revokeQuestion && save({ ...revokeQuestion, revokeExistingLinks: false }),
+        }}
+        primaryAction={{
+          label: `Revoke ${linkCount} links`,
+          danger: true,
+          onClick: () => revokeQuestion && save({ ...revokeQuestion, revokeExistingLinks: true }),
         }}
       >
-        <Dialog.Content>
-          <Dialog.CloseTrigger />
-          <Dialog.Header>
-            <Dialog.Title>Turn off sharing</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack align="start" gap={2}>
-              <Text>{linkCount} share links exist for this project.</Text>
-              <Text fontSize="sm" color="fg.muted">
-                Paused links stop working while sharing is off and work again when it is turned back
-                on. Revoked links are gone for good.
-              </Text>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack gap={2}>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  revokeQuestion && save({ ...revokeQuestion, revokeExistingLinks: false })
-                }
-              >
-                Keep links paused
-              </Button>
-              <Button
-                colorPalette="red"
-                onClick={() =>
-                  revokeQuestion && save({ ...revokeQuestion, revokeExistingLinks: true })
-                }
-              >
-                Revoke {linkCount} links
-              </Button>
-            </HStack>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+        <VStack align="start" gap={2}>
+          <Text>{linkCount} share links exist for this project.</Text>
+          <Text fontSize="sm" color="fg.muted">
+            Paused links stop working while sharing is off and work again when it is turned back on.
+            Revoked links are gone for good.
+          </Text>
+        </VStack>
+      </Dialog>
       <Drawer
         open={!!project}
         onClose={onClose}

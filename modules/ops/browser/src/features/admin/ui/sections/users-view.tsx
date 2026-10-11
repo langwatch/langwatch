@@ -11,7 +11,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Table,
   Text,
   VStack,
   Wrap,
@@ -105,59 +104,51 @@ export default function UsersView() {
           onPageChange: setPage,
         }}
       >
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          width="full"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>ID</Table.ColumnHeader>
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Email</Table.ColumnHeader>
-              <Table.ColumnHeader>Organizations</Table.ColumnHeader>
-              <Table.ColumnHeader>Projects</Table.ColumnHeader>
-              <Table.ColumnHeader>Created</Table.ColumnHeader>
-              <Table.ColumnHeader>Last login</Table.ColumnHeader>
-              <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader width="60px" textAlign="right" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel="Users table">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>ID</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Email</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Organizations</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Projects</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Last login</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width={60} align="end" label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {list.data?.data.length === 0 && (
-              <Table.Row>
-                <Table.Cell colSpan={9}>
-                  <NoDataInfoBlock
-                    icon={<SearchX />}
-                    title="No users match your search."
-                    description="Try a different search or clear the filter to see all records."
-                  />
-                </Table.Cell>
-              </Table.Row>
+              <ListTable.SpanRow columns={9}>
+                <NoDataInfoBlock
+                  icon={<SearchX />}
+                  title="No users match your search."
+                  description="Try a different search or clear the filter to see all records."
+                />
+              </ListTable.SpanRow>
             )}
             {list.data?.data.map((user) => (
-              <Table.Row key={user.id}>
+              <ListTable.Row key={user.id}>
                 <ListTable.IdCell value={user.id} label="user ID" />
-                <Table.Cell>{user.name ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>{user.email ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>
+                <ListTable.Cell>{user.name ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>{user.email ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>
                   <RefChipList refs={user.organizations} resource="organizations" />
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <RefChipList refs={user.projects} resource="projects" />
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <AdminDate value={user.createdAt} display="date" />
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <AdminDate value={user.lastLoginAt} display="datetime" />
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <UserStatusBadge user={user} />
-                </Table.Cell>
-                <Table.Cell textAlign="right">
+                </ListTable.Cell>
+                <ListTable.Cell align="end">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
@@ -177,10 +168,10 @@ export default function UsersView() {
                       </Menu.Content>
                     </Menu.Root>
                   </Box>
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       </AdminTable>
 

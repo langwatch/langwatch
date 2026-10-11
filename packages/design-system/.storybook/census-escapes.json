@@ -356,5 +356,13 @@
     "reason": "A tinted span panel; a Card would flatten its colour meaning. (X5o1 review)",
     "owner": "ops",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/features/admin/ui/sections/sso-connection-details.tsx",
+    "rule": "card-box",
+    "line": 157,
+    "reason": "A bordered pending-domain row with no fill; Card and ResourceRow would add one (X3o review).",
+    "owner": "ops",
+    "disposition": "reviewed"
   }
 ]
