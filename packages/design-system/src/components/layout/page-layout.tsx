@@ -35,25 +35,35 @@ export type { PageTab } from "./page-header-tabs.tsx";
 /** The one left and right edge a page's header and body share; the shell area may set it. */
 const PAGE_INSET = "var(--page-inset, var(--chakra-spacing-6))";
 
-// Container component
-interface ContainerProps extends ChakraContainerProps {
+/** The page body: `default` fits beside the sidebar; `fill` takes the whole width. */
+export interface PageContainerProps {
+  width?: "default" | "fill";
+  children: ReactNode;
+  "data-testid"?: string;
+}
+
+/** @deprecated Open style props; pass `width="fill"` instead of `maxWidth="full"`. */
+interface LegacyContainerProps extends ChakraContainerProps {
   sidebarWidth?: number;
 }
 
-/**
- * Container component
- * @param children - The children to render inside the container
- * @param sidebarWidth - Width of sidebar (default 200px); used to calculate container max width
- * @param props - The props to pass to the container
- * @returns A container component with a max width based on the sidebar width
- */
-function Container({ children, sidebarWidth = 200, ...props }: PropsWithChildren<ContainerProps>) {
+function Container(props: PageContainerProps): ReactNode;
+/** @deprecated Pass only `width`, `children` and `data-testid`. */
+function Container(props: PropsWithChildren<LegacyContainerProps>): ReactNode;
+function Container({
+  children,
+  sidebarWidth = 200,
+  width,
+  ...props
+}: PropsWithChildren<LegacyContainerProps> & { "data-testid"?: string }): ReactNode {
+  const named = width === "fill" || width === "default";
   return (
     <ChakraContainer
       data-page-container
-      maxW={`calc(100vw - ${sidebarWidth}px)`}
+      maxW={width === "fill" ? "full" : `calc(100vw - ${sidebarWidth}px)`}
       paddingX={PAGE_INSET}
       paddingY={3}
+      width={named ? undefined : width}
       {...props}
     >
       {children}
