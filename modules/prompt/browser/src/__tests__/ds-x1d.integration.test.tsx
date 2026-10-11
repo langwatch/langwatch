@@ -165,9 +165,13 @@ describe("GenerateApiSnippetDialog language tabs", () => {
       renderDialog({ onOpenChange });
 
       const dialog = screen.getByRole("dialog");
-      await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
-      await user.keyboard("{Escape}");
-      await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+      screen.getByRole("tab", { name: "Python" }).focus();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+      // The dismiss layer arms a moment after mount, so press until it answers.
+      await waitFor(async () => {
+        await user.keyboard("{Escape}");
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+      });
       expect(onOpenChange).toHaveBeenCalledTimes(1);
     });
 
