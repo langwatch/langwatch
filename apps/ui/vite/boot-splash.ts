@@ -138,13 +138,23 @@ export async function bundleBootGround({ minify }: { minify: boolean }): Promise
 const groundTag = (code: string) =>
   `<script data-boot-splash>${code.replaceAll("</script", "<\\/script")}</script>`;
 
-// On Vite's bundling page the wait is the build, so the note says so after a moment.
+const FALLBACK_MARKER = "__vite_is_fallback_page__";
+
+// On Vite's bundling page the wait is the build, so the note says so after a moment. Vite
+// reloads this page once, when its first build ends, so a page that missed that message asks
+// the server itself every two seconds and reloads once it serves the app.
 const BUILDING_NOTE = `<script data-boot-splash>setTimeout(function () {
   var note = document.getElementById("lw-boot-note");
   if (note) { note.textContent = "Building the app…"; note.setAttribute("data-on", ""); }
-}, 1500);</script>`;
-
-const FALLBACK_MARKER = "__vite_is_fallback_page__";
+}, 1500);
+setInterval(function () {
+  fetch(location.href, { headers: { accept: "text/html" }, cache: "no-store" })
+    .then(function (response) { return response.ok ? response.text() : ""; })
+    .then(function (html) {
+      if (html && html.indexOf("${FALLBACK_MARKER}") === -1) location.reload();
+    })
+    .catch(function () {});
+}, 2000);</script>`;
 
 /**
  * Vite's fallback page with our screen in its body. Its scripts stay: they reload the page

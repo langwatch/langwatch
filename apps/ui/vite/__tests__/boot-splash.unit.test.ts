@@ -3,6 +3,8 @@
  * @vitest-environment node
  */
 
+import { runInNewContext } from "node:vm";
+
 import { describe, expect, it } from "vitest";
 
 import { BOOT_SPLASH_BODY, bootSplash, brandFallbackPage } from "../boot-splash";
@@ -58,6 +60,34 @@ describe("the boot splash", () => {
       expect(html).toContain("/* hmr client */");
       expect(html).toContain(GROUND);
       expect(html).toContain("Building the app…");
+    });
+
+    it("reloads itself once the server serves the app, even if Vite's reload never came", async () => {
+      const html = brandFallbackPage({ html: VITE_FALLBACK });
+      const script = [...html.matchAll(/<script data-boot-splash>([\s\S]*?)<\/script>/g)]
+        .map((match) => match[1])
+        .find((code) => code?.includes("location.reload"));
+      if (!script) throw new Error("expected the reload probe");
+      let served = VITE_FALLBACK;
+      let reloads = 0;
+      const ticks: (() => void)[] = [];
+      const page = {
+        document: { getElementById: () => null },
+        location: { href: "/project/traces", reload: () => (reloads += 1) },
+        setTimeout: () => 0,
+        setInterval: (tick: () => void) => ticks.push(tick),
+        fetch: async () => ({ ok: true, text: async () => served }),
+      };
+      runInNewContext(script, page);
+      const tick = async () => {
+        for (const run of ticks) run();
+        await new Promise((resolve) => setImmediate(resolve));
+      };
+      await tick();
+      expect(reloads).toBe(0);
+      served = '<html><body><div id="root"></div></body></html>';
+      await tick();
+      expect(reloads).toBe(1);
     });
   });
 
