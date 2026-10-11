@@ -42,6 +42,48 @@ export const EveryRole: Story = {
   },
 };
 
+export const SemanticOutlineActions: Story = {
+  args: { primaryAction: undefined },
+  parameters: {
+    usage: {
+      use: "Several outline actions in a footer, each with a tone: neutral, danger (red), success (green) or info (blue). No primary is needed.",
+      avoid: "Promoting an operation to a solid primary just to colour it.",
+    },
+  },
+  render: () => (
+    <Box display="flex" flexDirection="column" gap={6}>
+      <ActionRow
+        secondaryActions={[
+          { label: "Full Page View", onClick: noop },
+          { label: "Cancel replay", tone: "danger", onClick: noop },
+          { label: "Wake now", tone: "info", onClick: noop },
+          { label: "Redrive dead messages", tone: "success", onClick: noop },
+        ]}
+      />
+      <ActionRow
+        secondaryActions={[
+          {
+            label: "Drain",
+            tone: "danger",
+            onClick: noop,
+            disabledReason: "Only admins can drain",
+          },
+          { label: "Retry now", tone: "success", onClick: noop, loading: true },
+        ]}
+      />
+      <Box maxWidth="320px">
+        <ActionRow
+          secondaryActions={[
+            { label: "Move to dead-letter queue", onClick: noop },
+            { label: "Redrive dead messages", tone: "success", onClick: noop },
+            { label: "Cancel replay", tone: "danger", onClick: noop },
+          ]}
+        />
+      </Box>
+    </Box>
+  ),
+};
+
 export const MenuAction: Story = {
   args: {
     primaryAction: {

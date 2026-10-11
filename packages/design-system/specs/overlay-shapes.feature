@@ -94,6 +94,20 @@ Feature: Drawer and dialog shapes
     And while a save is in flight Cancel waits
 
   @integration
+  Scenario: A drawer footer holds several outline actions without a primary
+    Given a drawer whose footer carries only secondary actions
+    Then every action is drawn in the order given, with no Cancel and no solid primary
+    And a singular secondary action is drawn before the array
+    And a loading, disabled or busy action runs nothing and keeps its name or reason
+
+  @integration @browser
+  Scenario: A secondary action's tone colours its outline
+    Given secondary actions that are neutral, danger, success and info
+    Then each coloured one keeps an outline in its palette's text, border and hover colours
+    And the neutral one keeps today's look in light and dark
+    And at 320px every label stays reachable without horizontal overflow
+
+  @integration
   Scenario: A drawer header and footer give way on a narrow screen
     Given a drawer with header tools and a footer with three actions
     Then the header row and the footer actions wrap instead of overflowing

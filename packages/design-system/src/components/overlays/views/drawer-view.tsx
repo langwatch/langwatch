@@ -32,7 +32,12 @@ import {
 } from "../action-row.tsx";
 import { CloseButton } from "../close-button.tsx";
 
-export type { ActionRowProps, FrameAction } from "../action-row.tsx";
+export type {
+  ActionRowProps,
+  FrameAction,
+  FrameSecondaryAction,
+  FrameSecondaryTone,
+} from "../action-row.tsx";
 
 /**
  * The panel's ground, border and radius are the recipe's: don't pass `bg`, `background` or
@@ -259,6 +264,7 @@ const FOOTER_SAFE_AREA = "max(var(--chakra-spacing-4), env(safe-area-inset-botto
 /**
  * The drawer footer is an ActionRow. It draws no Cancel unless the descriptor carries `cancel`
  * (ruling 2026-10-11: a drawer that has one keeps it); the X and Escape close either way.
+ * `secondaryActions` adds outline actions, each with an optional tone; no primary is needed.
  */
 export type DrawerFooterProps = ActionRowProps;
 

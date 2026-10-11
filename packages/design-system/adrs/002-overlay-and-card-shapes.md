@@ -27,7 +27,9 @@ drawers and dialogs on 2026-09-29 therefore did not keep them the same.
    (`type: "submit"`, optional `form` id for a child-owned form) or a menu (`items`). The row
    (`ActionRow`, `@langwatch/design-system/action-row`) picks variant, colour and size by role:
    primary solid orange (red with `danger`), secondary outline, destructive ghost red, utility
-   ghost. Disabled only with a `disabledReason`, shown as a tooltip (ADR-018: never validation).
+   ghost. A secondary may carry a `tone` (`danger` red, `success` green, `info` blue, default
+   neutral) and a footer may give several in `secondaryActions`; they stay outline and need no
+   primary (ruling 2026-10-11). Disabled only with a `disabledReason`, shown as a tooltip (ADR-018: never validation).
    An overlay owns a form through `onSubmit` (and `formId`); a child form is never wrapped.
 3. **One width scale.** `sm` 28rem, `md` 32rem, `lg` 42rem, `xl` 56rem, `full` (drawers only),
    the same name meaning the same width in a drawer and a dialog. They are maxima, capped by the

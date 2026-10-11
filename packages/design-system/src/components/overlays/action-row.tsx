@@ -62,11 +62,19 @@ export interface FrameMenuAction extends FrameActionLook {
 /** One button the shape draws. The caller never picks variant, colour, size or `type`. */
 export type FrameAction = FrameButtonAction | FrameSubmitAction | FrameMenuAction;
 
+/** The colour meaning of a secondary outline action; omitted is neutral. */
+export type FrameSecondaryTone = "neutral" | "danger" | "success" | "info";
+
+/** A secondary descriptor: a `FrameAction` that may carry a tone. */
+export type FrameSecondaryAction = FrameAction & { tone?: FrameSecondaryTone };
+
 export interface ActionRowProps {
   /** Solid in the product's accent (red with `danger`), rightmost. */
   primaryAction?: FrameAction;
-  /** Outline, left of the primary. */
-  secondaryAction?: FrameAction;
+  /** Outline, left of the primary; its `tone` is danger (red), success (green) or info (blue). */
+  secondaryAction?: FrameSecondaryAction;
+  /** More outline actions after the singular one, in order; a footer needs no primary for them. */
+  secondaryActions?: FrameSecondaryAction[];
   /** Ghost red, on the left edge: Delete, Archive. */
   destructiveAction?: FrameAction;
   /** Ghost, after the destructive one: Duplicate, Test connection. */
@@ -92,22 +100,40 @@ const LOOK: Record<FrameActionKind, { variant: "solid" | "outline" | "ghost"; pa
     cancel: { variant: "outline" },
   };
 
+const TONE_PALETTE = { danger: "red", success: "green", info: "blue" } as const;
+
+/** Scoped overrides: the outline recipe pins neutral fg, border and hover. */
+function toneStyle(tone: FrameSecondaryTone | undefined) {
+  if (tone === undefined || tone === "neutral") return undefined;
+  return {
+    colorPalette: TONE_PALETTE[tone],
+    color: "colorPalette.fg",
+    borderColor: "colorPalette.muted",
+    bg: "transparent",
+    _hover: { backgroundColor: "colorPalette.subtle" },
+    _expanded: { backgroundColor: "colorPalette.subtle" },
+  } as const;
+}
+
 /** One descriptor drawn as a button; the shapes use it for their header action too. */
 export function FrameActionButton({
   action,
   kind,
   busy = false,
   size,
+  tone,
 }: {
   action: FrameAction;
   kind: FrameActionKind;
   busy?: boolean;
   size?: "sm";
+  tone?: FrameSecondaryTone;
 }) {
   const look = LOOK[kind];
   const accent = useProductAccent();
   const primaryPalette = action.danger ? "red" : accent.colorPalette;
   const palette = kind === "primary" ? primaryPalette : look.palette;
+  const toned = kind === "secondary" ? toneStyle(tone) : undefined;
   const submits = action.type === "submit";
   const blocked = busy || action.loading === true;
   const button = (
@@ -116,6 +142,7 @@ export function FrameActionButton({
       form={submits ? action.form : undefined}
       variant={look.variant}
       colorPalette={palette}
+      {...toned}
       size={size}
       loading={action.loading}
       disabled={busy || action.disabledReason !== undefined}
@@ -174,6 +201,7 @@ export function FrameActionButton({
 export function ActionRow({
   primaryAction,
   secondaryAction,
+  secondaryActions = [],
   destructiveAction,
   utilityActions = [],
   note,
@@ -207,8 +235,22 @@ export function ActionRow({
         />
       )}
       {secondaryAction && (
-        <FrameActionButton action={secondaryAction} kind="secondary" busy={busy} />
+        <FrameActionButton
+          action={secondaryAction}
+          kind="secondary"
+          busy={busy}
+          tone={secondaryAction.tone}
+        />
       )}
+      {secondaryActions.map((action) => (
+        <FrameActionButton
+          key={action.label}
+          action={action}
+          kind="secondary"
+          busy={busy}
+          tone={action.tone}
+        />
+      ))}
       {primaryAction && <FrameActionButton action={primaryAction} kind="primary" busy={busy} />}
     </HStack>
   );
