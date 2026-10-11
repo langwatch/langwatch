@@ -1,16 +1,18 @@
 /**
  * Carries out one daily run: asks whether the person may have it, briefs Langy, waits, checks
- * the answer, files what holds up and records how it ended. The outbox may run it twice, so
- * every id, date and filing is derived from the run and a repeat writes the same facts.
+ * the answer, files what is new, renews what it repeats and records how it ended. The outbox
+ * may run it twice, so every id, date and write is the run's own and a repeat writes the same.
  * @see modules/insight/adrs/004-daily-run.md
  */
 
 import { HandledError } from "@langwatch/handled-error";
 import type {
+  InsightEntry,
   InsightRunBoard,
   InsightRunFailureReason,
   InsightRunOutcome,
   InsightRunReason,
+  InsightSource,
 } from "@langwatch/insight-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -24,10 +26,12 @@ import type { InsightRepository } from "../repositories/insight.repository.ts";
 import { type CheckedFinding, checkRunAnswer } from "../rules/insight-daily-run-answer.rules.ts";
 import { buildDailyRunBrief } from "../rules/insight-daily-run-brief.rules.ts";
 import {
-  DAILY_RUN_GRANULARITY_SECONDS,
   type DailyRunWindows,
   dailyRunConversationTitle,
+  dailyRunReplay,
   dailyRunWindows,
+  decideRunFindings,
+  matchableInsightsOfBoard,
   openInsightsOfBoard,
   runInsightId,
 } from "../rules/insight-daily-run.rules.ts";
@@ -53,6 +57,8 @@ type RunEnd = Readonly<{
   outcome: InsightRunOutcome;
   reason: InsightRunReason | null;
   filedCount: number;
+  /** The insights the run found still true and renewed; they are not counted as filed. */
+  renewedCount: number;
   conversationId: string | null;
   /** The board as the run read it; absent when it never reached the board. */
   board?: InsightRunBoard;
@@ -65,6 +71,12 @@ type ReadyRun = Readonly<{
 }>;
 
 type StartedTurn = Readonly<{ conversationId: string; turnId: string }>;
+
+/** What a run that wrote nothing counts, whatever ended it. */
+const NOTHING_WRITTEN = { filedCount: 0, renewedCount: 0 } as const;
+
+/** The run a write belongs to, and the answer it is taken from. */
+type RunWrite = Readonly<{ input: RunInput; ready: ReadyRun; source: InsightSource }>;
 
 /** Langy's refusals that no retry changes: each ends the run with its own reason. */
 const START_REFUSALS: Readonly<Record<string, Pick<RunEnd, "outcome" | "reason">>> = {
@@ -84,7 +96,7 @@ function codeOf(error: unknown): string {
 }
 
 function failed(reason: InsightRunFailureReason, conversationId: string | null): RunEnd {
-  return { outcome: "failed", reason, filedCount: 0, conversationId };
+  return { outcome: "failed", reason, ...NOTHING_WRITTEN, conversationId };
 }
 
 type InsightDailyRunMembers = Readonly<{
@@ -92,7 +104,7 @@ type InsightDailyRunMembers = Readonly<{
   langy: Pick<LangyApi, "startUnattendedTurn" | "awaitTurnSettlement" | "stopTurn">;
   insights: Pick<InsightRepository, "findForReader">;
   queries: Pick<InsightRunQueryService, "keepValid">;
-  insightCommands: Pick<InsightCommandsService, "fileInsight">;
+  insightCommands: Pick<InsightCommandsService, "fileInsight" | "renewInsight">;
   runCommands: Pick<
     InsightDailyRunCommandsService,
     "recordRunStarted" | "settleRun" | "turnOffSchedule"
@@ -136,7 +148,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     const { projectId, userId, board, slot } = input;
     const gate = await this.members.gate.check({ projectId, userId, board });
     if (!gate.ok) {
-      return { outcome: "skipped", reason: gate.reason, filedCount: 0, conversationId: null };
+      return { outcome: "skipped", reason: gate.reason, ...NOTHING_WRITTEN, conversationId: null };
     }
     return {
       gate,
@@ -165,11 +177,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
 
   private async askLangy(input: RunInput, { gate, windows }: ReadyRun) {
     const { projectId, userId, scheduleId, runId, slot, maxInsights } = input;
-    const entries = await this.members.insights.findForReader({
-      projectId,
-      userId,
-      limit: OPEN_INSIGHTS_READ_LIMIT,
-    });
+    const entries = await this.insightsOf(input);
     try {
       return await this.members.langy.startUnattendedTurn({
         projectId,
@@ -192,12 +200,18 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     } catch (error) {
       const refusal = START_REFUSALS[codeOf(error)];
       if (!refusal) throw error;
-      return { ...refusal, filedCount: 0, conversationId: null } satisfies RunEnd;
+      return { ...refusal, ...NOTHING_WRITTEN, conversationId: null } satisfies RunEnd;
     }
   }
 
+  /** The person's newest insights in the project, with their own state on each. */
+  private insightsOf({ projectId, userId }: RunInput): Promise<InsightEntry[]> {
+    const { insights } = this.members;
+    return insights.findForReader({ projectId, userId, limit: OPEN_INSIGHTS_READ_LIMIT });
+  }
+
   private async finish(input: RunInput, ready: ReadyRun, turn: StartedTurn): Promise<RunEnd> {
-    const { projectId, userId, maxInsights } = input;
+    const { projectId, userId, maxInsights, slot } = input;
     const { conversationId } = turn;
     const wait = await this.members.langy.awaitTurnSettlement({
       projectId,
@@ -224,7 +238,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     // Asked again: the turn took minutes, and a person who lost access since files nothing.
     const still = await this.members.gate.check({ projectId, userId, board: input.board });
     if (!still.ok) {
-      return { outcome: "skipped", reason: still.reason, filedCount: 0, conversationId };
+      return { outcome: "skipped", reason: still.reason, ...NOTHING_WRITTEN, conversationId };
     }
     const findings = await this.members.queries.keepValid({
       projectId,
@@ -232,26 +246,31 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       window: ready.windows.window,
       findings: answer.findings,
     });
-    for (const [position, finding] of findings.entries()) {
-      await this.file({
-        input,
-        ready,
-        finding,
-        position,
-        source: { conversationId, messageId: settlement.messageId },
-      });
+    // Read again: what the person marked done while Langy read is not found again for them.
+    const insights = matchableInsightsOfBoard({
+      entries: await this.insightsOf(input),
+      boardId: ready.gate.board.id,
+      slot,
+    });
+    const acts = decideRunFindings({ findings, insights });
+    const write = { input, ready, source: { conversationId, messageId: settlement.messageId } };
+    for (const act of acts) {
+      if (act.kind === "renew") await this.renew({ ...write, ...act });
+      else await this.file({ ...write, ...act });
     }
-    const filedCount = findings.length;
+    const filedCount = acts.filter((act) => act.kind === "file").length;
     return {
+      // Seen again is not news: a run that only renewed found nothing new.
       outcome: filedCount > 0 ? "filed" : "nothing",
       reason: null,
       filedCount,
+      renewedCount: acts.length - filedCount,
       conversationId,
     };
   }
 
   /**
-   * The module's one write for a run. The owner, the project and the board come from the run
+   * Files a finding as a new insight. The owner, the project and the board come from the run
    * and never from the answer; the id and the instant are the run's, so a repeat files nothing new.
    */
   private async file({
@@ -260,36 +279,47 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     finding,
     position,
     source,
-  }: {
-    input: RunInput;
-    ready: ReadyRun;
-    finding: CheckedFinding;
-    position: number;
-    source: { conversationId: string; messageId: string };
-  }): Promise<void> {
+  }: RunWrite & { finding: CheckedFinding; position: number }): Promise<void> {
     const { projectId, userId, scheduleId, runId, slot } = input;
-    const { widget, ...words } = finding;
-    const { start, end } = ready.windows.window;
+    const { widget, renews: _renews, ...words } = finding;
     await this.members.insightCommands.fileInsight({
       tenantId: projectId,
       occurredAt: slot,
       insightId: runInsightId({ scheduleId, runId, position }),
       ...words,
-      replay:
-        words.lwql === null
-          ? null
-          : {
-              start,
-              end,
-              granularitySeconds: DAILY_RUN_GRANULARITY_SECONDS,
-              period: null,
-              parameters: {},
-            },
+      replay: words.lwql === null ? null : dailyRunReplay({ window: ready.windows.window }),
       source,
       board: { ...ready.gate.board, widget },
       filedVia: "run",
       ownerUserId: userId,
       filedByUserId: null,
+    });
+  }
+
+  /**
+   * Renews the insight a finding repeats: the run's words, validity, window and answer, on the
+   * same id. Stamped with the run's slot, so a repeat is the same renewal. The insight keeps
+   * its own query and that query's values; nothing here names a reader, so seen stays as it is.
+   */
+  private async renew({
+    input,
+    ready,
+    finding,
+    insight,
+    source,
+  }: RunWrite & { finding: CheckedFinding; insight: InsightEntry }): Promise<void> {
+    const { window } = ready.windows;
+    await this.members.insightCommands.renewInsight({
+      tenantId: input.projectId,
+      occurredAt: input.slot,
+      insightId: insight.id,
+      body: finding.body,
+      validDays: finding.validDays,
+      replay:
+        insight.lwql === null
+          ? null
+          : dailyRunReplay({ window, parameters: insight.replay?.parameters ?? {} }),
+      source,
     });
   }
 

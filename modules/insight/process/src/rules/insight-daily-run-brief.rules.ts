@@ -11,6 +11,7 @@ import {
 } from "@langwatch/analytics-contract";
 import {
   INSIGHT_RUN_FINDING_BODY_MAX,
+  INSIGHT_RUN_FINDING_KEY_MAX,
   INSIGHT_RUN_FINDING_TITLE_MAX,
   INSIGHT_RUN_FINDINGS_FENCE_TAG,
   INSIGHT_TONES,
@@ -43,7 +44,7 @@ export type DailyRunBriefInput = Readonly<{
   windows: DailyRunWindows;
   maxInsights: number;
   /** The person's open insights for this board, newest first. */
-  openInsights: readonly { title: string }[];
+  openInsights: readonly { id: string; title: string; findingKey: string | null }[];
 }>;
 
 /**
@@ -108,7 +109,14 @@ export const EXAMPLE_FINDING = insightRunFindingSchema.parse({
   validDays: 7,
   widgetId: "a-widget-id-from-the-list",
   lwql: "that widget's stored query, exactly as stored",
+  key: "checkout-errors-doubled",
 });
+
+/** An open insight by its id, its title and the key a repeat of it carries, on one line. */
+function openInsightLine({ id, title, findingKey }: DailyRunBriefInput["openInsights"][number]) {
+  const named = `- ${quoted(id)}: ${quoted(title)}`;
+  return findingKey === null ? named : `${named} (key ${quoted(findingKey)})`;
+}
 
 /** Everything a person named, between the two markers and nowhere else in the brief. */
 function dataBlock({
@@ -122,7 +130,7 @@ function dataBlock({
     "Widgets on it:",
     ...widgets.map((widget) => `- ${quoted(widget.id)}: ${quoted(widget.name)}`),
     "Open insights:",
-    ...openInsights.map((insight) => `- ${quoted(insight.title)}`),
+    ...openInsights.map(openInsightLine),
     BRIEF_DATA_CLOSES,
   ].join("\n");
 }
@@ -171,7 +179,12 @@ function briefListing({
     ].join("\n"),
     open.length === 0
       ? "The person has no open insights for this dashboard."
-      : "The data lists the open insights the person already has for this dashboard. Do not report the same finding again.",
+      : [
+          "The data lists the open insights the person already has for this dashboard, each by",
+          "its id, its title and its key. When a finding is the same thing as one of them, do not",
+          "report it as new: report it with renews set to that insight's id, and with key set to",
+          "that insight's key when it has one, so the insight is renewed and no second one is filed.",
+        ].join("\n"),
     [
       `End your answer with exactly one fenced block tagged ${INSIGHT_RUN_FINDINGS_FENCE_TAG}`,
       "that holds one JSON object, and write nothing after it:",
@@ -184,7 +197,11 @@ function briefListing({
       "true), widgetId (optional, the id of the listed widget the finding came from), lwql",
       "(optional, the stored query of that widget the finding came from, exactly as the widget",
       "stores it: its parameters left in, no date and no database name. Any other query is not",
-      'kept). Use no other field. With nothing to report, answer {"findings":[]} in the block.',
+      `kept), key (a short name for what was found, in lower case with hyphens, at most ${INSIGHT_RUN_FINDING_KEY_MAX}`,
+      "characters: the same thing found on a later day must get the same key, so name the",
+      "subject and the kind of change, and no number or date), renews (optional, the id of the",
+      "open insight this finding repeats). Use no other field. With nothing to report,",
+      'answer {"findings":[]} in the block.',
     ].join("\n"),
   ].join("\n\n");
 }

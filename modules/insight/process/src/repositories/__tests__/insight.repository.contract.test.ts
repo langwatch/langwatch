@@ -64,6 +64,7 @@ function insight(overrides: Partial<InsightState> = {}): InsightState {
     filedVia: "chat",
     ownerUserId: OWNER,
     filedByUserId: OWNER,
+    findingKey: null,
     filedAt: FILED_AT,
     renewedAt: null,
     ...overrides,
@@ -195,6 +196,32 @@ function contractCases(backend: Backend): void {
       await expect(refusalOf(read({ insightId, userId: OWNER }))).resolves.toMatchObject({
         code: "insight_not_found",
       });
+    });
+  });
+
+  describe("when a later run renewed an insight that holds a key", () => {
+    /** @scenario "An insight's key and the day it was renewed are stored with it" */
+    it("answers the owner its key and when it was renewed, and neither for one saved from a chat", async () => {
+      const renewedAt = FILED_AT + 24 * HOUR_MS;
+      const renewed = await file({
+        filedVia: "run",
+        filedByUserId: null,
+        findingKey: "checkout-errors-doubled",
+        renewedAt,
+      });
+      const saved = await file({ filedAt: FILED_AT - HOUR_MS });
+
+      await expect(read({ insightId: renewed, userId: OWNER })).resolves.toMatchObject({
+        id: renewed,
+        findingKey: "checkout-errors-doubled",
+        filedAt: FILED_AT,
+        renewedAt,
+      });
+      const inbox = await inboxOf(OWNER);
+      expect(inbox.map((entry) => [entry.id, entry.findingKey, entry.renewedAt])).toEqual([
+        [renewed, "checkout-errors-doubled", renewedAt],
+        [saved, null, null],
+      ]);
     });
   });
 

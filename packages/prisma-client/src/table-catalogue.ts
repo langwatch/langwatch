@@ -1080,7 +1080,8 @@ export const prismaModelFieldCatalogue = {
     "replayEnd",
     "replayGranularitySeconds",
     "replayContext",
-    "ownerUserId"
+    "ownerUserId",
+    "findingKey"
   ],
   "InsightReaderProjection": [
     "id",

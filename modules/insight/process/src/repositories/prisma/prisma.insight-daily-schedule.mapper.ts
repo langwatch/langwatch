@@ -38,6 +38,7 @@ export function dailyScheduleStateFromRow(row: InsightDailyScheduleRow): Insight
     lastRunReason:
       row.lastRunReason === null ? null : insightRunReasonSchema.parse(row.lastRunReason),
     lastRunFiled: row.lastRunFiled,
+    lastRunRenewed: row.lastRunRenewed,
     lastRunConversationId: row.lastRunConversationId,
   };
 }

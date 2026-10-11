@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
+import { insightRunSettledEventDataSchema } from "../insight-daily-run.events.ts";
 import {
   configureInsightDailyRunInputSchema,
   insightBoardDailyRunScopeSchema,
@@ -63,6 +64,38 @@ describe("given the findings a run's answer holds", () => {
     expect(
       insightRunFindingsSchema.validate({ findings: [{ ...finding, ownerUserId: "user-2" }] }),
     ).toBe(false);
+  });
+
+  /** @scenario "A finding may carry a key and the insight it repeats" */
+  it("takes a key and the insight a finding repeats, and refuses a key longer than 80", () => {
+    const finding = { title: "Cost doubled", body: "Cost doubled.", tone: "bad" };
+    const takes = (patch: Record<string, unknown>) =>
+      insightRunFindingsSchema.validate({ findings: [{ ...finding, ...patch }] });
+
+    expect(takes({ key: "checkout-cost-doubled", renews: "insight_1" })).toBe(true);
+    expect(takes({ key: "k".repeat(80) })).toBe(true);
+    expect(takes({ key: "k".repeat(81) })).toBe(false);
+    expect(takes({ key: " " })).toBe(false);
+    expect(takes({ renews: "" })).toBe(false);
+  });
+});
+
+describe("given a run's outcome stored before a run could renew", () => {
+  /** @scenario "An outcome stored before renewal reads as none renewed" */
+  it("reads as no insight renewed", () => {
+    const stored = {
+      scheduleId: "schedule-1",
+      userId: "user-1",
+      board: REQUEST.board,
+      runId: "run-1",
+      slot: Date.UTC(2026, 9, 10, 9, 37),
+      outcome: "filed",
+      reason: null,
+      filedCount: 2,
+      conversationId: "conversation-1",
+    };
+
+    expect(insightRunSettledEventDataSchema.parse(stored)).toEqual({ ...stored, renewedCount: 0 });
   });
 });
 

@@ -25,14 +25,17 @@ const CLOSING_FENCE = /^ {0,3}`{3,}[ \t]*$/;
 type BoardWidget = Readonly<{ id: string; name: string; queries: readonly string[] }>;
 
 /**
- * One finding as the run files it: its words, a widget only when the board has it, and a
- * query only when that widget stores it.
+ * One finding as the run files it: its words, a widget only when the board has it, a query
+ * only when that widget stores it, its key as one spelling, and the insight it says it repeats.
  */
 export type CheckedFinding = Readonly<
-  Omit<InsightRunFinding, "widgetId" | "topic" | "lwql"> & {
+  Omit<InsightRunFinding, "widgetId" | "topic" | "lwql" | "key" | "renews"> & {
     topic: string | null;
     lwql: string | null;
     widget: { id: string; name: string } | null;
+    findingKey: string | null;
+    /** An insight id as Langy wrote it; the run checks whose it is. */
+    renews: string | null;
   }
 >;
 
@@ -81,6 +84,18 @@ function isHandedBack({ stored, handedBack }: { stored: string; handedBack: stri
   return line.replaceAll(PERIOD_STEP, String(DAILY_RUN_GRANULARITY_SECONDS)) === handedBack;
 }
 
+/**
+ * A key as one spelling: lower case, words joined by hyphens. Langy writes the same finding's
+ * key with other capitals or spaces on another day, and it must still match.
+ */
+function findingKeyOf(key: string | undefined): string | null {
+  const slug = (key ?? "")
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-|-$/g, "");
+  return slug.length > 0 ? slug : null;
+}
+
 function parsedJson(raw: string): unknown {
   try {
     return JSON.parse(raw);
@@ -111,7 +126,7 @@ export function checkRunAnswer({
 
   const findings = parsed.data.findings
     .slice(0, maxInsights)
-    .map(({ widgetId, topic, lwql, ...words }) => {
+    .map(({ widgetId, topic, lwql, key, renews, ...words }) => {
       const widget = widgets.find((candidate) => candidate.id === widgetId);
       // Langy's own text is never kept: it may name a database or a date, and would not replay.
       const handedBack = lwql === undefined ? undefined : onOneLine(lwql);
@@ -124,6 +139,8 @@ export function checkRunAnswer({
         topic: topic ?? null,
         lwql: stored ?? null,
         widget: widget ? { id: widget.id, name: widget.name } : null,
+        findingKey: findingKeyOf(key),
+        renews: renews ?? null,
       };
     });
   return { ok: true, findings };

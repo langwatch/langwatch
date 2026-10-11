@@ -1,6 +1,7 @@
 /**
- * The record of one insight and whose it is, folded onto its row. The owner's acts ride the
- * same stream and are folded by `insight-reader.projection.ts`, never here.
+ * The record of one insight and whose it is, folded onto its row: as it was filed, then as
+ * each later run renewed it. The owner's acts ride the same stream and are folded by
+ * `insight-reader.projection.ts`, never here.
  */
 
 import type { StateProjectionDefinition, StateProjectionStore } from "@langwatch/eventing";
@@ -14,7 +15,11 @@ import {
   type InsightTone,
 } from "@langwatch/insight-contract";
 
-import type { InsightProcessingEvent } from "./insight.events.ts";
+import type {
+  InsightFiledEvent,
+  InsightProcessingEvent,
+  InsightRenewedEvent,
+} from "./insight.events.ts";
 
 export interface InsightState {
   readonly title: string;
@@ -30,6 +35,8 @@ export interface InsightState {
   /** The one person who reads the insight; null only when the event names nobody at all. */
   readonly ownerUserId: string | null;
   readonly filedByUserId: string | null;
+  /** The key a daily run matches a repeated finding by; null when no run filed it. */
+  readonly findingKey: string | null;
   /** Epoch milliseconds. */
   readonly filedAt: number;
   readonly renewedAt: number | null;
@@ -48,15 +55,12 @@ const INITIAL_INSIGHT_STATE: InsightState = {
   filedVia: "chat",
   ownerUserId: null,
   filedByUserId: null,
+  findingKey: null,
   filedAt: 0,
   renewedAt: null,
 };
 
-export function applyInsightEvent(
-  state: InsightState,
-  event: InsightProcessingEvent,
-): InsightState {
-  if (event.type !== INSIGHT_EVENT_TYPES.FILED) return state;
+function applyFiled(state: InsightState, event: InsightFiledEvent): InsightState {
   const { insightId: _insightId, ownerUserId, ...filed } = event.data;
   return {
     ...state,
@@ -67,13 +71,34 @@ export function applyInsightEvent(
   };
 }
 
+function applyRenewed(state: InsightState, event: InsightRenewedEvent): InsightState {
+  // A renewal older than the one the row holds is a late repeat of an earlier run's.
+  if (state.renewedAt !== null && event.occurredAt < state.renewedAt) return state;
+  const { insightId: _insightId, ...renewed } = event.data;
+  return { ...state, ...renewed, renewedAt: event.occurredAt };
+}
+
+export function applyInsightEvent(
+  state: InsightState,
+  event: InsightProcessingEvent,
+): InsightState {
+  switch (event.type) {
+    case INSIGHT_EVENT_TYPES.FILED:
+      return applyFiled(state, event);
+    case INSIGHT_EVENT_TYPES.RENEWED:
+      return applyRenewed(state, event);
+    default:
+      return state;
+  }
+}
+
 export function createInsightProjection(deps: {
   store: StateProjectionStore<InsightState>;
 }): StateProjectionDefinition<InsightState, InsightProcessingEvent> {
   return {
     name: "insight",
     version: INSIGHT_PROJECTION_VERSIONS.INSIGHT,
-    eventTypes: [INSIGHT_EVENT_TYPES.FILED],
+    eventTypes: [INSIGHT_EVENT_TYPES.FILED, INSIGHT_EVENT_TYPES.RENEWED],
     init: () => INITIAL_INSIGHT_STATE,
     apply: applyInsightEvent,
     store: deps.store,

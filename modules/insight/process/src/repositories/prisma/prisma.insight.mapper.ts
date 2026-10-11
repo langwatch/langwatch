@@ -96,6 +96,7 @@ export function insightEntryFromRows({
     filedVia: insightFiledViaSchema.parse(insight.filedVia),
     ownerUserId: insight.ownerUserId ?? insight.filedByUserId,
     filedByUserId: insight.filedByUserId,
+    findingKey: insight.findingKey,
     filedAt: insight.filedAt,
     renewedAt: insight.renewedAt,
     seenAt: reader?.seenAt ?? null,

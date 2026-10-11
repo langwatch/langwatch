@@ -2282,7 +2282,7 @@ model InsightProjection {
   sourceMessageId          String?
   filedByUserId            String?
   filedAt                  Float
-  /// Set by a later run that found the insight still true; nothing writes it before slice 3.
+  /// Set by a later run that found the insight still true.
   renewedAt                Float?
   createdAt                Float
   updatedAt                Float
@@ -2307,6 +2307,10 @@ model InsightProjection {
   /// Whose insight it is: the one person who reads it. NULL on a row folded before the
   /// column existed, which is owned by whoever filed it (`filedByUserId`).
   ownerUserId              String?
+  /// The stable key a daily run matches a repeated finding by, so it renews the insight
+  /// and files no twin. NULL for an insight saved from a chat and on a row folded before
+  /// the column existed.
+  findingKey               String?
 
   @@index([projectId, filedAt])
   @@index([projectId, ownerUserId, filedAt])
@@ -2357,7 +2361,7 @@ model InsightDailyScheduleProjection {
   lastRunOutcome        String?
   lastRunReason         String?
   lastRunFiled          Int?
-  /// Nothing writes it before a run can renew an insight.
+  /// How many insights the run found still true and renewed.
   lastRunRenewed        Int?
   lastRunConversationId String?
   createdAt             Float

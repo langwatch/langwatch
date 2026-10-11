@@ -966,6 +966,7 @@ describe("given the run's row", () => {
           outcome: "nothing",
           reason: null,
           filedCount: 0,
+          renewedCount: 0,
           conversationId: "conversation-1",
         },
       },

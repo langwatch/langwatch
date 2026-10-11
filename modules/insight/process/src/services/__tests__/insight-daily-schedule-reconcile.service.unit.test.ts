@@ -76,6 +76,7 @@ async function row({
         lastRunOutcome: null,
         lastRunReason: null,
         lastRunFiled: null,
+        lastRunRenewed: null,
         lastRunConversationId: null,
       },
       cursor: { acceptedAt: PASS_AT, eventId: `event-${scheduleId}` },

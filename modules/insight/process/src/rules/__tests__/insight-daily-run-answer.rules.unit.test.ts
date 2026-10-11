@@ -58,9 +58,30 @@ describe("checkRunAnswer", () => {
             validDays: 7,
             lwql: null,
             widget: null,
+            findingKey: null,
+            renews: null,
           },
         ],
       });
+    });
+
+    it("takes the insight a finding says it repeats as written, for the run to check", () => {
+      const checked = check(answer([good({ renews: "insight_1" })]));
+
+      expect(checked.ok && checked.findings[0]?.renews).toBe("insight_1");
+    });
+
+    /** @scenario "A finding's key is kept in one spelling" */
+    it.each([
+      ["checkout-cost-doubled", "checkout-cost-doubled"],
+      ["Checkout Cost Doubled", "checkout-cost-doubled"],
+      ["  checkout_cost  doubled! ", "checkout-cost-doubled"],
+      ["Checkout/Cost: doubled (p95)", "checkout-cost-doubled-p95"],
+      ["---", null],
+    ])("keeps the key %j as %j", (key, findingKey) => {
+      const checked = check(answer([good({ key })]));
+
+      expect(checked.ok && checked.findings[0]?.findingKey).toBe(findingKey);
     });
 
     it("takes an empty list as nothing to report", () => {

@@ -1,7 +1,7 @@
 /**
  * What a daily run derives from its own identity, never from a clock: its ids, the fixed
- * dates it reads and the title of its conversation. Delivery is at least once, so a run
- * carried out twice must name the same schedule, the same insights and the same dates.
+ * dates it reads, its conversation's title and which insight a finding repeats. Delivery is at
+ * least once, so a run carried out twice must name the same schedule, insights and dates.
  */
 
 import { createHash } from "node:crypto";
@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import {
   type InsightEntry,
   insightFolder,
+  type InsightReplay,
   type InsightRunBoard,
 } from "@langwatch/insight-contract";
 import { Temporal } from "@langwatch/time";
@@ -87,6 +88,23 @@ export function dailyRunWindows({
   };
 }
 
+/** The run's window as an insight's query replays it, with the values the query takes. */
+export function dailyRunReplay({
+  window,
+  parameters = {},
+}: {
+  window: RunWindow;
+  parameters?: InsightReplay["parameters"];
+}): InsightReplay {
+  return {
+    start: window.start,
+    end: window.end,
+    granularitySeconds: DAILY_RUN_GRANULARITY_SECONDS,
+    period: null,
+    parameters,
+  };
+}
+
 const MAX_TITLE_BOARD_NAME_LENGTH = 120;
 
 /** How the run's conversation reads in the person's Langy history. */
@@ -115,25 +133,71 @@ export function pointerName({ name, fallback }: { name: string; fallback: string
   return clean.length > 0 ? clean : fallback;
 }
 
-/**
- * The person's insights a run must not report again: in their inbox for this board as the
- * run's slot found it, newest first. Read against the slot, so a retry lists the same ones.
- */
-export function openInsightsOfBoard({
-  entries,
-  boardId,
-  slot,
-}: {
+type BoardInsights = Readonly<{
   entries: readonly InsightEntry[];
   boardId: string;
   slot: number;
-}): InsightEntry[] {
+}>;
+
+/**
+ * The person's insights a finding of this run may repeat: on this board, filed before the
+ * run, and open at the run's slot or marked done. Newest first. An expired one is no match,
+ * so its finding is filed as news. A renewal keeps an open one open, so a retry reads the same.
+ */
+export function matchableInsightsOfBoard({
+  entries,
+  boardId,
+  slot,
+}: BoardInsights): InsightEntry[] {
   return entries
     .filter(
       (entry) =>
         entry.board?.id === boardId &&
         entry.filedAt < slot &&
-        insightFolder({ entry, now: slot }) === "inbox",
+        insightFolder({ entry, now: slot }) !== "stale",
     )
     .toSorted((a, b) => b.filedAt - a.filedAt || a.id.localeCompare(b.id));
+}
+
+/** The ones a brief lists: those of the above still in the person's inbox. */
+export function openInsightsOfBoard(input: BoardInsights): InsightEntry[] {
+  return matchableInsightsOfBoard(input).filter((entry) => entry.archivedAt === null);
+}
+
+/** What a run does with one finding: files it as a new insight, or renews the one it repeats. */
+export type RunFindingAct<Finding> =
+  | Readonly<{ kind: "file"; finding: Finding; position: number }>
+  | Readonly<{ kind: "renew"; finding: Finding; insight: InsightEntry }>;
+
+/**
+ * Decides each finding in the answer's order: it repeats the insight its `renews` names, else
+ * the newest with its key, never one matched by its words. Dropped: a repeat of an insight
+ * marked done, and a second finding for one insight or one key. `position` names a new id.
+ */
+export function decideRunFindings<
+  Finding extends Readonly<{ findingKey: string | null; renews: string | null }>,
+>({
+  findings,
+  insights,
+}: {
+  findings: readonly Finding[];
+  /** What {@link matchableInsightsOfBoard} answers. */
+  insights: readonly InsightEntry[];
+}): RunFindingAct<Finding>[] {
+  const taken = { insights: new Set<string>(), keys: new Set<string>() };
+  return findings.flatMap((finding, position): RunFindingAct<Finding>[] => {
+    const { findingKey: key, renews } = finding;
+    const insight =
+      insights.find((candidate) => candidate.id === renews) ??
+      insights.find((candidate) => key !== null && candidate.findingKey === key);
+    const repeatsThisAnswer =
+      (insight !== undefined && taken.insights.has(insight.id)) ||
+      (key !== null && taken.keys.has(key));
+    if (insight) taken.insights.add(insight.id);
+    if (key !== null) taken.keys.add(key);
+    if (repeatsThisAnswer) return [];
+    if (!insight) return [{ kind: "file", finding, position }];
+    // Done, often by acting on it: finding it again is not news, and the run stays quiet.
+    return insight.archivedAt === null ? [{ kind: "renew", finding, insight }] : [];
+  });
 }

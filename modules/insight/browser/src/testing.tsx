@@ -148,6 +148,7 @@ export function insightEntry(overrides: Partial<InsightEntry> = {}): InsightEntr
     filedVia: "chat",
     ownerUserId: "user-filer",
     filedByUserId: "user-filer",
+    findingKey: null,
     filedAt: nowInstant().epochMilliseconds,
     renewedAt: null,
     seenAt: null,

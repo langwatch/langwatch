@@ -56,6 +56,7 @@ const settled = (runId: string): InsightRunSettledEventData => ({
   outcome: "filed",
   reason: null,
   filedCount: 2,
+  renewedCount: 0,
   conversationId: "conversation-1",
 });
 

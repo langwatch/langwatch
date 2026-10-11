@@ -27,6 +27,8 @@ const finding = (title: string, lwql: string | null): CheckedFinding => ({
   validDays: 7,
   lwql,
   widget: null,
+  findingKey: null,
+  renews: null,
 });
 
 type Analytics = Pick<AnalyticsApi, "resolveProtections" | "validateLangWatchQL">;

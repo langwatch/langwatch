@@ -54,7 +54,7 @@ export function createInsightReaderProjection(deps: {
     apply: applyInsightReaderEvent,
     store: deps.store,
     key: (event) =>
-      event.type === INSIGHT_EVENT_TYPES.FILED
+      event.type === INSIGHT_EVENT_TYPES.FILED || event.type === INSIGHT_EVENT_TYPES.RENEWED
         ? event.aggregateId
         : insightReaderKey({ insightId: event.data.insightId, userId: event.data.userId }),
   };

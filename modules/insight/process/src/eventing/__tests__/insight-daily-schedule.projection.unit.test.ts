@@ -81,7 +81,20 @@ describe("given a run that settled", () => {
       lastRunOutcome: "filed",
       lastRunReason: null,
       lastRunFiled: 2,
+      lastRunRenewed: 0,
       lastRunConversationId: "conversation-1",
+    });
+  });
+
+  describe("when the run filed 1 insight and renewed 2", () => {
+    /** @scenario "The run's row counts what a run renewed apart from what it filed" */
+    it("holds 1 filed and 2 renewed", () => {
+      const state = applyInsightDailyRunEvent(
+        PROJECTION.init(),
+        settled(T0 + 60_000, { filedCount: 1, renewedCount: 2 }),
+      );
+
+      expect(state).toMatchObject({ lastRunFiled: 1, lastRunRenewed: 2 });
     });
   });
 

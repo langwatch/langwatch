@@ -130,6 +130,15 @@ function runWhen({ at, now, timezone }: { at: number; now: number; timezone: str
     : format(at, "MMM d", zone);
 }
 
+/** "filed 2 new, seen again 1": what a run that read the board did, or "nothing new". */
+function ranWords({ filedCount, renewedCount }: InsightLastRun): string {
+  const parts = [
+    ...(filedCount > 0 ? [`filed ${filedCount} new`] : []),
+    ...(renewedCount > 0 ? [`seen again ${renewedCount}`] : []),
+  ];
+  return parts.join(", ") || "nothing new";
+}
+
 /**
  * The line under the schedule: what the last run did. A run that never reached Langy says
  * "Did not run" and why, so an empty inbox is an answer and not a question.
@@ -146,8 +155,9 @@ export function lastRunWords({
 }): string {
   if (!lastRun) return "No run yet.";
   const when = runWhen({ at: lastRun.at, now, timezone });
-  if (lastRun.outcome === "filed") return `Ran ${when} · filed ${lastRun.filedCount} new`;
-  if (lastRun.outcome === "nothing") return `Ran ${when} · nothing new`;
+  if (lastRun.outcome === "filed" || lastRun.outcome === "nothing") {
+    return `Ran ${when} · ${ranWords(lastRun)}`;
+  }
   if (lastRun.outcome === "failed") {
     return `Failed ${when} · nothing was filed, and the next run tries again`;
   }

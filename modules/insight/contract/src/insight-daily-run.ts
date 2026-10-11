@@ -94,6 +94,8 @@ const insightLastRunSchema = z.object({
   outcome: insightRunOutcomeSchema,
   reason: insightRunReasonSchema.nullable(),
   filedCount: z.number().int().nonnegative(),
+  /** How many insights the run found still true and renewed; they are not new. */
+  renewedCount: z.number().int().nonnegative(),
   conversationId: z.string().nullable(),
 });
 
@@ -223,6 +225,8 @@ export const INSIGHT_RUN_MAX_FINDINGS_IN_ANSWER = 50;
 /** A run's finding is a headline and a few paragraphs; shorter than what a person may save. */
 export const INSIGHT_RUN_FINDING_TITLE_MAX = 120;
 export const INSIGHT_RUN_FINDING_BODY_MAX = 4_000;
+/** A finding's key is a few words joined by hyphens, never a sentence. */
+export const INSIGHT_RUN_FINDING_KEY_MAX = 80;
 
 /**
  * One finding as Langy hands it back. Strict: a key that is not listed here refuses the whole
@@ -238,6 +242,10 @@ const insightRunFindingSchemaDefinition = z
     /** A widget of the board; one that is not on it is dropped, never trusted. */
     widgetId: z.string().min(1).max(200).optional(),
     lwql: z.string().trim().min(1).max(20_000).optional(),
+    /** A name for what was found that stays the same when a later run finds it again. */
+    key: z.string().trim().min(1).max(INSIGHT_RUN_FINDING_KEY_MAX).optional(),
+    /** The open insight this finding repeats; one that is not the person's is ignored. */
+    renews: z.string().min(1).max(200).optional(),
   })
   .strict();
 export interface InsightRunFindingSchema extends Named<typeof insightRunFindingSchemaDefinition> {}

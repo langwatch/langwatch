@@ -1,10 +1,12 @@
 Feature: The daily insights run
   A run starts a Langy turn for one person about one board. Langy reads the board's widgets
   with that person's permissions as they are when the run starts, and hands back findings.
-  The insight module checks the findings and files each one in that person's inbox, unread.
-  Langy only reads: filing is the one write, and the insight module does it. Every run
-  records an outcome: filed, nothing, failed or skipped. A person turns the run on for a
-  board, and it then starts once per calendar date, around the hour they chose, in their zone.
+  The insight module checks the findings and files each new one in that person's inbox, unread.
+  A finding that repeats an insight they still have open renews that insight and files no twin.
+  Langy only reads: filing and renewing are the run's only writes, and the insight module does
+  them. Every run records an outcome: filed, nothing, failed or skipped. A person turns the run
+  on for a board, and it then starts once per calendar date, around the hour they chose, in
+  their zone.
 
   Background:
     Given the release_insights flag is on for the project
@@ -302,6 +304,149 @@ Feature: The daily insights run
       And the second keeps its query and the run's window
       And each query was validated with the protections of the person the run is for
 
+  Rule: A finding that repeats an insight renews it
+
+    @unit
+    Scenario: A finding may carry a key and the insight it repeats
+      Given a finding with a key and the id of the insight it repeats
+      When the findings are checked against the contract
+      Then the finding is taken
+      And a key longer than 80 characters, an empty key and an empty id are each refused
+
+    @unit
+    Scenario: A finding's key is kept in one spelling
+      Given findings whose keys differ only in capitals, spaces and punctuation
+      When the answer is checked
+      Then each key is kept as the same lower case words joined by hyphens
+      And a key with no letter and no digit is kept as no key
+
+    @unit
+    Scenario: A new finding is filed with its key
+      Given Langy answers a finding with a key that none of the person's insights holds
+      When the run is carried out
+      Then one insight is filed with that key
+      And the run's row reads filed with a count of 1 and none renewed
+
+    @unit
+    Scenario: A finding that names an open insight renews it and files nothing
+      Given the person has an open insight for the board from an earlier run
+      When a later run's finding names that insight as the one it repeats
+      Then the insight is renewed once and no insight is filed
+      And it keeps its id, its title, its tone and the day it was filed
+      And it takes the later run's body, validity, conversation and message
+      And the run's row reads nothing with none filed and 1 renewed
+
+    @unit
+    Scenario: A finding with the key of an open insight renews it
+      Given the person has an open insight for the board that holds a key
+      When a later run's finding carries the same key and names no insight
+      Then the insight is renewed and no insight is filed
+
+    @unit
+    Scenario: A renewed insight replays its own query over the later run's window
+      Given an open insight that keeps a query and one that keeps none
+      When a later run renews both
+      Then the first keeps its query and replays it over the later run's window
+      And the second still has no query and no window
+
+    @unit
+    Scenario: Renewal changes nothing the person did with the insight
+      Given an open insight the person has seen and kept, and one they have not seen
+      When a later run renews both
+      Then the first is still seen and kept, and neither is done
+      And the second is still unseen
+
+    @unit
+    Scenario: A finding that repeats an insight the person marked done does nothing
+      Given the person marked an insight for the board done
+      When a later run's finding carries its key or names it
+      Then the insight is not renewed and no insight is filed
+      And the run's row reads nothing with none filed and none renewed
+
+    @unit
+    Scenario: An insight marked done while Langy read is not found again
+      Given an open insight the person marks done after the run briefed Langy
+      When Langy answers a finding that repeats it
+      Then the insight is not renewed and no insight is filed
+
+    @unit
+    Scenario: An id that is not the person's own insight for the board is ignored
+      Given a finding that names another person's insight, an insight of another board or no insight
+      When the run is carried out
+      Then the finding is filed as a new insight for the run's person
+      And no other insight is renewed or changed
+
+    @unit
+    Scenario: A finding is never matched by its title
+      Given an open insight and a finding with the same title, another key and no id
+      When the run decides what each finding does
+      Then the finding is filed as new
+
+    @unit
+    Scenario: A finding that repeats an expired insight is filed as news
+      Given an insight of the board whose validity ended before the run and that was not kept
+      When a finding carries its key or names it
+      Then the finding is filed as new and the expired insight is not renewed
+
+    @unit
+    Scenario: Two findings for one insight or one key count once
+      Given an answer with two findings that repeat the same insight and two that share a new key
+      When the run decides what each finding does
+      Then the insight is renewed once and one insight is filed
+      And a new insight keeps the place of its finding in the answer
+
+    @unit
+    Scenario: A run carried out twice renews once
+      Given a run that renewed one insight and filed one
+      When the same run is carried out again
+      Then the person's inbox holds the same insights and no more
+      And the insight was renewed once, the other filed once, and the run settled once
+      And Langy was given the same brief both times
+
+    @unit
+    Scenario: A renewed insight keeps its id and reads as seen again
+      Given a filed insight and a renewal of it by a later run
+      When both events are folded
+      Then the row is the same insight with the renewal's body, validity, window and source
+      And it holds when it was renewed beside when it was filed
+
+    @unit
+    Scenario: A late repeat of an older renewal changes nothing
+      Given an insight renewed by a later run
+      When a renewal stamped before that one is folded
+      Then the row is unchanged
+
+    @unit
+    Scenario: An insight filed before keys existed still folds
+      Given a filed event stored without a key
+      When the event is folded
+      Then the insight holds no key
+
+    @unit
+    Scenario: An outcome stored before renewal reads as none renewed
+      Given a run's outcome stored without a renewed count
+      When the event is read
+      Then it reads as no insight renewed
+
+    @unit
+    Scenario: The run's row counts what a run renewed apart from what it filed
+      Given a run that filed 1 insight and renewed 2
+      When its outcome is folded onto the row
+      Then the row holds 1 filed and 2 renewed
+
+    @integration
+    Scenario: An insight's key and the day it was renewed are stored with it
+      Given an insight with a key that a later run renewed, and one saved from a chat
+      When the owner reads them
+      Then the first reads with its key and when it was renewed
+      And the second reads with no key and no renewal
+
+    @unit
+    Scenario: A renewal refetches the person's inbox
+      Given the inbox read's list of events that make it stale
+      When it is read from the contract
+      Then it names the renewed event beside filed, seen, archived and kept
+
   Rule: The run always records an outcome
 
     @unit
@@ -484,6 +629,14 @@ Feature: The daily insights run
       Given the person has an open insight, a done insight and an insight from another board
       When the brief is written
       Then it lists the open insight of this board and neither of the others
+
+    @unit
+    Scenario: The brief names each open insight by its id and key and asks for a repeat to renew it
+      Given the person has an open insight with a key and one without for the board
+      When the brief is written
+      Then each is listed with its id and its title, and the first with its key
+      And the brief tells Langy to report a repeat with renews set to that id, not as new
+      And asks for a key on every finding that stays the same when the finding is found again
 
     @unit
     Scenario: The run reads the last full day before it started
@@ -911,6 +1064,12 @@ Feature: The daily insights run
       When its last run filed 2, found nothing new, failed, or was skipped for each reason a run records
       Then the dropdown names the outcome in plain words, and no run yet before the first one
       And a skipped run says it did not run and why
+
+    @unit
+    Scenario: The dropdown says how many insights the last run saw again
+      Given a board that is on
+      When its last run filed 2 and renewed 1, or filed none and renewed 3
+      Then the line reads "filed 2 new, seen again 1" for the first and "seen again 3" for the second
 
     @integration
     Scenario: A From LangWatch board takes the control and is named by its template id

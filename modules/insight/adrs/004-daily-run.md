@@ -73,14 +73,38 @@ id, each insight id is a digest of the schedule, the run and the finding's posit
 and each filing is stamped with the run's slot. The brief is built only from what is
 fixed for the run, so a repeat sends the same words and Langy answers with the same
 turn. It lists at most 40 widgets, stays within 12,000 characters, and holds every name
-a person wrote inside one marked block that it calls data. It tells Langy to write no file,
+a person wrote inside one marked block that it calls data. A renewal is stamped with
+the slot too, and keeps an open insight open at that slot, so a repeat reads the same
+open insights, writes the same brief and renews or files the same things. A new
+insight's id is named by its finding's place in the answer, whatever the findings
+before it did. It tells Langy to write no file,
 to run one query per command and on one line, to start from a widget's stored query, to hand
 that query back as stored, and to read the window's hourly steps before it reports a total.
 A repeat whose brief differs is refused by Langy and recorded as `failed` with
 `brief_changed`. The row keeps the first outcome a run recorded.
 
+**A finding that repeats an insight renews it.** A finding may carry a `key`, a short
+name for what was found that stays the same on a later day, and `renews`, the id of
+the open insight it repeats. The brief lists the person's open insights for the board
+by id, title and key, and tells Langy to report a repeat with `renews`, not as new. The
+key is kept in one spelling (lower case, words joined by hyphens) on the `filed` event
+and the row, as `findingKey`. The run reads the person's insights again when Langy has
+answered and matches each finding in this order: the insight `renews` names, then the
+newest insight with the finding's key. Never by title. Only the person's own insights
+for this board are candidates, filed before the run, and open at the run's slot or
+marked done; so an id of another person, another board or no insight is ignored and the
+finding is filed as new. A match that is open is renewed: one `renewed` event on the
+insight's own stream with the run's body, validity, window and source, stamped with the
+run's slot. The insight keeps its id, title, tone, pointer and query; a query it keeps
+replays over the run's window with the values it was filed with. A match the person
+marked done makes the run quiet for that finding: no renewal and no new insight. An
+expired insight is no match, so finding it again is filed as news, unread. A second
+finding for the same insight or the same key in one answer is dropped. Renewal changes
+nobody's seen, done or kept state.
+
 **Every run records an outcome.** `filed`, `nothing`, `failed` or `skipped`, each
-with a reason where one applies. A failure is thrown for the outbox to retry; the
+with a reason where one applies. The outcome counts what was filed and what was renewed
+apart; a run that only renewed is `nothing`, since seen again is not news. A failure is thrown for the outbox to retry; the
 third attempt records `failed` first. One run is in flight per person and board. A
 run that recorded no outcome within every attempt's lease stops holding the board. A
 request is answered with a request id, never a run id: whether it starts a run is the
@@ -165,7 +189,17 @@ stays off when the person turned it off since. A pass changes no setting.
   (dashboards-v2.feature AC196). It is not a key no person owns, which has no viewer.
 - `InsightDailyScheduleProjection` was created with the schedule's columns (`state`,
   `hour`, `timezone`, `maxInsights`), which the setting now writes, so the schedule
-  needed no migration. Nothing writes `lastRunRenewed` yet.
+  needed no migration. `lastRunRenewed` is written by every outcome since renewal;
+  an outcome stored before it reads as none renewed. `InsightProjection` gained the
+  nullable `findingKey` (migration `20261010120032`).
+- A brief written before renewal differs from one written after it, so a run in flight
+  across that deploy that is retried ends `failed` with `brief_changed`, once.
+- An insight saved from a chat holds no key. A run renews it only when Langy names its
+  id, and it stays without a key after that.
+- A renewed insight keeps the query it was filed with. The later finding's own query is
+  validated and then not kept.
+- Langy writes the key, so the same finding matches on a later day only as far as Langy
+  names it the same way. `renews` does not depend on that.
 - A run still reads calendar days in UTC. The schedule's zone decides when a run starts,
   not which day it reads.
 - A setting changed while a slot is due replaces that slot: the next one is derived from

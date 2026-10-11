@@ -51,6 +51,7 @@ function ranToday(overrides: Partial<LastRun>): InsightDailyRunSetting {
       outcome: "nothing",
       reason: null,
       filedCount: 0,
+      renewedCount: 0,
       conversationId: null,
       ...overrides,
     },

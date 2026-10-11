@@ -8410,7 +8410,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "Set by a later run that found the insight still true; nothing writes it before slice 3."
+          "documentation": "Set by a later run that found the insight still true."
         },
         {
           "name": "createdAt",
@@ -8555,6 +8555,15 @@
           "isList": false,
           "isOptional": true,
           "documentation": "Whose insight it is: the one person who reads it. NULL on a row folded before the\ncolumn existed, which is owned by whoever filed it (`filedByUserId`)."
+        },
+        {
+          "name": "findingKey",
+          "columnName": "findingKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The stable key a daily run matches a repeated finding by, so it renews the insight\nand files no twin. NULL for an insight saved from a chat and on a row folded before\nthe column existed."
         }
       ]
     },
@@ -8835,7 +8844,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": true,
-          "documentation": "Nothing writes it before a run can renew an insight."
+          "documentation": "How many insights the run found still true and renewed."
         },
         {
           "name": "lastRunConversationId",

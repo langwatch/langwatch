@@ -64,9 +64,11 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
     queries: createApiFixture<Pick<InsightRunQueryService, "keepValid">>({
       keepValid: async ({ findings }) => [...findings],
     }),
-    insightCommands: createApiFixture<Pick<InsightCommandsService, "fileInsight">>({
-      fileInsight: async (input) => void filed.push(input),
-    }),
+    insightCommands: createApiFixture<Pick<InsightCommandsService, "fileInsight" | "renewInsight">>(
+      {
+        fileInsight: async (input) => void filed.push(input),
+      },
+    ),
     runCommands: createApiFixture<
       Pick<InsightDailyRunCommandsService, "recordRunStarted" | "settleRun" | "turnOffSchedule">
     >({
@@ -105,6 +107,7 @@ describe("given Langy's turn outlasts the run's deadline", () => {
         outcome: "failed",
         reason: "timeout",
         filedCount: 0,
+        renewedCount: 0,
         conversationId: "conversation-1",
       },
     ]);

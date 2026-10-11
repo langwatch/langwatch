@@ -120,6 +120,7 @@ describe("given a member turned their daily run on for a board", () => {
         outcome: "filed",
         reason: null,
         filedCount: 2,
+        renewedCount: 0,
         conversationId: "conversation-1",
       },
     });

@@ -65,6 +65,7 @@ const ROW_BEFORE_COLUMNS: InsightRow = {
   replayGranularitySeconds: null,
   replayContext: null,
   ownerUserId: null,
+  findingKey: null,
 };
 
 function folded(state: Partial<InsightState> = {}): StoredProjection<InsightState> {
@@ -82,6 +83,7 @@ function folded(state: Partial<InsightState> = {}): StoredProjection<InsightStat
       filedVia: "chat",
       ownerUserId: "user-filer",
       filedByUserId: "user-filer",
+      findingKey: null,
       filedAt: FILED_AT,
       renewedAt: null,
       ...state,
@@ -189,6 +191,28 @@ describe("given an insight a run filed for a person", () => {
   });
 });
 
+describe("given an insight a run filed with a key and a later run renewed", () => {
+  describe("when its row is written", () => {
+    /** @scenario "An insight's key and the day it was renewed are stored with it" */
+    it("holds the key and the renewal in columns of their own, and reads back the same", async () => {
+      const { repository, written } = repositoryOverOneRow();
+      const renewedAt = FILED_AT + 86_400_000;
+
+      await repository.store(
+        folded({ filedVia: "run", findingKey: "checkout-errors-doubled", renewedAt }),
+        CONTEXT,
+      );
+
+      expect(written.row).toMatchObject({ findingKey: "checkout-errors-doubled", renewedAt });
+      const read = await repository.get("insight-1", CONTEXT);
+      expect(read.kind === "folded" && read.projection.state).toMatchObject({
+        findingKey: "checkout-errors-doubled",
+        renewedAt,
+      });
+    });
+  });
+});
+
 describe("given an insight row written before the pointer, window and owner columns existed", () => {
   describe("when the row is read", () => {
     /** @scenario "An insight stored before owners existed belongs to whoever filed it" */
@@ -207,6 +231,7 @@ describe("given an insight row written before the pointer, window and owner colu
         board: null,
         replay: null,
         filedVia: "chat",
+        findingKey: null,
       });
     });
   });

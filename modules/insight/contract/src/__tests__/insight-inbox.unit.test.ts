@@ -32,6 +32,7 @@ function entry(overrides: Partial<InsightEntry> = {}): InsightEntry {
     filedVia: "chat",
     ownerUserId: "user-filer",
     filedByUserId: "user-filer",
+    findingKey: null,
     filedAt: NOW,
     renewedAt: null,
     seenAt: null,

@@ -13,19 +13,23 @@ in the top bar. An insight is read by its owner alone
 ([ADR-003](./003-personal-insights.md)). This record first made it the project's,
 with only seen, done and kept personal; ADR-003 replaced that.
 
-A daily run will later renew insights (a new body, a new validity window), so
+A daily run renews an insight it finds again (a new body, a new validity window), so
 the record has a history worth keeping.
 
 ## Decision
 
 The `insight_processing` pipeline holds one aggregate per insight, keyed by the
-insight id and grouped by project. Four commands: `file`, `mark_seen`,
-`archive` and `keep`. The api only sends; the worker folds.
+insight id and grouped by project. Five commands: `file`, `renew`, `mark_seen`,
+`archive` and `keep`. The api sends the four a person causes, a daily run sends
+`file` and `renew`, and the worker folds.
 
 Two Postgres projections:
 
 - `InsightProjection`: the insight and whose it is (owner, title, body, tone,
-  topic, validity, source). Folded from `filed` only.
+  topic, validity, source, the key a run matches a repeat by). Folded from `filed`
+  and `renewed`. A renewal keeps the id, the title, the tone and `filedAt`, takes
+  the later run's body, validity, window and source, and sets `renewedAt`. A
+  renewal stamped before the one the row holds is a late repeat and changes nothing.
 - `InsightReaderProjection`: one row per insight and reader, keyed
   `insightId:userId`, holding `seenAt`, `archivedAt` and `keptAt`. An insight has
   one reader, its owner (ADR-003); the table stays apart so a later forward can
@@ -62,9 +66,10 @@ depends on insight.
 Three Postgres projections: `InsightProjection`, `InsightReaderProjection` and
 `InsightDailyScheduleProjection` (ADR-004). The insight and reader tables are
 folded from the `insight_processing` stream, and the schedule table from
-`insight_daily_run`. Migrations `20261010120020` to `20261010120022` and
-`20261010120031` create them and add the board pointer and the owner. ClickHouse is
-not used. Nothing is deleted when a member leaves.
+`insight_daily_run`. Migrations `20261010120020` to `20261010120022`,
+`20261010120031` and `20261010120032` create them and add the board pointer, the
+owner and the finding key. ClickHouse is not used. Nothing is deleted when a member
+leaves.
 
 ## Runtime and registration
 
@@ -105,7 +110,12 @@ defaults.
   rows for them. The list is capped at 500 per owner and project (ADR-003).
 - The browser writes optimistically into the cached list, because the read
   hint arrives only after the worker folds.
-- Renewal (slice 3) adds a `renewed` event to the same aggregate; the reader
-  projection does not change.
+- Renewal is a `renewed` event on the same aggregate
+  ([ADR-004](./004-daily-run.md)). It names no reader, so the reader projection
+  does not fold it: seen, done and kept stay as the person left them. The inbox
+  read lists it among the events that make it stale, so "seen again" shows
+  without a reload.
+- `findingKey` on `filed` is additive with a null default, so an event stored
+  before it folds unchanged and is matched by no key.
 - Permissions reuse `analytics:view` for every procedure, filing included
   (ADR-003), until the owner decides on a separate set.

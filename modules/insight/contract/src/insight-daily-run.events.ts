@@ -48,7 +48,10 @@ export const insightRunStartedEventDataSchema: InsightRunStartedEventDataSchema 
   insightRunStartedEventDataSchemaDefinition;
 export type InsightRunStartedEventData = z.infer<typeof insightRunStartedEventDataSchema>;
 
-/** How the run ended. A run skipped before Langy took the turn names no conversation. */
+/**
+ * How the run ended. A run skipped before Langy took the turn names no conversation.
+ * `renewedCount` came with renewal: an event stored before it reads as none renewed.
+ */
 const insightRunSettledEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   runId: z.string().min(1),
@@ -56,6 +59,7 @@ const insightRunSettledEventDataSchemaDefinition = z.object({
   outcome: insightRunOutcomeSchema,
   reason: insightRunReasonSchema.nullable(),
   filedCount: z.number().int().nonnegative(),
+  renewedCount: z.number().int().nonnegative().default(0),
   conversationId: z.string().min(1).nullable(),
 });
 export interface InsightRunSettledEventDataSchema extends Named<

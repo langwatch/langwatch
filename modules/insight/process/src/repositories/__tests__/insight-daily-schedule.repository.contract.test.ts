@@ -63,6 +63,7 @@ function settled(overrides: Partial<InsightDailyScheduleState> = {}): InsightDai
     lastRunOutcome: "filed",
     lastRunReason: null,
     lastRunFiled: 2,
+    lastRunRenewed: 1,
     lastRunConversationId: "conversation-1",
     ...overrides,
   };
@@ -107,6 +108,7 @@ function contractCases(backend: Backend): void {
             outcome: "filed",
             reason: null,
             filedCount: 2,
+            renewedCount: 1,
             conversationId: "conversation-1",
           },
         },
@@ -130,6 +132,7 @@ function contractCases(backend: Backend): void {
         lastRunOutcome: "failed",
         lastRunReason: "bad_output",
         lastRunFiled: 0,
+        lastRunRenewed: 0,
         boardName: "Costs and errors",
       });
 
@@ -142,6 +145,7 @@ function contractCases(backend: Backend): void {
             outcome: "failed",
             reason: "bad_output",
             filedCount: 0,
+            renewedCount: 0,
             conversationId: "conversation-1",
           },
         },
@@ -206,6 +210,7 @@ function contractCases(backend: Backend): void {
             outcome: "filed",
             reason: null,
             filedCount: 2,
+            renewedCount: 1,
             conversationId: "conversation-1",
           },
         },
@@ -342,14 +347,20 @@ describe.skipIf(!databaseUrl)("given the Postgres daily schedule repositories", 
         hour: null,
         timezone: null,
         maxInsights: null,
-        lastRunRenewed: null,
+      });
+    });
+
+    it("holds how many insights the run renewed in a column of its own", async () => {
+      expect(await storedRow(settled({ lastRunFiled: 0, lastRunRenewed: 3 }))).toMatchObject({
+        lastRunFiled: 0,
+        lastRunRenewed: 3,
       });
     });
 
     it("writes the setting into the schedule's own columns", async () => {
       const setting = { state: "on", hour: 17, timezone: "Asia/Kolkata", maxInsights: 10 } as const;
 
-      expect(await storedRow(settled(setting))).toMatchObject({ ...setting, lastRunRenewed: null });
+      expect(await storedRow(settled(setting))).toMatchObject(setting);
     });
   });
 });

@@ -1,4 +1,8 @@
-import type { InsightFiledEventData, InsightReaderEventData } from "@langwatch/insight-contract";
+import type {
+  InsightFiledEventData,
+  InsightReaderEventData,
+  InsightRenewedEventData,
+} from "@langwatch/insight-contract";
 
 type CommandSender<Input> = { send(input: Input): Promise<unknown> };
 
@@ -6,6 +10,7 @@ type Envelope = { tenantId: string; occurredAt: number };
 
 export type InsightCommandSenders = {
   fileInsight: CommandSender<InsightFiledEventData & Envelope>;
+  renewInsight: CommandSender<InsightRenewedEventData & Envelope>;
   markInsightSeen: CommandSender<InsightReaderEventData & Envelope>;
   archiveInsight: CommandSender<InsightReaderEventData & Envelope>;
   keepInsight: CommandSender<InsightReaderEventData & Envelope>;
@@ -30,6 +35,10 @@ export class InsightCommandsService {
 
   async fileInsight(input: InsightFiledEventData & Envelope): Promise<void> {
     await this.senders().fileInsight.send(input);
+  }
+
+  async renewInsight(input: InsightRenewedEventData & Envelope): Promise<void> {
+    await this.senders().renewInsight.send(input);
   }
 
   async markInsightSeen(input: InsightReaderEventData & Envelope): Promise<void> {

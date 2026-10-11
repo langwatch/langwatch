@@ -113,6 +113,7 @@ export async function installInsight({
         filedVia: "run",
         ownerUserId,
         filedByUserId: null,
+        findingKey: null,
       };
       await fileInsight.send({
         tenantId: projectId,

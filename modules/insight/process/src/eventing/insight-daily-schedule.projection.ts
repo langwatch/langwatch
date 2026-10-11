@@ -37,6 +37,8 @@ export interface InsightDailyScheduleState {
   readonly lastRunOutcome: InsightRunOutcome | null;
   readonly lastRunReason: InsightRunReason | null;
   readonly lastRunFiled: number | null;
+  /** How many insights the run found still true and renewed. */
+  readonly lastRunRenewed: number | null;
   readonly lastRunConversationId: string | null;
 }
 
@@ -54,6 +56,7 @@ const INITIAL_INSIGHT_DAILY_SCHEDULE_STATE: InsightDailyScheduleState = {
   lastRunOutcome: null,
   lastRunReason: null,
   lastRunFiled: null,
+  lastRunRenewed: null,
   lastRunConversationId: null,
 };
 
@@ -89,6 +92,7 @@ function changeOf(event: InsightDailyRunEvent): Partial<InsightDailyScheduleStat
         lastRunOutcome: event.data.outcome,
         lastRunReason: event.data.reason,
         lastRunFiled: event.data.filedCount,
+        lastRunRenewed: event.data.renewedCount,
         lastRunConversationId: event.data.conversationId,
       };
     default:

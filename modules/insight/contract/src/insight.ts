@@ -100,8 +100,11 @@ const insightEntrySchemaDefinition = z.object({
   /** Whose insight it is: the one person who reads it. Null only where nobody can. */
   ownerUserId: z.string().nullable(),
   filedByUserId: z.string().nullable(),
+  /** The key a daily run matches a repeated finding by; null when it was saved from a chat. */
+  findingKey: z.string().nullable(),
   /** Epoch milliseconds. */
   filedAt: z.number(),
+  /** When a later run last found it still true; null until one did. */
   renewedAt: z.number().nullable(),
   seenAt: z.number().nullable(),
   archivedAt: z.number().nullable(),

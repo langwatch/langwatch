@@ -1,7 +1,7 @@
 /**
  * insight_processing: one aggregate per insight, two Postgres projections (the insight with
- * its owner, and the owner's own state on it) and four commands. The api sends; the worker
- * folds.
+ * its owner, and the owner's own state on it) and five commands. The api and a daily run
+ * send; the worker folds.
  * @see modules/insight/adrs/001-insight-aggregate.md
  * @see modules/insight/adrs/003-personal-insights.md
  */
@@ -26,6 +26,7 @@ import {
   FileInsightCommand,
   KeepInsightCommand,
   MarkInsightSeenCommand,
+  RenewInsightCommand,
 } from "./insight.commands.ts";
 import { INSIGHT_EVENT_SCHEMAS } from "./insight.events.ts";
 import { createInsightProjection, type InsightState } from "./insight.projection.ts";
@@ -44,6 +45,7 @@ const defineInsightPipeline = (deps: InsightPipelineDeps) =>
     .withPostgresProjection(createInsightProjection({ store: deps.insightStore }))
     .withPostgresProjection(createInsightReaderProjection({ store: deps.readerStore }))
     .withCommand("fileInsight", FileInsightCommand)
+    .withCommand("renewInsight", RenewInsightCommand)
     .withCommand("markInsightSeen", MarkInsightSeenCommand)
     .withCommand("archiveInsight", ArchiveInsightCommand)
     .withCommand("keepInsight", KeepInsightCommand)

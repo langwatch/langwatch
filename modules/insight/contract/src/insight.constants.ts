@@ -6,6 +6,7 @@
 
 export const INSIGHT_EVENT_TYPES = {
   FILED: "lw.insight.filed",
+  RENEWED: "lw.insight.renewed",
   SEEN: "lw.insight.seen",
   ARCHIVED: "lw.insight.archived",
   KEPT: "lw.insight.kept",
@@ -14,6 +15,7 @@ export const INSIGHT_EVENT_TYPES = {
 /** Every event the pipeline carries; a read naming these is refetched when one commits. */
 export const INSIGHT_PROCESSING_EVENT_TYPES = [
   INSIGHT_EVENT_TYPES.FILED,
+  INSIGHT_EVENT_TYPES.RENEWED,
   INSIGHT_EVENT_TYPES.SEEN,
   INSIGHT_EVENT_TYPES.ARCHIVED,
   INSIGHT_EVENT_TYPES.KEPT,
@@ -28,6 +30,7 @@ export const INSIGHT_READER_EVENT_TYPES = [
 
 export const INSIGHT_COMMAND_TYPES = {
   FILE: "lw.insight.file",
+  RENEW: "lw.insight.renew",
   MARK_SEEN: "lw.insight.mark_seen",
   ARCHIVE: "lw.insight.archive",
   KEEP: "lw.insight.keep",
@@ -36,6 +39,7 @@ export const INSIGHT_COMMAND_TYPES = {
 /** Event schema versions, calendar versioned. */
 export const INSIGHT_EVENT_VERSIONS = {
   FILED: "2026-10-09",
+  RENEWED: "2026-10-11",
   SEEN: "2026-10-09",
   ARCHIVED: "2026-10-09",
   KEPT: "2026-10-09",

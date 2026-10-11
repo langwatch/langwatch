@@ -57,6 +57,8 @@ export class InsightService {
       filedVia: "chat" as const,
       ownerUserId: userId,
       filedByUserId: userId,
+      // Only a run names its finding; a saved answer is matched by nothing.
+      findingKey: null,
     };
     const { insightId, ...entry } = filed;
     await this.commands.fileInsight({ tenantId: input.projectId, occurredAt, ...filed });

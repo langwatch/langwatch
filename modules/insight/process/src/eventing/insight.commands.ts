@@ -11,6 +11,7 @@ import {
   INSIGHT_EVENT_VERSIONS,
   insightFiledEventDataSchema,
   insightReaderEventDataSchema,
+  insightRenewedEventDataSchema,
 } from "@langwatch/insight-contract";
 
 const byProject = (data: { tenantId: string }): string => data.tenantId;
@@ -26,6 +27,22 @@ export const FileInsightCommand = defineCommand({
   groupKey: byProject,
   idempotencyKey: (data) => `${data.tenantId}:insight:${data.insightId}:filed`,
   spanAttributes: (data) => ({ "payload.tone": data.tone, "payload.valid_days": data.validDays }),
+});
+
+/**
+ * Renewed once per insight and run: the run stamps the renewal with its own slot, so a run
+ * carried out twice sends the same renewal.
+ */
+export const RenewInsightCommand = defineCommand({
+  commandType: INSIGHT_COMMAND_TYPES.RENEW,
+  eventType: INSIGHT_EVENT_TYPES.RENEWED,
+  eventVersion: INSIGHT_EVENT_VERSIONS.RENEWED,
+  aggregateType: INSIGHT_AGGREGATE_TYPE,
+  schema: insightRenewedEventDataSchema,
+  aggregateId: (data) => data.insightId,
+  groupKey: byProject,
+  idempotencyKey: (data) => `${data.tenantId}:insight:${data.insightId}:renewed:${data.occurredAt}`,
+  spanAttributes: (data) => ({ "payload.valid_days": data.validDays }),
 });
 
 /** Seen is a fact that happens once per reader, so it is keyed by the reader alone. */

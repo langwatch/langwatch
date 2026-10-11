@@ -21,6 +21,7 @@ function lastRunOf(state: InsightDailyScheduleState): InsightDailyRun["lastRun"]
     outcome: lastRunOutcome,
     reason: state.lastRunReason,
     filedCount: state.lastRunFiled ?? 0,
+    renewedCount: state.lastRunRenewed ?? 0,
     conversationId: state.lastRunConversationId,
   };
 }

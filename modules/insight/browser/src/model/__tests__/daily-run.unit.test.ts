@@ -38,6 +38,7 @@ function lastRun(overrides: Partial<InsightLastRun> = {}): InsightLastRun {
     outcome: "nothing",
     reason: null,
     filedCount: 0,
+    renewedCount: 0,
     conversationId: null,
     ...overrides,
   };
@@ -139,6 +140,14 @@ describe("given a board that is on", () => {
     /** @scenario "The dropdown says how the last run ended" */
     it("says nothing new for a run Langy found no news in", () => {
       expect(words({ outcome: "nothing" })).toBe("Ran 12:34 · nothing new");
+    });
+
+    /** @scenario "The dropdown says how many insights the last run saw again" */
+    it("names what it saw again beside what it filed, and alone when it filed none", () => {
+      expect(words({ outcome: "filed", filedCount: 2, renewedCount: 1 })).toBe(
+        "Ran 12:34 · filed 2 new, seen again 1",
+      );
+      expect(words({ outcome: "nothing", renewedCount: 3 })).toBe("Ran 12:34 · seen again 3");
     });
 
     /** @scenario "The dropdown says how the last run ended" */

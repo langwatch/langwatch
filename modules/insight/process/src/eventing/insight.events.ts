@@ -9,6 +9,7 @@ import {
   INSIGHT_EVENT_VERSIONS,
   insightFiledEventDataSchema,
   insightReaderEventDataSchema,
+  insightRenewedEventDataSchema,
 } from "@langwatch/insight-contract";
 import { z } from "zod";
 
@@ -19,6 +20,14 @@ export const InsightFiledEventSchema = z.object({
   data: insightFiledEventDataSchema,
 });
 export type InsightFiledEvent = z.infer<typeof InsightFiledEventSchema>;
+
+export const InsightRenewedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(INSIGHT_EVENT_TYPES.RENEWED),
+  version: z.literal(INSIGHT_EVENT_VERSIONS.RENEWED),
+  data: insightRenewedEventDataSchema,
+});
+export type InsightRenewedEvent = z.infer<typeof InsightRenewedEventSchema>;
 
 export const InsightSeenEventSchema = z.object({
   ...EventSchema.shape,
@@ -46,10 +55,11 @@ export type InsightKeptEvent = z.infer<typeof InsightKeptEventSchema>;
 
 export type InsightReaderEvent = InsightSeenEvent | InsightArchivedEvent | InsightKeptEvent;
 
-export type InsightProcessingEvent = InsightFiledEvent | InsightReaderEvent;
+export type InsightProcessingEvent = InsightFiledEvent | InsightRenewedEvent | InsightReaderEvent;
 
 export const INSIGHT_EVENT_SCHEMAS = [
   InsightFiledEventSchema,
+  InsightRenewedEventSchema,
   InsightSeenEventSchema,
   InsightArchivedEventSchema,
   InsightKeptEventSchema,
