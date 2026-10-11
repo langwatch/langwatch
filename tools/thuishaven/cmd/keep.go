@@ -5,10 +5,11 @@ import (
 	"errors"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"golang.org/x/sys/unix"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
 // runKeep is the hidden `haven keep <slug>`, the stack's keeper (section 11.1
@@ -23,12 +24,7 @@ func runKeep(ctx context.Context, d deps, inv invocation) error {
 	if err != nil {
 		return err
 	}
-	os.Clearenv()
-	for _, kv := range plan.Env {
-		if k, v, ok := strings.Cut(kv, "="); ok {
-			_ = os.Setenv(k, v)
-		}
-	}
+	app.ApplyPlanEnv(plan)
 	return d.orch.Keep(ctx, inv.args[0], plan)
 }
 

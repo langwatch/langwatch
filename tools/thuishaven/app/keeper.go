@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -375,5 +376,32 @@ func (o *Orchestrator) reloadAfterFirstSeed(ctx context.Context, seed KeeperSeed
 	sayPhase(seed.Since, "reloading the worker so it fills the seeded project's analytics key")
 	if err := o.Reload(ctx, UpParams{ExplicitSlug: seed.Job.Slug}, "worker"); err != nil {
 		sayPhase(seed.Since, fmt.Sprintf("worker reload failed (continuing): %v", err))
+	}
+}
+
+// keeperBasics are the only variables a keeper may keep from the daemon that
+// started it, and only when the up's own environment lacks them.
+var keeperBasics = []string{"PATH", "HOME", "USER", "LOGNAME", "TMPDIR"}
+
+// ApplyPlanEnv replaces this process's environment with the plan's: the `haven
+// up` caller's, never the daemon's. Whatever the daemon was started with
+// (IS_SAAS, a licence key) must not reach a stack whose up did not set it.
+func ApplyPlanEnv(plan KeeperPlan) {
+	inherited := map[string]string{}
+	for _, key := range keeperBasics {
+		if v, ok := os.LookupEnv(key); ok {
+			inherited[key] = v
+		}
+	}
+	os.Clearenv()
+	for _, kv := range plan.Env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			_ = os.Setenv(k, v)
+		}
+	}
+	for key, v := range inherited {
+		if _, isSet := os.LookupEnv(key); !isSet {
+			_ = os.Setenv(key, v)
+		}
 	}
 }
