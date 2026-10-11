@@ -165,13 +165,19 @@ export function AppTopBar({
           pointerEvents="none"
         />
       ) : null}
-      <HStack gap={0} flex={1} alignItems="center" minWidth={0}>
+      <HStack gap={0} flex={1} alignItems="center" minWidth={0} position="relative">
         {leading}
         <HStack gap={3} alignItems="center" minWidth={0} paddingLeft={leading ? "22px" : 0}>
           {controls}
         </HStack>
       </HStack>
-      <HStack gap={2} justifyContent="flex-end" overflow="hidden" flexShrink={0}>
+      <HStack
+        gap={2}
+        justifyContent="flex-end"
+        overflow="hidden"
+        flexShrink={0}
+        position="relative"
+      >
         {trailing}
       </HStack>
     </HStack>
