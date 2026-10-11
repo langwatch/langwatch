@@ -141,6 +141,7 @@ export function JsonView() {
               tabSize: 2,
               wordWrap: "on",
               formatOnPaste: true,
+              stickyScroll: { enabled: false },
             }}
           />
         </Suspense>
