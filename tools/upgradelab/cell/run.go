@@ -35,6 +35,7 @@ type Options struct {
 	Before, AtCut, AfterReady        time.Duration // traffic on main, with main's worker paused, after head is ready
 	ReadyWithin, SettleWithin        time.Duration
 	WorkerDelay, Rate, Hold          time.Duration
+	WalkEvery                        time.Duration // the browser walker's pause between rounds
 	DrainWithin                      time.Duration // produce: bound on main draining its queue after the seed burst
 	DrainNear, Trickle               int           // produce: depth that counts as drained; spans sent live before the cut
 	SwitchOn, ServiceBin             string
@@ -629,7 +630,7 @@ func (cell *run) startObservers(ctx context.Context) {
 	if cell.options.Shots && !cell.emptyOrigin() { // the walker signs in, and an empty install has no account until ready
 		email, password := generate.SeedAccount(cell.options.Seed)
 		cell.walker, _ = StartWalker(ctx, WalkSpec{Dir: filepath.Join(cell.options.HeadDir, "apps", "ui"), RunDir: cell.options.RunDir,
-			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: 10 * time.Second})
+			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: cell.options.WalkEvery})
 	}
 }
 

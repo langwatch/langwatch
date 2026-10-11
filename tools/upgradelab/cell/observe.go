@@ -312,6 +312,9 @@ func StartWalker(ctx context.Context, spec WalkSpec) (*Walker, error) {
 	if err := os.WriteFile(script, walkScript, 0o600); err != nil {
 		return nil, err
 	}
+	if spec.Every <= 0 {
+		spec.Every = 10 * time.Second
+	}
 	args, _ := json.Marshal(map[string]any{"url": spec.URL, "email": spec.Email, "password": spec.Password, "runDir": spec.RunDir, "originMs": spec.Origin.UnixMilli(), "every": spec.Every.Milliseconds()})
 	command := exec.CommandContext(ctx, "node", script, string(args)) // #nosec G204 -- harness-written script.
 	command.Dir = spec.Dir

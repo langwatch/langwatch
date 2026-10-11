@@ -93,6 +93,7 @@ func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags.DurationVar(&options.Hold, "hold", 60*time.Second, "how long a held request may take before it counts as failed")
 	flags.StringVar(&options.ServiceBin, "service-bin", ".claude/tmp/upgradelab/bin/service", "the Go service binary hosting storagesim (go build -tags dev -o <path> ./cmd/service), for profiles with object stores")
 	flags.BoolVar(&options.Keep, "keep", false, "keep the cell's databases afterwards (kept anyway when a step fails)")
+	flags.DurationVar(&options.WalkEvery, "walk-every", 10*time.Second, "the browser walker's pause between rounds (one tab); longer cuts Chromium's CPU")
 	flags.BoolVar(&options.Shots, "shots", true, "screenshot each api phase and Ops > Upgrades (Playwright from head's apps/ui)")
 	flags.Float64Var(&options.MaxLoad, "max-load", 40, "refuse to start when the machine's 1-minute load average is above this (0: never refuse)")
 	flags.StringVar(&options.TestedBy, "tested-by", "", "who runs the cell, written to the ledger's Tested by: lane:<id> (model) or @handle")
