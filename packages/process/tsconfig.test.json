@@ -1,6 +1,7 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "lib": ["es2023", "dom"],
     "types": ["node"],
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
     "composite": false,
@@ -20,6 +21,9 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
     }
   ]
 }

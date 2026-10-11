@@ -6,7 +6,7 @@
     "composite": false,
     "noEmit": true
   },
-  "include": ["src/**/*", "type-tests/**/*"],
+  "include": ["type-tests/**/*"],
   "references": [
     {
       "path": "./tsconfig.build.json"

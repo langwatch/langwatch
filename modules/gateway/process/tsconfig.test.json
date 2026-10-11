@@ -23,6 +23,18 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluation/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../instant-eval/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process-stores/tsconfig.build.json"
     }
   ],
   "exclude": [

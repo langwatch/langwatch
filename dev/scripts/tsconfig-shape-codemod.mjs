@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Narrows each package's tsconfigs so `tsc -b` checks every file once and references only
-// what the source imports (dev/docs/plans/typescript-cpu-and-check-time.md steps 4 and 7).
+// Narrows each package's tsconfigs so `tsc -b` checks every file once, builds reference only
+// what the build imports, and test settings stay in test configs
+// (dev/docs/plans/typescript-cpu-and-check-time.md).
 // Idempotent. Usage: node dev/scripts/tsconfig-shape-codemod.mjs [package dirs...], then
-// `pnpm sync:references` and `pnpm install --lockfile-only`. Fails if a test config's file
-// set would differ from (its old set minus the build's).
+// `pnpm sync:references` (it never edits tsconfig.test.json) and `pnpm install --lockfile-only`.
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -22,14 +22,33 @@ const HAND_IGNORED = {
   "modules/langy/browser": ["@langwatch/skills"],
   "packages/observability": ["langwatch"],
 };
-const MARKER =
+const OLD_MARKER =
   "// Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).";
+const MARKER =
+  "// Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).";
+// Ambient types only tests use; build programs never load them.
+const TEST_TYPES = ["vitest/globals", "@testing-library/jest-dom"];
+// Server-only programs: no `dom` lib. api, config, csv, handled-error keep it.
+const SERVER_ONLY = [
+  /^(?:enterprise\/)?modules\/[^/]+\/process$/,
+  /^packages\/(?:process|observability|redaction|webhook-verify)$/,
+];
+const DOM_LIBS = new Set(["dom", "dom.iterable"]);
 const READ_FILE = /\.(?:[cm]?[jt]sx?|css|html)$/;
 const UNSCANNED_DIRS = new Set(["node_modules", "dist", "coverage", ".git", ".turbo"]);
 const formattingOptions = { insertSpaces: true, tabSize: 2 };
 const written = new Set();
 const problems = [];
-const counts = { testConfigs: 0, ignoreConfigs: 0, removed: 0, moved: 0 };
+const counts = {
+  testConfigs: 0,
+  ignoreConfigs: 0,
+  testReferences: 0,
+  typesMoved: 0,
+  domDropped: 0,
+  pathsDropped: 0,
+  removed: 0,
+  moved: 0,
+};
 
 const read = (file) => readFileSync(file, "utf8");
 const readConfig = (file) => jsonc.parse(read(file), [], { allowTrailingComma: true }) ?? {};
@@ -170,33 +189,114 @@ function uses({ text, name }) {
   return new RegExp(`${call}\\s*\\(?\\s*(?:<[^>]*>\\s*\\(\\s*)?${quoted}`).test(text);
 }
 
-/** Step 2: deps no source or test file imports go in nx.sync.ignoredDependencies. Test
- * imports keep theirs: the test config references only the build config (ADR-150). */
-function ignoreUnimported({ directory, buildFiles, testFiles, manifest, projects }) {
-  const file = join(root, directory, "tsconfig.build.json");
+/** Step 2: deps the build does not import go in nx.sync.ignoredDependencies; the test-only
+ * ones get their reference in tsconfig.test.json, which nx sync leaves alone. */
+function ignoreUnimported({ directory, file, buildFiles, testFiles, manifest, projects }) {
   const types = parsedFile(file)?.options.types ?? [];
-  const texts = [...buildFiles, ...testFiles]
-    .filter((name) => existsSync(name))
-    .map((name) => read(name));
-  const derived = workspaceDeps(manifest)
+  const textsOf = (files) =>
+    [...files].filter((name) => existsSync(name)).map((name) => read(name));
+  const buildTexts = textsOf(buildFiles);
+  const testTexts = textsOf(testFiles);
+  const candidates = workspaceDeps(manifest)
     .map(({ name }) => name)
-    .filter((name) => projects.has(name) && name !== manifest.name)
-    .filter((name) => !types.includes(name) && !texts.some((text) => uses({ text, name })));
-  const ignored = [...new Set([...(HAND_IGNORED[directory] ?? []), ...derived])].toSorted(byName);
+    .filter((name) => projects.has(name) && name !== manifest.name && !types.includes(name))
+    .filter((name) => !buildTexts.some((text) => uses({ text, name })));
+  const testOnly = candidates.filter((name) => testTexts.some((text) => uses({ text, name })));
+  referenceFromTests({ directory, testOnly });
+  const ignored = [...new Set([...(HAND_IGNORED[directory] ?? []), ...candidates])].toSorted(
+    byName,
+  );
   let text = read(file);
   const raw = readConfig(file);
   const current = raw.nx?.sync?.ignoredDependencies ?? [];
-  if (JSON.stringify(current) === JSON.stringify(ignored)) return;
-  const lines = text.split("\n").filter((line) => line.trim() !== MARKER);
+  const marked = text.includes(MARKER) || candidates.length === 0;
+  if (JSON.stringify(current) === JSON.stringify(ignored) && marked) return;
+  const lines = text.split("\n").filter((line) => ![MARKER, OLD_MARKER].includes(line.trim()));
   text = lines.join("\n");
   if (ignored.length === 0) {
     text = edit({ text, path: ["nx"], value: undefined });
   } else {
     text = edit({ text, path: ["nx", "sync", "ignoredDependencies"], value: ignored });
-    if (derived.length > 0)
+    if (candidates.length > 0)
       text = text.replace(/^(\s*)"nx": \{/m, (line, indent) => `${indent}${MARKER}\n${line}`);
   }
   if (write({ file, text })) counts.ignoreConfigs += 1;
+}
+
+/** The test config references the build config of each workspace dep only tests import. */
+function referenceFromTests({ directory, testOnly }) {
+  const file = join(root, directory, "tsconfig.test.json");
+  if (!existsSync(file) || testOnly.length === 0) return;
+  const raw = readConfig(file);
+  const have = new Set((raw.references ?? []).map((ref) => resolve(dirname(file), ref.path)));
+  const added = testOnly
+    .map((name) => join(root, directoryOf.get(name), "tsconfig.build.json"))
+    .filter((path) => existsSync(path) && !have.has(path))
+    .map((path) => ({ path: relative(dirname(file), path) }));
+  if (added.length === 0) return;
+  const references = [...(raw.references ?? []), ...added];
+  const text = edit({ text: read(file), path: ["references"], value: references });
+  if (write({ file, text })) counts.testReferences += added.length;
+}
+
+/** Step 4: test-only ambient types leave the container (and so the build) for the test config. */
+function moveTestTypes({ directory }) {
+  const container = join(root, directory, "tsconfig.json");
+  const testFile = join(root, directory, "tsconfig.test.json");
+  if (!existsSync(container)) return;
+  const types = readConfig(container).compilerOptions?.types ?? [];
+  const moved = types.filter((type) => TEST_TYPES.includes(type));
+  if (moved.length === 0) return;
+  if (!existsSync(testFile)) {
+    problems.push(`${directory}: test types in tsconfig.json but no tsconfig.test.json`);
+    return;
+  }
+  const kept = types.filter((type) => !TEST_TYPES.includes(type));
+  const testTypes = [
+    ...new Set([...(readConfig(testFile).compilerOptions?.types ?? kept), ...moved]),
+  ];
+  const testText = edit({
+    text: read(testFile),
+    path: ["compilerOptions", "types"],
+    value: testTypes,
+  });
+  write({ file: testFile, text: testText });
+  write({
+    file: container,
+    text: edit({ text: read(container), path: ["compilerOptions", "types"], value: kept }),
+  });
+  counts.typesMoved += 1;
+}
+
+/** Step 5: server-only programs drop the `dom` lib; node's types carry the web globals they use. */
+function dropServerDom({ directory }) {
+  if (!SERVER_ONLY.some((pattern) => pattern.test(directory))) return;
+  const container = join(root, directory, "tsconfig.json");
+  if (!existsSync(container)) return;
+  const isDom = (entry) => DOM_LIBS.has(entry.toLowerCase());
+  const lib = readConfig(container).compilerOptions?.lib ?? [];
+  const kept = lib.filter((entry) => !isDom(entry));
+  if (kept.length === lib.length) return;
+  const text = edit({ text: read(container), path: ["compilerOptions", "lib"], value: kept });
+  if (write({ file: container, text })) counts.domDropped += 1;
+}
+
+/** Step 6: no `paths` into another package's source; self-mappings and type shims stay. */
+function dropCrossPaths({ directory }) {
+  for (const name of ["tsconfig.json", "tsconfig.build.json"]) {
+    const file = join(root, directory, name);
+    if (!existsSync(file)) continue;
+    const paths = readConfig(file).compilerOptions?.paths;
+    if (!paths) continue;
+    const crosses = (target) => target.startsWith("../") && !target.endsWith(".d.ts");
+    const kept = Object.fromEntries(
+      Object.entries(paths).filter(([, targets]) => !targets.some(crosses)),
+    );
+    if (Object.keys(kept).length === Object.keys(paths).length) continue;
+    const value = Object.keys(kept).length > 0 ? kept : undefined;
+    const text = edit({ text: read(file), path: ["compilerOptions", "paths"], value });
+    if (write({ file, text })) counts.pathsDropped += 1;
+  }
 }
 
 /** The files the package-dependencies policy reads (architecture-enforcer manifests.ts). */
@@ -273,11 +373,12 @@ function pruneDependencies({ directory, manifest }) {
 }
 
 const all = members();
-const projects = new Set(
+const directoryOf = new Map(
   all
     .filter((directory) => existsSync(join(root, directory, "tsconfig.json")))
-    .map((directory) => readConfig(join(root, directory, "package.json")).name),
+    .map((directory) => [readConfig(join(root, directory, "package.json")).name, directory]),
 );
+const projects = new Set(directoryOf.keys());
 const asked = process.argv.slice(2).map((path) => relative(root, resolve(path)));
 const directories = all
   .filter((directory) => asked.length === 0 || asked.includes(directory))
@@ -286,13 +387,18 @@ const directories = all
   );
 
 for (const directory of directories) {
-  const buildFile = join(root, directory, "tsconfig.build.json");
   const manifest = readConfig(join(root, directory, "package.json"));
-  if (existsSync(buildFile)) {
+  moveTestTypes({ directory });
+  dropServerDom({ directory });
+  dropCrossPaths({ directory });
+  const buildFile = ["tsconfig.build.json", "tsconfig.app.json"]
+    .map((name) => join(root, directory, name))
+    .find((file) => existsSync(file));
+  if (buildFile) {
     const buildRaw = readConfig(buildFile);
     const buildFiles = filesOf({ raw: buildRaw, file: buildFile });
     const testFiles = narrowTestConfig({ directory, buildFiles, buildRaw });
-    ignoreUnimported({ directory, buildFiles, testFiles, manifest, projects });
+    ignoreUnimported({ directory, file: buildFile, buildFiles, testFiles, manifest, projects });
   }
   pruneDependencies({ directory, manifest });
 }
@@ -300,7 +406,9 @@ for (const directory of directories) {
 for (const file of [...written].toSorted(byName)) console.log(file);
 console.error(
   `${directories.length} packages: ${counts.testConfigs} test configs narrowed, ` +
-    `${counts.ignoreConfigs} build configs re-ignored, ${counts.removed} deps removed, ` +
+    `${counts.ignoreConfigs} build configs re-ignored, ${counts.testReferences} test references ` +
+    `added, ${counts.typesMoved} test types moved, ${counts.domDropped} dom libs dropped, ` +
+    `${counts.pathsDropped} cross-package paths dropped, ${counts.removed} deps removed, ` +
     `${counts.moved} deps moved to devDependencies.`,
 );
 if (problems.length > 0) {

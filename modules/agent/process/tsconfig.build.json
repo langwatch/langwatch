@@ -84,25 +84,20 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/secrets/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../api-key/contract/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
-      "ignoredDependencies": ["@langwatch/module", "@langwatch/task"]
+      "ignoredDependencies": [
+        "@langwatch/api-key-contract",
+        "@langwatch/module",
+        "@langwatch/secrets",
+        "@langwatch/task",
+        "@langwatch/test-harness",
+        "@langwatch/trace-contract"
+      ]
     }
   }
 }

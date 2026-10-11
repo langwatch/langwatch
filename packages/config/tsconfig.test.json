@@ -3,7 +3,6 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"],
-    "incremental": true,
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
     "composite": false
   },

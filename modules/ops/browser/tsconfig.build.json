@@ -3,10 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
-    "paths": {
-      "@langwatch/identity-contract": ["../../identity/contract/src/index.ts"]
-    }
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": ["./src/ui/sections/impersonation/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
@@ -78,7 +75,7 @@
       "path": "../../../packages/api/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
       "ignoredDependencies": ["@langwatch/enterprise-billing-contract", "@langwatch/vitest-config"]

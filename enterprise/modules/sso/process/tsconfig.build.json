@@ -24,9 +24,6 @@
   ],
   "references": [
     {
-      "path": "../../../../packages/eventing/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
@@ -48,6 +45,9 @@
       "path": "../../../../modules/feature-flag/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/eventing/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
@@ -61,17 +61,15 @@
     },
     {
       "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/test-harness/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
       "ignoredDependencies": [
         "@langwatch/auth-contract",
         "@langwatch/module",
+        "@langwatch/test-harness",
         "@langwatch/vitest-config"
       ]
     }

@@ -5,7 +5,7 @@
     "jsx": "react-jsx",
     "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
-    "types": ["vitest/globals"],
+    "types": [],
     "verbatimModuleSyntax": true,
 
     "rootDir": ".",

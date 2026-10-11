@@ -3,7 +3,8 @@
   "compilerOptions": {
     "composite": false,
     "noEmit": true,
-    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "types": ["node", "vitest/globals"]
   },
   "include": [
     "src/**/__tests__/**/*.ts",
@@ -23,6 +24,21 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

@@ -23,6 +23,15 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ],
   "exclude": ["src/repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts"]

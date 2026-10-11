@@ -24,9 +24,6 @@
   ],
   "references": [
     {
-      "path": "../../sso/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/upgrade/tsconfig.build.json"
     },
     {
@@ -72,6 +69,9 @@
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
     },
     {
+      "path": "../../sso/contract/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {
@@ -88,21 +88,17 @@
     },
     {
       "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/secrets/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
       "ignoredDependencies": [
         "@langwatch/authz-contract",
         "@langwatch/internal-slack",
         "@langwatch/module",
+        "@langwatch/secrets",
+        "@langwatch/test-harness",
         "@langwatch/user-contract",
         "@langwatch/vitest-config"
       ]

@@ -1,7 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": ["vitest/globals"],
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
     "composite": false,
     "noEmit": true
@@ -43,12 +42,6 @@
       "path": "../../modules/share/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/share/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/secrets/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/secret/process/tsconfig.build.json"
     },
     {
@@ -64,43 +57,22 @@
       "path": "../../modules/role/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/redis-client/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/prompt/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/prompt/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/project/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/process-stores/tsconfig.build.json"
-    },
-    {
       "path": "../../packages/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/prisma-client/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/presence/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/presence/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/platform-health/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/organization/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/organization/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/ops/process/tsconfig.build.json"
@@ -118,28 +90,16 @@
       "path": "../../modules/monitor/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/module/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/model-provider/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/model-provider/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/metric/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/mail/tsconfig.build.json"
     },
     {
       "path": "../../modules/log/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/langy/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../modules/instant-eval/process/tsconfig.build.json"
@@ -151,9 +111,6 @@
       "path": "../../modules/identity/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/identity/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/hosted-mcp/process/tsconfig.build.json"
     },
     {
@@ -163,25 +120,16 @@
       "path": "../../modules/gateway/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/gateway/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/feature-flag/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/experiment/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/eventing/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/evaluator/process/tsconfig.build.json"
     },
     {
       "path": "../../modules/evaluation/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/evaluation/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/entitlement/process/tsconfig.build.json"
@@ -208,13 +156,7 @@
       "path": "../../enterprise/modules/licensing/process/tsconfig.build.json"
     },
     {
-      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../enterprise/modules/governance/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../enterprise/modules/governance/contract/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/enterprise-gateway/process/tsconfig.build.json"
@@ -235,9 +177,6 @@
       "path": "../../modules/data-retention/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/data-retention/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/data-privacy/process/tsconfig.build.json"
     },
     {
@@ -250,40 +189,19 @@
       "path": "../../modules/coding-agent/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/clickhouse-client/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/automation/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/automation/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/authz/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/authorization/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/auth/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/auth/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/audit-log/process/tsconfig.build.json"
     },
     {
-      "path": "../../modules/audit-log/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/api-key/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/api-key/contract/tsconfig.build.json"
     },
     {
       "path": "../../packages/api/tsconfig.build.json"
@@ -301,13 +219,94 @@
       "path": "../../modules/agent/process/tsconfig.build.json"
     },
     {
-      "path": "../../packages/vitest-config/tsconfig.build.json"
-    },
-    {
       "path": "../../packages/test-harness/tsconfig.build.json"
     },
     {
+      "path": "../../modules/share/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/presence/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/gateway/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/governance/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/audit-log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/api-key/contract/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/mail", "@langwatch/vitest-config"]
+    }
+  }
 }

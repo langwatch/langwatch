@@ -12,7 +12,7 @@
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
 
   "references": [],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
       "ignoredDependencies": ["@langwatch/vitest-config"]

@@ -3,8 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "rootDir": ".",
-    "types": ["node"],
-    "incremental": true,
+    "types": ["node", "vitest/globals"],
     "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
     "composite": false
   },

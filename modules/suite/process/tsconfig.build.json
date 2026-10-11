@@ -79,27 +79,19 @@
     },
     {
       "path": "../../agent/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/process-stores/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
-      "ignoredDependencies": ["@langwatch/module"]
+      "ignoredDependencies": [
+        "@langwatch/authorization",
+        "@langwatch/authz-contract",
+        "@langwatch/module",
+        "@langwatch/process-stores",
+        "@langwatch/secrets",
+        "@langwatch/test-harness"
+      ]
     }
   }
 }

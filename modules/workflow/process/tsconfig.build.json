@@ -88,18 +88,17 @@
     },
     {
       "path": "../../agent/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/prisma-client/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
-      "ignoredDependencies": ["@langwatch/project-contract", "@langwatch/task"]
+      "ignoredDependencies": [
+        "@langwatch/prisma-client",
+        "@langwatch/project-contract",
+        "@langwatch/task",
+        "@langwatch/test-harness"
+      ]
     }
   }
 }

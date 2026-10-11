@@ -5,17 +5,10 @@
     "outDir": "dist",
 
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": ["es2023", "dom"],
+    "lib": ["es2023"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "paths": {
-      "@langwatch/webhook-contract": ["../contract/src/index.ts"],
-      "@langwatch/handled-error": ["../../../packages/handled-error/src/index.ts"],
-      "@langwatch/prisma-client/generated": [
-        "../../../packages/prisma-client/src/generated/client.ts"
-      ]
-    },
     "composite": true,
     "noEmit": false
   },

@@ -9,7 +9,7 @@
     // `node` is for `scripts/` (Node generators) and the tests that read the
     // repo from disk, not for `src/` — `process.env` in browser source is
     // refused by `langwatch/environment-boundaries`, not by this list.
-    "types": ["node", "vitest/globals", "@testing-library/jest-dom"],
+    "types": ["node"],
     "resolveJsonModule": true,
 
     "rootDir": ".",

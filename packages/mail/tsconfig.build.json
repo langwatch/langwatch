@@ -1,12 +1,6 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": ["./tsconfig.json", "../../tsconfig.emit.json"],
   "compilerOptions": {
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "emitDeclarationOnly": true,
-    "noEmit": false,
-    "noEmitOnError": true,
     "rootDir": "src",
     "outDir": "dist/typecheck",
     "tsBuildInfoFile": "dist/typecheck/tsconfig.build.tsbuildinfo"
@@ -33,7 +27,7 @@
       "path": "../observability/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
       "ignoredDependencies": [

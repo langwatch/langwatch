@@ -6,7 +6,7 @@
     "composite": false,
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "type-tests/**/*.ts"],
+  "include": ["type-tests/**/*.ts"],
   "exclude": [],
   "references": [
     {

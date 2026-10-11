@@ -96,9 +96,6 @@
       "path": "../../../enterprise/modules/sso/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
@@ -115,9 +112,12 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/enterprise-licensing-contract", "@langwatch/test-harness"]
+    }
+  }
 }

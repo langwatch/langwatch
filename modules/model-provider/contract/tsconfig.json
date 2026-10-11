@@ -8,6 +8,7 @@
     "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
     "resolveJsonModule": true,
+    "allowArbitraryExtensions": true,
     "verbatimModuleSyntax": true,
     "composite": true,
     "noEmit": false

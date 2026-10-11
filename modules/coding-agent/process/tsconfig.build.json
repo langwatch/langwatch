@@ -85,29 +85,19 @@
     },
     {
       "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/process-stores/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/group-queue/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
       "ignoredDependencies": [
+        "@langwatch/clickhouse-migrations",
+        "@langwatch/group-queue",
         "@langwatch/metric-process",
         "@langwatch/module",
+        "@langwatch/process-stores",
+        "@langwatch/secrets",
+        "@langwatch/test-harness",
         "@langwatch/trace-process",
         "@langwatch/vitest-config"
       ]

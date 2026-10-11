@@ -9,11 +9,6 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "paths": {
-      "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
-      "@langwatch/dataset-contract": ["../../dataset/contract/src/index.ts"],
-      "@langwatch/monitor-contract": ["../../monitor/contract/src/index.ts"]
-    },
     "composite": true,
     "noEmit": false
   },

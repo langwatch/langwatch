@@ -9,11 +9,6 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "paths": {
-      "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"],
-      "@langwatch/gateway-contract": ["../../../../modules/gateway/contract/src/index.ts"],
-      "@langwatch/authz-contract": ["../../../../modules/authz/contract/src/index.ts"]
-    },
     "composite": true,
     "noEmit": false
   },

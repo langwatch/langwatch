@@ -6,7 +6,7 @@
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "types": ["node", "vitest/globals"],
+    "types": ["node"],
 
     "rootDir": ".",
 

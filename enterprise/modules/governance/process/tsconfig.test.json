@@ -23,6 +23,12 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/secrets/tsconfig.build.json"
     }
   ],
   "exclude": ["src/__tests__/testing.ts"]

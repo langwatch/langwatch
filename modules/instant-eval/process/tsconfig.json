@@ -9,7 +9,7 @@
     "noImplicitReturns": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
-    "types": ["vitest/globals"],
+    "types": [],
     "composite": true,
     "noEmit": false
   },

@@ -10,7 +10,7 @@
     "noImplicitReturns": true,
 
     "verbatimModuleSyntax": true,
-    "types": ["vitest/globals"],
+    "types": [],
     "composite": true,
     "noEmit": false
   },

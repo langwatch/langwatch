@@ -39,6 +39,9 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/billing/client/tsconfig.build.json"
     }
   ]
 }

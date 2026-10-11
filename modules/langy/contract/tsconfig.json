@@ -8,7 +8,7 @@
     "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "types": ["node", "vitest/globals"],
+    "types": ["node"],
     "composite": true,
     "noEmit": false
   },

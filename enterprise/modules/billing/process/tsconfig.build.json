@@ -103,12 +103,9 @@
     },
     {
       "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/test-harness/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
       "ignoredDependencies": [
@@ -116,6 +113,7 @@
         "@langwatch/instant-eval-judge-process",
         "@langwatch/onboarding-contract",
         "@langwatch/scenario-contract",
+        "@langwatch/test-harness",
         "@langwatch/trace-contract",
         "@langwatch/vitest-config"
       ]

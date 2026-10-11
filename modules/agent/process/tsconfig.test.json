@@ -23,6 +23,18 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
     }
   ]
 }

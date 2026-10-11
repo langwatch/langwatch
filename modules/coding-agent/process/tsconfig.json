@@ -6,13 +6,6 @@
 
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2023"],
-    "paths": {
-      "@langwatch/coding-agent-contract": ["../contract/src/index.ts"],
-      "@langwatch/coding-agent-contract/testing": ["../contract/src/testing.ts"],
-      "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
-      "@langwatch/github-contract": ["../../github/contract/src/index.ts"],
-      "@langwatch/project-contract": ["../../project/contract/src/index.ts"]
-    },
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "composite": true,

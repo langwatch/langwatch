@@ -23,6 +23,12 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process-stores/tsconfig.build.json"
     }
   ],
   "exclude": ["src/__tests__/testing.ts", "src/__tests__/fixtures/graph-activity.fixture.ts"]

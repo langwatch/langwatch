@@ -3,7 +3,8 @@
   "compilerOptions": {
     "composite": false,
     "noEmit": true,
-    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "types": ["node", "vitest/globals"]
   },
   "include": [
     "src/**/__tests__/**/*.ts",

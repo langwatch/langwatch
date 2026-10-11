@@ -37,6 +37,9 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../scenario/contract/tsconfig.build.json"
     }
   ]
 }

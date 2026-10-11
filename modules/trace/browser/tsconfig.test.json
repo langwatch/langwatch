@@ -49,6 +49,9 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/span-normalisation/tsconfig.build.json"
     }
   ]
 }

@@ -108,7 +108,7 @@
       "path": "../../agent/contract/tsconfig.build.json"
     }
   ],
-  // Workspace dependencies no source or test file imports get no reference (tsconfig-shape-codemod).
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
       "ignoredDependencies": ["@langwatch/experiment-contract", "@langwatch/vitest-config"]

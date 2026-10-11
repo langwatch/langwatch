@@ -3,7 +3,8 @@
   "compilerOptions": {
     "composite": false,
     "noEmit": true,
-    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "types": ["node", "vitest/globals"]
   },
   "include": [
     "src/**/__tests__/**/*.ts",
@@ -23,6 +24,12 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

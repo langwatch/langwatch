@@ -37,6 +37,9 @@
   "references": [
     {
       "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
     }
   ]
 }

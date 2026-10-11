@@ -9,10 +9,6 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "paths": {
-      "@langwatch/enterprise-licensing-contract": ["../contract/src/index.ts"],
-      "@langwatch/authz-contract": ["../../../../modules/authz/contract/src/index.ts"]
-    },
     "composite": true,
     "noEmit": false
   },

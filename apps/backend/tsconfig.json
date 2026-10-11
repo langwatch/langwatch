@@ -5,7 +5,6 @@
     "types": [],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "incremental": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
     "composite": true,
