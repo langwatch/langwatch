@@ -10,6 +10,8 @@ import type {
   AnalyticsEvaluationUpsertInput,
 } from "./analytics.evaluation.ts";
 import type {
+  AnalyticsFeedbacksPageParams,
+  AnalyticsFeedbacksPageResult,
   AnalyticsFeedbacksResult,
   AnalyticsFilterOption,
   AnalyticsMetricSource,
@@ -69,6 +71,13 @@ export interface AnalyticsApi {
     options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult>;
   getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult>;
+  /**
+   * The same feedbacks as {@link getFeedbacks}, newest first, one bounded page at a time.
+   * Refuses a cursor from another project or filter set with `validation_error`.
+   */
+  getFeedbacksPage(
+    input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
+  ): Promise<AnalyticsFeedbacksPageResult>;
   getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult>;
   filterOptions(input: {
     readonly projectId: string;

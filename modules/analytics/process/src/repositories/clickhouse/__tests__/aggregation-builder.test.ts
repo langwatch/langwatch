@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   __testOnly__,
   buildDataForFilterQuery,
+  buildFeedbacksPageQuery,
   buildFeedbacksQuery,
   buildTimeseriesQuery,
   buildTopDocumentsQuery,
@@ -1830,6 +1831,93 @@ describe("aggregation-builder", () => {
       // also select it (otherwise ClickHouse would reject ts.TopicId).
       expect(latestTraceRowColumns(result.sql)).toEqual([["OccurredAt", "TopicId"]]);
       expect(result.sql).toContain("ts.TopicId IN");
+    });
+  });
+
+  describe("buildFeedbacksPageQuery()", () => {
+    const projectId = "test-project";
+    const startDate = new Date("2024-01-01T00:00:00Z");
+    const endDate = new Date("2024-01-02T00:00:00Z");
+
+    /** @scenario "The paged query orders by a persisted identity and resumes strictly after the cursor" */
+    it("orders by timestamp, trace, span and event position, all newest first", () => {
+      const result = buildFeedbacksPageQuery({ projectId, startDate, endDate, limit: 25 });
+
+      expect(result.sql).toMatch(
+        /ORDER BY event_timestamp DESC, ts\.TraceId DESC, ss\.SpanId DESC, event_index DESC/,
+      );
+      expect(result.sql).toContain('arrayEnumerate(ss."Events.Timestamp") AS event_index');
+    });
+
+    it("asks for one row more than the page size, as a bound parameter", () => {
+      const result = buildFeedbacksPageQuery({ projectId, startDate, endDate, limit: 25 });
+
+      expect(result.sql).toContain("LIMIT {pageLimit:UInt32}");
+      expect(result.params.pageLimit).toBe(26);
+    });
+
+    it("has no position condition for the first page", () => {
+      const result = buildFeedbacksPageQuery({ projectId, startDate, endDate, limit: 25 });
+
+      expect(result.sql).not.toContain("afterStartedAt");
+      expect(Object.keys(result.params)).not.toContain("afterTraceId");
+    });
+
+    it("resumes strictly after the cursor position with every part bound", () => {
+      const result = buildFeedbacksPageQuery({
+        projectId,
+        startDate,
+        endDate,
+        limit: 25,
+        after: {
+          startedAt: 1_704_067_300_000,
+          traceId: "trace'; DROP",
+          spanId: "s1",
+          eventIndex: 2,
+        },
+      });
+
+      expect(result.sql).toContain(
+        "(toUnixTimestamp64Milli(event_timestamp), ts.TraceId, ss.SpanId, event_index) < ({afterStartedAt:Int64}, {afterTraceId:String}, {afterSpanId:String}, {afterEventIndex:UInt32})",
+      );
+      expect(result.sql).not.toContain("DROP");
+      expect(result.params).toMatchObject({
+        afterStartedAt: 1_704_067_300_000,
+        afterTraceId: "trace'; DROP",
+        afterSpanId: "s1",
+        afterEventIndex: 2,
+      });
+    });
+
+    it("fences the tenant and the window and keeps the thumbs vote filter", () => {
+      const result = buildFeedbacksPageQuery({ projectId, startDate, endDate, limit: 25 });
+
+      expect(result.sql).toContain("ts.TenantId = {tenantId:String}");
+      expect(result.params).toMatchObject({ tenantId: projectId, startDate, endDate });
+      expect(result.sql).toContain("event_name = 'thumbs_up_down'");
+      expect(result.sql).toContain("mapContains(event_attrs, 'event.metrics.vote')");
+    });
+
+    it("applies the same filters as the unpaged query, parameterised", () => {
+      resetParamCounter();
+      const filters = { "metadata.user_id": ["user-1"] };
+      const page = buildFeedbacksPageQuery({ projectId, startDate, endDate, filters, limit: 25 });
+      resetParamCounter();
+      const unpaged = buildFeedbacksQuery({ projectId, startDate, endDate, filters });
+
+      expect(page.sql).not.toContain("user-1");
+      for (const key of Object.keys(unpaged.params)) {
+        expect(page.params[key]).toEqual(unpaged.params[key]);
+      }
+    });
+
+    /** @scenario "The existing feedback read keeps its query and result" */
+    it("leaves the unpaged query ordering by timestamp and capped at 100", () => {
+      const result = buildFeedbacksQuery({ projectId, startDate, endDate });
+
+      expect(result.sql).toMatch(/ORDER BY event_timestamp DESC\s+LIMIT 100\s*$/);
+      expect(result.sql).not.toContain("event_index");
+      expect(result.sql).not.toContain("pageLimit");
     });
   });
 

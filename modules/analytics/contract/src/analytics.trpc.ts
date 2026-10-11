@@ -9,6 +9,8 @@ import { z } from "zod";
 import { filterFieldsEnum } from "./analytics.filter-field.ts";
 import { sharedFiltersInputSchema, timeseriesInputSchema } from "./analytics.input-schemas.ts";
 import {
+  analyticsFeedbacksPageParamsSchema,
+  analyticsFeedbacksPageResultSchema,
   analyticsFeedbacksResultSchema,
   analyticsFilterOptionsResultSchema,
   analyticsTimeseriesResultSchema,
@@ -41,6 +43,16 @@ export interface AnalyticsDataForFilterInputSchema extends Named<
 export const analyticsDataForFilterInputSchema: AnalyticsDataForFilterInputSchema =
   analyticsDataForFilterInputSchemaDefinition;
 
+const analyticsFeedbacksPageInputSchemaDefinition = z.object({
+  ...sharedFiltersInputSchema.shape,
+  ...analyticsFeedbacksPageParamsSchema.shape,
+});
+export interface AnalyticsFeedbacksPageInputSchema extends Named<
+  typeof analyticsFeedbacksPageInputSchemaDefinition
+> {}
+export const analyticsFeedbacksPageInputSchema: AnalyticsFeedbacksPageInputSchema =
+  analyticsFeedbacksPageInputSchemaDefinition;
+
 export const analyticsTrpc = defineTrpcContract("analytics")
   .query("getTimeseries")
   .withInput(timeseriesInputSchema)
@@ -60,4 +72,8 @@ export const analyticsTrpc = defineTrpcContract("analytics")
   .query("feedbacks")
   .withInput(sharedFiltersInputSchema)
   .withOutput(analyticsFeedbacksResultSchema)
+
+  .query("feedbacksPage")
+  .withInput(analyticsFeedbacksPageInputSchema)
+  .withOutput(analyticsFeedbacksPageResultSchema)
   .build();
