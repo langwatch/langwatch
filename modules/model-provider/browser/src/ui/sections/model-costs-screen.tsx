@@ -15,7 +15,6 @@ import {
   HStack,
   NativeSelect,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -44,14 +43,13 @@ import { RegexHighlight } from "../elements/regex-highlight.tsx";
 /** One rate as US dollars per million tokens; the exact per-token figure sits in the tooltip. */
 function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: boolean }) {
   return (
-    <Table.Cell padding={0}>
+    <ListTable.Cell nowrap>
       {rate !== undefined && (
         <Tooltip content={`$${formatRate(rate)} per token`}>
           <Text
             as="span"
             display="inline-block"
             whiteSpace="nowrap"
-            paddingX={3}
             textStyle="sm"
             fontVariantNumeric="tabular-nums"
             color={isCustom ? "green.fg" : undefined}
@@ -64,7 +62,7 @@ function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: bool
           </Text>
         </Tooltip>
       )}
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 
@@ -294,9 +292,9 @@ export default function ModelCostsScreen() {
           </NoDataInfoBlock>
         )}
         {!noCosts && !noMatches && (
-          <ListTable containerProps={{ overflowX: "auto" }}>
-            <Table.Header width="full">
-              <Table.Row width="full">
+          <ListTable scroll="x" scrollLabel="Model costs" loading={llmModelCosts.isLoading}>
+            <ListTable.Header>
+              <ListTable.Row>
                 <SortHeader
                   label="Model name"
                   sortKey="model"
@@ -304,7 +302,7 @@ export default function ModelCostsScreen() {
                   onSort={onSort}
                   minWidth="160px"
                 />
-                <Table.ColumnHeader minWidth="160px">Regex match rule</Table.ColumnHeader>
+                <ListTable.ColumnHeader minWidth="160px">Regex match rule</ListTable.ColumnHeader>
                 <SortHeader
                   label="Input cost"
                   sortKey="inputCostPerToken"
@@ -317,39 +315,36 @@ export default function ModelCostsScreen() {
                   sort={sort}
                   onSort={onSort}
                 />
-                <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
-                <Table.ColumnHeader whiteSpace="nowrap">Cache write (5 min)</Table.ColumnHeader>
-                <Table.ColumnHeader whiteSpace="nowrap">Cache write (1 hour)</Table.ColumnHeader>
-                <Table.ColumnHeader whiteSpace="nowrap">Image input</Table.ColumnHeader>
-                <Table.ColumnHeader whiteSpace="nowrap">Image output</Table.ColumnHeader>
+                <ListTable.ColumnHeader>Cache read</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Cache write (5 min)</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Cache write (1 hour)</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Image input</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Image output</ListTable.ColumnHeader>
                 <ListTable.ActionHeader />
-              </Table.Row>
-            </Table.Header>
-            <Table.Body width="full">
+              </ListTable.Row>
+            </ListTable.Header>
+            <ListTable.Body>
               {llmModelCosts.isLoading && <ListTable.LoadingRows rows={3} columns={10} />}
               {visibleRows.map((row) => (
-                <Table.Row
+                <ListTable.Row
                   key={row.model}
-                  width="full"
-                  cursor="pointer"
-                  _hover={{ bg: "bg.muted" }}
-                  onClick={() =>
+                  onActivate={() =>
                     host.openPlatformDrawer({
                       drawer: "llmModelCost",
                       params: editorParams(row),
                     })
                   }
                 >
-                  <Table.Cell>
+                  <ListTable.Cell>
                     <ModelNameCell
                       model={row.model}
                       isCustom={!!row.updatedAt}
                       modelProviderId={providerRows.get(providerOf(row))}
                     />
-                  </Table.Cell>
-                  <Table.Cell>
+                  </ListTable.Cell>
+                  <ListTable.Cell>
                     <RegexHighlight pattern={row.regex} />
-                  </Table.Cell>
+                  </ListTable.Cell>
                   <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
                   <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
                   <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
@@ -360,9 +355,9 @@ export default function ModelCostsScreen() {
                   <ListTable.ActionCell>
                     <ActionsMenu id={row.id} model={row.model} />
                   </ListTable.ActionCell>
-                </Table.Row>
+                </ListTable.Row>
               ))}
-            </Table.Body>
+            </ListTable.Body>
           </ListTable>
         )}
       </VStack>

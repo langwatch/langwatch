@@ -9,15 +9,7 @@ import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import {
@@ -99,8 +91,8 @@ function ProviderRow({
   const isSystem = provider.isSystem === true;
 
   return (
-    <Table.Row data-testid={`model-provider-row-${provider.provider}`}>
-      <Table.Cell>
+    <ListTable.Row data-testid={`model-provider-row-${provider.provider}`}>
+      <ListTable.Cell>
         <HStack gap={3} align="center">
           {isProviderKey(provider.provider) && (
             <ProviderIconGlyph provider={provider.provider} size="24px" />
@@ -112,15 +104,15 @@ function ProviderRow({
             />
           </VStack>
         </HStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <ProviderScopeChips
           scopes={namedScopes}
           // Env-var-fed providers carry `isSystem`; the chip column reads
           // "System" instead of an empty cell.
           system={isSystem}
         />
-      </Table.Cell>
+      </ListTable.Cell>
       <ListTable.ActionCell>
         {isSystem ? null : (
           <Menu.Root>
@@ -195,7 +187,7 @@ function ProviderRow({
           </Menu.Root>
         )}
       </ListTable.ActionCell>
-    </Table.Row>
+    </ListTable.Row>
   );
 }
 
@@ -260,15 +252,15 @@ function ProvidersPanel({
   }
 
   return (
-    <ListTable containerProps={{ overflowX: "auto" }}>
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Provider</Table.ColumnHeader>
-          <Table.ColumnHeader>Scope</Table.ColumnHeader>
+    <ListTable scroll="x" scrollLabel="Model providers">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Provider</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
           <ListTable.ActionHeader />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {enabledProviders.map((provider) => (
           <ProviderRow
             key={provider.id ?? `system-${provider.provider}`}
@@ -280,7 +272,7 @@ function ProvidersPanel({
             scopeNameById={scopeNameById}
           />
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
@@ -654,17 +646,17 @@ function AddModelProviderMenu({
 function ProvidersTableSkeleton() {
   return (
     <Box width="full" data-testid="providers-table-skeleton">
-      <ListTable containerProps={{ overflowX: "auto" }}>
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Provider</Table.ColumnHeader>
-            <Table.ColumnHeader>Scope</Table.ColumnHeader>
+      <ListTable scroll="x" scrollLabel="Model providers" loading>
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Provider</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
             <ListTable.ActionHeader />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           <ListTable.LoadingRows rows={3} columns={3} />
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     </Box>
   );

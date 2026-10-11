@@ -13,7 +13,6 @@ import {
   Button,
   HStack,
   IconButton,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -234,20 +233,20 @@ function AllConfigsView({
     );
   }
   return (
-    <ListTable containerProps={{ overflowX: "auto" }}>
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+    <ListTable scroll="x" scrollLabel="Default models by scope">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Scopes</ListTable.ColumnHeader>
           {MODEL_ROLES.map((role) => (
-            <Table.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</Table.ColumnHeader>
+            <ListTable.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</ListTable.ColumnHeader>
           ))}
           <ListTable.ActionHeader />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {configs.map((config) => (
-          <Table.Row key={config.id} data-testid={`config-row-${config.id}`}>
-            <Table.Cell>
+          <ListTable.Row key={config.id} data-testid={`config-row-${config.id}`}>
+            <ListTable.Cell>
               <HStack gap={2} flexWrap="wrap">
                 {config.scopes.map((scope) => (
                   <ScopeChip
@@ -257,9 +256,9 @@ function AllConfigsView({
                   />
                 ))}
               </HStack>
-            </Table.Cell>
+            </ListTable.Cell>
             {MODEL_ROLES.map((role) => (
-              <Table.Cell
+              <ListTable.Cell
                 key={role}
                 data-testid={`config-row-${config.id}-cell-${role.toLowerCase()}`}
               >
@@ -274,7 +273,7 @@ function AllConfigsView({
                   enabledProviderKeys={enabledProviderKeys}
                   displayNames={displayNames}
                 />
-              </Table.Cell>
+              </ListTable.Cell>
             ))}
             <ListTable.ActionCell>
               {/* Matches the model-providers table: a vertical 3-dot menu with
@@ -322,9 +321,9 @@ function AllConfigsView({
                 </Menu.Content>
               </Menu.Root>
             </ListTable.ActionCell>
-          </Table.Row>
+          </ListTable.Row>
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
@@ -477,19 +476,19 @@ function ScopeChip({ type, name }: { type: ModelProviderScopeType; name: string 
 function DefaultModelsTableSkeleton() {
   return (
     <Box width="full" data-testid="default-models-table-skeleton">
-      <ListTable containerProps={{ overflowX: "auto" }}>
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+      <ListTable scroll="x" scrollLabel="Default models by scope" loading>
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Scopes</ListTable.ColumnHeader>
             {MODEL_ROLES.map((role) => (
-              <Table.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</Table.ColumnHeader>
+              <ListTable.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</ListTable.ColumnHeader>
             ))}
             <ListTable.ActionHeader />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           <ListTable.LoadingRows rows={3} columns={MODEL_ROLES.length + 2} />
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     </Box>
   );
