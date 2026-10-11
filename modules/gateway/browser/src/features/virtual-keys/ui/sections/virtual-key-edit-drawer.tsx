@@ -597,7 +597,7 @@ export function VirtualKeyEditDrawer({
               <Field.Label>
                 Name
                 <FieldInfoTooltip
-                  description="Human-readable identifier shown in the list and audit log. Must be unique within the organization. Rename is non-breaking: the VK id + secret remain the same."
+                  description="A name to help you recognize this key in the list and audit log. Renaming it changes nothing else: the key and its secret stay the same."
                   docHref="/ai-gateway/virtual-keys#creating-a-vk"
                 />
               </Field.Label>
