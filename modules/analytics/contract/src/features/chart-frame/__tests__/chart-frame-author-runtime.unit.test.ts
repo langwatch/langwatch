@@ -33,7 +33,10 @@ interface RuntimeWindow {
 function evaluateAuthorRuntime() {
   const rendered: unknown[] = [];
   const panel = { textContent: "", style: { display: "none" } };
-  const fakeDocument = { getElementById: () => panel };
+  const root = { style: { display: "" } };
+  const fakeDocument = {
+    getElementById: (id: string) => (id === "lw-root" ? root : panel),
+  };
   const captured: { visitor?: BabelVisitor } = {};
   const win: RuntimeWindow = {
     document: fakeDocument,
@@ -55,7 +58,7 @@ function evaluateAuthorRuntime() {
   const run = new Function("window", "document", "URL", "Blob", buildAuthorRuntimeScript());
   run(win, fakeDocument, win.URL, win.Blob);
 
-  return { win, panel, rendered, captured };
+  return { win, panel, root, rendered, captured };
 }
 
 describe("given the author runtime's Babel plugin", () => {
@@ -228,5 +231,6 @@ describe("given a widget that imports an http module URL", () => {
     expect(runtime.panel.style.display).toBe("block");
     expect(runtime.panel.textContent).toContain("Compile error");
     expect(runtime.panel.textContent).toContain("Module URLs must use https:");
+    expect(runtime.root.style.display).toBe("none");
   });
 });

@@ -32,6 +32,9 @@ export function buildAuthorRuntimeScript(): string {
     if (panel) {
       panel.textContent = detail ? title + "\\n\\n" + detail : title;
       panel.style.display = "block";
+      // The root is height: 100%, so the panel would sit below the fold.
+      var root = document.getElementById("lw-root");
+      if (root) root.style.display = "none";
     }
     if (window.LW && typeof window.LW.error === "function") {
       // Forward the detail too, not just the title — otherwise the parent's
