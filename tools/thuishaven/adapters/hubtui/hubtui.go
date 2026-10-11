@@ -47,6 +47,8 @@ type Row struct {
 type WorktreeRow struct {
 	Slug, Branch, Dir    string
 	IsPrimary, IsCurrent bool
+	// StaleDays is the days since the last commit when past the stale age, else 0.
+	StaleDays int
 }
 
 // Name is what the worktree is called on screen and what a destroy
@@ -678,6 +680,8 @@ func (m model) viewWorktrees(b *strings.Builder) {
 			note += "  (primary — protected)"
 		case w.IsCurrent:
 			note += "  (current — protected)"
+		case w.StaleDays > 0:
+			note += fmt.Sprintf("  (stale — no commit in %dd)", w.StaleDays)
 		}
 		fmt.Fprintf(b, "%s ○ %s  %s\n", marker, style.Render(fmt.Sprintf("%-18s", truncate(w.Name(), 18))), styleDim.Render(note))
 		if isSelected {

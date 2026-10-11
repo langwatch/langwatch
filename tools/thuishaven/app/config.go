@@ -40,6 +40,9 @@ type Config struct {
 	// Browser bounds LangWatch's Playwright headless shells the same way;
 	// Browser.MaxRSS == 0 disables that governor.
 	Browser domain.BrowserLimits
+	// Orphans bounds the daemon's sweep of unowned dev tooling under the
+	// BrowserOwnerRoots and every stack's worktree; a zero field disables a rule.
+	Orphans domain.OrphanLimits
 	// BrowserOwnerRoots are the checkout roots whose scripts' headless shells
 	// the browser governor may reap; worktrees sit beneath the main root.
 	BrowserOwnerRoots []string
@@ -57,6 +60,9 @@ type Config struct {
 	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool // daemon stops the managed CH container when the last stack is reaped
+	// ClickHousePressure is the load at which the daemon drops the least recently
+	// used unowned stack database, one per ~2 minute probe (zero disables).
+	ClickHousePressure ClickHousePressure
 	// ClickHousePostgresHost is how the managed ClickHouse reaches host Postgres
 	// (domain.ClickHouseRuntime.PostgresHost), recorded on each stack it serves.
 	ClickHousePostgresHost string

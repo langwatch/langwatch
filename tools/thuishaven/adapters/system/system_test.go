@@ -82,3 +82,10 @@ func TestTotalMemoryMatchesTheSysctl(t *testing.T) {
 		t.Fatalf("TotalMemory() = %d, sysctl says %d", got, want)
 	}
 }
+
+func TestParseLsofCwdsReadsPidThenPath(t *testing.T) {
+	got := parseLsofCwds("p35038\nfcwd\nn/w/tools/dev-runtime\np53235\nfcwd\nn/w2/tools/dev-runtime\n")
+	if len(got) != 2 || got[35038] != "/w/tools/dev-runtime" || got[53235] != "/w2/tools/dev-runtime" {
+		t.Fatalf("parseLsofCwds = %v", got)
+	}
+}

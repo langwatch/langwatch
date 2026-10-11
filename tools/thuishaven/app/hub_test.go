@@ -168,6 +168,7 @@ type fakeSystem struct {
 	// matches every process on the machine and group-kills the result.
 	orphanMarker string
 	procSamples  []ProcessSample
+	cwds         map[int]string
 	killed       []int
 	totalMemory  uint64
 	portsInUse   map[int]bool
@@ -221,6 +222,15 @@ func (f *fakeSystem) OrphanedWorkers(marker string) []int {
 }
 func (f *fakeSystem) ProcessSamples() []ProcessSample { return f.procSamples }
 func (f *fakeSystem) Kill(pid int)                    { f.killed = append(f.killed, pid) }
+func (f *fakeSystem) ProcessCwds(pids []int) map[int]string {
+	out := map[int]string{}
+	for _, pid := range pids {
+		if dir, ok := f.cwds[pid]; ok {
+			out[pid] = dir
+		}
+	}
+	return out
+}
 
 // fakeProxy is safe for concurrent calls: provision and teardown route in parallel.
 type fakeProxy struct {

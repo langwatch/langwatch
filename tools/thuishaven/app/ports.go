@@ -268,6 +268,9 @@ type System interface {
 	// OrphanedWorkers lists processes matching marker whose parent is PID 1 —
 	// test workers an interrupted run left behind, owned by nobody.
 	OrphanedWorkers(marker string) []int
+	// ProcessCwds maps each pid to its working directory; a pid it cannot read
+	// is absent. Asked only for the orphan sweep's few candidates.
+	ProcessCwds(pids []int) map[int]string
 }
 
 // ClickHouse manages one shared, memory-capped Altinity ClickHouse container (on

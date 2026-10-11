@@ -91,6 +91,14 @@ func browserOwnerRoots(root string) []string {
 	return []string{root}
 }
 
+// orphanLimits are the orphan sweep's defaults, each overridable (0 disables).
+func orphanLimits() domain.OrphanLimits {
+	l := domain.DefaultOrphanLimits()
+	l.Grace = envDuration("HAVEN_ORPHAN_GRACE", l.Grace)
+	l.TypecheckMaxAge = envDuration("HAVEN_TYPECHECK_MAX_AGE", l.TypecheckMaxAge)
+	return l
+}
+
 // Root parses the global flags, wires the object graph, and dispatches. The three
 // steps are separate so none of them grows the others: meta commands answer
 // before anything is built, wire() is the only place adapters are constructed,
@@ -255,11 +263,13 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 		// old default) meant a dozen dead stacks' databases sat on the shared
 		// ClickHouse's small memory cap before the first prune ever fired.
 		DBIdleTTL:               envDuration("HAVEN_DB_TTL", 4*24*time.Hour),
+		ClickHousePressure:      app.DefaultClickHousePressure(),
 		TestContainerTTL:        envDuration("HAVEN_TESTCONTAINER_TTL", domain.DefaultTestContainerTTL),
 		RunningTestContainerTTL: envDuration("HAVEN_TESTCONTAINER_RUNNING_TTL", domain.DefaultRunningTestContainerTTL),
 		Tsgo:                    tsgoLimits(ram),
 		Browser:                 browserLimits(),
 		BrowserOwnerRoots:       browserOwnerRoots(trustedRepoRoot()),
+		Orphans:                 orphanLimits(),
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),

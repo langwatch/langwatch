@@ -349,6 +349,9 @@ func launcherAge(samples []ProcessSample, row HubStack) time.Duration {
 type HubWorktree struct {
 	Dir, Branch, Slug    string
 	IsPrimary, IsCurrent bool
+	// IdleFor is how long since HEAD's last commit (0 when unknown); past
+	// domain.StaleWorktreeAge the hub marks the row stale.
+	IdleFor time.Duration
 }
 
 // HubFootprint is the machine's memory picture as the hub header shows it:
@@ -498,6 +501,7 @@ func (o *Orchestrator) hubWorktrees(gitDir, selfDir string, stacks []domain.Stac
 		worktrees = append(worktrees, HubWorktree{
 			Dir: r.Dir, Branch: r.Branch, Slug: r.Slug,
 			IsPrimary: r.IsPrimary, IsCurrent: r.IsCurrent,
+			IdleFor: o.worktreeIdle(r.Dir),
 		})
 	}
 	return worktrees
@@ -550,4 +554,35 @@ func isKnownWorktree(worktrees []Worktree, dir string) bool {
 		}
 	}
 	return false
+}
+
+// worktreeIdleTTL is how long a worktree's idle reading is reused: the hub
+// refreshes every 2 s, and a `git log` per worktree per refresh is waste.
+const worktreeIdleTTL = 10 * time.Minute
+
+type idleReading struct {
+	lastActivity time.Time
+	readAt       time.Time
+}
+
+// worktreeIdle is how long since dir's HEAD last moved, cached per worktree.
+func (o *Orchestrator) worktreeIdle(dir string) time.Duration {
+	now := o.sys.Now()
+	o.idleMu.Lock()
+	cached, ok := o.idleReadings[dir]
+	o.idleMu.Unlock()
+	if !ok || now.Sub(cached.readAt) >= worktreeIdleTTL {
+		at, known := o.hyg.LastActivity(dir)
+		if !known {
+			return 0
+		}
+		cached = idleReading{lastActivity: at, readAt: now}
+		o.idleMu.Lock()
+		if o.idleReadings == nil {
+			o.idleReadings = map[string]idleReading{}
+		}
+		o.idleReadings[dir] = cached
+		o.idleMu.Unlock()
+	}
+	return max(now.Sub(cached.lastActivity), 0)
 }

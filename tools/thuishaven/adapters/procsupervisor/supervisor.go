@@ -181,6 +181,10 @@ func killOnCancel(ctx context.Context, cmd *exec.Cmd, done <-chan struct{}) {
 	}
 }
 
+// reapOrphans SIGTERMs a dead launcher's lanes: each PPID-1 dev-runtime
+// orphan's group AND every descendant. A group alone missed the `sh -c` restart
+// loop pnpm runs a script in, which leads a group of its own: it outlived the
+// lane, reparented to PID 1, and kept its node child up for hours.
 func reapOrphans(children []app.Child, self int) {
 	knownDirs := make([]string, 0, len(children))
 	for _, child := range children {
@@ -192,30 +196,66 @@ func reapOrphans(children []app.Child, self int) {
 	if err != nil {
 		return
 	}
-	for _, line := range strings.Split(string(out), "\n") {
+	groups, pids := orphanTargets(parsePS(string(out)), knownDirs, self)
+	for _, pgid := range groups {
+		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+	}
+	for _, pid := range pids {
+		_ = syscall.Kill(pid, syscall.SIGTERM)
+	}
+}
+
+// psRow is one line of `ps -axo pid=,ppid=,pgid=,command=`.
+type psRow struct {
+	pid, ppid, pgid int
+	command         string
+}
+
+func parsePS(out string) []psRow {
+	var rows []psRow
+	for _, line := range strings.Split(out, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 4 {
 			continue
 		}
-		var pid, ppid, pgid int
-		if _, err := fmt.Sscanf(fields[0], "%d", &pid); err != nil {
+		var r psRow
+		if _, err := fmt.Sscanf(fields[0], "%d", &r.pid); err != nil {
 			continue
 		}
-		if _, err := fmt.Sscanf(fields[1], "%d", &ppid); err != nil {
+		if _, err := fmt.Sscanf(fields[1], "%d", &r.ppid); err != nil {
 			continue
 		}
-		if _, err := fmt.Sscanf(fields[2], "%d", &pgid); err != nil {
+		if _, err := fmt.Sscanf(fields[2], "%d", &r.pgid); err != nil {
 			continue
 		}
-		if pid == self || ppid != 1 || pgid <= 0 {
-			continue
-		}
-		command := strings.Join(fields[3:], " ")
-		if !knownDevRuntime(command) || !containsAny(command, knownDirs) {
-			continue
-		}
-		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+		r.command = strings.Join(fields[3:], " ")
+		rows = append(rows, r)
 	}
+	return rows
+}
+
+// orphanTargets is the groups of the matched PPID-1 orphans and the pids of
+// every descendant, listed before anything is signalled.
+func orphanTargets(rows []psRow, knownDirs []string, self int) (groups, pids []int) {
+	parents := make(map[int]int, len(rows))
+	for _, r := range rows {
+		parents[r.pid] = r.ppid
+	}
+	for _, r := range rows {
+		if r.pid == self || r.ppid != 1 || r.pgid <= 1 {
+			continue
+		}
+		if !knownDevRuntime(r.command) || !containsAny(r.command, knownDirs) {
+			continue
+		}
+		groups = append(groups, r.pgid)
+		for _, pid := range descendantsOf(r.pid, parents) {
+			if pid != self {
+				pids = append(pids, pid)
+			}
+		}
+	}
+	return groups, pids
 }
 
 func ReapOrphans(dirs []string) {

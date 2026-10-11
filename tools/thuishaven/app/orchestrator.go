@@ -82,6 +82,18 @@ type Orchestrator struct {
 	// browserActivity is the headless browser governor's cross-tick CPU clock.
 	browserActivity map[int]browserSeen
 	procTel         ProcTelemetry
+	// orphanTermed is every pid the orphan sweep has SIGTERMed and when, so a
+	// later sweep SIGKILLs the ones that ignored it; orphanSweptAt paces it.
+	orphanTermed  map[int]orphanTerm
+	orphanSweptAt time.Time
+	// orphanWorktrees is the repository's worktree list, re-read at most every
+	// worktreeIdleTTL: sibling checkouts sit outside the main root.
+	orphanWorktrees   []string
+	orphanWorktreesAt time.Time
+	// idleReadings caches each worktree's last-commit clock for the hub, which
+	// the TUI and the web dashboard read concurrently.
+	idleMu       sync.Mutex
+	idleReadings map[string]idleReading
 }
 
 // Deps is the injected object graph. A struct rather than a positional

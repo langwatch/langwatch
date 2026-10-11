@@ -204,10 +204,14 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.reapReclaimableWorktrees(ctx)
 				o.reapJobScratch()
 			}
+			if cycles%clickHousePressureCycles == 0 {
+				o.pruneUnderClickHousePressure(ctx)
+			}
 			o.reapDeadStacks()
 			o.governPressure()
 			o.governProcesses()
 			o.reapOrphanNxDaemons()
+			o.sweepRepoOrphans()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 			o.stopColimaIfIdle(ctx)
