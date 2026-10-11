@@ -1,7 +1,8 @@
+import { Card } from "@langwatch/design-system/card";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Badge, Button, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Radio } from "lucide-react";
 
 import type { SubscriberHealthRow } from "../../model/subscriber-health.ts";
@@ -92,29 +93,29 @@ function SubscriberRow({
   isPausePending?: boolean;
 }) {
   return (
-    <Table.Row bg={row.blocked > 0 ? "red.subtle" : undefined}>
-      <Table.Cell>
+    <ListTable.Row tone={row.blocked > 0 ? "danger" : undefined}>
+      <ListTable.Cell>
         <InlineCode variant="neutral">{row.subscriberName}</InlineCode>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color="fg.muted">
           {row.pipelineName}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <EventTypesCell eventTypes={row.eventTypes} />
-      </Table.Cell>
-      <Table.Cell textAlign="end">
+      </ListTable.Cell>
+      <ListTable.Cell align="end">
         <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {row.pending}
         </Text>
-      </Table.Cell>
-      <Table.Cell textAlign="end">
+      </ListTable.Cell>
+      <ListTable.Cell align="end">
         <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {row.active}
         </Text>
-      </Table.Cell>
-      <Table.Cell textAlign="end">
+      </ListTable.Cell>
+      <ListTable.Cell align="end">
         <Text
           textStyle="caption"
           fontVariantNumeric="tabular-nums"
@@ -122,12 +123,12 @@ function SubscriberRow({
         >
           {row.blocked}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <SubscriberStatus row={row} />
-      </Table.Cell>
+      </ListTable.Cell>
       {hasAccess && (
-        <Table.Cell>
+        <ListTable.Cell>
           {queueName && onTogglePause && (
             <SubscriberPauseAction
               row={row}
@@ -136,9 +137,9 @@ function SubscriberRow({
               isPausePending={isPausePending ?? false}
             />
           )}
-        </Table.Cell>
+        </ListTable.Cell>
       )}
-    </Table.Row>
+    </ListTable.Row>
   );
 }
 
@@ -161,54 +162,46 @@ export function SubscribersCard({
   isPausePending?: (row: SubscriberHealthRow) => boolean;
 }) {
   return (
-    <Card.Root borderColor="border.muted" boxShadow="none">
-      <Card.Body padding={0}>
-        <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
-          <Text textStyle="sm" fontWeight="medium">
-            Event subscribers
-          </Text>
-        </HStack>
-        {rows.length === 0 ? (
-          <NoDataInfoBlock
-            icon={<Radio />}
-            title="No event subscribers registered."
-            description="Registered subscribers and their delivery status appear here."
-          />
-        ) : (
-          <ListTable
-            density="compact"
-            columnRules={false}
-            containerProps={{ overflowX: "auto" }}
-            size="sm"
-            variant="embedded"
-          >
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Subscriber</Table.ColumnHeader>
-                <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                <Table.ColumnHeader>Events</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">Pending</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">Active</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">Blocked</Table.ColumnHeader>
-                <Table.ColumnHeader>Status</Table.ColumnHeader>
-                {hasAccess && <Table.ColumnHeader>Actions</Table.ColumnHeader>}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {rows.map((row) => (
-                <SubscriberRow
-                  key={row.pauseKey}
-                  row={row}
-                  queueName={queueName}
-                  hasAccess={hasAccess}
-                  onTogglePause={onTogglePause}
-                  isPausePending={isPausePending?.(row)}
-                />
-              ))}
-            </Table.Body>
-          </ListTable>
-        )}
-      </Card.Body>
-    </Card.Root>
+    <Card padding="none">
+      <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
+        <Text textStyle="sm" fontWeight="medium">
+          Event subscribers
+        </Text>
+      </HStack>
+      {rows.length === 0 ? (
+        <NoDataInfoBlock
+          icon={<Radio />}
+          title="No event subscribers registered."
+          description="Registered subscribers and their delivery status appear here."
+        />
+      ) : (
+        <ListTable density="compact" variant="embedded" scroll="x" scrollLabel="Event subscribers">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Subscriber</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Pipeline</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Events</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Pending</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Active</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Blocked</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+              {hasAccess && <ListTable.ColumnHeader>Actions</ListTable.ColumnHeader>}
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {rows.map((row) => (
+              <SubscriberRow
+                key={row.pauseKey}
+                row={row}
+                queueName={queueName}
+                hasAccess={hasAccess}
+                onTogglePause={onTogglePause}
+                isPausePending={isPausePending?.(row)}
+              />
+            ))}
+          </ListTable.Body>
+        </ListTable>
+      )}
+    </Card>
   );
 }

@@ -308,5 +308,13 @@
     "reason": "False positive: height is ListTable.PaddingRow's required virtual-scroll spacer prop, not a style override (X4q review).",
     "owner": "ops",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/features/event-store/ui/elements/throughput-chart.tsx",
+    "rule": "card-box",
+    "line": 191,
+    "reason": "The throughput chart hover tooltip, not a card; charts stay as they are (X4s1 review).",
+    "owner": "ops",
+    "disposition": "reviewed"
   }
 ]
