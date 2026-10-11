@@ -351,6 +351,10 @@
       "types": "./dist/components/overlays/popover.d.ts",
       "default": "./src/components/overlays/popover.tsx"
     },
+    "./date-range-picker": {
+      "types": "./dist/components/forms/date-range-picker.d.ts",
+      "default": "./src/components/forms/date-range-picker.tsx"
+    },
     "./radio": {
       "types": "./dist/components/forms/radio.d.ts",
       "default": "./src/components/forms/radio.tsx"

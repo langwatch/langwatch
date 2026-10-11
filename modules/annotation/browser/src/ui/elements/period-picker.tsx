@@ -4,19 +4,8 @@
  * and address writes), copied from `PeriodSelector` since a migration forbids reuse.
  */
 
-import { Popover } from "@langwatch/design-system/popover";
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { DateRangePicker } from "@langwatch/design-system/date-range-picker";
 import { format, nowInstant, toDate, toZonedDateTime } from "@langwatch/time";
-import { Calendar, ChevronDown } from "lucide-react";
 
 import {
   ANNOTATION_PERIOD_PRESETS,
@@ -52,92 +41,23 @@ export function PeriodPicker({
    */
   clearPeriod?: () => void;
 }) {
-  const { open, onOpen, onClose, setOpen } = useDisclosure();
   const { startDate, endDate } = period;
-
-  const triggerLabel = () => {
-    if (mode === "relative") {
-      const preset = matchingPreset({ period, now: toDate(nowInstant()) });
-      if (preset) return preset.label;
-    }
-
-    return `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`;
-  };
+  const preset =
+    mode === "relative" ? matchingPreset({ period, now: toDate(nowInstant()) }) : undefined;
 
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}
-      positioning={{ placement: "bottom-end" }}
-      size="sm"
-    >
-      <Popover.Trigger asChild>
-        <Button variant="outline" size="sm" minWidth="fit-content" onClick={onOpen}>
-          <Calendar size={16} />
-          <Text>{label ?? triggerLabel()}</Text>
-          <Box>
-            <ChevronDown size={16} />
-          </Box>
-        </Button>
-      </Popover.Trigger>
-      <Popover.Content width="fit-content">
-        <Popover.Arrow />
-        <Popover.CloseTrigger />
-        <Popover.Header>
-          <Popover.Title>Select Date Range</Popover.Title>
-        </Popover.Header>
-        <Popover.Body>
-          <HStack align="start" gap={6}>
-            <VStack gap={4}>
-              <Field.Root>
-                <Field.Label>Start Date</Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={format(startDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(event) =>
-                    setPeriod(toDate(toZonedDateTime(event.target.value)), endDate)
-                  }
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>End Date</Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={format(endDate, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(event) =>
-                    setPeriod(startDate, toDate(toZonedDateTime(event.target.value)))
-                  }
-                />
-              </Field.Root>
-            </VStack>
-            <VStack>
-              {clearPeriod && (
-                <Button
-                  width="full"
-                  onClick={() => {
-                    clearPeriod();
-                    onClose();
-                  }}
-                >
-                  All time
-                </Button>
-              )}
-              {ANNOTATION_PERIOD_PRESETS.map((preset) => (
-                <Button
-                  width="full"
-                  key={preset.key}
-                  onClick={() => {
-                    setRelativePeriod(preset.key);
-                    onClose();
-                  }}
-                >
-                  {preset.label}
-                </Button>
-              ))}
-            </VStack>
-          </HStack>
-        </Popover.Body>
-      </Popover.Content>
-    </Popover.Root>
+    <DateRangePicker
+      presets={ANNOTATION_PERIOD_PRESETS}
+      activePresetKey={preset?.key}
+      startValue={format(startDate, "yyyy-MM-dd'T'HH:mm")}
+      endValue={format(endDate, "yyyy-MM-dd'T'HH:mm")}
+      triggerLabel={
+        label ?? preset?.label ?? `${format(startDate, "MMM d")} - ${format(endDate, "MMM d")}`
+      }
+      onStartChange={(text) => setPeriod(toDate(toZonedDateTime(text)), endDate)}
+      onEndChange={(text) => setPeriod(startDate, toDate(toZonedDateTime(text)))}
+      onPresetSelect={setRelativePeriod}
+      onClear={clearPeriod}
+    />
   );
 }
