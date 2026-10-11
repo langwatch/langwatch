@@ -211,6 +211,26 @@ describe("PersonalConfigureScreen", () => {
     });
   });
 
+  describe("when the reader arrows onto the devices tab", () => {
+    it("moves focus without reading the inventory, and Enter opens it", async () => {
+      renderScreen();
+      screen.getByRole("tab", { name: "Virtual keys" }).focus();
+
+      await userEvent.keyboard("{ArrowRight}");
+      await waitFor(() =>
+        expect(screen.getByRole("tab", { name: "Devices and keys" })).toHaveFocus(),
+      );
+      expect(screen.queryByTestId("devices-panel")).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Virtual keys" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+
+      await userEvent.keyboard("{Enter}");
+      expect(await screen.findByTestId("devices-panel")).toBeInTheDocument();
+    });
+  });
+
   describe("when a key is issued", () => {
     async function issueKey() {
       await userEvent.click(screen.getByRole("button", { name: "Add a new key" }));
@@ -344,7 +364,7 @@ describe("PersonalConfigureScreen", () => {
     it("says none apply once the answer is in and empty", () => {
       renderScreen();
 
-      expect(screen.getByText("No budgets apply to your usage yet.")).toBeInTheDocument();
+      expect(screen.getByText(/^No budgets apply to your usage yet\./)).toBeInTheDocument();
     });
 
     it("says nothing before the answer arrives", () => {

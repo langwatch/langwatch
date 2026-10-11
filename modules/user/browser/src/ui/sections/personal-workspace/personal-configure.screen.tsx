@@ -1,4 +1,5 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -8,7 +9,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -211,104 +211,107 @@ function PersonalCredentialsSection({
         )
       }
     >
-      <Tabs.Root
+      <ContentTabs
+        label="Personal credentials"
         value={credentialsTab}
-        onValueChange={(event) => selectCredentialsTab(event.value)}
-        colorPalette="blue"
-        // The devices panel reads its inventory on mount, so it is not
-        // mounted until the reader is actually on that tab.
-        lazyMount
-      >
-        <Tabs.List marginBottom={3}>
-          <Tabs.Trigger value="keys">Virtual keys</Tabs.Trigger>
-          <Tabs.Trigger value="devices">Devices and keys</Tabs.Trigger>
-        </Tabs.List>
-
-        <Tabs.Content value="keys">
-          {revealedSecret && (
-            <RevealedSecretBanner
-              secret={revealedSecret}
-              onDismiss={() => setRevealedSecret(null)}
-            />
-          )}
-
-          {showAddForm && (
-            <Box
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="sm"
-              padding={3}
-              marginBottom={3}
-            >
-              <VStack align="stretch" gap={2}>
-                <Text fontSize="sm" fontWeight="medium">
-                  New personal key
-                </Text>
-                <Input
-                  placeholder="e.g. jane-laptop-2"
-                  size="sm"
-                  value={newKeyLabel}
-                  onChange={(e) => setNewKeyLabel(e.target.value)}
-                />
-                <Text fontSize="xs" color="fg.muted">
-                  Lowercase letters, numbers, dash, underscore. The secret is shown once on
-                  creation.
-                </Text>
-                {workspaceWait.waiting && (
-                  <Text fontSize="xs" color="fg.muted" as="output" display="block">
-                    {PERSONAL_WORKSPACE_WAIT_HINT}
-                  </Text>
+        onValueChange={({ value }) => selectCredentialsTab(value)}
+        // The devices panel reads its inventory on mount, so it is not mounted until the reader
+        // opens that tab, and arrowing past it selects nothing.
+        mount="lazy"
+        activationMode="manual"
+        body="flush"
+        items={[
+          {
+            value: "keys",
+            label: "Virtual keys",
+            content: (
+              <VStack align="stretch" gap={3} paddingTop={7}>
+                {revealedSecret && (
+                  <RevealedSecretBanner
+                    secret={revealedSecret}
+                    onDismiss={() => setRevealedSecret(null)}
+                  />
                 )}
-                <HStack gap={2}>
-                  <Button
-                    size="sm"
-                    onClick={onIssue}
-                    loading={issueMutation.isPending}
-                    disabled={!newKeyLabel.trim() || workspaceWait.waiting}
-                  >
-                    Create key
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setShowAddForm(false);
-                      setNewKeyLabel("");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </HStack>
+
+                {showAddForm && (
+                  <Box borderWidth="1px" borderColor="border.muted" borderRadius="sm" padding={3}>
+                    <VStack align="stretch" gap={2}>
+                      <Text fontSize="sm" fontWeight="medium">
+                        New personal key
+                      </Text>
+                      <Input
+                        placeholder="e.g. jane-laptop-2"
+                        size="sm"
+                        value={newKeyLabel}
+                        onChange={(e) => setNewKeyLabel(e.target.value)}
+                      />
+                      <Text fontSize="xs" color="fg.muted">
+                        Lowercase letters, numbers, dash, underscore. The secret is shown once on
+                        creation.
+                      </Text>
+                      {workspaceWait.waiting && (
+                        <Text fontSize="xs" color="fg.muted" as="output" display="block">
+                          {PERSONAL_WORKSPACE_WAIT_HINT}
+                        </Text>
+                      )}
+                      <HStack gap={2}>
+                        <Button
+                          size="sm"
+                          onClick={onIssue}
+                          loading={issueMutation.isPending}
+                          disabled={!newKeyLabel.trim() || workspaceWait.waiting}
+                        >
+                          Create key
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setShowAddForm(false);
+                            setNewKeyLabel("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </HStack>
+                    </VStack>
+                  </Box>
+                )}
+
+                {apiKeys.length === 0 ? (
+                  <Text fontSize="sm" color="fg.muted">
+                    No personal keys yet. Run <InlineCode>langwatch login</InlineCode> in your
+                    terminal to issue your first one.
+                  </Text>
+                ) : (
+                  <VStack align="stretch" gap={2}>
+                    {apiKeys.map((key) => (
+                      <ApiKeyRow
+                        key={key.id}
+                        apiKey={key}
+                        isPendingRevoke={pendingRevokeId === key.id}
+                        isRevoking={revokeMutation.isPending && pendingRevokeId === key.id}
+                        onRequestRevoke={() => setPendingRevokeId(key.id)}
+                        onCancelRevoke={() => setPendingRevokeId(null)}
+                        onConfirmRevoke={() => onRevoke(key.id)}
+                      />
+                    ))}
+                  </VStack>
+                )}
               </VStack>
-            </Box>
-          )}
-
-          {apiKeys.length === 0 ? (
-            <Text fontSize="sm" color="fg.muted">
-              No personal keys yet. Run <InlineCode>langwatch login</InlineCode> in your terminal to
-              issue your first one.
-            </Text>
-          ) : (
-            <VStack align="stretch" gap={2}>
-              {apiKeys.map((key) => (
-                <ApiKeyRow
-                  key={key.id}
-                  apiKey={key}
-                  isPendingRevoke={pendingRevokeId === key.id}
-                  isRevoking={revokeMutation.isPending && pendingRevokeId === key.id}
-                  onRequestRevoke={() => setPendingRevokeId(key.id)}
-                  onCancelRevoke={() => setPendingRevokeId(null)}
-                  onConfirmRevoke={() => onRevoke(key.id)}
-                />
-              ))}
-            </VStack>
-          )}
-        </Tabs.Content>
-
-        <Tabs.Content value="devices">
-          <DevicesPanel />
-        </Tabs.Content>
-      </Tabs.Root>
+            ),
+          },
+          {
+            value: "devices",
+            label: "Devices and keys",
+            content: (
+              <Box paddingTop={7}>
+                <DevicesPanel />
+              </Box>
+            ),
+          },
+        ]}
+      />
     </SectionCard>
   );
 }
@@ -545,7 +548,6 @@ function RevealedSecretBanner({
       backgroundColor="green.subtle"
       borderRadius="md"
       padding={3}
-      marginBottom={3}
     >
       <VStack align="stretch" gap={2}>
         <HStack>
