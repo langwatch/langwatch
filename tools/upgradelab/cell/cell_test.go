@@ -197,4 +197,9 @@ func TestInDownWindowLeavesOnlyUnavailableLinesInsideTheWindowToH8(t *testing.T)
 	if inDownWindow(after, 95_000, 146_000, origin) || inDownWindow(unknown, 95_000, 146_000, origin) || inDownWindow(inside, 0, 0, origin) {
 		t.Fatal("only unavailable lines inside a real window go to H8")
 	}
+	preflight := `{"level":"error","time":"2026-10-11T18:46:47.693Z","phase":"preflight","msg":"Cannot connect to ClickHouse at http://127.0.0.1:1/ after waiting 5s"}`
+	client := `[2026-10-11T18:46:47.788Z][ERROR][@clickhouse/client][Connection] Query: HTTP request error.`
+	if !inDownWindow(preflight, 95_000, 146_000, origin) || !inDownWindow(client, 95_000, 146_000, origin) {
+		t.Fatal("the migration preflight and the client's own line meeting the closed gate go to H8")
+	}
 }

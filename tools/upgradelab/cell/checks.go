@@ -208,7 +208,7 @@ var acceptedLogs = []acceptedLog{
 	{"UpgradeInProgressError", "expected 503 upgrade_in_progress while steps run", true},
 }
 
-var logTime = regexp.MustCompile(`"time":"?(\d{13}|\d{4}-\d\d-\d\dT[0-9:.]+Z)"?`)
+var logTime = regexp.MustCompile(`(?:"time":"?|^\[)(\d{13}|\d{4}-\d\d-\d\dT[0-9:.]+Z)`)
 
 // lineEpochMs is a log line's pino time (epoch ms or ISO), and whether it had one.
 func lineEpochMs(line string) (int64, bool) {
@@ -241,9 +241,12 @@ func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog,
 	return acceptedLog{}, false
 }
 
+// downSignatures: what a line says when it met the private target H8's gate held closed.
+var downSignatures = []string{"ClickHouseUnavailableError", "clickhouse_unavailable", "Cannot connect to ClickHouse at", "[@clickhouse/client][Connection]"}
+
 // inDownWindow: a ClickHouse-unavailable error line logged while H8's gate held the private target closed (as N2 does).
 func inDownWindow(line string, downAt, upAt int64, origin time.Time) bool {
-	if upAt <= 0 || !(strings.Contains(line, "ClickHouseUnavailableError") || strings.Contains(line, "clickhouse_unavailable")) {
+	if upAt <= 0 || !slices.ContainsFunc(downSignatures, func(each string) bool { return strings.Contains(line, each) }) {
 		return false
 	}
 	epoch, ok := lineEpochMs(line)
