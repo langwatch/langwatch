@@ -2,6 +2,7 @@
 // resource, the single actions behind a disclosure (main's RolePermissionComposer).
 
 import type { AuthzPermission } from "@langwatch/authorization";
+import { Card } from "@langwatch/design-system/card";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Box,
@@ -16,7 +17,7 @@ import {
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { type Ref, useMemo, useState } from "react";
 
 import type { AuthzResource as OfferedResource } from "../../model/permission-catalogue.ts";
 import {
@@ -42,7 +43,11 @@ type Selection = {
   onChange: (next: AuthzPermission[]) => void;
 };
 
-export function RolePermissionComposer({ selected, onChange }: Selection) {
+export function RolePermissionComposer({
+  selected,
+  onChange,
+  searchRef,
+}: Selection & { searchRef?: Ref<HTMLInputElement> }) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   // Groups holding grants start open, so an editor sees what the role already says.
@@ -67,6 +72,7 @@ export function RolePermissionComposer({ selected, onChange }: Selection) {
       <PermissionSearchField
         search={search}
         onSearchChange={setSearch}
+        {...(searchRef ? { searchRef } : {})}
         {...(selected.length > 0 ? { onClear: () => onChange([]) } : {})}
       />
 
@@ -137,7 +143,7 @@ function AreaGroup({
   );
 
   return (
-    <Box borderWidth="1px" borderColor="border" borderRadius="lg" overflow="hidden">
+    <Card variant="frame" padding="none">
       <chakra.button
         type="button"
         display="flex"
@@ -193,7 +199,7 @@ function AreaGroup({
           ))}
         </VStack>
       )}
-    </Box>
+    </Card>
   );
 }
 
@@ -215,9 +221,11 @@ function resourceMatches({ resource, query: raw }: { resource: OfferedResource; 
 function PermissionSearchField({
   search,
   onSearchChange,
+  searchRef,
   onClear,
 }: {
   search: string;
+  searchRef?: Ref<HTMLInputElement>;
   onSearchChange: (next: string) => void;
   /** Offered only once there is something to clear. */
   onClear?: () => void;
@@ -242,6 +250,7 @@ function PermissionSearchField({
           <Search size={14} aria-hidden />
         </Box>
         <Input
+          ref={searchRef}
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Search permissions"

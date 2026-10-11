@@ -1,5 +1,6 @@
 // A permission as the engine spells it, split at the colon; the sentence lives on hover.
 
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
@@ -81,9 +82,10 @@ export function PermissionTokenList({
 
   if (permissions.length === 0) {
     return (
-      <Text textStyle="caption" color="fg.subtle">
-        No permissions yet
-      </Text>
+      <NoDataInfoBlock
+        size="line"
+        title="No permissions yet. Edit the role to choose what it grants."
+      />
     );
   }
 
