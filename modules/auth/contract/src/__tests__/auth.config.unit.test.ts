@@ -142,6 +142,12 @@ describe("auth server configuration", () => {
             idpSimulatorUrl: undefined,
             localPasswords: false,
             auth0ManagementClientId: undefined,
+            socialProviderBases: {
+              google: undefined,
+              github: undefined,
+              gitlab: undefined,
+              microsoft: undefined,
+            },
             isSaas: false,
             signUpMode: "open",
             publicBaseUrl: undefined,

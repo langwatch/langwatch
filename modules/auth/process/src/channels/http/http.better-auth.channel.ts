@@ -15,6 +15,7 @@ import {
   normalizedRequestPathname,
   requestPathname,
   type AuthApi,
+  type SocialProviderBases,
 } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -46,6 +47,7 @@ import {
   findSubmittedAddresses,
   isLockoutCountedPath,
 } from "../../rules/sign-in-identifier-hash.rules.ts";
+import { withSocialProviderBases } from "../../rules/social-provider-bases.rules.ts";
 import { resolveTrustedOrigins } from "../../rules/trusted-origins.rules.ts";
 import type {
   BetterAuthAnnouncements,
@@ -88,6 +90,7 @@ import {
   signUpConfirmationPlugin,
   type SignUpAddressConfirmation,
 } from "./http.sign-up-confirmation.channel.ts";
+import { socialProviderBasesPlugin } from "./http.social-provider-bases.channel.ts";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -124,6 +127,8 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
   isProduction: boolean;
   /** Social providers this deployment mounted, already built. */
   socialProviders: NonNullable<BetterAuthOptions["socialProviders"]>;
+  /** Where each social provider is reached; unset is the real provider. */
+  socialProviderBases?: Partial<SocialProviderBases> | undefined;
   /** Generic-OIDC connections this deployment mounted, already built. */
   genericOAuthConfigs: readonly Parameters<typeof genericOAuth>[0]["config"][number][];
 }>;
@@ -613,7 +618,10 @@ export const createAuthOptions = ({
   },
 
   secondaryStorage: undefined,
-  socialProviders: deployment.socialProviders,
+  socialProviders: withSocialProviderBases({
+    providers: deployment.socialProviders,
+    bases: deployment.socialProviderBases ?? {},
+  }),
   plugins: genericOAuthPlugins(deployment),
 
   databaseHooks: {
@@ -1082,6 +1090,7 @@ const transportOptions = ({
     plugins: [
       samlOwnOriginRepost,
       ...genericOAuthPlugins(deployment),
+      socialProviderBasesPlugin({ bases: deployment.socialProviderBases ?? {} }),
       ...(deployment.mfaEnrollmentOpen ? [twoFactorPlugin()] : []),
       ...(deployment.passkeysEnabled
         ? [

@@ -38,6 +38,7 @@ import {
   type AuthFederatedPasswordChange,
   type AuthFederatedPasswordOutcome,
   isEmailPasswordEnabled,
+  type SocialProviderBases,
 } from "@langwatch/auth-contract";
 import { AuthzApi, type AuthzGrantsService } from "@langwatch/authz-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
@@ -743,6 +744,7 @@ export class AuthModule implements AuthApiContract {
             localPasswords: config.localPasswords,
             trustedIdpOrigins: config.trustedIdpOrigins,
             idpSimulatorUrl: config.idpSimulatorUrl,
+            socialProviderBases: config.socialProviderBases,
             isProduction: config.nodeEnvironment === "production",
             logger,
           });
@@ -1653,6 +1655,7 @@ type BuildBetterAuthOptions = Readonly<{
    *  static ways an origin is trusted without a registered connection. */
   trustedIdpOrigins: string | undefined;
   idpSimulatorUrl: string | undefined;
+  socialProviderBases: SocialProviderBases;
   /** Whether this is a production deployment — the simulator is trusted
    *  nowhere else, because it signs whatever it is asked to sign. */
   isProduction: boolean;
@@ -1711,6 +1714,7 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
       passkeyHandleSecret: identity.passkeyHandleSecret,
       trustedIdpOrigins: options.trustedIdpOrigins,
       idpSimulatorUrl: options.idpSimulatorUrl,
+      socialProviderBases: options.socialProviderBases,
       isProduction: options.isProduction,
       socialProviders: capturingProfileEmails({
         providers: socialProviders,

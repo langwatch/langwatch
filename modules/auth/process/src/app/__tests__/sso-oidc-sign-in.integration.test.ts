@@ -92,6 +92,12 @@ async function composedBetterAuth(provider: ServedOidcProvider): Promise<BetterA
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      socialProviderBases: {
+        google: undefined,
+        github: undefined,
+        gitlab: undefined,
+        microsoft: undefined,
+      },
       cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
