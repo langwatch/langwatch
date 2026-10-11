@@ -5,7 +5,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useRef } from "react";
 import { Tooltip } from "../overlays/tooltip.tsx";
 
 /** Section width below which a row wraps its value under the name. */
-const NARROW_BELOW = "480px";
+const NARROW_BELOW = "400px";
 const CONTROL_HEIGHT = "32px";
 
 type FieldEditorProps = {
@@ -77,7 +77,7 @@ type FieldEditorRowProps = {
 
 /**
  * One row on the fixed grid: type 104px, name and info 144px, separator 12px, value
- * (the rest), remove 32px. Under 480px of section width the value drops below.
+ * (the rest), remove 32px. Under 400px of section width the value drops below.
  */
 export function FieldEditorRow({
   typeControl,
