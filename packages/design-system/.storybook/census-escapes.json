@@ -5123,5 +5123,241 @@
     "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
     "owner": "trace",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "native-table",
+    "line": 199,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 200,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 201,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 207,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 210,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 212,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 214,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 223,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 225,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/onboarding/observability/flowise-setup.tsx",
+    "rule": "legacy-card-part",
+    "line": 28,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/onboarding/observability/flowise-setup.tsx",
+    "rule": "legacy-card-part",
+    "line": 58,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/onboarding/observability/flowise-setup.tsx",
+    "rule": "legacy-card-part",
+    "line": 87,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "card-box",
+    "line": 171,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/explorer/trace-drawer/annotation-card.tsx",
+    "rule": "card-box",
+    "line": 73,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/explorer/trace-drawer/annotation-card.tsx",
+    "rule": "card-box",
+    "line": 289,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/explorer/trace-drawer/annotation-card.tsx",
+    "rule": "card-box",
+    "line": 314,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/explorer/trace-drawer/annotation-card.tsx",
+    "rule": "card-box",
+    "line": 356,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/explorer/trace-drawer/trace-accordions/empty-states.tsx",
+    "rule": "card-box",
+    "line": 35,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/share/share-links-list.tsx",
+    "rule": "empty-text",
+    "line": 68,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/coding-agent/trace/session-view.tsx",
+    "rule": "card-box",
+    "line": 147,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/coding-agent/trace/session-view.tsx",
+    "rule": "card-box",
+    "line": 201,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/coding-agent/trace/session-view.tsx",
+    "rule": "card-box",
+    "line": 535,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/dataset/floating-cell-editor.tsx",
+    "rule": "card-box",
+    "line": 143,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/export-progress.tsx",
+    "rule": "card-box",
+    "line": 51,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/trace-drawer/scope-chip.tsx",
+    "rule": "card-box",
+    "line": 72,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/trace-drawer/trace-accordions/section-focus-glow.tsx",
+    "rule": "card-box",
+    "line": 93,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/transcript/tool-pair-sections.tsx",
+    "rule": "card-box",
+    "line": 104,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/conversation/parts.tsx",
+    "rule": "card-box",
+    "line": 71,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/datasets/dataset-mapping-preview.tsx",
+    "rule": "empty-text",
+    "line": 72,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/datasets/dataset-selector.tsx",
+    "rule": "card-box",
+    "line": 48,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/errors/handled-error-state.tsx",
+    "rule": "page-title-size",
+    "line": 55,
+    "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
   }
 ]
