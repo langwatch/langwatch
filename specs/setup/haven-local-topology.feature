@@ -261,3 +261,11 @@ Feature: The local development topology
     When it starts them
     Then the worker is told it owns telemetry and the API is told it does not
     And so the telemetry SDK is set up exactly once for the process
+
+  @unit
+  Scenario: The overlay leaves browser telemetry keys the operator exported alone
+    Given the observability collector is up
+    And the shell that runs haven up exports RUM_ENABLED or RUM_COLLECTOR_ENDPOINT, even empty
+    When haven assembles the application's environment
+    Then each key the operator exported keeps their value
+    And haven fills only the RUM keys they left unset

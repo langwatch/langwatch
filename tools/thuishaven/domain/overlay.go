@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -312,15 +313,8 @@ func (s Stack) observabilityEnv() []string {
 		"OTEL_METRICS_EXPORTER=otlp",
 		"LOG_OTEL_LEVEL=debug",
 		"OTEL_RESOURCE_ATTRIBUTES=" + ObservabilityWorktreeAttr + "=" + s.Slug,
-		// Browser telemetry (ADR-058). Tied to the collector rather than flagged
-		// separately: the app proxies the browser's OTLP to the same endpoint, so
-		// without a collector the exporter would post to a route with nowhere to
-		// forward to. The frontend half of a trace is exactly what a developer
-		// debugging their own worktree wants, so it is on whenever the stack is.
-		"RUM_ENABLED=true",
-		// Named explicitly so the rum module does not fall back to the deprecated OTEL endpoint and warn.
-		"RUM_COLLECTOR_ENDPOINT=" + otlp,
 	}
+	env = append(env, RUMEnv(os.LookupEnv, otlp)...)
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
 	// The proxied hostname when the portless proxy carries the route (stable,
 	// matches every other haven surface); loopback otherwise — either way the
@@ -345,6 +339,25 @@ func (s Stack) observabilityEnv() []string {
 	// Quiet the console to warn+ (the full stream is in Grafana). Empty = opt-out.
 	if s.ObservabilityConsoleLevel != "" {
 		env = append(env, "LOG_CONSOLE_LEVEL="+s.ObservabilityConsoleLevel)
+	}
+	return env
+}
+
+// RUMEnv turns browser telemetry (ADR-058) on with the collector, which the
+// app's OTLP proxy forwards to. A key the operator already exports when running
+// `haven up` (lookup, even set empty) is left to them, so a tester can boot
+// with RUM off or pointed elsewhere; haven never set RUM_SAMPLE_RATIO.
+func RUMEnv(lookup func(string) (string, bool), otlp string) []string {
+	var env []string
+	for _, kv := range []string{
+		"RUM_ENABLED=true",
+		// Named so the rum module does not fall back to the deprecated OTEL endpoint and warn.
+		"RUM_COLLECTOR_ENDPOINT=" + otlp,
+	} {
+		key, _, _ := strings.Cut(kv, "=")
+		if _, isSet := lookup(key); !isSet {
+			env = append(env, kv)
+		}
 	}
 	return env
 }
