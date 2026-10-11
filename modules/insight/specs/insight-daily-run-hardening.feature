@@ -30,7 +30,7 @@ Feature: The daily insights run before a wider rollout
       Given a schedule whose runs were skipped on 6 scheduled days in a row
       When the next day's run ends as nothing with the reason no_new_traces
       Then the count of skipped days starts over
-      And the schedule stays on
+      And it is still 6 after two more such days
 
     @unit
     Scenario: The last run line says when a project had no new traces
@@ -66,6 +66,13 @@ Feature: The daily insights run before a wider rollout
       When an operator's run is skipped
       Then the count is still 6
       And an operator's run that files starts it over
+
+    @unit
+    Scenario: A skipped run on a From LangWatch board is no skipped day
+      Given a count of 6 skipped days
+      When a scheduled run is skipped with the reason template_board
+      Then the count is still 6
+      And it is still 6 after two more such days
 
     @unit
     Scenario: The seventh skipped day turns the schedule off

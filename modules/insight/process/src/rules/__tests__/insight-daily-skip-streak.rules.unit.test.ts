@@ -4,7 +4,7 @@
  * @see modules/insight/specs/insight-daily-run-hardening.feature
  */
 
-import type { InsightRunOutcome } from "@langwatch/insight-contract";
+import type { InsightRunOutcome, InsightRunReason } from "@langwatch/insight-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,9 +20,13 @@ const DAY = 24 * 60 * 60_000;
 const DAY_ONE = Date.UTC(2026, 9, 10, 9, 37);
 
 /** The scheduled run of a day, counted from the first. */
-const scheduled = (day: number, outcome: InsightRunOutcome) => {
+const scheduled = (
+  day: number,
+  outcome: InsightRunOutcome,
+  reason: InsightRunReason | null = null,
+) => {
   const slot = DAY_ONE + day * DAY;
-  return { runId: scheduledRunId({ slot }), slot, outcome };
+  return { runId: scheduledRunId({ slot }), slot, outcome, reason };
 };
 
 /** An operator's run, asked for some hours after a day's slot. */
@@ -30,6 +34,7 @@ const requested = (day: number, outcome: InsightRunOutcome) => ({
   runId: "insightrun_request",
   slot: DAY_ONE + day * DAY + 3 * 60 * 60_000,
   outcome,
+  reason: null,
 });
 
 type Run = Parameters<typeof foldSkipStreak>[0]["run"];
@@ -107,6 +112,16 @@ describe("given a count of 6 skipped days", () => {
 
       expect(fold([requested(5, "skipped")], streak)).toBe(streak);
       expect(fold([requested(5, "filed")], streak).count).toBe(0);
+    });
+  });
+
+  describe("when a run on a From LangWatch board is skipped", () => {
+    /** @scenario "A skipped run on a From LangWatch board is no skipped day" */
+    it("still counts 6, on that day and on every day after", () => {
+      const streak = skippedFor(6);
+      const days = [6, 7, 8].map((day) => scheduled(day, "skipped", "template_board"));
+
+      expect(fold(days, streak)).toBe(streak);
     });
   });
 

@@ -216,8 +216,9 @@ asked for them.
 (`foldSkipStreak`) that the process state and the row both use: it holds the count and
 the slot of the newest run folded, so an outcome folded twice counts once and an
 outcome older than the newest changes nothing. `filed`, `nothing` and `failed` start
-the count over. An operator's run that is skipped is no skipped day. Turning the run
-on starts the count over. A wake hands its run the skipped days before it
+the count over. An operator's run that is skipped is no skipped day, and neither is a
+run skipped with `template_board`: a schedule on a From LangWatch board stays on.
+Turning the run on starts the count over. A wake hands its run the skipped days before it
 (`skippedDaysBefore` on the `runBoard` intent), and the run that records the seventh
 turns the schedule off, by `system` with the reason `skipped_days`, on the path
 `board_deleted` already took. No side counter exists, so a replay rebuilds the count.

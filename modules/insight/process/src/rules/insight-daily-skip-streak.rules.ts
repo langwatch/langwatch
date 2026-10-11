@@ -7,6 +7,7 @@
 import {
   INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
   type InsightRunOutcome,
+  type InsightRunReason,
 } from "@langwatch/insight-contract";
 
 const SCHEDULED_RUN_PREFIX = "slot:";
@@ -26,20 +27,21 @@ export type SkipStreak = Readonly<{
 export const NO_SKIP_STREAK: SkipStreak = { count: 0, slot: null };
 
 /**
- * The streak after one run's outcome. A skipped scheduled run adds a day; a run that filed,
- * found nothing or failed starts over; an operator's skipped run is no scheduled day. A run
- * for a slot no newer than the last one counted is a repeat or arrived late, and is ignored.
+ * The streak after one run's outcome. A skipped scheduled run adds a day; filed, nothing or
+ * failed starts over; an operator's run and a run on a From LangWatch board are no skipped
+ * day. A run for a slot no newer than the last one counted is a repeat, and is ignored.
  */
 export function foldSkipStreak({
   streak,
   run,
 }: {
   streak: SkipStreak;
-  run: { runId: string; slot: number; outcome: InsightRunOutcome };
+  run: { runId: string; slot: number; outcome: InsightRunOutcome; reason: InsightRunReason | null };
 }): SkipStreak {
   if (streak.slot !== null && run.slot <= streak.slot) return streak;
   if (run.outcome !== "skipped") return { count: 0, slot: run.slot };
   if (!run.runId.startsWith(SCHEDULED_RUN_PREFIX)) return streak;
+  if (run.reason === "template_board") return streak;
   return { count: streak.count + 1, slot: run.slot };
 }
 

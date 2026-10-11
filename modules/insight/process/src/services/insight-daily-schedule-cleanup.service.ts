@@ -75,8 +75,13 @@ export class InsightDailyScheduleCleanupService {
         reason,
       });
     }
-    if (schedules.length > 0) {
-      logger.info({ reason, count: schedules.length }, "turned off daily insight schedules");
-    }
+    if (schedules.length === 0) return;
+    // The ambient project and person are the caller's: the ones cleaned up are named here.
+    const scheduleProjectIds = [...new Set(schedules.map(({ projectId }) => projectId))];
+    const scheduleUserIds = [...new Set(schedules.map(({ userId }) => userId))];
+    logger.info(
+      { reason, count: schedules.length, scheduleProjectIds, scheduleUserIds },
+      "turned off daily insight schedules",
+    );
   }
 }
