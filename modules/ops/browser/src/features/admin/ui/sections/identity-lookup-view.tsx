@@ -10,7 +10,6 @@ import {
   Button,
   Heading,
   HStack,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -169,53 +168,30 @@ function PeopleTable({
       <Heading textStyle="cardTitle" paddingBottom={2}>
         People holding this address
       </Heading>
-      <ListTable
-        density="compact"
-        columnRules={false}
-        containerProps={{ overflowX: "auto" }}
-        size="sm"
-        width="full"
-      >
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Person</Table.ColumnHeader>
-            <Table.ColumnHeader>Organizations</Table.ColumnHeader>
-            <Table.ColumnHeader>Holds it as</Table.ColumnHeader>
-            <Table.ColumnHeader width="60px" textAlign="right" />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+      <ListTable density="compact" scroll="x" scrollLabel="People holding this address table">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Person</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Organizations</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Holds it as</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width={60} align="end" label="Actions" />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {people.length === 0 && (
-            <Table.Row>
-              <Table.Cell colSpan={COLUMN_COUNT}>
-                <Text color="fg.muted" paddingY={4}>
-                  Nobody holds this address.
-                </Text>
-              </Table.Cell>
-            </Table.Row>
+            <ListTable.SpanRow columns={COLUMN_COUNT}>
+              <Box paddingX={4}>
+                <NoDataInfoBlock size="line" title="Nobody holds this address." />
+              </Box>
+            </ListTable.SpanRow>
           )}
           {people.map((person) => (
-            <Table.Row
-              key={person.userId}
-              cursor="pointer"
-              _hover={{ backgroundColor: "bg.muted" }}
-              onClick={() => onOpen(person.userId)}
-            >
-              <Table.Cell>
+            <ListTable.Row key={person.userId} onActivate={() => onOpen(person.userId)}>
+              <ListTable.Cell>
                 <VStack align="start" gap={0}>
-                  <Button
-                    variant="plain"
-                    size="sm"
-                    height="auto"
-                    whiteSpace="normal"
-                    textAlign="start"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onOpen(person.userId);
-                    }}
-                  >
+                  <ListTable.RowAction onActivate={() => onOpen(person.userId)}>
                     {person.name ?? person.email ?? "Unnamed person"}
-                  </Button>
+                  </ListTable.RowAction>
                   {person.name && person.email && (
                     <Text fontSize="xs" color="fg.muted">
                       {person.email}
@@ -223,8 +199,8 @@ function PeopleTable({
                   )}
                   <ShortId id={person.userId} />
                 </VStack>
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 {person.organizations.length === 0 ? (
                   <EmptyCell />
                 ) : (
@@ -237,22 +213,22 @@ function PeopleTable({
                       .join(", ")}
                   </Text>
                 )}
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 <Text fontSize="sm">
                   {person.holding
                     .map((held) => `${held.provider} (${identifierStateLabel(held.state)})`)
                     .join(", ") || <EmptyCell />}
                 </Text>
-              </Table.Cell>
-              <Table.Cell textAlign="right">
+              </ListTable.Cell>
+              <ListTable.Cell align="end">
                 <Box display="flex" justifyContent="end">
                   <PersonRowActions person={person} canRepair={canRepair} onOpen={onOpen} />
                 </Box>
-              </Table.Cell>
-            </Table.Row>
+              </ListTable.Cell>
+            </ListTable.Row>
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     </Box>
   );

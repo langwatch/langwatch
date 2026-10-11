@@ -12,7 +12,6 @@ import {
   NativeSelect,
   Separator,
   Spacer,
-  Table,
   Text,
   Textarea,
   VStack,
@@ -96,51 +95,43 @@ export default function OrganizationsView() {
           onPageChange: setPage,
         }}
       >
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          width="full"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>ID</Table.ColumnHeader>
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Slug</Table.ColumnHeader>
-              <Table.ColumnHeader>Plan model</Table.ColumnHeader>
-              <Table.ColumnHeader>Currency</Table.ColumnHeader>
-              <Table.ColumnHeader>SSO domain</Table.ColumnHeader>
-              <Table.ColumnHeader>Created</Table.ColumnHeader>
-              <Table.ColumnHeader width="60px" textAlign="right" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel="Organizations table">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>ID</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Slug</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Plan model</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Currency</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>SSO domain</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width={60} align="end" label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {list.data?.data.length === 0 && (
-              <Table.Row>
-                <Table.Cell colSpan={8}>
-                  <NoDataInfoBlock
-                    icon={<SearchX />}
-                    title="No organizations match your search."
-                    description="Try a different search or clear the filter to see all records."
-                  />
-                </Table.Cell>
-              </Table.Row>
+              <ListTable.SpanRow columns={8}>
+                <NoDataInfoBlock
+                  icon={<SearchX />}
+                  title="No organizations match your search."
+                  description="Try a different search or clear the filter to see all records."
+                />
+              </ListTable.SpanRow>
             )}
             {list.data?.data.map((org) => (
-              <Table.Row key={org.id}>
+              <ListTable.Row key={org.id}>
                 <ListTable.IdCell value={org.id} label="organization ID" />
-                <Table.Cell>{org.name}</Table.Cell>
-                <Table.Cell>
+                <ListTable.Cell>{org.name}</ListTable.Cell>
+                <ListTable.Cell>
                   {org.slug && <InlineCode variant="neutral">{org.slug}</InlineCode>}
-                </Table.Cell>
-                <Table.Cell>{PRICING_MODEL_LABELS[org.pricingModel]}</Table.Cell>
-                <Table.Cell>{org.currency}</Table.Cell>
-                <Table.Cell>{org.ssoDomain ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>{PRICING_MODEL_LABELS[org.pricingModel]}</ListTable.Cell>
+                <ListTable.Cell>{org.currency}</ListTable.Cell>
+                <ListTable.Cell>{org.ssoDomain ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>
                   <AdminDate value={org.createdAt} display="date" />
-                </Table.Cell>
-                <Table.Cell textAlign="right">
+                </ListTable.Cell>
+                <ListTable.Cell align="end">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
@@ -154,10 +145,10 @@ export default function OrganizationsView() {
                       </Menu.Content>
                     </Menu.Root>
                   </Box>
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       </AdminTable>
 
