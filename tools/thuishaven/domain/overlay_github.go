@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"net/url"
 	"strings"
 	"sync"
 )
@@ -51,4 +52,15 @@ func GithubAppEnv(endpoint string) []string {
 		"GITHUB_LANGY_API_BASE=" + endpoint,
 		"GITHUB_LANGY_WEB_BASE=" + endpoint,
 	}
+}
+
+// GithubLangyEnv points Langy's worker gh and git at githubsim at endpoint (its
+// portless URL): LANGY_GITHUB_HOST is the host and port with no scheme. Nil
+// when endpoint has no host.
+func GithubLangyEnv(endpoint string) []string {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Host == "" {
+		return nil
+	}
+	return []string{"LANGY_GITHUB_HOST=" + u.Host}
 }

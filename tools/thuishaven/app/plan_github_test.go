@@ -2,6 +2,7 @@ package app
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -31,5 +32,11 @@ func TestGithubEnvNamesTheStacksWebhookAndSetupDoors(t *testing.T) {
 	}
 	if got := simulatorBaseEnv(domain.Selection{Github: true}, svc, t.TempDir()); !slices.Contains(got, "GITHUB_LANGY_API_BASE=https://github.feat-x.langwatch.localhost") {
 		t.Errorf("a selected githubsim set %v", got)
+	}
+	if got := simulatorBaseEnv(domain.Selection{Github: true}, svc, t.TempDir()); slices.ContainsFunc(got, func(l string) bool { return strings.HasPrefix(l, "LANGY_GITHUB_HOST=") }) {
+		t.Errorf("without +langy the worker host must stay unset, got %v", got)
+	}
+	if got := simulatorBaseEnv(domain.Selection{Github: true, Langy: true}, svc, t.TempDir()); !slices.Contains(got, "LANGY_GITHUB_HOST=github.feat-x.langwatch.localhost") {
+		t.Errorf("+github +langy must name the sim as Langy's GitHub host, got %v", got)
 	}
 }

@@ -73,3 +73,14 @@ func TestGithubAppEnvBeatsARealAppInDotenv(t *testing.T) {
 		t.Errorf("the private key is not the sim's")
 	}
 }
+
+// @scenario "Langy's worker reaches githubsim when the stack names it as the GitHub host"
+func TestGithubLangyEnvNamesTheSimHost(t *testing.T) {
+	got := GithubLangyEnv("https://github.s.langwatch.localhost:1355")
+	if !slices.Equal(got, []string{"LANGY_GITHUB_HOST=github.s.langwatch.localhost:1355"}) {
+		t.Errorf("GithubLangyEnv = %v", got)
+	}
+	if got := GithubLangyEnv(""); got != nil {
+		t.Errorf("no endpoint must give no host, got %v", got)
+	}
+}
