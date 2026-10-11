@@ -4614,10 +4614,23 @@ function WebhookEndpointPanel({
         Webhook URL (paste into upstream webhook config)
       </Text>
       <HStack gap={2}>
-        <Code flex={1} padding={2} fontSize="xs">
+        <Code
+          flex={1}
+          minWidth={0}
+          padding={2}
+          fontSize="xs"
+          whiteSpace="normal"
+          overflowWrap="anywhere"
+        >
           {webhookUrl}
         </Code>
-        <Button size="sm" variant="outline" onClick={() => onCopy(webhookUrl)}>
+        <Button
+          size="sm"
+          variant="outline"
+          flexShrink={0}
+          aria-label="Copy webhook URL"
+          onClick={() => onCopy(webhookUrl)}
+        >
           <Copy size={14} />
         </Button>
       </HStack>
@@ -4650,10 +4663,23 @@ function OtlpEndpointPanel({
         OTLP ingestion endpoint (paste into upstream exporter)
       </Text>
       <HStack gap={2}>
-        <Code flex={1} padding={2} fontSize="xs">
+        <Code
+          flex={1}
+          minWidth={0}
+          padding={2}
+          fontSize="xs"
+          whiteSpace="normal"
+          overflowWrap="anywhere"
+        >
           {otlpUrl}
         </Code>
-        <Button size="sm" variant="outline" onClick={() => onCopy(otlpUrl)}>
+        <Button
+          size="sm"
+          variant="outline"
+          flexShrink={0}
+          aria-label="Copy ingestion endpoint"
+          onClick={() => onCopy(otlpUrl)}
+        >
           <Copy size={14} />
         </Button>
       </HStack>
