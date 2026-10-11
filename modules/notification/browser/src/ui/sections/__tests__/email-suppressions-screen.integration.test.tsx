@@ -139,6 +139,19 @@ describe("when the reader may manage the triggers of this project", () => {
   });
 });
 
+describe("given nobody has unsubscribed", () => {
+  it("names where notifications are set up in this project", () => {
+    state.rows = [];
+
+    renderWithNotificationHost(<EmailSuppressionsScreen />);
+
+    expect(screen.getByText("No suppressions yet")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Open automations/ }).getAttribute("href")).toBe(
+      "/web-app/automations",
+    );
+  });
+});
+
 describe("given the list could not be read", () => {
   it("says so and offers the read again rather than an empty table", () => {
     state.rows = [];

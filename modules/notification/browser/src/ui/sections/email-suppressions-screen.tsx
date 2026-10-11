@@ -23,6 +23,12 @@ import {
 
 const PAGE_SIZE = 50;
 
+const AUTOMATIONS_DOCS = {
+  kind: "docs",
+  label: "How notifications are set up",
+  href: "https://docs.langwatch.ai/features/automations",
+} as const;
+
 export default function EmailSuppressionsScreen() {
   const host = useNotificationHost();
   const project = host.project();
@@ -30,6 +36,7 @@ export default function EmailSuppressionsScreen() {
   return (
     <EmailSuppressionsPage
       projectId={project.id}
+      projectSlug={project.slug}
       canManage={host.hasPermission(EMAIL_SUPPRESSIONS_MANAGE_PERMISSION)}
     />
   );
@@ -37,9 +44,11 @@ export default function EmailSuppressionsScreen() {
 
 function EmailSuppressionsPage({
   projectId,
+  projectSlug,
   canManage,
 }: {
   projectId: string;
+  projectSlug?: string;
   canManage: boolean;
 }) {
   const host = useNotificationHost();
@@ -97,6 +106,18 @@ function EmailSuppressionsPage({
           title="No suppressions yet"
           description="When a recipient unsubscribes from a notification, they appear here."
           icon={<MailX />}
+          next={
+            projectSlug
+              ? [
+                  {
+                    kind: "setting",
+                    label: "Open automations",
+                    href: `/${projectSlug}/automations`,
+                  },
+                  AUTOMATIONS_DOCS,
+                ]
+              : [AUTOMATIONS_DOCS]
+          }
         />
       );
     }
