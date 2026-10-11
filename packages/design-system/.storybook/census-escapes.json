@@ -637,5 +637,273 @@
     "reason": "No data yet inside a stat figure, with a Set up link when given. (R5a1 review)",
     "owner": "analytics",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 71,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 74,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 82,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 83,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "legacy-card-part",
+    "line": 270,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "legacy-card-part",
+    "line": 271,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "legacy-card-part",
+    "line": 323,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 337,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 369,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 371,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 379,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 380,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 385,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 386,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 389,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 425,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 435,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 473,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 481,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 624,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 629,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 640,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 650,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 658,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 669,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 672,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 694,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 695,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 696,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 697,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 698,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 700,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 701,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 702,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 703,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "raw-export",
+    "line": 704,
+    "reason": "Approved: the protected instant-evaluation Try it out table keeps its own card, rows, muted non-matching rows and tooltips exactly as today (astra review try-it-out.md).",
+    "owner": "evaluator"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "page-title-size",
+    "line": 230,
+    "reason": "Protected instant-evaluation surface kept as today (astra review try-it-out.md).",
+    "owner": "evaluator",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "empty-text",
+    "line": 380,
+    "reason": "Protected instant-evaluation surface kept as today (astra review try-it-out.md).",
+    "owner": "evaluator",
+    "disposition": "reviewed"
   }
 ]
