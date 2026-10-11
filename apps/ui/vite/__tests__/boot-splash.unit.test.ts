@@ -96,7 +96,9 @@ describe("the boot splash", () => {
       expect(html).toContain("__vite_is_fallback_page__");
       expect(html).toContain("/* hmr client */");
       expect(html).toContain(GROUND);
-      expect(html).toContain("Building the app…");
+      expect(html).toContain("Building the app\\u2026");
+      expect(html).toContain('<meta charset="utf-8">');
+      expect(html).not.toContain("…");
     });
 
     it("reloads itself once the server serves the app, even if Vite's reload never came", async () => {

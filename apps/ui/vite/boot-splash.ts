@@ -112,17 +112,17 @@ const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
   }
   function probe() {
     if (!splash.isConnected) return;
-    say("Connecting to the server…");
+    say("Connecting to the server\\u2026");
     fetch("${HEALTH_PATH}", { cache: "no-store" })
       .then(function (response) { return response.ok; }, function () { return false; })
       .then(function (answered) {
-        if (answered) return say("Connected. Opening LangWatch…");
+        if (answered) return say("Connected. Opening LangWatch\\u2026");
         var left = Math.round(wait / 1000);
         clearInterval(countdown);
-        say("Can't reach the server yet. Trying again in " + left + "s…");
+        say("Can't reach the server yet. Trying again in " + left + "s\\u2026");
         countdown = setInterval(function () {
           left -= 1;
-          if (left > 0) return say("Can't reach the server yet. Trying again in " + left + "s…");
+          if (left > 0) return say("Can't reach the server yet. Trying again in " + left + "s\\u2026");
           clearInterval(countdown);
           probe();
         }, 1000);
@@ -172,7 +172,7 @@ const FALLBACK_MARKER = "__vite_is_fallback_page__";
 // the server itself every two seconds and reloads once it serves the app.
 const BUILDING_NOTE = `<script data-boot-splash>setTimeout(function () {
   var note = document.getElementById("lw-boot-note");
-  if (note) { note.textContent = "Building the app…"; note.setAttribute("data-on", ""); }
+  if (note) { note.textContent = "Building the app\\u2026"; note.setAttribute("data-on", ""); }
 }, 1500);
 setInterval(function () {
   fetch(location.href, { headers: { accept: "text/html" }, cache: "no-store" })
@@ -197,7 +197,7 @@ export function brandFallbackPage({
   if (!html.includes(FALLBACK_MARKER)) return html;
   const body = `${BOOT_SPLASH_BODY}${BUILDING_NOTE}${ground ? groundTag(ground) : ""}`;
   return html
-    .replace(/<style>[\s\S]*?<\/style>/, BOOT_SPLASH_HEAD)
+    .replace(/<style>[\s\S]*?<\/style>/, `<meta charset="utf-8">${BOOT_SPLASH_HEAD}`)
     .replace(/<body>[\s\S]*<\/body>/, `<body style="margin:0">${body}</body>`);
 }
 
