@@ -23,6 +23,11 @@ export async function checkAgentSetup({ page, base, prompt }) {
     assert.equal(await setup.locator('[aria-pressed="true"]').count(), 1);
     assert.ok((await setup.textContent()).includes(`Open your project in ${agent}`));
   }
+  await setup.locator("summary").filter({ hasText: "Read the full prompt" }).click();
+  const fullPrompt = setup.getByLabel("Full setup prompt");
+  assert.ok(await fullPrompt.isVisible());
+  assert.equal(await fullPrompt.textContent(), prompt);
+  await setup.locator("summary").filter({ hasText: "Read the full prompt" }).click();
   await setup.getByRole("button", { name: "Copy setup prompt" }).click();
   await setup.getByRole("button", { name: "Prompt copied" }).waitFor();
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), prompt);
@@ -42,6 +47,11 @@ export async function checkMobileNavigation({ page, base }) {
   await trigger.click();
   const drawer = page.getByRole("dialog", { name: "Documentation" });
   await drawer.waitFor({ state: "visible" });
+  assert.equal(
+    await drawer.evaluate((element) => element.getAnimations({ subtree: true }).length),
+    0,
+    "Reduced motion must disable drawer animations",
+  );
   assert.ok(await drawer.getByRole("link", { name: "API Reference", exact: true }).isVisible());
   const tree = drawer.getByRole("navigation", { name: "Page navigation" });
   assert.equal(await tree.locator('[aria-current="page"]').textContent(), "Introduction");
@@ -91,6 +101,25 @@ export async function checkStaticDiagrams({ browser, base }) {
     await diagram.locator("summary").click();
     assert.ok(await diagram.locator("pre").isVisible());
     assert.match(await diagram.locator("pre").textContent(), /graph|flowchart|sequenceDiagram/);
+  } finally {
+    await context.close();
+  }
+}
+
+export async function checkClipboardReadiness({ browser, base }) {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  try {
+    const page = await context.newPage();
+    for (const [slug, label] of [
+      ["introduction", "Copy setup prompt"],
+      ["integration/quick-start", "Copy page"],
+      ["integration/quick-start", "Copy code"],
+      ["skills/directory", "Copy full prompt"],
+    ]) {
+      await page.goto(`${base}${slug}`);
+      const button = page.getByRole("button", { name: label, exact: true }).first();
+      assert.ok(await button.isDisabled(), `${label} must wait for its handler`);
+    }
   } finally {
     await context.close();
   }

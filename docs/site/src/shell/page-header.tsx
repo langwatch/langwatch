@@ -14,7 +14,7 @@ async function readMarkdown({ slug }: { slug: string }): Promise<string> {
 }
 
 function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
-  const { state, copy } = useCopy();
+  const { state, copy, ready } = useCopy();
   const url = `${ORIGIN}/${slug}`;
   const prompt = `Read ${url} and help me understand this page.`;
   const openIn = ({ base, note }: { base: string; note: string }) => {
@@ -31,6 +31,7 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
           size="sm"
           height={{ base: "44px", xl: "34px" }}
           minHeight={{ base: "44px", xl: "34px" }}
+          disabled={!ready}
           borderEndRadius="0"
           onClick={() =>
             copy({
@@ -57,6 +58,7 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
               size="sm"
               height={{ base: "44px", xl: "34px" }}
               minHeight={{ base: "44px", xl: "34px" }}
+              disabled={!ready}
               aria-label="More page actions"
               borderStartRadius="0"
               marginInlineStart="-1px"
@@ -152,8 +154,8 @@ export function PageHeader({
           position="relative"
           fontFamily="heading"
           fontWeight="650"
-          fontSize={{ base: "30px", md: "36px" }}
-          lineHeight={{ base: "38px", md: "44px" }}
+          fontSize={{ base: "28px", md: "34px" }}
+          lineHeight={{ base: "36px", md: "42px" }}
           letterSpacing="-0.025em"
           paddingInlineEnd={{ base: "0", xl: slug === "404" ? "0" : "10rem" }}
           textWrap="pretty"
@@ -165,8 +167,8 @@ export function PageHeader({
             marginTop="4"
             marginBottom="0"
             position="relative"
-            fontSize="18px"
-            lineHeight="28px"
+            fontSize={{ base: "16px", md: "18px" }}
+            lineHeight={{ base: "26px", md: "28px" }}
             color="docs.lede"
             maxWidth="60ch"
           >

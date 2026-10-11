@@ -8,6 +8,7 @@ import { parseArgs } from "node:util";
 import {
   checkAgentSetup,
   checkCapabilityErrors,
+  checkClipboardReadiness,
   checkMobileNavigation,
   checkSkillCopy,
   checkStaticDiagrams,
@@ -127,6 +128,11 @@ await it("renders and operates the key pages at 1440 and 390 in light and dark",
 await it("selects a coding agent and copies the complete authored setup prompt", async () => {
   const prompt = await tracingPrompt({ outDir });
   await withReader({ outDir, run: ({ page, base }) => checkAgentSetup({ page, base, prompt }) });
+});
+
+/** @scenario "Keep clipboard controls unavailable before hydration" */
+await it("disables clipboard actions until their browser handlers are ready", async () => {
+  await withPreviewBrowser({ outDir, run: checkClipboardReadiness });
 });
 
 /** @scenario "Copy a skill prompt" */

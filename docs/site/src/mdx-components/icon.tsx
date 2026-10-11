@@ -1,6 +1,9 @@
+import { GitHubIcon, Python, TypeScript } from "@langwatch/design-system/icons";
 import { Box, Image } from "@langwatch/design-system/primitives";
 
 import { GenericIcon, ICONS } from "../lib/icon-registry.tsx";
+
+const BRAND_ICONS = { github: GitHubIcon, python: Python, typescript: TypeScript };
 
 type IconProps = { icon?: string; size?: number | string };
 
@@ -20,10 +23,26 @@ export function Icon({ icon, size = 20 }: IconProps) {
       />
     );
   }
+  const Brand = Object.entries(BRAND_ICONS).find(([name]) => name === icon)?.[1];
+  if (Brand) {
+    return (
+      <Box
+        as="span"
+        display="inline-flex"
+        flexShrink={0}
+        width={`${pixels}px`}
+        height={`${pixels}px`}
+        aria-hidden="true"
+        css={{ "& svg": { width: "100%", height: "100%" } }}
+      >
+        <Brand />
+      </Box>
+    );
+  }
   const Glyph = (icon && ICONS[icon]) || GenericIcon;
   return (
     <Box as="span" display="inline-flex" flexShrink={0} color="inherit" aria-hidden="true">
-      <Glyph size={pixels} />
+      <Glyph size={pixels} strokeWidth={1.8} />
     </Box>
   );
 }

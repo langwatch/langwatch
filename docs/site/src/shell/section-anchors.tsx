@@ -29,7 +29,7 @@ import type { Section } from "../lib/nav-model.ts";
 function SectionGlyph({ title }: { title: string }) {
   const entry = Object.entries(SECTION_ICONS).find(([label]) => label === title);
   const Glyph = entry?.[1] ?? Blocks;
-  return <Glyph size={19} strokeWidth={1.7} aria-hidden="true" />;
+  return <Glyph size={18} strokeWidth={1.8} aria-hidden="true" />;
 }
 
 function AnchorLink({ href, title, selected }: { href: string; title: string; selected: boolean }) {
@@ -40,7 +40,7 @@ function AnchorLink({ href, title, selected }: { href: string; title: string; se
       display="flex"
       alignItems="center"
       gap="3"
-      minHeight={{ base: "44px", lg: "39px" }}
+      minHeight={{ base: "44px", lg: "36px" }}
       paddingX="3"
       borderRadius="md"
       fontSize="14px"
@@ -48,9 +48,10 @@ function AnchorLink({ href, title, selected }: { href: string; title: string; se
       textDecoration="none"
       color={selected ? "accent.fg" : "nav.fg"}
       fontWeight={selected ? "600" : "450"}
-      bg={selected ? "accent.subtle" : "transparent"}
-      marginBottom="1"
-      _hover={{ bg: "bg.hover", textDecoration: "none" }}
+      bg={selected ? "docs.raised" : "transparent"}
+      marginBottom="0.5"
+      boxShadow={selected ? "0 1px 3px var(--chakra-colors-docs-shadow)" : void 0}
+      _hover={{ bg: selected ? "docs.raised" : "bg.hover", textDecoration: "none" }}
     >
       <SectionGlyph title={title} />
       <Text as="span">{title}</Text>

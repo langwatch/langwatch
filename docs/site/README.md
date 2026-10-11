@@ -84,12 +84,14 @@ centred paper, navigation rail and raised panels use separate semantic surfaces;
 gradients stay behind the page. The ground is static, including under reduced
 motion. The home recording starts only on request and has a local poster frame.
 Its agent setup panel copies the full tracing prompt from `skills/directory.mdx`;
-the picker changes the paste instructions, and the source remains in the MDX.
+the picker changes the paste instructions, and an expandable preview shows exactly
+what is copied. The source remains in the MDX.
 The compiler watches that source so edits also refresh the home panel in dev.
 
 Potential design-system contributions are the layered documentation shell,
 agent setup panel and compact announcement strip. They remain docs-local until
-another surface needs the same behaviour.
+another surface needs the same behaviour. The docs also disable drawer and dialog
+animations under reduced motion; that behaviour is a design-system candidate.
 
 ```sh
 pnpm exec tsc --noEmit -p docs/site/tsconfig.json
@@ -125,6 +127,7 @@ Additional regressions exercise the agent picker, full authored prompt copying,
 mobile navigation and focus restoration, diagrams with JavaScript disabled, and
 video failure followed by a successful retry. Clipboard rejection is injected at
 the browser API boundary to exercise the visible recovery state deterministically.
+Clipboard controls stay disabled in prerendered HTML until their handlers are ready.
 Every browser context and temporary server closes even when an assertion fails.
 
 The link checker checks every built HTML page, local link and fragment, following

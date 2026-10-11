@@ -44,7 +44,7 @@ function copyAnnouncement({ state }: { state: CopyState }) {
 }
 
 export function CopyAction({ code, label = "Copy code" }: { code: string; label?: string }) {
-  const { state, copy } = useCopy();
+  const { state, copy, ready } = useCopy();
   return (
     <>
       <Button
@@ -56,6 +56,7 @@ export function CopyAction({ code, label = "Copy code" }: { code: string; label?
         minWidth={{ base: "44px", md: "40px" }}
         color="fg.muted"
         aria-label={state === "copied" ? "Copied" : label}
+        disabled={!ready}
         onClick={() => copy({ text: code })}
       >
         {state === "copied" ? (

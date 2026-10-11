@@ -1,14 +1,73 @@
 import { Box, Button, Flex, Link, Text } from "@langwatch/design-system/primitives";
-import { ArrowRight, Check, Copy, Terminal } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Copy, Terminal } from "lucide-react";
 import { useState } from "react";
 
 import { useCopy } from "../lib/clipboard.ts";
 
 const AGENTS = ["Claude Code", "Codex", "Cursor"];
 
+function PromptPreview({ prompt }: { prompt: string }) {
+  return (
+    <Box borderWidth="1px" borderColor="border" borderRadius="lg" overflow="hidden" bg="bg.subtle">
+      <Box padding="4">
+        <Text as="div" fontSize="15px" lineHeight="26px" color="fg" fontWeight="500">
+          {prompt.split("\n")[0]}
+        </Text>
+        <Text as="div" fontSize="14px" lineHeight="24px" color="docs.lede" marginTop="1">
+          SDK setup, instrumentation and verification, ready for your coding agent.
+        </Text>
+      </Box>
+      <Box
+        as="details"
+        borderTopWidth="1px"
+        borderColor="border"
+        css={{
+          "&[open] summary svg": { transform: "rotate(180deg)" },
+          "& summary::-webkit-details-marker": { display: "none" },
+        }}
+      >
+        <Flex
+          as="summary"
+          cursor="pointer"
+          alignItems="center"
+          justifyContent="space-between"
+          gap="3"
+          paddingX="4"
+          minHeight="44px"
+          fontSize="13px"
+          color="fg"
+          listStyleType="none"
+        >
+          Read the full prompt <ChevronDown size={16} aria-hidden="true" />
+        </Flex>
+        <Box
+          as="pre"
+          tabIndex={0}
+          aria-label="Full setup prompt"
+          maxHeight="240px"
+          overflowY="auto"
+          whiteSpace="pre-wrap"
+          overflowWrap="anywhere"
+          padding="4"
+          margin="0"
+          borderTopWidth="1px"
+          borderColor="border"
+          bg="docs.paper"
+          color="docs.body"
+          fontFamily="mono"
+          fontSize="13px"
+          lineHeight="22px"
+        >
+          {prompt}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 export function AgentQuickStart({ prompt }: { prompt: string }) {
   const [agent, setAgent] = useState("Claude Code");
-  const { state, copy } = useCopy();
+  const { state, copy, ready } = useCopy();
   return (
     <Box
       className="docs-agent-start docs-raised"
@@ -36,7 +95,9 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
               variant="outline"
               colorPalette="gray"
               size="sm"
+              flex={{ base: "1", md: "initial" }}
               minHeight="40px"
+              disabled={!ready}
               aria-pressed={agent === name}
               onClick={() => setAgent(name)}
               bg={agent === name ? "fg" : "transparent"}
@@ -48,12 +109,7 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
             </Button>
           ))}
         </Flex>
-        <Box padding="5" bg="bg.subtle" borderRadius="lg" borderWidth="1px" borderColor="border">
-          <Text as="div" fontSize="15px" lineHeight="26px" color="fg" margin="0">
-            Instrument my code with LangWatch. Add tracing to my AI agent so I can inspect requests,
-            latency and cost.
-          </Text>
-        </Box>
+        <PromptPreview prompt={prompt} />
         <Flex marginTop="5" gap="4" alignItems="center" justifyContent="space-between" wrap="wrap">
           <Text
             as="div"
@@ -66,10 +122,12 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
             Open your project in {agent}, then paste the full setup prompt.
           </Text>
           <Button
+            width={{ base: "100%", md: "auto" }}
             minHeight="44px"
             bg="fg"
             color="bg.surface"
             _hover={{ bg: "docs.body" }}
+            disabled={!ready}
             onClick={() => copy({ text: prompt })}
           >
             {state === "copied" ? <Check size={16} /> : <Copy size={16} />}

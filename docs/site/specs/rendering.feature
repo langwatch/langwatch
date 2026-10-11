@@ -42,6 +42,8 @@ Feature: Read and navigate the generated documentation
     And the video waits for the reader to start playback
     When the reader selects Claude Code, Codex or Cursor
     Then the setup instructions name the selected agent
+    When the reader opens the full prompt preview
+    Then the complete authored tracing prompt is readable
     When the reader copies the setup prompt
     Then the clipboard contains the full authored tracing prompt
     And the setup panel reports success
@@ -60,5 +62,12 @@ Feature: Read and navigate the generated documentation
     Given the reader opens navigation on a small screen
     Then the section list and page tree appear in a modal drawer
     And the page tree can scroll to its final item
+    And reduced motion disables the drawer animation
     When the reader presses Escape
     Then the drawer closes and focus returns to the navigation button
+
+  @e2e
+  Scenario: Keep clipboard controls unavailable before hydration
+    Given the generated HTML is available before its JavaScript
+    When a reader sees a page, code, skill or setup copy action
+    Then the control is disabled until its browser handler is ready

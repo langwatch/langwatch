@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type CopyState = "idle" | "copied" | "failed";
 const RESET_MS = 2000;
@@ -15,9 +15,13 @@ export async function writeClipboard({ text }: { text: string }): Promise<boolea
 /** Copy action state: idle, copied for two seconds, or failed. */
 export function useCopy() {
   const [state, setState] = useState<CopyState>("idle");
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  const copy = useCallback(async ({ text }: { text: string | (() => Promise<string>) }) => {
+  const [ready, setReady] = useState(false);
+  const timer = useRef<number | undefined>(void 0);
+  useEffect(() => {
+    setReady(true);
+    return () => window.clearTimeout(timer.current);
+  }, []);
+  const copy = async ({ text }: { text: string | (() => Promise<string>) }) => {
     window.clearTimeout(timer.current);
     let ok = false;
     try {
@@ -27,6 +31,6 @@ export function useCopy() {
     }
     setState(ok ? "copied" : "failed");
     timer.current = window.setTimeout(() => setState("idle"), RESET_MS);
-  }, []);
-  return { state, copy };
+  };
+  return { state, copy, ready };
 }

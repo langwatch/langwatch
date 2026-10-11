@@ -1,5 +1,5 @@
 import { Box } from "@langwatch/design-system/primitives";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { neighbours, sectionOf, trailOf } from "../lib/nav-model.ts";
@@ -48,7 +48,7 @@ function LeftRail({ children }: { children: ReactNode }) {
         display="flex"
         flexDirection="column"
         overflowY="auto"
-        paddingTop="7"
+        paddingTop="6"
         paddingBottom="10"
         paddingX="4"
         css={{ scrollbarWidth: "thin" }}
@@ -72,13 +72,13 @@ export function DocsShell({
 }: ShellProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const openSearch = useCallback(() => setSearchOpen(true), []);
+  const openSearch = () => setSearchOpen(true);
   useSearchShortcut({ onOpen: openSearch });
   const section = sectionOf({ slug });
   const trail = section ? (trailOf({ items: section.children, slug }) ?? []) : [];
   const breadcrumb = [section?.title ?? "Docs", ...trail.slice(-1)];
   const { previous, next } = neighbours({ section, slug });
-  const showRail = kind === "guide" && !wide && toc.length >= 2;
+  const showRail = kind !== "endpoint" && toc.length >= 2;
   const header = (
     <PageHeader
       slug={slug}
@@ -120,7 +120,8 @@ export function DocsShell({
       <Box
         className="docs-layout"
         data-kind={kind}
-        data-wide={wide || kind === "home" || !showRail ? "true" : "false"}
+        data-has-toc={showRail ? "true" : "false"}
+        data-wide={wide || !showRail ? "true" : "false"}
       >
         <LeftRail>
           <SideNav active={section} slug={slug} treeId="page-tree" />
@@ -213,8 +214,8 @@ export function DocsShell({
             </Box>
           </Box>
         ) : null}
+        <SiteFooter />
       </Box>
-      <SiteFooter />
       <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} active={section} slug={slug} />
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </Box>

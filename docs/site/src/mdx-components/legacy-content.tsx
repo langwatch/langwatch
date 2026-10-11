@@ -8,7 +8,7 @@ export function LegacyContent({
   className,
   ...props
 }: ComponentProps<"div"> & { "data-copy"?: string }) {
-  const { state, copy } = useCopy();
+  const { state, copy, ready } = useCopy();
   const text = props["data-copy"];
   if (text)
     return (
@@ -19,6 +19,7 @@ export function LegacyContent({
         minHeight="44px"
         padding="3"
         whiteSpace="normal"
+        disabled={!ready}
         onClick={() => copy({ text })}
       >
         {state === "copied" ? "Copied" : children}

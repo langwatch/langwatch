@@ -22,7 +22,7 @@ export function GithubLink({ compact }: { compact: boolean }) {
       _hover={{ color: "fg", textDecoration: "none" }}
     >
       <GitHubIcon size={16} />
-      <Text as="span" display={compact ? { base: "none", xl: "inline" } : "inline"}>
+      <Text as="span" display={compact ? "none" : "inline"}>
         langwatch/langwatch
       </Text>
       {stars === null ? null : (

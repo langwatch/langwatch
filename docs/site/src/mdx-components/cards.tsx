@@ -26,7 +26,13 @@ type CardProps = {
 };
 
 const STRETCH = {
-  "&::after": { content: '""', position: "absolute", inset: "0", borderRadius: "showcase" },
+  "&::after": { content: '""', position: "absolute", inset: "0", borderRadius: "xl" },
+  "&:focus-visible": { outline: "none" },
+  "&:focus-visible::after": {
+    outline: "2px solid",
+    outlineColor: "blue.focusRing",
+    outlineOffset: "2px",
+  },
 } satisfies SystemStyleObject;
 
 function CardHeading({
@@ -73,10 +79,9 @@ export function Card({ title, description, icon, href, horizontal, arrow, childr
       minHeight={compact ? "64px" : void 0}
       borderWidth="1px"
       borderColor="border"
-      borderRadius="showcase"
+      borderRadius="xl"
       bg="bg.panel"
       minWidth="0"
-      css={href ? { "&:hover": { borderColor: "border.emphasized" } } : undefined}
     >
       {icon ? (
         <Flex
@@ -92,7 +97,7 @@ export function Card({ title, description, icon, href, horizontal, arrow, childr
           <Icon icon={icon} size={compact ? 24 : 20} />
         </Flex>
       ) : null}
-      <Flex direction="column" gap="1" minWidth="0" flex="1">
+      <Flex direction="column" gap="2" minWidth="0" flex="1">
         {title && href ? (
           <Link
             href={href}

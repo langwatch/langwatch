@@ -66,12 +66,12 @@ function PageRow({
         aria-current={active ? "page" : undefined}
         display="flex"
         gap="2"
-        alignItems="baseline"
-        minHeight={{ base: "44px", lg: "38px" }}
+        alignItems="flex-start"
+        minHeight={{ base: "44px", lg: "36px" }}
         paddingY="2"
         paddingX="3"
         paddingInlineStart={indent({ depth })}
-        borderRadius="md"
+        borderRadius="sm"
         fontSize="14px"
         lineHeight="20px"
         textDecoration="none"
@@ -105,7 +105,7 @@ function GroupRow({
       <Box
         as="li"
         listStyleType="none"
-        marginTop="8"
+        marginTop="6"
         css={{ "&:first-of-type": { marginTop: "0" } }}
       >
         <Text
@@ -135,11 +135,11 @@ function GroupRow({
         alignItems="center"
         justifyContent="space-between"
         gap="2"
-        minHeight={{ base: "44px", lg: "38px" }}
+        minHeight={{ base: "44px", lg: "36px" }}
         paddingY="2"
         paddingX="3"
         paddingInlineStart={indent({ depth })}
-        borderRadius="md"
+        borderRadius="sm"
         fontSize="14px"
         lineHeight="20px"
         fontWeight="500"

@@ -56,7 +56,7 @@ export function Header({
         height={{ base: "56px", lg: "72px" }}
         gridTemplateColumns={{ lg: "1fr minmax(15rem, 28rem) 1fr" }}
       >
-        <Flex alignItems="center" gap="1" paddingInlineStart={{ base: "0", lg: "4" }}>
+        <Flex alignItems="center" gap="3" paddingInlineStart={{ base: "0", lg: "4" }}>
           <IconButton
             variant="ghost"
             colorPalette="gray"
@@ -79,6 +79,16 @@ export function Header({
           >
             <FullLogo width={128} height={31.38} />
           </Link>
+          <Text
+            display={{ base: "none", lg: "block" }}
+            borderInlineStartWidth="1px"
+            borderColor="border"
+            paddingInlineStart="3"
+            color="docs.lede"
+            fontSize="14px"
+          >
+            Docs
+          </Text>
         </Flex>
         <Button
           type="button"
@@ -89,7 +99,7 @@ export function Header({
           alignItems="center"
           justifyContent="flex-start"
           gap="2"
-          height="42px"
+          height="40px"
           width="100%"
           borderRadius="lg"
           paddingX="3"

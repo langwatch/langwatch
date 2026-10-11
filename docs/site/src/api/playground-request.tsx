@@ -234,10 +234,10 @@ function SendActions({
             colorPalette="gray"
             flex="1"
             height="44px"
-            borderRadius="full"
+            borderRadius="lg"
             bg="fg"
             color="fg.inverted"
-            _hover={{ bg: "fg", opacity: 0.9 }}
+            _hover={{ bg: "docs.body" }}
             disabled={outcome.kind === "sending"}
             id="pg-send"
             onClick={onSend}

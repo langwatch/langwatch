@@ -7,7 +7,7 @@ import { site } from "../lib/nav-model.ts";
 
 const FOOTER_GROUPS = [
   {
-    title: "Build with LangWatch",
+    title: "Documentation",
     links: [
       { label: "Quick start", href: "/integration/quick-start" },
       { label: "API reference", href: "/api-reference/introduction" },
@@ -16,7 +16,7 @@ const FOOTER_GROUPS = [
     ],
   },
   {
-    title: "Make it better",
+    title: "Community",
     links: [
       { label: "Contribute on GitHub", href: `${site.github}/blob/main/CONTRIBUTING.md` },
       { label: "Report an issue", href: `${site.github}/issues` },
@@ -33,18 +33,16 @@ export function SiteFooter() {
       className="docs-site-footer"
       position="relative"
       zIndex="1"
-      maxWidth="1360px"
-      marginX="auto"
-      padding={{ base: "7", lg: "10" }}
-      marginTop="8"
+      padding={{ base: "5", lg: "10" }}
+      paddingTop={{ base: "8", lg: "10" }}
     >
       <Box
         display="grid"
-        gridTemplateColumns={{ base: "1fr", md: "1.4fr 1fr 1fr" }}
+        gridTemplateColumns={{ base: "repeat(2, minmax(0, 1fr))", md: "1.4fr 1fr 1fr" }}
         gap={{ base: "8", md: "12" }}
         paddingBottom="8"
       >
-        <Box>
+        <Box gridColumn={{ base: "1 / -1", md: "auto" }}>
           <Link href="https://langwatch.ai" aria-label="LangWatch website" display="inline-flex">
             <FullLogo width={144} height={35.3} />
           </Link>
@@ -66,7 +64,14 @@ export function SiteFooter() {
         </Box>
         {FOOTER_GROUPS.map((group) => (
           <Box key={group.title}>
-            <Text fontSize="14px" fontWeight="600" color="fg" marginBottom="4">
+            <Text
+              fontSize="12px"
+              letterSpacing="0.06em"
+              textTransform="uppercase"
+              fontWeight="600"
+              color="docs.lede"
+              marginBottom="3"
+            >
               {group.title}
             </Text>
             <Flex
@@ -74,14 +79,14 @@ export function SiteFooter() {
               aria-label={group.title}
               direction="column"
               alignItems="flex-start"
-              gap="2"
+              gap={{ base: "0", md: "1" }}
             >
               {group.links.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
                   fontSize="14px"
-                  minHeight="32px"
+                  minHeight={{ base: "44px", md: "32px" }}
                   color="docs.body"
                 >
                   {link.label}
@@ -103,7 +108,7 @@ export function SiteFooter() {
       >
         <Text margin="0">LangWatch B.V. · Built in Amsterdam.</Text>
         <Link href={`${site.github}/blob/main/LICENSE.md`} color="inherit">
-          Open core. Apache 2.0 + Enterprise.
+          Apache 2.0 + Enterprise
         </Link>
       </Flex>
     </Box>
