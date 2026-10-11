@@ -233,7 +233,7 @@ func StoredIDs(ctx context.Context, stores Stores, label, project string) (map[s
 }
 
 // storedTable is where an ingest kind's id lands.
-var storedTable = map[string]string{"otlp-trace": "spans", "collector": "spans", "otlp-log": "logs", "otlp-metric": "metrics"}
+var storedTable = map[string]string{"otlp-trace": "spans", "collector": "spans", "collector-eval": "spans", "otlp-log": "logs", "otlp-metric": "metrics"}
 
 // LedgerRow is one step of the upgrade ledger, as far as the invariants read it.
 type LedgerRow struct {

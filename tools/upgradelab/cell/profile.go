@@ -64,10 +64,11 @@ var processKeys = []string{"PATH", "HOME", "USER", "TMPDIR", "LANG", "SHELL"}
 
 // EnvInput is what a release's processes share: the profile, the stores and the public address.
 type EnvInput struct {
-	Profile Profile
-	Stores  Stores
-	APIPort int
-	Admin   string
+	PrivateTargets map[string]string // label -> organization; nil reads the shape file
+	Profile        Profile
+	Stores         Stores
+	APIPort        int
+	Admin          string
 	// LicensePublicKey verifies the test license on both releases (licensed shapes only).
 	LicensePublicKey string
 }
@@ -97,7 +98,11 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	routePrivateTargets(env, input.Stores, shape.PrivateTargets())
+	targets := input.PrivateTargets
+	if targets == nil {
+		targets = shape.PrivateTargets()
+	}
+	routePrivateTargets(env, input.Stores, targets)
 	routeObjects(env, input.Stores, shape.PrivateObjectTargets())
 	routeIdentityProvider(env, input.Stores, input.Profile)
 	if input.Profile.Shape == licensedShape && input.LicensePublicKey != "" {
@@ -137,7 +142,11 @@ func routePrivateTargets(env map[string]string, stores Stores, targets map[strin
 		}
 	}
 	for label, organization := range targets {
-		env["CLICKHOUSE_URL__"+label+"__"+organization] = stores.ClickHouseURL(label)
+		url := stores.ClickHouseURL(label)
+		if port, ok := stores.Gates[label]; ok {
+			url = GatedURL(url, port)
+		}
+		env["CLICKHOUSE_URL__"+label+"__"+organization] = url
 	}
 }
 

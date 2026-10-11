@@ -39,7 +39,13 @@ try {
       .click({ timeout: 5_000 })
       .catch(() => undefined);
     if (open) {
-      await page.getByText(open).first().click({ timeout: 30_000 }).catch(() => undefined);
+      // A tab by its role first: a text match can land on hidden text before the tabs render.
+      const tab = page.getByRole("tab", { name: open });
+      await tab
+        .first()
+        .click({ timeout: 30_000 })
+        .catch(() => page.getByText(open).first().click({ timeout: 10_000 }))
+        .catch(() => undefined);
       await page
         .getByText(expect ?? open)
         .first()
@@ -63,7 +69,12 @@ try {
   }
   await page.screenshot({ path: out, fullPage: true });
   const text = await page.innerText("body").catch(() => "");
-  console.log(JSON.stringify({ url: page.url(), text: text.slice(0, 4000) }));
+  const selectedTab = await page
+    .locator('[role="tab"][aria-selected="true"]')
+    .first()
+    .innerText({ timeout: 2_000 })
+    .catch(() => "");
+  console.log(JSON.stringify({ url: page.url(), text: text.slice(0, 4000), selectedTab }));
 } finally {
   await browser.close();
 }

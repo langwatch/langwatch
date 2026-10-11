@@ -29,6 +29,7 @@ type Stores struct {
 	S3                           map[string]int // storagesim port per object target: "" shared, else a private label
 	IDP                          int            // idpsim port, for profiles that sign in through an identity provider
 	IDPPublic, IDPCA             string         // legacy SSO: idpsim behind the cell's TLS proxy, and the CA the releases trust
+	Gates                        map[string]int // private-down drill: the gate port in front of each private target
 }
 
 // DatabaseURL is the Prisma URL both releases share; schema mydb matches the tenancy SQL.

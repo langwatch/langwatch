@@ -465,13 +465,13 @@ func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	privateSpans := map[string]bool{}
+	privateStored := map[string]map[string]bool{}
 	if cell.privateTraffic != nil {
 		private, err := StoredIDs(ctx, cell.stores, cell.privateLabel, cell.privateTraffic.Client.Project)
 		if err != nil {
 			return nil, err
 		}
-		privateSpans = private["spans"]
+		privateStored = private
 	}
 	visible := map[string]bool{}
 	seen := evidence{stored: stored, versions: cell.promptVersions(ctx)}
@@ -480,7 +480,7 @@ func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
 			continue
 		}
 		if strings.HasPrefix(call.Kind, privatePrefix) {
-			visible[call.Kind+"/"+call.ID] = cell.privateVisible(ctx, call, privateSpans)
+			visible[call.Kind+"/"+call.ID] = cell.privateVisible(ctx, call, privateStored)
 			continue
 		}
 		visible[call.Kind+"/"+call.ID] = cell.isVisible(ctx, call, seen)
@@ -544,27 +544,15 @@ func (cell *run) hybridVerdicts(ctx context.Context) []Verdict {
 	if len(cell.private) == 0 {
 		return nil
 	}
-	misplaced, err := cell.misplacedTenants(ctx)
-	placement := verdict("H1", len(misplaced) == 0 && err == nil, fmt.Sprintf("misplaced: %v %s", misplaced, errText(err)))
-	return append([]Verdict{placement, cell.targetsVerdict(ctx)}, cell.isolationVerdicts(ctx)...)
-}
-
-// misplacedTenants names every tenant found on a target other than its own.
-func (cell *run) misplacedTenants(ctx context.Context) ([]string, error) {
-	home := cell.homes()
-	var misplaced []string
-	for _, label := range append([]string{""}, cell.stores.Private...) {
-		tenants, err := tenantsOn(ctx, cell.stores.queryURL(label))
-		if err != nil {
-			return misplaced, err
-		}
-		for tenant := range tenants {
-			if home[tenant] != label {
-				misplaced = append(misplaced, fmt.Sprintf("%s on %q, home %q", tenant, label, home[tenant]))
-			}
-		}
+	verdicts := append(cell.placementVerdicts(ctx), cell.targetsVerdict(ctx))
+	verdicts = append(verdicts, cell.isolationVerdicts(ctx)...)
+	if cell.drill(DrillRouteBroken) {
+		verdicts = append(verdicts, cell.routeVerdict())
 	}
-	return misplaced, nil
+	if cell.drill(DrillPrivateDown) {
+		verdicts = append(verdicts, cell.downVerdict(ctx))
+	}
+	return append(verdicts, cell.dataplanesVerdict(ctx))
 }
 
 // homes maps each private organization and its projects to its target label; an absent tenant is shared ("").
@@ -577,16 +565,6 @@ func (cell *run) homes() map[string]string {
 		}
 	}
 	return home
-}
-
-// tenantsOn lists the TenantIds holding spans or events on one ClickHouse target.
-func tenantsOn(ctx context.Context, target string) (map[string]bool, error) {
-	out, err := clickhouseQuery(ctx, target, "SELECT DISTINCT TenantId FROM (SELECT TenantId FROM stored_spans UNION ALL SELECT TenantId FROM event_log) FORMAT TSV")
-	tenants := map[string]bool{}
-	for _, tenant := range strings.Fields(out) {
-		tenants[tenant] = true
-	}
-	return tenants, err
 }
 
 func (cell *run) targetsVerdict(ctx context.Context) Verdict {

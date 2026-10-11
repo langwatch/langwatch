@@ -51,7 +51,7 @@ func parse(args []string) (Options, error) {
 	flags := cellFlags("cell", &options)
 	flags.StringVar(&options.FromSnapshot, "from-snapshot", "", "a produce entry directory or cache key: restore it instead of seeding")
 	ledger := flags.String("ledger", "", "comma-separated #8553 rows (UP-04, UD-7, ...) to claim at start and report at the end")
-	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry")
+	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry, private-down, route-broken (hybrid)")
 	overlays := flags.String("overlays", "", "comma-separated overlays planted on main: retention (aged telemetry under three retention rules)")
 	if err := flags.Parse(args); err != nil {
 		return options, err
@@ -108,10 +108,10 @@ func withDrills(options Options, ledger, drills string) (Options, error) {
 		case DrillAPIEarly:
 			options.SwitchOn = "/healthz"
 			options.Drills = append(options.Drills, drill)
-		case DrillWorkerRestart, DrillRetry:
+		case DrillWorkerRestart, DrillRetry, DrillPrivateDown, DrillRouteBroken:
 			options.Drills = append(options.Drills, drill)
 		default:
-			return options, fmt.Errorf("unknown drill %q: want %s, %s or %s", drill, DrillAPIEarly, DrillWorkerRestart, DrillRetry)
+			return options, fmt.Errorf("unknown drill %q: want %s, %s, %s, %s or %s", drill, DrillAPIEarly, DrillWorkerRestart, DrillRetry, DrillPrivateDown, DrillRouteBroken)
 		}
 	}
 	return withDefaults(options)

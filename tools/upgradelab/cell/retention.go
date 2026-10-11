@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/langwatch/langwatch/tools/upgradelab/generate"
 )
 
 // OverlayRetention plants aged telemetry under three retention rules (trial T2, ledger UM-25).
@@ -53,9 +56,10 @@ type retentionOrg struct {
 	Label          string `json:"label"`
 	OrganizationID string `json:"organizationId"`
 	ProjectID      string `json:"projectId"`
-	Scope          string `json:"scope"`         // PROJECT, ORGANIZATION, or "" for main's default
-	RuleDays       int    `json:"ruleDays"`      // the rule set; 0 for none
-	EffectiveDays  int    `json:"effectiveDays"` // main's resolved traces retention, stamped into _retention_days
+	Scope          string `json:"scope"`            // PROJECT, ORGANIZATION, or "" for main's default
+	RuleDays       int    `json:"ruleDays"`         // the rule set; 0 for none
+	EffectiveDays  int    `json:"effectiveDays"`    // main's resolved traces retention, stamped into _retention_days
+	Target         string `json:"target,omitempty"` // the ClickHouse target label its rows live on; "" shared
 }
 
 // retentionPlan is the overlay's three organizations (UM-25): a project rule, an organization rule, none.
@@ -105,7 +109,33 @@ func (cell *run) retentionRules(ctx context.Context) error {
 		}
 		cell.retention.orgs = append(cell.retention.orgs, org)
 	}
+	if len(cell.private) > 0 {
+		org, err := cell.privateRetentionOrg(ctx)
+		if err != nil {
+			cell.report.Notes = append(cell.report.Notes, "retention on the private target (H-e) not planted: "+err.Error())
+			return nil //nolint:nilerr // the overlay records its failure for R1 and the cell goes on
+		}
+		cell.retention.orgs = append(cell.retention.orgs, org)
+	}
 	return nil
+}
+
+// privateRetentionOrg sets an organization rule on the hybrid private organization, whose rows live on its own
+// target: the seed account joins it as an admin first, as an operator would to set the rule.
+func (cell *run) privateRetentionOrg(ctx context.Context) (retentionOrg, error) {
+	client, label, ok := cell.privateClient()
+	if !ok {
+		return retentionOrg{}, fmt.Errorf("no private project in the tenancy")
+	}
+	org := retentionOrg{Label: "private-rule", Scope: "ORGANIZATION", RuleDays: 63, Target: label, OrganizationID: cell.private[label], ProjectID: client.Project}
+	email, _ := generate.SeedAccount(cell.options.Seed)
+	statement := fmt.Sprintf(`INSERT INTO mydb."OrganizationUser" ("userId", "organizationId", role, "createdAt", "updatedAt") SELECT id, %[2]s, 'ADMIN', now(), now() FROM mydb."User" WHERE email = %[1]s ON CONFLICT DO NOTHING;
+INSERT INTO mydb."TeamUser" ("userId", "teamId", role, "createdAt", "updatedAt") SELECT u.id, p."teamId", 'ADMIN', now(), now() FROM mydb."User" u, mydb."Project" p WHERE u.email = %[1]s AND p.id = %[3]s ON CONFLICT DO NOTHING`,
+		sqlQuote(email), sqlQuote(org.OrganizationID), sqlQuote(org.ProjectID))
+	if _, err := psql(ctx, cell.stores.psqlURL(), statement); err != nil {
+		return org, fmt.Errorf("seed account membership (SQL): %w", err)
+	}
+	return cell.applyRetentionRule(ctx, org)
 }
 
 func (cell *run) retentionOrganization(ctx context.Context, index int, org retentionOrg) (retentionOrg, error) {
@@ -119,6 +149,11 @@ func (cell *run) retentionOrganization(ctx context.Context, index int, org reten
 	if _, err := psql(ctx, cell.stores.psqlURL(), statement); err != nil {
 		return org, fmt.Errorf("paid subscription (SQL): %w", err)
 	}
+	return cell.applyRetentionRule(ctx, org)
+}
+
+// applyRetentionRule sets the organization's rule through main's door and reads back what main resolves.
+func (cell *run) applyRetentionRule(ctx context.Context, org retentionOrg) (retentionOrg, error) {
 	if org.Scope != "" {
 		scope := map[string]any{"scopeType": org.Scope, "scopeId": org.ProjectID}
 		if org.Scope == "ORGANIZATION" {
@@ -182,24 +217,29 @@ func (cell *run) retentionAge(ctx context.Context) error {
 	if cell.retention.err != nil {
 		return nil
 	}
-	target := cell.stores.queryURL("")
 	cell.retention.seeded = map[string]int{}
 	for _, table := range agedTables {
-		final, err := finalClause(ctx, target, table.Table)
-		if err != nil {
-			cell.retention.err = err
-			return nil
-		}
-		source := fmt.Sprintf("SELECT count() FROM (SELECT 1 FROM %s%s WHERE TenantId = %s LIMIT %d) FORMAT TSV", table.Table, final, sqlQuote(cell.client.Project), agedRowsPerTable)
-		out, err := clickhouseQuery(ctx, target, source)
-		if err != nil {
-			cell.retention.err = err
-			return nil
-		}
-		cell.retention.seeded[table.Table], _ = strconv.Atoi(strings.TrimSpace(out))
 		for _, org := range cell.retention.orgs {
+			target, source := cell.stores.queryURL(org.Target), cell.client.Project
+			if org.Target != "" {
+				source = cell.privateTraffic.Client.Project
+			}
+			final, err := finalClause(ctx, target, table.Table)
+			if err != nil {
+				cell.retention.err = err
+				return nil //nolint:nilerr // the overlay records its failure for R1 and the cell goes on
+			}
+			key := org.Target + "/" + table.Table
+			if _, counted := cell.retention.seeded[key]; !counted {
+				out, err := clickhouseQuery(ctx, target, fmt.Sprintf("SELECT count() FROM (SELECT 1 FROM %s%s WHERE TenantId = %s LIMIT %d) FORMAT TSV", table.Table, final, sqlQuote(source), agedRowsPerTable))
+				if err != nil {
+					cell.retention.err = err
+					return nil //nolint:nilerr // the overlay records its failure for R1 and the cell goes on
+				}
+				cell.retention.seeded[key], _ = strconv.Atoi(strings.TrimSpace(out))
+			}
 			for _, age := range agedSlices {
-				statement := agedInsert(agedInsertInput{Table: table, Final: final, Source: cell.client.Project, Tenant: org.ProjectID, Age: age, Retention: org.EffectiveDays})
+				statement := agedInsert(agedInsertInput{Table: table, Final: final, Source: source, Tenant: org.ProjectID, Age: age, Retention: org.EffectiveDays})
 				if _, err := clickhouseQuery(ctx, target, statement); err != nil {
 					cell.retention.err = fmt.Errorf("aged %s for %s at %d days: %w", table.Table, org.Label, age, err)
 					return nil
@@ -278,24 +318,29 @@ func parseAgedCounts(out string) map[agedKey][2]int {
 	return counts
 }
 
-// countAged reads every overlay slice from the shared target.
+// countAged reads every overlay slice from each organization's own target.
 func (cell *run) countAged(ctx context.Context) (map[string]map[agedKey][2]int, error) {
-	tenants := make([]string, 0, len(cell.retention.orgs))
+	tenantsAt := map[string][]string{}
 	for _, org := range cell.retention.orgs {
-		tenants = append(tenants, org.ProjectID)
+		tenantsAt[org.Target] = append(tenantsAt[org.Target], org.ProjectID)
 	}
-	target := cell.stores.queryURL("")
 	byTable := map[string]map[agedKey][2]int{}
-	for _, table := range agedTables {
-		final, err := finalClause(ctx, target, table.Table)
-		if err != nil {
-			return nil, err
+	for label, tenants := range tenantsAt {
+		target := cell.stores.queryURL(label)
+		for _, table := range agedTables {
+			final, err := finalClause(ctx, target, table.Table)
+			if err != nil {
+				return nil, err
+			}
+			out, err := clickhouseQuery(ctx, target, agedCountQuery(table, final, tenants))
+			if err != nil {
+				return nil, err
+			}
+			if byTable[table.Table] == nil {
+				byTable[table.Table] = map[agedKey][2]int{}
+			}
+			maps.Copy(byTable[table.Table], parseAgedCounts(out))
 		}
-		out, err := clickhouseQuery(ctx, target, agedCountQuery(table, final, tenants))
-		if err != nil {
-			return nil, err
-		}
-		byTable[table.Table] = parseAgedCounts(out)
 	}
 	return byTable, nil
 }
@@ -315,7 +360,7 @@ func (cell *run) retentionAtCut(ctx context.Context) error {
 			for _, age := range agedSlices {
 				measured := counts[table.Table][agedKey{org.ProjectID, age}]
 				cell.retention.counts = append(cell.retention.counts, sliceCount{Org: org.Label, Kind: table.Kind, Table: table.Table, Slice: age, Retention: org.EffectiveDays,
-					Seeded: cell.retention.seeded[table.Table], AtCut: measured[0], Expirable: measured[1], Expect: expectAfter(measured[0], measured[1]), After: -1})
+					Seeded: cell.retention.seeded[org.Target+"/"+table.Table], AtCut: measured[0], Expirable: measured[1], Expect: expectAfter(measured[0], measured[1]), After: -1})
 			}
 		}
 	}
@@ -333,9 +378,23 @@ func expectAfter(atCut, expirable int) string {
 func (cell *run) retentionAllowance() map[string]map[string]int64 {
 	allowance := map[string]map[string]int64{"clickhouse/shared": {}}
 	for _, count := range cell.retention.counts {
-		allowance["clickhouse/shared"][count.Table] += int64(count.Expirable)
+		store := "clickhouse/" + clickHouseTarget(cell.retentionTarget(count.Org))
+		if allowance[store] == nil {
+			allowance[store] = map[string]int64{}
+		}
+		allowance[store][count.Table] += int64(count.Expirable)
 	}
 	return allowance
+}
+
+// retentionTarget is the target label of an overlay organization, by its overlay label.
+func (cell *run) retentionTarget(label string) string {
+	for _, org := range cell.retention.orgs {
+		if org.Label == label {
+			return org.Target
+		}
+	}
+	return ""
 }
 
 // retentionVerdict (R1): every organization's every age slice holds after the upgrade what it held at the cut,
@@ -367,7 +426,7 @@ func (cell *run) agedReadVerdict(ctx context.Context) Verdict {
 	var read, failed []string
 	for _, org := range cell.retention.orgs {
 		query := fmt.Sprintf("SELECT TraceId, dateDiff('day', OccurredAt, now()) FROM trace_summaries FINAL WHERE TenantId = %s AND dateDiff('day', OccurredAt, now()) >= 20 ORDER BY OccurredAt ASC LIMIT 1 FORMAT TSV", sqlQuote(org.ProjectID))
-		out, err := clickhouseQuery(ctx, cell.stores.queryURL(""), query)
+		out, err := clickhouseQuery(ctx, cell.stores.queryURL(org.Target), query)
 		trace, age, _ := strings.Cut(strings.TrimSpace(out), "\t")
 		if err != nil || trace == "" {
 			failed = append(failed, fmt.Sprintf("%s: no aged trace to read (%s)", org.Label, errText(err)))

@@ -98,6 +98,14 @@ type run struct {
 	signupUsersErr     error
 	signupSessions     map[string]*seed.Seeder // each sign-up signed in once
 	memberNotice       bool                    // the member notice showed while the retry drill's step was failed
+	gates              map[string]*Gate        // private-down drill: a gate in front of each private target
+	down               downState
+	downWG             sync.WaitGroup
+	placedBefore       []string // H1: misplaced rows at the cut
+	placedBeforeErr    error
+	routeProbes        []routeProbe
+	routeAfter         []string
+	routeAfterErr      error
 
 	stopTraffic, stopPoller, stopSampler context.CancelFunc
 	trafficDone                          chan struct{}
@@ -136,7 +144,8 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	}
 	steps := slices.Concat([]step{{"build", cell.buildBoth}}, origin, before, cut, []step{
 		{"switch", cell.switchToHead}, {"ready", cell.awaitReady},
-		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"checks", func(ctx context.Context) error {
+		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"drill-route", cell.routeBrokenDrill}, {"checks", func(ctx context.Context) error {
+			cell.downWG.Wait()
 			cell.stopObservers()
 			return cell.checks(ctx)
 		}},
@@ -271,12 +280,15 @@ func (cell *run) freshStores(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	cell.private = shape.PrivateTargets()
+	cell.private = PrivateTargetsFor(shape.PrivateTargets(), cell.options.Tier)
 	for label := range cell.private {
 		cell.stores.Private = append(cell.stores.Private, label)
 	}
 	if err := cell.stores.Fresh(ctx); err != nil {
 		return err
+	}
+	if err := cell.startGates(); err != nil {
+		return fmt.Errorf("private-down gates: %w", err)
 	}
 	if cell.profile.Objects {
 		if err := cell.startObjectStores(slices.Collect(maps.Keys(shape.PrivateObjectTargets()))); err != nil {
@@ -307,7 +319,7 @@ func (cell *run) freshStores(ctx context.Context) error {
 			return fmt.Errorf("test license: %w", err)
 		}
 	}
-	cell.env, err = BuildEnv(EnvInput{Profile: cell.profile, Stores: cell.stores, APIPort: cell.apiPort, Admin: email, LicensePublicKey: cell.license.PublicKey})
+	cell.env, err = BuildEnv(EnvInput{Profile: cell.profile, PrivateTargets: cell.private, Stores: cell.stores, APIPort: cell.apiPort, Admin: email, LicensePublicKey: cell.license.PublicKey})
 	return err
 }
 
@@ -567,6 +579,7 @@ func (cell *run) cut(ctx context.Context) error {
 	}
 	fingerprint, err := cell.fingerprint(ctx)
 	cell.before = fingerprint
+	cell.placementAtCut(ctx)
 	return err
 }
 
@@ -670,6 +683,10 @@ func (cell *run) switchToHead(ctx context.Context) error {
 	}
 	cell.proc("from-worker").Stop(20 * time.Second)
 	cell.mark("headWorkerStarted")
+	if len(cell.gates) > 0 {
+		cell.downWG.Add(1)
+		go cell.holdPrivateDown(ctx)
+	}
 	if err := cell.startHeadWorker(); err != nil {
 		return err
 	}
@@ -873,6 +890,9 @@ func (cell *run) teardown() {
 	if cell.balancer != nil {
 		cell.balancer.Close()
 	}
+	for _, gate := range cell.gates {
+		gate.Close()
+	}
 	if cell.legacy.proxy != nil {
 		_ = cell.legacy.proxy.Close()
 	}
@@ -897,16 +917,19 @@ func (cell *run) shootPhases(ctx context.Context) {
 	}
 }
 
-func (cell *run) shoot(ctx context.Context, phase string) {
-	signIn := phase == "holding:upgrading" || phase == "ready" || phase == "settled" || phase == "drill-failed"
+func (cell *run) shoot(ctx context.Context, phase string) { cell.shootPage(ctx, phase, nil) }
+
+// shootPage screenshots one phase; extra adds ops-upgrades.mjs fields (path, open, expect). Answers the page text and file.
+func (cell *run) shootPage(ctx context.Context, phase string, extra map[string]any) (string, string) {
+	signIn := extra != nil || phase == "holding:upgrading" || phase == "ready" || phase == "settled" || phase == "drill-failed"
 	if phase == "down" {
-		return
+		return "", ""
 	}
 	if signIn {
 		select { // a signed-in shot before the grant shows "Access Restricted"
 		case <-cell.granted:
 		case <-ctx.Done():
-			return
+			return "", ""
 		}
 	}
 	email, password := generate.SeedAccount(cell.options.Seed)
@@ -916,10 +939,12 @@ func (cell *run) shoot(ctx context.Context, phase string) {
 	if !signIn {
 		target = cell.headURL()
 	}
-	args, _ := json.Marshal(map[string]any{"url": target, "email": email, "password": password, "out": out, "signIn": signIn})
+	fields := map[string]any{"url": target, "email": email, "password": password, "out": out, "signIn": signIn}
+	maps.Copy(fields, extra)
+	args, _ := json.Marshal(fields)
 	script := filepath.Join(cell.options.RunDir, "ops-upgrades.mjs")
 	if err := os.WriteFile(script, opsScript, 0o600); err != nil {
-		return
+		return "", ""
 	}
 	shotCtx, cancel := context.WithTimeout(ctx, 3*time.Minute) // the script's own waits add up to about 140 s
 	defer cancel()
@@ -931,12 +956,13 @@ func (cell *run) shoot(ctx context.Context, phase string) {
 		err = fmt.Errorf("%w: %s", err, tail(exit.Stderr))
 	}
 	shot := Shot{Phase: phase, AtMs: time.Since(cell.origin).Milliseconds(), File: filepath.Join("shots", name)}
-	var page struct{ URL, Text string }
+	var page struct{ URL, Text, SelectedTab string }
 	if err != nil || json.Unmarshal(output, &page) != nil {
 		shot.Error = fmt.Sprint(err)
 	}
 	shot.URL, shot.State = page.URL, OpsState(page.Text)
 	cell.addShot(shot)
+	return "selected tab: " + page.SelectedTab + "\n" + page.Text, shot.File
 }
 
 func (cell *run) addShot(shot Shot) {
