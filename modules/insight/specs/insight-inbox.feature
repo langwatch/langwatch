@@ -196,6 +196,27 @@ Feature: The insights inbox
       Then the filing carries that board and widget, that query and that window
       And an answer that names none of them is filed with none
 
+    @integration
+    Scenario: Saving a finding of an answer's insights card files its typed data
+      Given a Langy answer that carries an insights card with a board, a window and two findings
+      When a member saves the first finding as an insight
+      Then the filing carries that finding's title, body, tone, topic and valid days
+      And the card's board with the finding's widget, the finding's query and the card's window
+      And nothing of it is read from the answer's prose
+
+    @integration
+    Scenario: A member picks which finding of a card to save
+      Given a Langy answer that carries an insights card with two findings
+      When a member picks the second finding and saves it
+      Then the form starts again from that finding's own words
+      And the filing carries that finding and no query it does not hold
+
+    @integration
+    Scenario: An answer without an insights card is saved from its text
+      Given a Langy answer that carries no insights card, or a card with no finding
+      When a member saves it as an insight
+      Then the form starts from the answer's own text
+
   Rule: Evidence on fixed dates
     An insight keeps what to run, never the result: its query, the fixed window the query
     read and the values in force when it was filed.

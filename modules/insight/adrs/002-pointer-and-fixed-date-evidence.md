@@ -51,8 +51,14 @@ a new field with a default is the default, not an upcast.
 - The board's Source (which origins a board leaves out) is not kept yet,
   because no board has one on this branch. It joins `replayContext`, the JSON
   column beside the window, with no migration.
-- Langy does not hand "Save as insight" a structured subject yet
-  (`LangyAnswerActionProps.subject`), so no insight filed from the panel
-  carries a pointer or a window until it does.
+- An answer that carries an insights card hands "Save as insight" that card
+  (`LangyAnswerActionProps.insights`). Saving one of its findings files the
+  finding's title, body, tone, topic and valid days, the card's board with the
+  finding's widget, the finding's query and the card's window, all as typed
+  data. The query is Langy's own text and is not checked when it is filed: the
+  LangWatchQL door checks it when a reader replays it.
+- No asking module hands Langy a structured subject for an ordinary answer yet
+  (`LangyAnswerActionProps.subject`), so an answer with no card is saved from
+  its text and carries no pointer and no window.
 - An old image that folds a new filed event drops the three fields, because it
   does not know them. Replaying the insight projection restores them.
