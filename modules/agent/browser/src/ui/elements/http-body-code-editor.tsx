@@ -67,6 +67,7 @@ export function HttpBodyCodeEditor({
                 scrollBeyondLastLine: false,
                 lineNumbers: "off",
                 wordWrap: "on",
+                renderValidationDecorations: "off",
               }}
             />
           </Suspense>
