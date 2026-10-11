@@ -96,6 +96,8 @@ export type DatasetEditorController = {
 };
 
 const CHECKBOX_WIDTH_PX = 36;
+/** The grid's id, so the selection bar can return focus to its select-all box. */
+const GRID_ID = "dataset-editor-grid";
 const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
 /** Records per page for the saved-dataset editor (classic page N of M). One
  *  page comfortably fits the virtualized viewport while keeping each read
@@ -508,7 +510,7 @@ function buildTableColumns({
           checked={allSelected}
           onCheckedChange={() => (allSelected ? clearRowSelection() : selectAllRows(rowCount))}
         >
-          <Checkbox.HiddenInput />
+          <Checkbox.HiddenInput data-select-all="" />
           <Checkbox.Control />
         </Checkbox.Root>
       ),
@@ -1056,9 +1058,6 @@ export function DatasetEditorTable({
         searchInput={searchInput}
         hasPendingWrites={hasPendingWrites}
         onSearchChange={onSearchChange}
-        floatingSelectionBar={floatingSelectionBar}
-        selectedRowCount={selectedRows.size}
-        onDeleteSelected={() => deleteSelectedRows()}
         hideButtons={hideButtons}
         isDownloading={isDownloading}
         onDownload={() => void downloadCSV()}
@@ -1068,6 +1067,13 @@ export function DatasetEditorTable({
         onEditColumns={() => editColumnsDrawer.onOpen()}
         headerActions={headerActions}
         headerSlot={headerSlot}
+      />
+
+      <EditorSelectionBar
+        selectedRowCount={selectedRows.size}
+        floating={floatingSelectionBar}
+        onClear={clearRowSelection}
+        onDelete={() => deleteSelectedRows()}
       />
 
       <Box
@@ -1090,7 +1096,7 @@ export function DatasetEditorTable({
         }}
       >
         <DatasetTableProvider value={contextValue}>
-          <table ref={tableRef} data-testid="dataset-editor-grid">
+          <table ref={tableRef} id={GRID_ID} data-testid="dataset-editor-grid">
             <colgroup>
               <col style={{ width: CHECKBOX_WIDTH_PX }} />
               {columns.map((col) => (
@@ -1158,10 +1164,6 @@ export function DatasetEditorTable({
       {bottomSpace && <Box height={bottomSpace} flexShrink={0} />}
 
       <EditorOverlays
-        floatingSelectionBar={floatingSelectionBar}
-        selectedRowCount={selectedRows.size}
-        clearRowSelection={clearRowSelection}
-        onDeleteSelected={() => deleteSelectedRows()}
         isEditColumnsOpen={editColumnsDrawer.open}
         onCloseEditColumns={editColumnsDrawer.onClose}
         datasetId={datasetId}
@@ -1237,7 +1239,11 @@ function EditorPager({
   clearRowSelection,
   setPage,
   setPageSize,
-  ...pagination
+  page,
+  pageSize,
+  totalCount,
+  isLoading,
+  navDisabled,
 }: {
   page: number;
   pageSize: number;
@@ -1251,7 +1257,11 @@ function EditorPager({
 }) {
   return (
     <Pagination
-      {...pagination}
+      page={page}
+      pageSize={pageSize}
+      totalCount={totalCount}
+      isLoading={isLoading}
+      navDisabled={navDisabled}
       onPageChange={(nextPage) => {
         clearRowSelection();
         setPage(nextPage);
@@ -1275,12 +1285,48 @@ function HeaderCell({ header }: { header: Header<DatasetTableRowData, unknown> }
   );
 }
 
-/** The floating row-selection bar, the edit-columns drawer and the CSV import dialog. */
-function EditorOverlays({
-  floatingSelectionBar,
+/** Floating in a host that owns the page, inline above the grid when the editor is embedded. */
+function EditorSelectionBar({
   selectedRowCount,
-  clearRowSelection,
-  onDeleteSelected,
+  floating,
+  onClear,
+  onDelete,
+}: {
+  selectedRowCount: number;
+  floating: boolean;
+  onClear: () => void;
+  onDelete: () => void;
+}) {
+  if (selectedRowCount === 0) return null;
+  return (
+    <SelectionActionBar
+      label={`${selectedRowCount} selected`}
+      onClear={() => {
+        onClear();
+        // The header cell is rebuilt as the selection changes, so focus lands after it has been.
+        requestAnimationFrame(() =>
+          document.querySelector<HTMLElement>("#" + GRID_ID + " [data-select-all]")?.focus(),
+        );
+      }}
+      placement={floating ? "floating" : "inline"}
+      forTable={GRID_ID}
+      testId="dataset-selection-bar"
+    >
+      <Button
+        size="xs"
+        variant="outline"
+        colorPalette="red"
+        data-testid="delete-selected-rows"
+        onClick={onDelete}
+      >
+        <Trash2 size={14} /> Delete
+      </Button>
+    </SelectionActionBar>
+  );
+}
+
+/** The edit-columns drawer and the CSV import dialog. */
+function EditorOverlays({
   isEditColumnsOpen,
   onCloseEditColumns,
   datasetId,
@@ -1291,10 +1337,6 @@ function EditorOverlays({
   hasSearchTakenTheGrid,
   onCloseCsvModal,
 }: {
-  floatingSelectionBar: boolean;
-  selectedRowCount: number;
-  clearRowSelection: () => void;
-  onDeleteSelected: () => void;
   isEditColumnsOpen: boolean;
   onCloseEditColumns: () => void;
   datasetId: string | undefined;
@@ -1307,24 +1349,6 @@ function EditorOverlays({
 }) {
   return (
     <>
-      {floatingSelectionBar && selectedRowCount > 0 && (
-        <SelectionActionBar
-          label={`${selectedRowCount} selected`}
-          onClear={clearRowSelection}
-          testId="dataset-selection-bar"
-        >
-          <Button
-            size="xs"
-            variant="outline"
-            colorPalette="red"
-            data-testid="delete-selected-rows"
-            onClick={onDeleteSelected}
-          >
-            <Trash2 size={14} /> Delete
-          </Button>
-        </SelectionActionBar>
-      )}
-
       {isEditColumnsOpen && (
         <AddOrEditDatasetDrawer
           open={isEditColumnsOpen}
@@ -1397,9 +1421,6 @@ function EditorToolbar({
   searchInput,
   hasPendingWrites,
   onSearchChange,
-  floatingSelectionBar,
-  selectedRowCount,
-  onDeleteSelected,
   hideButtons,
   isDownloading,
   onDownload,
@@ -1421,9 +1442,6 @@ function EditorToolbar({
   searchInput: string;
   hasPendingWrites: boolean;
   onSearchChange: (next: string) => void;
-  floatingSelectionBar: boolean;
-  selectedRowCount: number;
-  onDeleteSelected: () => void;
   hideButtons: boolean;
   isDownloading: boolean;
   onDownload: () => void;
@@ -1480,21 +1498,6 @@ function EditorToolbar({
       )}
     </>
   );
-  const deleteSelected = (
-    <>
-      {!floatingSelectionBar && selectedRowCount > 0 && (
-        <Button
-          size="sm"
-          colorPalette="red"
-          variant="outline"
-          data-testid="delete-selected-rows"
-          onClick={onDeleteSelected}
-        >
-          <X size={14} /> Delete {selectedRowCount} {selectedRowCount === 1 ? "row" : "rows"}
-        </Button>
-      )}
-    </>
-  );
   const actions = (
     <>
       {!hideButtons && (
@@ -1538,8 +1541,6 @@ function EditorToolbar({
         )}
         <HStack gap={3} align="center" width="full">
           {searchBox}
-          <Spacer />
-          {deleteSelected}
         </HStack>
       </>
     );
@@ -1551,7 +1552,6 @@ function EditorToolbar({
       {counts}
       <Spacer />
       {searchBox}
-      {deleteSelected}
       {actions}
     </HStack>
   );
