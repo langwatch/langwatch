@@ -49,12 +49,14 @@ type damageRefusal struct {
 	RerunMs            int64  // from the fix to the first upgrade run after it; -1 none
 	Code               string // the run's outcome code, when the refusal came from a run rather than a step
 	ConvergedAfterFix  bool
-	FinishedRowsBefore int // finished _prisma_migrations rows right after the plant
+	PrismaRowsBefore   int // _prisma_migrations rows after the plant or the last fix
+	FinishedRowsBefore int // finished ones then
 	FinishedRowsWhile  int
 }
 
 type damageState struct {
 	plantedRows, finishedRows int
+	rowsNow, finishedNow      int // after the plant, then after each fix: resolve --applied writes a row of its own
 	plantedIndex              string
 	refusals                  []damageRefusal
 	other                     []string // failed steps the overlay did not plant
@@ -74,6 +76,7 @@ func (cell *run) plantDamage(ctx context.Context) error {
 		return dmg.err
 	}
 	dmg.plantedRows, dmg.finishedRows = cell.prismaRowCounts(ctx)
+	dmg.rowsNow, dmg.finishedNow = dmg.plantedRows, dmg.finishedRows
 	dmg.plantedIndex = cell.indexDef(ctx)
 	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("operator damage: %s marked failed (finished_at NULL, logs a statement timeout); %s pre-built as %s; %d _prisma_migrations rows, %d finished",
 		damageFolder, damageIndex, dmg.plantedIndex, dmg.plantedRows, dmg.finishedRows))
@@ -138,15 +141,11 @@ func (dmg *damageState) classify(step, text string) (damageRefusal, bool) {
 	if _, handled := dmg.refusal(kind); handled {
 		return damageRefusal{}, false
 	}
-	before := dmg.finishedRows
-	if row, fixed := dmg.refusal(damageKindRow); fixed && row.FixErr == "" {
-		before++ // the operator recorded the failed folder applied
-	}
 	code, _, _ := strings.Cut(text, ":")
 	if !strings.HasPrefix(step, "run:") {
 		code = ""
 	}
-	return damageRefusal{Kind: kind, Step: step, Text: text, Code: code, FinishedRowsBefore: before}, true
+	return damageRefusal{Kind: kind, Step: step, Text: text, Code: code, PrismaRowsBefore: dmg.rowsNow, FinishedRowsBefore: dmg.finishedNow}, true
 }
 
 func (dmg *damageState) refusal(kind string) (*damageRefusal, bool) {
@@ -176,6 +175,7 @@ func (cell *run) handleRefusal(ctx context.Context, seen damageRefusal) {
 	lastRun, _ := psql(ctx, cell.stores.psqlURL(), `SELECT coalesce(max(started_at)::text, '-infinity') FROM mydb_upgrade_ledger._langwatch_upgrade_run`)
 	seen.Fix, seen.FixErr = cell.fixDamage(ctx, kind)
 	fixedAt := time.Now()
+	cell.damage.rowsNow, cell.damage.finishedNow = cell.prismaRowCounts(ctx)
 	rerun := func() bool {
 		left, _ := psql(ctx, cell.stores.psqlURL(), `SELECT count(*) FROM mydb_upgrade_ledger._langwatch_upgrade_run WHERE started_at > '`+strings.TrimSpace(lastRun)+`'`)
 		return strings.TrimSpace(left) != "0"
@@ -298,11 +298,11 @@ func judgeRefusal(dmg *damageState, c refusalCase, ready bool) Verdict {
 	}
 	held := r.ReadyzWhile != 200 && !r.SwitchedWhile
 	// Refused before any folder applied, and nothing of the operator's dropped.
-	kept := r.PrismaRowsWhile == dmg.plantedRows && r.FinishedRowsWhile == r.FinishedRowsBefore && (c.kind == damageKindRow || r.IndexWhile == dmg.plantedIndex)
+	kept := r.PrismaRowsWhile == r.PrismaRowsBefore && r.FinishedRowsWhile == r.FinishedRowsBefore && (c.kind == damageKindRow || r.IndexWhile == dmg.plantedIndex)
 	pass := len(missing) == 0 && held && kept && r.FixErr == "" && ready && c.endOK
 	return Verdict{ID: c.id, Name: c.name, Result: passText(pass), Detail: fmt.Sprintf(
-		"refused on %s at %d ms: %q; missing from the text: %v; while refused /readyz %d, switched %t, prisma rows %d (planted %d), finished %d (before %d), index %s; operator fix %q %s; rerun %s, %d ms after the fix; ready %t; at the end: %s",
-		r.Step, r.AtMs, r.Text, missing, r.ReadyzWhile, r.SwitchedWhile, r.PrismaRowsWhile, dmg.plantedRows, r.FinishedRowsWhile, r.FinishedRowsBefore, r.IndexWhile, r.Fix, r.FixErr, r.RerunHow, r.RerunMs, ready, c.end)}
+		"refused on %s at %d ms: %q; missing from the text: %v; while refused /readyz %d, switched %t, prisma rows %d (before %d), finished %d (before %d), index %s; operator fix %q %s; rerun %s, %d ms after the fix; ready %t; at the end: %s",
+		r.Step, r.AtMs, r.Text, missing, r.ReadyzWhile, r.SwitchedWhile, r.PrismaRowsWhile, r.PrismaRowsBefore, r.FinishedRowsWhile, r.FinishedRowsBefore, r.IndexWhile, r.Fix, r.FixErr, r.RerunHow, r.RerunMs, ready, c.end)}
 }
 
 func judgeWhileRefused(dmg *damageState) Verdict {

@@ -8,10 +8,10 @@ import (
 
 func refusedAndFixed() damageState {
 	planted := `CREATE INDEX "` + damageIndex + `" ON mydb."AuditLog" USING btree ("createdAt")`
-	row := damageRefusal{Kind: damageKindRow, Step: "prisma:" + damageFolder, ReadyzWhile: 503, PrismaRowsWhile: 346, FinishedRowsBefore: 345, FinishedRowsWhile: 345,
+	row := damageRefusal{Kind: damageKindRow, Step: "prisma:" + damageFolder, ReadyzWhile: 503, PrismaRowsWhile: 346, PrismaRowsBefore: 346, FinishedRowsBefore: 345, FinishedRowsWhile: 345,
 		Text:      "Prisma migration " + damageFolder + " failed ... in packages/prisma-client with DATABASE_URL set, run \"prisma migrate resolve --rolled-back " + damageFolder + "\"",
 		StatusOut: "failed prisma:" + damageFolder, RerunHow: "on its own", IndexWhile: planted}
-	index := damageRefusal{Kind: damageKindIndex, Step: "run:x", Code: "prebuilt_index_differs", ReadyzWhile: 503, PrismaRowsWhile: 346, FinishedRowsBefore: 346, FinishedRowsWhile: 346,
+	index := damageRefusal{Kind: damageKindIndex, Step: "run:x", Code: "prebuilt_index_differs", ReadyzWhile: 503, PrismaRowsWhile: 347, PrismaRowsBefore: 347, FinishedRowsBefore: 346, FinishedRowsWhile: 346,
 		Text: "prebuilt_index_differs: index \"" + damageIndex + "\" on \"AuditLog\" ... It should be: x. It is: y. Drop or rename it; nothing drops it for you.", StatusOut: damageIndex, RerunHow: "on its own", IndexWhile: planted}
 	return damageState{plantedRows: 346, finishedRows: 345, plantedIndex: planted, refusals: []damageRefusal{row, index},
 		finalIndex: damageWantIndex, finalFolder: "1 applied, 0 failed"}
