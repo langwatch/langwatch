@@ -92,6 +92,32 @@ Feature: Projection replay from the operator console
     Then the replay carries that table for its post-rebuild OPTIMIZE
     And a map declaring no table names none
 
+  # The history keeps only the newest runs; a page continues over what is retained, never beyond it.
+  @unit @replay
+  Scenario: The replay history continues page by page, newest first, to its end
+    Given the retained history holds more runs than one page
+    When an operator reads a page and then each page after it by the cursor it returned
+    Then every retained run appears exactly once, in the order the full history lists them
+    And only the last page says there is no more
+
+  @unit @replay
+  Scenario: A run finishing between two pages does not repeat or skip a run
+    Given an operator has read the first page of the history
+    When another run finishes and joins the history before they read the next page
+    Then the next page continues after the last run they saw
+
+  @unit @replay
+  Scenario: A cursor whose run has left the retained history asks the reader to restart
+    Given a cursor naming a run that is no longer retained
+    When an operator reads the page it names
+    Then the answer is cursor_expired and carries no runs
+
+  @unit @replay
+  Scenario: Reading the history by page is an operator view, like reading it whole
+    Given a caller without the platform view permission
+    When they read a page of the replay history
+    Then they are refused and no history is read
+
   # The event explorer reads through the routed ClickHouse member itself (ARCHITECTURE §7).
   @unit @replay
   Scenario: One aggregate's history reads its tenant's server, a cross-tenant search the shared one
