@@ -360,6 +360,19 @@ func expectedWhileStepsRun(record BrowserRecord, switched, ready int64) bool {
 		strings.Contains(record.Text, "upgrade_in_progress") && switched >= 0 && ready >= 0 && record.AtMs >= switched && record.AtMs <= ready
 }
 
+// consoleTwinOf503: the console line Chromium writes for a failed load names no url or code, so it is
+// matched by status and window only, and capped at the number of expected 503s it echoes.
+func consoleTwinOf503(record BrowserRecord, switched, ready int64) bool {
+	return record.Kind == "console" && strings.Contains(record.Text, "status of 503") && switched >= 0 && ready >= 0 &&
+		record.AtMs >= switched && record.AtMs <= ready
+}
+
+// stopStartDowntime: a stop-start install serves nothing between the old release stopping and head's api
+// answering (the walker's "down" phase), so the balancer's 502s and the loads they abort are expected there.
+func stopStartDowntime(record BrowserRecord, stopStart bool) bool {
+	return stopStart && record.Phase == "down" && slices.Contains([]string{"console", "http", "requestfailed"}, record.Kind)
+}
+
 // mainTabAcrossSwitch: main's UI, loaded before the switch, reconnects its tRPC WebSocket to head, which
 // serves none and whose UI opens none; tolerated for a minute after the switch, a finding after that.
 func mainTabAcrossSwitch(record BrowserRecord, switched int64) bool {
@@ -404,25 +417,38 @@ var acceptedBrowserNoise = []browserNoise{
 }
 
 // BrowserFindings reads browser.jsonl: the walks completed and every error outside the accepted list.
-func BrowserFindings(path string, switched, ready int64) (walks, expected int, tolerated map[string]int, findings []BrowserRecord, err error) {
+func BrowserFindings(path string, switched, ready int64, stopStart bool) (walks, expected int, tolerated map[string]int, findings []BrowserRecord, err error) {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return 0, 0, nil, nil, err
 	}
 	tolerated = map[string]int{}
+	var records []BrowserRecord
+	twins := 0 // the browser echoes each failed load as a console line naming no url: one per expected 503
 	for _, line := range strings.Split(string(data), "\n") {
 		var record BrowserRecord
 		if strings.TrimSpace(line) == "" || json.Unmarshal([]byte(line), &record) != nil {
 			continue
 		}
+		records = append(records, record)
+		if expectedWhileStepsRun(record, switched, ready) {
+			twins++
+		}
+	}
+	for _, record := range records {
 		switch {
 		case record.Kind == "walk":
 			walks++
 		case expectedWhileStepsRun(record, switched, ready):
 			expected++
+		case twins > 0 && consoleTwinOf503(record, switched, ready):
+			twins--
+			tolerated["console 'status of 503' (the browser's echo of an expected upgrade_in_progress 503)"]++
 		case record.Kind == "walkerror":
 		case record.Kind == "navigated":
 			tolerated["the open tab navigated on its own between walks (told to reload)"]++
+		case stopStartDowntime(record, stopStart):
+			tolerated["502 or aborted load while no release serves (self-hosted stop-start downtime, T4-F3)"]++
 		case mainTabAcrossSwitch(record, switched):
 			tolerated["/api/trpc-ws (main's tab, open across the switch, reconnecting)"]++
 		case mainPageAcrossSwitch(record, switched):

@@ -111,6 +111,13 @@ Feature: Every deployment upgrades to head with the api serving and nothing drop
     And a call answered upgrade_in_progress is retried after Retry-After and counted with its retry window
 
   @unit
+  Scenario: A stop-start install's starting api is waited out as downtime, a rolling deploy's is a non-2xx
+    Given a self-hosted install stops its old release before head's api starts
+    When head's api answers 503 "is starting" with Retry-After while it boots
+    Then the call waits out Retry-After and counts the answer as downtime, not as a non-2xx
+    And on a rolling deploy the same answer stays a non-2xx
+
+  @unit
   Scenario: A cell claims its ledger row and reports its verdict to it
     Given a cell run with a tested-flow ledger row named
     When the cell starts and when it ends

@@ -36,7 +36,7 @@ func TestBrowserFindingsCountsWalksAndHonoursTheAcceptedList(t *testing.T) {
 	saved := acceptedBrowserNoise
 	acceptedBrowserNoise = []browserNoise{{[]string{"ok-noise"}, "test"}}
 	defer func() { acceptedBrowserNoise = saved }()
-	walks, _, _, findings, err := BrowserFindings(path, -1, -1)
+	walks, _, _, findings, err := BrowserFindings(path, -1, -1, false)
 	if err != nil || walks != 1 || len(findings) != 1 || findings[0].Text != "boom" {
 		t.Errorf("walks %d findings %+v err %v", walks, findings, err)
 	}
@@ -88,7 +88,7 @@ func TestBrowserFindingsCountsThirdPartyNoiseApart(t *testing.T) {
 		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_BLOCKED_BY_ORB"}` + "\n" +
 		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_FAILED"}` + "\n"
 	_ = os.WriteFile(path, []byte(lines), 0o600)
-	_, _, tolerated, findings, err := BrowserFindings(path, -1, -1)
+	_, _, tolerated, findings, err := BrowserFindings(path, -1, -1, false)
 	if err != nil || len(findings) != 1 || findings[0].Text != "net::ERR_FAILED" || len(tolerated) != 2 {
 		t.Errorf("findings %+v tolerated %v err %v", findings, tolerated, err)
 	}
@@ -169,5 +169,33 @@ func TestMainClientOutdatedIsWindowedEnvelopeRefusal(t *testing.T) {
 		if mainClientOutdated(record, 1_000) {
 			t.Errorf("%s tolerated", name)
 		}
+	}
+}
+
+// @scenario "A stop-start install's downtime 502s are tolerated, a rolling deploy's are findings"
+func TestStopStartDowntimeIsToleratedOnlyWhileDown(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "browser.jsonl")
+	lines := `{"phase":"down","kind":"http","url":"http://x/ops/upgrades","status":502}` + "\n" +
+		`{"phase":"down","kind":"requestfailed","url":"http://x/assets/a.js","text":"net::ERR_ABORTED"}` + "\n" +
+		`{"phase":"ready","kind":"http","url":"http://x/ops/upgrades","status":502}` + "\n"
+	_ = os.WriteFile(path, []byte(lines), 0o600)
+	_, _, tolerated, findings, err := BrowserFindings(path, -1, -1, true)
+	if err != nil || len(findings) != 1 || findings[0].Phase != "ready" || len(tolerated) != 1 {
+		t.Errorf("stop-start: findings %+v tolerated %v err %v", findings, tolerated, err)
+	}
+	if _, _, _, findings, _ := BrowserFindings(path, -1, -1, false); len(findings) != 3 {
+		t.Errorf("rolling: %d findings, want 3", len(findings))
+	}
+}
+
+// @scenario "The console echo of an expected upgrade_in_progress 503 is counted apart, one per 503"
+func TestConsoleTwinOfAnExpected503IsCappedByThe503s(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "browser.jsonl")
+	expected503 := `{"atMs":50,"kind":"http","status":503,"retryAfter":"10","text":"{\"error\":{\"message\":\"upgrade_in_progress\"}}"}`
+	echo := `{"atMs":51,"kind":"console","text":"Failed to load resource: the server responded with a status of 503 (Service Unavailable)"}`
+	_ = os.WriteFile(path, []byte(expected503+"\n"+echo+"\n"+echo+"\n"), 0o600)
+	_, expected, tolerated, findings, err := BrowserFindings(path, 10, 100, false)
+	if err != nil || expected != 1 || len(tolerated) != 1 || len(findings) != 1 {
+		t.Errorf("expected %d tolerated %v findings %+v err %v", expected, tolerated, findings, err)
 	}
 }

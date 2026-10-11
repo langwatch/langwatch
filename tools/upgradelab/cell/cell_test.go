@@ -125,6 +125,31 @@ func TestUpgradeInProgressIsRetriedAfterRetryAfter(t *testing.T) {
 	}
 }
 
+// @scenario "A stop-start install's starting api is waited out as downtime, a rolling deploy's is a non-2xx"
+func TestStartingAnswerIsDowntimeOnlyInStopStart(t *testing.T) {
+	for _, stopStart := range []bool{true, false} {
+		var answered atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if answered.Add(1) == 1 {
+				w.Header().Set("Retry-After", "1")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte("langwatch-api is starting"))
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		traffic := &Traffic{Client: Client{URL: server.URL}, Hold: 5 * time.Second, Origin: time.Now(), http: server.Client(), RetryUnanswered: stopStart}
+		call := traffic.one(context.Background(), Kind{Name: "rest-read", Do: restRead}, 0)
+		server.Close()
+		if stopStart && (call.Status != http.StatusOK || call.Gap != 1 || call.NonOK != 0) {
+			t.Errorf("stop-start: call = %+v, want 200 after waiting out the start, no non-2xx", call)
+		}
+		if !stopStart && (call.Status != http.StatusServiceUnavailable || call.NonOK != 1) {
+			t.Errorf("rolling: call = %+v, want the 503 kept as a non-2xx", call)
+		}
+	}
+}
+
 // @scenario "Traffic is seeded and judged per kind and per api phase"
 func TestQueueKindsGroupWaitingJobs(t *testing.T) {
 	out := "{event-sourcing/jobs}:gq:group:p1/fold/traceSummary/reactor/deferredOriginResolution/trace:a:jobs 1 1000 1000\n" +

@@ -580,7 +580,7 @@ func (cell *run) targetsVerdict(ctx context.Context) Verdict {
 
 // browserVerdict: the signed-in walk saw no console error and no failed request outside the accepted list.
 func (cell *run) browserVerdict() Verdict {
-	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], FirstAt(cell.report.Phases, "ready"))
+	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], FirstAt(cell.report.Phases, "ready"), cell.profile.StopStart)
 	if err != nil || walks == 0 {
 		return Verdict{ID: "B1", Name: invariantNames["B1"], Result: "inconclusive", Detail: fmt.Sprintf("%d completed walks; %s", walks, errText(err))}
 	}
