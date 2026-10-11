@@ -74,7 +74,11 @@ const LANE_IDLE_MS = Number(process.env.HAVEN_BROWSER_LANE_IDLE_MS ?? 10 * 60_00
 /** An idle lane's page is closed (its renderer freed) and reopened on the lane's next verb. */
 const LANE_UNLOAD_MS = Number(process.env.HAVEN_BROWSER_LANE_UNLOAD_MS ?? 2 * 60_000);
 const MAX_LANES = Number(process.env.HAVEN_BROWSER_MAX_LANES ?? 24);
-const MAX_RSS_MB = Number(process.env.HAVEN_BROWSER_MAX_RSS_MB ?? 8192);
+/** haven's browser-memory-mb limit, handed over by the haven that starts this daemon. */
+const MAX_RSS_MB = Number(process.env.HAVEN_BROWSER_MAX_RSS_MB ?? 4096);
+/** Above this share of the limit idle pages are unloaded, least recently used first. */
+const UNLOAD_ABOVE_MB = Math.round(MAX_RSS_MB * 0.75);
+const PRESSURE_CHECK_MS = 15_000;
 const MAX_BUSY = Number(process.env.HAVEN_BROWSER_MAX_PAGES ?? 6);
 const READY_LINE = '"msg":"backend ready"';
 const RECYCLING_LINE = '"msg":"backend recycling"';
@@ -170,6 +174,8 @@ type Lane = {
   /** `--lean`: images, fonts and media blocked, animations off. */
   lean: boolean;
   leanRoute: (route: Route) => Promise<void>;
+  /** When the lane last ran a verb: memory pressure unloads the oldest first. */
+  usedAt: number;
 };
 const lanes = new Map<string, Lane>();
 const netEntries = new WeakMap<PwRequest, NetEntry>();
@@ -401,14 +407,10 @@ async function laneFor({
       `the browser already holds ${MAX_LANES} lanes; close one (haven browser close --lane <name>)`,
     );
   }
-  let rss = await treeRssMb();
-  if (rss > MAX_RSS_MB) {
-    for (const idle of lanes.values()) await unloadPage({ lane: idle });
-    rss = await treeRssMb();
-  }
+  const rss = await relieveMemory({ aboveMb: UNLOAD_ABOVE_MB });
   if (rss > MAX_RSS_MB) {
     throw new Error(
-      `the browser uses ${Math.round(rss)} MB (ceiling ${MAX_RSS_MB} MB): refusing a new lane; close one (haven browser close --lane <name>)`,
+      `the browser uses ${Math.round(rss)} MB, over its ${MAX_RSS_MB} MB limit (browser-memory-mb) after unloading idle pages: refusing a new lane; close one (haven browser close --lane <name>) or raise it (haven machine limits set browser-memory-mb <MB>)`,
     );
   }
   // A lane keeps its session across daemons: the stack allows 30 sign-ins per 15 minutes.
@@ -446,6 +448,7 @@ async function laneFor({
     lean: false,
     leanRoute,
     busy: 0,
+    usedAt: Date.now(),
   };
   watchLane({ lane });
   lanes.set(key, lane);
@@ -473,6 +476,7 @@ function scheduleExit() {
 }
 
 function touch({ lane }: { lane: Lane }) {
+  lane.usedAt = Date.now();
   clearTimeout(exitTimer);
   clearTimeout(lane.idle);
   lane.idle = setTimeout(() => {
@@ -485,13 +489,39 @@ function touch({ lane }: { lane: Lane }) {
 }
 
 /** Closes an idle lane's page, keeping its context (cookies, storage, routes, lean). */
-async function unloadPage({ lane }: { lane: Lane }) {
+async function unloadPage({ lane, why }: { lane: Lane; why?: string }) {
   if (lane.busy || lane.unloadedFrom || lane.webauthn || profiling?.key === lane.key) return;
   if (lanes.get(lane.key) !== lane) return;
   lane.unloadedFrom = lane.page.url();
-  console.error(`lane ${lane.key} page unloaded after idling ${LANE_UNLOAD_MS} ms`);
+  console.error(`lane ${lane.key} page unloaded ${why ?? `after idling ${LANE_UNLOAD_MS} ms`}`);
   await lane.page.close().catch(() => undefined);
 }
+
+/** Unloads idle pages, least recently used first, until the tree is at or under aboveMb. */
+async function relieveMemory({ aboveMb }: { aboveMb: number }): Promise<number> {
+  let rss = await treeRssMb();
+  const oldestFirst = [...lanes.values()].toSorted((a, b) => a.usedAt - b.usedAt);
+  for (const lane of oldestFirst) {
+    if (rss <= aboveMb) break;
+    if (lane.busy || lane.unloadedFrom) continue;
+    await unloadPage({
+      lane,
+      why: `under memory pressure (${Math.round(rss)} MB, limit ${MAX_RSS_MB} MB)`,
+    });
+    rss = await treeRssMb();
+  }
+  return rss;
+}
+
+let relieving = false;
+const pressureTimer = setInterval(() => {
+  if (relieving || lanes.size === 0) return;
+  relieving = true;
+  void relieveMemory({ aboveMb: UNLOAD_ABOVE_MB })
+    .catch(() => undefined)
+    .finally(() => (relieving = false));
+}, PRESSURE_CHECK_MS);
+pressureTimer.unref();
 
 /** A new page for an unloaded lane, back at the url it was on. */
 async function reopenPage({ lane, timeout }: { lane: Lane; timeout: number }) {
@@ -1311,7 +1341,7 @@ async function totpFill({ lane, body, timeout }: { lane: Lane; body: Request; ti
 }
 
 /** `status`: the machine's browser, with this stack's lanes by name and every stack's by key. */
-function status({ body }: { body: Request }) {
+async function status({ body }: { body: Request }) {
   const slug = body.stack?.slug;
   const all = [...lanes.values()];
   const mine = slug ? all.filter((lane) => lane.stack.slug === slug) : all;
@@ -1319,6 +1349,9 @@ function status({ body }: { body: Request }) {
     running: true,
     pid: process.pid,
     protocol: PROTOCOL,
+    memoryMb: Math.round(await treeRssMb()),
+    limitMb: MAX_RSS_MB,
+    unloadAboveMb: UNLOAD_ABOVE_MB,
     lanes: mine.map((lane) => (slug ? lane.name : lane.key)),
     all: all.map((lane) => lane.key),
   };

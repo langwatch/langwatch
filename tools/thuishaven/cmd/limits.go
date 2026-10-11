@@ -169,3 +169,9 @@ func printLimits(asJSON bool) error {
 	fmt.Println("\nPrecedence: environment > .env > settings file > default.")
 	return nil
 }
+
+// browserMemoryMB is the shared browser's one memory limit, resolved through
+// the same layers as every catalog limit; the daemon and the governor both read it.
+func browserMemoryMB() int {
+	return limitValue(limitsReport(), domain.LimitBrowserMemory).Value
+}

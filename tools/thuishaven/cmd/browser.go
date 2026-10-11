@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/atomicfile"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // The `haven browser` noun: one light headless browser per machine (Playwright's
@@ -383,20 +384,57 @@ func browserControl(o browserControlOptions) error {
 	if !ok {
 		reply = map[string]any{"running": false}
 	}
+	limitMB := browserMemoryMB()
+	killMB := int(domain.BrowserKillRSS(limitMB) >> 20)
+	if o.verb == "status" {
+		reply["governorKillMb"] = killMB
+		if _, has := reply["limitMb"]; !has {
+			reply["limitMb"] = limitMB
+		}
+	}
 	if o.asJSON {
 		return json.NewEncoder(os.Stdout).Encode(reply)
 	}
 	switch {
 	case !ok:
 		fmt.Println("no browser running on this machine")
+		fmt.Println(browserMemory{usedMB: -1, limitMB: limitMB, killAboveMB: killMB}.line())
 	case o.verb == "stop" && reply["stopped"] == true:
 		fmt.Println("browser stopped")
 	case o.verb == "stop":
 		fmt.Printf("closed this stack's lanes %v; the browser exits once no lane is left\n", reply["closed"])
 	default:
 		fmt.Printf("browser pid %d (machine-wide), this stack's lanes %v, every lane %v\n", daemon.PID, reply["lanes"], reply["all"])
+		memoryMB, _ := reply["memoryMb"].(float64)
+		unloadMB, _ := reply["unloadAboveMb"].(float64)
+		fmt.Println(browserMemory{usedMB: int(memoryMB), limitMB: daemonLimitMB(reply, limitMB), unloadAboveMB: int(unloadMB), killAboveMB: killMB}.line())
 	}
 	return nil
+}
+
+// daemonLimitMB is the limit the running daemon was started with, else haven's own.
+func daemonLimitMB(reply map[string]any, fallback int) int {
+	if n, ok := reply["limitMb"].(float64); ok && n > 0 {
+		return int(n)
+	}
+	return fallback
+}
+
+// browserMemory is status's memory line: use against the one limit, where the
+// daemon unloads pages (0 when an older daemon does not say) and where haven's
+// governor kills (from haven's own limit). usedMB below zero: no browser running.
+type browserMemory struct{ usedMB, limitMB, unloadAboveMB, killAboveMB int }
+
+func (m browserMemory) line() string {
+	if m.usedMB < 0 {
+		return fmt.Sprintf("memory limit %d MB (%s); haven kills the browser above %d MB", m.limitMB, domain.LimitBrowserMemory, m.killAboveMB)
+	}
+	unload := ""
+	if m.unloadAboveMB > 0 {
+		unload = fmt.Sprintf("idle pages unload above %d MB, ", m.unloadAboveMB)
+	}
+	return fmt.Sprintf("memory %d MB of the %d MB limit (%s): %snew lanes are refused above the limit, haven kills the browser above %d MB",
+		m.usedMB, m.limitMB, domain.LimitBrowserMemory, unload, m.killAboveMB)
 }
 
 // stopBrowser closes slug's lanes in the machine's browser; `haven down` calls it.
@@ -546,7 +584,8 @@ func startBrowser(ctx context.Context, s browserStart) (browserDaemon, error) {
 	web := filepath.Join(s.worktree, "apps", "haven-web")
 	child := exec.Command("node", filepath.Join(web, "scripts", "browser-daemon.ts"))
 	child.Dir = web
-	child.Env = append(append(os.Environ(), "HAVEN_BROWSER_TOKEN="+daemon.Token), s.legacyEnv...)
+	child.Env = append(append(os.Environ(), "HAVEN_BROWSER_TOKEN="+daemon.Token,
+		fmt.Sprintf("%s=%d", domain.BrowserMemoryEnv, browserMemoryMB())), s.legacyEnv...)
 	child.Stderr = logFile
 	child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	stdout, err := child.StdoutPipe()

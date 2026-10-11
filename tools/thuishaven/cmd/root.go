@@ -64,12 +64,11 @@ func tsgoLimits(ram uint64) domain.TsgoLimits {
 }
 
 // browserLimits resolves the headless browser governor's knobs with env
-// overrides; 0 disables a rule, HAVEN_BROWSER_SHELL_MAX_RSS_MB=0 the governor.
+// overrides (0 disables a rule). Its memory ceiling is the browser-memory-mb
+// limit plus headroom, so the daemon refuses lanes long before a kill.
 func browserLimits() domain.BrowserLimits {
 	l := domain.DefaultBrowserLimits()
-	if mb := envInt("HAVEN_BROWSER_SHELL_MAX_RSS_MB", -1); mb >= 0 {
-		l.MaxRSS = int64(mb) << 20
-	}
+	l.MaxRSS = domain.BrowserKillRSS(browserMemoryMB())
 	if pct := envInt("HAVEN_BROWSER_SHELL_MAX_CPU_PCT", -1); pct >= 0 {
 		l.MaxCPU = float64(pct)
 	}

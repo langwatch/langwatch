@@ -74,6 +74,11 @@ var Limits = []Limit{
 		max: func(m LimitMachine) int { return m.NumCPU },
 	},
 	{
+		Name: LimitBrowserMemory, Env: BrowserMemoryEnv, Unit: "MB", Min: 1024,
+		def: func(m LimitMachine) int { return DefaultBrowserMemoryMB(m.TotalRAMBytes) },
+		max: func(m LimitMachine) int { return m.ramMB() / 2 },
+	},
+	{
 		Name: LimitInstantEvalMockJudge, Env: InstantEvalMockJudgeEnv, Unit: "on", Min: 0,
 		def: func(LimitMachine) int { return 0 },
 		max: func(LimitMachine) int { return 1 },
@@ -188,6 +193,8 @@ func limitApplies(name, profile string, values map[string]int) string {
 		return "when the observability stack next restarts (native: `haven down` then `haven up`; container: when it is recreated)"
 	case LimitRedisMaxMemory:
 		return "next `haven up`, which runs `config set maxmemory`"
+	case LimitBrowserMemory:
+		return "when the shared browser next starts (haven browser stop --all, or once its lanes close); haven's watchdog when the haven daemon restarts"
 	case LimitInstantEvalMockJudge:
 		return "when the stack is next brought up (haven down, then haven up), on a modular checkout only"
 	case LimitColimaCPUs, LimitColimaMemory:
