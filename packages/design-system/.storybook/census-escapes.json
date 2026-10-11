@@ -1725,5 +1725,245 @@
     "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
     "owner": "project",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/agent-testing/drawers/run-verdict-panel.tsx",
+    "rule": "card-box",
+    "line": 327,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/agent-testing/drawers/run-verdict-panel.tsx",
+    "rule": "card-box",
+    "line": 611,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/agent-testing/shared/evaluator-pill.tsx",
+    "rule": "card-box",
+    "line": 135,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/agent-testing/shared/mini-bar-card.tsx",
+    "rule": "card-box",
+    "line": 140,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/agent-testing/suite/suite-fields-section.tsx",
+    "rule": "card-box",
+    "line": 131,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/media-part-placeholder.tsx",
+    "rule": "card-box",
+    "line": 42,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/scenario-library-controls.tsx",
+    "rule": "card-box",
+    "line": 89,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/scenario-welcome.tsx",
+    "rule": "page-title-size",
+    "line": 62,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/suite/dialogs/suite-context-menu.tsx",
+    "rule": "card-box",
+    "line": 40,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/suite/pickers/scenario-picker.tsx",
+    "rule": "card-box",
+    "line": 174,
+    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "native-table",
+    "line": 199,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 200,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 201,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 207,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 210,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 212,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 214,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 223,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 225,
+    "reason": "Approved: the protected dataset preview table with rich cells (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 61,
+    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 70,
+    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 71,
+    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 72,
+    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 74,
+    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 75,
+    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 99,
+    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "card-box",
+    "line": 171,
+    "reason": "Not a plain card: a protected table frame, cell editor popup, diff well, icon tile, popover trigger or picker row (R9p1 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/dataset/floating-cell-editor.tsx",
+    "rule": "card-box",
+    "line": 143,
+    "reason": "Not a plain card: a protected table frame, cell editor popup, diff well, icon tile, popover trigger or picker row (R9p1 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/prompts/version-changes.tsx",
+    "rule": "card-box",
+    "line": 31,
+    "reason": "Not a plain card: a protected table frame, cell editor popup, diff well, icon tile, popover trigger or picker row (R9p1 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/workflow/workflow-icons.tsx",
+    "rule": "card-box",
+    "line": 90,
+    "reason": "Not a plain card: a protected table frame, cell editor popup, diff well, icon tile, popover trigger or picker row (R9p1 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/llm-parameters/parameter-row.tsx",
+    "rule": "card-box",
+    "line": 92,
+    "reason": "Not a plain card: a protected table frame, cell editor popup, diff well, icon tile, popover trigger or picker row (R9p1 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-list-drawer.tsx",
+    "rule": "card-box",
+    "line": 301,
+    "reason": "Not a plain card: a protected table frame, cell editor popup, diff well, icon tile, popover trigger or picker row (R9p1 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
   }
 ]
