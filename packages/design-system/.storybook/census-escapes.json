@@ -905,5 +905,13 @@
     "reason": "Protected instant-evaluation surface kept as today (astra review try-it-out.md).",
     "owner": "evaluator",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/coding-agent/browser/src/ui/sections/pull-requests-table.tsx",
+    "rule": "empty-text",
+    "line": 717,
+    "reason": "False positive: the No PR yet status value in a cell, not an empty state (R4a2 review).",
+    "owner": "coding-agent",
+    "disposition": "reviewed"
   }
 ]

@@ -146,7 +146,7 @@ const listedNumbers = () =>
 
 /** The heading cell a sortable column announces its state on. */
 const headingFor = (label: string) =>
-  screen.getByRole("button", { name: `Sort by ${label}` }).closest("th") as HTMLElement;
+  screen.getByRole("button", { name: label }).closest("th") as HTMLElement;
 
 /**
  * Waits until the period popover is off the screen: the trigger repeats the
@@ -356,7 +356,7 @@ describe("the personal Pull Requests table", () => {
       const chip = screen.getByText("Open");
       expect(chip).toHaveAttribute("data-status-source", "live");
       expect(screen.getByText("Link sessions to pull requests")).toBeInTheDocument();
-      expect(screen.getByText("10.0K")).toBeInTheDocument();
+      expect(screen.getByText("10K")).toBeInTheDocument();
       expect(screen.getByText("$12.50")).toBeInTheDocument();
     });
 
@@ -515,7 +515,7 @@ describe("the personal Pull Requests table", () => {
       const user = userEvent.setup();
       renderTable();
 
-      const trigger = screen.getByText("10.0K").closest("[tabindex]");
+      const trigger = screen.getByText("10K").closest("[tabindex]");
       expect(trigger).toHaveAttribute("tabindex", "0");
       await tabTo({ user, element: trigger as HTMLElement });
 
@@ -559,7 +559,7 @@ describe("the personal Pull Requests table", () => {
       const opening = listedNumbers();
       expect(opening).toEqual(["#4220", "#4219", "#4218"]);
 
-      const tokens = screen.getByRole("button", { name: "Sort by Tokens" });
+      const tokens = screen.getByRole("button", { name: "Tokens" });
       await tabTo({ user, element: tokens });
       expect(document.activeElement).toBe(tokens);
 

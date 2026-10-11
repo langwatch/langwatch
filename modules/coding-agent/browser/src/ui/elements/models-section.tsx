@@ -1,11 +1,12 @@
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
+import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import type { DetailPayload } from "../../model/pull-request-detail.ts";
 import { MISSING_VALUE } from "./cells/missing-value.tsx";
-import { EmptySection, Section } from "./detail-section.tsx";
+import { Section } from "./detail-section.tsx";
 
 type ModelUsage = DetailPayload["modelBreakdown"][number];
 
@@ -53,6 +54,14 @@ const ModelRow: React.FC<{ model: ModelUsage; peak: number }> = ({ model, peak }
   </VStack>
 );
 
+const MODELS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How usage is attributed",
+    href: "https://docs.langwatch.ai/coding-agents/repository-and-pr-attribution",
+  },
+];
+
 /** What each model consumed, heaviest first. */
 export const ModelsSection: React.FC<{
   models: DetailPayload["modelBreakdown"];
@@ -61,7 +70,11 @@ export const ModelsSection: React.FC<{
   return (
     <Section title="Models">
       {models.length === 0 ? (
-        <EmptySection>No model data for this pull request yet</EmptySection>
+        <NoDataInfoBlock
+          size="line"
+          title="No model data for this pull request yet"
+          next={MODELS_NEXT}
+        />
       ) : (
         <VStack align="stretch" gap={3}>
           {models.map((model) => (
