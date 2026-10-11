@@ -4618,13 +4618,6 @@
     "disposition": "reviewed"
   },
   {
-    "path": "modules/trace/browser/src/ui/sections/datasets/add-dataset-record-drawer.tsx",
-    "rule": "local-copy",
-    "line": 255,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
     "path": "modules/trace/browser/src/ui/sections/dialog.tsx",
     "rule": "raw-export",
     "line": 61,
@@ -4679,14 +4672,6 @@
     "line": 97,
     "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
     "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/keyboard-shortcuts-help.tsx",
-    "rule": "card-box",
-    "line": 86,
-    "reason": "Kept as today: an illustration row or accent-banded shortcut tile (R11h review).",
-    "owner": "trace",
-    "disposition": "reviewed"
   },
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/column-education-dialog.tsx",
@@ -6042,13 +6027,6 @@
     "line": 125,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/sections/explorer/onboarding/integrate-drawer.tsx",
-    "rule": "local-copy",
-    "line": 111,
-    "reason": "Approved: the local drawer carries Langy dock behaviour the shared drawer lacks (LEFTOVER-1 review).",
-    "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/sections/onboarding/observability/install-preview.tsx",
