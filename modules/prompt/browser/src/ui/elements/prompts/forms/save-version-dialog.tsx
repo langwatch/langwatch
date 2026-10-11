@@ -35,7 +35,7 @@ export function SaveVersionDialog({
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting, isDirty },
+    formState: { errors, isSubmitting },
     reset,
   } = useForm<z.infer<typeof saveVersionFormSchema>>({
     defaultValues: {
@@ -79,7 +79,7 @@ export function SaveVersionDialog({
               void handleSubmit(submitCallback)();
             }}
           >
-            <Field.Root>
+            <Field.Root invalid={!!errors.commitMessage}>
               <Field.Label>Description</Field.Label>
               <Input
                 placeholder="Enter a description for this version"
@@ -105,7 +105,6 @@ export function SaveVersionDialog({
             data-testid="prompt-save-version-submit"
             onClick={() => void handleSubmit(submitCallback)()}
             loading={isSubmitting}
-            disabled={!isDirty}
           >
             {nextVersion !== undefined ? `Update to v${nextVersion}` : "Save"}
           </Button>
