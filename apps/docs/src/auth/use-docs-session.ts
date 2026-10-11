@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
+import { docsSessionMode } from "../config.ts";
 import { createDocsSession } from "./session-config.ts";
 import type { DocsSessionController, SessionView } from "./session-controller.ts";
 import { DocsSessionError } from "./token-provider.ts";
 
 export function useDocsSession() {
-  const [controller] = useState(() =>
-    createDocsSession({ mode: import.meta.env.VITE_DOCS_SESSION_AUTH }),
-  );
+  const [controller] = useState(() => createDocsSession({ mode: docsSessionMode }));
   const [selected, setSelected] = useState(false);
   const [view, setView] = useState<SessionView>({ kind: "disconnected" });
   const pending = useRef<AbortController | null>(null);

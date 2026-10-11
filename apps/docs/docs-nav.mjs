@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { parse } from "yaml";
 
@@ -188,13 +189,13 @@ const STARS_URL = "https://api.github.com/repos/langwatch/langwatch";
 
 /** Keep the last known star count when GitHub is unavailable. */
 let starsRead;
-function readStars({ docsRoot }) {
-  starsRead ??= fetchStars({ docsRoot });
+function readStars() {
+  starsRead ??= fetchStars();
   return starsRead;
 }
 
-async function fetchStars({ docsRoot }) {
-  const cacheDir = path.join(docsRoot, "site/node_modules/.cache/docs-site");
+async function fetchStars() {
+  const cacheDir = fileURLToPath(new URL("./node_modules/.cache/docs-site", import.meta.url));
   const cacheFile = path.join(cacheDir, "stars.json");
   try {
     const response = await fetch(STARS_URL, {
@@ -231,7 +232,7 @@ export function docsNavPlugin({ docsRoot }) {
       for (const slug of Object.keys(nav.pages))
         this.addWatchFile(path.join(docsRoot, `${slug}.mdx`));
       for (const file of SPEC_FILES) this.addWatchFile(path.join(docsRoot, file));
-      nav.site.stars = await readStars({ docsRoot });
+      nav.site.stars = await readStars();
       return `export default ${JSON.stringify(nav)};`;
     },
   };

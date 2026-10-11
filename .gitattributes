@@ -68,3 +68,27 @@ docs/**/*.webp filter=lfs diff=lfs merge=lfs -text
 docs/**/*.woff filter=lfs diff=lfs merge=lfs -text
 docs/**/*.woff2 filter=lfs diff=lfs merge=lfs -text
 docs/**/*.zip filter=lfs diff=lfs merge=lfs -text
+
+# Docs app fonts and other bundled media remain in Git LFS.
+apps/docs/**/*.avif filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.eot filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.gif filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.ico filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.m4v filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.mov filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.ogg filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.otf filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.pdf filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.png filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.svg filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.ttf filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.wav filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.webm filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.webp filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.woff filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.woff2 filter=lfs diff=lfs merge=lfs -text
+apps/docs/**/*.zip filter=lfs diff=lfs merge=lfs -text

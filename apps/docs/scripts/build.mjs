@@ -7,12 +7,15 @@ import { build } from "vite";
 
 import { writeCloudFrontFunction } from "../cloudfront/generate.mjs";
 import { assertMaterializedAssets } from "../docs-assets.mjs";
-import { createViteConfig } from "../vite.config.mjs";
+import { createViteConfig, docsRoot } from "../vite.config.mjs";
 import { readBuildOptions } from "./options.mjs";
 import { writeServiceWorker } from "./service-worker-build.mjs";
 
 const { outDir } = readBuildOptions();
-await assertMaterializedAssets({ docsRoot: fileURLToPath(new URL("../..", import.meta.url)) });
+await assertMaterializedAssets({
+  docsRoot,
+  publicRoot: fileURLToPath(new URL("../public", import.meta.url)),
+});
 const run = promisify(execFile);
 const ssrDir = fileURLToPath(new URL("../dist-ssr", import.meta.url));
 await rm(ssrDir, { recursive: true, force: true });
@@ -38,7 +41,7 @@ try {
   process.stderr.write(stderr);
   await writeServiceWorker({ outDir });
   await writeCloudFrontFunction({
-    docsRoot: fileURLToPath(new URL("../..", import.meta.url)),
+    docsRoot,
     outDir,
   });
 } finally {

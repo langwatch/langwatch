@@ -21,11 +21,11 @@ Feature: Docs structure check
 
   @unit
   Scenario: Site implementation files are excluded from content scanning
-    Given docs/site holds compiler sources and internal design notes excluded by Mintlify
+    Given apps/docs holds compiler sources and internal design notes outside the public docs directory
     And public content includes docs/sub/site/page.mdx
     When docscheck loads the documentation content
-    Then files under docs/site are not counted as pages or release references
-    And public MDX outside docs/site remains included
+    Then files under apps/docs are not counted as pages or release references
+    And public MDX under docs/ remains included
 
   @unit
   Scenario: A page missing from the navigation is reported

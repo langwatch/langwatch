@@ -13,7 +13,7 @@ function configuredSlugs({ node }) {
 }
 
 export async function checkBuild({ outDir }) {
-  const docsRoot = fileURLToPath(new URL("../..", import.meta.url));
+  const docsRoot = fileURLToPath(new URL("../../../docs/", import.meta.url));
   const config = JSON.parse(await readFile(path.join(docsRoot, "docs.json"), "utf8"));
   const slugs = [
     ...new Set(config.navigation.anchors.flatMap((node) => configuredSlugs({ node }))),

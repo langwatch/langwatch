@@ -23,7 +23,10 @@ export function SessionViewContent({
         {view.kind === "ready" ? (
           <>
             <strong>{view.projectName}</strong>
-            <span>Trace reading · Expires at {new Date(view.expiresAt).toLocaleTimeString()}</span>
+            <span>
+              Trace reading · Expires at{" "}
+              {new Intl.DateTimeFormat(void 0, { timeStyle: "medium" }).format(view.expiresAt)}
+            </span>
           </>
         ) : null}
         {view.kind === "expired" ? "Session expired. Connect again to continue." : null}

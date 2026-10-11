@@ -1,9 +1,14 @@
 {
   "name": "@langwatch/docs-site",
   "private": true,
+  "description": "Prerendered documentation app: static HTML and agent exports, shared design-system React at build time, and small lazy browser islands.",
   "type": "module",
+  "exports": {
+    ".": null
+  },
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
     "preview": "node scripts/preview.mjs",
     "test": "vitest run",

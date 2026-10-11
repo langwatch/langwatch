@@ -17,7 +17,8 @@ function pageUrl({ anchor }: { anchor: HTMLAnchorElement }): URL | null {
 async function fetchPage({ url }: { url: URL }) {
   const key = url.origin + url.pathname;
   const cached = pages.get(key);
-  if (cached && Date.now() - cached.at < 30_000) return cached.html;
+  const now = performance.now();
+  if (cached && now - cached.at < 30_000) return cached.html;
   const html = fetch(key, { credentials: "omit", headers: { Accept: "text/html" } }).then(
     async (response) => {
       if (!response.ok || !response.headers.get("content-type")?.includes("text/html"))
@@ -25,7 +26,7 @@ async function fetchPage({ url }: { url: URL }) {
       return response.text();
     },
   );
-  pages.set(key, { at: Date.now(), html });
+  pages.set(key, { at: now, html });
   if (pages.size > 12) pages.delete(pages.keys().next().value ?? "");
   try {
     return await html;

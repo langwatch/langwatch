@@ -1,3 +1,4 @@
+import { isProduction } from "../config.ts";
 import { startNavigation } from "./navigation.ts";
 import { prepareControls } from "./prepare.ts";
 
@@ -57,7 +58,7 @@ document.addEventListener("keydown", (event) => {
     document.dispatchEvent(new Event("docs:search"));
   }
 });
-if ("serviceWorker" in navigator && import.meta.env.PROD) {
+if ("serviceWorker" in navigator && isProduction) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
   });

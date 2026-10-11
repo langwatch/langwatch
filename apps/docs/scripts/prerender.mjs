@@ -19,7 +19,7 @@ import { extractStyles } from "./static-styles.mjs";
 
 const siteRoot = fileURLToPath(new URL("..", import.meta.url));
 const { outDir: dist } = readBuildOptions();
-const docsRoot = path.resolve(siteRoot, "..");
+const docsRoot = path.resolve(siteRoot, "../../docs");
 const manifestText = await readFile(path.join(dist, ".vite/manifest.json"), "utf8");
 const manifest = JSON.parse(manifestText);
 const sources = Object.fromEntries(

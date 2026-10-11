@@ -52,7 +52,7 @@ describe("when CloudFront receives a documentation request", () => {
 
   /** @scenario "Serve every configured redirect at the edge" */
   it("matches preview for every authored redirect, queries and trailing slashes", () => {
-    const docsRoot = fileURLToPath(new URL("../../../", import.meta.url));
+    const docsRoot = fileURLToPath(new URL("../../../../docs/", import.meta.url));
     const redirects = readRedirects({ docsRoot });
     expect(Object.keys(redirects)).toHaveLength(116);
     for (const source of Object.keys(redirects)) {

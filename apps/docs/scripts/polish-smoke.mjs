@@ -192,7 +192,7 @@ await it("serves brand SVGs with an image type that browsers can decode", async 
     configFile: false,
     root: process.cwd(),
     server: { port: 0, host: "127.0.0.1" },
-    plugins: [docsDevPlugin({ docsRoot: path.resolve("..") })],
+    plugins: [docsDevPlugin({ docsRoot: path.resolve("../../docs") })],
   });
   try {
     await server.listen();

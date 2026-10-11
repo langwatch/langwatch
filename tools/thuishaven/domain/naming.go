@@ -47,7 +47,7 @@ const DesignSystemService = "design-system"
 // Its lane is called mail-room too.
 const MailRoomService = "mail-room"
 
-// DocsService is the public docs site (docs/site) on its Vite dev server,
+// DocsService is the public docs site (apps/docs) on its Vite dev server,
 // routed at docs.<slug>.langwatch.localhost. Its lane is called docs too.
 const DocsService = "docs"
 

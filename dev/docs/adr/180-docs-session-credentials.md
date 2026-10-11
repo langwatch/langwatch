@@ -132,4 +132,4 @@ The default flag is off. `VITE_DOCS_SESSION_AUTH=mock` exposes the provider slot
 connection, expiry and disconnect states with a demo project and simulated trace
 response. The mock credential lasts one minute and cannot authorise a real API
 request. No popup adapter, message listener or real server operation is implemented.
-See [docs feature scenarios](../../../docs/site/specs/shared-auth.feature).
+See [docs feature scenarios](../../../apps/docs/specs/shared-auth.feature).

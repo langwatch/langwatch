@@ -5,12 +5,20 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "apps/docs/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "packages/design-system/**"
       - "CHANGELOG.md"
       - ".gitattributes"
       - ".github/workflows/docs-site-deploy.yml"
   pull_request:
     paths:
       - "docs/**"
+      - "apps/docs/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "packages/design-system/**"
       - "CHANGELOG.md"
       - ".gitattributes"
       - ".github/workflows/docs-site-deploy.yml"
@@ -49,7 +57,7 @@ jobs:
         if: always()
         with:
           name: docs-site
-          path: docs/site/dist
+          path: apps/docs/dist
           if-no-files-found: error
           retention-days: 7
 

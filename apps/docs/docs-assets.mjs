@@ -13,11 +13,12 @@ async function assetFiles(directory) {
   return files;
 }
 
-export async function assertMaterializedAssets({ docsRoot }) {
+export async function assertMaterializedAssets({ docsRoot, publicRoot }) {
   const files = [];
-  for (const directory of ["images", "media", "logo", "site/public", "scripts/video"]) {
+  for (const directory of ["images", "media", "logo", "scripts/video"]) {
     files.push(...(await assetFiles(path.join(docsRoot, directory))));
   }
+  if (publicRoot) files.push(...(await assetFiles(publicRoot)));
   const favicon = path.join(docsRoot, "favicon.svg");
   if (existsSync(favicon)) files.push(favicon);
   for (const file of files) {

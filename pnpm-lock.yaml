@@ -2401,7 +2401,7 @@ importers:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)
 
-  docs/site:
+  apps/docs:
     dependencies:
       '@langwatch/design-system':
         specifier: workspace:*

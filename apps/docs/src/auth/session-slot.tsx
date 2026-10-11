@@ -44,7 +44,8 @@ export function SessionSlot({
               {view.projectName}
             </Text>
             <Text as="span" display="block" margin="0">
-              Trace reading · Expires at {new Date(view.expiresAt).toLocaleTimeString()}
+              Trace reading · Expires at{" "}
+              {new Intl.DateTimeFormat(void 0, { timeStyle: "medium" }).format(view.expiresAt)}
             </Text>
           </>
         ) : null}

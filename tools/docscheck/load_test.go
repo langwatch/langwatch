@@ -102,8 +102,8 @@ func TestLoadReadsPagesRedirectsAndChartVersion(t *testing.T) {
 		"docs/a.mdx":                  "---\ntitle: t\n---\nlangwatch/langwatch:3.0.0\n",
 		"docs/sub/b.md":               "---\ntitle: t\n---\nbody\n",
 		"docs/sub/site/page.mdx":      "---\ntitle: public page\n---\nbody\n",
-		"docs/site/DESIGN.md":         "# compiler notes\nlangwatch/langwatch:0.0.1\n",
-		"docs/site/src/example.mdx":   "# compiler fixture\n",
+		"apps/docs/DESIGN.md":         "# compiler notes\nlangwatch/langwatch:0.0.1\n",
+		"apps/docs/src/example.mdx":   "# compiler fixture\n",
 		// Not servable: a snippet is included by other pages, and a README is
 		// repository documentation.
 		"docs/snippets/s.mdx": "shared\n",

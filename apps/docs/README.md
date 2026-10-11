@@ -1,5 +1,10 @@
 # LangWatch documentation site
 
+The application lives in `apps/docs/`; authored pages, navigation and media stay
+in `docs/`. Production is a static artifact served by S3/CloudFront, with no
+application server, database or API required. React and the shared design system
+render at build time; browser interactions load only their small islands.
+
 The site renders the existing `docs/` MDX, navigation from `docs/docs.json`, and
 operations from `docs/api-reference/openapiLangWatch.json` and
 `docs/api-reference/openapi-evals.json`. Pages need no React route files. Only
@@ -41,7 +46,7 @@ pnpm --filter @langwatch/docs-site build
 ```
 
 This command compiles the client and renderer, then prerenders every configured
-page into `docs/site/dist`. It emits:
+page into `apps/docs/dist`. It emits:
 
 - `/path/index.html` for each page, plus the introduction at `/index.html`.
   Configured `section/index` pages also have a `/section` alias.
@@ -94,8 +99,8 @@ another surface needs the same behaviour. The docs also disable drawer and dialo
 animations under reduced motion; that behaviour is a design-system candidate.
 
 ```sh
-pnpm exec tsc --noEmit -p docs/site/tsconfig.json
-pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc docs/site
+pnpm exec tsc --noEmit -p apps/docs/tsconfig.json
+pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc apps/docs
 ```
 
 Behaviour scenarios live in `specs/`; generator tests are colocated in
@@ -142,7 +147,7 @@ pnpm --filter @langwatch/docs-site preview --out-dir "$TMPDIR/docs-test-dist" --
 ```
 
 `--out-dir` is resolved from the package directory; absolute paths avoid
-ambiguity. Omitting it retains the normal `docs/site/dist` output. Preview still
+ambiguity. Omitting it retains the normal `apps/docs/dist` output. Preview still
 defaults to port 4173, and fails if its chosen port is occupied.
 
 ## Publish to S3 and CloudFront
