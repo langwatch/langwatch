@@ -118,6 +118,14 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the answer makes exactly those tool calls with exactly those arguments, in order
     And a message without such lines keeps the model's usual answer
 
+  # Bound by services/llmsim/llmsim_test.go. A schema-less json_object caller (trace Ask AI)
+  # gets one exact object, so a walk can drive it to a parseable answer.
+  Scenario: A JSON request answers the object a scripted message names
+    Given the request asks for a JSON object or a JSON schema
+    When the last user message holds a "/json <object>" line
+    Then the answer is exactly that object
+    And a text request with the same message keeps the model's usual answer
+
   Scenario: Langy mode echoes a tool result back
     Given the script's tool calls have been answered with tool results
     When the script has a "/next" step left

@@ -294,6 +294,8 @@ func (s *Server) answer(h http.Header, req request) reply {
 	} else if scriptedTools(req) {
 		rep = langy(req, r)
 		rep.Mode = "scripted"
+	} else if object, ok := scriptedJSON(req); ok {
+		rep = reply{Mode: "scripted", Text: object, Finish: "stop"}
 	} else {
 		rep = s.markovReply(req, r, toolsMode(h, req.model))
 	}
@@ -320,6 +322,23 @@ func scriptedTools(req request) bool {
 	}
 	_, scripted := parseScript(req.turns[user].text)
 	return scripted
+}
+
+// scriptedJSON is the object a "/json <object>" line of the last user message names,
+// when the request asks for JSON: a schema-less json_object caller (Ask AI) gets one
+// exact, parseable answer that random schema output would almost never be.
+func scriptedJSON(req request) (string, bool) {
+	user := lastUserTurn(req.turns)
+	if (req.schema == nil && !req.jsonObject) || user < 0 {
+		return "", false
+	}
+	for line := range strings.SplitSeq(req.turns[user].text, "\n") {
+		object, found := strings.CutPrefix(strings.TrimSpace(line), "/json ")
+		if found && json.Valid([]byte(object)) {
+			return strings.TrimSpace(object), true
+		}
+	}
+	return "", false
 }
 
 // toolsMode makes an unforced (auto) tool choice always call a tool: the

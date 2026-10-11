@@ -569,3 +569,17 @@ func TestScriptedToolCallsOnAnyModel(t *testing.T) {
 		t.Fatalf("an unscripted message was scripted: %+v", plain.Choices[0])
 	}
 }
+
+// @scenario "A JSON request answers the object a scripted message names"
+func TestScriptedJSONObject(t *testing.T) {
+	srv := newTestServer(t)
+	script := `"messages":[{"role":"user","content":"traces with errors\n/json {\"kind\":\"apply_query\",\"query\":\"status:error\"}"}]`
+	out := chat(t, srv, `{"model":"gpt-5-mini","response_format":{"type":"json_object"},`+script+`}`, nil)
+	if got := *out.Choices[0].Message.Content; got != `{"kind":"apply_query","query":"status:error"}` {
+		t.Fatalf("json_object got %q", got)
+	}
+	plain := chat(t, srv, `{"model":"gpt-5-mini",`+script+`}`, nil)
+	if strings.HasPrefix(*plain.Choices[0].Message.Content, `{"kind"`) {
+		t.Fatalf("a text request was scripted: %q", *plain.Choices[0].Message.Content)
+	}
+}
