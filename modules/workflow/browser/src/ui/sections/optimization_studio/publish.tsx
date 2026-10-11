@@ -4,6 +4,7 @@ import { showErrorToast } from "@langwatch/browser-host/errors";
 import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { CodePreview } from "@langwatch/design-system/code-preview";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { Menu } from "@langwatch/design-system/menu";
 import {
@@ -23,7 +24,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { nowInstant } from "@langwatch/time";
@@ -168,13 +168,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
         )}
       </Dialog.Root>
 
-      <Dialog.Root
-        open={apiModal.open}
-        onOpenChange={({ open }) => apiModal.setOpen(open)}
-        size="lg"
-      >
-        {apiModal.open && <ApiModalContent />}
-      </Dialog.Root>
+      {apiModal.open && <ApiModalContent onClose={apiModal.onClose} />}
     </>
   );
 }
@@ -653,7 +647,7 @@ function PublishModalContent({
   );
 }
 
-export const ApiModalContent = () => {
+export const ApiModalContent = ({ onClose }: { onClose: () => void }) => {
   const { workflowId } = useWorkflowStore(({ workflow_id: workflowId }) => ({
     workflowId,
   }));
@@ -699,19 +693,14 @@ export const ApiModalContent = () => {
     2,
   );
   return (
-    <Dialog.Content>
-      <Dialog.Header>
-        <Dialog.Title>Workflow API</Dialog.Title>
-      </Dialog.Header>
-      <Dialog.CloseTrigger />
-      <Dialog.Body>
-        <Text paddingBottom={8}>
-          Incorporate the following JSON payload within the body of your HTTP POST request to get
-          the workflow result.
-        </Text>
-        <Box>
-          <CodePreview
-            code={`# Set your API key
+    <Dialog open onClose={onClose} title="Workflow API" size="lg" cancelLabel="Close">
+      <Text paddingBottom={8}>
+        Incorporate the following JSON payload within the body of your HTTP POST request to get the
+        workflow result.
+      </Text>
+      <Box>
+        <CodePreview
+          code={`# Set your API key
 LANGWATCH_API_KEY="${token ?? API_KEY_PLACEHOLDER}"
 
 # Use curl to send the POST request, e.g.:
@@ -721,36 +710,34 @@ curl -X POST "${langwatchEndpoint()}/api/workflows/${workflowId}/run" \\
      -d @- <<EOF
 ${message}
 EOF`}
-            language="bash"
+          language="bash"
+        />
+      </Box>
+      {project?.id && organization && (
+        <Box marginTop={4}>
+          <PersonalAccessTokenBanner
+            token={token}
+            isCreating={minting.isMinting}
+            scopeNote={minting.scopeNote}
+            onCreate={() =>
+              void minting.mint().catch((error: unknown) =>
+                showErrorToast({
+                  error,
+                  fallbackTitle: "Couldn't create the personal access token",
+                }),
+              )
+            }
           />
         </Box>
-        {project?.id && organization && (
-          <Box marginTop={4}>
-            <PersonalAccessTokenBanner
-              token={token}
-              isCreating={minting.isMinting}
-              scopeNote={minting.scopeNote}
-              onCreate={() =>
-                void minting.mint().catch((error: unknown) =>
-                  showErrorToast({
-                    error,
-                    fallbackTitle: "Couldn't create the personal access token",
-                  }),
-                )
-              }
-            />
-          </Box>
-        )}
-        <Text marginTop={4}>
-          To access the API details and view more information, please refer to the official
-          documentation{" "}
-          <Link href="https://docs.langwatch.ai" textDecoration="underline" isExternal>
-            here
-          </Link>
-          .
-        </Text>
-      </Dialog.Body>
-      <Dialog.Footer />
-    </Dialog.Content>
+      )}
+      <Text marginTop={4}>
+        To access the API details and view more information, please refer to the official
+        documentation{" "}
+        <Link href="https://docs.langwatch.ai" textDecoration="underline" isExternal>
+          here
+        </Link>
+        .
+      </Text>
+    </Dialog>
   );
 };

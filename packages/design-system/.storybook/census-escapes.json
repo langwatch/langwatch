@@ -1965,5 +1965,364 @@
     "reason": "Not a plain card: a protected table frame, cell editor popup, diff well, icon tile, popover trigger or picker row (R9p1 review).",
     "owner": "prompt",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 55,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 60,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/dataset-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 184,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/dataset-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 185,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/dataset-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 197,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/dataset-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 200,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/dataset-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 214,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/dataset-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 229,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/dataset-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 237,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 199,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 208,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 209,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 211,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 215,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 377,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/evaluate.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 83,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/evaluate.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 288,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/evaluate.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 294,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/evaluate.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 295,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/evaluate.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 296,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/evaluate.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 298,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/evaluate.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 316,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimization-studio.tsx",
+    "rule": "restyle",
+    "line": 257,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 114,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 434,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 435,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 436,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 437,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 443,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 459,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 465,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 466,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 467,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/optimize.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 527,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/properties/agent-properties-panel.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 954,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/properties/evaluator-properties-panel.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 275,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 156,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 558,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 559,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 560,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 562,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 563,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 569,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 580,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 586,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 587,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 589,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 590,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 599,
+    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/component_execution/input-panel.tsx",
+    "rule": "card-box",
+    "line": 94,
+    "reason": "Workflow studio panel kept as today (R9w review).",
+    "owner": "workflow",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/component_execution/output-panel.tsx",
+    "rule": "card-box",
+    "line": 17,
+    "reason": "Workflow studio panel kept as today (R9w review).",
+    "owner": "workflow",
+    "disposition": "reviewed"
   }
 ]
