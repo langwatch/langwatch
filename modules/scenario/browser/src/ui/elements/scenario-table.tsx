@@ -1,8 +1,9 @@
-import { Checkbox } from "@langwatch/design-system/checkbox";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { HStack, IconButton, Table, Text } from "@langwatch/design-system/primitives";
+import { IconButton, Table, Text } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import {
+  type Cell,
   type ColumnFiltersState,
   createColumnHelper,
   type FilterFn,
@@ -10,11 +11,14 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  type Header,
+  type Row,
   type RowSelectionState,
   type SortingState,
+  type Table as TanstackTable,
   useReactTable,
 } from "@tanstack/react-table";
-import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
+import { Archive, MoreVertical } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
 
 import type { ScenarioListItem } from "../../model/scenario-list.types.ts";
@@ -42,12 +46,6 @@ export type ScenarioTableProps = {
 
 const columnHelper = createColumnHelper<ScenarioListItem>();
 
-function headerWidthProps(headerId: string): { width?: string } {
-  if (headerId === "select") return { width: "40px" };
-  if (headerId === "actions") return { width: "48px" };
-  return {};
-}
-
 const labelsFilterFn: FilterFn<ScenarioListItem> = (row, columnId, filterValue) => {
   const labels = row.getValue<string[]>(columnId);
   const activeLabels = Array.isArray(filterValue)
@@ -72,26 +70,7 @@ export function ScenarioTable({
 
   const columns = useMemo(
     () => [
-      columnHelper.display({
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            aria-label="Select all"
-            checked={table.getIsAllPageRowsSelected()}
-            onChange={() => table.toggleAllPageRowsSelected()}
-            onClick={(event) => event.stopPropagation()}
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            aria-label={`Select ${row.original.name}`}
-            checked={row.getIsSelected()}
-            onChange={() => row.toggleSelected()}
-            onClick={(event) => event.stopPropagation()}
-          />
-        ),
-        enableSorting: false,
-      }),
+      columnHelper.display({ id: "select", enableSorting: false }),
       columnHelper.accessor("name", {
         header: "Name",
         cell: (info) => <Text fontWeight="medium">{info.getValue()}</Text>,
@@ -121,7 +100,7 @@ export function ScenarioTable({
                 <MoreVertical size={16} />
               </IconButton>
             </Menu.Trigger>
-            <Menu.Content portalled={false}>
+            <Menu.Content>
               <Menu.Item
                 value="archive"
                 color="orange.fg"
@@ -163,29 +142,17 @@ export function ScenarioTable({
   });
 
   return (
-    <Table.Root variant="line" width="full" size="md">
-      <Table.Header>
+    <ListTable>
+      <ListTable.Header>
         {table.getHeaderGroups().map((headerGroup) => (
-          <Table.Row key={headerGroup.id}>
+          <ListTable.Row key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
-              <Table.ColumnHeader
-                key={header.id}
-                cursor={header.column.getCanSort() ? "pointer" : "default"}
-                onClick={header.column.getToggleSortingHandler()}
-                userSelect="none"
-                {...headerWidthProps(header.id)}
-              >
-                <HStack gap={1}>
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  {header.column.getIsSorted() === "asc" && <ChevronUp size={14} />}
-                  {header.column.getIsSorted() === "desc" && <ChevronDown size={14} />}
-                </HStack>
-              </Table.ColumnHeader>
+              <ScenarioHeader key={header.id} header={header} table={table} />
             ))}
-          </Table.Row>
+          </ListTable.Row>
         ))}
-      </Table.Header>
-      <Table.Body>
+      </ListTable.Header>
+      <ListTable.Body>
         {table.getRowModel().rows.map((row) => {
           const rowElement = (
             <Table.Row
@@ -195,16 +162,68 @@ export function ScenarioTable({
               onClick={() => onRowClick(row.original.id)}
             >
               {row.getVisibleCells().map((cell) => (
-                <Table.Cell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </Table.Cell>
+                <ScenarioCell key={cell.id} cell={cell} row={row} />
               ))}
             </Table.Row>
           );
 
           return renderRow(row.original, rowElement);
         })}
-      </Table.Body>
-    </Table.Root>
+      </ListTable.Body>
+    </ListTable>
   );
+}
+
+type ScenarioRow = Row<ScenarioListItem>;
+type ScenarioHeaderCell = Header<ScenarioListItem, unknown>;
+type ScenarioTableApi = TanstackTable<ScenarioListItem>;
+
+/** One header cell: select-all, the pinned action column, a sortable or a plain heading. */
+function ScenarioHeader({
+  header,
+  table,
+}: {
+  header: ScenarioHeaderCell;
+  table: ScenarioTableApi;
+}) {
+  const { column } = header;
+  if (column.id === "select") {
+    const someSelected = table.getIsSomePageRowsSelected();
+    return (
+      <ListTable.SelectHeader
+        label="Select all"
+        checked={table.getIsAllPageRowsSelected() || (someSelected && "indeterminate")}
+        onCheckedChange={({ checked }) => table.toggleAllPageRowsSelected(checked)}
+      />
+    );
+  }
+  if (column.id === "actions") return <ListTable.ActionHeader />;
+  const label = flexRender(column.columnDef.header, header.getContext());
+  if (!column.getCanSort()) return <ListTable.ColumnHeader>{label}</ListTable.ColumnHeader>;
+  const multiSort = table.getState().sorting.length > 1;
+  return (
+    <ListTable.SortHeader
+      sorted={column.getIsSorted()}
+      sortRank={multiSort ? column.getSortIndex() + 1 : void 0}
+      onSort={({ multi }) => column.toggleSorting(void 0, multi)}
+    >
+      {label}
+    </ListTable.SortHeader>
+  );
+}
+
+/** One body cell: the row checkbox, the pinned actions or a plain cell. */
+function ScenarioCell({ cell, row }: { cell: Cell<ScenarioListItem, unknown>; row: ScenarioRow }) {
+  if (cell.column.id === "select") {
+    return (
+      <ListTable.SelectCell
+        label={`Select ${row.original.name}`}
+        checked={row.getIsSelected()}
+        onCheckedChange={({ checked }) => row.toggleSelected(checked)}
+      />
+    );
+  }
+  const content = flexRender(cell.column.columnDef.cell, cell.getContext());
+  if (cell.column.id === "actions") return <ListTable.ActionCell>{content}</ListTable.ActionCell>;
+  return <ListTable.Cell>{content}</ListTable.Cell>;
 }

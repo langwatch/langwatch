@@ -2324,5 +2324,97 @@
     "reason": "Workflow studio panel kept as today (R9w review).",
     "owner": "workflow",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/scenario-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 158,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/cases/cases-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 59,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/cases/cases-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 61,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 69,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 70,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 81,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 85,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 106,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 107,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 109,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/results-table-chrome.tsx",
+    "rule": "legacy-table-part",
+    "line": 46,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/results-table-chrome.tsx",
+    "rule": "legacy-table-part",
+    "line": 48,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/view-mode-toggle.tsx",
+    "rule": "card-box",
+    "line": 29,
+    "reason": "False positive: the view mode toggle (R7t review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
   }
 ]

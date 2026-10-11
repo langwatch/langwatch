@@ -5,20 +5,12 @@
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
-import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Button,
-  chakra,
-  HStack,
-  Table,
-  Text,
-  VisuallyHidden,
-} from "@langwatch/design-system/primitives";
+import { Button, chakra, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";
-import { MoreVertical } from "lucide-react";
 
 import { type TestCase } from "../../../../model/agent-testing/cases/test-cases.ts";
 import type { Period } from "../../../../model/analytics/period.ts";
@@ -114,19 +106,15 @@ export function CasesTable({
 
   return (
     <CasesListTable columns={columns} testId="agent-testing-cases-table">
-      <Table.Header>
-        <Table.Row>
-          {isSelectionMode && (
-            <Table.ColumnHeader>
-              <VisuallyHidden>Select</VisuallyHidden>
-            </Table.ColumnHeader>
-          )}
-          <Table.ColumnHeader>Scenario</Table.ColumnHeader>
+      <ListTable.Header>
+        <ListTable.Row>
+          {isSelectionMode && <ListTable.ColumnHeader label="Select" />}
+          <ListTable.ColumnHeader>Scenario</ListTable.ColumnHeader>
           <ListTable.ActionHeader />
-        </Table.Row>
-      </Table.Header>
+        </ListTable.Row>
+      </ListTable.Header>
 
-      <Table.Body>
+      <ListTable.Body>
         {cases.map((testCase) => (
           <CaseRow
             key={testCase.id}
@@ -145,7 +133,7 @@ export function CasesTable({
             onArchive={onArchive}
           />
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </CasesListTable>
   );
 }
@@ -188,26 +176,19 @@ function CaseRow({
   };
 
   return (
-    <Table.Row
-      cursor="pointer"
-      onClick={handleRowClick}
-      data-selected={isSelectionMode && isSelected ? "" : undefined}
+    <ListTable.Row
+      selected={isSelectionMode && isSelected}
+      onActivate={handleRowClick}
       data-testid={`case-row-${testCase.name}`}
     >
       {isSelectionMode && (
-        <Table.Cell onClick={(event) => event.stopPropagation()}>
-          <Checkbox.Root
-            checked={isSelected}
-            onCheckedChange={() => onToggleSelected(testCase.id)}
-            aria-label={`Select ${testCase.name}`}
-            data-testid={`case-row-${testCase.name}-checkbox`}
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-          </Checkbox.Root>
-        </Table.Cell>
+        <ListTable.SelectCell
+          label={`Select ${testCase.name}`}
+          checked={isSelected}
+          onCheckedChange={() => onToggleSelected(testCase.id)}
+        />
       )}
-      <Table.Cell>
+      <ListTable.Cell>
         <HStack gap={1.5} minWidth={0} flexWrap="wrap">
           <chakra.button
             type="button"
@@ -226,7 +207,7 @@ function CaseRow({
           </chakra.button>
           <TagList labels={testCase.labels} tone="pastel" />
         </HStack>
-      </Table.Cell>
+      </ListTable.Cell>
 
       <CaseRowActions
         testCase={testCase}
@@ -239,7 +220,7 @@ function CaseRow({
         onStartMoveToSuite={onStartMoveToSuite}
         onArchive={onArchive}
       />
-    </Table.Row>
+    </ListTable.Row>
   );
 }
 
@@ -316,7 +297,7 @@ function CaseRowActionsMenu({
           aria-label={`Actions for ${testCase.name}`}
           onClick={stop}
         >
-          <MoreVertical size={14} />
+          <MoreVerticalIcon size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
@@ -384,21 +365,20 @@ export function ExternalCasesTable({
       columns={[{ key: "scenario" }, { key: "last-run", width: EXTERNAL_LAST_RUN_WIDTH }]}
       testId="agent-testing-external-cases-table"
     >
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Scenario</Table.ColumnHeader>
-          <Table.ColumnHeader textAlign="end">Last run</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Scenario</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader align="end">Last run</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {cases.map((externalCase) => (
-          <Table.Row
+          <ListTable.Row
             key={externalCase.scenarioId}
-            cursor="pointer"
-            onClick={() => onRowClick(externalCase.scenarioId)}
+            onActivate={() => onRowClick(externalCase.scenarioId)}
             data-testid={`external-case-row-${externalCase.name}`}
           >
-            <Table.Cell>
+            <ListTable.Cell>
               <chakra.button
                 type="button"
                 minWidth={0}
@@ -414,15 +394,15 @@ export function ExternalCasesTable({
                   {externalCase.name}
                 </Text>
               </chakra.button>
-            </Table.Cell>
-            <Table.Cell textAlign="end">
+            </ListTable.Cell>
+            <ListTable.Cell align="end">
               <Text textStyle="micro" color="fg.muted" whiteSpace="nowrap">
                 {format(externalCase.lastRunAt, "MMM d, HH:mm")}
               </Text>
-            </Table.Cell>
-          </Table.Row>
+            </ListTable.Cell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </CasesListTable>
   );
 }
@@ -431,15 +411,15 @@ export function ExternalCasesTable({
 export function CasesTableSkeleton() {
   return (
     <ListTable data-testid="agent-testing-cases-skeleton">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Scenario</Table.ColumnHeader>
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Scenario</ListTable.ColumnHeader>
           <ListTable.ActionHeader />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         <ListTable.LoadingRows rows={3} columns={2} />
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
