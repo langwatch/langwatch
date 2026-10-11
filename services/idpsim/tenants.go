@@ -115,6 +115,9 @@ type Tenant struct {
 	lastAssertionID string
 	// amr is the authentication methods its ID tokens assert (amr.go); Reset clears it.
 	amr []string
+	// auth0Passwords and auth0Scopes are the Auth0 Management simulation (auth0_management.go); Reset clears both.
+	auth0Passwords map[string]string
+	auth0Scopes    []string
 	// keyVersion numbers Key; previousKey and previousCert are what the last
 	// rotation retired, still published until dropped (RotateKey).
 	keyVersion   int
@@ -206,6 +209,7 @@ func (t *Tenant) Reset() {
 	t.seedUsers()
 	t.skew, t.lastAssertionID = 0, ""
 	t.amr = nil
+	t.auth0Passwords, t.auth0Scopes = nil, nil
 }
 
 // Users returns a snapshot of the tenant's users.

@@ -83,6 +83,10 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
   `haven sim idp legacy env <t>` for the env lines (apply with `haven down` then `haven up`).
   `azure` is Entra: the product's authority host is hard-wired, so resolve
   `login.microsoftonline.com` to idpsim over https; the env gives `AZURE_AD_TENANT_ID`.
+- An Auth0 tenant also answers the product's password change at the host root: `POST /oauth/token`
+  (password grant against each user's password, default `idpsim-password`; client_credentials for a
+  Management token) and `PATCH /api/v2/users/{auth0|id}`. `config {"auth0Scopes":["read:users"]}` drops
+  `update:users` (insufficient_scope); under 8 characters is a PasswordStrengthError; a reset restores both.
 - Legacy-SSO org (main's shape, no connection): `haven db seed --org name=<n>,plan=licence`, then set its
   `Organization."ssoDomain"` to `acme<t>.test` and `"ssoProvider"` to the legacy provider name over `haven db url`.
 - Failed SCIM apply (needs `SCIM_V2_GRANTS=1` at `haven up`): push the org's last active admin `active=false`;

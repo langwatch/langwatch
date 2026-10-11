@@ -117,6 +117,9 @@ func (s *Server) routeProtocols(mux *http.ServeMux) {
 	mux.HandleFunc("GET /t/{tenant}/oidc/2/.well-known/openid-configuration", s.handleLegacyDiscovery)
 	mux.HandleFunc("GET /t/{tenant}/{pool}/.well-known/openid-configuration", s.handleLegacyDiscovery)
 	mux.HandleFunc("GET /.well-known/openid-configuration", s.handleAuth0RootDiscovery)
+	// Auth0's password grant and Management API, at the host root like its issuer.
+	mux.HandleFunc("POST /oauth/token", s.handleAuth0RootToken)
+	mux.HandleFunc("PATCH /api/v2/users/{id}", s.handleAuth0UpdateUser)
 
 	// SAML, per tenant. SSO accepts both the redirect (GET) and POST bindings.
 	mux.HandleFunc("GET /t/{tenant}/saml/metadata", s.handleSAMLMetadata)
