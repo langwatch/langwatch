@@ -3,8 +3,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
-import { Box, chakra, Text } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Phone, Play } from "lucide-react";
 import { useId } from "react";
@@ -73,7 +72,7 @@ export function RunDialogFooter({
     </SmallButton>
   );
   return (
-    <Dialog.Footer borderTopWidth="1px" borderColor="border" paddingX={5} paddingY={3} gap={2}>
+    <HStack width="full" gap={2}>
       {reason ? (
         <Text
           id={reasonId}
@@ -122,6 +121,6 @@ export function RunDialogFooter({
       ) : (
         runButton
       )}
-    </Dialog.Footer>
+    </HStack>
   );
 }
