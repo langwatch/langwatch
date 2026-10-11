@@ -260,6 +260,20 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Then no role can be chosen
       And the key is minted with the role of "vic"'s own binding
 
+    @integration
+    Scenario: Every unmet requirement of a new key is named and the first is focused
+      Given "ada" submits the create drawer with no name, no scope, Restricted with no permission and no expiry
+      Then each of those fields shows its own error
+      And focus moves to the first of them
+      And no key is minted
+      And what she entered is kept when she fixes one field and submits again
+
+    @integration
+    Scenario: A failed read of the caller's access can be retried from the drawer
+      Given the read of "ada"'s access failed
+      Then Create is unavailable and says why
+      And Retry reads it again without closing the drawer or losing what she typed
+
   Rule: a key in another organization does not exist for the caller
 
     @integration
