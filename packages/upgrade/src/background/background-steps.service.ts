@@ -1,3 +1,5 @@
+import { generate } from "@langwatch/ksuid";
+
 import type { UpgradeStep } from "../ledger.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
 
@@ -88,9 +90,21 @@ export interface BackgroundStepsOptions {
   deadlineMs?: number;
   /** A monotonic clock in milliseconds, for the retry backoff and the lease's last renewal. */
   now?: () => number;
-  /** Runs a step so the queue work it sends runs ahead of any backlog (Alex, 2026-10-11). */
-  runStepWork?: <Result>(work: () => Promise<Result>) => Promise<Result>;
+  /** Where a step's queue work runs ahead of any backlog and is waited for (Alex, 2026-10-11). */
+  queue?: BackgroundStepsQueue;
 }
+
+/** The job queue's listed runs: a run's jobs, and the jobs they cause, run ahead of any backlog. */
+export interface BackgroundStepsQueue {
+  runListedWork<Result>(input: {
+    name: string;
+    timeoutMs: number;
+    work: () => Promise<Result>;
+  }): Promise<Result>;
+}
+
+/** How long a step waits for its queue work unless it declares `queueWaitMs`. */
+export const BACKGROUND_STEP_QUEUE_WAIT_MS = 60_000;
 
 type StepOutcome = "done" | "failed" | "retrying" | "held" | "waiting" | "skipped";
 
@@ -200,23 +214,24 @@ export class BackgroundStepsService {
       const resumeFrom = current.report ?? null;
       await ledger.markRunning({ id: step.id, runId });
       log("info", "background step started", { step: step.id, module, resumed: !!resumeFrom });
-      const runStepWork = this.options.runStepWork ?? ((work) => work());
-      run = runStepWork(() =>
-        step.run({
-          checkpoint: {
-            resumeFrom,
-            save: async ({ report: saved }) => {
-              if (held.lost())
-                throw new Error(`the lease of ${step.id} was lost; checkpoint refused`);
-              if (held.expired())
-                throw new Error(`${step.id} passed its deadline; checkpoint refused`);
-              await ledger.saveReport({ id: step.id, report: saved });
+      run = this.runQueueWork({
+        step,
+        work: () =>
+          step.run({
+            checkpoint: {
+              resumeFrom,
+              save: async ({ report: saved }) => {
+                if (held.lost())
+                  throw new Error(`the lease of ${step.id} was lost; checkpoint refused`);
+                if (held.expired())
+                  throw new Error(`${step.id} passed its deadline; checkpoint refused`);
+                await ledger.saveReport({ id: step.id, report: saved });
+              },
             },
-          },
-          dryRun: false,
-          signal: held.signal,
-        }),
-      );
+            dryRun: false,
+            signal: held.signal,
+          }),
+      });
       const report = await Promise.race([run, held.deadline]);
       if (held.signal.aborted) return await this.suspend({ step, runId, held });
       if (!forced && (await this.reopenedByRollback({ step }))) return "waiting";
@@ -230,6 +245,26 @@ export class BackgroundStepsService {
     } finally {
       await this.releaseWhenSettled({ step: step.id, held, run });
     }
+  }
+
+  /**
+   * A step's run on a queue list of its own: done only once every job it sent, and every job
+   * those caused, has run. A failed or blocked job, or the wait running out, fails this run alone.
+   */
+  private runQueueWork<Result>({
+    step,
+    work,
+  }: {
+    step: MigrationStep;
+    work: () => Promise<Result>;
+  }): Promise<Result> {
+    const queue = this.options.queue;
+    if (!queue) return work();
+    return queue.runListedWork({
+      name: `upgrade-step:${step.id}:${generate("steprun").toString()}`,
+      timeoutMs: step.queueWaitMs ?? BACKGROUND_STEP_QUEUE_WAIT_MS,
+      work,
+    });
   }
 
   /** A run cut at its deadline may still write: no second copy starts until it settles. */

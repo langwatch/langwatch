@@ -1,13 +1,16 @@
 import { hostname } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { runAsUpgradeStepWork } from "@langwatch/process-stores";
 import { storesOwner } from "@langwatch/process-stores/config";
 import type { ScopedSecrets } from "@langwatch/secrets";
 import pg from "pg";
 import { z } from "zod";
 
-import { BackgroundStepsService, startBackgroundSteps } from "../background/index.ts";
+import {
+  type BackgroundStepsQueue,
+  BackgroundStepsService,
+  startBackgroundSteps,
+} from "../background/index.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
@@ -521,7 +524,7 @@ function backgroundStepsOver({
     level === "warn" ? warn(message, { processId, ...fields }) : undefined;
   return {
     isStep: isDeclaredMigrationStep,
-    start: (steps: readonly unknown[]) => {
+    start: (steps: readonly unknown[], queue?: BackgroundStepsQueue) => {
       const service = BackgroundStepsService.create({
         ledger: {
           findSteps: () => ledger.findSteps(),
@@ -538,7 +541,7 @@ function backgroundStepsOver({
         oldWritersGoneFor: (input) => roster.oldWritersGoneFor(input),
         identity: { owner: processId, image: release ?? "unreleased", host: hostname() },
         log,
-        runStepWork: runAsUpgradeStepWork,
+        ...(queue === undefined ? {} : { queue }),
       });
       const sweeping = startBackgroundSteps({ service, log });
       const catchingUp = startTargetCatchUp({

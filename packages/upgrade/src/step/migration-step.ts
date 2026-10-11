@@ -34,6 +34,8 @@ export const migrationStepDeclarationSchema = z.object({
   after: z.array(z.string().regex(MIGRATION_STEP_ID)).optional(),
   /** The release a background step must have finished by; the ledger keeps it for the reader. */
   finishBy: releaseVersionSchema.optional(),
+  /** How long a background step waits for the queue work it sent, past the 60 s default. */
+  queueWaitMs: z.number().int().positive().optional(),
 });
 export type MigrationStepDeclaration = z.infer<typeof migrationStepDeclarationSchema>;
 

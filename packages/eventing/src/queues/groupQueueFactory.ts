@@ -16,8 +16,8 @@ import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./
 export interface EventingGroupQueueFactoryOptions {
   dependencies: GroupQueueDependencies<Record<string, unknown>>;
   consumersEnabled?: boolean;
-  /** A second consumer runs only the groups listed under this key, ahead of any backlog. */
-  allowListKeyFor?: (queueName: string) => string;
+  /** A second consumer runs only the groups on lists `runListedWork` opens, ahead of the rest. */
+  listedConsumer?: boolean;
 }
 
 /** A schema refusal is deterministic: retrying the same value would only fail 25 times. */
@@ -80,16 +80,16 @@ export async function backOffWhenOverloaded<T>({
   }
 }
 
-/** The queue's own consumer, and one that runs only listed groups when a key names them. */
+/** The queue's own consumer, and one that runs only listed groups when asked for. */
 function consumerDependencies({
   dependencies,
-  listedKey,
+  listedConsumer,
 }: {
   dependencies: GroupQueueDependencies<Record<string, unknown>>;
-  listedKey: string | undefined;
+  listedConsumer: boolean;
 }): GroupQueueDependencies<Record<string, unknown>>[] {
-  if (listedKey === undefined) return [dependencies];
-  return [dependencies, { ...dependencies, dispatchGroupAllowListKey: listedKey }];
+  if (!listedConsumer) return [dependencies];
+  return [dependencies, { ...dependencies, dispatchListed: true }];
 }
 
 /**
@@ -100,7 +100,7 @@ function consumerDependencies({
 export function createEventingGroupQueueFactory({
   dependencies,
   consumersEnabled = true,
-  allowListKeyFor,
+  listedConsumer = false,
 }: EventingGroupQueueFactoryOptions): (
   definition: EventSourcedQueueDefinition<Record<string, unknown>>,
 ) => EventSourcedQueueProcessor<Record<string, unknown>> {
@@ -157,12 +157,10 @@ export function createEventingGroupQueueFactory({
     return {
       send: (payload, options) => producer.send(payload, options),
       sendBatch: (payloads, options) => producer.sendBatch(payloads, options),
+      runListedWork: (input) => producer.runListedWork(input),
       start() {
         if (!consumersEnabled || consumers.length > 0) return;
-        consumers = consumerDependencies({
-          dependencies,
-          listedKey: allowListKeyFor?.(eventingDefinition.name),
-        }).map(startConsuming);
+        consumers = consumerDependencies({ dependencies, listedConsumer }).map(startConsuming);
       },
       pause: () => consumers.forEach((each) => each.pause()),
       resume: () => consumers.forEach((each) => each.resume()),

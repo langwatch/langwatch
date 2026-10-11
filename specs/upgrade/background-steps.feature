@@ -161,9 +161,9 @@ Feature: The worker runs declared background steps
     Then the step is not recorded done
     And it is pending again with its checkpoint cleared, naming why
 
-  # Queue work from upgrade steps runs ahead of bulk work (Alex, 2026-10-11): the worker runs a
-  # second consumer that takes only the groups an upgrade step's sends listed. Permission changes
-  # stay in the normal queue.
+  # Queue work from upgrade steps runs ahead of bulk work (Alex, 2026-10-11): each step run sends
+  # on a list of its own, which the worker's listed consumer runs ahead of any backlog, and the
+  # step is done only once that work has run. Permission changes stay in the normal queue.
   @integration
   Scenario: Queue work an upgrade step sends runs ahead of a backlog
     Given a job queue holding a large backlog of older work
@@ -172,15 +172,31 @@ Feature: The worker runs declared background steps
     Then it runs the command and then the job the command caused
     And it takes no job from the backlog
 
+  @integration
   @unit
-  Scenario: Queue work an upgrade step sends is listed for the upgrade-step consumer
-    Given a worker running a pending background step
-    When the step sends queue work
-    Then the work names the upgrade-step list of the job queue
-    And the step is recorded done with its report
+  Scenario: A background step is done only once the queue work it sent has run
+    Given a worker running a pending background step that sends a command
+    When the step's run returns
+    Then the step waits until the command and the jobs it caused have run, 60 seconds unless it declares longer
+    And only then is it recorded done, and its list is removed
+
+  @integration
+  Scenario: A failed job fails only the step whose list it is on
+    Given two background steps running at once, each with its own list
+    When a job on the first step's list fails and blocks its group
+    Then the first step's run fails naming that group
+    And the second step finishes and is recorded done
+
+  @integration
+  @unit
+  Scenario: A step whose queue work does not run in time fails that attempt and stays resumable
+    Given a background step whose queue work has not all run when its wait runs out
+    When the wait runs out
+    Then the attempt fails naming the groups still waiting, and its list is removed
+    And the step is pending again with its checkpoint kept, to retry after its backoff
 
   @unit
   Scenario: The upgrade-step consumer leaves the queue's wake-up signal to the main consumer
     Given the worker runs the upgrade-step consumer beside its main consumer
     When the upgrade-step consumer waits for listed work
-    Then it polls, and never takes or clears the queue's shared wake-up signal
+    Then it claims from each open list in turn, polling, and never takes or clears the queue's shared wake-up signal

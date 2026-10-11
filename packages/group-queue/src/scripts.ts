@@ -1738,6 +1738,9 @@ return {pending, active, failed, blocked, #groups, held, pendingGroups, failedId
 `;
 const inspectPreflightTargetsScript = new CachedLuaScript(INSPECT_PREFLIGHT_TARGETS_LUA);
 
+/** How long a preflight's or a listed run's groups stay recorded after their last registration. */
+const LISTED_GROUPS_TTL_SEC = 3600;
+
 /** How many group ids a single refusal names before it says "and N more". */
 export const PREFLIGHT_NAMED_GROUP_LIMIT = 20;
 
@@ -2517,9 +2520,31 @@ export class GroupStagingScripts {
       `${this.keyPrefix}blocked`,
       `${targetKey}:baseline`,
       this.keyPrefix,
-      "3600",
+      String(LISTED_GROUPS_TTL_SEC),
       ...groupIds,
     );
+  }
+
+  /** Opens a list for a `dispatchListed` consumer; it lapses with its groups' own expiry. */
+  async openGroupList({ listKey, nowMs }: { listKey: string; nowMs: number }): Promise<void> {
+    await this.redis.zadd(this.openGroupListsKey(), nowMs + LISTED_GROUPS_TTL_SEC * 1000, listKey);
+  }
+
+  /** The lists a `dispatchListed` consumer runs now, dropping any that lapsed. */
+  async findOpenGroupLists(nowMs: number): Promise<string[]> {
+    const key = this.openGroupListsKey();
+    await this.redis.zremrangebyscore(key, "-inf", nowMs);
+    return this.redis.zrange(key, 0, -1);
+  }
+
+  /** Closes a list and removes its groups' record; the jobs themselves stay queued. */
+  async closeGroupList(listKey: string): Promise<void> {
+    await this.redis.zrem(this.openGroupListsKey(), listKey);
+    await this.redis.del(listKey, `${listKey}:candidates`, `${listKey}:baseline`);
+  }
+
+  private openGroupListsKey(): string {
+    return `${this.keyPrefix}listed`;
   }
 
   /**

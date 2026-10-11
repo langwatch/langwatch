@@ -13,6 +13,7 @@ import {
 import {
   type BackgroundStepsLedger,
   type BackgroundStepsLog,
+  type BackgroundStepsQueue,
   BackgroundStepsService,
 } from "../background-steps.service.ts";
 
@@ -243,13 +244,15 @@ function serviceOver({
   run,
   log = () => undefined,
   clock = { now: 0 },
-  runStepWork,
+  queue,
+  queueWaitMs,
 }: {
   ledger: MemoryBackgroundLedger;
   run: MigrationStepRun;
   log?: BackgroundStepsLog;
   clock?: { now: number };
-  runStepWork?: <Result>(work: () => Promise<Result>) => Promise<Result>;
+  queue?: BackgroundStepsQueue;
+  queueWaitMs?: number;
 }) {
   return BackgroundStepsService.create({
     ledger,
@@ -259,6 +262,7 @@ function serviceOver({
         kind: "data",
         mode: "background",
         description: "Reopens accounts that never proved their address.",
+        ...(queueWaitMs === undefined ? {} : { queueWaitMs }),
         run,
       }),
     ],
@@ -269,7 +273,7 @@ function serviceOver({
     renewEveryMs: 1_000,
     retry: { attempts: 3, firstBackoffMs: 60_000, maxBackoffMs: 600_000 },
     now: () => clock.now,
-    ...(runStepWork === undefined ? {} : { runStepWork }),
+    ...(queue === undefined ? {} : { queue }),
   });
 }
 
@@ -820,35 +824,92 @@ describe("BackgroundStepsService one copy at a time", () => {
   });
 });
 
+/** The job queue's listed runs: records each run, and answers with the work or a refusal. */
+class ListedRunsDouble implements BackgroundStepsQueue {
+  readonly runs: { name: string; timeoutMs: number }[] = [];
+  refusal: Error | undefined;
+
+  async runListedWork<Result>({
+    name,
+    timeoutMs,
+    work,
+  }: {
+    name: string;
+    timeoutMs: number;
+    work: () => Promise<Result>;
+  }): Promise<Result> {
+    this.runs.push({ name, timeoutMs });
+    const result = await work();
+    if (this.refusal) throw this.refusal;
+    return result;
+  }
+}
+
 describe("BackgroundStepsService queue work", () => {
-  describe("given a worker that runs step work ahead of the queue backlog", () => {
-    /** @scenario "Queue work an upgrade step sends is listed for the upgrade-step consumer" */
-    it("runs the whole step inside that work and records it done", async () => {
+  describe("given a step whose queue work all runs", () => {
+    /** @scenario "A background step is done only once the queue work it sent has run" */
+    it("runs the step on a list of its own, waiting 60 s by default, and records it done", async () => {
       const ledger = new MemoryBackgroundLedger();
-      let listing = false;
-      const sentWhileListing: boolean[] = [];
-      const service = serviceOver({
-        ledger,
-        runStepWork: async (work) => {
-          listing = true;
-          try {
-            return await work();
-          } finally {
-            listing = false;
-          }
-        },
-        run: async ({ checkpoint }) => {
-          sentWhileListing.push(listing);
-          await checkpoint.save({ report: { sent: 1 } });
-          sentWhileListing.push(listing);
-          return { sent: 2 };
-        },
-      });
+      const queue = new ListedRunsDouble();
+      const service = serviceOver({ ledger, queue, run: async () => ({ sent: 2 }) });
 
       expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
 
-      expect(sentWhileListing).toEqual([true, true]);
+      expect(queue.runs).toEqual([
+        { name: expect.stringMatching(`^upgrade-step:${STEP}:`), timeoutMs: 60_000 },
+      ]);
       expect(ledger.row).toMatchObject({ status: "done", report: { sent: 2 } });
+    });
+  });
+
+  describe("given two runs of a step that declares a longer wait", () => {
+    it("waits as long as it declares, on a new list each run", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new ListedRunsDouble();
+      queue.refusal = new Error("Queue work had not all run within 300000 ms");
+      const clock = { now: 0 };
+      const service = serviceOver({
+        ledger,
+        queue,
+        clock,
+        queueWaitMs: 300_000,
+        run: async () => ({ sent: 1 }),
+      });
+
+      await sweepOnce(service);
+      queue.refusal = undefined;
+      clock.now = 600_000;
+      await sweepOnce(service);
+
+      expect(queue.runs.map((run) => run.timeoutMs)).toEqual([300_000, 300_000]);
+      expect(new Set(queue.runs.map((run) => run.name)).size).toBe(2);
+    });
+  });
+
+  describe("given a step whose queue work failed or did not run in time", () => {
+    /** @scenario "A step whose queue work does not run in time fails that attempt and stays resumable" */
+    it("is not recorded done: pending again with the refusal and its checkpoint kept", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new ListedRunsDouble();
+      queue.refusal = new Error(
+        "Queue work of upgrade-step had not all run within 60000 ms (still waiting: t/command/a)",
+      );
+      const service = serviceOver({
+        ledger,
+        queue,
+        run: async ({ checkpoint }) => {
+          await checkpoint.save({ report: { sent: 1 } });
+          return { sent: 1 };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [], retrying: [STEP] });
+
+      expect(ledger.row).toMatchObject({
+        status: "pending",
+        report: { sent: 1 },
+        lastError: expect.stringContaining("still waiting: t/command/a"),
+      });
     });
   });
 });

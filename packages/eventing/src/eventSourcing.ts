@@ -32,6 +32,7 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   JobDelivery,
+  ListedWork,
 } from "./queues/index.ts";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory.ts";
 import type { ReplayService } from "./replay/replayService.ts";
@@ -63,9 +64,6 @@ import {
 import { upcastEventStore } from "./upcast/upcastEventStore.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
-
-/** The one queue eventing runs on, unless a composition names another. */
-export const EVENTING_QUEUE_NAME = "event-sourcing/jobs";
 
 /**
  * Options for constructing an EventSourcing instance.
@@ -193,7 +191,7 @@ export class EventSourcing {
     this._eventStore = options.eventStore;
     this._eventReadSeat = options.eventReadSeat;
     this._queueFactory = options.queueFactory;
-    this._queueName = options.queueName ?? EVENTING_QUEUE_NAME;
+    this._queueName = options.queueName ?? "event-sourcing/jobs";
     this._consumersEnabled = options.consumersEnabled ?? true;
     this._executionTarget = options.executionTarget;
     this._replayMarkerChecker = options.replayMarkerChecker;
@@ -665,6 +663,15 @@ export class EventSourcing {
       processName: HANDOFF_PROCESS_NAME,
       handlers: Object.fromEntries(handoffLaneKindSchema.options.map((kind) => [kind, route])),
     });
+  }
+
+  /**
+   * Runs `work` so the queue jobs it sends, and the jobs those cause, run ahead of any backlog,
+   * and returns once they have all run. A queue with no list of its own just runs the work.
+   */
+  runListedWork<Result>(input: ListedWork<Result>): Promise<Result> {
+    const queue = this._globalQueue;
+    return queue?.runListedWork ? queue.runListedWork(input) : input.work();
   }
 
   /**

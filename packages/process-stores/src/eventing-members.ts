@@ -51,7 +51,6 @@ import type { RedisConnection } from "@langwatch/redis-client";
 
 import type { EventingConfig, EventingGroupQueueConfig, EventingStoreConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
-import { upgradeStepGroupsKey } from "./upgrade-step-dispatch.ts";
 
 /** The event log a draining role reads. */
 export interface EventingEventLogMembers {
@@ -343,7 +342,7 @@ function eventingQueueFactory(options: {
   return createEventingGroupQueueFactory({
     dependencies,
     consumersEnabled: options.consumersEnabled,
-    allowListKeyFor: (queueName) => upgradeStepGroupsKey({ queueName }),
+    listedConsumer: true,
   });
 }
 

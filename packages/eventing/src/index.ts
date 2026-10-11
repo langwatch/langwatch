@@ -58,7 +58,7 @@ export { EventMetadataBaseSchema, EventSchema, ProjectionSchema } from "./domain
 export type { ExecutionTarget, RetentionPolicy, RetentionPolicyResolver } from "./runtime.types.ts";
 export type { EventSourcingOptions } from "./eventSourcing.ts";
 // Runtime
-export { EVENTING_QUEUE_NAME, EventSourcing } from "./eventSourcing.ts";
+export { EventSourcing } from "./eventSourcing.ts";
 // Pipeline (static definitions)
 export {
   type DeclaredEvents,

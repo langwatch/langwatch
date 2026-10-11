@@ -1,17 +1,18 @@
 /**
- * A consumer that runs only listed groups, beside a large backlog: the work a
- * listed send causes is listed too, and nothing from the backlog is taken.
+ * Listed runs beside a large backlog: a run's jobs, and the jobs they cause, run on the listed
+ * consumer and the run returns once they have all run. A fault or a timeout fails only that run.
  * Spec: specs/upgrade/background-steps.feature.
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import IORedis, { type Redis } from "ioredis";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { GroupQueueContext, GroupQueueContextMetadata } from "../contracts.ts";
+import { GroupQueueError, NonRetryableGroupQueueError } from "../errors.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 
-type TestPayload = { id: string; groupId: string; followUp?: string };
+type TestPayload = { id: string; groupId: string; followUp?: string; fails?: boolean };
 
 const BACKLOG = 2_000;
 const HOUR_AGO_MS = Date.now() - 60 * 60 * 1000;
@@ -29,11 +30,19 @@ class TestQueueContext implements GroupQueueContext {
   }
 }
 
-describe("GroupQueueProcessor - allow-listed dispatch beside a backlog", () => {
+async function refusalOf(run: Promise<unknown>): Promise<unknown> {
+  return run.then(
+    () => undefined,
+    (error: unknown) => error,
+  );
+}
+
+describe("GroupQueueProcessor - listed runs beside a backlog", () => {
   let redis: Redis;
   let queues: GroupQueueProcessor<TestPayload>[];
   let queueName: string;
   let context: TestQueueContext;
+  let processed: string[];
 
   beforeAll(() => {
     redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
@@ -43,6 +52,7 @@ describe("GroupQueueProcessor - allow-listed dispatch beside a backlog", () => {
 
   beforeEach(() => {
     queues = [];
+    processed = [];
     queueName = `{test/gqlisted/${crypto.randomUUID().slice(0, 8)}}`;
     context = new TestQueueContext();
   });
@@ -58,70 +68,116 @@ describe("GroupQueueProcessor - allow-listed dispatch beside a backlog", () => {
     await redis.quit();
   });
 
-  function listKey(): string {
-    return `${queueName}:gq:upgrade-steps`;
-  }
-
-  function createQueue({
-    consumer,
-    process = async () => {},
-  }: {
-    consumer: boolean;
-    process?: (payload: TestPayload) => Promise<void>;
-  }): GroupQueueProcessor<TestPayload> {
-    const queue = new GroupQueueProcessor<TestPayload>(
+  function createQueue({ listed }: { listed: boolean }): GroupQueueProcessor<TestPayload> {
+    const queue: GroupQueueProcessor<TestPayload> = new GroupQueueProcessor<TestPayload>(
       {
         name: queueName,
-        process,
+        process: async (payload) => {
+          if (payload.fails) throw new NonRetryableGroupQueueError(`${payload.id} refused`);
+          processed.push(payload.id);
+          if (payload.followUp) {
+            await producer().send({ id: payload.followUp, groupId: `${payload.groupId}/reaction` });
+          }
+        },
         groupKey: (payload) => payload.groupId,
         identify: (payload) => payload.id,
         score: (payload) => (payload.id.startsWith("backlog-") ? HOUR_AGO_MS : Date.now()),
       },
       redis,
-      {
-        consumerEnabled: consumer,
-        context,
-        ...(consumer ? { dispatchGroupAllowListKey: listKey() } : {}),
-      },
+      { consumerEnabled: listed, context, ...(listed ? { dispatchListed: true } : {}) },
     );
     queues.push(queue);
     return queue;
   }
 
-  describe("given a large backlog of older groups and one listed send", () => {
+  function producer(): GroupQueueProcessor<TestPayload> {
+    return queues[0]!;
+  }
+
+  async function withBacklog(): Promise<GroupQueueProcessor<TestPayload>> {
+    const sender = createQueue({ listed: false });
+    await sender.waitUntilReady();
+    await sender.sendBatch(
+      Array.from({ length: BACKLOG }, (_, index) => ({
+        id: `backlog-${index}`,
+        groupId: `tenant-${index % 50}/bulk/${index}`,
+      })),
+    );
+    return sender;
+  }
+
+  describe("given a large backlog of older groups and a run that sends a command", () => {
     /** @scenario "Queue work an upgrade step sends runs ahead of a backlog" */
-    it("runs the listed job and the job it causes, and takes nothing from the backlog", async () => {
-      const producer = createQueue({ consumer: false });
-      await producer.waitUntilReady();
-      await producer.sendBatch(
-        Array.from({ length: BACKLOG }, (_, index) => ({
-          id: `backlog-${index}`,
-          groupId: `tenant-${index % 50}/bulk/${index}`,
-        })),
-      );
+    /** @scenario "A background step is done only once the queue work it sent has run" */
+    it("returns once the command and the job it caused have run, taking nothing from the backlog", async () => {
+      const sender = await withBacklog();
+      await createQueue({ listed: true }).waitUntilReady();
 
-      await context.run({ queueDispatchScopeKey: listKey() }, () =>
-        producer.send({ id: "step-command", groupId: "tenant-1/command/a", followUp: "reaction" }),
-      );
-
-      const processed: string[] = [];
-      const consumer = createQueue({
-        consumer: true,
-        process: async (payload) => {
-          processed.push(payload.id);
-          if (payload.followUp) {
-            await producer.send({ id: payload.followUp, groupId: "tenant-1/subscriber/a" });
-          }
+      const report = await sender.runListedWork({
+        name: "upgrade-step:trace:month-ids:run-1",
+        timeoutMs: 20_000,
+        work: async () => {
+          await sender.send({ id: "command", groupId: "tenant-1/command/a", followUp: "reaction" });
+          return { sent: 1 };
         },
       });
-      await consumer.waitUntilReady();
 
-      await vi.waitFor(() => expect(processed).toEqual(["step-command", "reaction"]), {
-        timeout: 20_000,
-        interval: 50,
-      });
-      expect(processed.some((id) => id.startsWith("backlog-"))).toBe(false);
+      expect(report).toEqual({ sent: 1 });
+      expect(processed).toEqual(["command", "reaction"]);
       expect(await redis.zcard(`${queueName}:gq:ready`)).toBeGreaterThanOrEqual(BACKLOG);
+      expect(await redis.keys(`${queueName}:gq:listed*`)).toEqual([]);
     }, 30_000);
+  });
+
+  describe("given two runs at once, one of whose commands fails", () => {
+    /** @scenario "A failed job fails only the step whose list it is on" */
+    it("refuses the failing run naming its group, and the other run finishes", async () => {
+      const sender = await withBacklog();
+      await createQueue({ listed: true }).waitUntilReady();
+
+      const [failing, finishing] = await Promise.all([
+        refusalOf(
+          sender.runListedWork({
+            name: "upgrade-step:a:fails",
+            timeoutMs: 20_000,
+            work: () => sender.send({ id: "bad", groupId: "tenant-2/command/bad", fails: true }),
+          }),
+        ),
+        refusalOf(
+          sender.runListedWork({
+            name: "upgrade-step:b:works",
+            timeoutMs: 20_000,
+            work: () => sender.send({ id: "good", groupId: "tenant-3/command/good" }),
+          }),
+        ),
+      ]);
+
+      expect(failing).toBeInstanceOf(GroupQueueError);
+      expect(failing).toMatchObject({ operation: "runListedWork" });
+      expect(String((failing as Error).message)).toContain("tenant-2/command/bad");
+      expect(finishing).toBeUndefined();
+      expect(processed).toEqual(["good"]);
+      expect(await redis.keys(`${queueName}:gq:listed*`)).toEqual([]);
+    }, 30_000);
+  });
+
+  describe("given no listed consumer runs the work", () => {
+    /** @scenario "A step whose queue work does not run in time fails that attempt and stays resumable" */
+    it("refuses once the wait runs out, naming the group still waiting, and removes the list", async () => {
+      const sender = createQueue({ listed: false });
+      await sender.waitUntilReady();
+
+      const refusal = await refusalOf(
+        sender.runListedWork({
+          name: "upgrade-step:c:stuck",
+          timeoutMs: 300,
+          work: () => sender.send({ id: "stuck", groupId: "tenant-4/command/stuck" }),
+        }),
+      );
+
+      expect(refusal).toMatchObject({ operation: "runListedWork" });
+      expect(String((refusal as Error).message)).toContain("still waiting: tenant-4/command/stuck");
+      expect(await redis.keys(`${queueName}:gq:listed*`)).toEqual([]);
+    });
   });
 });

@@ -8,6 +8,7 @@ import { hostname } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { setLedgerCurrent } from "@langwatch/api";
+import type { ListedWork } from "@langwatch/eventing";
 
 import type { ServerRole } from "../feature-installer.ts";
 import { UPGRADE_CONSOLE_TOKEN_TTL_MS, type UpgradeConsole } from "../lifecycle/liveness-thread.ts";
@@ -35,7 +36,16 @@ export type UpgradeGateVerdict =
 /** A worker's declared background steps, run by the gate's package (round 14: framework runs). */
 export type UpgradeGateBackgroundSteps = Readonly<{
   isStep: (contribution: unknown) => contribution is { readonly id: string };
-  start: (steps: readonly { readonly id: string }[]) => Readonly<{ stop: () => Promise<void> }>;
+  /** `queue` runs a step's jobs ahead of any backlog and waits for them (Alex, 2026-10-11). */
+  start: (
+    steps: readonly { readonly id: string }[],
+    queue?: UpgradeGateStepQueue,
+  ) => Readonly<{ stop: () => Promise<void> }>;
+}>;
+
+/** The worker's job queue, as a background step's listed runs see it. */
+export type UpgradeGateStepQueue = Readonly<{
+  runListedWork: <Result>(input: ListedWork<Result>) => Promise<Result>;
 }>;
 
 /** What a gate answers: `admit` before the application starts, `release` at a graceful stop. */

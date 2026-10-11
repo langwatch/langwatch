@@ -185,6 +185,14 @@ export function getBackoffMs(attempt: number): number {
  */
 export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil((JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3);
 
+/** What a refusal over a list's groups names: the operation, and whose work it was. */
+type TargetsFault = Readonly<{ operation: string; work: string }>;
+
+const PREFLIGHT_FAULT: TargetsFault = {
+  operation: "waitUntilPreflightIdle",
+  work: "Migration preflight work",
+};
+
 /** The groups a preflight refusal names, capped so one wide fan-out stays a log line. */
 function namedGroups({ groupIds, total }: { groupIds: readonly string[]; total: number }): string {
   if (groupIds.length === 0) return `${total} group(s)`;
@@ -365,6 +373,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
   private readonly dispatchGroupAllowListKey?: string;
+  private readonly dispatchListed: boolean;
   private readonly preflightDrainTimeoutMs: number;
   private readonly dispatcher: GroupQueueDispatcher | null;
   private readonly metricsCollector: GroupQueueMetricsCollector | null;
@@ -426,6 +435,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     options?: {
       consumerEnabled?: boolean;
       dispatchGroupAllowListKey?: string;
+      /** Runs only the groups on the lists `runListedWork` opens, from any process. */
+      dispatchListed?: boolean;
       preflightDrainTimeoutMs?: number;
       objectStoreFor?: (projectId: string) => ObjectStore;
       resolveStorageDestination?: (projectId: string) => Promise<Destination>;
@@ -474,6 +485,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     this.redisConnection = effectiveConnection;
     this.consumerEnabled = options?.consumerEnabled ?? true;
     this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
+    this.dispatchListed = options?.dispatchListed ?? false;
     this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 60_000;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
@@ -561,6 +573,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         logger: this.logger,
         dispatchGroupAllowListKey: this.dispatchGroupAllowListKey
           ? `${this.dispatchGroupAllowListKey}:candidates`
+          : undefined,
+        listedGroupsKeys: this.dispatchListed
+          ? () => this.scripts.findOpenGroupLists(nowInstant().epochMilliseconds)
           : undefined,
       });
       this.dispatcher.start();
@@ -2808,18 +2823,90 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         message: "Queue has no preflight allow-list",
       });
     }
-    const deadline = nowInstant().epochMilliseconds + this.preflightDrainTimeoutMs;
+    const unsettled = await this.waitForTargets({
+      key,
+      timeoutMs: this.preflightDrainTimeoutMs,
+      fault: { operation: "waitUntilPreflightIdle", work: "Migration preflight work" },
+      onHeld: (state) => this.logHeldFromBefore(state),
+    });
+    if (unsettled) this.settlePastDrainTimeout(unsettled);
+  }
+
+  /**
+   * Runs `work` with its jobs, and the jobs they cause, on a list a `dispatchListed` consumer runs
+   * ahead of any backlog; returns once all have run, else throws naming the failed, blocked or
+   * waiting groups. The list goes when the run ends. Spec: specs/upgrade/background-steps.feature.
+   */
+  async runListedWork<Result>({
+    name,
+    timeoutMs,
+    work,
+  }: {
+    name: string;
+    timeoutMs: number;
+    work: () => Promise<Result>;
+  }): Promise<Result> {
+    const listKey = `${this.queueName}:gq:listed:${name}`;
+    await this.scripts.openGroupList({ listKey, nowMs: nowInstant().epochMilliseconds });
+    try {
+      const scope = { ...this.captureContext(), queueDispatchScopeKey: listKey };
+      const result = await this.runInContext(scope, work);
+      const fault = { operation: "runListedWork", work: `Queue work of ${name}` };
+      const unsettled = await this.waitForTargets({ key: listKey, timeoutMs, fault });
+      if (unsettled) this.refuseUnsettledList({ name, timeoutMs, state: unsettled, fault });
+      return result;
+    } finally {
+      await this.scripts.closeGroupList(listKey);
+    }
+  }
+
+  /** Polls a list's groups until they settle (undefined) or the deadline passes (their state). */
+  private async waitForTargets({
+    key,
+    timeoutMs,
+    fault,
+    onHeld,
+  }: {
+    key: string;
+    timeoutMs: number;
+    fault: TargetsFault;
+    onHeld?: (state: PreflightTargetsState) => void;
+  }): Promise<PreflightTargetsState | undefined> {
+    const deadline = nowInstant().epochMilliseconds + timeoutMs;
     let reportedHeld = false;
     while (true) {
       const state = await this.scripts.inspectPreflightTargets(key);
       if (!reportedHeld && state.heldFromBefore > 0) {
         reportedHeld = true;
-        this.logHeldFromBefore(state);
+        onHeld?.(state);
       }
-      if (this.preflightHasSettled(state)) return;
-      if (nowInstant().epochMilliseconds >= deadline) return this.settlePastDrainTimeout(state);
+      // A blocked group stays blocked until an operator acts: no point waiting it out.
+      if (state.blocked > 0) this.assertTargetsSucceeded({ state, fault });
+      if (this.targetsHaveSettled({ state, fault })) return undefined;
+      if (nowInstant().epochMilliseconds >= deadline) return state;
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
     }
+  }
+
+  /** A listed run past its deadline: a fault is named first, else the work still waiting. */
+  private refuseUnsettledList({
+    name,
+    timeoutMs,
+    state,
+    fault,
+  }: {
+    name: string;
+    timeoutMs: number;
+    state: PreflightTargetsState;
+    fault: TargetsFault;
+  }): never {
+    this.assertTargetsSucceeded({ state, fault });
+    const waiting = namedGroups({ groupIds: state.pendingGroupIds, total: state.pendingGroups });
+    throw new GroupQueueError({
+      queueName: this.queueName,
+      operation: "runListedWork",
+      message: `Queue work of ${name} had not all run within ${timeoutMs} ms on queue ${this.queueName} (still waiting: ${waiting})`,
+    });
   }
 
   /**
@@ -2828,7 +2915,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * pass clears a fault. specs/migration/system-migrations-runner.feature.
    */
   private settlePastDrainTimeout(state: PreflightTargetsState): void {
-    this.assertPreflightTargetsSucceeded(state);
+    this.assertTargetsSucceeded({ state, fault: PREFLIGHT_FAULT });
     this.logger.warn(
       {
         queueName: this.queueName,
@@ -2842,9 +2929,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }
 
   /** Throws on the way past when the settled work did not all succeed. */
-  private preflightHasSettled(state: PreflightTargetsState): boolean {
+  private targetsHaveSettled({
+    state,
+    fault,
+  }: {
+    state: PreflightTargetsState;
+    fault: TargetsFault;
+  }): boolean {
     if (state.pending > 0 || state.active > 0) return false;
-    this.assertPreflightTargetsSucceeded(state);
+    this.assertTargetsSucceeded({ state, fault });
     return this.processingQueue.idle();
   }
 
@@ -2860,7 +2953,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     );
   }
 
-  private assertPreflightTargetsSucceeded(state: PreflightTargetsState): void {
+  private assertTargetsSucceeded({
+    state,
+    fault,
+  }: {
+    state: PreflightTargetsState;
+    fault: TargetsFault;
+  }): void {
     if (state.failed === 0 && state.blocked === 0) return;
     const faults: string[] = [];
     if (state.failed > 0)
@@ -2874,8 +2973,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     }
     throw new GroupQueueError({
       queueName: this.queueName,
-      operation: "waitUntilPreflightIdle",
-      message: `Migration preflight work did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
+      operation: fault.operation,
+      message: `${fault.work} did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
     });
   }
 

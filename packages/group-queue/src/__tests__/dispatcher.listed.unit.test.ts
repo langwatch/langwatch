@@ -13,7 +13,7 @@ import type { DispatchResult } from "../scripts.ts";
 describe("GroupQueueDispatcher with an allow-list", () => {
   describe("given it runs beside the queue's own dispatcher", () => {
     /** @scenario "The upgrade-step consumer leaves the queue's wake-up signal to the main consumer" */
-    it("polls for listed groups without taking or clearing the signal", async () => {
+    it("claims from each open list in turn, polling without taking or clearing the signal", async () => {
       const dispatchBatch = vi.fn(async (): Promise<DispatchResult[]> => []);
       const brpop = vi.fn(async () => null);
       const del = vi.fn(async () => 0);
@@ -30,7 +30,7 @@ describe("GroupQueueDispatcher with an allow-list", () => {
         activeTtlSec: 300,
         signalTimeoutSec: 0.01,
         logger: createTestLogger().logger,
-        dispatchGroupAllowListKey: "{test}:gq:upgrade-steps:candidates",
+        listedGroupsKeys: async () => ["{test}:gq:listed:a", "{test}:gq:listed:b"],
       });
 
       dispatcher.start();
@@ -43,9 +43,11 @@ describe("GroupQueueDispatcher with an allow-list", () => {
 
       expect(brpop).not.toHaveBeenCalled();
       expect(del).not.toHaveBeenCalled();
-      expect(dispatchBatch).toHaveBeenCalledWith(
-        expect.objectContaining({ allowedGroupsKey: "{test}:gq:upgrade-steps:candidates" }),
-      );
+      for (const list of ["a", "b"]) {
+        expect(dispatchBatch).toHaveBeenCalledWith(
+          expect.objectContaining({ allowedGroupsKey: `{test}:gq:listed:${list}:candidates` }),
+        );
+      }
     });
   });
 });
