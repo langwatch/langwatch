@@ -4821,6 +4821,7 @@ export function SecretModal({
       closeOnInteractOutside={false}
       note={<Link href={`/governance/inventory/${details.sourceId}`}>View source page →</Link>}
       primaryAction={{ label: "I've saved it", onClick: onClose }}
+      cancelLabel={null}
     >
       <VStack align="stretch" gap={4}>
         <Text fontSize="sm" color="fg.muted">
