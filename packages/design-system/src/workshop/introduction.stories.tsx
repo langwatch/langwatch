@@ -58,6 +58,13 @@ function Introduction({ colorMode }: { colorMode?: unknown }) {
           it. A component's page shows it, then its states, then its props. The toolbar switches the
           colour mode.
         </Text>
+        <Text>
+          Raw Chakra components, the layer under these, are in{" "}
+          <Link href="https://storybook.chakra-ui.com" target="_blank" rel="noreferrer">
+            Chakra UI's own Storybook
+          </Link>
+          .
+        </Text>
       </Stack>
       <Stack gap={2}>
         <Heading size="sm">Adding a component</Heading>

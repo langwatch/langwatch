@@ -3,11 +3,7 @@ import { useEffect, useState } from "react";
 import { GLOBALS_UPDATED, SET_GLOBALS } from "storybook/internal/core-events";
 import { addons } from "storybook/preview-api";
 
-import { paperTheme, pickScheme } from "./theme.ts";
-
-/** The toolbar's colour mode as a scheme: "System" (or nothing yet) follows the OS. */
-export const schemeFor = (mode: unknown) =>
-  mode === "light" || mode === "dark" ? mode : pickScheme();
+import { paperTheme, schemeFor } from "./theme.ts";
 
 /** `globals=colorMode:dark;…` on the preview's URL, which the manager sets on every load. */
 const modeInUrl = () =>
