@@ -111,3 +111,69 @@ Tester recipes:
   each; `sk-admin-nokeys` drops the key dimension, `sk-admin-flaky` fails after page one and resumes.
   Anthropic usage and cost sources (`sk-ant-admin-good`) page the same. Claude compliance and the
   Microsoft directory audits as custom pulls: 7 events, then 0.
+
+## Codex (ChatGPT subscription) sign-in and turns
+
+`codex.go` stands in for OpenAI's Codex issuer and model backend. `haven up +outbound` sets
+`CODEX_OAUTH_ISSUER=<direct>/codex-auth` (model-provider module: device sign-in, refresh) and
+`CODEX_API_BASE=<direct>/codex-api` (the AI gateway: `POST /responses`), unless .env names them.
+Unset means OpenAI. Routes, in OpenAI's own shape: `POST /codex-auth/api/accounts/deviceauth/usercode`
+(device id, user code `SIMC-nnnn`, interval 3), `.../deviceauth/token` (403 `authorization_pending`
+or `slow_down` while waiting, 404 unknown device, 400 `expired_token` or `access_denied`, then the
+authorization code), `POST /codex-auth/oauth/token` (code and refresh grants; refused refresh is 400
+`invalid_grant`), `GET /codex-auth/codex/device` (the verification page: type the code, Approve or
+Deny) and `POST /codex-api/responses` (Responses SSE, empty output on `response.completed`; 429
+`usage_limit_reached`; 401 for an expired token). Account `acct_outboundsim`, plan `plus`.
+
+Control API (fault channel `codex`, target = the path):
+```
+GET  /_sim/api/codex                          state + every device sign-in
+PUT  /_sim/api/codex  {"usageLimit":bool,"slowDown":bool,"refreshRevoked":bool,"deviceTtlSeconds":n,"plan":"pro"}
+POST /_sim/api/codex/expire-tokens            every issued access token answers 401 next turn
+POST /_sim/api/codex/devices/<code>/approve|deny|expire
+```
+
+Tester recipes:
+- CA-23 / MP-20 connect: Settings > Model providers > Codex; open the verification URL shown
+  (outboundsim's page), Approve; the drawer finishes, Codex shows connected (`codex@sim.vendor.test`).
+  Leave it pending past `deviceTtlSeconds` (or `.../expire`) for the calm timeout; `deny` for refused.
+- Refresh: `expire-tokens`, run a Langy turn: the gateway gets 401, refreshes via the issuer, retries.
+  Expired session: `PUT {"refreshRevoked":true}` then `expire-tokens`: the re-authenticate card.
+- Usage limit: `PUT {"usageLimit":true}`: the turn fails with the plan-limit explanation.
+- MP-26 allow-list leg: connect Codex here, then ask a non-Codex surface for a Codex model.
+
+## Cloud stand-ins: AWS STS, Azure Blob, Web Push
+
+Fault channels `aws`, `azure`, `push`. `haven up +outbound` sets, unless .env names them:
+`MANAGED_BEDROCK_STS_BASE=<direct>/sts` (managed-provider module: both role hops),
+`AZURE_BLOB_ENDPOINT=<outbound>/azure-blob/<AZURE_BLOB_ACCOUNT_NAME or simaccount>` and
+`AZURE_BLOB_AUTHORITY_HOST=<outbound>/azure-login` (object storage; inert unless
+`STORED_OBJECTS_BACKEND=azure`). `WEB_PUSH_SERVICE_BASE` (notification module) is not set: see NOTIF-09.
+
+- `sts.go`: `POST /sts/` AssumeRole (SigV4 header required, never verified) answers fresh session
+  credentials; a role ARN holding `denied` is 403 AccessDenied.
+- `azureblob.go`: path-style accounts `simaccount` and `otheraccount`, keys are
+  `base64("outboundsim <account> shared key, dev only")` (dev-only, like Azurite's). Put/Get/Delete
+  Blob, `HEAD ?restype=container`, user-delegation key, service and delegation SAS (checked), CORS.
+  Wrong key or unknown account: 403 AuthenticationFailed. `GET /azure-msi/token` is the App Service
+  managed-identity endpoint: tokens live 6 minutes (the product renews 5 minutes early, so it
+  re-exchanges after one). `GET /_sim/api/azure` counts exchanges and lists blobs;
+  `DELETE /_sim/api/azure/tokens` revokes every token (the next call is 401).
+- `webpush.go`: `POST /push/<device>` checks the VAPID JWT (ES256 under `k`, `aud` = the origin
+  reached, `exp` within 24h), TTL and aes128gcm; 201 and a per-device tally at `GET /_sim/api/push`.
+  A device name holding `gone`/`notfound`/`ratelimited` answers 410/404/429;
+  `PUT /_sim/api/push/<device> {"status":410}` makes any device go away, `DELETE` restores it.
+
+Tester recipes:
+- MP-32: `MANAGED_BEDROCK_CONFIGS` holds one organisation (sim values, no real key):
+  `{"<orgId>":{"proxyRoleArn":"arn:aws:iam::111111111111:role/proxy","bedrockRoleArn":"arn:aws:iam::222222222222:role/customer","proxyAwsAccessKeyId":"AKIASIMPROXY","proxyAwsSecretAccessKey":"sim-only","bedrockProxyEndpoint":"http://127.0.0.1:<llmsim port>","region":"us-east-1"}}`
+  with `+llm +outbound`. Model providers of that org: exactly one Bedrock system row; another org: none.
+  A Bedrock call there: `haven sim outbound list --channel aws` shows two AssumeRole hops, llmsim's
+  calls show one Converse. `bedrockRoleArn` holding `denied` refuses the call.
+- DS-46: `STORED_OBJECTS_BACKEND=azure AZURE_BLOB_ACCOUNT_NAME=simaccount AZURE_BLOB_CONTAINER=langwatch`
+  plus either `AZURE_BLOB_ACCOUNT_KEY=<simaccount key>` (shared key) or `AZURE_BLOB_AUTH_MODE=managedIdentity
+  IDENTITY_ENDPOINT=<direct>/azure-msi/token IDENTITY_HEADER=sim` (token mode, refresh). Upload a
+  dataset, open it, delete it; `GET /_sim/api/azure` shows the blob come and go. Wrong account: the
+  `otheraccount` key against `simaccount` (or a name outboundsim does not hold) is denied.
+- NOTIF-09: needs an https push origin the API trusts on an IP literal (blocked, see the fl-cloud
+  handoff). Until then: `POST /push/<device>` with web-push's own request proves the stand-in side.

@@ -68,6 +68,9 @@ type Server struct {
 	receivers  *receiverSet
 	slack      *slackWorkspace
 	databricks *dbxWorkspace
+	azure      *azureStorage
+	push       *pushDevices
+	codex      *codexAccount
 	now        func() time.Time
 	mux        *http.ServeMux
 	console    http.Handler
@@ -87,7 +90,9 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	}
 	s := &Server{
 		cfg: cfg, records: newStore(cfg.MaxRecords), faults: &faultSet{}, receivers: seedReceivers(),
-		slack: seedWorkspace(), databricks: seedDatabricks(time.Now()), now: time.Now, console: newConsole(bundle),
+		slack: seedWorkspace(), databricks: seedDatabricks(time.Now()), codex: newCodexAccount(),
+		azure: newAzureStorage(), push: newPushDevices(), now: time.Now,
+		console: newConsole(bundle),
 	}
 	if cfg.Seed {
 		for _, r := range seedRecords() {
@@ -126,7 +131,31 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /microsoft-graph/v1.0/auditLogs/directoryAudits", s.handleGraphDirectoryAudits)
 	mux.HandleFunc("GET /dataverse/api/data/v9.2/bots", s.handleDataverseBots)
 	mux.HandleFunc("GET /dataverse/api/data/v9.2/conversationtranscripts", s.handleDataverseTranscripts)
+	mux.HandleFunc("POST /codex-auth/api/accounts/deviceauth/usercode", s.handleCodexUserCode)
+	mux.HandleFunc("POST /codex-auth/api/accounts/deviceauth/token", s.handleCodexDeviceToken)
+	mux.HandleFunc("POST /codex-auth/oauth/token", s.handleCodexOAuthToken)
+	mux.HandleFunc("GET /codex-auth/codex/device", s.handleCodexDevicePage)
+	mux.HandleFunc("POST /codex-auth/codex/device", s.handleCodexDeviceDecision)
+	mux.HandleFunc("POST /codex-api/responses", s.handleCodexResponses)
+	mux.HandleFunc("GET /_sim/api/codex", s.handleCodexState)
+	mux.HandleFunc("PUT /_sim/api/codex", s.handleSetCodexState)
+	mux.HandleFunc("POST /_sim/api/codex/expire-tokens", s.handleExpireCodexTokens)
+	mux.HandleFunc("POST /_sim/api/codex/devices/{code}/{action}", s.handleCodexDeviceAction)
+	mux.HandleFunc("POST /sts/", s.handleSTS)
+	for _, method := range []string{"PUT", "GET", "HEAD", "DELETE"} {
+		mux.HandleFunc(method+" /azure-blob/{account}/{container}/{blob...}", s.handleAzureBlob)
+	}
+	mux.HandleFunc("HEAD /azure-blob/{account}/{container}", s.handleAzureBlob)
+	mux.HandleFunc("POST /azure-blob/{account}/", s.handleAzureDelegationKey)
+	mux.HandleFunc("OPTIONS /azure-blob/", s.handleAzureCORS)
+	mux.HandleFunc("GET /azure-msi/token", s.handleAzureManagedIdentity)
+	mux.HandleFunc("POST /push/{device}", s.handlePush)
 	mux.HandleFunc("PUT /_sim/api/databricks/users", s.handleSetDbxUsers)
+	mux.HandleFunc("GET /_sim/api/azure", s.handleAzureStatus)
+	mux.HandleFunc("DELETE /_sim/api/azure/tokens", s.handleAzureRevokeTokens)
+	mux.HandleFunc("GET /_sim/api/push", s.handlePushDevices)
+	mux.HandleFunc("PUT /_sim/api/push/{device}", s.handleSetPushAnswer)
+	mux.HandleFunc("DELETE /_sim/api/push/{device}", s.handleClearPushAnswer)
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
 	mux.HandleFunc("GET /_sim/api/setup", s.handleSetup)
 	mux.HandleFunc("GET /_sim/api/records", s.handleRecords)

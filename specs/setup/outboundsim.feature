@@ -335,3 +335,53 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       When a Dataverse pull source reads /dataverse/api/data/v9.2/bots and conversationtranscripts
       Then outboundsim answers the agents, and the transcripts ordered by createdon and id three a page through @odata.nextLink
       And it honours the createdon cursor and bot ids in $filter, and refuses a revoked or missing token with 401
+
+  Rule: Codex sign-in and turns (the ChatGPT subscription provider)
+
+    @unit
+    Scenario: Outboundsim stands in for Codex device sign-in and model turns
+      When the product starts a Codex device sign-in against /codex-auth and polls it
+      Then outboundsim answers 403 authorization_pending until the code is approved on its verification page
+      And the poll then hands over an authorization code that exchanges for id, access and refresh tokens
+      And a model turn on /codex-api/responses streams Responses SSE ending in response.completed
+
+    @unit
+    Scenario: Outboundsim's Codex refuses as the control API asks
+      Given the control API sets a usage limit, expires the access tokens, revokes refresh or slows polling
+      Then a turn is refused 429 usage_limit_reached, or 401 for an expired token
+      And a refresh is refused 400 invalid_grant, and a poll answers slow_down, expired_token or access_denied
+
+  Rule: Cloud stand-ins (AWS STS, Azure Blob, Web Push)
+
+    @unit
+    Scenario: The overlay points managed Bedrock's STS and Azure Blob storage at outboundsim
+      Given the worktree's environment names none of MANAGED_BEDROCK_STS_BASE, AZURE_BLOB_ENDPOINT or AZURE_BLOB_AUTHORITY_HOST
+      When the developer runs "haven up +outbound"
+      Then the overlay sets MANAGED_BEDROCK_STS_BASE to outboundsim's direct /sts
+      And AZURE_BLOB_ENDPOINT to its haven route's /azure-blob/<account>, the account .env names or simaccount
+      And a base .env names is left alone
+
+    @unit
+    Scenario: Outboundsim answers the STS AssumeRole calls managed Bedrock makes
+      When managed Bedrock assumes its proxy role and then the customer role at /sts/
+      Then outboundsim answers each SigV4-signed AssumeRole with fresh session credentials as STS XML
+      And a role ARN holding denied is refused 403 AccessDenied, and an unsigned call 403 MissingAuthenticationToken
+
+    @unit
+    Scenario: Outboundsim holds Azure Blob accounts the object storage writes, reads and deletes
+      When object storage probes the container, puts, gets and deletes a blob under /azure-blob/<account> with Shared Key
+      Then outboundsim answers 200, 201, 200 with the bytes and 202, and a missing blob 404 BlobNotFound
+      And a browser holding a service or user-delegation SAS can upload and read the blob, with CORS
+
+    @unit
+    Scenario: Outboundsim refuses the wrong Azure account and an expired token
+      When a call is signed with another account's key, or names an account outboundsim does not hold
+      Then it is refused 403 AuthenticationFailed
+      And a managed-identity token from /azure-msi/token lives six minutes, after which a blob call is refused 401
+
+    @unit
+    Scenario: Outboundsim is a push service that records each send per device
+      When the product sends a VAPID-signed aes128gcm message to /push/<device>
+      Then outboundsim answers 201 and /_sim/api/push counts the send against that device
+      And a bad signature or another aud is refused 403, a missing TTL 400
+      And a device named gone, or told to by PUT /_sim/api/push/<device>, answers 410 (or 404, 429)

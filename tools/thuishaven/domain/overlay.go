@@ -510,7 +510,7 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 // and its Slack Web API and webhook addresses at outboundsim's haven route, and
 // admits local webhook URLs, each only when the resolved environment leaves it unset.
 // It also names outboundsim as the base of each governance pull vendor (Databricks,
-// Dataverse, OpenAI, Anthropic, Microsoft sign-in and Graph), on the same rule, at
+// Dataverse, OpenAI, Anthropic, Microsoft sign-in and Graph) and of Codex sign-in and turns, at
 // outboundsim's direct IP-literal port: the egress fence refuses a *.localhost host,
 // and only a configured base is exempt from its private-address rule.
 func OutboundProviderEnv(resolved map[string]string, endpoint string, port int) []string {
@@ -541,6 +541,29 @@ func OutboundProviderEnv(resolved map[string]string, endpoint string, port int) 
 		{"ANTHROPIC_ADMIN_API_BASE", direct + "/anthropic"},
 		{"MICROSOFT_LOGIN_BASE", direct + "/microsoft-login"},
 		{"MICROSOFT_GRAPH_API_BASE", direct + "/microsoft-graph"},
+		{"CODEX_OAUTH_ISSUER", direct + "/codex-auth"},
+		{"CODEX_API_BASE", direct + "/codex-api"},
+		{"MANAGED_BEDROCK_STS_BASE", direct + "/sts"},
+	} {
+		if resolved[v[0]] == "" {
+			env = append(env, v[0]+"="+v[1])
+		}
+	}
+	return append(env, azureBlobEnv(resolved, endpoint)...)
+}
+
+// azureBlobEnv points Azure Blob object storage at outboundsim's path-style account on its
+// haven route, inert unless STORED_OBJECTS_BACKEND=azure. The authority host only satisfies the
+// token-mode transport check: managed identity asks IDENTITY_ENDPOINT, which haven leaves alone.
+func azureBlobEnv(resolved map[string]string, endpoint string) []string {
+	account := resolved["AZURE_BLOB_ACCOUNT_NAME"]
+	if account == "" {
+		account = "simaccount"
+	}
+	var env []string
+	for _, v := range [][2]string{
+		{"AZURE_BLOB_ENDPOINT", endpoint + "/azure-blob/" + account},
+		{"AZURE_BLOB_AUTHORITY_HOST", endpoint + "/azure-login"},
 	} {
 		if resolved[v[0]] == "" {
 			env = append(env, v[0]+"="+v[1])
