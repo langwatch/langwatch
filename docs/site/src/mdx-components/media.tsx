@@ -1,4 +1,4 @@
-import { Box } from "@langwatch/design-system/primitives";
+import { Box, Link } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 
@@ -14,9 +14,9 @@ export function DocsImage({ className, alt, src, width, ...rest }: ComponentProp
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
-      <Box as="a" href={src} fontSize="14px" color="blue.fg" className={themeClass({ className })}>
+      <Link href={src} fontSize="14px" color="blue.fg" className={themeClass({ className })}>
         {alt || "Image unavailable"}
-      </Box>
+      </Link>
     );
   }
   return (

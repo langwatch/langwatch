@@ -71,7 +71,10 @@ export function CodeBody({ source, expanded }: { source: CodeSource; expanded: b
       aria-label={`${source.title || source.lang || "Code"} source`}
       margin="0"
       padding="4"
-      overflow="auto"
+      minWidth="0"
+      maxWidth="100%"
+      overflowX="auto"
+      overflowY="auto"
       maxHeight={capped ? { base: "22rem", md: "33rem" } : undefined}
       fontFamily="mono"
       fontSize="14px"

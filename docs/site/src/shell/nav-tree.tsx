@@ -1,4 +1,4 @@
-import { Box, Flex, Text } from "@langwatch/design-system/primitives";
+import { Box, chakra, Flex, Text } from "@langwatch/design-system/primitives";
 import nav from "virtual:docs-nav";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -44,8 +44,7 @@ function PageRow({ item, current, depth }: { item: Extract<NavItem, { type: "pag
   const method = methodOf({ slug: item.slug });
   return (
     <Box as="li" listStyleType="none">
-      <Box
-        as="a"
+      <chakra.a
         href={`/${item.slug}`}
         aria-current={active ? "page" : undefined}
         display="flex"
@@ -66,7 +65,7 @@ function PageRow({ item, current, depth }: { item: Extract<NavItem, { type: "pag
       >
         {method ? <NavMethod method={method} /> : null}
         <span>{item.title}</span>
-      </Box>
+      </chakra.a>
     </Box>
   );
 }
@@ -86,9 +85,9 @@ function GroupRow({ item, current, depth }: { item: Extract<NavItem, { type: "gr
   }
   return (
     <Box as="li" listStyleType="none">
-      <Flex
-        as="button"
+      <chakra.button
         type="button"
+        display="flex"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         width="100%"
@@ -110,7 +109,7 @@ function GroupRow({ item, current, depth }: { item: Extract<NavItem, { type: "gr
       >
         <span>{item.title}</span>
         <ChevronRight size={14} aria-hidden="true" style={{ transform: open ? "rotate(90deg)" : undefined, flexShrink: 0 }} />
-      </Flex>
+      </chakra.button>
       <Box hidden={!open} data-docs-panel="">
         <NavList items={item.children} current={current} depth={depth + 1} />
       </Box>

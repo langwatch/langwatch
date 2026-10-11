@@ -1,4 +1,4 @@
-import { Alert, Badge, Box, Button, Flex, Input, NativeSelect, Spinner, Tabs, Text, Textarea } from "@langwatch/design-system/primitives";
+import { Alert, Badge, Box, Button, chakra, Flex, Input, NativeSelect, Spinner, Tabs, Text, Textarea } from "@langwatch/design-system/primitives";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CodeFrame } from "../code/code-block.tsx";
@@ -34,7 +34,7 @@ function ParamInput({ param, value, error, onChange }: { param: Parameter; value
   const numeric = param.schema.type === "integer" || param.schema.type === "number";
   return (
     <Box>
-      <Flex as="label" htmlFor={id} alignItems="center" gap="2" fontSize="13px" lineHeight="20px" fontWeight="600" marginBottom="1">
+      <chakra.label htmlFor={id} display="flex" alignItems="center" gap="2" fontSize="13px" lineHeight="20px" fontWeight="600" marginBottom="1">
         <Box as="span" fontFamily="mono">
           {param.name}
         </Box>
@@ -47,7 +47,7 @@ function ParamInput({ param, value, error, onChange }: { param: Parameter; value
             Deprecated
           </Badge>
         ) : null}
-      </Flex>
+      </chakra.label>
       {options ? (
         <NativeSelect.Root size="sm">
           <NativeSelect.Field id={id} value={value} onChange={(event) => onChange(event.target.value)}>
@@ -230,7 +230,7 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
               {host}
             </Text>
     {scheme ? (
-      <Box as="details" open={required.length === 0 || undefined} css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", fontWeight: 600 } }}>
+      <chakra.details open={required.length === 0 || undefined} css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", fontWeight: 600 } }}>
         <summary>Authorisation: {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
         <Flex gap="2" marginTop="1">
           <Input
@@ -253,7 +253,7 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
         <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
           Kept in this tab. Cleared when you reload.
         </Text>
-      </Box>
+      </chakra.details>
     ) : null}
 
     {required.length > 0 ? <Flex direction="column" gap="3">{required.map(renderParam)}</Flex> : null}
@@ -263,19 +263,19 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
       </Flex>
     ) : null}
     {deprecated.length > 0 ? (
-      <Box as="details" css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", color: "var(--chakra-colors-fg-muted)" } }}>
+      <chakra.details css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", color: "var(--chakra-colors-fg-muted)" } }}>
         <summary>Optional fields (deprecated)</summary>
         <Flex direction="column" gap="3" marginTop="2">
           {deprecated.map(renderParam)}
         </Flex>
-      </Box>
+      </chakra.details>
     ) : null}
 
     {operation.body && bodyContent ? (
       <Box>
-        <Text as="label" htmlFor="pg-body" display="block" fontSize="13px" fontWeight="600" marginBottom="1">
+        <chakra.label htmlFor="pg-body" display="block" fontSize="13px" fontWeight="600" marginBottom="1">
           Body <Text as="span" fontWeight="400" color="fg.muted">(application/json)</Text>
-        </Text>
+        </chakra.label>
         <Textarea
           id="pg-body"
           size="sm"
@@ -334,7 +334,7 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
       ) : null}
 
       <Panel title="Request example" aside={<Text as="span" fontSize="12px" fontWeight="500" color="fg.muted">{operation.method}</Text>}>
-        <Tabs.Root value={languageLabel} onValueChange={({ value }) => writePreference({ key: "api-language", value })} variant="line" colorPalette="accent">
+        <Tabs.Root value={languageLabel} onValueChange={({ value }) => writePreference({ key: "api-language", value })} variant="line" colorPalette="accent" minWidth="0" maxWidth="100%">
           <Flex alignItems="center" borderBottomWidth="1px" borderColor="border.nested" paddingX="2">
             <Tabs.List css={{ ...readingTabList, flex: 1, minWidth: 0, borderBottomWidth: 0, boxShadow: "none" }}>
               {EXAMPLE_LANGUAGES.map((entry) => (
@@ -346,7 +346,7 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
             <CopyAction code={examples[language].code} />
           </Flex>
           {EXAMPLE_LANGUAGES.map((entry) => (
-            <Tabs.Content key={entry.id} value={entry.label} padding="0" data-docs-panel="" bg="bg.nested">
+            <Tabs.Content key={entry.id} value={entry.label} padding="0" data-docs-panel="" bg="bg.nested" minWidth="0" maxWidth="100%" overflow="hidden">
               <CodeBody source={examples[entry.id]} expanded />
             </Tabs.Content>
           ))}

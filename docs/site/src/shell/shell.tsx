@@ -34,9 +34,10 @@ function LeftRail({ children }: { children: ReactNode }) {
       <Box
         position="sticky"
         top="var(--docs-header-h)"
-        maxHeight="calc(100vh - var(--docs-header-h))"
+        height="calc(100vh - var(--docs-header-h))"
+        display="flex"
+        flexDirection="column"
         overflowY="auto"
-        data-docs-scroll=""
         paddingTop="6"
         paddingBottom="10"
         paddingInlineEnd="3"
@@ -105,7 +106,7 @@ export function DocsShell({ slug, kind, title, description, toc, children, endpo
         css={kind === "endpoint" ? { [ENDPOINT_QUERY]: { gridTemplateColumns: `${NAV_WIDTH.xl} minmax(0, 40rem) 26rem`, gridTemplateAreas: '"nav top play" "nav ref play"', columnGap: "2rem" } } : undefined}
       >
         <LeftRail>
-          <SideNav active={section} slug={slug} treeId="page-tree" />
+          <SideNav active={section} slug={slug} treeId="page-tree" scrollTree />
         </LeftRail>
         {endpoint ? (
           <>

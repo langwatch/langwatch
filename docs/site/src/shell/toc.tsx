@@ -1,4 +1,4 @@
-import { Box, Text } from "@langwatch/design-system/primitives";
+import { Box, chakra, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -31,8 +31,7 @@ function TocLinks({ entries, active, onChoose }: { entries: TocEntry[]; active: 
         const current = entry.id === active;
         return (
           <Box as="li" key={entry.id} listStyleType="none">
-            <Box
-              as="a"
+            <chakra.a
               href={`#${entry.id}`}
               onClick={onChoose}
               aria-current={current ? "location" : undefined}
@@ -48,7 +47,7 @@ function TocLinks({ entries, active, onChoose }: { entries: TocEntry[]; active: 
               paddingInlineStart={entry.depth > 2 ? "6" : "3"}
             >
               {entry.text}
-            </Box>
+            </chakra.a>
           </Box>
         );
       })}

@@ -11,7 +11,7 @@ import { readingTabList, readingTabTrigger } from "./tabs.tsx";
 type Item = { label: string; source?: CodeSource; content?: ReactNode };
 
 function itemsOf({ children }: { children: ReactNode }): Item[] {
-  return Children.toArray(children).flatMap((child) => {
+  return Children.toArray(children).flatMap((child): Item[] => {
     if (!isValidElement<Record<string, unknown>>(child)) return [];
     if (child.type === CodeGroupItem) {
       return [{ label: String(child.props.title ?? "Example"), content: child.props.children as ReactNode }];

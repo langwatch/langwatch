@@ -5,6 +5,12 @@ import { parse } from "yaml";
 const SPEC_FILES = ["api-reference/openapiLangWatch.json", "api-reference/openapi-evals.json"];
 const VERBS = ["get", "post", "put", "patch", "delete"];
 
+const ACRONYMS = new Set(["api", "cli", "id", "ui", "url", "sso", "scim", "llm", "otlp", "ottl", "dspy", "rum", "sql", "pii"]);
+const VERB_NAMES = { get: "Get", post: "Create", put: "Update", patch: "Update", delete: "Delete" };
+const GROUP_NAMES = { Elevenlabs: "ElevenLabs", Openai: "OpenAI", Langevals: "LangEvals", Ragas: "Ragas" };
+const MAX_SUMMARY = 70;
+const operationCache = new Map();
+
 const VIRTUAL_ID = "virtual:docs-nav";
 const RESOLVED_ID = `\0${VIRTUAL_ID}`;
 
@@ -19,15 +25,60 @@ function readFrontmatter({ file }) {
   }
 }
 
+function operationKey({ openapi }) {
+  const match = /^(?:(\w+)\s+)?(\S+)$/.exec(openapi.trim().replace(/^["']|["']$/g, ""));
+  if (!match) return "";
+  return match[1] ? `${match[1].toUpperCase()} ${match[2]}` : match[2];
+}
+
+function operationIndex({ docsRoot }) {
+  if (!operationCache.has(docsRoot)) {
+    const index = new Map();
+    for (const file of SPEC_FILES) {
+      const spec = JSON.parse(readFileSync(path.join(docsRoot, file), "utf8"));
+      for (const [route, methods] of Object.entries(spec.paths)) {
+        for (const verb of VERBS) {
+          if (!methods[verb]?.responses) continue;
+          const entry = { verb, route, operation: methods[verb] };
+          index.set(`${verb.toUpperCase()} ${route}`, entry);
+          if (!index.has(route)) index.set(route, entry);
+        }
+      }
+    }
+    operationCache.set(docsRoot, index);
+  }
+  return operationCache.get(docsRoot);
+}
+
+/** "getApiTraceId" becomes "Get trace by ID"; the verb word maps to what the call does. */
+export function humaniseOperationId({ operationId }) {
+  const words = operationId.replace(/([a-z0-9])([A-Z])/g, "$1 $2").split(/[\s_-]+/).map((word) => word.toLowerCase()).filter(Boolean);
+  const [first, ...rest] = words;
+  const subject = rest.filter((word) => word !== "api");
+  if (subject.at(-1) === "id" && subject.length > 1 && subject.at(-2) !== "by") subject.splice(-1, 1, "by", "id");
+  const text = [VERB_NAMES[first] ?? first, ...subject].map((word) => (ACRONYMS.has(word) ? word.toUpperCase() : word)).join(" ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Authored title first, then the spec summary, then a humanised operationId; never a path. */
+function operationTitle({ entry, fallback }) {
+  const summary = String(entry?.operation.summary ?? "").trim();
+  if (summary && summary.length <= MAX_SUMMARY) return summary;
+  if (entry?.operation.operationId) return humaniseOperationId({ operationId: entry.operation.operationId });
+  return fallback;
+}
+
 function buildItem({ item, docsRoot, pages }) {
   if (typeof item === "string") {
     const file = path.join(docsRoot, `${item}.mdx`);
     if (!existsSync(file)) return null;
     const meta = readFrontmatter({ file });
+    const entry = meta.openapi ? operationIndex({ docsRoot }).get(operationKey({ openapi: String(meta.openapi) })) : undefined;
+    const derived = meta.openapi ? operationTitle({ entry, fallback: titleCase({ text: item.split("/").pop() }) }) : item;
     pages[item] = {
-      title: String(meta.title ?? item),
-      description: meta.description ? String(meta.description) : "",
-      sidebarTitle: String(meta.sidebarTitle ?? meta.title ?? item),
+      title: String(meta.title ?? derived),
+      description: meta.description ? String(meta.description) : String(entry?.operation.description ?? "").split("\n")[0],
+      sidebarTitle: String(meta.sidebarTitle ?? meta.title ?? derived),
       openapi: meta.openapi ? String(meta.openapi) : "",
       mode: meta.mode ? String(meta.mode) : "",
       icon: meta.icon ? String(meta.icon) : "",
@@ -52,9 +103,10 @@ function titleCase({ text }) {
 }
 
 function groupNameOf({ operation, route }) {
-  if (operation.tags?.[0]) return operation.tags[0];
+  const named = operation.tags?.[0] ?? "";
   const segment = route.split("/").filter((part) => part && part !== "api" && !/^v\d+$/.test(part) && !part.startsWith("{"))[0];
-  return segment ? titleCase({ text: segment }) : "Other";
+  const name = named || (segment ? titleCase({ text: segment }) : "Other");
+  return GROUP_NAMES[name] ?? name;
 }
 
 /** Every operation in both specs, in spec order, with its group name. */
@@ -70,13 +122,36 @@ function specOperations({ docsRoot }) {
           key: `${verb.toUpperCase()} ${route}`,
           openapi: `${verb.toUpperCase()} ${route}`,
           group: groupNameOf({ operation, route }),
-          title: String(operation.summary ?? operation.operationId ?? route),
+          title: operationTitle({ entry: { operation }, fallback: titleCase({ text: route.split("/").filter((part) => part && !part.startsWith("{")).at(-1) ?? "Operation" }) }),
+          route,
+          verb,
           description: String(operation.description ?? "").split("\n")[0],
         });
       }
     }
   }
   return out;
+}
+
+function slugsOf({ items }) {
+  return items.flatMap((item) => (item.type === "page" ? [item.slug] : slugsOf({ items: item.children })));
+}
+
+/** Two operations with one title in a group gain their method and path tail. */
+function disambiguate({ children, pages }) {
+  const counts = new Map();
+  for (const child of children) counts.set(child.title, (counts.get(child.title) ?? 0) + 1);
+  for (const child of children) {
+    if (counts.get(child.title) > 1) {
+      const tail = child.route.split("/").filter((part) => part && part !== "api" && !/^v\d+$/.test(part) && !part.startsWith("{")).slice(-2).join("/");
+      const title = `${child.title} (${child.verb.toUpperCase()} ${tail})`;
+      pages[child.slug].title = title;
+      pages[child.slug].sidebarTitle = title;
+      child.title = title;
+    }
+    delete child.route;
+    delete child.verb;
+  }
 }
 
 /** The API Reference anchor: authored non-endpoint groups, then one group per OpenAPI tag. */
@@ -88,8 +163,10 @@ function apiAnchor({ anchor, docsRoot, pages }) {
   }
   const groups = new Map();
   const taken = new Set(Object.keys(pages));
+  const authoredSlugs = new Set(slugsOf({ items: authored }));
   for (const operation of specOperations({ docsRoot })) {
     let slug = bySpec.get(operation.key);
+    if (slug && authoredSlugs.has(slug)) continue;
     if (!slug) {
       const base = `api-reference/${kebab({ text: operation.group })}/${kebab({ text: operation.title })}`;
       slug = base;
@@ -98,8 +175,9 @@ function apiAnchor({ anchor, docsRoot, pages }) {
       pages[slug] = { title: operation.title, description: operation.description, sidebarTitle: operation.title, openapi: operation.openapi, mode: "", icon: "", generated: true };
     }
     if (!groups.has(operation.group)) groups.set(operation.group, []);
-    groups.get(operation.group).push({ type: "page", slug, title: pages[slug].sidebarTitle });
+    groups.get(operation.group).push({ type: "page", slug, title: pages[slug].sidebarTitle, route: operation.route, verb: operation.verb });
   }
+  for (const children of groups.values()) disambiguate({ children, pages });
   const tagGroups = [...groups].map(([title, children]) => ({ type: "group", title, children }));
   return { ...anchor, children: [...authored, ...tagGroups] };
 }

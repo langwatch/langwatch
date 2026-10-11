@@ -14,7 +14,7 @@ export function exampleFromSchema({ schema, depth = 0 }: { schema: Schema | null
   if (schema.example !== undefined) return schema.example;
   if (schema.default !== undefined) return schema.default;
   if (schema.enum?.length) return schema.enum[0];
-  const merged = schema.allOf ? Object.assign({}, ...schema.allOf, schema) : schema;
+  const merged: Schema = schema.allOf ? Object.assign({}, ...schema.allOf, schema) : schema;
   const branch = merged.oneOf?.[0] ?? merged.anyOf?.[0];
   if (branch) return exampleFromSchema({ schema: branch, depth: depth + 1 });
   const type = Array.isArray(merged.type) ? merged.type.find((entry) => entry !== "null") : merged.type;
