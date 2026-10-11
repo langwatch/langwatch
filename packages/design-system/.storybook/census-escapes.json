@@ -1110,5 +1110,108 @@
     "reason": "The drag-preview type pill, not a card. (R4d review)",
     "owner": "dataset",
     "disposition": "reviewed"
+  },
+  {
+    "path": "apps/ui/src/main.tsx",
+    "rule": "page-title-h1",
+    "line": 96,
+    "reason": "Approved: The last-resort boot error page is plain HTML by design. (R6f1 review)",
+    "owner": "ui"
+  },
+  {
+    "path": "apps/ui/src/shell/ui-error-page.tsx",
+    "rule": "page-title-h1",
+    "line": 82,
+    "reason": "Approved: The app error page heading; a truncating page heading is wrong for error copy. (R6f1 review)",
+    "owner": "ui"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/elements/compat/next-error.tsx",
+    "rule": "page-title-h1",
+    "line": 19,
+    "reason": "Approved: A plain error page outside the provider. (R6f1 review)",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 162,
+    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 168,
+    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 169,
+    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 170,
+    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 172,
+    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 177,
+    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/auth/browser/src/ui/elements/inviting-organization.tsx",
+    "rule": "card-box",
+    "line": 18,
+    "reason": "An identity strip on the front-door field tokens. Not a card (R6f1 review).",
+    "owner": "auth",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/value-screen.tsx",
+    "rule": "card-box",
+    "line": 117,
+    "reason": "A selectable pick tile. Not a card (R6f1 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/tour/tour-overlay.tsx",
+    "rule": "card-box",
+    "line": 202,
+    "reason": "The floating tour caption. Not a card (R6f1 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/blocks/onboarding-container.tsx",
+    "rule": "card-box",
+    "line": 111,
+    "reason": "A fixed skip-link pill. Not a card (R6f1 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/elements/forms/icon-checkbox-card-group.tsx",
+    "rule": "card-box",
+    "line": 86,
+    "reason": "A CheckboxCard input. Not a card (R6f1 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
   }
 ]

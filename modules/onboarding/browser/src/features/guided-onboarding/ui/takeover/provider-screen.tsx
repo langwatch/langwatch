@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Connect an AI provider on the way into the product: one row of marks, one
@@ -120,30 +121,25 @@ export function ProviderScreen({
           })}
         </Flex>
 
-        <Box
-          key={selected.id}
-          mt={5}
-          borderRadius="16px"
-          border="1px solid"
-          borderColor="border"
-          bg="bg.panel"
-          p={5}
-          boxShadow="xs"
-          data-testid="provider-panel"
-        >
-          <LentEditModelProviderForm
-            providerKey={selected.registryKey}
-            modelProviderId="new"
-            organizationId={organizationId}
-            projectId={projectId}
-            guided
-            onFailed={(failure) => emit("failed", "provider", failure)}
-            onSaved={(saved) =>
-              onSaved(selected, saved).catch(() =>
-                emit("failed", "provider", { provider: selected.registryKey, code: "save_failed" }),
-              )
-            }
-          />
+        <Box key={selected.id} mt={5}>
+          <Card variant="emphasized" padding="lg" data-testid="provider-panel">
+            <LentEditModelProviderForm
+              providerKey={selected.registryKey}
+              modelProviderId="new"
+              organizationId={organizationId}
+              projectId={projectId}
+              guided
+              onFailed={(failure) => emit("failed", "provider", failure)}
+              onSaved={(saved) =>
+                onSaved(selected, saved).catch(() =>
+                  emit("failed", "provider", {
+                    provider: selected.registryKey,
+                    code: "save_failed",
+                  }),
+                )
+              }
+            />
+          </Card>
         </Box>
 
         <Box mt={5} textAlign="center">
