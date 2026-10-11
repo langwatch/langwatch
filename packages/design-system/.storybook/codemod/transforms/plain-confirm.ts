@@ -46,6 +46,7 @@ function checkShape({ overlay }: { overlay: Overlay }): void {
   const { footer } = overlay;
   if (overlay.onSubmit || overlay.formId) skip("is a form");
   if (overlay.testId || overlay.role) skip("sets a test id or role ConfirmDialog does not take");
+  if (overlay.placement) skip("is centred, which ConfirmDialog does not take");
   if (overlay.size && overlay.size !== "md") skip("is wider than a confirmation");
   if (!footer.primarySpec || footer.secondary || footer.destructive || footer.utility.length) {
     skip("is not one primary action and a Cancel");

@@ -1,7 +1,7 @@
 /**
  * A part-built Drawer (Root, Content, Header/Title, Body, Footer, CloseTrigger) to the
- * callable `<Drawer title onClose footer>` shape. Cancel leaves the footer (ruling Q2: the
- * X and Escape close); anything outside the mapping table is a skip with its reason.
+ * callable `<Drawer title onClose footer>` shape. An existing Cancel stays as `footer.cancel` (late
+ * ruling 2026-10-11); anything outside the mapping table is a skip with its reason.
  */
 import { type FileOutcome, type Transform } from "../ast.ts";
 import { footerCode, convertFile } from "../overlay-parts.ts";
@@ -41,6 +41,6 @@ export function simpleDrawer({ file, source }: { file: string; source: string })
 export const simpleDrawerTransform: Transform = {
   name: "simple-drawer",
   summary:
-    "Part-built Drawer.Root compositions to the callable Drawer shape (no Cancel in footers)",
+    "Part-built Drawer.Root compositions to the callable Drawer shape (an existing Cancel stays as footer.cancel)",
   run: simpleDrawer,
 };

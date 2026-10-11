@@ -33,7 +33,7 @@ const DRAWER_SIZES: Record<string, string> = {
   full: "full",
   "2xl": "lg",
 };
-const DIALOG_SIZES: Record<string, string> = { xs: "sm", sm: "sm", md: "md", lg: "lg", xl: "xl" };
+const DIALOG_SIZES: Record<string, string> = { sm: "sm", md: "md", lg: "lg", xl: "xl" };
 
 function sizeCode({
   family,
@@ -218,6 +218,7 @@ const FORM_LIBRARY = /useForm|FormProvider/;
 type RootRead = {
   open?: string;
   sizeAttr?: Attr;
+  placement?: string;
   role?: string;
   close: CloseRequest;
   content: AstNode;
@@ -239,12 +240,22 @@ function readRoot({
   family: Family;
 }): RootRead {
   const attrs = attrsOf({ opening: child(root, "openingElement") });
-  const allowed = ["open", "onOpenChange", "size", family === "Drawer" ? "placement" : "role"];
+  const allowed = [
+    "open",
+    "onOpenChange",
+    "size",
+    "placement",
+    ...(family === "Dialog" ? ["role"] : []),
+  ];
   onlyAttrs({ attrs, allowed, where: `${family}.Root prop` });
   const openAttr = attrNamed({ attrs, name: "open" });
   if (!openAttr) return skip("no `open` prop (a Trigger opens it)");
   const placement = attrNamed({ attrs, name: "placement" });
-  if (placement && literalOf({ node: placement.value }) !== "end") skip("placement is not end");
+  const placementValue = placement ? literalOf({ node: placement.value }) : undefined;
+  if (family === "Drawer" && placement && placementValue !== "end") skip("placement is not end");
+  if (family === "Dialog" && placement && !["top", "center"].includes(String(placementValue))) {
+    skip("placement is not top or center");
+  }
   const role = attrNamed({ attrs, name: "role" });
   const roleValue = role ? literalOf({ node: role.value }) : undefined;
   if (role && roleValue !== "alertdialog" && roleValue !== "dialog") skip("role is dynamic");
@@ -256,6 +267,7 @@ function readRoot({
   return {
     open: openCode({ parsed, family, attr: openAttr }),
     sizeAttr: attrNamed({ attrs, name: "size" }),
+    placement: family === "Dialog" && placementValue === "center" ? "center" : undefined,
     role: roleValue === undefined ? undefined : `role="${roleValue}"`,
     close,
     content,
@@ -336,7 +348,7 @@ export function readOverlay({
   family: Family;
 }): Overlay {
   const local = familyLocal({ parsed, family }) ?? family;
-  const { open, sizeAttr, role, close, content } = readRoot({ parsed, root, family });
+  const { open, sizeAttr, placement, role, close, content } = readRoot({ parsed, root, family });
   const ctx: Ctx = { parsed, family, close };
   const read = readContentAttrs({
     parsed,
@@ -361,6 +373,7 @@ export function readOverlay({
       sizeAttr,
       maxWidthPx: family === "Dialog" ? read.maxWidthPx : undefined,
     }),
+    placement,
     role,
     testId: read.testId,
     title: state.header.title,

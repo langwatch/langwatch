@@ -15,6 +15,7 @@ export function renderDialog({ overlay }: { overlay: Overlay }): string {
     overlay.open,
     `onClose={${overlay.onClose}}`,
     overlay.size && `size="${overlay.size}"`,
+    overlay.placement && `placement="${overlay.placement}"`,
     titleAttr({ title: overlay.title }),
     overlay.subtitle && `description=${overlay.subtitle}`,
     overlay.role,

@@ -436,7 +436,7 @@ export type FooterModel = {
   secondary?: string;
   destructive?: string;
   utility: string[];
-  cancel?: { label?: string };
+  cancel?: { label?: string; onClick?: string };
   busy?: string;
   childForm: boolean;
   primarySpec?: ButtonSpec;
@@ -447,6 +447,7 @@ export type Overlay = {
   open?: string;
   onClose: string;
   size?: string;
+  placement?: string;
   role?: string;
   testId?: string;
   title: string;
@@ -535,22 +536,30 @@ function takeCancel({
   model,
   spec,
   wrapped,
+  family,
   close,
 }: {
   parsed: Parsed;
   model: FooterModel;
   spec: ButtonSpec;
   wrapped: boolean;
+  family: Family;
   close: CloseRequest;
 }): void {
   if (model.cancel) skip("two Cancel buttons");
   const own = wrapped
     ? spec.onClick !== undefined
     : !closesLikeRoot({ parsed, onClick: spec.onClick, close });
-  if (own) skip("Cancel has its own handler");
+  if (own && (family === "Dialog" || wrapped)) skip("Cancel has its own handler");
   if (spec.disabled) model.busy = spec.disabled;
-  model.cancel =
-    spec.plain !== undefined && /^cancel$/i.test(spec.plain) ? {} : { label: spec.label };
+  const label = spec.plain !== undefined && /^cancel$/i.test(spec.plain) ? undefined : spec.label;
+  if (family === "Dialog") {
+    model.cancel = label === undefined ? {} : { label };
+    return;
+  }
+  if (!wrapped && !spec.onClick) skip("Cancel without onClick");
+  const onClick = spec.onClick ? handlerCode({ parsed, node: spec.onClick }) : close.code;
+  model.cancel = label === undefined ? { onClick } : { label, onClick };
 }
 
 /** The footer's plain Buttons classified: Cancel dropped, the rest primary and secondary. */
@@ -571,7 +580,8 @@ export function readButtons({
   const others: ButtonSpec[] = [];
   for (const { element, wrapped } of footerUses({ parsed, nodes, family })) {
     const spec = buttonSpec({ parsed, element });
-    if (isCancel({ spec, wrapped, family })) takeCancel({ parsed, model, spec, wrapped, close });
+    if (isCancel({ spec, wrapped, family }))
+      takeCancel({ parsed, model, spec, wrapped, family, close });
     else others.push(spec);
   }
   if (others.length > 2) skip("footer has more than two actions");
@@ -622,13 +632,20 @@ export function readActions({
   const start = buttonIn("start", "destructive");
   if (start?.role === "destructive") model.destructive = start.code;
   else if (start) model.utility.push(start.code);
-  const cancel = attrNamed({ attrs, name: "onCancel" });
-  if (cancel && !closesLikeRoot({ parsed, onClick: cancel.value, close })) {
-    skip("onCancel is not the Root's close request");
+  if (!model.secondary) {
+    const cancel = attrNamed({ attrs, name: "onCancel" });
+    const label = attrNamed({ attrs, name: "cancelLabel" });
+    const onClick = cancel?.value ? handlerCode({ parsed, node: cancel.value }) : close.code;
+    model.cancel = label ? { label: valueCode({ parsed, attr: label }), onClick } : { onClick };
   }
   const busy = attrNamed({ attrs, name: "busy" });
   if (busy) model.busy = valueCode({ parsed, attr: busy });
   return model;
+}
+
+function cancelCode({ cancel }: { cancel: NonNullable<FooterModel["cancel"]> }): string {
+  const fields = [cancel.label && `label: ${cancel.label}`, `onClick: ${cancel.onClick}`];
+  return `{ ${fields.filter((field) => typeof field === "string").join(", ")} }`;
 }
 
 export function footerCode({ footer }: { footer: FooterModel }): string | undefined {
@@ -637,6 +654,7 @@ export function footerCode({ footer }: { footer: FooterModel }): string | undefi
     footer.secondary && `secondaryAction: ${footer.secondary}`,
     footer.destructive && `destructiveAction: ${footer.destructive}`,
     footer.utility.length && `utilityActions: [${footer.utility.join(", ")}]`,
+    footer.cancel?.onClick && `cancel: ${cancelCode({ cancel: footer.cancel })}`,
   ].filter((field) => typeof field === "string");
   return fields.length ? `{ ${fields.join(", ")} }` : undefined;
 }

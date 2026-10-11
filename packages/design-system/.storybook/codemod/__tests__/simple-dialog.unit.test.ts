@@ -75,6 +75,18 @@ describe("part-built Dialog to the callable shape", () => {
     );
   });
 
+  it("keeps a centred dialog centred and gives a Root with no size the shape's md", () => {
+    const footer = `<Dialog.Footer><Dialog.ActionTrigger asChild><Button>Cancel</Button></Dialog.ActionTrigger><Button onClick={go}>OK</Button></Dialog.Footer>`;
+    const centred = run(dialog({ root: `placement="center"`, footer }));
+    expect(centred.skips).toEqual([]);
+    expect(compact(centred.output)).toContain(
+      `<Dialog open={open} onClose={onClose} size="md" placement="center" title="Title"`,
+    );
+    const top = run(dialog({ root: `placement="top" size="sm"`, footer }));
+    expect(compact(top.output)).toContain(`<Dialog open={open} onClose={onClose} title="Title"`);
+    expect(compact(top.output)).not.toContain("placement");
+  });
+
   it("maps a literal maxWidth to a size and passes the setter's flag as a close", () => {
     const { output, skips } = run(`${IMPORTS}
       export const A = () => (
@@ -130,10 +142,17 @@ describe("part-built Dialog to the callable shape", () => {
       ],
       [
         {
-          root: `placement="center"`,
+          root: `placement="bottom"`,
           footer: `<Dialog.Footer><Dialog.ActionTrigger asChild><Button>Cancel</Button></Dialog.ActionTrigger></Dialog.Footer>`,
         },
-        "Dialog.Root prop `placement` is outside the mapping",
+        "placement is not top or center",
+      ],
+      [
+        {
+          root: `size="xs"`,
+          footer: `<Dialog.Footer><Dialog.ActionTrigger asChild><Button>Cancel</Button></Dialog.ActionTrigger></Dialog.Footer>`,
+        },
+        "dialog size `xs` has no slot",
       ],
     ];
     for (const [parts, reason] of cases) {

@@ -14,7 +14,7 @@ const run = (source: string) => {
 const compact = (value: string) => value.replace(/\s+/g, " ");
 
 describe("part-built Drawer to the callable shape", () => {
-  it("folds Root, Content, Header, Body and a footer; Cancel goes, the X stays the shape's", () => {
+  it("folds Root, Content, Header, Body and a footer; Cancel stays as footer.cancel", () => {
     const { output, skips } = run(`${IMPORTS}
       export const A = ({ open, onClose, save, saving }: P) => (
         <Drawer.Root
@@ -47,14 +47,13 @@ describe("part-built Drawer to the callable shape", () => {
     expect(skips).toEqual([]);
     const text = compact(output);
     expect(text).toContain(
-      `<Drawer open={open} onClose={onClose} size="lg" title="Edit rule" subtitle="Changes apply at once." body="flush" busy={saving} footer={{ primaryAction: { label: "Save", onClick: save, loading: saving, "data-testid": "save" } }}> <Text>Body</Text> </Drawer>`,
+      `<Drawer open={open} onClose={onClose} size="lg" title="Edit rule" subtitle="Changes apply at once." body="flush" busy={saving} footer={{ primaryAction: { label: "Save", onClick: save, loading: saving, "data-testid": "save" }, cancel: { onClick: onClose } }}> <Text>Body</Text> </Drawer>`,
     );
     expect(text).not.toContain("Drawer.");
-    expect(text).not.toContain("Cancel");
     expect(output).toContain(`import { Text } from "@langwatch/design-system/primitives";`);
   });
 
-  it("maps Drawer.Actions: start red is destructive, secondary stays, Cancel goes", () => {
+  it("maps Drawer.Actions: start red is destructive, a secondary takes Cancel's place", () => {
     const { output, skips } = run(`${IMPORTS}
       export const A = () => (
         <Drawer.Root open onOpenChange={() => onClose()} size="2xl">
@@ -75,6 +74,49 @@ describe("part-built Drawer to the callable shape", () => {
     expect(compact(output)).toContain(
       `<Drawer onClose={onClose} size="lg" title="Case" footer={{ primaryAction: { label: "Go", onClick: go, danger: true }, secondaryAction: { label: "Duplicate", onClick: dup }, destructiveAction: { label: "Delete", onClick: remove } }}>x</Drawer>`,
     );
+  });
+
+  it("keeps a Cancel with its own handler, a Close label, an Actions onCancel and its label", () => {
+    const wrap = (footer: string) => `${IMPORTS}
+      export const A = () => (
+        <Drawer.Root open onOpenChange={() => onClose()}>
+          <Drawer.Content>
+            <Drawer.Header><Drawer.Title>T</Drawer.Title></Drawer.Header>
+            <Drawer.Body>x</Drawer.Body>
+            ${footer}
+          </Drawer.Content>
+        </Drawer.Root>
+      );
+    `;
+    const own = run(
+      wrap(
+        `<Drawer.Footer><Button onClick={() => discard()}>Cancel</Button><Button onClick={save}>Save</Button></Drawer.Footer>`,
+      ),
+    );
+    expect(own.skips).toEqual([]);
+    expect(compact(own.output)).toContain(
+      `footer={{ primaryAction: { label: "Save", onClick: save }, cancel: { onClick: () => discard() } }}`,
+    );
+    const close = run(
+      wrap(
+        `<Drawer.Footer><Drawer.ActionTrigger asChild><Button>Close</Button></Drawer.ActionTrigger></Drawer.Footer>`,
+      ),
+    );
+    expect(close.skips).toEqual([]);
+    expect(compact(close.output)).toContain(
+      `footer={{ cancel: { label: "Close", onClick: onClose } }}`,
+    );
+    const actions = run(
+      wrap(
+        `<Drawer.Actions onCancel={back} cancelLabel="Back" primary={<Button onClick={go}>Go</Button>} busy={busy} />`,
+      ),
+    );
+    expect(actions.skips).toEqual([]);
+    expect(compact(actions.output)).toContain(
+      `busy={busy} footer={{ primaryAction: { label: "Go", onClick: go }, cancel: { label: "Back", onClick: back } }}`,
+    );
+    const bare = run(wrap(`<Drawer.Actions primary={<Button onClick={go}>Go</Button>} />`));
+    expect(compact(bare.output)).toContain(`cancel: { onClick: onClose }`);
   });
 
   it("owns a form as=form and passes a child form's id to the submit action", () => {
@@ -108,10 +150,10 @@ describe("part-built Drawer to the callable shape", () => {
     );
   });
 
-  it("keeps a Cancel with its own handler, validation-disabled saves, back buttons and extras", () => {
+  it("skips a trigger Cancel with its own handler, validation-disabled saves and extras", () => {
     const cases: [string, string][] = [
       [
-        `<Drawer.Footer><Button onClick={discard}>Cancel</Button><Button onClick={save}>Save</Button></Drawer.Footer>`,
+        `<Drawer.Footer><Drawer.ActionTrigger asChild><Button onClick={discard}>Cancel</Button></Drawer.ActionTrigger><Button onClick={save}>Save</Button></Drawer.Footer>`,
         "Cancel has its own handler",
       ],
       [
