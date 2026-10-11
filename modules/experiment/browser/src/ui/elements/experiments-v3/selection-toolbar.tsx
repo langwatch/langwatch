@@ -1,13 +1,5 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/studio-dialog";
 import { Play, Square, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
@@ -118,38 +110,14 @@ export function SelectionToolbar({
         </Button>
       </HStack>
 
-      <DialogRoot open={showDeleteConfirm} onOpenChange={({ open }) => setShowDeleteConfirm(open)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Delete {selectedCount} row{selectedCount > 1 ? "s" : ""}?
-            </DialogTitle>
-          </DialogHeader>
-          <DialogCloseTrigger />
-          <DialogBody>
-            <Text>
-              Are you sure you want to delete {selectedCount} selected row
-              {selectedCount > 1 ? "s" : ""}?
-            </Text>
-          </DialogBody>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteConfirm(false)}
-              data-testid="delete-cancel-btn"
-            >
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              onClick={handleConfirmDelete}
-              data-testid="delete-confirm-btn"
-            >
-              Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </DialogRoot>
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title={`Delete ${selectedCount} row${selectedCount > 1 ? "s" : ""}?`}
+        description={`Are you sure you want to delete ${selectedCount} selected row${selectedCount > 1 ? "s" : ""}?`}
+        confirmLabel="Delete"
+        onConfirm={handleConfirmDelete}
+      />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
 import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
@@ -17,6 +18,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs, readableDate } from "@langwatch/time";
+import { FlaskConical } from "lucide-react";
 import numeral from "numeral";
 import { Download } from "react-feather";
 
@@ -361,7 +363,22 @@ export default function BatchEvaluation({
       >
         <VStack align="start" minWidth="0">
           {evaluations.isLoading && <LoadingTable />}
-          {isEmpty && <Text>No data found</Text>}
+          {isEmpty && (
+            <NoDataInfoBlock
+              size="inline"
+              bordered={false}
+              icon={<FlaskConical />}
+              title="No data found"
+              description="Run an evaluation from the studio and its results appear here."
+              next={[
+                {
+                  kind: "docs",
+                  label: "How experiments work",
+                  href: "https://docs.langwatch.ai/evaluations/experiments/overview",
+                },
+              ]}
+            />
+          )}
           {showGroups &&
             groups.map(([name, group]) => (
               <EvaluationTable key={name} name={name} group={group} metric={metricOf(group)} />

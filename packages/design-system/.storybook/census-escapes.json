@@ -3169,5 +3169,477 @@
     "reason": "Not a plain card: an error-bordered picker, icon tile, table skeleton frame, selectable row or scrolling list (R8s2 review).",
     "owner": "scenario",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "native-table",
+    "line": 32,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-table-part",
+    "line": 33,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-table-part",
+    "line": 34,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-table-part",
+    "line": 35,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-table-part",
+    "line": 37,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-table-part",
+    "line": 43,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-table-part",
+    "line": 45,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-table-part",
+    "line": 46,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-table-part",
+    "line": 50,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-card-part",
+    "line": 64,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/table-skeleton.tsx",
+    "rule": "legacy-card-part",
+    "line": 65,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments-v3/editable-heading.tsx",
+    "rule": "restyle",
+    "line": 93,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-card-part",
+    "line": 126,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-card-part",
+    "line": 127,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-card-part",
+    "line": 161,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-card-part",
+    "line": 162,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "hand-table",
+    "line": 175,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 176,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 178,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 180,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 192,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 212,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 216,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 218,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 222,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 225,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 233,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 236,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "hand-table",
+    "line": 259,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 260,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 261,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 262,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 263,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 264,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 265,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 266,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 269,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 270,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 271,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/batch-evaluation.tsx",
+    "rule": "legacy-table-part",
+    "line": 274,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/copy-experiment-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 72,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/copy-experiment-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 73,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/copy-experiment-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 74,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/copy-experiment-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 75,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/copy-experiment-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 76,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/copy-experiment-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 78,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/copy-experiment-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 128,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/feedback-link.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 13,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/feedback-link.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 14,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/feedback-link.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 15,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/feedback-link.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 16,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/feedback-link.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 18,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/feedback-link.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 19,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-evaluation-results/batch-evaluation-results-header.tsx",
+    "rule": "restyle",
+    "line": 100,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
+    "rule": "legacy-card-part",
+    "line": 544,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-evaluation-results/batch-evaluation-results.tsx",
+    "rule": "legacy-card-part",
+    "line": 545,
+    "reason": "Approved: protected experiments table, its skeleton, score cards and headers, or a shell kept exactly as today (R10e1 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/analytics/chart-tooltip.tsx",
+    "rule": "card-box",
+    "line": 35,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/batch-results/leaderboard-step.tsx",
+    "rule": "card-box",
+    "line": 35,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/dataset/floating-cell-editor.tsx",
+    "rule": "card-box",
+    "line": 143,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/evaluator/evaluator-result-chip.tsx",
+    "rule": "card-box",
+    "line": 193,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments-v3/selection-toolbar.tsx",
+    "rule": "card-box",
+    "line": 74,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/workflow/workflow-icons.tsx",
+    "rule": "card-box",
+    "line": 90,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-charts.tsx",
+    "rule": "card-box",
+    "line": 673,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-charts.tsx",
+    "rule": "card-box",
+    "line": 785,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-charts.tsx",
+    "rule": "card-box",
+    "line": 887,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-charts.tsx",
+    "rule": "card-box",
+    "line": 935,
+    "reason": "Protected experiments surface or not a plain card: chart tooltip, leaderboard step, cell editor, result chip, icon tile, chart frame or selection bar (R10e1 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
   }
 ]
