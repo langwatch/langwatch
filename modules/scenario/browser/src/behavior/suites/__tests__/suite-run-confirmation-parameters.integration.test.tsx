@@ -275,19 +275,25 @@ describe("suite run confirmation parameters", () => {
       });
 
       /** @scenario "The run dialog requires a value for every secret parameter" */
-      it("holds the run until the secret has a value", async () => {
+      it("holds the run and focuses the secret until it has a value", async () => {
         mocks.scenarios = scenariosDeclaringASecret;
 
         const user = await openConfirmation();
 
         const runButton = screen.getByText("Run 2 jobs").closest("button");
-        expect(runButton).toBeDisabled();
+        expect(runButton).toBeEnabled();
         expect(screen.getByTestId("suite-run-parameter-error-api_token")).toBeInTheDocument();
+
+        await user.click(screen.getByText("Run 2 jobs"));
+
+        expect(mocks.mutate).not.toHaveBeenCalled();
+        expect(screen.getByTestId("suite-run-parameter-api_token")).toHaveFocus();
 
         await user.type(screen.getByTestId("suite-run-parameter-api_token"), "tok-live-1");
 
-        expect(runButton).not.toBeDisabled();
         expect(screen.queryByTestId("suite-run-parameter-error-api_token")).toBeNull();
+        await user.click(screen.getByText("Run 2 jobs"));
+        expect(mocks.mutate).toHaveBeenCalledTimes(1);
       });
     });
 
