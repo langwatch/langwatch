@@ -116,7 +116,7 @@ function canary({
 }
 
 function probe(service: ScenarioCanaryService, runPlanId = "plan-1") {
-  return service.run({ projectId: PROJECT, runPlanId });
+  return service.run({ projectId: PROJECT, runPlanId, actor: undefined });
 }
 
 describe("ScenarioCanaryService, as the probe spec describes it", () => {
@@ -263,7 +263,7 @@ describe("ScenarioCanaryService, as the probe spec describes it", () => {
         scenarioId: "scenario-1",
         target: { type: "prompt", referenceId: "prompt-1" },
         note: "scenario canary health check",
-        actor: { id: "scenario-canary", label: "api" },
+        actor: undefined,
       });
     });
 

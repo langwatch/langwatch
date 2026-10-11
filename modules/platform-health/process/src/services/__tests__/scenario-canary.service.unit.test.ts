@@ -95,12 +95,12 @@ describe("ScenarioCanaryService", () => {
       ],
     });
 
-    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1" });
+    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1", actor: undefined });
 
     expect(result).toMatchObject({ healthy: true });
     expect(launchRun).toHaveBeenCalledWith(
       expect.objectContaining({
-        actor: { id: "scenario-canary", label: "api" },
+        actor: undefined,
         note: "scenario canary health check",
       }),
     );
@@ -115,7 +115,7 @@ describe("ScenarioCanaryService", () => {
       ],
     });
 
-    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1" });
+    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1", actor: undefined });
 
     expect(result).toMatchObject({ healthy: true });
     expect(launchRun).toHaveBeenCalledTimes(2);
@@ -127,7 +127,7 @@ describe("ScenarioCanaryService", () => {
       reads: [runData(ScenarioRunStatus.SUCCESS), runData(ScenarioRunStatus.SUCCESS)],
     });
 
-    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1" });
+    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1", actor: undefined });
 
     expect(result).toMatchObject({ healthy: false, reason: "judge_failed" });
   });
@@ -136,7 +136,7 @@ describe("ScenarioCanaryService", () => {
   it("reports timeout when no terminal status arrives within the budget", async () => {
     const { service } = canary({ reads: [] });
 
-    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1" });
+    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1", actor: undefined });
 
     expect(result).toMatchObject({ healthy: false, reason: "timeout" });
   });
@@ -148,7 +148,7 @@ describe("ScenarioCanaryService", () => {
       reads: [],
     });
 
-    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1" });
+    const result = await service.run({ projectId: PROJECT, runPlanId: "plan-1", actor: undefined });
 
     expect(result).toEqual({ healthy: false, reason: "run_failed", durationMs: 0 });
     expect(launchRun).not.toHaveBeenCalled();
@@ -160,7 +160,7 @@ describe("ScenarioCanaryService", () => {
       reads: [runData(ScenarioRunStatus.SUCCESS, Verdict.SUCCESS)],
     });
 
-    const result = await service.run({ projectId: PROJECT, runPlanId: "canary" });
+    const result = await service.run({ projectId: PROJECT, runPlanId: "canary", actor: undefined });
 
     expect(result).toMatchObject({ healthy: true });
   });
@@ -172,8 +172,8 @@ describe("ScenarioCanaryService", () => {
     });
 
     const [first, second] = await Promise.all([
-      service.run({ projectId: PROJECT, runPlanId: "plan-1" }),
-      service.run({ projectId: PROJECT, runPlanId: "canary" }),
+      service.run({ projectId: PROJECT, runPlanId: "plan-1", actor: undefined }),
+      service.run({ projectId: PROJECT, runPlanId: "canary", actor: undefined }),
     ]);
 
     expect(first).toMatchObject({ healthy: true });
