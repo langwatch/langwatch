@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -6,6 +7,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "@langwatch/design-system/dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { getProviderModelOptions } from "@langwatch/model-provider-contract";
@@ -80,45 +82,39 @@ export function RegistryModelsModal({
             {filteredChatModels.length > 0 && (
               <VStack gap={2} align="stretch">
                 <SmallLabel>Chat Models</SmallLabel>
-                <Box
-                  maxHeight="200px"
-                  overflowY="auto"
-                  borderWidth="1px"
-                  borderRadius="md"
-                  padding={2}
-                >
-                  {filteredChatModels.map((model) => (
-                    <Text key={model.value} fontSize="sm" paddingY={1}>
-                      {model.label}
-                    </Text>
-                  ))}
-                </Box>
+                <Card variant="frame" padding="sm">
+                  <Box maxHeight="200px" overflowY="auto">
+                    {filteredChatModels.map((model) => (
+                      <Text key={model.value} fontSize="sm" paddingY={1}>
+                        {model.label}
+                      </Text>
+                    ))}
+                  </Box>
+                </Card>
               </VStack>
             )}
 
             {filteredEmbeddingModels.length > 0 && (
               <VStack gap={2} align="stretch">
                 <SmallLabel>Embedding Models</SmallLabel>
-                <Box
-                  maxHeight="200px"
-                  overflowY="auto"
-                  borderWidth="1px"
-                  borderRadius="md"
-                  padding={2}
-                >
-                  {filteredEmbeddingModels.map((model) => (
-                    <Text key={model.value} fontSize="sm" paddingY={1}>
-                      {model.label}
-                    </Text>
-                  ))}
-                </Box>
+                <Card variant="frame" padding="sm">
+                  <Box maxHeight="200px" overflowY="auto">
+                    {filteredEmbeddingModels.map((model) => (
+                      <Text key={model.value} fontSize="sm" paddingY={1}>
+                        {model.label}
+                      </Text>
+                    ))}
+                  </Box>
+                </Card>
               </VStack>
             )}
 
             {filteredChatModels.length === 0 && filteredEmbeddingModels.length === 0 && (
-              <Text fontSize="sm" color="fg.muted" textAlign="center">
-                No models found
-              </Text>
+              <NoDataInfoBlock
+                size="line"
+                title="No models found"
+                action={search ? { label: "Clear search", onClick: () => setSearch("") } : void 0}
+              />
             )}
           </VStack>
         </DialogBody>

@@ -472,5 +472,13 @@
     "reason": "The config-path copy chip. (R2m1 review)",
     "owner": "api-key",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/model-provider/browser/src/ui/sections/guided-provider-panel.tsx",
+    "rule": "card-box",
+    "line": 47,
+    "reason": "A provider logo tile, not a card (R2m2 review).",
+    "owner": "model-provider",
+    "disposition": "reviewed"
   }
 ]
