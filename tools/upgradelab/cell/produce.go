@@ -122,7 +122,7 @@ func Produce(ctx context.Context, options ProduceOptions) (string, error) {
 		return FromBuild(options.FromDir).Ensure(ctx, cell.logPath("from-build"))
 	}
 	cell.runSteps(ctx, []step{{"build", build}, {"stores", cell.freshStores}, {"from-schema", cell.fromSchema}, {"from-up", cell.fromUp},
-		{"seed", cell.seedTier}, {"traffic-before", cell.trafficBefore}, {"cut", cell.cut},
+		{"seed", cell.seedTier}, {"drain", cell.drainQueue}, {"trickle", cell.trickle}, {"traffic-before", cell.trafficBefore}, {"cut", cell.cut},
 		{"capture", func(ctx context.Context) error { return cell.capture(ctx, dir) }}})
 	cell.finishTraffic()
 	writeErr := cell.write()
@@ -171,6 +171,68 @@ func (cell *run) seedTier(ctx context.Context) error {
 	return nil
 }
 
+// drainState is the drain wait's verdict on one queue reading.
+type drainState int
+
+const (
+	drainWaiting drainState = iota
+	drainDone
+	drainExpired
+)
+
+// drainVerdict judges one reading: done at or below near; expired once waited passes limit; an
+// unread depth (readErr) is never done.
+func drainVerdict(depth int, readErr error, near int, waited, limit time.Duration) drainState {
+	switch {
+	case readErr == nil && depth <= near:
+		return drainDone
+	case waited >= limit:
+		return drainExpired
+	}
+	return drainWaiting
+}
+
+const drainPoll = 15 * time.Second
+
+// drainQueue waits for main's worker to work the seed burst's backlog down to near zero, logging
+// progress, so the snapshot carries what a real install holds at upgrade time.
+func (cell *run) drainQueue(ctx context.Context) error {
+	start, lastLog := time.Now(), time.Time{}
+	for {
+		depth, err := QueueDepth(ctx, cell.stores.RedisPort)
+		switch drainVerdict(depth, err, cell.options.DrainNear, time.Since(start), cell.options.DrainWithin) {
+		case drainDone:
+			cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("queue drained to %d in %s", depth, time.Since(start).Round(time.Second)))
+			return nil
+		case drainExpired:
+			return fmt.Errorf("main's queue still held %d jobs (read error: %v) after -drain-within %s", depth, err, cell.options.DrainWithin)
+		}
+		if cell.options.Stdout != nil && time.Since(lastLog) >= time.Minute {
+			fmt.Fprintf(cell.options.Stdout, "upgradelab: draining main's queue: %d jobs left after %s\n", depth, time.Since(start).Round(time.Second))
+			lastLog = time.Now()
+		}
+		if err := sleep(ctx, drainPoll); err != nil {
+			return err
+		}
+	}
+}
+
+// trickle sends Trickle spans of live telemetry (a different seed from the burst, so ids differ), so
+// the cut still catches a few hundred in-flight jobs. Tier S has no heavy seed and sends none.
+func (cell *run) trickle(ctx context.Context) error {
+	if cell.options.Tier != tierHeavy || cell.options.Trickle <= 0 {
+		return nil
+	}
+	email, password := generate.SeedAccount(cell.options.Seed)
+	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: cell.tenancy,
+		Seed: cell.options.Seed + 1000, Anchor: time.Now().UTC(), Spans: cell.options.Trickle, TelemetryOnly: true})
+	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("trickle sent %v, refused %v", result.Sent, result.Refused))
+	if err != nil {
+		cell.report.Notes = append(cell.report.Notes, "trickle: "+err.Error())
+	}
+	return nil
+}
+
 // capture stops main's app (its worker stays paused, so queued jobs stay queued) and writes the
 // entry beside dir first, renaming it in once whole, so a cache entry is never half written.
 func (cell *run) capture(ctx context.Context, dir string) error {
@@ -194,7 +256,7 @@ func (cell *run) capture(ctx context.Context, dir string) error {
 	}
 	meta := snapshot.Manifest{ID: CacheKey(cell.options), Recipe: cell.recipe, Release: cell.options.Release, Image: "source",
 		Shape: snapshot.Shape{Name: cell.profile.Shape, Env: shape.Values, SecretNames: shape.SecretNames}, Overlays: []string{},
-		Seed: cell.options.Seed, Anchor: cell.anchor, GeneratorCommit: HeadCommit(cell.options.HeadDir), PostgresSchema: "mydb"}
+		Seed: cell.options.Seed, Anchor: cell.anchor, GeneratorCommit: HeadCommit(cell.options.HeadDir), PostgresSchema: "mydb", QueueDepthAtCut: cell.cutDepth}
 	if _, err := snapshot.Capture(ctx, snapshot.CaptureInput{Dir: filepath.Join(partial, entrySnapshot), Stores: stores, Meta: meta,
 		Scrubber: snapshot.Scrubber{Allow: allow}}); err != nil {
 		return err
@@ -252,9 +314,11 @@ func (cell *run) restore(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := snapshot.Restore(ctx, snapshot.RestoreInput{Dir: filepath.Join(dir, entrySnapshot), Stores: stores}); err != nil {
+	restored, err := snapshot.Restore(ctx, snapshot.RestoreInput{Dir: filepath.Join(dir, entrySnapshot), Stores: stores})
+	if err != nil {
 		return err
 	}
+	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("snapshot queue depth at its cut: %d (-1 unread)", restored.QueueDepthAtCut))
 	fingerprint, err := snapshot.TakeFingerprint(ctx, stores)
 	if err != nil {
 		return err

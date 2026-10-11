@@ -35,6 +35,8 @@ type Options struct {
 	Before, AtCut, AfterReady        time.Duration // traffic on main, with main's worker paused, after head is ready
 	ReadyWithin, SettleWithin        time.Duration
 	WorkerDelay, Rate, Hold          time.Duration
+	DrainWithin                      time.Duration // produce: bound on main draining its queue after the seed burst
+	DrainNear, Trickle               int           // produce: depth that counts as drained; spans sent live before the cut
 	SwitchOn, ServiceBin             string
 	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
 	Ledger                           []string // #8553 rows this cell claims and reports to

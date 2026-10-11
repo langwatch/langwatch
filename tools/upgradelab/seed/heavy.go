@@ -20,8 +20,9 @@ type HeavyInput struct {
 	Tenancy              Tenancy // its projects' keys carry the telemetry
 	Seed                 int64
 	Anchor               time.Time
-	Spans                int // 0 is seedgen's medium: about 300k
-	Workers              int // concurrent doors; default 8: requests carry up to 500 spans, so 32 timed out and starved the grants projection
+	Spans                int  // 0 is seedgen's medium: about 300k
+	TelemetryOnly        bool // skip the product kinds: a trickle of live telemetry, not a second seed
+	Workers              int  // concurrent doors; default 8: requests carry up to 500 spans, so 32 timed out and starved the grants projection
 	Log                  io.Writer
 }
 
@@ -62,6 +63,9 @@ func Heavy(ctx context.Context, in HeavyInput) (HeavyResult, error) {
 		return result, err
 	}
 	run := &heavyRun{door: door, plan: plan, live: live, workers: cmp.Or(in.Workers, defaultHeavyWorkers), count: count}
+	if in.TelemetryOnly {
+		return result, errors.Join(run.telemetry(ctx)...)
+	}
 	return result, errors.Join(append(run.telemetry(ctx), run.product(ctx)...)...)
 }
 
