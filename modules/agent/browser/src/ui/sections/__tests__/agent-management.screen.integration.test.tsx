@@ -495,7 +495,8 @@ describe("given the agents page", () => {
       await user.click(screen.getByRole("menuitem", { name: /replicate/i }));
 
       expect(screen.getByText("(no permission)")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Replicate" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Replicate" }));
+      expect(screen.getByText("Choose a project you can create agents in.")).toBeInTheDocument();
 
       await user.click(screen.getByRole("combobox"));
       const refused = await screen.findAllByRole("option", {
@@ -504,7 +505,8 @@ describe("given the agents page", () => {
       });
       await user.click(refused.find((option) => option.tagName === "DIV")!);
 
-      expect(screen.getByRole("button", { name: "Replicate" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Replicate" }));
+      expect(browser.copied).toEqual([]);
 
       await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(browser.copied).toEqual([]);
