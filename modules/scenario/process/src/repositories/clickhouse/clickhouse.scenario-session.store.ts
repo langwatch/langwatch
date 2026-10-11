@@ -1,4 +1,4 @@
-import type { ClickHouseColumns } from "@langwatch/clickhouse-client";
+import type { ClickHouseColumns, IdIndexBounds, IdIndexLookup } from "@langwatch/clickhouse-client";
 
 import type { SimulationClickHouseClient } from "./simulation-clickhouse.repository.ts";
 
@@ -12,6 +12,8 @@ type ScenarioReadOnlyClickHouse = Readonly<{
     SKIP_COLD_SCAN_CHECK?: true | undefined;
   }): Promise<{ rows: Row[] }>;
   columns(input: { tenantId: string }): ClickHouseColumns;
+  targetOf(input: { tenantId: string }): Promise<string>;
+  indexBounds(input: IdIndexLookup & { tenantId: string }): Promise<IdIndexBounds>;
 }>;
 
 /** One tenant's view of the routing member, in the `.query()` shape the simulation reads use. */
@@ -44,6 +46,16 @@ export class ClickHouseScenarioSession implements SimulationClickHouseClient {
     };
 
     return { json: async <Result>() => (await this.clickhouse.query<Result>(request)).rows };
+  }
+
+  /** The target `tenantId` lands on, which keys the module's id-index flag. */
+  targetOf(input: { tenantId: string }): Promise<string> {
+    return this.clickhouse.targetOf(input);
+  }
+
+  /** The time range one id's rows span, from the id index. */
+  indexBounds(input: IdIndexLookup & { tenantId: string }): Promise<IdIndexBounds> {
+    return this.clickhouse.indexBounds(input);
   }
 
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */

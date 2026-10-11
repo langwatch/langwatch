@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   completeExperimentRunInputSchema,
   experimentDspyStepLookupSchema,
@@ -96,6 +97,8 @@ type ExperimentServiceOptions = {
   updates?: ExperimentWorkbenchUpdates;
   /** Prices a run's unpriced target rows from their traces' settled cost. */
   traces: Pick<TraceApi, "findTraceCosts">;
+  /** Whether this module's id indexes are filled; absent reads runs and steps as before. */
+  idIndex?: IdIndexFlags | undefined;
 };
 
 /**
@@ -358,11 +361,15 @@ export class ExperimentService {
     await this.options.dspyRepository.upsert({
       step: experimentDspyStepSchema.parse(input),
       retention: this.options.dspyRetention,
+      idIndex: this.options.idIndex,
     });
   }
 
   async listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
-    return this.options.dspyRepository.findAll(experimentDspyStepsLookupSchema.parse(input));
+    return this.options.dspyRepository.findAll({
+      ...experimentDspyStepsLookupSchema.parse(input),
+      idIndex: this.options.idIndex,
+    });
   }
 
   async listDspyRuns(input: ExperimentDspyStepsLookup): Promise<DSPyRunsSummary[]> {
@@ -409,7 +416,10 @@ export class ExperimentService {
 
   async getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep> {
     const lookup = experimentDspyStepLookupSchema.parse(input);
-    const value = await this.options.dspyRepository.findStep(lookup);
+    const value = await this.options.dspyRepository.findStep({
+      ...lookup,
+      idIndex: this.options.idIndex,
+    });
     if (!value) {
       throw new ExperimentDspyStepNotFoundError(
         `${lookup.tenantId}/${lookup.experimentId}/${lookup.runId}/${lookup.stepIndex}`,
@@ -466,7 +476,10 @@ export class ExperimentService {
   }
 
   async findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
-    const run = await this.options.runRepository.findRun(experimentRunLookupSchema.parse(input));
+    const run = await this.options.runRepository.findRun({
+      ...experimentRunLookupSchema.parse(input),
+      idIndex: this.options.idIndex,
+    });
     return run ? this.runTraceCosts.priceRows(run) : null;
   }
 

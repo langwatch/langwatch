@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
@@ -105,6 +106,7 @@ export class SimulationProcessingRuntimeAdapter {
       grading: SimulationGradingPeers;
       milestones: SimulationMilestonePeers;
       pool: ExecutionPoolBudget;
+      idIndex?: IdIndexFlags | undefined;
     },
   ) {}
 
@@ -120,12 +122,14 @@ export class SimulationProcessingRuntimeAdapter {
     grading: SimulationGradingPeers;
     milestones: SimulationMilestonePeers;
     pool: ExecutionPoolBudget;
+    /** Whether this module's id indexes are filled; absent reads runs with no time bound. */
+    idIndex?: IdIndexFlags | undefined;
   }): SimulationProcessingRuntimeAdapter {
     return new SimulationProcessingRuntimeAdapter(input);
   }
 
   buildPipeline(setup: SimulationPipelineSetup): SimulationProcessingPipelineDefinition {
-    const { runs, cancellations, traces, retention, commands, simulations } = this.input;
+    const { runs, cancellations, traces, retention, commands, simulations, idIndex } = this.input;
     const loadPriorEvents = this.#priorEventsLoader(setup.priorEvents);
     const pool =
       setup.participation === "consume"
@@ -142,6 +146,7 @@ export class SimulationProcessingRuntimeAdapter {
 
     const simulationRunStore = runs.runStateStore({
       defaultRetentionDays: () => retention.getPlatformDefaultRetentionDays(),
+      idIndex,
     });
     const evaluations = this.#gradingDeps(simulationRunStore);
     const loadAttachments = (params: {

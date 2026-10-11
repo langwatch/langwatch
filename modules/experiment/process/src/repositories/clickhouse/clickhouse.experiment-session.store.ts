@@ -1,4 +1,15 @@
-import type { ClickHouseColumns, ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseColumns,
+  type ClickHouseQueryClient,
+  type IdIndexBounds,
+  type IdIndexLookup,
+  type IdIndexReader,
+  type IdIndexFlags,
+  type IdIndexKey,
+  type WindowFallback,
+  type WindowFragment,
+  indexedRead,
+} from "@langwatch/clickhouse-client";
 
 import type {
   ExperimentEventingClickHouseClient,
@@ -10,6 +21,41 @@ type ClickHouseRow = Readonly<Record<string, unknown>>;
 
 function isRow(value: unknown): value is ClickHouseRow {
   return typeof value === "object" && value !== null;
+}
+
+/** Never asked: a read through it carries no flags, so `indexedRead` takes today's path. */
+const NO_ID_INDEX: IdIndexReader = {
+  targetOf: () => Promise.reject(new Error("This client cannot name a ClickHouse target")),
+  indexBounds: () => Promise.reject(new Error("This client cannot read an id index")),
+};
+
+function canReadIdIndex(client: Partial<IdIndexReader>): client is IdIndexReader {
+  return typeof client.targetOf === "function" && typeof client.indexBounds === "function";
+}
+
+/**
+ * `indexedRead` over a session client. A client that cannot answer the index (a bare driver in a
+ * test) reads as the flag off, so a repository never branches on what it was handed.
+ */
+export function readByIdIndex<T>({
+  client,
+  idIndex,
+  ...options
+}: {
+  client: Partial<IdIndexReader>;
+  idIndex?: IdIndexFlags | undefined;
+  tenantId: string;
+  table: string;
+  index: string;
+  key: IdIndexKey;
+  fallback: WindowFallback;
+  isEmpty: (result: T) => boolean;
+  run: (window: WindowFragment | null) => Promise<T>;
+}): Promise<T> {
+  if (!canReadIdIndex(client)) {
+    return indexedRead({ ...options, client: NO_ID_INDEX, idIndex: undefined });
+  }
+  return indexedRead({ ...options, client, idIndex });
 }
 
 /**
@@ -38,6 +84,16 @@ export class ClickHouseExperimentSession implements ExperimentEventingClickHouse
       params: input.query_params,
     };
     return { json: async <T>() => (await this.clickhouse.query<T>(request)).rows };
+  }
+
+  /** The target `tenantId` lands on, which keys the module's id-index flag. */
+  targetOf(input: { tenantId: string }): Promise<string> {
+    return this.clickhouse.targetOf(input);
+  }
+
+  /** The time range one id's rows span, from the id index. */
+  indexBounds(input: IdIndexLookup & { tenantId: string }): Promise<IdIndexBounds> {
+    return this.clickhouse.indexBounds(input);
   }
 
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */

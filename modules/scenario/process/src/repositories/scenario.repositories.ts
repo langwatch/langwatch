@@ -2,6 +2,7 @@ import type { ScenarioTabStore } from "../app/scenario.app.ts";
 import type { ResultAtomsRepository } from "./result-atoms.repository.ts";
 import type { RunConfigurationsRepository } from "./run-configurations.repository.ts";
 import type { ScenarioCancellationRepository } from "./scenario-cancellation.repository.ts";
+import type { ScenarioIdIndexFillRepository } from "./scenario-id-index-fill.repository.ts";
 import type { ScenarioRateLimitRepository } from "./scenario-rate-limit.repository.ts";
 import type { ScenarioRepository } from "./scenario.repository.ts";
 import type { SimulationRunProcessingRepository } from "./simulation-run-processing.repository.ts";
@@ -33,4 +34,6 @@ export interface ScenarioRepositories {
   readonly rateLimits: ScenarioRateLimitRepository;
   /** The cancel signal a running child listens for, across every replica. */
   readonly cancellations: ScenarioCancellationRepository;
+  /** Fills the id index from rows older than its view. */
+  readonly idIndexFill: ScenarioIdIndexFillRepository;
 }

@@ -2,6 +2,8 @@ import { Buffer } from "node:buffer";
 
 import {
   ClickHouseColumns,
+  type IdIndexFlags,
+  type IdIndexReader,
   queryWindowed,
   type WindowFragment,
 } from "@langwatch/clickhouse-client";
@@ -26,6 +28,7 @@ import {
   EVALUATION_LIST_COLUMNS_SQL,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import { SimulationRepository } from "../simulation.repository.ts";
+import { readByIdIndex } from "./clickhouse.simulation-session.store.ts";
 import { CRITERIA_COLUMNS } from "./simulation-criteria.mapper.ts";
 import {
   type ClickHouseSimulationRunRow,
@@ -227,7 +230,7 @@ interface PreviewItemRow {
 export type SimulationClickHouseClient = {
   query(input: {
     query: string;
-    query_params: Record<string, string | string[]>;
+    query_params: Record<string, string | string[] | number>;
     format: "JSONEachRow";
     /** A declared tenant set: one organization's projects, bound by `TenantId IN (...)`. */
     tenantIds?: readonly string[];
@@ -236,7 +239,7 @@ export type SimulationClickHouseClient = {
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
-};
+} & Partial<IdIndexReader>;
 
 type SimulationClickHouseClientResolver = (tenantId: string) => Promise<SimulationClickHouseClient>;
 
@@ -402,31 +405,50 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   async findScenarioRunData({
     projectId,
     scenarioRunId,
+    idIndex,
   }: {
     projectId: string;
     scenarioRunId: string;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<SimulationRunData | null> {
     // Uses a scalar subquery to find the latest UpdatedAt, avoiding the old
     // pattern that read all heavy columns (Messages, RoleCosts, etc.) across
     // entire granules (~8K rows) for dedup, causing OOM on parts with large
     // payloads.
     const criteria = await this.criteriaColumns(projectId);
-    const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${runColumns(criteria)},
+    const client = await this.getClient(projectId);
+    const rows = await readByIdIndex<(ClickHouseSimulationRunRow & { ExportSortKey: string })[]>({
+      client,
+      idIndex,
+      tenantId: projectId,
+      table: TABLE_NAME,
+      index: `${TABLE_NAME}_id_index`,
+      key: { ScenarioRunId: scenarioRunId },
+      fallback: "unbounded",
+      isEmpty: (found) => found.length === 0,
+      run: async (window) => {
+        const result = await client.query({
+          query: `SELECT ${runColumns(criteria)},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.ScenarioRunId = {scenarioRunId:String}
          AND t.ArchivedAt IS NULL
+         ${window?.sqlFor("t.StartedAt") ?? ""}
          AND t.UpdatedAt = (
            SELECT max(s.UpdatedAt)
            FROM ${TABLE_NAME} AS s
            WHERE s.TenantId = {tenantId:String}
              AND s.ScenarioRunId = {scenarioRunId:String}
+             ${window?.sqlFor("s.StartedAt") ?? ""}
          )
        LIMIT 1`,
-      { tenantId: projectId, scenarioRunId },
-    );
+          query_params: { tenantId: projectId, scenarioRunId, ...window?.params },
+          format: "JSONEachRow",
+        });
+        return result.json<ClickHouseSimulationRunRow & { ExportSortKey: string }>();
+      },
+    });
 
     const row = rows[0];
     if (!row) return null;

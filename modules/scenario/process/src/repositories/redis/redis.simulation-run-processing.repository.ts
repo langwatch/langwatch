@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient, IdIndexFlags } from "@langwatch/clickhouse-client";
 import { type FoldProjectionStore, RedisCachedFoldStore } from "@langwatch/eventing";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -38,13 +38,16 @@ export class RedisSimulationRunProcessingRepository implements SimulationRunProc
 
   runStateStore({
     defaultRetentionDays,
+    idIndex,
   }: {
     defaultRetentionDays: () => number;
+    idIndex?: IdIndexFlags | undefined;
   }): FoldProjectionStore<SimulationRunStateData> {
     const durable = SimulationRunStateStore.create({
       type: "clickhouse",
       resolveClient: this.resolveClient,
       defaultRetentionDays,
+      idIndex,
     }).createFoldStore();
 
     return new RedisCachedFoldStore<SimulationRunStateData>(durable, this.redis, {

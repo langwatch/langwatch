@@ -9,6 +9,7 @@ import type {
   WorkbenchCredential,
 } from "@langwatch/experiment-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { ExperimentModule } from "#app/experiment.app";
 
@@ -85,4 +86,16 @@ export const experimentProcessModule: PublishedProcessModule<
     },
   })
   .withEventing(experimentRunProcessingEventing)
-  .withEventing(experimentLifecycleEventing);
+  .withEventing(experimentLifecycleEventing)
+  .withMigrations(({ app }) => [
+    defineMigrationStep({
+      id: "experiment:fill-id-indexes",
+      kind: "data",
+      mode: "background",
+      description:
+        "Fills the id indexes of experiment runs and DSPy steps from older rows, then turns each ClickHouse target's index flag on.",
+      needsOldWritersGone: false,
+      // Level-triggered: a rerun merges the same ranges and resumes at the saved cursor.
+      run: ({ checkpoint, dryRun, signal }) => app.fillIdIndexes({ checkpoint, dryRun, signal }),
+    }),
+  ]);

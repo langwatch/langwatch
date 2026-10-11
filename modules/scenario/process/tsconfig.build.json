@@ -139,6 +139,9 @@
       "path": "../../../packages/redis-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/authorization/tsconfig.build.json"
     }
   ],

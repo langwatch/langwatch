@@ -1,4 +1,4 @@
-import type { ClickHouseColumns } from "@langwatch/clickhouse-client";
+import type { ClickHouseColumns, IdIndexReader } from "@langwatch/clickhouse-client";
 
 export type ExperimentEventingClickHouseResult = {
   json<T>(): Promise<T[]>;
@@ -28,7 +28,7 @@ export type ExperimentEventingClickHouseClient = {
   }): Promise<ExperimentEventingClickHouseResult>;
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
-};
+} & Partial<IdIndexReader>;
 
 /** How the application hands the feature a tenant-scoped ClickHouse client. */
 export type ExperimentEventingClickHouseResolver = (

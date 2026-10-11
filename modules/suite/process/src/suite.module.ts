@@ -66,4 +66,14 @@ export const suiteProcessModule: PublishedProcessModule<"suite", SuiteApi, Suite
           });
         },
       }),
+      defineMigrationStep({
+        id: "suite:fill-id-indexes",
+        kind: "data",
+        mode: "background",
+        description:
+          "Fills the id index of suite runs from older rows, then turns each ClickHouse target's index flag on.",
+        needsOldWritersGone: false,
+        // Level-triggered: a rerun merges the same ranges and resumes at the saved cursor.
+        run: ({ checkpoint, dryRun, signal }) => app.fillIdIndexes({ checkpoint, dryRun, signal }),
+      }),
     ]);

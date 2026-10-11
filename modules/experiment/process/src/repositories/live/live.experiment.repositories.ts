@@ -3,6 +3,7 @@ import type { ExperimentServerConfig } from "@langwatch/experiment-contract";
 import type { Cluster, Redis } from "ioredis";
 
 import { ClickHouseExperimentDspyRepository } from "../clickhouse/clickhouse.experiment-dspy.repository.ts";
+import { ExperimentIdIndexFillClickHouseRepository } from "../clickhouse/clickhouse.experiment-id-index-fill.repository.ts";
 import { ClickHouseExperimentRunProcessingRepository } from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse/clickhouse.experiment-run.repository.ts";
 import { ClickHouseExperimentSession } from "../clickhouse/clickhouse.experiment-session.store.ts";
@@ -58,13 +59,15 @@ export class LiveExperimentRepositories {
       }),
       dspySteps: ClickHouseExperimentDspyRepository.create({ resolveClient, telemetry }),
       people: PrismaExperimentPeopleRepository.create(prisma),
+      idIndexFill: ExperimentIdIndexFillClickHouseRepository.create({ clickhouse }),
       runProcessing: {
-        open: ({ defaultRetentionDays }) => {
+        open: ({ defaultRetentionDays, idIndex }) => {
           const cached = RedisExperimentRunProcessingRepository.create({
             resolveClient,
             defaultRetentionDays,
             redis,
             foldCacheTtlSeconds: config.foldCacheTtlSeconds,
+            idIndex,
           });
           return {
             folds,
@@ -73,6 +76,7 @@ export class LiveExperimentRepositories {
             idLookup: ClickHouseExperimentRunProcessingRepository.create({
               resolveClient,
               clickhouseEnabled: true,
+              idIndex,
             }).idLookup(),
             experimentRunStateFoldStore: cached.stateFoldStore(),
             experimentRunItemAppendStore: cached.itemStore(),

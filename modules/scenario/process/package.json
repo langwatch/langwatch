@@ -84,6 +84,7 @@
   },
   "devDependencies": {
     "@langwatch/authorization": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/model-provider-process": "workspace:*",

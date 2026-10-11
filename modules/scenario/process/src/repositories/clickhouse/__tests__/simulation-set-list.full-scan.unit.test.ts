@@ -21,6 +21,8 @@ function compose() {
       columns: () => {
         throw new Error("the set list names its columns");
       },
+      targetOf: async () => "shared",
+      indexBounds: async () => ({ n: 0, fromMs: 0, toMs: 0 }),
     }),
   );
   return { repository, sent };

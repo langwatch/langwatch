@@ -1,4 +1,4 @@
-import { ClickHouseColumns, queryWindowed } from "@langwatch/clickhouse-client";
+import { ClickHouseColumns, type IdIndexFlags, queryWindowed } from "@langwatch/clickhouse-client";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -27,7 +27,10 @@ import {
   evaluationsToColumns,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import type { SimulationRunStateRepository } from "../simulation-run-state.repository.ts";
-import type { SimulationEventingClickHouseResolver } from "./clickhouse.simulation-session.store.ts";
+import {
+  readByIdIndex,
+  type SimulationEventingClickHouseResolver,
+} from "./clickhouse.simulation-session.store.ts";
 import {
   type ClickHouseCriteriaColumns,
   columnsToCriteria,
@@ -122,6 +125,8 @@ export class ClickHouseSimulationRunStateRepository<
   static create<ProjectionType extends Projection = Projection>(options: {
     resolveClient: SimulationClickHouseClientResolver;
     defaultRetentionDays: () => number;
+    /** The module's id-index flags; absent reads the run with no time bound, as before. */
+    idIndex?: IdIndexFlags | undefined;
   }): ClickHouseSimulationRunStateRepository<ProjectionType> {
     return new ClickHouseSimulationRunStateRepository(options);
   }
@@ -130,6 +135,7 @@ export class ClickHouseSimulationRunStateRepository<
     private readonly options: {
       resolveClient: SimulationClickHouseClientResolver;
       defaultRetentionDays: () => number;
+      idIndex?: IdIndexFlags | undefined;
     },
   ) {}
 
@@ -275,7 +281,7 @@ export class ClickHouseSimulationRunStateRepository<
   /**
    * A fold read-back carries the fold's read window (ADR-066), applied verbatim
    * with no fallback here: the fold executor retries a miss without the window.
-   * Any other read has no window and reads every partition, as before.
+   * Any other read takes the run's id index range once the index is ready, else every partition.
    */
   async findProjection(
     aggregateId: string,
@@ -287,19 +293,36 @@ export class ClickHouseSimulationRunStateRepository<
     const window = context.readWindow;
 
     try {
-      const row = await queryWindowed<ClickHouseSimulationRunRecord | null>({
-        table: TABLE_NAME,
-        hintMs: window ? (window.fromMs + window.toMs) / 2 : null,
-        ...(window ? { windowMs: (window.toMs - window.fromMs) / 2 } : {}),
-        fallback: window ? "none" : "unbounded",
-        isEmpty: (result) => result === null,
-        run: (fragment) =>
-          this.#findLatestRow({
+      const row = window
+        ? await queryWindowed<ClickHouseSimulationRunRecord | null>({
+            table: TABLE_NAME,
+            hintMs: (window.fromMs + window.toMs) / 2,
+            windowMs: (window.toMs - window.fromMs) / 2,
+            fallback: "none",
+            isEmpty: (result) => result === null,
+            run: (fragment) =>
+              this.#findLatestRow({
+                tenantId: context.tenantId,
+                scenarioRunId,
+                window: fragment ? window : undefined,
+              }),
+          })
+        : await readByIdIndex<ClickHouseSimulationRunRecord | null>({
+            client: await this.options.resolveClient(context.tenantId),
+            idIndex: this.options.idIndex,
             tenantId: context.tenantId,
-            scenarioRunId,
-            window: fragment ? window : undefined,
-          }),
-      });
+            table: TABLE_NAME,
+            index: `${TABLE_NAME}_id_index`,
+            key: { ScenarioRunId: scenarioRunId },
+            fallback: "unbounded",
+            isEmpty: (result) => result === null,
+            run: (indexWindow) =>
+              this.#findLatestRow({
+                tenantId: context.tenantId,
+                scenarioRunId,
+                window: indexWindow ?? undefined,
+              }),
+          });
       if (!row) return null;
 
       const projection: SimulationRunState = {

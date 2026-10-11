@@ -4,6 +4,7 @@
 import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { IdIndexFillCheckpoint, IdIndexFillReport } from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   DatasetApi,
@@ -88,6 +89,7 @@ import {
   type ExperimentWizardSaveInput,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
@@ -144,6 +146,8 @@ import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
 import { ExperimentDatasetEvaluationService } from "../services/experiment-dataset-evaluation.service.ts";
 import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
+import { ExperimentIdIndexFillService } from "../services/experiment-id-index-fill.service.ts";
+import { ExperimentIdIndexFlagsService } from "../services/experiment-id-index-flags.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
 import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
 import {
@@ -192,6 +196,8 @@ export interface ExperimentAppDependencies {
   batchLog?: Pick<ExperimentBatchLogService, "assertWithinLimit" | "log">;
   /** The SDK's dataset evaluation; absent where a suite builds none. */
   datasetEvaluation?: Pick<ExperimentDatasetEvaluationService, "evaluate">;
+  /** Fills the id indexes from older rows; absent where a suite builds no step. */
+  idIndexFill?: ExperimentIdIndexFillService;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -231,6 +237,8 @@ export class ExperimentModule implements ExperimentApi {
     storedObjects: StoredObjectApi,
     /** A settled experiment trace's fold, and the summary costs a run's unpriced rows take. */
     traces: TraceApi,
+    /** Whether this module's id indexes are filled, and the step that turns that on. */
+    featureFlags: FeatureFlagApi,
   };
   static readonly config = experimentConfig;
 
@@ -239,6 +247,9 @@ export class ExperimentModule implements ExperimentApi {
     const logger = createLogger("langwatch:experiment");
     const { workflows, dataset, agents, evaluators, prompts, retention } = dependencies;
     const commands = ExperimentRunCommandDispatcherService.create();
+    const idIndex = ExperimentIdIndexFlagsService.create({
+      featureFlags: dependencies.featureFlags,
+    });
     const senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> } = {};
     const experiments = ExperimentService.create({
       repository: repositories.experiments,
@@ -250,6 +261,7 @@ export class ExperimentModule implements ExperimentApi {
       newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
       references: { prompts, agents, evaluators, workflows, dataset },
       traces: dependencies.traces,
+      idIndex,
       updates: ExperimentWorkbenchPresenceUpdatesService.create({
         presence: dependencies.presence,
         logger,
@@ -259,6 +271,7 @@ export class ExperimentModule implements ExperimentApi {
       commands,
       experiments,
       runStores: repositories.runProcessing,
+      idIndex,
       peers: dependencies,
       config,
       // A start's refusal names the role; a suite that builds by hand names none.
@@ -285,6 +298,11 @@ export class ExperimentModule implements ExperimentApi {
       workbenchObserver: ExperimentWorkbenchObserverService.create({ logger, senders }),
       lifecycle: { pipeline: buildExperimentLifecyclePipeline(), senders },
       runProcessing: runs.processing,
+      idIndexFill: ExperimentIdIndexFillService.create({
+        fills: repositories.idIndexFill,
+        retention,
+        featureFlags: dependencies.featureFlags,
+      }),
       batchLog: ExperimentBatchLogService.create({
         runLookup,
         runs: experiments,
@@ -481,6 +499,17 @@ export class ExperimentModule implements ExperimentApi {
   }
 
   /** One run of one experiment. A missing run reads as null. */
+  /** The `experiment:fill-id-indexes` step's body: the id indexes, then each target's flag. */
+  fillIdIndexes(input: {
+    checkpoint: IdIndexFillCheckpoint;
+    dryRun: boolean;
+    signal: AbortSignal;
+  }): Promise<IdIndexFillReport> {
+    const fill = this.#dependencies.idIndexFill;
+    if (!fill) throw new Error("This experiment app was composed without an id index fill");
+    return fill.fillIdIndexes(input);
+  }
+
   findRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
     return this.#dependencies.experiments.findRun(input);
   }

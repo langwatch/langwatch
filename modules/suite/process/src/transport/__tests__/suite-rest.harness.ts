@@ -34,6 +34,7 @@ import { fromDate } from "@langwatch/time";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";
 import { SuiteModule } from "../../app/suite.app.ts";
+import { MemorySuiteIdIndexFillRepository } from "../../repositories/memory/memory.suite-id-index-fill.repository.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRunProcessingRepository } from "../../repositories/memory/memory.suite.repositories.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
@@ -447,6 +448,7 @@ export function mountSuiteFamilies(
     repositories: {
       suites: MemorySuiteRepository.create({ database }),
       runProcessing: MemorySuiteRunProcessingRepository.create(),
+      idIndexFill: MemorySuiteIdIndexFillRepository.create(),
     },
     dependencies: {
       scenarios,

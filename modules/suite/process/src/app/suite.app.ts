@@ -2,6 +2,7 @@ import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contra
 /**
  * The suite feature's application: what both of its doors call.
  */
+import type { IdIndexFillCheckpoint, IdIndexFillReport } from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   EvaluatorApi,
@@ -83,6 +84,8 @@ import {
   SuiteExecutionService,
   type SuiteRunEvaluatorsResolver,
 } from "../services/suite-execution.service.ts";
+import { SuiteIdIndexFillService } from "../services/suite-id-index-fill.service.ts";
+import { SuiteIdIndexFlagsService } from "../services/suite-id-index-flags.service.ts";
 import { SuitePlatformLinkService } from "../services/suite-platform-link.service.ts";
 import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
 import {
@@ -184,9 +187,15 @@ export class SuiteModule implements SuiteApi {
         publicBaseUrl: infrastructure.publicBaseUrl,
       }),
       publicBaseUrl: infrastructure.publicBaseUrl,
+      idIndexFill: SuiteIdIndexFillService.create({
+        fills: repositories.idIndexFill,
+        retention: dependencies.retention,
+        featureFlags: dependencies.featureFlags,
+      }),
       pipeline: SuiteModule.buildEventingPipeline({
         suiteRunStateFoldStore: repositories.runProcessing.openRunStateFoldStore({
           defaultRetentionDays,
+          idIndex: SuiteIdIndexFlagsService.create({ featureFlags: dependencies.featureFlags }),
         }),
         retention: {
           resolve: (tenantId) =>
@@ -295,6 +304,7 @@ export class SuiteModule implements SuiteApi {
   readonly #runItems: SuiteRunItemCommandsService;
   readonly #runPlans: RunPlanReadService;
   readonly #connectedTargets: ConnectedTargetService;
+  readonly #idIndexFill: SuiteIdIndexFillService | undefined;
 
   private constructor(
     dependencies: SuiteAppDependencies & {
@@ -303,9 +313,11 @@ export class SuiteModule implements SuiteApi {
       runPlans: RunPlanReadService;
       publicBaseUrl: string | undefined;
       pipeline?: SuiteRunProcessingPipeline;
+      idIndexFill?: SuiteIdIndexFillService;
     },
   ) {
-    const { publicBaseUrl, pipeline, runItems, runPlans, ...rest } = dependencies;
+    const { publicBaseUrl, pipeline, idIndexFill, runItems, runPlans, ...rest } = dependencies;
+    this.#idIndexFill = idIndexFill;
     this.#publicBaseUrl = publicBaseUrl;
     this.#pipeline = pipeline;
     this.#runItems = runItems;
@@ -315,6 +327,18 @@ export class SuiteModule implements SuiteApi {
       agents: rest.agents,
       owners: AgentOwnerNamesService.create(rest.agents),
     });
+  }
+
+  /** The `suite:fill-id-indexes` step's body: the id index, then each target's flag. */
+  fillIdIndexes(input: {
+    checkpoint: IdIndexFillCheckpoint;
+    dryRun: boolean;
+    signal: AbortSignal;
+  }): Promise<IdIndexFillReport> {
+    if (!this.#idIndexFill) {
+      throw new Error("This suite app was composed without an id index fill");
+    }
+    return this.#idIndexFill.fillIdIndexes(input);
   }
 
   /**

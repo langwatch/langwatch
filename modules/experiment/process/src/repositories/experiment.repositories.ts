@@ -1,4 +1,5 @@
 import type { ExperimentDspyRepository } from "./experiment-dspy.repository.ts";
+import type { ExperimentIdIndexFillRepository } from "./experiment-id-index-fill.repository.ts";
 import type { ExperimentPeopleRepository } from "./experiment-people.repository.ts";
 import type { ExperimentRunProcessingStores } from "./experiment-run.repositories.ts";
 import type { ExperimentRunRepository } from "./experiment-run.repository.ts";
@@ -12,4 +13,6 @@ export interface ExperimentRepositories {
   readonly dspySteps: ExperimentDspyRepository;
   readonly people: ExperimentPeopleRepository;
   readonly runProcessing: ExperimentRunProcessingStores;
+  /** Fills the id indexes from rows older than their views. */
+  readonly idIndexFill: ExperimentIdIndexFillRepository;
 }

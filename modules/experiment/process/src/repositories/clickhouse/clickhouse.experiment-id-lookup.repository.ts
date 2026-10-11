@@ -1,5 +1,8 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
+
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import { ExperimentIdLookupRepository } from "../experiment-id-lookup.repository.ts";
+import { readByIdIndex } from "./clickhouse.experiment-session.store.ts";
 
 const TABLE_NAME = "experiment_runs" as const;
 
@@ -9,14 +12,19 @@ const TABLE_NAME = "experiment_runs" as const;
  * `experimentId` it belongs to, and only `experiment_runs` carries that mapping.
  */
 export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRepository {
-  private constructor(private readonly clickhouse: ExperimentClickHouseRepository) {
+  private constructor(
+    private readonly clickhouse: ExperimentClickHouseRepository,
+    private readonly idIndex: IdIndexFlags | undefined,
+  ) {
     super();
   }
 
   static create(options: {
     clickhouse: ExperimentClickHouseRepository;
+    /** The module's id-index flags; absent reads the run with no time bound, as before. */
+    idIndex?: IdIndexFlags | undefined;
   }): ClickHouseExperimentIdLookupRepository {
-    return new ClickHouseExperimentIdLookupRepository(options.clickhouse);
+    return new ClickHouseExperimentIdLookupRepository(options.clickhouse, options.idIndex);
   }
 
   async findExperimentId({
@@ -27,20 +35,32 @@ export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRe
     runId: string;
   }): Promise<string | null> {
     const client = await this.clickhouse.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
-        SELECT ExperimentId
-        FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
-          AND RunId = {runId:String}
-        ORDER BY UpdatedAt DESC
-        LIMIT 1
-      `,
-      query_params: { tenantId, runId },
-      format: "JSONEachRow",
+    const rows = await readByIdIndex<{ ExperimentId: string }[]>({
+      client,
+      idIndex: this.idIndex,
+      tenantId,
+      table: TABLE_NAME,
+      index: `${TABLE_NAME}_id_index`,
+      key: { RunId: runId },
+      fallback: "unbounded",
+      isEmpty: (found) => found.length === 0,
+      run: async (window) => {
+        const result = await client.query({
+          query: `
+            SELECT ExperimentId
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND RunId = {runId:String}
+              ${window?.sqlFor("StartedAt") ?? ""}
+            ORDER BY UpdatedAt DESC
+            LIMIT 1
+          `,
+          query_params: { tenantId, runId, ...window?.params },
+          format: "JSONEachRow",
+        });
+        return result.json<{ ExperimentId: string }>();
+      },
     });
-
-    const rows = await result.json<{ ExperimentId: string }>();
     return rows[0]?.ExperimentId ?? null;
   }
 }

@@ -9,6 +9,7 @@ import {
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { IdIndexFillCheckpoint, IdIndexFillReport } from "@langwatch/clickhouse-client";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -178,6 +179,8 @@ import { ScenarioExecutorService } from "../services/scenario-executor.service.t
 import { ScenarioFailureHandlerService } from "../services/scenario-failure-handler.service.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
+import { ScenarioIdIndexFillService } from "../services/scenario-id-index-fill.service.ts";
+import { ScenarioIdIndexFlagsService } from "../services/scenario-id-index-flags.service.ts";
 import { ScenarioPlatformLinkService } from "../services/scenario-platform-link.service.ts";
 import { ScenarioRunAttachmentsService } from "../services/scenario-run-attachments.service.ts";
 import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
@@ -224,6 +227,8 @@ interface ScenarioAppDependencies {
   platformLinks: ScenarioPlatformLinkService;
   /** The runs and batches a simulation produced, as the run drawer and the public API read them. */
   runViews: SimulationRunViewService;
+  /** Fills the id index from rows older than its view, for the `scenario:fill-id-indexes` step. */
+  idIndexFill: ScenarioIdIndexFillService;
   /** "Talk to it": browser voice sessions and their recordings. */
   voiceSessions: VoiceSessionService;
   /** The worker's media door: hands a Twilio upgrade to the child that owns the call. */
@@ -309,7 +314,12 @@ export class ScenarioModule implements ScenarioApi {
     const clock = { now: nowInstant };
     // The live repository seals and opens run secrets; the memory twin holds them in plaintext.
     const runSecretSeal = repositories.scenarios;
-    const simulations = SimulationService.create(repositories.simulations, simulationCommands);
+    const idIndex = ScenarioIdIndexFlagsService.create({
+      featureFlags: setup.dependencies.featureFlags,
+    });
+    const simulations = SimulationService.create(repositories.simulations, simulationCommands, {
+      idIndex,
+    });
     const scenarios = ScenarioService.create({
       repository: repositories.scenarios,
       simulations,
@@ -441,6 +451,11 @@ export class ScenarioModule implements ScenarioApi {
         allowLoopbackVoiceProviders: config.allowLoopbackVoiceProviders,
         recordings: setup.channels.recordings,
       }),
+      idIndexFill: ScenarioIdIndexFillService.create({
+        fills: repositories.idIndexFill,
+        retention: setup.dependencies.retention,
+        featureFlags: setup.dependencies.featureFlags,
+      }),
       lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,
       simulationProcessing: SimulationProcessingRuntimeAdapter.create({
@@ -453,6 +468,7 @@ export class ScenarioModule implements ScenarioApi {
         cancellations,
         traces: setup.dependencies.traces,
         retention: setup.dependencies.retention,
+        idIndex,
         commands: simulationCommands,
         simulations,
         snapshotUpdates: {
@@ -511,6 +527,15 @@ export class ScenarioModule implements ScenarioApi {
     this.#simulationProcessing = simulationProcessing;
     this.#dependencies = rest;
     this.#runLaunch = ScenarioRunLaunchService.create(this);
+  }
+
+  /** The `scenario:fill-id-indexes` step's body: the id index, then each target's flag. */
+  fillIdIndexes(input: {
+    checkpoint: IdIndexFillCheckpoint;
+    dryRun: boolean;
+    signal: AbortSignal;
+  }): Promise<IdIndexFillReport> {
+    return this.#dependencies.idIndexFill.fillIdIndexes(input);
   }
 
   testAgentTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {

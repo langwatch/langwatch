@@ -39,7 +39,6 @@ export const RETENTION_ID_INDEX_TABLES = {
   evaluation_runs_id_index: "evaluation_runs",
   evaluation_analytics_id_index: "evaluation_analytics",
   experiment_runs_id_index: "experiment_runs",
-  experiment_run_items_id_index: "experiment_run_items",
   dspy_steps_id_index: "dspy_steps",
   simulation_runs_id_index: "simulation_runs",
   suite_runs_id_index: "suite_runs",

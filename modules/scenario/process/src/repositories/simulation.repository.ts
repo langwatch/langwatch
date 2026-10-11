@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type {
   SimulationBatchHistory,
   SimulationBatchRunData,
@@ -40,8 +41,9 @@ export abstract class SimulationRepository {
   abstract findScenarioSetsData(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationSetData[]>;
+  /** With `idIndex` on, the run is read only in the weeks its id index names. */
   abstract findScenarioRunData(
-    input: SimulationScenarioRunInput,
+    input: SimulationScenarioRunInput & { idIndex?: IdIndexFlags | undefined },
   ): Promise<SimulationRunData | null>;
   abstract listBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,

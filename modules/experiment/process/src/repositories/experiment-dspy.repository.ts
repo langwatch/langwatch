@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type {
   ExperimentDspyStep,
   ExperimentDspyStepLookup,
@@ -12,7 +13,13 @@ export abstract class ExperimentDspyRepository {
   abstract upsert(input: {
     step: ExperimentDspyStep;
     retention: ExperimentDspyRetentionRepository;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<void>;
-  abstract findAll(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]>;
-  abstract findStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep | null>;
+  /** With `idIndex` on, an experiment's steps are read only in the weeks its id index names. */
+  abstract findAll(
+    input: ExperimentDspyStepsLookup & { idIndex?: IdIndexFlags | undefined },
+  ): Promise<ExperimentDspyStepSummary[]>;
+  abstract findStep(
+    input: ExperimentDspyStepLookup & { idIndex?: IdIndexFlags | undefined },
+  ): Promise<ExperimentDspyStep | null>;
 }
