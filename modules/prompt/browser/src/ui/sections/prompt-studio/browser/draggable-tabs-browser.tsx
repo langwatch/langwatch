@@ -336,19 +336,18 @@ function DraggableBrowserTabTrigger({
 function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
   const { windowId } = useTabWindowContext();
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } =
-    useSortable({
-      id,
-      data: {
-        windowId,
-        tabId: id,
-        label: (
-          <TabIdProvider tabId={id}>
-            <PromptBrowserTab dimmed={false} />
-          </TabIdProvider>
-        ),
-      },
-    });
+  const { listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
+    id,
+    data: {
+      windowId,
+      tabId: id,
+      label: (
+        <TabIdProvider tabId={id}>
+          <PromptBrowserTab dimmed={false} />
+        </TabIdProvider>
+      ),
+    },
+  });
 
   return (
     <Box
@@ -371,8 +370,10 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       transform={CSS.Transform.toString(transform)}
       transition={transition}
       opacity={isDragging || isOver ? 0.5 : 1}
-      {...attributes}
       {...listeners}
+      // Pointer-only drag: the sensor list has no keyboard sensor, so dnd-kit's button role, tab
+      // stop and "press space" hints are left off; the tablist holds only tabs.
+      role="presentation"
     >
       {children}
     </Box>

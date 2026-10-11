@@ -2,7 +2,7 @@ import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Tabs, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useId, useMemo, useState } from "react";
 
 import type { Snippet, Target } from "../../api-snippet/openapi-snippet.types.ts";
 
@@ -71,6 +71,8 @@ export function GenerateApiSnippetDialog({
   };
   const onOpen = () => setOpen(true);
   const onClose = () => setOpen(false);
+  const idBase = useId();
+  const previewId = `${idBase}-snippet-preview`;
   const [selectedTarget, setSelectedTarget] = useState<Target>(targets[0] ?? "python_python3");
 
   // Derived, never synced by an effect: callers rebuild `snippets` each render (React #185).
@@ -128,6 +130,10 @@ export function GenerateApiSnippetDialog({
                   }}
                   variant="line"
                   size="sm"
+                  ids={{
+                    trigger: (value) => `${idBase}-snippet-${value}`,
+                    content: () => previewId,
+                  }}
                 >
                   <Tabs.List aria-label="Snippet language">
                     {targets.map((target) => (
@@ -137,18 +143,24 @@ export function GenerateApiSnippetDialog({
                     ))}
                   </Tabs.List>
                 </Tabs.Root>
-                <SnippetPreview
-                  code={code}
-                  filename={fileNameForLanguage(language)}
-                  codeLanguage={language}
-                  languageIconUrl={languageIconFor(language)}
-                  sensitiveValue={sensitiveValue}
-                  enableVisibilityToggle={!!sensitiveValue}
-                  // Always the unmasked snippet: a masked key fails only once pasted.
-                  copyText={code}
-                  disableActions={copyDisabled}
-                  maxHeight="min(460px, 58dvh)"
-                />
+                <Box
+                  id={previewId}
+                  role="tabpanel"
+                  aria-labelledby={`${idBase}-snippet-${selectedSnippet.target}`}
+                >
+                  <SnippetPreview
+                    code={code}
+                    filename={fileNameForLanguage(language)}
+                    codeLanguage={language}
+                    languageIconUrl={languageIconFor(language)}
+                    sensitiveValue={sensitiveValue}
+                    enableVisibilityToggle={!!sensitiveValue}
+                    // Always the unmasked snippet: a masked key fails only once pasted.
+                    copyText={code}
+                    disableActions={copyDisabled}
+                    maxHeight="min(460px, 58dvh)"
+                  />
+                </Box>
               </Box>
             </VStack>
           </Dialog.Body>
