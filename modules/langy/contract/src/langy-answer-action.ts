@@ -5,6 +5,8 @@
 
 import { uiTokens } from "@langwatch/module";
 
+import type { LangyDerivedInsightsCard } from "./cards/derived-safe.ts";
+
 /**
  * What an answer was about, when the module that asked said so: the board and widget on
  * screen, and the query the answer read with the fixed window it read it over. A portable
@@ -32,6 +34,8 @@ export type LangyAnswerActionProps = {
   answerText: string;
   /** Absent while no asking module hands Langy a structured subject for the turn. */
   subject?: LangyAnswerSubject;
+  /** The answer's first insights card, when it carries one: its findings as typed data. */
+  insights?: LangyDerivedInsightsCard;
 };
 
 export const LangyAnswerActionToken =

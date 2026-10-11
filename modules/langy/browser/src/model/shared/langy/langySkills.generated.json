@@ -55,6 +55,13 @@
 		"userPrompt": "Find my context sweet spot"
 	},
 	{
+		"id": "daily-insights",
+		"label": "Daily insights",
+		"description": "Read one LangWatch dashboard over a fixed window and hand back what changed as one card of findings. Use when a user message starts with \"Daily insights run\" and names this skill, and never otherwise.",
+		"category": "skill",
+		"internal": true
+	},
+	{
 		"id": "dashboard-widgets",
 		"label": "Dashboard widgets",
 		"description": "Author a dashboard widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.",
