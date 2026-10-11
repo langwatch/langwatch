@@ -4,8 +4,8 @@ import type React from "react";
 
 function Screenshot({ src, alt }: { src: string; alt: string }): React.ReactElement {
   return (
-    <Box maxW="840px" alignSelf="start">
-      <Card variant="nested" tone="neutral" padding="none">
+    <Box maxW="840px" alignSelf="start" minWidth={0}>
+      <Card variant="image-frame">
         <img
           src={src}
           alt={alt}
