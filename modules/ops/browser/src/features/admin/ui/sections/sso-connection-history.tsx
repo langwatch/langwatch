@@ -66,7 +66,10 @@ export function ConnectionHistory({ connectionId }: { connectionId: string }) {
     };
   });
   let emptyState = (
-    <NoDataInfoBlock size="line" title="Nothing has happened to this connection yet." />
+    <NoDataInfoBlock
+      size="line"
+      title="Nothing has happened to this connection yet. Review the connection details above; future setup and status changes will appear here."
+    />
   );
   if (history.isLoading) emptyState = <Skeleton height="16" />;
   if (history.error)

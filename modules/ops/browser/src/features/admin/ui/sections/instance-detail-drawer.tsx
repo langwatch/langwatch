@@ -250,7 +250,10 @@ function HistorySection({
   return (
     <Card title="Reports" titleLevel={3} padding={reports.length === 0 ? "md" : "none"}>
       {reports.length === 0 ? (
-        <NoDataInfoBlock size="line" title="No reports stored yet." />
+        <NoDataInfoBlock
+          size="line"
+          title="No reports stored yet. Ask the instance administrator to check that usage reporting is configured and the instance can reach LangWatch."
+        />
       ) : (
         <ListTable variant="embedded" density="compact" scroll="x" scrollLabel="Reports table">
           <ListTable.Header>

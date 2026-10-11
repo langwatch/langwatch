@@ -134,7 +134,7 @@ export function ConnectionDomains({ connection }: { connection: AdminSsoConnecti
           />
         ))}
         {connection.domainVerifications.length === 0 && (
-          <NoDataInfoBlock size="line" title="No domain has been proved yet." />
+          <NoDataInfoBlock size="line" title={noDomainProvedTitle(connection)} />
         )}
         {connection.claimedDomains.map((domain) => (
           <PendingDomain key={domain} domain={domain} status="Awaiting approval" />
@@ -169,4 +169,25 @@ function PendingDomain({ domain, status }: { domain: string; status: string }) {
       <Badge colorPalette="orange">{status}</Badge>
     </HStack>
   );
+}
+
+/** What an operator can do next, from the claims and approvals the connection already holds. */
+function noDomainProvedTitle(
+  connection: Pick<AdminSsoConnection, "claimedDomains" | "approvedDomains">,
+): string {
+  const steps: string[] = [];
+  if (connection.claimedDomains.length > 0) {
+    steps.push("Review the pending domain claims below before approving them.");
+  }
+  if (connection.approvedDomains.length > 0) {
+    steps.push(
+      "Ask the organization administrator to complete verification for the approved domains.",
+    );
+  }
+  if (steps.length === 0) {
+    steps.push(
+      "Ask the organization administrator to add and verify a domain in single sign-on setup.",
+    );
+  }
+  return `No domain has been proved yet. ${steps.join(" ")}`;
 }
