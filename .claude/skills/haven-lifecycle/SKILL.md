@@ -108,6 +108,8 @@ prometheus loki` and the pinned ClickHouse, Tempo and Alloy downloads). macOS ne
 - haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or
   observability, sandboxed Langy, `haven pr --throwaway`), records that in `colima-<profile>.json`, and stops it
   once nothing needs it (`haven status` adds "stopped by haven"). A VM you started is never stopped.
+- `haven machine settings set vm off` keeps haven off the VM entirely: ClickHouse and observability run
+  natively, sandboxed Langy and `haven pr --throwaway` refuse naming the setting, and a VM haven started stops.
 - `machine clean` flags: `--stale-days <n>`, `--include-recent` (agent jobs finished within 48h).
   Only agents that were asked may run `haven machine clean` or `haven down --destroy`.
 

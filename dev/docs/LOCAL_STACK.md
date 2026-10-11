@@ -377,3 +377,5 @@ Locally built binaries land only in `.bin/<name>/<name>` (git- and
 Docker-ignored). Release pipelines pass their own `--outfile`.
 
 haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or observability, sandboxed Langy, `haven pr --throwaway`). When it starts the VM it records that in its home (`colima-<profile>.json`), and `haven down` or the daemon stops it once no stack needs a container and none is running; `haven status` then adds "stopped by haven". A VM you started yourself is never stopped.
+
+`haven machine settings set vm off` keeps haven off the VM entirely: ClickHouse and observability always run natively, sandboxed Langy and `haven pr --throwaway` refuse with a line naming the setting, and a VM haven started is stopped once nothing runs on it.
