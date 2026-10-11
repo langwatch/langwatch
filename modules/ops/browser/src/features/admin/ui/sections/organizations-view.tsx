@@ -374,7 +374,10 @@ export function OrganizationEditDrawer({
       open={!!organization}
       onClose={onClose}
       title="Edit Organization"
-      footer={{ primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending } }}
+      footer={{
+        primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending },
+        cancel: { onClick: onClose },
+      }}
     >
       {organization && form && (
         <VStack gap={4} align="stretch">

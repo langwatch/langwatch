@@ -394,7 +394,10 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
       open={!!user}
       onClose={onClose}
       title="Edit user"
-      footer={{ primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending } }}
+      footer={{
+        primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending },
+        cancel: { onClick: onClose },
+      }}
     >
       {user && (
         <VStack gap={4} align="stretch">

@@ -331,6 +331,7 @@ function ProjectEditDrawer({
         title="Edit Project"
         footer={{
           primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending },
+          cancel: { onClick: onClose },
         }}
       >
         {project && form && (
