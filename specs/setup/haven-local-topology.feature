@@ -195,6 +195,16 @@ Feature: The local development topology
     And with LANGWATCH_DEV_ONE_PROCESS=0 the "go" and "sims" lanes are planned as before
     And Langy keeps a lane of its own either way
 
+  # Bound by tools/thuishaven/app/plan_langy_test.go. A global CLI from a package
+  # manager lags the checkout, so Langy's commands would be tested against old flags.
+  @unit
+  Scenario: Langy on the host runs this checkout's langwatch CLI
+    Given a stack whose Langy runs on the host tier
+    When haven plans the Langy lane
+    Then the checkout's built CLI is built first when it is missing
+    And "langwatch" and "lw" shims that run it lead the Langy lane's PATH
+    And a failed CLI build keeps Langy, names the build command and its log, and leaves the CLI on PATH in use
+
   @unit
   Scenario: Services sharing one Go process keep their own telemetry identity
     Given the gateway and the NLP engine each set up telemetry in one process
