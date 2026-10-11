@@ -6246,5 +6246,53 @@
     "line": 116,
     "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
     "owner": "workflow"
+  },
+  {
+    "path": "modules/automation/browser/src/features/authoring/ui/sections/template-authoring.tsx",
+    "rule": "card-box",
+    "line": 242,
+    "reason": "Kept as today: the template code editor frame, resizable email preview, Slack-style preview, wireframe block, or an inline filter chip (R4w2 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/features/authoring/ui/sections/template-authoring.tsx",
+    "rule": "card-box",
+    "line": 296,
+    "reason": "Kept as today: the template code editor frame, resizable email preview, Slack-style preview, wireframe block, or an inline filter chip (R4w2 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/features/authoring/ui/sections/template-authoring.tsx",
+    "rule": "card-box",
+    "line": 449,
+    "reason": "Kept as today: the template code editor frame, resizable email preview, Slack-style preview, wireframe block, or an inline filter chip (R4w2 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/features/slack-templates/ui/elements/wireframes.tsx",
+    "rule": "card-box",
+    "line": 156,
+    "reason": "Kept as today: the template code editor frame, resizable email preview, Slack-style preview, wireframe block, or an inline filter chip (R4w2 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/ui/elements/filter-display.tsx",
+    "rule": "card-box",
+    "line": 34,
+    "reason": "Kept as today: the template code editor frame, resizable email preview, Slack-style preview, wireframe block, or an inline filter chip (R4w2 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/ui/sections/automations-screen.tsx",
+    "rule": "card-box",
+    "line": 135,
+    "reason": "Kept as today: the template code editor frame, resizable email preview, Slack-style preview, wireframe block, or an inline filter chip (R4w2 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
   }
 ]
