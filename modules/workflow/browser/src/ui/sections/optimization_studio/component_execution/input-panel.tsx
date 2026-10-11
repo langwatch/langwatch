@@ -1,4 +1,4 @@
-import { Box } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
 import type { Component } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -91,17 +91,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
   }, [animationFinished, inputFields, onExecute, setTriggerValidation, triggerValidation]);
 
   return (
-    <Box
-      background="bg"
-      height="full"
-      padding={6}
-      border="1px solid"
-      borderColor="border.emphasized"
-      borderRadius="8px 0 0 8px"
-      borderRightWidth={0}
-      boxShadow="sm"
-      overflowY="auto"
-    >
+    <Card variant="joined-panel" edge="start">
       <ExecutionInputPanel
         fields={inputFields}
         onExecute={onExecute}
@@ -110,6 +100,6 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
         disabledReason={isConnected ? undefined : WAITING_FOR_ENGINE}
         pendingText={isConnected ? undefined : "Reconnecting…"}
       />
-    </Box>
+    </Card>
   );
 };
