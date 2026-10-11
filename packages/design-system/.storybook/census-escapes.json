@@ -5555,5 +5555,460 @@
     "reason": "Not a plain card: an input-shaped placeholder, a lockable option button, a segmented toggle or the delivery picker whose border turns green when set up (R4w1 review).",
     "owner": "automation",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-card-part",
+    "line": 185,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-card-part",
+    "line": 186,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-card-part",
+    "line": 191,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-card-part",
+    "line": 204,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-card-part",
+    "line": 205,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 649,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 650,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 652,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 661,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 662,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 670,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 671,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 689,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 690,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 693,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 694,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 695,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 698,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 725,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 726,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 729,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 732,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 735,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 737,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 751,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 752,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 755,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 756,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 763,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 774,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 913,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 930,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 943,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 946,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 949,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 970,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "hand-table",
+    "line": 994,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1003,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1004,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1005,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1010,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1013,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1016,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1019,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1024,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 1035,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "hand-table",
+    "line": 1045,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1054,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1055,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1056,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1061,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1064,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1067,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1071,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1077,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 1097,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "hand-table",
+    "line": 1106,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1115,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1116,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1117,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1122,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1125,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1128,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1131,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments/ds-py-experiment.tsx",
+    "rule": "legacy-table-part",
+    "line": 1136,
+    "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
+    "owner": "experiment"
   }
 ]
