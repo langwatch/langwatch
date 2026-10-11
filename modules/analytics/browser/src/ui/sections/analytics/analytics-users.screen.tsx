@@ -1,5 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Card, GridItem, Heading, HStack, SimpleGrid } from "@langwatch/design-system/primitives";
+import { Box, GridItem, HStack, SimpleGrid } from "@langwatch/design-system/primitives";
 import { Users } from "lucide-react";
 
 import { ChartCard } from "../../../ui/elements/chart-card.tsx";
@@ -206,24 +207,18 @@ function UsersContent() {
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="auto">
-              <Card.Header>
-                <Heading textStyle="cardTitle">User traces</Heading>
-              </Card.Header>
-              <Card.Body>
+            <Card padding="lg" title="User traces">
+              <Box overflow="auto">
                 <CustomGraph input={messagesCount} emptyState={userEmptyState} />
-              </Card.Body>
-            </Card.Root>
+              </Box>
+            </Card>
           </GridItem>
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="auto">
-              <Card.Header>
-                <Heading textStyle="cardTitle">User threads</Heading>
-              </Card.Header>
-              <Card.Body>
+            <Card padding="lg" title="User threads">
+              <Box overflow="auto">
                 <CustomGraph input={userThreads} emptyState={userEmptyState} />
-              </Card.Body>
-            </Card.Root>
+              </Box>
+            </Card>
           </GridItem>
           <ChartCard title="Daily users" colSpan={2}>
             <CustomGraph input={userCountGraph} emptyState={userEmptyState} />

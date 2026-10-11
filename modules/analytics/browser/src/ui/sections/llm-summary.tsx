@@ -1,4 +1,5 @@
-import { Card, Heading, HStack, IconButton } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUpRight } from "lucide-react";
 
@@ -51,29 +52,27 @@ export const LLMSummary = () => {
   };
 
   return (
-    <Card.Root>
-      <Card.Header>
-        <HStack gap={1}>
-          <Heading textStyle="cardTitle">Summary</Heading>
-          {project?.slug && (
-            <Tooltip content="View LLM metrics">
-              <Link href={`/${project.slug}/analytics/metrics`}>
-                <IconButton
-                  aria-label="View LLM metrics"
-                  variant="ghost"
-                  size="2xs"
-                  color="fg.subtle"
-                >
-                  <ArrowUpRight size={14} />
-                </IconButton>
-              </Link>
-            </Tooltip>
-          )}
-        </HStack>
-      </Card.Header>
-      <Card.Body>
-        <CustomGraph input={llmSummary} />
-      </Card.Body>
-    </Card.Root>
+    <Card
+      padding="lg"
+      title="Summary"
+      actions={
+        project?.slug && (
+          <Tooltip content="View LLM metrics">
+            <Link href={`/${project.slug}/analytics/metrics`}>
+              <IconButton
+                aria-label="View LLM metrics"
+                variant="ghost"
+                size="2xs"
+                color="fg.subtle"
+              >
+                <ArrowUpRight size={14} />
+              </IconButton>
+            </Link>
+          </Tooltip>
+        )
+      }
+    >
+      <CustomGraph input={llmSummary} />
+    </Card>
   );
 };
