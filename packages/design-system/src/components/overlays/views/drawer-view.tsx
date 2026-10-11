@@ -14,24 +14,24 @@ import {
 import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
-import { DrawerFooterBand, DrawerHeaderBand } from "../../overlays/drawer-chrome.tsx";
-import { DrawerOffsetContext, useDrawerEndInset } from "../../overlays/drawer-inset.ts";
-import { useHasOpenModal } from "../../overlays/modal-stack.ts";
-import { BOUNDED_BODY, OverlayBodyState } from "../../overlays/overlay-body.tsx";
-import { OverlayPortalTargetProvider } from "../../overlays/portal-target.ts";
-import { useDrawerChrome, useDrawerGlass } from "../../overlays/use-drawer-chrome.ts";
-import { drawerGlassBodyInsets } from "../../system/drawer.recipe.ts";
-import { FieldLayoutProvider } from "../forms/field-layout.ts";
-import { StudioIsolatedErrorBoundary } from "../states/studio-error-boundary.tsx";
+import { DrawerFooterBand, DrawerHeaderBand } from "../../../overlays/drawer-chrome.tsx";
+import { DrawerOffsetContext, useDrawerEndInset } from "../../../overlays/drawer-inset.ts";
+import { useHasOpenModal } from "../../../overlays/modal-stack.ts";
+import { BOUNDED_BODY, OverlayBodyState } from "../../../overlays/overlay-body.tsx";
+import { OverlayPortalTargetProvider } from "../../../overlays/portal-target.ts";
+import { useDrawerChrome, useDrawerGlass } from "../../../overlays/use-drawer-chrome.ts";
+import { drawerGlassBodyInsets } from "../../../system/drawer.recipe.ts";
+import { FieldLayoutProvider } from "../../forms/field-layout.ts";
+import { StudioIsolatedErrorBoundary } from "../../states/studio-error-boundary.tsx";
 import {
   ActionRow,
   type ActionRowProps,
   type FrameAction,
   FrameActionButton,
-} from "./action-row.tsx";
-import { CloseButton } from "./close-button.tsx";
+} from "../action-row.tsx";
+import { CloseButton } from "../close-button.tsx";
 
-export type { ActionRowProps, FrameAction } from "./action-row.tsx";
+export type { ActionRowProps, FrameAction } from "../action-row.tsx";
 
 /**
  * The panel's ground, border and radius are the recipe's: don't pass `bg`, `background` or

@@ -1,10 +1,10 @@
 import { Dialog as ChakraDialog } from "@chakra-ui/react";
 
 /**
- * The published `dialog` subpath. Components live in `dialog-view.tsx` and nothing else, so an
+ * The published `dialog` subpath. Only components live in `views/dialog-view.tsx`, so an
  * edit there hot-swaps; the Chakra part aliases and hooks re-exported here would not.
  */
-export * from "./dialog-view.tsx";
+export * from "./views/dialog-view.tsx";
 export { Dialog as RawDialog } from "@chakra-ui/react";
 export { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
 

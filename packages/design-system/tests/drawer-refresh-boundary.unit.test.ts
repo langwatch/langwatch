@@ -54,7 +54,7 @@ describe("overlay Fast Refresh boundaries", () => {
     it("is a boundary the real refresh runtime accepts without invalidating", async () => {
       const runtime = await loadRefreshRuntime();
       const { previous, next } = await evaluateTwice({
-        load: () => import("../src/components/overlays/drawer-view.tsx"),
+        load: () => import("../src/components/overlays/views/drawer-view.tsx"),
       });
       runtime.registerExportsForReactRefresh("drawer-view.tsx", previous);
 
@@ -72,7 +72,7 @@ describe("overlay Fast Refresh boundaries", () => {
     it("is a boundary the real refresh runtime accepts without invalidating", async () => {
       const runtime = await loadRefreshRuntime();
       const { previous, next } = await evaluateTwice({
-        load: () => import("../src/components/overlays/dialog-view.tsx"),
+        load: () => import("../src/components/overlays/views/dialog-view.tsx"),
       });
       runtime.registerExportsForReactRefresh("dialog-view.tsx", previous);
 

@@ -1,8 +1,8 @@
 /**
- * The published `drawer` subpath. Components live in `drawer-view.tsx` and nothing else, so an
+ * The published `drawer` subpath. Only components live in `views/drawer-view.tsx`, so an
  * edit there hot-swaps; the hooks, providers and Chakra namespace re-exported here would not.
  */
-export * from "./drawer-view.tsx";
+export * from "./views/drawer-view.tsx";
 export { Drawer as RawDrawer } from "@chakra-ui/react";
 export {
   DrawerOffsetProvider,

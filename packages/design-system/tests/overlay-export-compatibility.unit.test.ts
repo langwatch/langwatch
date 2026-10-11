@@ -1,12 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import * as dialogView from "../src/components/overlays/dialog-view.tsx";
 import * as dialogFacade from "../src/components/overlays/dialog.tsx";
-import * as drawerView from "../src/components/overlays/drawer-view.tsx";
 import * as drawerFacade from "../src/components/overlays/drawer.tsx";
 import * as studioDialog from "../src/components/overlays/studio-dialog.tsx";
 import * as studioDrawer from "../src/components/overlays/studio-drawer.tsx";
+import * as dialogView from "../src/components/overlays/views/dialog-view.tsx";
+import * as drawerView from "../src/components/overlays/views/drawer-view.tsx";
 import * as drawerInset from "../src/overlays/drawer-inset.ts";
 import * as portalTarget from "../src/overlays/portal-target.ts";
 import * as drawerChrome from "../src/overlays/use-drawer-chrome.ts";

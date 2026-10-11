@@ -10,16 +10,16 @@ import {
 import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
-import { firstFocusable } from "../../overlays/focusable.ts";
-import { registerOpenModal } from "../../overlays/modal-stack.ts";
-import { BOUNDED_BODY, OverlayBodyState } from "../../overlays/overlay-body.tsx";
-import { OverlayPortalTargetProvider } from "../../overlays/portal-target.ts";
-import { FieldLayoutProvider } from "../forms/field-layout.ts";
-import { StudioIsolatedErrorBoundary } from "../states/studio-error-boundary.tsx";
-import { ActionRow, type FrameAction } from "./action-row.tsx";
-import { CloseButton } from "./close-button.tsx";
+import { firstFocusable } from "../../../overlays/focusable.ts";
+import { registerOpenModal } from "../../../overlays/modal-stack.ts";
+import { BOUNDED_BODY, OverlayBodyState } from "../../../overlays/overlay-body.tsx";
+import { OverlayPortalTargetProvider } from "../../../overlays/portal-target.ts";
+import { FieldLayoutProvider } from "../../forms/field-layout.ts";
+import { StudioIsolatedErrorBoundary } from "../../states/studio-error-boundary.tsx";
+import { ActionRow, type FrameAction } from "../action-row.tsx";
+import { CloseButton } from "../close-button.tsx";
 
-export type { ActionRowProps, FrameAction } from "./action-row.tsx";
+export type { ActionRowProps, FrameAction } from "../action-row.tsx";
 
 export type DialogRootProps = Omit<ChakraDialog.RootProps, "size"> & {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "5xl" | "6xl" | "cover" | "full";
