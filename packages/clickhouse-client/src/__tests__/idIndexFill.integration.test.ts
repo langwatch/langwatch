@@ -18,6 +18,7 @@ import {
   ClickHouseConnection,
 } from "../connection.ts";
 import { fillIdIndexes, type IdIndexFillReport, idIndexFillTargets } from "../idIndexFill.ts";
+import { READ_BACK_FOLD_INSERT_SETTINGS } from "../managed-client.ts";
 import { routingDriver } from "../routingDriver.ts";
 import { createTenantRouter } from "../tenancy.ts";
 import { TenantGuard } from "../tenantGuard.ts";
@@ -121,6 +122,27 @@ async function indexOf({
 }
 
 const ms = (iso: string) => Date.parse(iso);
+
+/** The id-index dedup setting each finished insert into one table ran with, from the query log. */
+async function dedupSettingOfInserts({
+  probe,
+  source,
+}: {
+  probe: ClickHouseClient;
+  source: string;
+}): Promise<string[]> {
+  await probe.command({ query: "SYSTEM FLUSH LOGS" });
+  const result = await probe.query({
+    query: `SELECT Settings['deduplicate_blocks_in_dependent_materialized_views'] AS dedup
+      FROM system.query_log
+      WHERE type = 'QueryFinish' AND query_kind = 'Insert' AND has(tables, currentDatabase() || '.' || {source:String})
+        AND event_date >= yesterday()`,
+    query_params: { source },
+    format: "JSONEachRow",
+  });
+  const rows = await result.json<{ dedup: string }>();
+  return rows.map((row) => row.dedup);
+}
 
 /**
  * A whole hour some days before today. Recent on purpose: an index row past its retention is
@@ -365,6 +387,59 @@ describe("an id index on a time-partitioned source", () => {
       );
       expect(await indexOf({ probe, source })).toEqual(filled);
       expect(flagged).toEqual(["shared", "shared"]);
+    });
+  });
+
+  describe("when the routed client writes into a source with an id index", () => {
+    it("fills the index from an async insert, which runs without the view dedup setting", async () => {
+      const source = `fixture_async_${RUN}`;
+      await createFixture({ probe, source, withIndex: true });
+
+      await statements.insert({
+        tenantId: TENANT,
+        table: source,
+        rows: [
+          {
+            TenantId: TENANT,
+            TraceId: "a1",
+            StartTime: at({ daysAgo: 1, hour: 9 }),
+            _retention_days: 30,
+          },
+        ],
+        settings: { ...READ_BACK_FOLD_INSERT_SETTINGS },
+      });
+
+      expect(await indexOf({ probe, source })).toEqual([
+        {
+          TenantId: TENANT,
+          TraceId: "a1",
+          fromMs: ms(at({ daysAgo: 1, hour: 9 })),
+          toMs: ms(at({ daysAgo: 1, hour: 9 })),
+          retention: 30,
+        },
+      ]);
+    });
+
+    it("keeps the view's blocks with an explicitly synchronous insert's dedup", async () => {
+      const source = `fixture_sync_${RUN}`;
+      await createFixture({ probe, source, withIndex: true });
+
+      await statements.insert({
+        tenantId: TENANT,
+        table: source,
+        rows: [
+          {
+            TenantId: TENANT,
+            TraceId: "s1",
+            StartTime: at({ daysAgo: 1, hour: 8 }),
+            _retention_days: 30,
+          },
+        ],
+        settings: { async_insert: 0 },
+      });
+
+      expect(await indexOf({ probe, source })).toHaveLength(1);
+      expect(await dedupSettingOfInserts({ probe, source })).toEqual(["1"]);
     });
   });
 });

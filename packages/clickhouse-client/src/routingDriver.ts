@@ -41,18 +41,33 @@ async function serverFor<Client extends RoutableStatementClient>(
   return request.tenantId === "" ? connection.shared() : connection.resolve(request.tenantId);
 }
 
+function isSettingOn(value: string | number | undefined): boolean {
+  if (value === undefined) return false;
+  const text = String(value).trim().toLowerCase();
+  return text !== "0" && text !== "false" && text !== "";
+}
+
+export const VIEW_DEDUP = { deduplicate_blocks_in_dependent_materialized_views: 1 } as const;
+
+/**
+ * Only a statement that turns `async_insert` off keeps its view blocks with its dedup: a server
+ * profile may make any other insert async, and ClickHouse refuses this setting there (Code 344).
+ */
+export function insertSettings(
+  settings: Record<string, string | number> | undefined,
+): Record<string, string | number> {
+  const asyncInsert = settings?.async_insert;
+  if (asyncInsert === undefined || isSettingOn(asyncInsert)) return { ...settings };
+  return { ...VIEW_DEDUP, ...settings };
+}
+
 function insertParams(request: InsertRequest): Record<string, unknown> {
-  const params: Record<string, unknown> = {
+  return {
     table: request.table,
     values: request.rows,
     format: "JSONEachRow",
+    clickhouse_settings: insertSettings(request.settings),
   };
-
-  if (request.settings !== undefined) {
-    params.clickhouse_settings = request.settings;
-  }
-
-  return params;
 }
 
 function queryParams(request: QueryRequest): Record<string, unknown> {

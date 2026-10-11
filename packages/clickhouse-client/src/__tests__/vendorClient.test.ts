@@ -505,4 +505,50 @@ describe("VendorClientResilience", () => {
       });
     });
   });
+
+  describe("given an insert through the vendor-shaped client", () => {
+    describe("when it turns async off", () => {
+      it("adds the view dedup setting and keeps the caller's own settings", async () => {
+        const insert = vi.fn().mockResolvedValue({});
+        const client = new VendorClientResilience().wrap({ query: vi.fn(), insert });
+
+        await client.insert({ table: "t", clickhouse_settings: { async_insert: 0 } });
+
+        expect(insert).toHaveBeenCalledWith({
+          table: "t",
+          clickhouse_settings: {
+            deduplicate_blocks_in_dependent_materialized_views: 1,
+            async_insert: 0,
+          },
+        });
+      });
+    });
+
+    describe("when it names no async setting", () => {
+      it("leaves it alone, since a server profile may make it async", async () => {
+        const insert = vi.fn().mockResolvedValue({});
+        const client = new VendorClientResilience().wrap({ query: vi.fn(), insert });
+        const params = { table: "t", clickhouse_settings: { max_insert_threads: 2 } };
+
+        await client.insert(params);
+
+        expect(insert).toHaveBeenCalledWith(params);
+      });
+    });
+
+    describe("when it is async", () => {
+      it("leaves its settings exactly as given, since ClickHouse refuses the dedup setting there", async () => {
+        const insert = vi.fn().mockResolvedValue({});
+        const client = new VendorClientResilience().wrap({ query: vi.fn(), insert });
+        const params = {
+          table: "t",
+          clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        };
+
+        await client.insert(params);
+
+        expect(insert).toHaveBeenCalledWith(params);
+      });
+    });
+  });
 });

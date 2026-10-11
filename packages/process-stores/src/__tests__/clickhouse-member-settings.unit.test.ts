@@ -9,16 +9,15 @@ describe("vendorClickHouseSettings", () => {
     });
   });
 
-  it("keeps a retried insert's materialised-view blocks, so id indexes survive insert dedup", () => {
-    expect(vendorClickHouseSettings(undefined)).toMatchObject({
-      deduplicate_blocks_in_dependent_materialized_views: 1,
-    });
+  it("leaves the view dedup setting to each insert, so async inserts are not refused", () => {
+    expect(vendorClickHouseSettings(undefined)).not.toHaveProperty(
+      "deduplicate_blocks_in_dependent_materialized_views",
+    );
   });
 
   it("keeps the deployment's own settings beside it", () => {
     expect(vendorClickHouseSettings({ max_threads: "4" })).toEqual({
       date_time_input_format: "best_effort",
-      deduplicate_blocks_in_dependent_materialized_views: 1,
       max_threads: "4",
     });
   });

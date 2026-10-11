@@ -82,12 +82,8 @@ export function vendorClickHouseClientOptions({
 export function vendorClickHouseSettings(
   settings: ClickHouseConfig["settings"],
 ): ClickHouseSettings {
-  // A retried replicated insert is deduplicated; this keeps the id-index views' blocks with it.
-  return {
-    date_time_input_format: "best_effort",
-    deduplicate_blocks_in_dependent_materialized_views: 1,
-    ...settings,
-  };
+  // The id-index view dedup setting is per insert (routingDriver), since async inserts refuse it.
+  return { date_time_input_format: "best_effort", ...settings };
 }
 
 /** Per-statement latency and outcome counts, under the names main's dashboards read. */

@@ -92,14 +92,14 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
     return { json: async <Row>() => (await this.clickhouse.query<Row>(request)).rows };
   }
 
-  /** The target `tenantId` lands on, which keys the module's id-index flag. */
-  targetOf(input: { tenantId: string }): Promise<string> {
-    return this.clickhouse.targetOf(input);
+  /** The target this session's tenant lands on, which keys the module's id-index flag. */
+  targetOf(_input: { tenantId: string }): Promise<string> {
+    return this.clickhouse.targetOf({ tenantId: this.tenantId });
   }
 
-  /** The time range one id's rows span, from the id index. */
+  /** The time range one id's rows span, from this session's tenant's id index. */
   indexBounds(input: IdIndexLookup & { tenantId: string }): Promise<IdIndexBounds> {
-    return this.clickhouse.indexBounds(input);
+    return this.clickhouse.indexBounds({ ...input, tenantId: this.tenantId });
   }
 
   /** A select list naming only the columns this tenant's target has, the rest as defaults. */
