@@ -48,8 +48,8 @@ describe("drawer scroll edges", () => {
     );
   });
 
-  /** @scenario "The translucent header and footer ship off until the screenshots are seen" */
-  it("ships off", () => {
-    expect(DRAWER_GLASS_DEFAULT).toBe(false);
+  /** @scenario "The translucent header and footer are on by default, approved after the screenshots" */
+  it("is on by default", () => {
+    expect(DRAWER_GLASS_DEFAULT).toBe(true);
   });
 });

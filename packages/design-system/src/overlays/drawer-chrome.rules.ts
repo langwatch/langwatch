@@ -1,5 +1,5 @@
 /** The translucent header and footer ship off until Alex has seen light and dark screenshots. */
-export const DRAWER_GLASS_DEFAULT = false;
+export const DRAWER_GLASS_DEFAULT = true;
 
 /** A scrollport within one pixel of an end counts as at that end. */
 const EDGE_TOLERANCE_PX = 1;

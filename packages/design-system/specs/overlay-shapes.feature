@@ -135,10 +135,10 @@ Feature: Drawer and dialog shapes
     And closing the drawer returns focus to the dialog's opener control and the dialog's trap holds again
 
   @unit
-  Scenario: The translucent header and footer ship off until the screenshots are seen
+  Scenario: The translucent header and footer are on by default, approved after the screenshots
     Given a drawer rendered with no glass switch
-    Then its header, body and footer are flex siblings with the solid look
-    And the same drawer under the glass switch gets the translucent bands
+    Then it gets the translucent bands
+    And the same drawer with the glass switch turned off keeps the solid look
 
   @integration
   Scenario: A glass drawer overlays its header band and footer on the one scrolling body

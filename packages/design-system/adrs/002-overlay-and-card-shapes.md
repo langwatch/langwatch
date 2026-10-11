@@ -38,8 +38,8 @@ drawers and dialogs on 2026-09-29 therefore did not keep them the same.
    outside click; `role` is separate.
 5. **Drawer ground** (Q3, superseded by the late ruling, 2026-10-11): the body keeps today's
    opaque `bg`; only the header band and footer turn partly translucent (card material, blur,
-   a scroll-dependent edge), over a body that scrolls beneath them. It ships off until Alex has
-   seen light and dark screenshots; the switch is `DRAWER_GLASS_DEFAULT`
+   a scroll-dependent edge), over a body that scrolls beneath them. It is on by default since Alex
+   approved the light and dark screenshots (2026-10-11); the switch is `DRAWER_GLASS_DEFAULT`
    (`overlays/drawer-chrome.rules.ts`). See [drawers](../../../dev/docs/best_practices/drawers.md).
 6. **Closing is a request.** `onClose` asks; the overlay stays until `open` turns false. `busy`
    holds the X, back, Escape, outside click and every action. The design system stays

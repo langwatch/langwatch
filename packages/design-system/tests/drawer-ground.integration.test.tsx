@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** The callable Drawer's translucent header and footer, behind one switch that ships off. */
+/** The callable Drawer's translucent header and footer, behind one switch that is on by default. */
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -125,15 +125,15 @@ describe("the Drawer shape's glass switch", () => {
     expect(resizeObservers).toHaveLength(0);
   });
 
-  /** @scenario "The translucent header and footer ship off until the screenshots are seen" */
-  it("defaults to the solid look without any provider", () => {
+  /** @scenario "The translucent header and footer are on by default, approved after the screenshots" */
+  it("defaults to the glass look without any provider", () => {
     renderWithDesignSystem(
       <Drawer title="Key" onClose={() => undefined} data-testid="key">
         <Text>Body</Text>
       </Drawer>,
     );
 
-    expect(document.querySelector("[data-chrome]")).toBeNull();
+    expect(document.querySelector("[data-chrome]")).not.toBeNull();
   });
 });
 

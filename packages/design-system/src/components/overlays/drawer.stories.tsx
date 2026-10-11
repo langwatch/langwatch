@@ -197,8 +197,8 @@ const withGlass = (glass: boolean): NonNullable<Story["decorators"]> => [
 
 /**
  * Review pair for the glass header and footer: the same long form, solid (today) and glass
- * (candidate), light and dark. Scroll the body to see content pass beneath the bands. The look
- * ships off (`DRAWER_GLASS_DEFAULT`) until these are approved.
+ * (the default since approval), light and dark. Scroll the body to see content pass beneath the
+ * bands. `DRAWER_GLASS_DEFAULT` turns it off.
  */
 export const SolidLight: Story = {
   args: longForm,

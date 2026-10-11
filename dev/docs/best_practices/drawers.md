@@ -8,8 +8,8 @@ and the trace drawer keep their own material.
 
 Ruled 2026-10-11: the body stays opaque and scrolls; the header band (header plus toolbar) and the
 footer are the card material (`bg.card` at half strength, 12px blur) laid over it, so content passes
-beneath. It ships **off**: `DRAWER_GLASS_DEFAULT` in `overlays/drawer-chrome.rules.ts`, until the
-light and dark screenshots are approved. Stories `Overlays/Drawer` Solid and Glass, light and dark,
+beneath. It is **on** by default (approved by Alex after the light and dark screenshots, 2026-10-11);
+`DRAWER_GLASS_DEFAULT` in `overlays/drawer-chrome.rules.ts` turns it off. Stories `Overlays/Drawer` Solid and Glass, light and dark,
 show the pair.
 
 | Concern | Behaviour |
