@@ -200,6 +200,8 @@ interface DraggableTabsWindowProps extends Omit<TabsRootProps, "onClick" | "defa
   onTabChange?: (params: { windowId: string; tabId: string }) => void;
   /** Named apart from the DOM's `onClick`, which it shadows and does not match. */
   onWindowClick?: (params: { windowId: string; tabId: string }) => void;
+  /** Panes beside each other share the width equally down to this floor. */
+  minPaneWidth?: string;
 }
 
 function DraggableTabsWindow({
@@ -208,6 +210,7 @@ function DraggableTabsWindow({
   activeTabId,
   onTabChange,
   onWindowClick,
+  minPaneWidth,
   ...props
 }: DraggableTabsWindowProps) {
   const windowContextValue: TabWindowContextValue = {
@@ -217,7 +220,14 @@ function DraggableTabsWindow({
 
   return (
     <TabWindowContext.Provider value={windowContextValue}>
-      <VStack height="full" gap={0} align="stretch" width="full">
+      <VStack
+        height="full"
+        gap={0}
+        align="stretch"
+        width="full"
+        flex={1}
+        minWidth={minPaneWidth ?? 0}
+      >
         <Tabs.Root
           value={activeTabId}
           onValueChange={(change) => onTabChange?.({ windowId, tabId: change.value })}

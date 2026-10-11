@@ -28,6 +28,8 @@ export type DatasetPreviewRow = { id?: string; isSelected?: boolean } & Record<s
 
 const CHECKBOX_WIDTH_PX = 36;
 const ROW_NUMBER_WIDTH_PX = 48;
+/** Below this a column's header and values clip, so the card scrolls sideways instead. */
+const MIN_COLUMN_WIDTH_PX = 140;
 
 const stringifyPreviewValue = (value: unknown): string => {
   if (value === null || value === void 0) return "";
@@ -171,6 +173,7 @@ export function DatasetPreviewTable({
     <Box
       width="full"
       maxHeight={maxHeight}
+      overflowX="auto"
       overflowY="auto"
       background={background}
       borderWidth="1px"
@@ -196,7 +199,14 @@ export function DatasetPreviewTable({
       }}
     >
       <DatasetTableProvider value={contextValue}>
-        <table data-testid="dataset-preview-table">
+        <table
+          data-testid="dataset-preview-table"
+          style={{
+            minWidth:
+              (isSelectable ? CHECKBOX_WIDTH_PX : ROW_NUMBER_WIDTH_PX) +
+              visibleColumns.length * MIN_COLUMN_WIDTH_PX,
+          }}
+        >
           <colgroup>
             <col
               style={{

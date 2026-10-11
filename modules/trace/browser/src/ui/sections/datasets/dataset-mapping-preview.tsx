@@ -313,7 +313,7 @@ export function DatasetMappingPreview({
             />
           )}
         </VStack>
-        <VStack align="start" width="full" height="full">
+        <VStack align="start" width="full" minWidth={0} height="full">
           <HStack width="full" align="end">
             <Field.Root width="auto">
               <VStack align="start">

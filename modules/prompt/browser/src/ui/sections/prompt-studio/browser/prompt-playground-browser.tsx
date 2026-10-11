@@ -10,6 +10,9 @@ import { ExperimentFromPlaygroundButton } from "./experiment-from-playground-but
 import { PromptTabStrip } from "./prompt-tab-strip.tsx";
 import { PromptBrowserWindowContent } from "./window/prompt-browser-window-content.tsx";
 
+/** The narrowest a pane gets beside another one: room for its tab row and toolbar. */
+const PANE_MIN_WIDTH = "360px";
+
 /** Tabbed browser for the prompt playground, with draggable tabs and split-pane support. */
 export function PromptPlaygroundBrowser() {
   const isCompact = useBreakpointValue({ base: true, md: false }, { fallback: "md" }) === true;
@@ -20,11 +23,11 @@ export function PromptPlaygroundBrowser() {
   const activeWindowId = useDraggableTabsBrowserStore((state) => state.activeWindowId);
   const setActiveWindow = useDraggableTabsBrowserStore((state) => state.setActiveWindow);
 
-  // Panes share the room beside the sidebar; with the sidebar in a drawer each takes the screen.
-  let windowMaxWidth = "auto";
-  if (windows.length > 1) {
-    windowMaxWidth = isCompact ? "100vw" : `calc((100vw - 340px) / ${windows.length})`;
-  }
+  // Panes share the room the studio gives them; a pane never narrows below its floor, and the
+  // area scrolls sideways inside the studio when the floors no longer fit. With the sidebar in a
+  // drawer each pane takes the screen.
+  let paneMinWidth: string | undefined;
+  if (windows.length > 1) paneMinWidth = isCompact ? "calc(100vw - 16px)" : PANE_MIN_WIDTH;
 
   function handleTabMove(params: {
     tabId: string;
@@ -55,7 +58,7 @@ export function PromptPlaygroundBrowser() {
           activeTabId={tabbedWindow.activeTabId ?? undefined}
           onTabChange={handleTabChange}
           onWindowClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
-          maxWidth={windowMaxWidth}
+          minPaneWidth={paneMinWidth}
           paddingTop={0}
         >
           <DraggableTabsBrowser.TabBar
