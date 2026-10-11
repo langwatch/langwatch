@@ -1,6 +1,6 @@
 import { Temporal } from "@langwatch/time";
 
-const MINUTE_MS = 60_000;
+const COUNT_MOMENT_LEAD_MS = 60_000;
 
 /**
  * How far a span's append may sit after its summary's first write and still be the trace's first
@@ -25,11 +25,22 @@ export function monthStartOf(month: string): number {
 }
 
 /**
- * Where the upgrade's count stops for a cut: the first whole UTC minute at or after it. Entitlement
- * counts sightings by minute, so the minute holding the cut belongs to the count.
+ * The moment the upgrade counts up to, chosen a minute ahead so it is stored and readable before
+ * any trace is first seen at or after it. From then on each new trace is its own event.
  */
-export function countedUntilOf(cutAt: number): number {
-  return Math.ceil(cutAt / MINUTE_MS) * MINUTE_MS;
+export function countMomentAfter(epochMs: number): number {
+  return epochMs + COUNT_MOMENT_LEAD_MS;
+}
+
+/** Whether a trace first seen at `firstSeenAt` is sent as its own event, not in the count. */
+export function isSentAsEvent({
+  firstSeenAt,
+  countedUntil,
+}: {
+  firstSeenAt: number;
+  countedUntil: number | undefined;
+}): boolean {
+  return countedUntil !== undefined && firstSeenAt >= countedUntil;
 }
 
 /**

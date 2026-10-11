@@ -1,8 +1,8 @@
 /** Spec: modules/entitlement/specs/usage.feature (the trace count). */
 import { createTenantId, FoldProjectionExecutor, type Event } from "@langwatch/eventing";
 import {
+  MONTH_TRACES_COUNTED_EVENT_TYPE,
   TRACE_FIRST_SEEN_EVENT_TYPE,
-  TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -16,43 +16,17 @@ const ORGANIZATION = "org_1";
 const PROJECT = "project_a";
 const MONTH = "2026-10";
 const HOUR = 3_600_000;
-const MINUTE = 60_000;
-const CUT = Date.UTC(2026, 9, 8, 14);
+const COUNTED_UNTIL = Date.UTC(2026, 9, 8, 14);
 
 let sequence = 0;
 
-function firstSeen({
+function newTrace({
   traceId,
   firstSeenAt,
   id = `evt_${++sequence}`,
-  projectId = PROJECT,
 }: {
   traceId: string;
   firstSeenAt: number;
-  id?: string;
-  projectId?: string;
-}): Event {
-  return {
-    id,
-    aggregateId: projectId,
-    aggregateType: "trace_project_milestone",
-    tenantId: createTenantId(projectId),
-    createdAt: firstSeenAt,
-    occurredAt: firstSeenAt,
-    type: TRACE_FIRST_SEEN_EVENT_TYPE,
-    version: "2026-10-01",
-    idempotencyKey: `${projectId}:trace_first_seen:${traceId}:${MONTH}`,
-    data: { tenantId: projectId, projectId, traceId, firstSeenAt },
-  };
-}
-
-function seed({
-  traces,
-  cutAt = CUT,
-  id = `evt_${++sequence}`,
-}: {
-  traces: number;
-  cutAt?: number;
   id?: string;
 }): Event {
   return {
@@ -60,12 +34,33 @@ function seed({
     aggregateId: PROJECT,
     aggregateType: "trace_project_milestone",
     tenantId: createTenantId(PROJECT),
-    createdAt: cutAt,
-    occurredAt: cutAt,
-    type: TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE,
+    createdAt: firstSeenAt,
+    occurredAt: firstSeenAt,
+    type: TRACE_FIRST_SEEN_EVENT_TYPE,
     version: "2026-10-01",
-    idempotencyKey: `${PROJECT}:traces_counted_before_cut:${MONTH}`,
-    data: { tenantId: PROJECT, projectId: PROJECT, month: MONTH, cutAt, traces },
+    idempotencyKey: `${PROJECT}:${traceId}`,
+    data: { tenantId: PROJECT, projectId: PROJECT, traceId, firstSeenAt },
+  };
+}
+
+function monthCount({ traces, id = `evt_${++sequence}` }: { traces: number; id?: string }): Event {
+  return {
+    id,
+    aggregateId: PROJECT,
+    aggregateType: "trace_project_milestone",
+    tenantId: createTenantId(PROJECT),
+    createdAt: COUNTED_UNTIL,
+    occurredAt: COUNTED_UNTIL,
+    type: MONTH_TRACES_COUNTED_EVENT_TYPE,
+    version: "2026-10-01",
+    idempotencyKey: `${PROJECT}:${MONTH}`,
+    data: {
+      tenantId: PROJECT,
+      projectId: PROJECT,
+      month: MONTH,
+      countedUntil: COUNTED_UNTIL,
+      traces,
+    },
   };
 }
 
@@ -104,15 +99,7 @@ const untouchedStore = TraceCountStoreService.create({
   projects: { getProjectPlacement: async () => ({ kind: "unplaced" as const }) },
 });
 
-/** The pure fold over facts, from a given state or from init. */
-function foldAll(events: readonly Event[], from?: TraceCountState): TraceCountState {
-  const { fold } = traceCountPeerFold(untouchedStore);
-  let state = from ?? fold.init();
-  for (const event of events) state = fold.apply(state, event as Parameters<typeof fold.apply>[1]);
-  return state;
-}
-
-/** A replay: every fact from init, deduplicated by idempotency key, in the order given. */
+/** A replay: every event from init, deduplicated by idempotency key, in the order given. */
 function replay(events: readonly Event[]): number {
   const { fold } = traceCountPeerFold(untouchedStore);
   const seen = new Set<string>();
@@ -127,116 +114,74 @@ function replay(events: readonly Event[]): number {
 }
 
 describe("the trace count fold", () => {
-  describe("when traces are first seen", () => {
-    /** @scenario "A trace first seen adds one to its project's month" */
-    it("counts one per trace in the month it was first seen", async () => {
+  describe("when trace sends new-trace events", () => {
+    /** @scenario "A new-trace event adds one to its project's month" */
+    it("counts one per event in the month the trace was first seen", async () => {
       const lane = liveLane();
-      await lane.deliver(firstSeen({ traceId: "t1", firstSeenAt: CUT + HOUR }));
-      await lane.deliver(firstSeen({ traceId: "t2", firstSeenAt: CUT + 2 * HOUR }));
-      await lane.deliver(firstSeen({ traceId: "t3", firstSeenAt: Date.UTC(2026, 8, 30, 23) }));
+      await lane.deliver(newTrace({ traceId: "t1", firstSeenAt: COUNTED_UNTIL + HOUR }));
+      await lane.deliver(newTrace({ traceId: "t2", firstSeenAt: COUNTED_UNTIL + 2 * HOUR }));
+      await lane.deliver(newTrace({ traceId: "t3", firstSeenAt: Date.UTC(2026, 8, 30, 23) }));
 
       await expect(lane.total()).resolves.toBe(2);
       await expect(lane.total("2026-09")).resolves.toBe(1);
     });
 
-    /** @scenario "A redelivered first sighting does not count its trace twice" */
-    it("skips a redelivery of the fact it just applied", async () => {
+    /** @scenario "A redelivered new-trace event does not count its trace twice" */
+    it("skips a redelivery of the event it just applied", async () => {
       const lane = liveLane();
-      const fact = firstSeen({ traceId: "t1", firstSeenAt: CUT + HOUR });
-      await lane.deliver(fact);
-      await lane.deliver(fact, 2);
+      const event = newTrace({ traceId: "t1", firstSeenAt: COUNTED_UNTIL + HOUR });
+      await lane.deliver(event);
+      await lane.deliver(event, 2);
 
       await expect(lane.total()).resolves.toBe(1);
     });
   });
 
-  describe("when trace's upgrade records the month before the cut", () => {
-    /** @scenario "The seed sets the month's base, however often it is delivered" */
-    it("sets the base once and keeps it on a redelivery or a re-sent fact", async () => {
+  describe("when trace's upgrade records the month's count", () => {
+    /** @scenario "The upgrade's count is added once, however often it is delivered" */
+    it("adds the count once and keeps it on a redelivery or a re-sent event", async () => {
       const lane = liveLane();
-      await lane.deliver(seed({ traces: 40 }));
-      await lane.deliver(seed({ traces: 40, id: "evt_resent" }));
+      await lane.deliver(monthCount({ traces: 40 }));
+      await lane.deliver(monthCount({ traces: 40, id: "evt_resent" }));
 
       await expect(lane.total()).resolves.toBe(40);
     });
 
-    /** @scenario "A trace is counted by the seed or by its sighting, never by both" */
-    it("drops sightings before the cut whether they arrive before or after the seed", async () => {
+    /** @scenario "The month is the upgrade's count plus one per new-trace event" */
+    it("adds new-trace events to the count whichever arrives first", async () => {
       const lane = liveLane();
-      await lane.deliver(firstSeen({ traceId: "early", firstSeenAt: CUT - HOUR }));
-      await lane.deliver(firstSeen({ traceId: "late", firstSeenAt: CUT + 1 }));
-      await lane.deliver(seed({ traces: 40 }));
-      await lane.deliver(firstSeen({ traceId: "lagging", firstSeenAt: CUT - 1 }));
-      await lane.deliver(firstSeen({ traceId: "after", firstSeenAt: CUT + HOUR }));
+      await lane.deliver(newTrace({ traceId: "before", firstSeenAt: COUNTED_UNTIL }));
+      await lane.deliver(monthCount({ traces: 40 }));
+      await lane.deliver(newTrace({ traceId: "after", firstSeenAt: COUNTED_UNTIL + HOUR }));
 
       await expect(lane.total()).resolves.toBe(42);
-    });
-
-    /** @scenario "A seed's cut inside a minute leaves that minute to the seed" */
-    it("drops sightings in the cut's own minute, which trace's seed counted", async () => {
-      const cutAt = CUT + 30_000;
-      const lane = liveLane();
-      await lane.deliver(firstSeen({ traceId: "same-minute", firstSeenAt: CUT + 45_000 }));
-      await lane.deliver(seed({ traces: 40, cutAt }));
-      await lane.deliver(firstSeen({ traceId: "same-minute-late", firstSeenAt: CUT + 50_000 }));
-      await lane.deliver(firstSeen({ traceId: "next-minute", firstSeenAt: CUT + MINUTE }));
-
-      await expect(lane.total()).resolves.toBe(41);
-    });
-
-    /** @scenario "Once seeded, the month keeps one running total and no minutes" */
-    it("empties the minutes when the seed lands and counts later sightings in one number", async () => {
-      const state = foldAll([
-        firstSeen({ traceId: "early", firstSeenAt: CUT - MINUTE }),
-        firstSeen({ traceId: "late", firstSeenAt: CUT + MINUTE }),
-      ]);
-      expect(Object.keys(state.liveByMinute)).toHaveLength(2);
-
-      const seededState = foldAll(
-        [seed({ traces: 40 }), firstSeen({ traceId: "after", firstSeenAt: CUT + 2 * MINUTE })],
-        state,
-      );
-
-      expect(seededState.liveByMinute).toEqual({});
-      expect(seededState.live).toBe(2);
-      expect(traceCountOf(seededState)).toBe(42);
-    });
-
-    /** @scenario "The first seed of a month sets its base; a later one changes nothing" */
-    it("keeps the first seed applied, as a replay keeps the first fact of one key", async () => {
-      const lane = liveLane();
-      await lane.deliver(seed({ traces: 40, cutAt: CUT }));
-      await lane.deliver(seed({ traces: 41, cutAt: CUT + MINUTE, id: "evt_second_run" }));
-
-      await expect(lane.total()).resolves.toBe(40);
     });
   });
 
   describe("when the month is rebuilt from trace's log", () => {
-    /** @scenario "A replay of trace's facts reaches the live count, in any order" */
-    it("reaches the live lane's count whatever order the facts are replayed in", async () => {
-      const facts = [
-        firstSeen({ traceId: "early", firstSeenAt: CUT - HOUR }),
-        firstSeen({ traceId: "late", firstSeenAt: CUT + 1 }),
-        seed({ traces: 40 }),
-        firstSeen({ traceId: "after", firstSeenAt: CUT + HOUR }),
+    /** @scenario "A replay of trace's events reaches the live count, in any order" */
+    it("reaches the live lane's count whatever order the events are replayed in", async () => {
+      const events = [
+        newTrace({ traceId: "a", firstSeenAt: COUNTED_UNTIL }),
+        monthCount({ traces: 40 }),
+        newTrace({ traceId: "b", firstSeenAt: COUNTED_UNTIL + HOUR }),
       ];
-      const resent = { ...facts[1]!, id: "evt_resent_late" };
+      const resent = { ...events[1]!, id: "evt_resent_count" };
       const lane = liveLane();
-      for (const fact of facts) await lane.deliver(fact);
+      for (const event of events) await lane.deliver(event);
 
       const live = await lane.total();
       expect(live).toBe(42);
-      expect(replay([...facts, resent])).toBe(live);
-      expect(replay([...facts].reverse())).toBe(live);
+      expect(replay([...events, resent])).toBe(live);
+      expect(replay([...events].reverse())).toBe(live);
     });
   });
 
   describe("when the project belongs to no organization", () => {
-    /** @scenario "A first sighting from a project in no organization is skipped, loudly" */
+    /** @scenario "A new-trace event from a project in no organization is skipped, loudly" */
     it("writes no count and warns naming the project", async () => {
       const lane = liveLane({ placed: false });
-      await lane.deliver(firstSeen({ traceId: "t1", firstSeenAt: CUT + HOUR }));
+      await lane.deliver(newTrace({ traceId: "t1", firstSeenAt: COUNTED_UNTIL + HOUR }));
 
       await expect(lane.total()).resolves.toBe(0);
       expect(lane.warnings).toEqual([{ projectId: PROJECT }]);

@@ -98,16 +98,16 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
           }),
       }),
       defineMigrationStep({
-        id: "trace:record-trace-counts-before-cut",
+        id: "trace:record-month-trace-counts",
         kind: "data",
         mode: "background",
         description:
           "Records each project's traces seen so far this month, so plan trace limits count from a complete month.",
-        // An old worker records no first sighting: the cut is the moment the last one is gone.
+        // An old worker sends no new-trace event, so the count starts only once the last is gone.
         needsOldWritersGone: true,
         run: ({ checkpoint, dryRun, signal }) => {
           const resumed = traceCountSeedReportSchema.safeParse(checkpoint.resumeFrom);
-          return app.recordTraceCountsBeforeCut({
+          return app.recordMonthTraceCounts({
             resumeFrom: resumed.success ? resumed.data : null,
             dryRun,
             signal,

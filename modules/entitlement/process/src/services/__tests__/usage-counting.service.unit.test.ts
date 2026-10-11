@@ -88,9 +88,8 @@ function compose({
     state: {
       projectId: "project_a",
       month: MONTH,
-      seeded: null,
+      counted: 0,
       live: 3,
-      liveByMinute: { "0": 3 },
       LastEventOccurredAt: 0,
     },
     traces: 3,

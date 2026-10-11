@@ -5,7 +5,7 @@ import type {
   RecordFirstTraceCommandData,
   RecordTraceFirstSeenCommandData,
   RecordTraceReceivedCommandData,
-  RecordTracesCountedBeforeCutCommandData,
+  RecordMonthTracesCountedCommandData,
 } from "../eventing/trace-project-milestones.events.ts";
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
@@ -14,7 +14,7 @@ type TraceProjectMilestonesSenders = Readonly<{
   recordFirstTrace: Sender<RecordFirstTraceCommandData>;
   recordTraceReceived: Sender<RecordTraceReceivedCommandData>;
   recordTraceFirstSeen: Sender<RecordTraceFirstSeenCommandData>;
-  recordTracesCountedBeforeCut: Sender<RecordTracesCountedBeforeCutCommandData>;
+  recordMonthTracesCounted: Sender<RecordMonthTracesCountedCommandData>;
 }>;
 
 /** Records a project's trace milestones on trace's own pipeline; unbound, each refuses by name. */
@@ -43,8 +43,8 @@ export class TraceProjectMilestonesService {
     await this.#connected().recordTraceFirstSeen.send(data);
   }
 
-  async recordTracesCountedBeforeCut(data: RecordTracesCountedBeforeCutCommandData): Promise<void> {
-    await this.#connected().recordTracesCountedBeforeCut.send(data);
+  async recordMonthTracesCounted(data: RecordMonthTracesCountedCommandData): Promise<void> {
+    await this.#connected().recordMonthTracesCounted.send(data);
   }
 
   #connected(): TraceProjectMilestonesSenders {

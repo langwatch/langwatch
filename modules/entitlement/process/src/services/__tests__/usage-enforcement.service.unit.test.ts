@@ -392,19 +392,18 @@ describe("UsageService over the trace count", () => {
     { projectId: "project-3", count: 0 },
   ];
 
-  /** The month's traces on the count: half seeded before the cut, half first seen after it. */
+  /** The month's traces on the count: half from the upgrade's count, half from new-trace events. */
   async function meterHolding(): Promise<MemoryTraceCountRepository> {
     const meter = MemoryTraceCountRepository.create();
     const month = UsageCountingService.monthOf(Date.now());
     for (const { projectId, count } of liveCounts) {
       if (count === 0) continue;
-      const seeded = Math.floor(count / 2);
+      const counted = Math.floor(count / 2);
       const state = {
         projectId,
         month,
-        seeded: { traces: seeded, cutAt: 0 },
-        live: count - seeded,
-        liveByMinute: {},
+        counted,
+        live: count - counted,
         LastEventOccurredAt: 0,
       };
       await meter.save({ organizationId: "org-1", state, traces: count, appliedEventIds: [] });

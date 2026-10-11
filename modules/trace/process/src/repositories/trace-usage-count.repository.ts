@@ -11,6 +11,10 @@ export abstract class TraceUsageCountRepository {
     fromMs: number;
     toMs: number;
   }): Promise<number>;
+  /** The moment the upgrade's trace count runs up to; empty until the upgrade has stored it. */
+  abstract findCountMoment(): Promise<number[]>;
+  /** Stores that moment once for this deployment; the earliest stored one is kept. */
+  abstract recordCountMoment(input: { countedUntil: number }): Promise<void>;
   abstract countTracesInLastDay(input: { tenantId: string }): Promise<number>;
   abstract hasTraceWithAttribute(input: {
     tenantId: string;

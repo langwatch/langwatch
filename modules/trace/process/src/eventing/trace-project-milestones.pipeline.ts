@@ -11,7 +11,7 @@ import {
   RecordFirstTraceCommand,
   RecordTraceFirstSeenCommand,
   RecordTraceReceivedCommand,
-  RecordTracesCountedBeforeCutCommand,
+  RecordMonthTracesCountedCommand,
 } from "./trace-project-milestones.commands.ts";
 import {
   firstTraceRecordedEventSchema,
@@ -19,8 +19,11 @@ import {
   TRACE_PROJECT_MILESTONES_PIPELINE_NAME,
   traceFirstSeenEventSchema,
   traceReceivedEventSchema,
-  tracesCountedBeforeCutEventSchema,
+  monthTracesCountedEventSchema,
 } from "./trace-project-milestones.events.ts";
+
+/** A day: far longer than one trace's first spans take to fold. */
+const TRACE_FIRST_SEEN_DEDUP_TTL_MS = 24 * 60 * 60 * 1000;
 
 function milestoneCommands(retention?: RetentionPolicyResolver) {
   const pipeline = definePipeline({
@@ -31,12 +34,18 @@ function milestoneCommands(retention?: RetentionPolicyResolver) {
       firstTraceRecordedEventSchema,
       traceReceivedEventSchema,
       traceFirstSeenEventSchema,
-      tracesCountedBeforeCutEventSchema,
+      monthTracesCountedEventSchema,
     ])
     .withCommand("recordFirstTrace", RecordFirstTraceCommand)
     .withCommand("recordTraceReceived", RecordTraceReceivedCommand)
-    .withCommand("recordTraceFirstSeen", RecordTraceFirstSeenCommand)
-    .withCommand("recordTracesCountedBeforeCut", RecordTracesCountedBeforeCutCommand);
+    // One queued job per trace, by the event's own key, so a re-sent trace is not appended twice.
+    .withCommand("recordTraceFirstSeen", RecordTraceFirstSeenCommand, {
+      deduplication: {
+        makeId: (data) => `${data.tenantId}:${data.traceId}`,
+        ttlMs: TRACE_FIRST_SEEN_DEDUP_TTL_MS,
+      },
+    })
+    .withCommand("recordMonthTracesCounted", RecordMonthTracesCountedCommand);
   return retention === undefined ? pipeline : pipeline.withRetention(retention);
 }
 

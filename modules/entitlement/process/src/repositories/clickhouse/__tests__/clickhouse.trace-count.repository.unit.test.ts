@@ -45,9 +45,8 @@ function countOver(rows: unknown[]) {
 const STATE: TraceCountState = {
   projectId: "project_1",
   month: "2026-10",
-  seeded: { traces: 40, cutAt: 1 },
+  counted: 40,
   live: 2,
-  liveByMinute: {},
   LastEventOccurredAt: 5,
 };
 

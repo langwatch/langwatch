@@ -82,6 +82,19 @@ describe("TraceUsageCountClickHouseRepository traces first seen", () => {
   });
 });
 
+describe("TraceUsageCountClickHouseRepository count moment", () => {
+  /** @scenario "The upgrade stores the moment it counts up to before it counts" */
+  it("reads the deployment's earliest stored moment, or nothing", async () => {
+    const stored = createRepository([{ countedUntil: "1791460800000" }]);
+    const none = createRepository([]);
+
+    await expect(stored.repository.findCountMoment()).resolves.toEqual([1_791_460_800_000]);
+    await expect(none.repository.findCountMoment()).resolves.toEqual([]);
+    expect(stored.queries[0]?.sql).toContain("min(CountedUntilMs)");
+    expect(stored.queries[0]?.table).toBe("trace_count_moment");
+  });
+});
+
 describe("MemoryTraceUsageCountRepository", () => {
   /** @scenario "The upgrade counts a trace in the month it was first seen" */
   it("counts a trace once, in the window holding its earliest summary write", async () => {

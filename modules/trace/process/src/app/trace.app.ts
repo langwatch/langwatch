@@ -366,6 +366,7 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import { TraceCountMomentService } from "../services/trace-count-moment.service.ts";
 import {
   TraceCountSeedService,
   type TraceCountSeedInput,
@@ -974,9 +975,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
+    const countMoment = TraceCountMomentService.create({ moments: setup.repositories.usageCount });
     app.#traceCountSeed = TraceCountSeedService.create({
       projects: setup.dependencies.projects,
       usageCount: setup.repositories.usageCount,
+      countMoment,
       milestones,
     });
     app.#retention = {
@@ -1000,6 +1003,7 @@ export class TraceModule implements TraceApi, CollectorApp {
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
       broadcast: setup.dependencies.presence,
       milestones,
+      countMoment,
     });
     return app;
   }
@@ -1323,12 +1327,12 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#milestones?.connect(commands);
   }
 
-  /** Records each project's traces first seen this month before the cut, for the upgrade step. */
-  recordTraceCountsBeforeCut(input: TraceCountSeedInput): Promise<TraceCountSeedReport> {
+  /** Counts each project's traces first seen this month, for the upgrade step. */
+  recordMonthTraceCounts(input: TraceCountSeedInput): Promise<TraceCountSeedReport> {
     if (!this.#traceCountSeed) {
       throw new TraceCapabilityUnavailableError("this process", "the trace count seed");
     }
-    return this.#traceCountSeed.recordCountsBeforeCut(input);
+    return this.#traceCountSeed.recordMonthCounts(input);
   }
 
   /** trace_collector_evaluations: the same in every role; evaluation reports from its side (§9). */

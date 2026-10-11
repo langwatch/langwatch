@@ -12,64 +12,45 @@ Feature: Entitlement's meters, decisions and who learns them
     Given an organization with two projects on a plan capped at 1,000 traces a month
 
   # --- The trace count ---------------------------------------------------------
-  # Ruling (Alex, 2026-10-11): a count per project and month, folded from trace's facts. Trace
-  # records each trace once when first seen; its upgrade records each project's month up to a cut,
-  # the moment its old writers were gone, counted to the next whole minute.
-  # Entitlement never asks trace: a peer fold over the two facts, replayable from trace's log.
+  # Ruling (Alex, 2026-10-11): a count per project and month, built from trace's events. Trace's
+  # upgrade counts each project's month up to a moment it stores first; after that moment trace
+  # sends one event per new trace. Trace keeps the two apart, so entitlement only adds them up.
+  # Entitlement never asks trace: a peer fold over the two events, replayable from trace's log.
 
   @unit @usage
-  Scenario: A trace first seen adds one to its project's month
-    Given traces of a project first seen this month and one first seen last month
+  Scenario: A new-trace event adds one to its project's month
+    Given new-trace events of a project this month and one first seen last month
     When the month's trace count is read for the organization
     Then each trace counts once, in the month it was first seen
 
   @unit @usage
-  Scenario: A redelivered first sighting does not count its trace twice
-    Given a trace's first sighting was counted
-    When the same fact is delivered again
+  Scenario: A redelivered new-trace event does not count its trace twice
+    Given a new-trace event was counted
+    When the same event is delivered again
     Then the month's trace count is unchanged
 
   @unit @usage
-  Scenario: The seed sets the month's base, however often it is delivered
-    Given trace recorded a project's month as 40 traces before the cut
-    When that fact is delivered twice, or re-sent under a new id
+  Scenario: The upgrade's count is added once, however often it is delivered
+    Given trace's upgrade counted 40 traces for a project's month
+    When that event is delivered twice, or re-sent under a new id
     Then the month's count is 40
 
   @unit @usage
-  Scenario: A trace is counted by the seed or by its sighting, never by both
-    Given first sightings before and after the cut, some arriving before the seed and some after
-    When the seed for the month is folded
-    Then sightings before the cut add nothing and sightings from the cut on add one each
+  Scenario: The month is the upgrade's count plus one per new-trace event
+    Given new-trace events arriving before and after the upgrade's count
+    When the month is counted
+    Then it is the upgrade's count plus one per new-trace event
 
   @unit @usage
-  Scenario: A seed's cut inside a minute leaves that minute to the seed
-    Given trace's seed counted up to the first whole minute after its cut
-    When sightings arrive in the cut's own minute and in the next one
-    Then only the next minute's sightings add to the month
-
-  # Bounded row (2026-10-11): minutes are kept only until the seed lands.
-  @unit @usage
-  Scenario: Once seeded, the month keeps one running total and no minutes
-    Given first sightings kept by minute before the seed
-    When the seed lands and more traces are first seen
-    Then the minutes are emptied and later sightings add to one running total
-
-  @unit @usage
-  Scenario: The first seed of a month sets its base; a later one changes nothing
-    Given a month already seeded
-    When a second seed of the same month arrives with a later cut
-    Then the month keeps the first seed, as a replay keeps the first fact of one key
-
-  @unit @usage
-  Scenario: A replay of trace's facts reaches the live count, in any order
-    Given the live lane counted a month from sightings and its seed
-    When the same facts are replayed from trace's log, deduplicated by idempotency key
+  Scenario: A replay of trace's events reaches the live count, in any order
+    Given the live lane counted a month from new-trace events and the upgrade's count
+    When the same events are replayed from trace's log, deduplicated by idempotency key
     Then the replayed count equals the live count whatever the order
 
   @unit @usage
-  Scenario: A first sighting from a project in no organization is skipped, loudly
+  Scenario: A new-trace event from a project in no organization is skipped, loudly
     Given a project that belongs to no organization
-    When a first sighting arrives for it
+    When a new-trace event arrives for it
     Then no trace count is written
     And a warning is logged naming the project
 
@@ -87,9 +68,9 @@ Feature: Entitlement's meters, decisions and who learns them
     Then each project's newest row is read on the organization's cluster
 
   @integration @usage @unimplemented
-  Scenario: A seeded month's trace count equals trace's own count for that month
+  Scenario: A counted month's trace count equals trace's own count for that month
     Given ClickHouse holding a month of trace summaries and no trace count
-    When trace's upgrade records the month and new traces arrive after the cut
+    When trace's upgrade counts the month and new traces arrive after its stored moment
     Then each project's trace count equals its traces first seen in the month
 
   @unit @usage

@@ -257,7 +257,7 @@
     "needsOldWritersGone": false
   },
   {
-    "id": "trace:record-trace-counts-before-cut",
+    "id": "trace:record-month-trace-counts",
     "kind": "data",
     "mode": "background",
     "owner": "trace",

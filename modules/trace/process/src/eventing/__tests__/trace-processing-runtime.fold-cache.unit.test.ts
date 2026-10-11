@@ -40,6 +40,7 @@ function compose() {
     findSummary: async () => null,
     recordTrackedEvent: async () => undefined,
     broadcast: createApiFixture<TraceProcessingPipelineInput["broadcast"]>(),
+    countMoment: createApiFixture<TraceProcessingPipelineInput["countMoment"]>(),
     milestones: createApiFixture<TraceProcessingPipelineInput["milestones"]>(),
   }).build({ participation: "consume" });
   return { pipeline, get, set };

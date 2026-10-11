@@ -16,6 +16,7 @@ import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-co
 import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import type { TraceCountMomentService } from "../services/trace-count-moment.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import type { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
@@ -74,6 +75,8 @@ export interface TraceProcessingPipelineInput {
   /** Where a project's first and later traces, and each trace's first sighting, are recorded. */
   milestones: ProjectMetadataSubscriberDeps["milestones"] &
     Pick<TraceProjectMilestonesService, "recordTraceFirstSeen">;
+  /** The upgrade's trace-count moment; new traces before it are in the count, not sent. */
+  countMoment: Pick<TraceCountMomentService, "find">;
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
 }
@@ -179,7 +182,10 @@ export class TraceProcessingRuntimeAdapter {
         projects: peers.projects,
         milestones: this.input.milestones,
       }),
-      traceFirstSeen: createTraceFirstSeenHandler({ milestones: this.input.milestones }),
+      traceFirstSeen: createTraceFirstSeenHandler({
+        milestones: this.input.milestones,
+        countMoment: this.input.countMoment,
+      }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,
     };

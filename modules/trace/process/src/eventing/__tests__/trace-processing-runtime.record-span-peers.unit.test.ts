@@ -150,6 +150,7 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
     findSummary: async () => null,
     recordTrackedEvent: async () => undefined,
     broadcast: createApiFixture<TraceProcessingPipelineInput["broadcast"]>(),
+    countMoment: createApiFixture<TraceProcessingPipelineInput["countMoment"]>(),
     milestones: createApiFixture<TraceProcessingPipelineInput["milestones"]>({
       recordFirstTrace,
       recordTraceReceived: async () => undefined,

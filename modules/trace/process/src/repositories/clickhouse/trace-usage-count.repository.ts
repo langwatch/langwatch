@@ -8,6 +8,9 @@ type HitRow = { hit: number };
 /** How far before a window a counted trace may have started, and been seen first. */
 const FIRST_SEEN_LOOKBACK_MS = 31 * 24 * 60 * 60 * 1_000;
 
+const COUNT_MOMENT_TABLE = "trace_count_moment" as const;
+
+type MomentRow = { countedUntil: string };
 type AttributeCountRow = { value: string; count: string | number };
 
 /** ClickHouse reads of per-project trace counts over `trace_summaries`. */
@@ -58,6 +61,34 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     });
 
     return Number.parseInt(String(result.rows[0]?.total ?? "0"), 10);
+  }
+
+  /** One row per deployment; the earliest stored moment wins if the upgrade ever stored two. */
+  async findCountMoment(): Promise<number[]> {
+    const result = await this.#clickhouse.query<MomentRow>({
+      tenantId: "",
+      table: COUNT_MOMENT_TABLE,
+      sql: `
+        SELECT toString(min(CountedUntilMs)) AS countedUntil
+        FROM ${COUNT_MOMENT_TABLE}
+        HAVING count() > 0
+      `,
+      // One row for the whole deployment, owned by no tenant.
+      SKIP_TENANT_CHECK: true,
+    });
+    return result.rows.map((row) => Number(row.countedUntil));
+  }
+
+  async recordCountMoment({ countedUntil }: { countedUntil: number }): Promise<void> {
+    await this.#clickhouse.insert({
+      tenantId: "",
+      table: COUNT_MOMENT_TABLE,
+      rows: [{ Id: "deployment", CountedUntilMs: countedUntil }],
+      // Readers must see the moment before the first trace at or after it is first seen.
+      settings: { async_insert: 0 },
+      // One row for the whole deployment, owned by no tenant.
+      SKIP_TENANT_CHECK: true,
+    });
   }
 
   /** Main's automation runaway count: exact distinct traces over the trailing 24 hours. */

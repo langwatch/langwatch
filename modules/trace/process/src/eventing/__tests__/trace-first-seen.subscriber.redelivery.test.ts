@@ -22,7 +22,7 @@ import {
 } from "./trace-subscriber.fixtures.ts";
 
 describe("given a trace's first sighting delivered twice", () => {
-  /** @scenario "A re-sent fact is stored once" */
+  /** @scenario "A re-sent event is stored once" */
   it("leaves one first-seen fact in trace's log", async () => {
     const store = EventStoreMemory.createForTesting();
     const tenantId = createTenantId(TENANT_ID);
@@ -36,7 +36,10 @@ describe("given a trace's first sighting delivered twice", () => {
       });
       await store.storeEvents(events, { tenantId }, TRACE_PROJECT_AGGREGATE_TYPE);
     };
-    const handle = createTraceFirstSeenHandler({ milestones: { recordTraceFirstSeen } });
+    const handle = createTraceFirstSeenHandler({
+      milestones: { recordTraceFirstSeen },
+      countMoment: { find: async () => 0 },
+    });
     const event = createSpanReceivedEvent(createOtlpSpan());
     const context = createContext(createFoldState({ createdAt: event.createdAt }));
 

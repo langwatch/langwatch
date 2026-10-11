@@ -47,8 +47,8 @@ export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema
 
 /** A trace's first span reached its summary: once per trace, the fact entitlement counts. */
 export const TRACE_FIRST_SEEN_EVENT_TYPE = "lw.trace.trace_first_seen" as const;
-/** The project's traces first seen in a month before a cut, recorded once by trace's upgrade. */
-export const TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE = "lw.trace.traces_counted_before_cut" as const;
+/** How many traces a project first saw in a month before the upgrade's count moment. */
+export const MONTH_TRACES_COUNTED_EVENT_TYPE = "lw.trace.month_traces_counted" as const;
 
 const traceFirstSeenEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
@@ -64,21 +64,21 @@ export const traceFirstSeenEventDataSchema: TraceFirstSeenEventDataSchema =
   traceFirstSeenEventDataSchemaDefinition;
 export type TraceFirstSeenEventData = z.infer<typeof traceFirstSeenEventDataSchema>;
 
-const tracesCountedBeforeCutEventDataSchemaDefinition = z.object({
+const monthTracesCountedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   projectId: z.string().min(1),
   /** `YYYY-MM`, the UTC month counted from its first instant. */
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
   /**
-   * Epoch ms, the moment the old writers were gone. `traces` counts up to the first whole UTC
-   * minute at or after it; later minutes arrive as {@link TRACE_FIRST_SEEN_EVENT_TYPE} facts.
+   * Epoch ms the count runs up to. Traces first seen from here on arrive one by one as
+   * {@link TRACE_FIRST_SEEN_EVENT_TYPE}; none first seen before it ever does.
    */
-  cutAt: z.number().int().nonnegative(),
+  countedUntil: z.number().int().nonnegative(),
   traces: z.number().int().nonnegative(),
 });
-export interface TracesCountedBeforeCutEventDataSchema extends Named<
-  typeof tracesCountedBeforeCutEventDataSchemaDefinition
+export interface MonthTracesCountedEventDataSchema extends Named<
+  typeof monthTracesCountedEventDataSchemaDefinition
 > {}
-export const tracesCountedBeforeCutEventDataSchema: TracesCountedBeforeCutEventDataSchema =
-  tracesCountedBeforeCutEventDataSchemaDefinition;
-export type TracesCountedBeforeCutEventData = z.infer<typeof tracesCountedBeforeCutEventDataSchema>;
+export const monthTracesCountedEventDataSchema: MonthTracesCountedEventDataSchema =
+  monthTracesCountedEventDataSchemaDefinition;
+export type MonthTracesCountedEventData = z.infer<typeof monthTracesCountedEventDataSchema>;

@@ -4,29 +4,28 @@ import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   TRACE_FIRST_SEEN_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
-  TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE,
+  MONTH_TRACES_COUNTED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 
-import { usageMonthOf } from "../rules/trace-first-seen.rules.ts";
 import {
   type FirstTraceRecordedEvent,
   RECORD_FIRST_TRACE_COMMAND_TYPE,
   RECORD_TRACE_FIRST_SEEN_COMMAND_TYPE,
   RECORD_TRACE_RECEIVED_COMMAND_TYPE,
-  RECORD_TRACES_COUNTED_BEFORE_CUT_COMMAND_TYPE,
+  RECORD_MONTH_TRACES_COUNTED_COMMAND_TYPE,
   type RecordFirstTraceCommandData,
   recordFirstTraceCommandDataSchema,
   type RecordTraceFirstSeenCommandData,
   recordTraceFirstSeenCommandDataSchema,
   type RecordTraceReceivedCommandData,
   recordTraceReceivedCommandDataSchema,
-  type RecordTracesCountedBeforeCutCommandData,
-  recordTracesCountedBeforeCutCommandDataSchema,
+  type RecordMonthTracesCountedCommandData,
+  recordMonthTracesCountedCommandDataSchema,
   TRACE_PROJECT_AGGREGATE_TYPE,
   TRACE_PROJECT_MILESTONES_EVENT_VERSION,
   type TraceFirstSeenEvent,
   type TraceReceivedEvent,
-  type TracesCountedBeforeCutEvent,
+  type MonthTracesCountedEvent,
 } from "./trace-project-milestones.events.ts";
 
 /** Records a project's first real trace; one event per project, however often it is sent. */
@@ -93,7 +92,7 @@ export class RecordTraceReceivedCommand implements CommandHandler<
   }
 }
 
-/** Records a trace's first sighting; keyed by trace and month, so a re-sent one is stored once. */
+/** Records a trace's first sighting, keyed by tenant and trace id. */
 export class RecordTraceFirstSeenCommand implements CommandHandler<
   Command<RecordTraceFirstSeenCommandData>,
   TraceFirstSeenEvent
@@ -106,7 +105,6 @@ export class RecordTraceFirstSeenCommand implements CommandHandler<
 
   handle(command: Command<RecordTraceFirstSeenCommandData>): TraceFirstSeenEvent[] {
     const data = command.data;
-    const month = usageMonthOf(data.firstSeenAt);
     return [
       EventUtils.createEvent<TraceFirstSeenEvent>({
         aggregateType: TRACE_PROJECT_AGGREGATE_TYPE,
@@ -116,7 +114,7 @@ export class RecordTraceFirstSeenCommand implements CommandHandler<
         version: TRACE_PROJECT_MILESTONES_EVENT_VERSION,
         data,
         occurredAt: data.firstSeenAt,
-        idempotencyKey: `${data.projectId}:trace_first_seen:${data.traceId}:${month}`,
+        idempotencyKey: `${data.tenantId}:${data.traceId}`,
       }),
     ];
   }
@@ -126,34 +124,34 @@ export class RecordTraceFirstSeenCommand implements CommandHandler<
   }
 }
 
-/** Records a project's month counted up to the upgrade's cut; one fact per project and month. */
-export class RecordTracesCountedBeforeCutCommand implements CommandHandler<
-  Command<RecordTracesCountedBeforeCutCommandData>,
-  TracesCountedBeforeCutEvent
+/** Records a project's month as counted by the upgrade; one event per project and month. */
+export class RecordMonthTracesCountedCommand implements CommandHandler<
+  Command<RecordMonthTracesCountedCommandData>,
+  MonthTracesCountedEvent
 > {
   static readonly schema = defineCommandSchema(
-    RECORD_TRACES_COUNTED_BEFORE_CUT_COMMAND_TYPE,
-    recordTracesCountedBeforeCutCommandDataSchema,
-    "Record how many traces a project first saw in a month before the count's cut",
+    RECORD_MONTH_TRACES_COUNTED_COMMAND_TYPE,
+    recordMonthTracesCountedCommandDataSchema,
+    "Record how many traces a project first saw in a month before the upgrade's count moment",
   );
 
-  handle(command: Command<RecordTracesCountedBeforeCutCommandData>): TracesCountedBeforeCutEvent[] {
+  handle(command: Command<RecordMonthTracesCountedCommandData>): MonthTracesCountedEvent[] {
     const data = command.data;
     return [
-      EventUtils.createEvent<TracesCountedBeforeCutEvent>({
+      EventUtils.createEvent<MonthTracesCountedEvent>({
         aggregateType: TRACE_PROJECT_AGGREGATE_TYPE,
         aggregateId: data.projectId,
         tenantId: createTenantId(command.tenantId),
-        type: TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE,
+        type: MONTH_TRACES_COUNTED_EVENT_TYPE,
         version: TRACE_PROJECT_MILESTONES_EVENT_VERSION,
         data,
-        occurredAt: data.cutAt,
-        idempotencyKey: `${data.projectId}:traces_counted_before_cut:${data.month}`,
+        occurredAt: data.countedUntil,
+        idempotencyKey: `${data.projectId}:${data.month}`,
       }),
     ];
   }
 
-  static getAggregateId(payload: RecordTracesCountedBeforeCutCommandData): string {
+  static getAggregateId(payload: RecordMonthTracesCountedCommandData): string {
     return payload.projectId;
   }
 }

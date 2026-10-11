@@ -29,7 +29,7 @@ import {
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   TRACE_FIRST_SEEN_EVENT_TYPE,
-  TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE,
+  MONTH_TRACES_COUNTED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -109,7 +109,7 @@ function traceMilestonesStandIn() {
   })
     .withEvents([
       testEventSchema(TRACE_FIRST_SEEN_EVENT_TYPE, z.object({})),
-      testEventSchema(TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE, z.object({})),
+      testEventSchema(MONTH_TRACES_COUNTED_EVENT_TYPE, z.object({})),
     ])
     .build();
 }

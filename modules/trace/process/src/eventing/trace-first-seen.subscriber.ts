@@ -5,7 +5,8 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 
-import { isFirstSighting } from "../rules/trace-first-seen.rules.ts";
+import { isFirstSighting, isSentAsEvent } from "../rules/trace-first-seen.rules.ts";
+import type { TraceCountMomentService } from "../services/trace-count-moment.service.ts";
 import type { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 
 /** Queue name of the subscriber that records each trace's first sighting. */
@@ -34,13 +35,20 @@ export function isTraceFirstSighting({
   });
 }
 
-/** Records the sighting as trace's own fact, at the summary's first write. */
+/**
+ * Records a new trace as trace's own event, at the summary's first write. Nothing is sent before
+ * the upgrade has stored its count moment, nor for a trace first seen before it: the count has it.
+ */
 export function createTraceFirstSeenHandler({
   milestones,
+  countMoment,
 }: {
   milestones: Pick<TraceProjectMilestonesService, "recordTraceFirstSeen">;
+  countMoment: Pick<TraceCountMomentService, "find">;
 }): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {
   return async (_event, context) => {
+    const countedUntil = await countMoment.find();
+    if (!isSentAsEvent({ firstSeenAt: context.state.createdAt, countedUntil })) return;
     await milestones.recordTraceFirstSeen({
       tenantId: context.tenantId,
       projectId: context.tenantId,

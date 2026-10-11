@@ -5,17 +5,18 @@ import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
-import { countedUntilOf, monthStartOf, usageMonthOf } from "../rules/trace-first-seen.rules.ts";
+import { countMomentAfter, monthStartOf, usageMonthOf } from "../rules/trace-first-seen.rules.ts";
+import type { TraceCountMomentService } from "./trace-count-moment.service.ts";
 import type { TraceProjectMilestonesService } from "./trace-project-milestones.service.ts";
 
 const PROJECT_PAGE_SIZE = 500;
-/** A summary written just before the counted minute ends is read only after its insert landed. */
+/** A summary written just before the moment is read only after its insert has landed. */
 const SETTLE_MS = 60_000;
 const POLL_MS = 15_000;
 
 /** What the step saves after each page of projects and returns at the end. */
 export const traceCountSeedReportSchema = z.object({
-  cutAt: z.number(),
+  countedUntil: z.number(),
   month: z.string(),
   afterProjectId: z.string().nullable(),
   projects: z.number(),
@@ -34,16 +35,17 @@ export interface TraceCountSeedInput {
 type TraceCountSeedDependencies = Readonly<{
   projects: Pick<ProjectApi, "listAllIds">;
   usageCount: Pick<TraceUsageCountRepository, "countTracesFirstSeen">;
-  milestones: Pick<TraceProjectMilestonesService, "recordTracesCountedBeforeCut">;
+  countMoment: Pick<TraceCountMomentService, "find" | "ensure">;
+  milestones: Pick<TraceProjectMilestonesService, "recordMonthTracesCounted">;
   now?: () => number;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   pageSize?: number;
 }>;
 
 /**
- * Records, once per project, its traces first seen this month before the cut, the moment the old
- * writers were gone, so entitlement's count starts complete; after it each trace is its own fact.
- * Design and the cut's arithmetic: modules/trace/specs/trace-first-seen.feature.
+ * Counts each project's traces first seen this month up to a moment stored first, one event per
+ * project. The new-trace subscriber sends only traces at or after that moment, so none is counted
+ * twice. Spec: modules/trace/specs/trace-first-seen.feature.
  */
 export class TraceCountSeedService {
   private readonly now: () => number;
@@ -61,23 +63,20 @@ export class TraceCountSeedService {
     return new TraceCountSeedService(deps);
   }
 
-  async recordCountsBeforeCut({
+  async recordMonthCounts({
     resumeFrom,
     dryRun,
     signal,
     onPage,
   }: TraceCountSeedInput): Promise<TraceCountSeedReport> {
-    // The step runs once the old writers are gone, so its first start is the cut, kept exactly.
-    const cutAt = resumeFrom?.cutAt ?? this.now();
-    const countedUntil = countedUntilOf(cutAt);
+    const countedUntil = await this.countedUntil({ resumeFrom, dryRun });
     let report: TraceCountSeedReport = resumeFrom ?? {
-      cutAt,
+      countedUntil,
       month: usageMonthOf(countedUntil - 1),
       afterProjectId: null,
       projects: 0,
       traces: 0,
     };
-    // The cut is saved before any wait, so a resumed run counts against the same instant.
     if (!dryRun && !resumeFrom) await onPage(report);
     if (!dryRun && !(await this.waitPast({ instant: countedUntil + SETTLE_MS, signal }))) {
       return report;
@@ -95,6 +94,20 @@ export class TraceCountSeedService {
       if (!dryRun) await onPage(report);
     } while (after !== undefined);
     return report;
+  }
+
+  /** The saved moment, else the stored one, else a new one stored now; a dry run stores none. */
+  private async countedUntil({
+    resumeFrom,
+    dryRun,
+  }: {
+    resumeFrom: TraceCountSeedReport | null;
+    dryRun: boolean;
+  }): Promise<number> {
+    if (resumeFrom) return resumeFrom.countedUntil;
+    const proposed = countMomentAfter(this.now());
+    if (dryRun) return (await this.deps.countMoment.find()) ?? proposed;
+    return this.deps.countMoment.ensure({ countedUntil: proposed });
   }
 
   /** Counts and records one page of projects; the report names the page's last project. */
@@ -120,11 +133,11 @@ export class TraceCountSeedService {
       });
       if (traces === 0) continue;
       if (!dryRun) {
-        await this.deps.milestones.recordTracesCountedBeforeCut({
+        await this.deps.milestones.recordMonthTracesCounted({
           tenantId: projectId,
           projectId,
           month: report.month,
-          cutAt: report.cutAt,
+          countedUntil: report.countedUntil,
           traces,
         });
       }
