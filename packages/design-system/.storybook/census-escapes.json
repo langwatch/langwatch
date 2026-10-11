@@ -6010,5 +6010,397 @@
     "line": 1136,
     "reason": "Approved: a protected DSPy experiment viewer, kept as today (b2cd2d8161) (trace review).",
     "owner": "experiment"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 68,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 85,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 86,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 113,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 114,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 126,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 143,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 154,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/blocks/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 155,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/elements/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 51,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/elements/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 81,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/elements/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 95,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/elements/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 113,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 68,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 85,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 86,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 113,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 114,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 126,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 143,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 154,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/blocks/dataset/virtualized-table-body.tsx",
+    "rule": "legacy-table-part",
+    "line": 155,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 54,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 84,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 98,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 116,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/elements/experiments-v3/super-header.tsx",
+    "rule": "legacy-table-part",
+    "line": 16,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/workbench-table-head.tsx",
+    "rule": "legacy-table-part",
+    "line": 31,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/workbench-table-head.tsx",
+    "rule": "legacy-table-part",
+    "line": 35,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/workbench-table-head.tsx",
+    "rule": "legacy-table-part",
+    "line": 45,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/workbench-table-head.tsx",
+    "rule": "legacy-table-part",
+    "line": 46,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/workbench-table-head.tsx",
+    "rule": "legacy-table-part",
+    "line": 99,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/workbench-table-head.tsx",
+    "rule": "legacy-table-part",
+    "line": 135,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/workbench-table-head.tsx",
+    "rule": "legacy-table-part",
+    "line": 142,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 54,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 84,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 98,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 116,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 54,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 84,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 98,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 116,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/trace-table/table-primitives.tsx",
+    "rule": "native-table",
+    "line": 3,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/trace-table/table-primitives.tsx",
+    "rule": "legacy-table-part",
+    "line": 4,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/trace-table/table-primitives.tsx",
+    "rule": "legacy-table-part",
+    "line": 5,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/trace-table/table-primitives.tsx",
+    "rule": "legacy-table-part",
+    "line": 6,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/trace-table/table-primitives.tsx",
+    "rule": "legacy-table-part",
+    "line": 7,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/explorer/trace-table/table-primitives.tsx",
+    "rule": "legacy-table-part",
+    "line": 8,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/toolbar/lens-tabs.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 153,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/toolbar/lens-tabs.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 167,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/span-tab-bar.tsx",
+    "rule": "hand-tabs",
+    "line": 270,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/span-tab-bar.tsx",
+    "rule": "hand-tabs",
+    "line": 608,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 54,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 84,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 98,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/elements/dataset/table-cell.tsx",
+    "rule": "legacy-table-part",
+    "line": 116,
+    "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
+    "owner": "workflow"
   }
 ]
