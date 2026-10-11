@@ -32,7 +32,11 @@ import { isDeclaredMigrationStep, isMigrationStep } from "../step/migration-step
 import type { FirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, imageRelease, readImageTree } from "./image-tree.ts";
-import { type BootUpgradeModules, inProcessUpgrade } from "./in-process-upgrade.ts";
+import {
+  type BootUpgradeModules,
+  inProcessUpgrade,
+  redisReadHintPublisher,
+} from "./in-process-upgrade.ts";
 import {
   type ServingRole,
   type ServingVerdict,
@@ -637,10 +641,10 @@ export async function servingUpgradeGate({
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
-        withCredentialKeys(secrets, (credentialKeys) => {
+        withStoreUrls(secrets, ({ redis, credentialKeys }) => {
           const databaseUrl = database?.trim();
           if (!databaseUrl) return { ...NO_LEDGER_GATE, runOnce: refuseWithoutDatabase };
-          const upgrade = upgradeIn({ bootModules, databaseUrl, clickhouse, environment });
+          const upgrade = upgradeIn({ bootModules, databaseUrl, clickhouse, redis, environment });
           const runOnce = async () => EXIT_CODES[(await upgrade()).code];
           if (!clickhouse?.trim() && routes.size === 0) return { ...NO_CLICKHOUSE_GATE, runOnce };
           const pool = guardGatePool({
@@ -671,11 +675,13 @@ function upgradeIn({
   bootModules,
   databaseUrl,
   clickhouse,
+  redis,
   environment,
 }: {
   bootModules: BootUpgradeModules | undefined;
   databaseUrl: string;
   clickhouse: string | undefined;
+  redis: string | undefined;
   environment: Readonly<Record<string, string | undefined>>;
 }): FirstInstallUpgrade {
   if (!bootModules) return refuseWithoutModules;
@@ -689,7 +695,18 @@ function upgradeIn({
       ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
     },
     development: environment.NODE_ENV === "development",
+    openPublisher: redisReadHintPublisher({ url: redis?.trim() || undefined, environment }),
   });
+}
+
+/** The worker's Redis URL, for the run's read hints, beside the credential key fingerprints. */
+function withStoreUrls<T>(
+  secrets: ScopedSecrets,
+  build: (urls: { redis: string | undefined; credentialKeys: string[] }) => T | Promise<T>,
+): Promise<T> {
+  return secrets.into(storesOwner.secrets.redis, (redis) =>
+    withCredentialKeys(secrets, (credentialKeys) => build({ redis, credentialKeys })),
+  );
 }
 
 async function refuseWithoutDatabase(): Promise<number> {

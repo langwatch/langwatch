@@ -6,6 +6,7 @@
 import { spawn } from "node:child_process";
 
 import type { EventUpcastReader } from "@langwatch/eventing";
+import { RedisConnectionService, RedisShutdownService } from "@langwatch/redis-client";
 import pg from "pg";
 
 import {
@@ -129,6 +130,41 @@ export function langWatchQlReconciler({
   };
 }
 
+/** Where one run publishes its read hints, closed when the run ends. */
+export type ReadHintPublisher = Readonly<{
+  publish: NonNullable<ImageUpgradeInputs["publish"]>;
+  close: () => Promise<void>;
+}>;
+
+/** Opens a run's publisher; null where the process has no Redis, so the run publishes none. */
+export type OpenReadHintPublisher = () => ReadHintPublisher | null;
+
+/**
+ * The worker's Redis, resolved as its stores resolve it (cluster endpoints over a URL, the dev
+ * database index), opened for one run so the api relays the run's read hints (U2-LIVE).
+ */
+export function redisReadHintPublisher({
+  url,
+  environment,
+}: {
+  url: string | undefined;
+  environment: ImageUpgradeInputs["environment"];
+}): OpenReadHintPublisher {
+  return () => {
+    const connection = new RedisConnectionService().connect({
+      url,
+      clusterEndpoints: environment.REDIS_CLUSTER_ENDPOINTS,
+      dbIndex: environment.REDIS_DB_INDEX,
+      skip: environment.SKIP_REDIS === "true",
+    });
+    if (!connection) return null;
+    return {
+      publish: (channel, message) => connection.publish(channel, message),
+      close: () => RedisShutdownService.create().shutdown(connection),
+    };
+  };
+}
+
 /** The runner's own connection: the ledger's schema, no statement timeout, a small pool. */
 export function runnerPoolConfig({ databaseUrl }: { databaseUrl: string }): pg.PoolConfig {
   const schema = URL.canParse(databaseUrl) ? new URL(databaseUrl).searchParams.get("schema") : null;
@@ -149,21 +185,25 @@ export function inProcessUpgrade({
   databaseUrl,
   environment,
   development,
-  publish,
+  openPublisher = () => null,
   signal = new AbortController().signal,
+  run = runImageUpgrade,
 }: {
   boot: BootUpgradeModules;
   databaseUrl: string;
   environment: ImageUpgradeInputs["environment"];
   development: boolean;
-  publish?: ImageUpgradeInputs["publish"];
+  openPublisher?: OpenReadHintPublisher;
   signal?: AbortSignal;
+  /** The image's upgrade; a test hands its own to read what the run was given. */
+  run?: typeof runImageUpgrade;
 }): FirstInstallUpgrade {
   return async (): Promise<UpgradeRunResult> => {
     const pool = new pg.Pool(runnerPoolConfig({ databaseUrl }));
+    const publisher = openPublisher();
     try {
       const outcome = await boot((modules) =>
-        runImageUpgrade({
+        run({
           inputs: {
             postgres: pool,
             databaseUrl,
@@ -175,7 +215,7 @@ export function inProcessUpgrade({
               langWatchQlReconciler({ environment }),
               passRequestReconciler({ modules }),
             ],
-            ...(publish ? { publish } : {}),
+            ...(publisher ? { publish: publisher.publish } : {}),
           },
           signal,
         }),
@@ -190,6 +230,7 @@ export function inProcessUpgrade({
       return { code: "failed", logTail: [message] };
     } finally {
       await pool.end();
+      await publisher?.close();
     }
   };
 }

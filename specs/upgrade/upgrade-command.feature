@@ -255,6 +255,13 @@ Feature: The upgrade command
     Then a hint is published as each phase starts and ends, and once when the run finishes
     And each hint names the run, the phase and its outcome under the platform upgrade scope
 
+  @unit
+  Scenario: A worker's in-process run publishes its read hints on the worker's Redis
+    Given the worker runs the upgrade in its own process with REDIS_URL set
+    When the run changes phase
+    Then its read hint is published on the worker's Redis, resolved as its stores resolve it
+    And the connection opened for the run is closed when the run ends
+
   @integration
   Scenario: A hint that cannot be published does not fail the run
     Given a hint publisher that refuses every publish

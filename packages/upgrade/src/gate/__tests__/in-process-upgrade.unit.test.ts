@@ -5,7 +5,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { langWatchQlReconciler, passRequestReconciler } from "../in-process-upgrade.ts";
+import { upgradeOutcome } from "../../runner/upgrade-outcome.ts";
+import {
+  inProcessUpgrade,
+  langWatchQlReconciler,
+  passRequestReconciler,
+} from "../in-process-upgrade.ts";
 
 const signal = new AbortController().signal;
 
@@ -58,5 +63,38 @@ describe("passRequestReconciler()", () => {
     });
 
     await expect(reconciler.run({ signal })).resolves.toBeUndefined();
+  });
+});
+
+describe("inProcessUpgrade()", () => {
+  const modules = {
+    migrationSteps: () => [],
+    upcastReader: () => undefined,
+    tasks: () => [],
+    runListedWork: <Result>({ work }: { work: () => Promise<Result> }) => work(),
+  };
+
+  /** @scenario "A worker's in-process run publishes its read hints on the worker's Redis" */
+  it("hands the run the worker's Redis publisher and closes it once the run ends", async () => {
+    const published: string[] = [];
+    let closed = 0;
+    const upgrade = inProcessUpgrade({
+      boot: (use) => use(modules),
+      databaseUrl: "postgresql://localhost:1/never",
+      environment: {},
+      development: false,
+      openPublisher: () => ({
+        publish: async (channel, message) => void published.push(`${channel} ${message}`),
+        close: async () => void (closed += 1),
+      }),
+      run: async ({ inputs }) => {
+        await inputs.publish?.("eventing:read_invalidated", "hint");
+        return upgradeOutcome({ code: "done", message: "upgraded" });
+      },
+    });
+
+    expect(await upgrade()).toEqual({ code: "done", logTail: ["upgraded"] });
+    expect(published).toEqual(["eventing:read_invalidated hint"]);
+    expect(closed).toBe(1);
   });
 });
