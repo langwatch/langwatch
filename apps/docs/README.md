@@ -1,7 +1,7 @@
 # LangWatch documentation site
 
 The application lives in `apps/docs/`; authored pages, navigation and media stay
-in `docs/`. Production is a static artifact served by S3/CloudFront, with no
+in `docs/`. The build produces a plain static directory, with no
 application server, database or API required. React and the shared design system
 render at build time; browser interactions load only their small islands.
 
@@ -50,17 +50,19 @@ page into `apps/docs/dist`. It emits:
 
 - `/path/index.html` for each page, plus the introduction at `/index.html`.
   Configured `section/index` pages also have a `/section` alias.
-- `/path.md` for each page's Markdown copy action.
+- Identical `/path.md`, `/path.claude` and `/path.agent` content exports.
 - Hashed JavaScript and CSS under `assets/`, fonts, posters and docs media.
 - `search-index.json` with article text, navigation trails and headings.
 - `llms.txt`, a directory of configured pages linking to their Markdown.
-- `redirects.json` generated from `docs.json`.
+- `redirects.json` and noindex redirect pages for exact source paths from `docs.json`.
 - `404.html` with the documentation shell and recovery links.
 - `skipped.json`, empty after a successful build.
 
 A missing configured source, invalid MDX or rendering failure makes the command
-fail. Do not publish output from a failed build. The temporary `dist-ssr` renderer
-is removed on completion or failure. No authored MDX or OpenAPI files are changed.
+fail. Do not publish output from a failed build. Each renderer uses its own temporary
+directory under the system temporary root (`TMPDIR` when set), removed on completion
+or failure. Builds with different output directories do not share renderer output.
+No authored MDX or OpenAPI files are changed.
 
 ## Preview
 
@@ -73,13 +75,34 @@ to be free. `/integration/quick-start` and `/integration/quick-start/` both serv
 `/integration/quick-start/index.html`. Configured redirects return 301 and retain
 incoming query parameters unless the destination already supplies that key.
 Unknown page routes return `404.html` with HTTP status 404. Malformed URL encoding
-returns 400. These are the routing rules the production edge must implement.
+returns 400. These are the routing rules a future static host must implement.
 Stop either local server with Ctrl+C.
+
+## Source ownership
+
+`src/app/` composes pages, theme and the reading shell. `src/features/` owns
+content, code, navigation, API reference, discovery, search, releases, session
+and shell behavior. A feature uses `compile/` for Node build work, `model/` for
+portable values, `ui/` for React and `browser/` for client enhancements as needed.
+There is no module installer or dependency injection pipeline.
+
+`src/site/` owns the static build, prerenderer, preview and Vite plugins;
+`vite.config.ts` delegates to the same configuration used by build commands.
+`src/site/document.ts` defines lazy browser entries and the document template seams.
+`src/browser/` holds the small navigation bootstrap. Worker source lives in
+`worker/`. Build paths and CLI options are in `src/paths.ts`; browser environment
+configuration stays in `src/config.ts`.
+
+The compiler and UI use strict TypeScript. Node 24 runs the typed build tools
+without a second loader. Dependency versions come from the workspace catalog.
+The Oxc React Compiler optimizes docs React components on the browser path;
+shared design-system sources are reused without recompiling them. Complete pages
+render at build time. Only interactive React islands need a browser runtime.
 
 ## Components and validation
 
 The shell, MDX components and API playground consume design-system exports;
-docs-specific semantic tokens live in `src/theme.ts`. Raw legacy skill markup is
+docs-specific semantic tokens live in `src/app/theme.ts`. Raw legacy skill markup is
 adapted during compilation. The current eight embedded product recordings have
 no audio streams; the video renderer explicitly mutes these silent demonstrations.
 Narrated media requires captions and a corresponding renderer before publication.
@@ -99,12 +122,13 @@ another surface needs the same behaviour. The docs also disable drawer and dialo
 animations under reduced motion; that behaviour is a design-system candidate.
 
 ```sh
-pnpm exec tsc --noEmit -p apps/docs/tsconfig.json
+pnpm --filter @langwatch/docs-site typecheck
 pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc apps/docs
 ```
 
-Behaviour scenarios live in `specs/`; generator tests are colocated in
-`__tests__/`, and browser and link runners live in `scripts/`.
+Behaviour scenarios live in `specs/`; unit and SSR tests are colocated with their
+owner under `src/**/__tests__/`. Browser runners live in `scripts/`; the typed
+link checker lives in `src/site/`.
 
 ## Test without disturbing a running preview
 
@@ -150,66 +174,25 @@ pnpm --filter @langwatch/docs-site preview --out-dir "$TMPDIR/docs-test-dist" --
 ambiguity. Omitting it retains the normal `apps/docs/dist` output. Preview still
 defaults to port 4173, and fails if its chosen port is occupied.
 
-## Publish to S3 and CloudFront
+## Static artifact and CI
 
-`.github/workflows/docs-site-deploy.yml` builds and tests changes under `docs/**`
-on pull requests and main, with a manual dispatch option. Deployment runs only on
-main when the repository variable `DOCS_DEPLOY_ENABLED` is `true`. It uses the
-`docs-production` GitHub environment; configure its protection rules before
-turning deployment on. No cloud resources are created by this workflow.
+`.github/workflows/docs-site.yml` installs materialized LFS assets, typechecks,
+tests, builds and checks the site, then uploads the `apps/docs/dist` artifact.
+It has no cloud deployment job or credentials. Build output contains no
+host-specific edge code. A future deployment belongs in GitHub Actions.
 
-The following settings must name existing resources:
+Any static host can serve the directory. Configure directory-index routing,
+a real 404 status for `404.html`, Markdown content types for `.md`, `.claude`
+and `.agent`, and the desired cache headers. Exact redirects have refresh pages
+with a canonical destination and a link usable without JavaScript. Existing pages
+take precedence. Pattern redirects need hosting rules; they remain in
+`redirects.json`. Preview tests HTTP redirects and query preservation separately.
 
-| Setting                           | Kind                | Purpose                                        |
-| --------------------------------- | ------------------- | ---------------------------------------------- |
-| `DOCS_DEPLOY_ENABLED`             | Repository variable | Explicit deployment switch, initially unset    |
-| `DOCS_AWS_REGION`                 | Repository variable | Region of the S3 bucket                        |
-| `DOCS_S3_BUCKET`                  | Repository variable | Dedicated documentation bucket, no path prefix |
-| `DOCS_CLOUDFRONT_DISTRIBUTION_ID` | Repository variable | Distribution to invalidate                     |
-| `DOCS_CLOUDFRONT_FUNCTION_NAME`   | Repository variable | Existing viewer request function               |
-| `DOCS_AWS_ROLE_ARN`               | Repository secret   | AWS role assumed through GitHub OIDC           |
-
-The role trust policy must restrict the repository and `docs-production`
-environment. Grant only bucket list/location, object get/put/delete, function
-get/describe/update/publish, and distribution create/get invalidation permissions
-for those resources. Static AWS access keys are unnecessary.
-
-The distribution must use the dedicated private S3 REST origin with Origin Access
-Control, the function associated with its default viewer-request behaviour, and
-runtime `cloudfront-js-2.0`. Cache policy minimum TTL must be zero so origin cache
-headers are honoured; maximum TTL must allow one year. Configure both S3 403 and
-404 errors to serve `/404.html` with status **404**, with a short error-cache TTL.
-Do not map missing pages to `index.html` or return a success status for them.
-The site currently deploys at the hostname root, not underneath `/docs`.
-
-The build assembles `dist/_deployment/viewer-request.js` from the checked-in
-`cloudfront/viewer-request.js` and all redirects in `docs/docs.json` (currently
-116). It enforces CloudFront’s 10 KB limit. The function checks redirects before
-mapping `/path` and `/path/` to `/path/index.html`; asset paths remain intact.
-Incoming query parameters are retained, with destination values taking precedence.
-As in local preview, repeated incoming keys retain their first value. The function
-configuration is emitted beside the code. Neither deployment metadata nor link
-reports are uploaded to the public bucket.
-
-Uploads happen in two stages: hashed `assets/` first with a one-year immutable
-cache header, then HTML and other mutable files with `max-age=60,must-revalidate`.
-The second sync deletes removed pages. Previous hashed assets are retained so
-readers of cached HTML can still load their chunks; any later bucket lifecycle
-cleanup must retain them beyond the HTML cache window and rollback period.
-The workflow updates and publishes the existing function, invalidates `/*`, and
-waits for that invalidation to complete. Deployments are serialised and are not
-cancelled mid-sync. S3 updates are not atomic; rerun the complete workflow after a
-partial failure. To roll back, dispatch from main after reverting the relevant
-source commit. The workflow will build and validate that source again.
-
-The local link check is a release gate and has no exclusions. The previously
-reported authored anchor errors have been corrected. Reports remain in the
-uploaded CI artefact when validation fails. The existing Mintlify `docs-release.yml` remains untouched;
-retiring that workflow and switching DNS are separate cutover decisions.
-
-AWS references: [function runtime](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/functions-javascript-runtime-20.html),
-[function quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html),
-[custom error responses](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/GeneratingCustomErrorResponses.html).
+Keep old hashed assets long enough for cached documents to finish loading their
+lazy chunks. Revalidate mutable HTML, search and worker files; immutable hashed
+assets can use a long cache lifetime. These are hosting requirements, not cloud
+configuration emitted by the compiler. The existing Mintlify release workflow
+and DNS cutover remain separate decisions.
 
 ## Shared session prototype
 
@@ -227,7 +210,7 @@ mock credential to a network endpoint. Connection clears manual-key input;
 expiry, disconnect and leaving the page clear session access. Switching back to
 a manual key is explicit. Examples and copied code keep environment placeholders.
 
-The docs-local `DocsTokenProvider` interface in `src/auth/token-provider.ts`
+The docs-local `DocsTokenProvider` interface in `src/features/session/model/token-provider.ts`
 separates acquisition and revocation from the playground. The controller validates
 provider responses, rejects late connections and enforces expiry and scope. A
 future app adapter requires approval and additional origin/source/state checks;
@@ -274,9 +257,8 @@ It revalidates public HTML/search, caps page caches at 40 entries, and expires t
 stale-while-revalidate window after 60 seconds. API requests, authentication
 headers, query strings and private/no-store responses bypass caching. Updates
 activate on successful installation without forcing a reload; subsequent document
-navigation adopts the new version. CloudFront retains old hashed assets for open
-tabs and gives `sw.js` the same short cache policy as HTML. No cloud changes are
-required.
+navigation adopts the new version. Future hosting should retain old hashed assets
+for open tabs and let `sw.js` revalidate promptly.
 
 ```sh
 pnpm --filter @langwatch/docs-site size --out-dir "$TMPDIR/docs-performance"
@@ -310,7 +292,7 @@ contextual menus, theme selection and complete prompt copying.
 The root `CHANGELOG.md` supplies the latest published version, date and change
 for the static announcement. The two newest entries also appear on
 `/self-hosting/releases` and in its Markdown export. Source MDX is unchanged.
-Dev watches the changelog, and the deployment workflow includes it in its path
+Dev watches the changelog, and the docs CI workflow includes it in its path
 filter. Missing or invalid release data hides the strip. Dismissal is remembered
 per version; storage denial still allows dismissal for the current document.
 There is no automatic ticker or additional announcement script.
@@ -319,7 +301,7 @@ There is no automatic ticker or additional announcement script.
 pnpm --filter @langwatch/docs-site test:news --out-dir "$TMPDIR/docs-test-dist" --screenshots "$TMPDIR/docs-news"
 ```
 
-Every configured page exports identical Markdown at `.md`, `.claude` and `.agent`; API exports include the resolved endpoint, authentication, parameters, request/response schemas and curl example, while guides retain authored MDX with their title and description. The latter two are content aliases rather than agent configuration. Root `index` exports map to the introduction. Discovery includes `llms.txt`, `robots.txt`, `humans.txt`, `agents.txt` and `sitemap.xml`. The deployment sets Markdown content types explicitly for all three extensions.
+Every configured page exports identical Markdown at `.md`, `.claude` and `.agent`; API exports include the resolved endpoint, authentication, parameters, request/response schemas and curl example, while guides retain authored MDX with their title and description. The latter two are content aliases rather than agent configuration. Root `index` exports map to the introduction. Discovery includes `llms.txt`, `robots.txt`, `humans.txt`, `agents.txt` and `sitemap.xml`. Local preview sets Markdown content types for all three extensions; production hosting must do the same.
 
 Alt+Shift+C copies the current page outside editable controls. The sidebar command selector copies the five supported CLI launchers; Cursor and Aider use the gateway guide rather than an invented wrapper command. Page feedback links open a GitHub issue draft containing the page URL.
 
@@ -327,7 +309,7 @@ The coding-agent hero uses checked-in 640/1024/1560px WebP derivatives of the ex
 
 ## Git LFS assets
 
-Docs images, video/audio, vector graphics, fonts and downloadable media are tracked by the docs-scoped patterns in `.gitattributes`. Install Git LFS, run `git lfs install --local --skip-repo` once when using this repo's `.githooks` (or ordinary `git lfs install` with Git's default hooks), then `git lfs pull` after a checkout that skipped LFS downloads. The docs CI checkout enables LFS, and the build rejects unresolved pointer files before emitting output. S3 and CloudFront receive the full asset bytes; readers do not fetch from Git LFS.
+Docs images, video/audio, vector graphics, fonts and downloadable media are tracked by the docs-scoped patterns in `.gitattributes`. Install Git LFS, run `git lfs install --local --skip-repo` once when using this repo's `.githooks` (or ordinary `git lfs install` with Git's default hooks), then `git lfs pull` after a checkout that skipped LFS downloads. The docs CI checkout enables LFS, and the build rejects unresolved pointer files before emitting output. The static directory contains the full asset bytes; readers do not fetch from Git LFS.
 
 New asset revisions are stored in LFS. Conversion in this branch does not rewrite existing repository history, so historical binary blobs remain until a separately coordinated history migration.
 
@@ -335,4 +317,4 @@ New asset revisions are stored in LFS. Conversion in this branch does not rewrit
 
 Every page emits a canonical URL, description when provided, Open Graph/social metadata, a factual WebPage JSON-LD record, a Markdown alternate and an llms.txt discovery link during prerender. HTML aliases share one canonical URL; introduction uses the root URL. Client navigation updates the destination metadata together with its content. The custom 404 is marked noindex. Public OpenAPI documents are copied alongside the page exports.
 
-These are discoverability and sharing features, not ranking guarantees. Validate production status codes, redirects and response headers against the configured distribution; Markdown HTTP canonical/noindex response headers and production search analytics have not been configured here.
+These are discoverability and sharing features, not ranking guarantees. Validate production status codes, redirects and response headers against the future host; Markdown HTTP canonical/noindex response headers and production search analytics have not been configured here.

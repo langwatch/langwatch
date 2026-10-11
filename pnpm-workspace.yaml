@@ -38,6 +38,8 @@ catalog:
   '@hono/node-server': ^2.0.6
   '@hookform/resolvers': ^5.4.0
   '@langwatch/scenario': 1.7.0-dev.voice10
+  '@mdx-js/react': ^3.1.0
+  '@mdx-js/rollup': ^3.1.0
   '@modelcontextprotocol/sdk': 1.29.0
   '@monaco-editor/react': ^4.7.0
   '@noble/hashes': ^2.4.0
@@ -128,6 +130,7 @@ catalog:
   liquidjs: ^10.27.1
   lodash-es: ^4.18.1
   lucide-react: ^1.22.0
+  mermaid: 11.16.1
   monaco-editor: ^0.55.1
   monacopilot: ^1.2.12
   motion: ^12.42.2
@@ -167,7 +170,10 @@ catalog:
   react-resizable-panels: ^2.1.9
   react-router: ^8.0.1
   recharts: ^3.9.1
+  rehype-slug: ^6.0.0
+  remark-frontmatter: ^5.0.0
   remark-gfm: ^4.0.1
+  remark-mdx-frontmatter: ^5.0.0
   safe-regex2: ^5.1.1
   shiki: ^4.3.0
   slugify: ^1.6.9
@@ -186,6 +192,7 @@ catalog:
   vitest-browser-react: ^2.3.0
   web-push: ^3.6.7
   ws: ^8.21.0
+  yaml: ^2.6.0
   zod: ^4.6.5
   zod-validation-error: ^5.0.0
   zundo: ^2.3.0

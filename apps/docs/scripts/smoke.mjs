@@ -5,6 +5,8 @@ import path from "node:path";
 import { it } from "node:test";
 import { parseArgs } from "node:util";
 
+import { checkBuild } from "../src/site/build-check.ts";
+import { startPreview } from "../src/site/preview-server.ts";
 import {
   checkAgentSetup,
   checkCapabilityErrors,
@@ -15,8 +17,6 @@ import {
   tracingPrompt,
 } from "./browser-checks.mjs";
 import { withPreviewBrowser, withReader } from "./browser-fixture.mjs";
-import { checkBuild } from "./build-check.mjs";
-import { startPreview } from "./preview-server.mjs";
 
 const { values } = parseArgs({
   options: { "out-dir": { type: "string" }, screenshots: { type: "string" } },
@@ -199,6 +199,10 @@ await it("serves directory URLs, redirects and the generated 404", async () => {
       assert.equal(location.pathname, expected.pathname, source);
       assert.equal(location.hash, expected.hash, source);
       assert.equal(location.searchParams.get("docs-smoke"), "1", source);
+      if (/[:*]/.test(source)) continue;
+      const page = await readFile(path.join(outDir, source.slice(1), "index.html"), "utf8");
+      if (!page.includes('name="robots" content="noindex"')) continue;
+      assert.ok(page.includes(`url=${destination.replaceAll("&", "&amp;")}"`), source);
     }
     const missing = await fetch(`${base}nonexistent-docs-smoke-route`);
     assert.equal(missing.status, 404);

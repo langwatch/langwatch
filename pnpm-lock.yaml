@@ -227,6 +227,12 @@ catalogs:
     '@hookform/resolvers':
       specifier: ^5.4.0
       version: 5.4.0
+    '@mdx-js/react':
+      specifier: ^3.1.0
+      version: 3.1.1
+    '@mdx-js/rollup':
+      specifier: ^3.1.0
+      version: 3.1.1
     '@modelcontextprotocol/sdk':
       specifier: 1.29.0
       version: 1.29.0
@@ -479,6 +485,9 @@ catalogs:
     lucide-react:
       specifier: ^1.22.0
       version: 1.22.0
+    mermaid:
+      specifier: 11.16.1
+      version: 11.16.1
     monaco-editor:
       specifier: ^0.55.1
       version: 0.55.1
@@ -584,9 +593,18 @@ catalogs:
     recharts:
       specifier: ^3.9.1
       version: 3.9.1
+    rehype-slug:
+      specifier: ^6.0.0
+      version: 6.0.0
+    remark-frontmatter:
+      specifier: ^5.0.0
+      version: 5.0.0
     remark-gfm:
       specifier: ^4.0.1
       version: 4.0.1
+    remark-mdx-frontmatter:
+      specifier: ^5.0.0
+      version: 5.2.0
     safe-regex2:
       specifier: ^5.1.1
       version: 5.1.1
@@ -641,6 +659,9 @@ catalogs:
     ws:
       specifier: ^8.21.0
       version: 8.21.3
+    yaml:
+      specifier: ^2.6.0
+      version: 2.9.0
     zod:
       specifier: ^4.6.5
       version: 4.6.5
@@ -1152,6 +1173,85 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)
+
+  apps/docs:
+    dependencies:
+      '@langwatch/design-system':
+        specifier: workspace:*
+        version: link:../../packages/design-system
+      '@mdx-js/react':
+        specifier: 'catalog:'
+        version: 3.1.1(@types/react@19.2.18)(react@19.2.8)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.22.0(react@19.2.8)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
+      shiki:
+        specifier: 'catalog:'
+        version: 4.3.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../packages/time
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../../packages/vitest-config
+      '@mdx-js/rollup':
+        specifier: 'catalog:'
+        version: 3.1.1(rollup@4.59.0)(supports-color@10.2.2)
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.4(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 6.1.1(babel-plugin-react-compiler@1.0.0)(oxc-transform-react@0.145.0)(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      mermaid:
+        specifier: 'catalog:'
+        version: 11.16.1
+      oxc-transform-react:
+        specifier: 'catalog:'
+        version: 0.145.0
+      playwright:
+        specifier: 'catalog:'
+        version: 1.63.0
+      rehype-slug:
+        specifier: 'catalog:'
+        version: 6.0.0
+      remark-frontmatter:
+        specifier: 'catalog:'
+        version: 5.0.0(supports-color@10.2.2)
+      remark-gfm:
+        specifier: 'catalog:'
+        version: 4.0.1(supports-color@10.2.2)
+      remark-mdx-frontmatter:
+        specifier: 'catalog:'
+        version: 5.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: 'catalog:'
+        version: 8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.0
 
   apps/haven-web:
     dependencies:
@@ -2400,79 +2500,6 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e)
-
-  apps/docs:
-    dependencies:
-      '@langwatch/design-system':
-        specifier: workspace:*
-        version: link:../../packages/design-system
-      '@mdx-js/react':
-        specifier: ^3.1.0
-        version: 3.1.1(@types/react@19.2.18)(react@19.2.8)
-      lucide-react:
-        specifier: 'catalog:'
-        version: 1.22.0(react@19.2.8)
-      react:
-        specifier: ^19.2.7
-        version: 19.2.8
-      react-dom:
-        specifier: ^19.2.7
-        version: 19.2.8(react@19.2.8)
-      shiki:
-        specifier: 'catalog:'
-        version: 4.3.0
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../../packages/vitest-config
-      '@mdx-js/rollup':
-        specifier: ^3.1.0
-        version: 3.1.1(rollup@4.59.0)(supports-color@10.2.2)
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.18
-      '@types/react-dom':
-        specifier: 'catalog:'
-        version: 19.2.4(@types/react@19.2.18)
-      '@vitejs/plugin-react':
-        specifier: 'catalog:'
-        version: 6.1.1(babel-plugin-react-compiler@1.0.0)(oxc-transform-react@0.145.0)(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-      mermaid:
-        specifier: 11.16.1
-        version: 11.16.1
-      playwright:
-        specifier: 'catalog:'
-        version: 1.63.0
-      rehype-slug:
-        specifier: ^6.0.0
-        version: 6.0.0
-      remark-frontmatter:
-        specifier: ^5.0.0
-        version: 5.0.0(supports-color@10.2.2)
-      remark-gfm:
-        specifier: 'catalog:'
-        version: 4.0.1(supports-color@10.2.2)
-      remark-mdx-frontmatter:
-        specifier: ^5.0.0
-        version: 5.2.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vite:
-        specifier: 'catalog:'
-        version: 8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.4.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-      yaml:
-        specifier: ^2.6.0
-        version: 2.9.0
 
   enterprise/modules/billing/browser:
     dependencies:

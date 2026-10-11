@@ -1,4 +1,4 @@
-# Revision 4: performance
+# Documentation app design
 
 Static HTML is the product. The approved design-system components still render
 all page content, navigation, examples and form controls on the server. The
@@ -7,6 +7,22 @@ order and writes one content-hashed stylesheet. The browser never needs Chakra
 or Emotion to paint. Highlighting and Mermaid remain build-time work. Public
 operation metadata is inert JSON; no credential or executable hydration state is
 serialised into a page.
+
+## Source and build boundaries
+
+The app owns feature folders without the server module installation pipeline.
+Build-only compilers are separated from portable models, React presentation and
+browser behavior. One Vite configuration resolves authored MDX, shared runtimes
+and explicit lazy entries. Strict TypeScript covers this path; build tools run
+on Node 24. The workspace catalog owns dependency versions. Oxc React Compiler
+optimizes docs React components without compiling shared design-system sources
+again. The unused whole-page hydration entry is removed.
+
+Build output is a static directory. Each prerender bundle has its own temporary
+directory and cleans up only that directory on success or failure. Exact
+redirects have static fallback pages; pattern rules and HTTP behavior belong to
+a future host. CI validates and uploads the artifact, without cloud deployment
+or host-specific code generation.
 
 ## Browser boundaries
 
@@ -30,7 +46,7 @@ those controls use browser event delegation instead. Module scripts give each
 island a separate entry. Reading needs no runtime CSS generation; the shared
 command and menu surfaces described below load their runtime on interaction.
 
-## Navigation and deployment
+## Navigation and static hosting
 
 Internal ordinary links prefetch on hover/focus; at most three content links also
 prefetch when visible. A bounded in-memory cache lives for 30 seconds. Modified,
@@ -53,10 +69,9 @@ private/no-store responses are not stored.
 The worker version hashes the rendered documents, including hashed CSS/JS
 references, together with the worker source and reading fonts. A successful install activates the new cache and removes previous
 versions. It neither forces a reload nor claims existing tabs. The next document
-navigation adopts the new version. The deployment retains old immutable assets,
-so an open document can still load its lazy chunks. CloudFront gives mutable
-files, including sw.js and search, a 60-second revalidation policy; worker
-registration bypasses the browser HTTP cache. No Workbox dependency is needed.
+navigation adopts the new version. Future hosting should retain old immutable assets so an open document can still
+load its lazy chunks, and revalidate mutable HTML, worker and search files promptly.
+Worker registration bypasses the browser HTTP cache. No Workbox dependency is needed.
 See [MDN lifecycle guidance](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers).
 
 ## Scroll layout
@@ -119,8 +134,8 @@ controls remember dismissal by version, so another release is visible again.
 There is no fetch or rendering runtime for the strip. Missing or invalid notes
 omit it. The two newest releases are injected into the existing releases page
 and its Markdown output at build time, above the authored support policy.
-Guide sidebars and mobile navigation link contextually to the home agent setup
-card; the home page and API reference do not repeat that call to action.
+Sidebars and mobile navigation expose the supported CLI command selector and
+setup-guide link on every page.
 
 The reading surface uses compact linked rows instead of repeated raised cards. Coding-agent setup is a real CLI command selector in every sidebar, with direct setup links on its overview. The overview's existing product capture supplies visual context; it remains a screenshot, not an interactive demo. The wider contents rail highlights only the active heading. Overflowing tab strips show a scrolling hint, reveal keyboard-selected tabs horizontally, and preserve document scroll. The footer and document overscroll share opaque paper.
 

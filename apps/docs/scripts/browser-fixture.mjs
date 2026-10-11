@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { chromium } from "playwright";
 
-import { startPreview } from "./preview-server.mjs";
+import { startPreview } from "../src/site/preview-server.ts";
 
 export async function withPreviewBrowser({ outDir, run }) {
   const server = await startPreview({ outDir, port: 0 });

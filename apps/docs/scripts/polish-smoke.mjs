@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 
 import { createServer } from "vite";
 
-import { docsDevPlugin } from "../docs-dev.mjs";
+import { docsDevPlugin } from "../src/site/dev-server.ts";
 import { withPreviewBrowser } from "./browser-fixture.mjs";
 
 const { values } = parseArgs({

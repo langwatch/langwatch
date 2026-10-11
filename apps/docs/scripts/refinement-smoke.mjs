@@ -14,7 +14,7 @@ const screenshots = path.resolve(values.screenshots ?? process.env.TMPDIR);
 await mkdir(screenshots, { recursive: true });
 
 /** @scenario "Open search only on explicit activation" */
-it("keeps focus on Search until activation and synchronizes destination metadata", async () => {
+await it("keeps focus on Search until activation and synchronizes destination metadata", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -59,7 +59,7 @@ it("keeps focus on Search until activation and synchronizes destination metadata
 });
 
 /** @scenario "Discover page exports and crawlable documentation" */
-it("serves identical page exports and discovery metadata", async () => {
+await it("serves identical page exports and discovery metadata", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -85,7 +85,7 @@ it("serves identical page exports and discovery metadata", async () => {
 });
 
 /** @scenario "Copy a supported coding-agent command on any page" */
-it("copies supported agent commands on guides, overview and API pages", async () => {
+await it("copies supported agent commands on guides, overview and API pages", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -124,7 +124,7 @@ it("copies supported agent commands on guides, overview and API pages", async ()
 });
 
 /** @scenario "Copy a page with the keyboard" */
-it("copies Markdown with Alt Shift C and leaves editable controls alone", async () => {
+await it("copies Markdown with Alt Shift C and leaves editable controls alone", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -156,7 +156,7 @@ it("copies Markdown with Alt Shift C and leaves editable controls alone", async 
 });
 
 /** @scenario "Reveal an overflowing tab without moving the document" */
-it("reveals the final setup tab horizontally while preserving vertical scroll", async () => {
+await it("reveals the final setup tab horizontally while preserving vertical scroll", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -190,7 +190,7 @@ it("reveals the final setup tab horizontally while preserving vertical scroll", 
   });
 });
 
-it("renders responsive product imagery and a solid footer across themes and screen sizes", async () => {
+await it("renders responsive product imagery and a solid footer across themes and screen sizes", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {
@@ -238,7 +238,7 @@ it("renders responsive product imagery and a solid footer across themes and scre
   });
 });
 
-it("caps ambient rendering resolution and disables it for reduced motion", async () => {
+await it("caps ambient rendering resolution and disables it for reduced motion", async () => {
   await withPreviewBrowser({
     outDir,
     run: async ({ browser, base }) => {

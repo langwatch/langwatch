@@ -77,19 +77,13 @@ async function measure({ directory }) {
   };
 }
 const after = await measure({ directory: outDir });
+if (after.initialGzip > 3_000)
+  throw new Error(`Initial reading budget exceeded: ${after.initialGzip}`);
 if (after.withIdleControlsGzip >= 15_000)
   throw new Error(`Initial JS budget exceeded: ${after.withIdleControlsGzip}`);
-let before;
-if (values.before) {
-  const directory = path.resolve(values.before);
-  const html = await readFile(path.join(directory, "index.html"), "utf8");
-  const files = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"/g)].map((match) => match[1]);
-  before = {
-    initialGzip: await gzipFiles({ directory, files }),
-    assetsBytes: await directorySize({ directory: path.join(directory, "assets") }),
-    totalBytes: await directorySize({ directory }),
-  };
-}
+const before = values.before
+  ? await measure({ directory: path.resolve(values.before) })
+  : undefined;
 const report = {
   before,
   after,

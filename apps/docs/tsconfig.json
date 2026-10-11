@@ -5,11 +5,30 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "lib": ["es2023", "dom", "dom.iterable"],
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "virtual:docs-nav": ["./src/app/virtual/docs-nav.d.ts"],
+      "virtual:docs-operations": ["./src/app/virtual/docs-operations.d.ts"],
+      "virtual:docs-pages": ["./src/app/virtual/docs-pages.d.ts"]
+    },
+    "tsBuildInfoFile": "node_modules/.cache/tsconfig.tsbuildinfo"
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts", "vitest.config.ts"],
+  "references": [
+    {
+      "path": "../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/vitest-config/tsconfig.build.json"
+    }
+  ]
 }
