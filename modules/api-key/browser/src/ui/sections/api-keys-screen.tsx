@@ -101,7 +101,10 @@ function PermissionBadge({ permissionMode }: { permissionMode: ApiKeyRow["permis
   );
 }
 
-const KEY_COLUMNS = 7;
+/** Pixel widths for the seven columns; long names and owners truncate, nothing else gives way. */
+const KEY_COLUMN_WIDTHS = [320, 120, 228, 176, 104, 110, 56] as const;
+const KEY_COLUMNS = KEY_COLUMN_WIDTHS.length;
+const KEY_TABLE_MIN_WIDTH = `${KEY_COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0)}px`;
 
 function NoMatchingKeysRow() {
   return (
@@ -131,22 +134,22 @@ function ApiKeyTableRow({
 }) {
   return (
     <Table.Row id={apiKeyRowAnchorId(apiKey.id)}>
-      <Table.Cell minWidth="220px" maxWidth="360px">
+      <Table.Cell>
         <HStack align="start">
           <Box paddingTop={1} color="fg.muted" flexShrink={0}>
             <Key size={14} />
           </Box>
           <VStack align="start" gap={0} minWidth={0}>
             <HStack gap={2} maxWidth="full" minWidth={0}>
-              <Text textStyle="label" truncate title={apiKey.name}>
+              <Text textStyle="label" flex={1} minWidth={0} truncate title={apiKey.name}>
                 {apiKey.name}
               </Text>
               {isExpired(apiKey) ? (
-                <Badge size="sm" colorPalette="red">
+                <Badge size="sm" colorPalette="red" flexShrink={0}>
                   Expired
                 </Badge>
               ) : (
-                <Badge size="sm" colorPalette="green">
+                <Badge size="sm" colorPalette="green" flexShrink={0}>
                   Active
                 </Badge>
               )}
@@ -177,7 +180,7 @@ function ApiKeyTableRow({
           </Text>
         </VStack>
       </Table.Cell>
-      <Table.Cell maxWidth="240px">
+      <Table.Cell>
         <VStack align="start" gap={0} minWidth={0}>
           {apiKey.userId ? (
             <Text
@@ -196,7 +199,7 @@ function ApiKeyTableRow({
           </Text>
         </VStack>
       </Table.Cell>
-      <Table.Cell maxWidth="240px">{scopeBadge}</Table.Cell>
+      <Table.Cell>{scopeBadge}</Table.Cell>
       <Table.Cell>
         <PermissionBadge permissionMode={apiKey.permissionMode} />
       </Table.Cell>
@@ -471,10 +474,19 @@ export default function ApiKeysScreen() {
               testId="api-keys-empty"
             />
           ) : (
-            <ListTable containerProps={{ overflowX: "auto" }}>
+            <ListTable
+              containerProps={{ overflowX: "auto" }}
+              tableLayout="fixed"
+              minWidth={KEY_TABLE_MIN_WIDTH}
+            >
+              <ListTable.ColumnGroup>
+                {KEY_COLUMN_WIDTHS.map((width) => (
+                  <ListTable.Column key={width} width={`${width}px`} />
+                ))}
+              </ListTable.ColumnGroup>
               <Table.Header>
                 <Table.Row>
-                  <Table.ColumnHeader minWidth="220px">Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader whiteSpace="nowrap">Secret key</Table.ColumnHeader>
                   <Table.ColumnHeader>Owner</Table.ColumnHeader>
                   <Table.ColumnHeader>Scope</Table.ColumnHeader>
