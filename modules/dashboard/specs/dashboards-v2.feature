@@ -898,12 +898,16 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     And a reader without analytics:create is offered no copy
     And the board's header has no such button, as on a From LangWatch board
 
-  @unit @integration
+  @unit
   Scenario: AC186 Scope: the migration keeps today's audience
     Given the boards that exist before the scope column
     When the scope migration runs
-    Then every board has the scope Project, except each member's own "My dashboard", which is Only me
-    And the migration only adds: a column with a default, a nullable column and an index
+    Then every board has the scope Project
+    And the migration only adds: a column with a default, a nullable column and an index,
+      the two columns in one statement on the table
+    And it changes no row
+    # No board made before this release has an author, so none is a member's own "My dashboard".
+    # One made from this release on starts at Only me (AC170).
 
   @unit @integration
   Scenario: AC187 Scope: an alert or a scheduled report reads nothing from an Only me board

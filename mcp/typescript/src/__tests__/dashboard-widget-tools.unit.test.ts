@@ -58,7 +58,8 @@ const sampleDashboard = {
   id: "dash_1",
   name: "Agent health",
   order: 0,
-  graphCount: 2,
+  graphCount: 0,
+  graphs: [],
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",
 };
@@ -77,6 +78,7 @@ beforeEach(() => {
     ...sampleWidget,
     dashboardId: "dash_1",
   });
+  mockDeleteDashboardWidget.mockResolvedValue(undefined);
 });
 
 describe("handleAddDashboardWidget()", () => {
