@@ -6,12 +6,14 @@
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import type { NavigationProject } from "@langwatch/navigation-contract";
 import { projectNavigation } from "@langwatch/project-contract";
-import { nowInstant } from "@langwatch/time";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
 
 import { navigationApi } from "../../behavior/navigation-api.ts";
-import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity.ts";
+import {
+  type CodingAgentLinks,
+  useCodingAgentLinks,
+} from "../../behavior/use-coding-agent-links.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
 import {
   isExperimentsActivePath,
@@ -82,43 +84,6 @@ interface ProjectSectionProps {
   showExpanded: boolean;
   project: NavigationProject | undefined;
   pathname: string;
-}
-
-interface CodingAgentLinks {
-  shouldShowSessions: boolean;
-  shouldShowPullRequests: boolean;
-}
-
-/**
- * Coding-agent destinations are grown by the project, not configured:
- * each needs its own recent signal, so sessions-only or PR-only both
- * appear alone, and each fades once its signal falls out of the window.
- */
-function useCodingAgentLinks(): CodingAgentLinks {
-  const host = useNavigationHost();
-  const project = host.project();
-  const codingAgentPagesEnabled = host.featureFlag(
-    FrontendFlags.release_ui_ai_governance_enabled,
-  ).enabled;
-  const canSeeCodingAgentActivity = codingAgentPagesEnabled && host.hasPermission("traces:view");
-  const now = nowInstant();
-
-  return {
-    shouldShowSessions:
-      canSeeCodingAgentActivity &&
-      withinDays({
-        at: project?.lastCodingAgentSessionAt,
-        days: CODING_AGENT_LINK_WINDOW_DAYS,
-        now,
-      }),
-    shouldShowPullRequests:
-      canSeeCodingAgentActivity &&
-      withinDays({
-        at: project?.lastCodingAgentPullRequestAt,
-        days: CODING_AGENT_LINK_WINDOW_DAYS,
-        now,
-      }),
-  };
 }
 
 function ObserveSection({
