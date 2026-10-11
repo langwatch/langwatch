@@ -102,11 +102,10 @@ vi.mock("@langwatch/dataset-client", () => ({
   },
 }));
 
-const Page = () => <NewExperimentWorkbench />;
-
+// Rendered directly: the React Compiler memoises a wrapper's output, so its rerenders stop short.
 const renderRepeatedly = () => {
-  const view = renderWithDesignSystem(<Page />);
-  for (let i = 0; i < 4; i++) view.rerender(<Page />);
+  const view = renderWithDesignSystem(<NewExperimentWorkbench />);
+  for (let i = 0; i < 4; i++) view.rerender(<NewExperimentWorkbench />);
   return view;
 };
 
@@ -210,7 +209,7 @@ describe("New experiment workbench address", () => {
 
       const view = renderRepeatedly();
       await waitFor(() => expect(mutationState.error).toBe(refusal));
-      view.rerender(<Page />);
+      view.rerender(<NewExperimentWorkbench />);
 
       expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't create the experiment");
       expect(alertMock).toHaveBeenLastCalledWith(refusal);
