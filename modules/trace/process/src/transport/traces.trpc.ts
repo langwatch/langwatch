@@ -12,7 +12,6 @@ import {
   distinctFieldNamesResultSchema,
   evaluationSchema,
   facetValuesResultSchema,
-  TraceAiQueryUnavailableError,
   TraceApi,
   traceListPageSchema,
   traceSummaryReadSchema,
@@ -480,32 +479,31 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       ),
     )
 
-    /**
-     * No model-invocation capability is wired into this transport yet — see
-     * the merge-traces-v2 handoff. Declared (not dropped) so the namespace
-     * carries the full `traces` shape; refuses by name instead of 404ing.
-     */
     .procedure("aiQuery")
     .withPermission("traces:view")
-    .handle(() => {
-      throw new TraceAiQueryUnavailableError();
-    })
+    .handle(({ app, input, authorization }) =>
+      app.aiQuery({
+        projectId: input.projectId,
+        authorization,
+        prompt: input.prompt,
+        timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+      }),
+    )
 
     .procedure("aiAction")
     .withPermission("traces:view")
-    .handle(() => {
-      throw new TraceAiQueryUnavailableError();
-    })
+    .handle(({ app, input, authorization }) =>
+      app.aiAction({
+        projectId: input.projectId,
+        authorization,
+        prompt: input.prompt,
+        timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+      }),
+    )
 
-    /**
-     * Enter on a sentence, routed. Refuses for the same reason `aiQuery` does:
-     * every route but the phrase needs a model this transport cannot call yet.
-     */
     .procedure("routeSearch")
     .withPermission("traces:view")
-    .handle(() => {
-      throw new TraceAiQueryUnavailableError();
-    })
+    .handle(({ app, input, authorization }) => app.routeSearch({ ...input, authorization }))
 
     .procedure("header")
     .withPermission("traces:view")

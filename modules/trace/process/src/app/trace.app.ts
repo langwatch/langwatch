@@ -1174,6 +1174,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       explorerEvalRuns: TraceInstantEvalRunService.create({
         runs: options.repositories.instantEvalRuns,
       }),
+      models: options.modelProviders,
       storedObjects: options.storedObjects,
       ...(options.presence ? { presence: options.presence } : {}),
       share: options.share,

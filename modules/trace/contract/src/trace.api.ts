@@ -67,6 +67,7 @@ import type {
   FacetValuesResult,
   TraceListPage,
 } from "./features/list/trace-list-view.ts";
+import type { AiActionResult, AiQueryResult } from "./features/query/trace-ai-query.ts";
 import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
 import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
 import type {
@@ -74,6 +75,7 @@ import type {
   TraceQueryClassificationInput,
   TraceQueryFieldCatalogueInput,
 } from "./features/query/trace-query.contract.ts";
+import type { RouteSearchInput, RouteSearchResult } from "./features/query/trace-search-route.ts";
 import type { LogTraceContribution } from "./features/span/trace-log-contribution.ts";
 import type {
   SpanSummaryRow,
@@ -763,6 +765,24 @@ export interface TraceApi extends TraceOtlpIngestApi {
     limit: number;
     offset: number;
   }): Promise<FacetValuesResult>;
+  /** A sentence to a trace query, on the project's `traces.ai_search` model. */
+  aiQuery(input: {
+    projectId: string;
+    authorization: Authorization;
+    prompt: string;
+    timeRange: { from: number; to: number };
+  }): Promise<AiQueryResult>;
+  /** A sentence to an applied query or a new lens. */
+  aiAction(input: {
+    projectId: string;
+    authorization: Authorization;
+    prompt: string;
+    timeRange: { from: number; to: number };
+  }): Promise<AiActionResult>;
+  /** Enter on a sentence: a filter, a judgement, a phrase or the assistant. */
+  routeSearch(
+    input: RouteSearchInput & { authorization: Authorization },
+  ): Promise<RouteSearchResult>;
   /** The proof narrowed to the member holding the trace; an unreadable member is not found. */
   authorizationForTrace(input: {
     authorization: Authorization;
