@@ -619,7 +619,9 @@ func (cell *run) targetsVerdict(ctx context.Context) Verdict {
 
 // browserVerdict: the signed-in walk saw no console error and no failed request outside the accepted list.
 func (cell *run) browserVerdict() Verdict {
-	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], FirstAt(cell.report.Phases, "ready"), cell.profile.StopStart)
+	// upgrade_in_progress stays expected after ready while H8's private target catches up (T7-F18).
+	stepsRunUntil := max(FirstAt(cell.report.Phases, "ready"), cell.down.caughtMs)
+	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], stepsRunUntil, cell.profile.StopStart)
 	if err != nil || walks == 0 {
 		return Verdict{ID: "B1", Name: invariantNames["B1"], Result: "inconclusive", Detail: fmt.Sprintf("%d completed walks; %s", walks, errText(err))}
 	}
@@ -627,7 +629,7 @@ func (cell *run) browserVerdict() Verdict {
 	for _, each := range findings[:min(len(findings), 3)] {
 		first = append(first, fmt.Sprintf("%s %s %d %.120s at %s (%d ms, %s)", each.Kind, each.URL, each.Status, each.Text, each.Step, each.AtMs, PhaseAt(cell.report.Phases, each.AtMs)))
 	}
-	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run), other %v", walks, len(findings), first, expected, tolerated))
+	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run or a private target catches up), other %v", walks, len(findings), first, expected, tolerated))
 }
 
 // readModelVerdict (I5): the projections an upgrade must leave filled. Any failed part fails it; a part
