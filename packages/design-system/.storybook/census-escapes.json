@@ -424,5 +424,53 @@
     "reason": "False positive: assignment rows with struck-through and staged states, not cards (R1a2 review).",
     "owner": "organization",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/api-key/browser/src/ui/blocks/permission-category-list.tsx",
+    "rule": "card-box",
+    "line": 123,
+    "reason": "Grouped permission rows with dividers inside a form field, not a card. (R2m1 review)",
+    "owner": "api-key",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/api-key/browser/src/ui/sections/api-keys-screen.tsx",
+    "rule": "list-page-inference",
+    "line": 447,
+    "reason": "ListPage would hide the ingestion keys section and move the scope filter out of the header. (R2m1 review)",
+    "owner": "api-key",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/api-key/browser/src/ui/sections/cli-auth-screen.tsx",
+    "rule": "card-box",
+    "line": 582,
+    "reason": "The device user-code display, not a card. (R2m1 review)",
+    "owner": "api-key",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/api-key/browser/src/ui/sections/cli-auth-screen.tsx",
+    "rule": "empty-text",
+    "line": 709,
+    "reason": "A helper note under a picker, not an empty state. (R2m1 review)",
+    "owner": "api-key",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/api-key/browser/src/ui/sections/token-created-dialog.tsx",
+    "rule": "card-box",
+    "line": 506,
+    "reason": "The JSON config code block with its copy button. (R2m1 review)",
+    "owner": "api-key",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/api-key/browser/src/ui/sections/token-created-dialog.tsx",
+    "rule": "card-box",
+    "line": 534,
+    "reason": "The config-path copy chip. (R2m1 review)",
+    "owner": "api-key",
+    "disposition": "reviewed"
   }
 ]

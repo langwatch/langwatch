@@ -381,6 +381,8 @@ describe("given keys bound at different scopes", () => {
         new FakeApiKeyHost({ grants, query: { [API_KEY_SCOPE_QUERY_KEY]: "TEAM:team-1" } }),
       );
       expect(screen.getByText(/No keys match the current scope/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /How API keys are scoped/ })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
     });
   });
 });

@@ -2,21 +2,14 @@ import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { IdText } from "@langwatch/design-system/id-text";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SectionTitle } from "@langwatch/design-system/typography";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { MoreVertical, Radio } from "lucide-react";
+import { Radio } from "lucide-react";
 
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
 
@@ -53,23 +46,23 @@ export function IngestionKeysSection({
         </Text>
       </VStack>
 
-      <ListTable containerProps={{ overflowX: "auto" }}>
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Name</Table.ColumnHeader>
-            <Table.ColumnHeader>Status</Table.ColumnHeader>
-            <Table.ColumnHeader>Secret key</Table.ColumnHeader>
-            <Table.ColumnHeader>Created</Table.ColumnHeader>
-            <Table.ColumnHeader>Last used</Table.ColumnHeader>
-            <Table.ColumnHeader>Source</Table.ColumnHeader>
-            <Table.ColumnHeader>Created from</Table.ColumnHeader>
+      <ListTable scroll="x" scrollLabel="Ingestion keys">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Secret key</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Last used</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Source</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Created from</ListTable.ColumnHeader>
             <ListTable.ActionHeader />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {keys.map((apiKey) => (
-            <Table.Row key={apiKey.id} id={apiKeyRowAnchorId(apiKey.id)}>
-              <Table.Cell>
+            <ListTable.Row key={apiKey.id} id={apiKeyRowAnchorId(apiKey.id)}>
+              <ListTable.Cell>
                 <HStack align="start">
                   <Box paddingTop={1}>
                     <Radio size={14} />
@@ -83,8 +76,8 @@ export function IngestionKeysSection({
                     )}
                   </VStack>
                 </HStack>
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 {isExpired(apiKey) ? (
                   <Badge size="sm" colorPalette="red">
                     Expired
@@ -94,36 +87,36 @@ export function IngestionKeysSection({
                     Active
                   </Badge>
                 )}
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 <IdText
                   value={`ik-lw-${apiKey.lookupIdPrefix}…`}
                   label="secret key prefix"
                   copyable={false}
                 />
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 <FormattedDate value={apiKey.createdAt} display="date" />
-              </Table.Cell>
-              <Table.Cell whiteSpace="nowrap">
+              </ListTable.Cell>
+              <ListTable.Cell nowrap>
                 {apiKey.lastUsedAt ? (
                   <FormattedDate value={apiKey.lastUsedAt} display="relative" />
                 ) : (
                   <EmptyValue label="Never used" />
                 )}
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 <Badge size="sm" colorPalette="blue">
                   {apiKey.ingestSourceType}
                 </Badge>
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 {apiKey.createdByDeviceLabel ? (
                   <Text textStyle="bodySm">{apiKey.createdByDeviceLabel}</Text>
                 ) : (
                   <EmptyValue label="Unknown device" />
                 )}
-              </Table.Cell>
+              </ListTable.Cell>
               <ListTable.ActionCell>
                 {/* Ingestion keys carry no role bindings to edit; revoke
                         only, gated to admins. */}
@@ -135,7 +128,7 @@ export function IngestionKeysSection({
                         variant="ghost"
                         aria-label={`Actions for ingestion key ${apiKey.name}`}
                       >
-                        <MoreVertical size={14} />
+                        <MoreVerticalIcon size={14} />
                       </Button>
                     </Menu.Trigger>
                     <Menu.Content>
@@ -146,9 +139,9 @@ export function IngestionKeysSection({
                   </Menu.Root>
                 )}
               </ListTable.ActionCell>
-            </Table.Row>
+            </ListTable.Row>
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     </VStack>
   );
