@@ -1,3 +1,5 @@
+import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -324,46 +326,10 @@ function SectionCard({
   // table that should read edge-to-edge while the title stays inset.
   flushContent?: boolean;
 }) {
-  if (flushContent) {
-    return (
-      <Box
-        background="bg.card"
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        overflow="hidden"
-      >
-        <HStack paddingX={4} paddingTop={4} paddingBottom={3}>
-          <Text fontSize="sm" fontWeight="semibold">
-            {title}
-          </Text>
-          <Spacer />
-          {action}
-        </HStack>
-        <Box borderTopWidth="1px" borderTopColor="border.muted">
-          {children}
-        </Box>
-      </Box>
-    );
-  }
-
   return (
-    <Box
-      background="bg.card"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
-      <HStack marginBottom={3}>
-        <Text fontSize="sm" fontWeight="semibold">
-          {title}
-        </Text>
-        <Spacer />
-        {action}
-      </HStack>
+    <Card title={title} actions={action} padding={flushContent ? "none" : "md"}>
       {children}
-    </Box>
+    </Card>
   );
 }
 
@@ -385,7 +351,6 @@ function BudgetStateBanners({
   if (!warningItem) return null;
   return (
     <BudgetBanner
-      tone="yellow"
       title="Approaching budget"
       message={`You've used ${fmtUsd(Number.parseFloat(warningItem.spentUsd) || 0)} of your ${fmtUsd(Number.parseFloat(warningItem.limitUsd) || 0)} ${budgetDescription(warningItem)}.`}
     />
@@ -413,40 +378,11 @@ function BreachedBudgetBanner({
   );
 }
 
-function BudgetBanner({
-  tone,
-  title,
-  message,
-}: {
-  tone: "red" | "yellow";
-  title: string;
-  message: string;
-}) {
-  const colors =
-    tone === "red"
-      ? { bg: "red.subtle", border: "red.muted", title: "red.fg", text: "red.fg" }
-      : {
-          bg: "yellow.subtle",
-          border: "yellow.emphasized",
-          title: "yellow.fg",
-          text: "yellow.fg",
-        };
-
+function BudgetBanner({ title, message }: { title: string; message: string }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor={colors.border}
-      backgroundColor={colors.bg}
-      borderRadius="md"
-      padding={4}
-    >
-      <Text fontWeight="semibold" color={colors.title}>
-        {title}
-      </Text>
-      <Text fontSize="sm" color={colors.text} marginTop={1}>
-        {message}
-      </Text>
-    </Box>
+    <Banner status="warning" title={title}>
+      {message}
+    </Banner>
   );
 }
 

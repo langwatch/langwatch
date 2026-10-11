@@ -1,7 +1,7 @@
 import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
 import {
   Alert,
-  Box,
   Button,
   Code,
   HStack,
@@ -163,14 +163,7 @@ export function ModelProviderTile({
   };
 
   return (
-    <Box
-      background="bg.card"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-      width="full"
-    >
+    <Card>
       <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
         <TileIcon
           iconAsset={iconAsset}
@@ -221,17 +214,11 @@ export function ModelProviderTile({
             Issue {articleFor(displayName)} {displayName} virtual key
           </Text>
           {config.projectSuggestionText && (
-            <Box
-              padding={3}
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="sm"
-              backgroundColor="bg.subtle"
-            >
+            <Card variant="nested" padding="sm">
               <Text fontSize="xs" color="fg.muted">
                 💡 {config.projectSuggestionText}
               </Text>
-            </Box>
+            </Card>
           )}
           <VStack align="stretch" gap={1}>
             <Text fontSize="xs" color="fg.muted">
@@ -324,6 +311,6 @@ export function ModelProviderTile({
           </Button>
         </VStack>
       )}
-    </Box>
+    </Card>
   );
 }

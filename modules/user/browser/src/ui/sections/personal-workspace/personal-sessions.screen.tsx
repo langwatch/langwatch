@@ -1,7 +1,9 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { CodingAgentSessionsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
+import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
 import { PERSONAL_WORKSPACE_WAIT_HINT } from "../../../behavior/use-personal-workspace-wait.ts";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
@@ -12,6 +14,7 @@ import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
  * its own reads. Spec: specs/coding-agent/sessions-screen.feature.
  */
 export function PersonalSessionsScreen() {
+  const router = usePersonalRouter();
   const {
     ready,
     isPersonalProjectResolved,
@@ -56,9 +59,18 @@ export function PersonalSessionsScreen() {
             />
           ) : null}
           {isWorkspaceResolved && !personalProjectId && (
-            <Text fontSize="sm" color="fg.muted">
-              No sessions yet
-            </Text>
+            <NoDataInfoBlock
+              size="line"
+              title="No sessions yet"
+              next={[
+                {
+                  kind: "setting",
+                  label: "Connect your AI tools",
+                  href: "/me/configure",
+                  onNavigate: ({ href }) => router.push(href),
+                },
+              ]}
+            />
           )}
         </VStack>
       </PersonalWorkspaceLayout>

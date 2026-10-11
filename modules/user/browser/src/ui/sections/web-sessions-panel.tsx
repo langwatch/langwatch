@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { Globe } from "lucide-react";
@@ -29,37 +30,30 @@ export function WebSessionsPanel() {
         Browser sign-ins
       </Text>
       {entries.map((session) => (
-        <HStack
-          key={session.sessionId}
-          gap={3}
-          paddingY={2}
-          paddingX={3}
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="sm"
-          data-testid="web-session-row"
-        >
-          <Box color="fg.muted">
-            <Globe size={16} />
-          </Box>
-          <VStack align="start" gap={0} flex={1}>
-            <HStack gap={2}>
-              <Text fontSize="sm">{session.method}</Text>
-              {session.current && (
-                <Badge size="sm" colorPalette="green">
-                  This device
-                </Badge>
-              )}
-            </HStack>
-            <Text fontSize="xs" color="fg.muted">
-              {session.secondFactorProven
-                ? "Second factor proven at sign-in"
-                : "No second factor at sign-in"}
-              {" · "}
-              Signed in {formatRelativeTime(toEpochMs(session.signedInAt))}
-            </Text>
-          </VStack>
-        </HStack>
+        <Card key={session.sessionId} padding="sm" data-testid="web-session-row">
+          <HStack gap={3}>
+            <Box color="fg.muted">
+              <Globe size={16} />
+            </Box>
+            <VStack align="start" gap={0} flex={1}>
+              <HStack gap={2}>
+                <Text fontSize="sm">{session.method}</Text>
+                {session.current && (
+                  <Badge size="sm" colorPalette="green">
+                    This device
+                  </Badge>
+                )}
+              </HStack>
+              <Text fontSize="xs" color="fg.muted">
+                {session.secondFactorProven
+                  ? "Second factor proven at sign-in"
+                  : "No second factor at sign-in"}
+                {" · "}
+                Signed in {formatRelativeTime(toEpochMs(session.signedInAt))}
+              </Text>
+            </VStack>
+          </HStack>
+        </Card>
       ))}
     </VStack>
   );

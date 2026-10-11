@@ -6,12 +6,14 @@
 
 import { apiKeyClient } from "@langwatch/api-key-client";
 import { Link } from "@langwatch/browser-host/link";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection, SettingsSectionRow } from "@langwatch/design-system/settings-section";
 import { toEpochMs } from "@langwatch/time";
 import { KeySquare } from "lucide-react";
 import { useEffect } from "react";
 
+import { usePersonalRouter } from "../../behavior/personal-workspace-router.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { formatRelativeTime } from "../../model/relative-time.ts";
 
@@ -23,6 +25,7 @@ function permissionLabel(mode: string): string {
 }
 
 export function PersonalApiKeysSummary() {
+  const router = usePersonalRouter();
   const host = usePersonalWorkspaceHost();
   const organizationId = host.organization()?.id ?? null;
   const userId = host.currentUser()?.id ?? null;
@@ -57,9 +60,18 @@ export function PersonalApiKeysSummary() {
       data-testid="personal-api-keys-summary"
     >
       {mine.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted">
-          No key has been issued to you yet.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No key has been issued to you yet."
+          next={[
+            {
+              kind: "setting",
+              label: "Create an API key",
+              href: "/settings/api-keys",
+              onNavigate: ({ href }) => router.push(href),
+            },
+          ]}
+        />
       ) : (
         <VStack align="stretch" gap={2} width="full">
           {mine.map((key) => (
