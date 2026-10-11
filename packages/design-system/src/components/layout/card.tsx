@@ -55,7 +55,7 @@ const RECIPE_VARIANT = {
 const FRAME = { background: "transparent", boxShadow: "none", backdropFilter: "none" } as const;
 
 /** The recipe's `showcase` look (Chakra's Card type lacks product variants): outline plus these. */
-const SHOWCASE = { borderRadius: "showcase", boxShadow: "showcase" } as const;
+export const SHOWCASE = { borderRadius: "showcase", boxShadow: "showcase" } as const;
 
 const OVERRIDES: Partial<Record<CardVariant, typeof FRAME | typeof SHOWCASE>> = {
   frame: FRAME,

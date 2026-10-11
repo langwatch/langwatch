@@ -7,6 +7,7 @@ import { Card, HStack, SimpleGrid, Skeleton, Text, VStack } from "@chakra-ui/rea
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { SHOWCASE } from "../layout/card.tsx";
 import { MeterBar } from "./meter-bar.tsx";
 
 export interface StatTileMeter {
@@ -17,7 +18,8 @@ export interface StatTileMeter {
 
 export interface StatTileProps {
   label: string;
-  variant?: Card.RootProps["variant"];
+  /** `showcase`: the governance and gateway figures' look, as the Card variant of that name. */
+  variant?: Card.RootProps["variant"] | "showcase";
   icon?: ReactNode;
   /** Under the figure, clamped to two lines. */
   hint?: string;
@@ -38,7 +40,12 @@ export function StatTile({
   "data-testid": testId,
 }: StatTileProps) {
   return (
-    <Card.Root variant={variant} minWidth={0} data-testid={testId}>
+    <Card.Root
+      variant={variant === "showcase" ? "outline" : variant}
+      {...(variant === "showcase" ? SHOWCASE : {})}
+      minWidth={0}
+      data-testid={testId}
+    >
       <Card.Body paddingX={4} paddingY={3}>
         <VStack align="start" gap={1.5} minWidth={0}>
           <HStack gap={1.5} color="fg.muted">
