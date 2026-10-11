@@ -41,6 +41,9 @@ export async function openObjectStorage(options: {
   const config: StoresConfig = {
     defaultRetentionDays: 30,
     shutdownDrainTimeoutMs: undefined,
+    queueConcurrency: undefined,
+    queueTenantCap: undefined,
+    queueGlobalBudget: undefined,
     clickhouseStatementLaneReserveShare: undefined,
     clickhousePool: {
       override: undefined,

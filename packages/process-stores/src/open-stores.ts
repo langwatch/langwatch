@@ -155,6 +155,9 @@ function processConfigOf(options: {
     eventing: pipelines.configure({
       defaultRetentionDays: config.defaultRetentionDays,
       queueDrainTimeoutMs: config.shutdownDrainTimeoutMs,
+      queueConcurrency: config.queueConcurrency,
+      queueTenantCap: config.queueTenantCap,
+      queueGlobalBudget: config.queueGlobalBudget,
     }),
     objectStorage: objectStorageConfig({
       settings: config.objectStorage,
