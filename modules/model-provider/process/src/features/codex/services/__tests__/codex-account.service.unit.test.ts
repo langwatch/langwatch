@@ -71,6 +71,40 @@ describe("CodexAccountService", () => {
     });
   });
 
+  describe("given a configured issuer base", () => {
+    /** @scenario "Codex is reached at the bases the deployment configures" */
+    it("calls that base and points the verification page at it", async () => {
+      const { impl, calls } = scriptedFetch({
+        "/sim/api/accounts/deviceauth/usercode": () => ({
+          status: 200,
+          json: { device_auth_id: "dev-1", user_code: "ABCD-1234", interval: 3 },
+        }),
+      });
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "http://127.0.0.1:6970/sim/",
+      });
+      const device = await service.startDeviceSignIn();
+      expect(calls[0]!.url).toBe("http://127.0.0.1:6970/sim/api/accounts/deviceauth/usercode");
+      expect(device.verificationUrl).toBe("http://127.0.0.1:6970/sim/codex/device");
+    });
+  });
+
+  describe("given no configured issuer base", () => {
+    /** @scenario "A Codex base that is unset or blank reaches OpenAI" */
+    it("calls OpenAI's own issuer", async () => {
+      const { impl, calls } = scriptedFetch({
+        "/api/accounts/deviceauth/usercode": () => ({
+          status: 200,
+          json: { device_auth_id: "dev-1", user_code: "ABCD-1234", interval: 3 },
+        }),
+      });
+      const device = await CodexAccountService.create({ fetchImpl: impl }).startDeviceSignIn();
+      expect(calls[0]!.url).toBe("https://auth.openai.com/api/accounts/deviceauth/usercode");
+      expect(device.verificationUrl).toBe("https://auth.openai.com/codex/device");
+    });
+  });
+
   describe("given the user has not approved yet", () => {
     it.each([403, 404])("reports HTTP %i as pending", async (status) => {
       const { impl } = scriptedFetch({

@@ -101,7 +101,7 @@ type BifrostOptions struct {
 	// CodexRefresher wires the control-plane token refresh for the codex
 	// provider (see adapters/providers/codex.go).
 	CodexRefresher domain.CodexTokenRefresher
-	// CodexBackendURL overrides the codex upstream (tests only).
+	// CodexBackendURL overrides the codex upstream (CODEX_API_BASE, and tests).
 	CodexBackendURL string
 	// OpenAIBackendURL overrides OpenAI's upstream (tests only). A credential
 	// base_url reroutes to the vLLM chat-compat provider (see mapProvider);

@@ -1,7 +1,6 @@
 import {
   CODEX_OAUTH_CLIENT_ID,
   CODEX_OAUTH_ISSUER,
-  CODEX_VERIFICATION_URL,
   CodexAuthError,
   type CodexTokenKeys,
 } from "@langwatch/model-provider-contract";
@@ -71,10 +70,8 @@ export class CodexAccountService {
     private readonly fetchImpl: typeof fetch,
     issuer: string | undefined,
   ) {
-    // The override exists for tests (a local stand-in issuer) and for
-    // debugging against a staging identity service; production always runs
-    // on the real issuer, so the composing process passes nothing.
-    this.issuer = issuer ?? CODEX_OAUTH_ISSUER;
+    // The deployment's configured issuer (haven's +outbound names outboundsim); absent is OpenAI.
+    this.issuer = (issuer ?? CODEX_OAUTH_ISSUER).replace(/\/+$/, "");
   }
 
   async startDeviceSignIn(): Promise<CodexDeviceCode> {
@@ -91,7 +88,7 @@ export class CodexAccountService {
       userCode,
       deviceAuthId,
       intervalSeconds: Math.max(2, Number.isFinite(interval) ? interval : 5),
-      verificationUrl: CODEX_VERIFICATION_URL,
+      verificationUrl: `${this.issuer}/codex/device`,
     };
   }
 
