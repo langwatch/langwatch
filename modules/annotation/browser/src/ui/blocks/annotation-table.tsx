@@ -1,20 +1,12 @@
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import { Checkbox } from "@langwatch/design-system/checkbox";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { ListTable, type ListTableRowProps } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Badge,
-  Box,
-  HStack,
-  IconButton,
-  Skeleton,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toDate } from "@langwatch/time";
-import { Database, Eye, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
-import type { CSSProperties, ReactElement, ReactNode } from "react";
+import { Database, Eye, MessageCircle, Trash2 } from "lucide-react";
+import type { ReactElement, ReactNode } from "react";
 import { z } from "zod";
 
 import type { AnnotationRow, AnnotationUser, DisplayMoment } from "../../model/annotation-row.ts";
@@ -53,14 +45,10 @@ export type AnnotationTableProps = {
   renderAvatar: (user: AnnotationUser) => ReactNode;
   renderTraceField: (field: AnnotationTableTraceField) => ReactNode;
   /**
-   * Wraps one rendered row. `children` is the single `<Table.Row>` element, not
-   * arbitrary nodes: the app's wrapper `cloneElement`s it to add `className` and
-   * `style`, so the element type has to say those props are accepted.
+   * Wraps one rendered row. `children` is the single `ListTable.Row` element, not
+   * arbitrary nodes; the wrapper may add the row's own props to it.
    */
-  renderRowContext?: (
-    row: AnnotationRow,
-    children: ReactElement<{ className?: string; style?: CSSProperties }>,
-  ) => ReactNode;
+  renderRowContext?: (row: AnnotationRow, children: ReactElement<ListTableRowProps>) => ReactNode;
 };
 
 /** The header select-all checkbox's tri-state, from the row selection counts. */
@@ -105,50 +93,47 @@ export function AnnotationTable({
 
   return (
     <>
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader width="1px" paddingX={0}>
-            {rows.length > 0 && (
-              <SelectCheckbox
-                ariaLabel="Select all on this page"
-                checked={headerCheckedState({ allRowsSelected, someRowsSelected })}
-                onToggle={() => onToggleAll(!allRowsSelected)}
-              />
-            )}
-          </Table.ColumnHeader>
-          {shown.has("queuedBy") && <Table.ColumnHeader />}
-          {shown.has("date") && <Table.ColumnHeader>{dateColumnLabel}</Table.ColumnHeader>}
-          {shown.has("input") && <Table.ColumnHeader>Input</Table.ColumnHeader>}
-          {shown.has("output") && <Table.ColumnHeader>Output</Table.ColumnHeader>}
-          {shown.has("scores") && <Table.ColumnHeader>Scores</Table.ColumnHeader>}
-          {shown.has("comments") && <Table.ColumnHeader>Comments</Table.ColumnHeader>}
-          {shown.has("suggestions") && <Table.ColumnHeader>Suggestions</Table.ColumnHeader>}
+      <ListTable.Header>
+        <ListTable.Row>
+          {rows.length > 0 ? (
+            <ListTable.SelectHeader
+              label="Select all on this page"
+              checked={headerCheckedState({ allRowsSelected, someRowsSelected })}
+              onCheckedChange={() => onToggleAll(!allRowsSelected)}
+            />
+          ) : (
+            <ListTable.ColumnHeader width="fit" label="Select" />
+          )}
+          {shown.has("queuedBy") && <ListTable.ColumnHeader label="People" />}
+          {shown.has("date") && <ListTable.ColumnHeader>{dateColumnLabel}</ListTable.ColumnHeader>}
+          {shown.has("input") && <ListTable.ColumnHeader>Input</ListTable.ColumnHeader>}
+          {shown.has("output") && <ListTable.ColumnHeader>Output</ListTable.ColumnHeader>}
+          {shown.has("scores") && <ListTable.ColumnHeader>Scores</ListTable.ColumnHeader>}
+          {shown.has("comments") && <ListTable.ColumnHeader>Comments</ListTable.ColumnHeader>}
+          {shown.has("suggestions") && <ListTable.ColumnHeader>Suggestions</ListTable.ColumnHeader>}
           {activeScoreTypes
             .filter((scoreType) => shown.has(scoreColumnId(scoreType.id)))
             .map((scoreType) => (
-              <Table.ColumnHeader key={scoreType.id}>{scoreType.name}</Table.ColumnHeader>
+              <ListTable.ColumnHeader key={scoreType.id}>{scoreType.name}</ListTable.ColumnHeader>
             ))}
-          <Table.ColumnHeader width="48px" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {rows.map((row) => {
           const rowElement = (
-            <Table.Row
+            <ListTable.Row
               key={row.id}
-              cursor="pointer"
-              onClick={() => onRowClick(row)}
+              onActivate={() => onRowClick(row)}
               data-testid="annotation-row"
             >
-              <Table.Cell paddingX={0} verticalAlign="top">
-                <SelectCheckbox
-                  ariaLabel={`Select trace ${row.traceId}`}
-                  checked={selectedRowIds.has(row.id)}
-                  onToggle={() => onToggleRow(row.id)}
-                />
-              </Table.Cell>
+              <ListTable.SelectCell
+                label={`Select trace ${row.traceId}`}
+                checked={selectedRowIds.has(row.id)}
+                onCheckedChange={() => onToggleRow(row.id)}
+              />
               {shown.has("queuedBy") && (
-                <Table.Cell verticalAlign="top">
+                <ListTable.Cell valign="top">
                   <Tooltip content={<PeopleTooltip row={row} />}>
                     <HStack>
                       <AnnotationAvatarGroup
@@ -158,97 +143,69 @@ export function AnnotationTable({
                       />
                     </HStack>
                   </Tooltip>
-                </Table.Cell>
+                </ListTable.Cell>
               )}
               {shown.has("date") && (
-                <Table.Cell verticalAlign="top">
+                <ListTable.Cell valign="top">
                   <Text whiteSpace="nowrap">{formatRowDate(row.date)}</Text>
-                </Table.Cell>
+                </ListTable.Cell>
               )}
               {shown.has("input") && (
-                <Table.Cell verticalAlign="top">
+                <ListTable.Cell valign="top">
                   {renderTraceField({
                     field: "input",
                     value: row.trace?.input?.value ?? "<empty>",
                   })}
-                </Table.Cell>
+                </ListTable.Cell>
               )}
               {shown.has("output") && (
-                <Table.Cell verticalAlign="top">
+                <ListTable.Cell valign="top">
                   {renderTraceField({
                     field: "output",
                     value: row.trace?.output?.value ?? "<empty>",
                   })}
-                </Table.Cell>
+                </ListTable.Cell>
               )}
               {shown.has("scores") && (
-                <Table.Cell verticalAlign="top">
+                <ListTable.Cell valign="top">
                   <GivenScoresCell
                     annotations={row.annotations}
                     activeScoreTypes={activeScoreTypes}
                   />
-                </Table.Cell>
+                </ListTable.Cell>
               )}
               {shown.has("comments") && (
-                <Table.Cell verticalAlign="top">
+                <ListTable.Cell valign="top">
                   <AnnotationCommentsChip annotations={row.annotations} traceId={row.traceId} />
-                </Table.Cell>
+                </ListTable.Cell>
               )}
               {shown.has("suggestions") && (
-                <Table.Cell verticalAlign="top">
+                <ListTable.Cell valign="top">
                   <AnnotationSuggestionsChip annotations={row.annotations} traceId={row.traceId} />
-                </Table.Cell>
+                </ListTable.Cell>
               )}
               {activeScoreTypes
                 .filter((scoreType) => shown.has(scoreColumnId(scoreType.id)))
                 .map((scoreType) => (
-                  <Table.Cell key={scoreType.id} verticalAlign="top">
+                  <ListTable.Cell key={scoreType.id} valign="top">
                     <ScoreCell annotations={row.annotations} scoreTypeId={scoreType.id} />
-                  </Table.Cell>
+                  </ListTable.Cell>
                 ))}
-              <Table.Cell verticalAlign="top">
+              <ListTable.ActionCell>
                 <RowActions
                   row={row}
                   onViewTrace={onViewTrace}
                   onAddToDataset={onAddToDataset}
                   onRemoveFromQueue={onRemoveFromQueue}
                 />
-              </Table.Cell>
-            </Table.Row>
+              </ListTable.ActionCell>
+            </ListTable.Row>
           );
 
           return renderRowContext ? renderRowContext(row, rowElement) : rowElement;
         })}
-      </Table.Body>
+      </ListTable.Body>
     </>
-  );
-}
-
-function SelectCheckbox({
-  ariaLabel,
-  checked,
-  onToggle,
-}: {
-  ariaLabel: string;
-  checked: boolean | "indeterminate";
-  onToggle: () => void;
-}) {
-  // The cell's click stays here: ticking a row selects it, never opens it.
-  return (
-    <Box onClick={(event) => event.stopPropagation()}>
-      <Checkbox
-        size="sm"
-        checked={checked}
-        onCheckedChange={onToggle}
-        inputProps={{ "aria-label": ariaLabel }}
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        minHeight="32px"
-        paddingX={2}
-        cursor="pointer"
-      />
-    </Box>
   );
 }
 
@@ -343,7 +300,7 @@ function RowActions({
           size="sm"
           onClick={(event) => event.stopPropagation()}
         >
-          <MoreVertical size={16} />
+          <MoreVerticalIcon size={16} />
         </IconButton>
       </Menu.Trigger>
       <Menu.Content>
@@ -423,37 +380,5 @@ function annotatorNames(annotations: AnnotationWithUser[]): string[] {
         .map((annotation) => annotation.user?.name)
         .filter((name): name is string => !!name),
     ),
-  );
-}
-
-export function AnnotationTableSkeleton() {
-  return (
-    <Box flex={1} minWidth={0} overflow="auto" paddingX={6} paddingTop={6}>
-      <Table.Root variant="line" width="full">
-        <Table.Header>
-          <Table.Row>
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Table.ColumnHeader key={index}>
-                <Skeleton height="20px" width="100px" />
-              </Table.ColumnHeader>
-            ))}
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {Array.from({ length: 5 }).map((_, rowIndex) => (
-            <Table.Row key={rowIndex}>
-              {Array.from({ length: 6 }).map((_, columnIndex) => (
-                <Table.Cell key={columnIndex}>
-                  <Skeleton
-                    height="20px"
-                    width={columnIndex === 2 || columnIndex === 3 ? "200px" : "100px"}
-                  />
-                </Table.Cell>
-              ))}
-            </Table.Row>
-          ))}
-        </Table.Body>
-      </Table.Root>
-    </Box>
   );
 }
