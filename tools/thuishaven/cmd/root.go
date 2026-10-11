@@ -899,6 +899,7 @@ func runUpAttached(ctx context.Context, d deps, rest []string) error {
 	if err != nil {
 		return err
 	}
+	defer claimBootWait(ctx, d, st.slug)()
 	logDir, _ := domain.StackLogPaths(d.worktree, st.slug)
 	if err := runUpViewer(ctx, viewerTarget{slug: st.slug, logPath: st.logPath, logDir: logDir, session: d.sessionActions(st.slug)}, preferredGroup(rest)); err != nil {
 		return err

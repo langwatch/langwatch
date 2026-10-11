@@ -44,6 +44,9 @@ type MemStat struct {
 	CompressedBytes uint64
 	SwapUsedBytes   uint64
 	SwapTotalBytes  uint64
+	// AvailableBytes is free, inactive and speculative pages: what the machine
+	// can hand out without paging. Zero when unread.
+	AvailableBytes uint64
 }
 
 // Pressure thresholds, as fractions. Picked from what was observed on a
@@ -187,6 +190,9 @@ type PressureRecord struct {
 	Version   int       `json:"version"`
 	Level     string    `json:"level"`
 	WrittenAt time.Time `json:"writtenAt"`
+	// Capacity is the idle-headroom tier (domain/capacity.go); an older daemon
+	// leaves it empty, which readers treat as no reading.
+	Capacity CapacityReading `json:"capacity,omitzero"`
 }
 
 // PressureRecordVersion is the current record shape. A reader that does not

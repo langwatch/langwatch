@@ -297,6 +297,13 @@ var baseTable = []commandSpec{
 			ctx, unwatch := watchLaunchingGroup(ctx)
 			defer unwatch()
 			d.opts.IsForegroundClient = !isSessionLeader()
+			// The boot's own runs (HAVEN_BOOT) and, when someone is attached, the
+			// wait on it: domain.ResolveCapacity gives that boot the cores first.
+			slug := d.resolvedStack()
+			_ = os.Setenv("HAVEN_BOOT", slug)
+			if d.opts.IsForegroundClient {
+				defer claimBootWait(ctx, d, slug)()
+			}
 			if err := d.orch.Up(ctx, d.params, d.opts); err != nil {
 				return err
 			}

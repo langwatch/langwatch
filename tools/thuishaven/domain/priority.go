@@ -137,11 +137,21 @@ type WaiterState struct {
 	Caller          CallerKind
 	Waited          time.Duration
 	OverrideHonored bool
+	// Blocked marks a run that is part of a boot someone is waiting on.
+	Blocked bool
 }
+
+// BlockedPriorityBonus lifts a run someone is blocked on above anything that
+// is not: more than a person's rank plus full aging plus an honored claim.
+const BlockedPriorityBonus = 5 * classPriorityStep
 
 // Priority is this waiter's own effective priority right now.
 func (w WaiterState) Priority() int {
-	return EffectivePriority(w.Caller, w.Waited, w.OverrideHonored)
+	p := EffectivePriority(w.Caller, w.Waited, w.OverrideHonored)
+	if w.Blocked {
+		p += BlockedPriorityBonus
+	}
+	return p
 }
 
 // ShouldYield reports that some other currently-queued waiter has a

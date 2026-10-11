@@ -564,6 +564,8 @@ type WaiterClaim struct {
 	AgentID         string            `json:"agentId,omitempty"`
 	QueuedAt        time.Time         `json:"queuedAt"`
 	OverrideHonored bool              `json:"overrideHonored,omitempty"`
+	// Blocked marks a run that is part of a boot someone is waiting on.
+	Blocked bool `json:"blocked,omitempty"`
 	// Class, Units and Worktree name what the run will take of the unit budget.
 	Class    string `json:"class,omitempty"`
 	Units    int    `json:"units,omitempty"`

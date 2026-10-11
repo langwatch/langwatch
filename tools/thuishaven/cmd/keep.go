@@ -25,6 +25,9 @@ func runKeep(ctx context.Context, d deps, inv invocation) error {
 		return err
 	}
 	app.ApplyPlanEnv(plan)
+	// The keeper boots the stack: its runs count as that boot's own work while
+	// someone waits on it (domain.ResolveCapacity).
+	_ = os.Setenv("HAVEN_BOOT", inv.args[0])
 	return d.orch.Keep(ctx, inv.args[0], plan)
 }
 

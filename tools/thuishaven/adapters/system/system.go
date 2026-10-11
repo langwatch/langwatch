@@ -254,6 +254,9 @@ func (s System) MemStat() domain.MemStat {
 		if pageSize, occupied, ok := domain.ParseVMStat(string(out)); ok {
 			m.CompressedBytes = occupied * pageSize
 		}
+		if available, ok := domain.ParseVMStatAvailable(string(out)); ok {
+			m.AvailableBytes = available
+		}
 	}
 	if out, err := probe("sysctl", "-n", "vm.swapusage"); err == nil {
 		if used, total, ok := domain.ParseSwapUsage(string(out)); ok {
@@ -262,6 +265,10 @@ func (s System) MemStat() domain.MemStat {
 	}
 	return m
 }
+
+// LoadAverage is the 1-minute load average, or -1 when unreadable: a sysctl
+// on macOS, /proc/loadavg on Linux, no process spawned either way.
+func (System) LoadAverage() float64 { return loadAverage() }
 
 // probeTimeout bounds every external command the governor shells out to.
 //

@@ -257,6 +257,9 @@ type System interface {
 	// occupancy and swap, which unlike summed RSS do not double-count shared
 	// pages. An unreadable signal stays zero and classifies green (ADR-090).
 	MemStat() domain.MemStat
+	// LoadAverage is the 1-minute load average, -1 when unreadable; with
+	// MemStat it is the sample the capacity tier is read from.
+	LoadAverage() float64
 	// DemoteGroup moves a process group into the throttled background band, and
 	// RestoreGroup moves it back. The group, not the launcher: the policy is
 	// inherited only by processes forked after it is set, so a tree that is

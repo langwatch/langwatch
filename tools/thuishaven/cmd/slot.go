@@ -57,9 +57,10 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		reportGateOffIgnored(env)
 		pressure := resolveSlotPressure()
 		slots, source := resolveSlotLimit(pressure, env)
-		units, unitSource := resolveSlotUnits(pressure, env)
+		capacity := resolveSlotCapacity(pressure, env, fileregistry.New(havenHome()))
 		fmt.Printf("slots=%d source=%s\n", slots, source)
-		fmt.Printf("units=%d source=%s\n", units, unitSource)
+		fmt.Printf("units=%d source=%s\n", capacity.Units, capacity.Source)
+		fmt.Printf("capacity=%s\n", capacity.Describe())
 		fmt.Printf("pressure=%s\n", pressure)
 		fmt.Printf("gomemlimit=%s\n", domain.CheckGoMemLimit(system.New().TotalMemory(), os.Getenv("GOMEMLIMIT"), pressure))
 		fmt.Printf("gomaxprocs=%s (a check; a run gets its units)\n", domain.CheckGoMaxProcs(domain.SlotWeight(domain.ClassCheck, ""), os.Getenv("GOMAXPROCS")))
@@ -204,16 +205,32 @@ func explainUnitHolders(sem *semaphore.Semaphore) {
 	}
 }
 
-// resolveSlotUnits is the unit budget `slot run` takes its weight from.
-func resolveSlotUnits(pressure domain.Pressure, env domain.CheckEnv) (int, string) {
-	return domain.ResolveCheckUnits(
-		domain.CheckMachine{
-			TotalRAMBytes: system.New().TotalMemory(),
-			NumCPU:        runtime.NumCPU(),
-			Pressure:      pressure,
-		},
-		env,
-	)
+// resolveSlotCapacity is the budget `slot run` is admitted against: the
+// pressure budget, reshaped by the daemon's capacity tier (measured here when
+// no daemon published one) and by any boot someone is waiting on.
+func resolveSlotCapacity(pressure domain.Pressure, env domain.CheckEnv, boots bootWaiters) domain.Capacity {
+	sys := system.New()
+	rec, ok := fileregistry.New(havenHome()).ReadPressure()
+	reading, fresh := domain.ReadCapacity(rec, ok, time.Now())
+	if !fresh {
+		reading = domain.MeasureCapacity(domain.CapacityNormal, domain.SampleLoad(sys.LoadAverage(), runtime.NumCPU(), sys.MemStat()))
+	}
+	var stacks []string
+	if boots != nil {
+		for _, w := range boots.WaiterSnapshots(domain.BootWaitName) {
+			stacks = append(stacks, w.Command)
+		}
+	}
+	waited, own := domain.BootsWaitedOn(stacks, os.Getenv("HAVEN_BOOT"))
+	return domain.ResolveCapacity(domain.CapacityRequest{
+		Machine: domain.CheckMachine{TotalRAMBytes: sys.TotalMemory(), NumCPU: runtime.NumCPU(), Pressure: pressure},
+		Env:     env, Reading: reading, BootsWaited: waited, BootWork: own,
+	})
+}
+
+// bootWaiters is the slice of the registry the capacity reads boot claims from.
+type bootWaiters interface {
+	WaiterSnapshots(name string) []fileregistry.WaiterSnapshot
 }
 
 // slotWorktree names the checkout a run came from without spawning git: the
@@ -458,6 +475,8 @@ type slotJob struct {
 
 	budget    int // the machine's units; zero means the gate is off
 	units     int // the units this run takes
+	capacity  domain.Capacity
+	resolved  time.Time // when capacity was last resolved
 	queuedAt  time.Time
 	announced bool
 	lastBeat  time.Time
@@ -472,13 +491,10 @@ func (j *slotJob) run(ctx context.Context) int {
 	if j.class == "" {
 		j.class = domain.ClassCheck
 	}
-	j.budget, _ = resolveSlotUnits(j.pressure, slotCheckEnv())
-	j.units = domain.SlotWeight(j.class, os.Getenv("VITEST_MAX_WORKERS"))
+	j.resolveCapacity()
 	if j.budget <= 0 {
 		return slotExec(ctx, j.argv, j.runEnv())
 	}
-	// A weight over a pressured budget takes the whole budget, or it would wait forever.
-	j.units = min(j.units, j.budget)
 	j.queuedAt = time.Now()
 	release, canceled := j.wait(ctx)
 	if canceled {
@@ -496,6 +512,24 @@ func (j *slotJob) run(ctx context.Context) int {
 	}
 	return code
 }
+
+// resolveCapacity sets the budget and this run's units from the capacity now.
+// A registry that is not the file store (a test fake) sees no boot claims.
+func (j *slotJob) resolveCapacity() {
+	boots, _ := j.registry.(bootWaiters)
+	j.capacity = resolveSlotCapacity(j.pressure, slotCheckEnv(), boots)
+	j.resolved = time.Now()
+	j.budget = j.capacity.Units
+	// A weight over a pressured budget takes the whole budget, or it would wait forever.
+	j.units = j.capacity.RunUnits(j.class, os.Getenv("VITEST_MAX_WORKERS"))
+	if j.budget > 0 {
+		j.units = min(j.units, j.budget)
+	}
+}
+
+// capacityRefresh is how often a queued run re-reads the capacity, so a boot
+// that became ready or a machine that went quiet applies at its admission.
+const capacityRefresh = time.Second
 
 // claimHolder lets queued runs name this one while it holds the slot. A nil
 // registry or a write error degrades to staying anonymous.
@@ -546,6 +580,9 @@ func (j *slotJob) wait(ctx context.Context) (release func(), canceled bool) {
 			return nil, false
 		}
 		j.report(waited)
+		if time.Since(j.resolved) >= capacityRefresh {
+			j.resolveCapacity()
+		}
 		select {
 		case <-ctx.Done():
 			return nil, true
@@ -596,6 +633,7 @@ func (j *slotJob) registerWaiter() func() {
 		AgentID:         j.agentID,
 		QueuedAt:        j.queuedAt,
 		OverrideHonored: j.overrideHonored,
+		Blocked:         j.capacity.BootWork,
 		Class:           string(j.class),
 		Units:           j.units,
 		Worktree:        j.worktree,
@@ -615,14 +653,14 @@ func (j *slotJob) shouldYieldToHigherPriority() bool {
 		return false
 	}
 	now := time.Now()
-	self := domain.WaiterState{Caller: j.caller, Waited: now.Sub(j.queuedAt), OverrideHonored: j.overrideHonored}
+	self := domain.WaiterState{Caller: j.caller, Waited: now.Sub(j.queuedAt), OverrideHonored: j.overrideHonored, Blocked: j.capacity.BootWork}
 	pid := os.Getpid()
 	var others []domain.WaiterState
 	for _, w := range j.registry.WaiterSnapshots(checkSlotName) {
 		if w.PID == pid {
 			continue
 		}
-		others = append(others, domain.WaiterState{Caller: w.Caller, Waited: now.Sub(w.QueuedAt), OverrideHonored: w.OverrideHonored})
+		others = append(others, domain.WaiterState{Caller: w.Caller, Waited: now.Sub(w.QueuedAt), OverrideHonored: w.OverrideHonored, Blocked: w.Blocked})
 	}
 	return domain.WaitBehind(self, others)
 }
@@ -635,8 +673,8 @@ func (j *slotJob) report(waited time.Duration) {
 		j.lastBeat = time.Now()
 		checks := max(1, j.budget/2)
 		fmt.Fprintf(j.progress,
-			"checks: %d units are already active on this machine (limit %d, %d units; set CHECK_SLOTS to change). %s queued, waiting for %d units\n",
-			j.budget, checks, j.budget, j.label, j.units)
+			"checks: %d units are already active on this machine (limit %d, %d units; %s; set CHECK_SLOTS to change). %s queued, waiting for %d units\n",
+			j.budget, checks, j.budget, j.capacity.Describe(), j.label, j.units)
 		return
 	}
 	beat := j.heartbeat
@@ -701,7 +739,7 @@ func (j *slotJob) activeNote() string {
 func slotExec(ctx context.Context, argv []string, run slotRunEnv) int {
 	// The whole command is the caller's own argv — this is a process wrapper,
 	// running exactly what it was asked to run, as the same user.
-	spawn := agentQoSArgv(runtime.GOOS, os.Getenv, argv)
+	spawn := agentBandArgv(qosEnv{goos: runtime.GOOS, getenv: os.Getenv}, argv, run.band)
 	cmd := exec.CommandContext(ctx, spawn[0], spawn[1:]...) //nolint:gosec // G204: wrapper runs the caller's own command
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	cmd.Env = append(os.Environ(),
@@ -732,14 +770,29 @@ func slotExec(ctx context.Context, argv []string, run slotRunEnv) int {
 // band; a person's shell is never clamped. A command that is not found stays
 // bare, so the run still fails with 127.
 func agentQoSArgv(goos string, getenv func(string) string, argv []string) []string {
-	if goos != "darwin" || (getenv("CLAUDECODE") == "" && getenv("HAVEN_AGENT_ID") == "") {
+	return agentBandArgv(qosEnv{goos: goos, getenv: getenv}, argv, domain.BandUtility)
+}
+
+// qosEnv is where a spawn's band is decided: the OS and the environment.
+type qosEnv struct {
+	goos   string
+	getenv func(string) string
+}
+
+// agentBandArgv is agentQoSArgv for a band the capacity chose: behind a boot
+// someone waits on, `taskpolicy -b`; a waited-on boot's own run, no clamp.
+func agentBandArgv(env qosEnv, argv []string, band domain.RunBand) []string {
+	if band == domain.BandDefault || env.goos != "darwin" || (env.getenv("CLAUDECODE") == "" && env.getenv("HAVEN_AGENT_ID") == "") {
 		return argv
 	}
-	if qos := strings.ToLower(strings.TrimSpace(getenv("HAVEN_AGENT_QOS"))); qos != "" && qos != "utility" {
+	if qos := strings.ToLower(strings.TrimSpace(env.getenv("HAVEN_AGENT_QOS"))); qos != "" && qos != "utility" {
 		return argv
 	}
 	if _, err := exec.LookPath(argv[0]); err != nil {
 		return argv
+	}
+	if band == domain.BandBackground {
+		return append([]string{"/usr/sbin/taskpolicy", "-b"}, argv...)
 	}
 	return append([]string{"/usr/sbin/taskpolicy", "-c", "utility"}, argv...)
 }
@@ -911,10 +964,11 @@ type slotRunEnv struct {
 	pressure domain.Pressure
 	class    domain.SlotClass
 	units    int
+	band     domain.RunBand // empty reads as utility
 }
 
 func (j *slotJob) runEnv() slotRunEnv {
-	return slotRunEnv{pressure: j.pressure, class: j.class, units: j.units}
+	return slotRunEnv{pressure: j.pressure, class: j.class, units: j.units, band: j.capacity.AgentBand()}
 }
 
 // startedAt is when the run took its units, fixed once so every claim agrees.

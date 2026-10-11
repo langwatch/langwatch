@@ -141,12 +141,37 @@ func (o *Orchestrator) takeHeavySlot(ctx context.Context, w waiter) (time.Durati
 
 // checkUnits is the machine's check budget in core units, the one counter
 // `haven machine slot run` shares (D1, dev/docs/plans/haven-exec-policy.md).
-func (o *Orchestrator) checkUnits() int {
-	pressure := domain.ResolveCheckPressure(o.cfg.CheckPressure, domain.ClassifyPressure(o.sys.MemStat()), o.cfg.CheckEnv.CI)
-	units, _ := domain.ResolveCheckUnits(domain.CheckMachine{
-		TotalRAMBytes: o.sys.TotalMemory(), NumCPU: runtime.NumCPU(), Pressure: pressure,
-	}, o.cfg.CheckEnv)
-	return units
+func (o *Orchestrator) checkUnits() int { return o.checkCapacity().Units }
+
+// checkCapacity is the budget a run is admitted against now and why: the
+// pressure budget, grown on a quiet machine, halved behind a waited-on boot.
+func (o *Orchestrator) checkCapacity() domain.Capacity {
+	mem := o.sys.MemStat()
+	pressure := domain.ResolveCheckPressure(o.cfg.CheckPressure, domain.ClassifyPressure(mem), o.cfg.CheckEnv.CI)
+	return o.capacityAt(pressure, mem)
+}
+
+// capacityAt resolves the capacity for a pressure level already settled: the
+// daemon's published tier when fresh, else this sample stepped from normal.
+func (o *Orchestrator) capacityAt(pressure domain.Pressure, mem domain.MemStat) domain.Capacity {
+	var reading domain.CapacityReading
+	fresh := false
+	var stacks []string
+	if o.store != nil {
+		rec, ok := o.store.ReadPressure()
+		reading, fresh = domain.ReadCapacity(rec, ok, o.sys.Now())
+		for _, claim := range o.store.WaiterClaims(domain.BootWaitName) {
+			stacks = append(stacks, claim.Label)
+		}
+	}
+	if !fresh {
+		reading = domain.MeasureCapacity(domain.CapacityNormal, domain.SampleLoad(o.sys.LoadAverage(), runtime.NumCPU(), mem))
+	}
+	boots, _ := domain.BootsWaitedOn(stacks, "")
+	return domain.ResolveCapacity(domain.CapacityRequest{
+		Machine: domain.CheckMachine{TotalRAMBytes: o.sys.TotalMemory(), NumCPU: runtime.NumCPU(), Pressure: pressure},
+		Env:     o.cfg.CheckEnv, Reading: reading, BootsWaited: boots,
+	})
 }
 
 // checkSlots is how many two-unit checks the budget holds; zero is the gate off.
@@ -191,7 +216,8 @@ func (o *Orchestrator) acquireCheckSlot(ctx context.Context, ceiling time.Durati
 	if err := ctx.Err(); err != nil {
 		return 0, false, noRelease, err
 	}
-	units := o.checkUnits()
+	capacity := o.checkCapacity()
+	units := capacity.Units
 	if units == 0 {
 		return 0, false, noRelease, nil
 	}
@@ -211,7 +237,7 @@ func (o *Orchestrator) acquireCheckSlot(ctx context.Context, ceiling time.Durati
 		case <-done:
 		case <-timer.C:
 			queued.Store(true)
-			fmt.Fprintf(os.Stderr, "haven: waiting for a shared check slot (limit %d units)\n", units)
+			fmt.Fprintf(os.Stderr, "haven: waiting for a shared check slot (%s)\n", capacity.Describe())
 		}
 	}()
 	release, err := o.acquireUnits(waitCtx, units, o.checkClaim(domain.ClassCheck, "haven gate"))
