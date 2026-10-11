@@ -3,6 +3,7 @@ import {
   sanitizeAutomationFilters,
 } from "@langwatch/automation-contract";
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import {
   Badge,
@@ -297,32 +298,26 @@ function SeriesPickerField({
  *  (also the #6716 template case). The link opens a new tab so the draft stays as left. */
 function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
   return (
-    <VStack
-      align="start"
-      gap={2}
-      padding={3}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      bg="bg.subtle"
-    >
-      <Text textStyle="sm">
-        This project doesn{"'"}t have a custom graph yet. An automation watches a metric on one, so
-        create a graph first, then come back here to pick it.
-      </Text>
-      {projectSlug ? (
-        <>
-          <Button asChild size="xs" variant="outline">
-            <Link href={`/${projectSlug}/analytics/custom`} isExternal>
-              <Plus size={13} /> Create a custom graph
-            </Link>
-          </Button>
-          <Text textStyle="2xs" color="fg.muted">
-            Opens in a new tab, so this automation stays exactly as you left it.
-          </Text>
-        </>
-      ) : null}
-    </VStack>
+    <Card variant="nested" tone="neutral" padding="sm">
+      <VStack align="start" gap={2}>
+        <Text textStyle="sm">
+          This project doesn{"'"}t have a custom graph yet. An automation watches a metric on one,
+          so create a graph first, then come back here to pick it.
+        </Text>
+        {projectSlug ? (
+          <>
+            <Button asChild size="xs" variant="outline">
+              <Link href={`/${projectSlug}/analytics/custom`} isExternal>
+                <Plus size={13} /> Create a custom graph
+              </Link>
+            </Button>
+            <Text textStyle="2xs" color="fg.muted">
+              Opens in a new tab, so this automation stays exactly as you left it.
+            </Text>
+          </>
+        ) : null}
+      </VStack>
+    </Card>
   );
 }
 
@@ -849,7 +844,7 @@ function TracePreview({
       ? estimateFiringRate({ matchesLast7Days: totalHits, cadence, canBatch })
       : "in the last 7 days";
   return (
-    <Box borderWidth="1px" borderColor="border" borderRadius="md" overflow="hidden" bg="bg.subtle">
+    <Card variant="nested" tone="neutral" padding="none">
       <HStack
         gap={2}
         align="baseline"
@@ -885,7 +880,7 @@ function TracePreview({
           ))}
         </VStack>
       ) : null}
-    </Box>
+    </Card>
   );
 }
 

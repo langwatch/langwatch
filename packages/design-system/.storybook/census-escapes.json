@@ -5523,5 +5523,37 @@
     "reason": "Kept as today: an illustration row or accent-banded shortcut tile (R11h review).",
     "owner": "trace",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/features/authoring/ui/blocks/dataset-selector.tsx",
+    "rule": "card-box",
+    "line": 44,
+    "reason": "Not a plain card: an input-shaped placeholder, a lockable option button, a segmented toggle or the delivery picker whose border turns green when set up (R4w1 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/features/authoring/ui/elements/source-card.tsx",
+    "rule": "card-box",
+    "line": 32,
+    "reason": "Not a plain card: an input-shaped placeholder, a lockable option button, a segmented toggle or the delivery picker whose border turns green when set up (R4w1 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/features/authoring/ui/sections/delivery-picker.tsx",
+    "rule": "card-box",
+    "line": 107,
+    "reason": "Not a plain card: an input-shaped placeholder, a lockable option button, a segmented toggle or the delivery picker whose border turns green when set up (R4w1 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/automation/browser/src/features/authoring/ui/sections/subject-section.tsx",
+    "rule": "card-box",
+    "line": 743,
+    "reason": "Not a plain card: an input-shaped placeholder, a lockable option button, a segmented toggle or the delivery picker whose border turns green when set up (R4w1 review).",
+    "owner": "automation",
+    "disposition": "reviewed"
   }
 ]
