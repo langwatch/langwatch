@@ -47,6 +47,14 @@ describe("the chart frame document", () => {
     });
   });
 
+  describe("when its canvas is read", () => {
+    it("paints the body with the supplied card background so a dark theme has no white canvas", () => {
+      const document = buildChartFrameDocument();
+
+      expect(document).toContain("background: var(--chakra-colors-bg-card)");
+    });
+  });
+
   describe("when the libraries it loads are read", () => {
     const document = buildChartFrameDocument({ nonce: "abc" });
 

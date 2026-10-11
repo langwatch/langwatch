@@ -61,6 +61,7 @@ export function buildChartFrameDocument(options: { nonce?: string } = {}): strin
     "  body {",
     "    margin: 0; padding: 8px; box-sizing: border-box;",
     "    font-family: system-ui, sans-serif; font-size: 13px; color: var(--chakra-colors-fg);",
+    "    background: var(--chakra-colors-bg-card);",
     "  }",
     // The widget's root fills whatever height the parent gave the iframe —
     // a widget wraps its own layout in height: 100% (and, for a chart,

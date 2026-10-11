@@ -155,7 +155,11 @@ export function SandboxedChartFrame({
   // Push dashboard context updates into the live frame without re-mounting it.
   useEffect(() => {
     initialDashboardContextRef.current = dashboardContext;
-    bridgeRef.current?.postDashboardContextChange(withThemeColors(dashboardContext));
+    // The theme's classes land after this commit; read the colours once they have.
+    const frame = requestAnimationFrame(() => {
+      bridgeRef.current?.postDashboardContextChange(withThemeColors(dashboardContext));
+    });
+    return () => cancelAnimationFrame(frame);
   }, [dashboardContext]);
 
   if (restart.status !== "running") {
