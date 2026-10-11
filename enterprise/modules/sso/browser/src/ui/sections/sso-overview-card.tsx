@@ -6,7 +6,9 @@ import { UpgradeRequired } from "@langwatch/design-system/access-state";
  * read, or what a connection would do before there is one. Declared through
  * `withCapabilities`. Spec: specs/identity/organization-authentication-settings.feature
  */
-import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { OverviewCard, OverviewDetail, StatusChip } from "@langwatch/design-system/settings-card";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { ArrowRight, ExternalLink, RefreshCw, Settings2 } from "lucide-react";
@@ -100,9 +102,11 @@ function DomainsDetail({ view, canManage }: { view: SsoSetupPageView; canManage:
     <OverviewDetail label="Domains">
       <VStack align="start" gap={2}>
         {rows.length === 0 ? (
-          <Text color="fg.muted" data-testid="domains-empty">
-            No domain has been claimed yet.
-          </Text>
+          <NoDataInfoBlock
+            size="line"
+            title="No domain has been claimed yet."
+            testId="domains-empty"
+          />
         ) : (
           <HStack gap={1} flexWrap="wrap">
             {rows.map((row) => {
@@ -249,13 +253,7 @@ function UpdateNotice({
   if (connection.source !== "legacy-grandfathered") return null;
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.emphasized"
-      borderRadius="md"
-      padding={3}
-      data-testid="sso-update-notice"
-    >
+    <Card variant="nested" data-testid="sso-update-notice">
       <VStack align="stretch" gap={2}>
         <Text textStyle="bodySm" color="fg.muted">
           {canManage
@@ -271,7 +269,7 @@ function UpdateNotice({
           </Button>
         )}
       </VStack>
-    </Box>
+    </Card>
   );
 }
 

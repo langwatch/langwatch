@@ -9,6 +9,7 @@
  * form arrives one act at a time — pick who, give their console our
  * addresses, bring back what it hands you.
  */
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Button,
   Field,
@@ -131,10 +132,11 @@ export function RegisterConnectionSection({
 
   if (!canManage) {
     return (
-      <Text color="fg.muted" fontSize="sm" data-testid="sso-register-unavailable">
-        No identity provider is registered for this organization yet. An organization administrator
-        can set one up here.
-      </Text>
+      <NoDataInfoBlock
+        size="line"
+        title="No identity provider is registered for this organization yet. An organization administrator can set one up here."
+        testId="sso-register-unavailable"
+      />
     );
   }
 

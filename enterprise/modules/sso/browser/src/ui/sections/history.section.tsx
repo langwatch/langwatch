@@ -6,13 +6,14 @@
  * edit would not be one. Every word comes from the server, so no reader ever
  * meets an internal event name.
  */
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant, toDate, Temporal } from "@langwatch/time";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
 import { useHistoryActivity } from "../../behavior/use-history-activity.ts";
 import { groupHistoryByDay, type HistoryDayEntry } from "../../model/history-days.ts";
-import { SettingsCard } from "../elements/settings-card.tsx";
 
 /**
  * `tabular-nums` with two-digit fields fixes both the character count and
@@ -43,10 +44,12 @@ export function HistorySection({
   const days = groupHistoryByDay({ entries: rows, nowMs: nowInstant().epochMilliseconds });
 
   return (
-    <SettingsCard
+    <Card
+      padding="lg"
+      bodyLayout="spaced"
       title="Event log"
-      hint="What happened to this connection, newest first."
-      testId="connection-history"
+      description="What happened to this connection, newest first."
+      data-testid="connection-history"
     >
       {history.isLoading && <Skeleton height="16px" width="60%" />}
 
@@ -60,9 +63,7 @@ export function HistorySection({
       )}
 
       {!history.isLoading && !history.isError && rows.length === 0 && (
-        <Text fontSize="xs" color="fg.muted">
-          Nothing has happened to this connection yet.
-        </Text>
+        <NoDataInfoBlock size="line" title="Nothing has happened to this connection yet." />
       )}
 
       <VStack align="stretch" gap={3}>
@@ -89,7 +90,7 @@ export function HistorySection({
           </Box>
         ))}
       </VStack>
-    </SettingsCard>
+    </Card>
   );
 }
 

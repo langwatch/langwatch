@@ -5,10 +5,10 @@
  * finished step keeps its answer and loses its workspace. Which step is in
  * which state is `model/setup-progress.ts`'s decision, never this file's.
  */
+import { Card } from "@langwatch/design-system/card";
 import {
   Badge,
   Box,
-  Card,
   Collapsible,
   HStack,
   Heading,
@@ -39,11 +39,11 @@ const BODY_INDENT = PADDING_X + MARKER + MARKER_GAP;
 /** The joined column the steps are rows of. */
 export function SetupSteps({ children }: { children: ReactNode }) {
   return (
-    <Card.Root borderRadius="xl" overflow="hidden">
+    <Card padding="none">
       <VStack align="stretch" gap={0}>
         {children}
       </VStack>
-    </Card.Root>
+    </Card>
   );
 }
 

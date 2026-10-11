@@ -6,6 +6,7 @@
  * and needs these values to do it. A form that only asked questions would
  * send them away to guess, and what they would guess is ours.
  */
+import { Card } from "@langwatch/design-system/card";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { SsoConnectionType } from "@langwatch/identity-contract";
@@ -16,7 +17,6 @@ import {
   type ServiceProviderAddresses,
 } from "../../model/service-provider-rows.ts";
 import { CopyValueRow } from "../elements/copy-value-row.tsx";
-import { SettingsCard } from "../elements/settings-card.tsx";
 
 export function ServiceProviderSection({
   protocol,
@@ -36,7 +36,12 @@ export function ServiceProviderSection({
   const one = rows.length === 1;
 
   return (
-    <SettingsCard title="Set LangWatch up in your identity provider" testId="service-provider">
+    <Card
+      padding="lg"
+      bodyLayout="spaced"
+      title="Set LangWatch up in your identity provider"
+      data-testid="service-provider"
+    >
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
         {one
           ? "Create an application there and give it this address. It is ours and it does not change."
@@ -62,6 +67,6 @@ export function ServiceProviderSection({
           in your identity provider, register both addresses there.
         </Text>
       )}
-    </SettingsCard>
+    </Card>
   );
 }
