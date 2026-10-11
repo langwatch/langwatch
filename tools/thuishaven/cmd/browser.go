@@ -494,7 +494,8 @@ func browserStack(d deps, inv invocation, slug string) (map[string]any, error) {
 	appLog := appLogPath(d.orch.LogDir(slug))
 	if appURL == "" {
 		// `haven up --only docs`: no app to wait on, so the docs host stands in for it.
-		appURL, appLog = d.orch.DocsOnlyURL(authParams(d, inv)), ""
+		run, _ := d.orch.DocsOnly(authParams(d, inv))
+		appURL, appLog = run.URL, ""
 	}
 	if appURL == "" {
 		return nil, errors.New("this worktree has no running stack; run haven up --agent -d (or haven up --only docs)")

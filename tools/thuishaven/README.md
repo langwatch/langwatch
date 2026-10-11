@@ -70,9 +70,12 @@ Three more are there only when the worktree asked for them (`haven up
 | `docs.<slug>.langwatch.localhost`          | The docs site on its Vite dev server (`+docs`), hot reloading |
 
 `haven up --only docs` runs the docs site alone, with no stack at all (no app, api, worker,
-databases, migrations or simulators): the route and the Vite dev server, in the foreground
-until stopped, the way `haven sim idp` runs the IdP alone. `haven browser open` reaches it
-with no app to wait on. A running stack refuses it; use `haven up +docs` there.
+databases, migrations or simulators): the route and the Vite dev server, the way `haven sim
+idp` runs the IdP alone. `-d` backgrounds it like `haven up -d`; `haven logs docs [-f]` reads
+its capture, `haven status` reports it (`docsOnly` in JSON) and `haven down` stops it.
+`haven browser open` reaches it with no app to wait on; a browser first started this way keeps
+the docs host as its base until `haven browser stop`. A running stack refuses it; use `haven
+up +docs` there.
 
 The design system answers to a shorter spelling too: `ds` stands in for
 `design-system`. The mail studio has no alias — its hostname is

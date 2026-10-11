@@ -333,6 +333,10 @@ var baseTable = []commandSpec{
 			if slug, err := d.orch.ResolveSlug(d.params); err == nil {
 				stopBrowser(slug)
 			}
+			if d.orch.StopDocsOnly(ctx, d.params) {
+				fmt.Println("stopped the docs running alone (haven up --only docs)")
+				return nil
+			}
 			return d.orch.Down(ctx, d.params, inv.has("--force"))
 		},
 	},

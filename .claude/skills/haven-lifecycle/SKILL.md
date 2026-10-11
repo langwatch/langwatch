@@ -30,7 +30,7 @@ haven up +langevals               # evaluators (monitors, evaluations)
 haven up +llm                     # zero-cost model answers (llmsim)
 haven up +design-system +mail-room  # the Storybook and the mail studio
 haven up +docs                    # the docs site (docs/site) on Vite, hot reloading, at docs.<slug>
-haven up --only docs              # the docs site ALONE: no app, databases or sims; foreground until stopped
+haven up --only docs --agent -d   # the docs site ALONE: no app, databases or sims; haven down stops it
 haven up --force                  # restart even when the stack already matches
 haven up --no-seed                # skip the auto-seed of an empty stack (haven-seed)
 haven up --mode <mode>            # a deployment mode from dev/tests/modes; sticky, `none` clears

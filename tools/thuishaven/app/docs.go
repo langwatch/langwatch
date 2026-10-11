@@ -7,24 +7,57 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // docsOnlyFile records a running `haven up --only docs` in the worktree's log
-// directory, so `haven browser` can open the docs with no stack overlay.
+// directory, so `haven browser`, `haven logs`, `haven status` and `haven down`
+// find the docs with no stack registered.
 const docsOnlyFile = "docs-only.json"
 
-type docsOnlyRun struct {
-	PID int    `json:"pid"`
-	URL string `json:"url"`
+// DocsOnlyRun is a live `haven up --only docs`: its launcher, its URL and the
+// directory its docs.log capture is in.
+type DocsOnlyRun struct {
+	PID    int    `json:"pid"`
+	URL    string `json:"url"`
+	LogDir string `json:"logDir"`
 }
 
 // RunDocsSolo runs only the docs site: no app, no API, no worker, no databases,
-// no simulators. Like RunIdPSolo it allocates a port, routes this worktree's
-// docs.<slug>.langwatch.localhost at it when the proxy is available (loopback
-// otherwise) and runs the dev server in the foreground until ctx ends.
+// no simulators. Like RunIdPSolo it allocates a port and routes this worktree's
+// docs.<slug>.langwatch.localhost at it (loopback without the proxy); the lane
+// is supervised and captured to docs.log, as in a stack, until ctx ends.
 func (o *Orchestrator) RunDocsSolo(ctx context.Context, p UpParams) error {
+	if err := o.DocsSoloRefusal(p); err != nil {
+		return err
+	}
+	slug, err := o.resolveSlug(p)
+	if err != nil {
+		return err
+	}
+	ports, err := o.sys.FreePorts(1)
+	if err != nil {
+		return fmt.Errorf("allocating a port for the docs site: %w", err)
+	}
+	port := ports[0]
+	logDir, _ := domain.StackLogPaths(p.WorktreeDir, slug)
+	docsURL, unroute := o.routeDocs(slug, port)
+	defer unroute()
+	defer o.recordDocsOnly(DocsOnlyRun{PID: o.sys.Getpid(), URL: docsURL, LogDir: logDir})()
+	fmt.Printf("  docs  %s\n", docsURL)
+	o.sup.Supervise(ctx, []Child{{
+		Name: domain.DocsService, Dir: p.WorktreeDir, Color: palette[4],
+		LogPath: filepath.Join(logDir, domain.DocsService+".log"),
+		Shell:   docsShell(port), Env: []string{domain.LaneEnv(domain.DocsService)},
+	}})
+	return nil
+}
+
+// DocsSoloRefusal is why `haven up --only docs` cannot start here, or nil: a
+// running stack (which takes +docs instead) or docs already running alone.
+func (o *Orchestrator) DocsSoloRefusal(p UpParams) error {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
 		return err
@@ -32,16 +65,10 @@ func (o *Orchestrator) RunDocsSolo(ctx context.Context, p UpParams) error {
 	if st, ok := o.stackBySlug(slug); ok && o.sys.ProcessAlive(st.LauncherPID) {
 		return errors.New("this worktree's stack is running; `haven up +docs` adds the docs to it, or `haven down` first")
 	}
-	ports, err := o.sys.FreePorts(1)
-	if err != nil {
-		return fmt.Errorf("allocating a port for the docs site: %w", err)
+	if run, ok := o.DocsOnly(p); ok {
+		return fmt.Errorf("the docs already run alone here (pid %d) at %s; `haven down` stops them", run.PID, run.URL)
 	}
-	port := ports[0]
-	docsURL, unroute := o.routeDocs(slug, port)
-	defer unroute()
-	defer o.recordDocsOnly(p.WorktreeDir, slug, docsURL)()
-	fmt.Printf("  docs  %s\n", docsURL)
-	return o.sup.RunOnce(ctx, domain.DocsService, p.WorktreeDir, docsShell(port), []string{domain.LaneEnv(domain.DocsService)})
+	return nil
 }
 
 // routeDocs routes docs.<slug> at port when the proxy is available and returns
@@ -64,28 +91,44 @@ func (o *Orchestrator) routeDocs(slug string, port int) (string, func()) {
 }
 
 // recordDocsOnly writes the docs-only record and returns its removal.
-func (o *Orchestrator) recordDocsOnly(worktreeDir, slug, docsURL string) func() {
-	logDir, _ := domain.StackLogPaths(worktreeDir, slug)
-	marker := filepath.Join(logDir, docsOnlyFile)
-	data, err := json.Marshal(docsOnlyRun{PID: o.sys.Getpid(), URL: docsURL})
-	if err != nil || os.MkdirAll(logDir, 0o750) != nil || os.WriteFile(marker, data, 0o600) != nil {
+func (o *Orchestrator) recordDocsOnly(run DocsOnlyRun) func() {
+	marker := filepath.Join(run.LogDir, docsOnlyFile)
+	data, err := json.Marshal(run)
+	if err != nil || os.MkdirAll(run.LogDir, 0o750) != nil || os.WriteFile(marker, data, 0o600) != nil {
 		return func() {}
 	}
 	return func() { _ = os.Remove(marker) }
 }
 
-// DocsOnlyURL is the docs URL of this worktree's live `haven up --only docs`,
-// or "" when none runs.
-func (o *Orchestrator) DocsOnlyURL(p UpParams) string {
+// DocsOnly is this worktree's live `haven up --only docs`, if one runs.
+func (o *Orchestrator) DocsOnly(p UpParams) (DocsOnlyRun, bool) {
 	slug, err := o.resolveSlug(p)
 	if err != nil {
-		return ""
+		return DocsOnlyRun{}, false
 	}
 	logDir, _ := domain.StackLogPaths(p.WorktreeDir, slug)
 	data, err := os.ReadFile(filepath.Join(logDir, docsOnlyFile))
-	var run docsOnlyRun
+	var run DocsOnlyRun
 	if err != nil || json.Unmarshal(data, &run) != nil || run.PID == 0 || !o.sys.ProcessAlive(run.PID) {
-		return ""
+		return DocsOnlyRun{}, false
 	}
-	return run.URL
+	return run, true
+}
+
+// StopDocsOnly stops this worktree's `haven up --only docs`, waiting a bounded
+// while for it to remove its route; it reports whether one was running.
+func (o *Orchestrator) StopDocsOnly(ctx context.Context, p UpParams) bool {
+	run, ok := o.DocsOnly(p)
+	if !ok {
+		return false
+	}
+	o.sys.Terminate(run.PID)
+	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline) && o.sys.ProcessAlive(run.PID); {
+		select {
+		case <-ctx.Done():
+			return true
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	return true
 }

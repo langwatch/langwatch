@@ -132,6 +132,9 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		return fmt.Errorf("--stack %q is not a valid stack slug", slug)
 	}
 	dir := d.orch.LogDir(slug)
+	if run, ok := d.orch.DocsOnly(d.params); ok && inv.value("--stack") == "" {
+		dir = run.LogDir // `haven up --only docs`: no stack is registered to name the directory
+	}
 
 	var since time.Time
 	if v := inv.value("--since"); v != "" {

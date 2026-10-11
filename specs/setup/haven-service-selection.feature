@@ -199,10 +199,12 @@ Feature: haven service selection
     # Writing docs needs none of the product: no app, api, worker, databases,
     # migrations or simulators. The docs run alone, the way "haven sim idp" does.
     Scenario: The docs site runs alone without the stack
-      When the developer runs "haven up --only docs"
-      Then only the docs site's dev server runs, in the foreground
-      And it is served at "docs.<slug>.langwatch.localhost" until it stops
+      When the developer runs "haven up --only docs -d"
+      Then only the docs site's dev server runs, in the background
+      And it is served at "docs.<slug>.langwatch.localhost"
+      And its output appears in "haven logs docs" and "haven status" reports it
       And "haven browser open" reaches it with no app to wait on
+      And "haven down" stops it and removes the route
       And a running stack refuses it, naming "haven up +docs"
 
     # Haven hands the ui lane the routed URL of the built Storybook, so the
