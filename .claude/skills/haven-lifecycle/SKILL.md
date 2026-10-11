@@ -115,3 +115,5 @@ Internal commands (hidden from help, spawned by haven, not for agents): `haven k
 keeper), `haven go-watch`, `haven simulator`, `haven static <lane> <dir> <port>` (serves a built bundle
 for `+design-system` and `+mail-room`). `haven hmr`, `haven git` and `haven play-launch` are deleted (ADR-064).
 See also: `haven-env` (`machine limits`), `haven-logs`, `troubleshooting.md` in `haven`.
+
+`haven reload` and `haven daemon restart` finish by ensuring the shared portless proxy is up; every portless command runs in its own session.

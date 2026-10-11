@@ -1060,9 +1060,9 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 }
 
 // keepProxyForOtherStacks restarts the machine-wide portless proxy if it is
-// down while another stack is still registered. Down never stops the proxy
-// (only `down --all` does); this is the net for a proxy that went away with
-// the downed stack's process group.
+// down while a stack is still registered. Down never stops the proxy (only
+// `down --all` does); this is the net for a proxy that went away with a
+// process group, and what reload and daemon restart run once they are done.
 func (o *Orchestrator) keepProxyForOtherStacks() {
 	if o.cfg.PortlessDisabled || o.proxy.Running() {
 		return

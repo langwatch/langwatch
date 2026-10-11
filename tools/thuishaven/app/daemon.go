@@ -149,6 +149,7 @@ func (o *Orchestrator) RestartDaemon(dir string) (int, error) {
 	}
 	for deadline := time.Now().Add(successorWait); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		if info, ok := o.store.Daemon(); ok && info.PID != old.PID && o.daemonAlive() {
+			o.keepProxyForOtherStacks()
 			return info.PID, nil
 		}
 	}
