@@ -4,11 +4,11 @@
  * a membership change cannot half-apply; archiving leaves for the list.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Button,
-  Card,
   Heading,
   HStack,
   Separator,
@@ -120,14 +120,9 @@ export default function TeamDetailScreen() {
 
   if (trpcErrorCode(team.error) === "NOT_FOUND") {
     return (
-      <VStack gap={2} align="start">
-        <Heading size="sm" as="h1">
-          Team not found
-        </Heading>
-        <Text color="fg.muted">
-          This team does not exist, or it was archived. Pick another from the Teams list.
-        </Text>
-      </VStack>
+      <PageLayout.Header description="This team does not exist, or it was archived. Pick another from the Teams list.">
+        <PageLayout.Heading>Team not found</PageLayout.Heading>
+      </PageLayout.Header>
     );
   }
 
@@ -141,20 +136,18 @@ export default function TeamDetailScreen() {
           <Skeleton height="20px" width="120px" />
         </HStack>
         <Skeleton height="32px" width="200px" />
-        <Card.Root width="full">
-          <Card.Body paddingY={4}>
-            <VStack gap={4} align="start">
-              <VStack gap={2} align="start" width="full">
-                <Skeleton height="16px" width="80px" />
-                <Skeleton height="40px" width="full" />
-              </VStack>
-              <VStack gap={2} align="start" width="full">
-                <Skeleton height="16px" width="100px" />
-                <Skeleton height="40px" width="full" />
-              </VStack>
+        <Card>
+          <VStack gap={4} align="start">
+            <VStack gap={2} align="start" width="full">
+              <Skeleton height="16px" width="80px" />
+              <Skeleton height="40px" width="full" />
             </VStack>
-          </Card.Body>
-        </Card.Root>
+            <VStack gap={2} align="start" width="full">
+              <Skeleton height="16px" width="100px" />
+              <Skeleton height="40px" width="full" />
+            </VStack>
+          </VStack>
+        </Card>
       </VStack>
     );
   }
@@ -323,27 +316,25 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
           <Heading textStyle="cardTitle" color="fg.error">
             Danger zone
           </Heading>
-          <Card.Root width="full" borderColor="border.error">
-            <Card.Body>
-              <HStack justify="space-between">
-                <VStack align="start" gap={0}>
-                  <Text fontWeight="medium">Archive this team</Text>
-                  <Text fontSize="sm" color="fg.muted">
-                    Hides the team and all its projects. Contact LangWatch support to restore it.
-                  </Text>
-                </VStack>
-                <Button
-                  colorPalette="red"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowArchiveDialog(true)}
-                  disabled={archiveTeam.isPending}
-                >
-                  Archive team
-                </Button>
-              </HStack>
-            </Card.Body>
-          </Card.Root>
+          <Card variant="nested" tone="red">
+            <HStack justify="space-between">
+              <VStack align="start" gap={0}>
+                <Text fontWeight="medium">Archive this team</Text>
+                <Text fontSize="sm" color="fg.muted">
+                  Hides the team and all its projects. Contact LangWatch support to restore it.
+                </Text>
+              </VStack>
+              <Button
+                colorPalette="red"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowArchiveDialog(true)}
+                disabled={archiveTeam.isPending}
+              >
+                Archive team
+              </Button>
+            </HStack>
+          </Card>
         </VStack>
       </VStack>
       <ConfirmDialog

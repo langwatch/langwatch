@@ -408,5 +408,21 @@
     "reason": "The change-diff and occurrences grids inside a protected audit entry detail (R1a1 review).",
     "owner": "organization",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/organization/browser/src/ui/sections/member-access-editor.tsx",
+    "rule": "card-box",
+    "line": 340,
+    "reason": "False positive: assignment rows with struck-through and staged states, not cards (R1a2 review).",
+    "owner": "organization",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/organization/browser/src/ui/sections/member-access-editor.tsx",
+    "rule": "card-box",
+    "line": 368,
+    "reason": "False positive: assignment rows with struck-through and staged states, not cards (R1a2 review).",
+    "owner": "organization",
+    "disposition": "reviewed"
   }
 ]

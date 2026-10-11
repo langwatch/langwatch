@@ -16,7 +16,6 @@ import {
   Heading,
   HStack,
   Separator,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -109,36 +108,34 @@ export default function GroupsScreen() {
 
         {!groups.isLoading && (
           <Box width="full" data-testid="groups-list">
-            <ListTable containerProps={{ overflowX: "auto" }}>
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Group</Table.ColumnHeader>
-                  <Table.ColumnHeader width="120px">Source</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
-                  <Table.ColumnHeader width="80px" textAlign="right">
+            <ListTable scroll="x" scrollLabel="Groups">
+              <ListTable.Header>
+                <ListTable.Row>
+                  <ListTable.ColumnHeader>Group</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader width="120px">Source</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader align="end">Access</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader width="80px" align="end">
                     Members
-                  </Table.ColumnHeader>
+                  </ListTable.ColumnHeader>
                   {canManage && <ListTable.ActionHeader />}
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
+                </ListTable.Row>
+              </ListTable.Header>
+              <ListTable.Body>
                 {(groups.data ?? []).map((g) => (
-                  <Table.Row
+                  <ListTable.Row
                     key={g.id}
                     data-testid="group-row"
-                    cursor="pointer"
-                    onClick={() => setSelectedGroup(g)}
-                    _hover={{ bg: "bg.muted" }}
+                    onActivate={() => setSelectedGroup(g)}
                   >
-                    <Table.Cell fontWeight="medium">
-                      <chakra.button type="button" cursor="pointer" textAlign="start">
+                    <ListTable.Cell>
+                      <ListTable.RowAction onActivate={() => setSelectedGroup(g)}>
                         {g.name}
-                      </chakra.button>
-                    </Table.Cell>
-                    <Table.Cell>
+                      </ListTable.RowAction>
+                    </ListTable.Cell>
+                    <ListTable.Cell>
                       <SourceBadge scimSource={g.scimSource} />
-                    </Table.Cell>
-                    <Table.Cell>
+                    </ListTable.Cell>
+                    <ListTable.Cell>
                       <VStack gap={1} align="end">
                         {g.grants.map((b, i) => (
                           <HStack key={i} gap={1} fontSize="xs">
@@ -157,12 +154,12 @@ export default function GroupsScreen() {
                           </Text>
                         )}
                       </VStack>
-                    </Table.Cell>
-                    <Table.Cell textAlign="right">
+                    </ListTable.Cell>
+                    <ListTable.Cell align="end">
                       <Text fontSize="sm" color="fg.muted">
                         {g.memberCount}
                       </Text>
-                    </Table.Cell>
+                    </ListTable.Cell>
                     {canManage && (
                       <ListTable.ActionCell>
                         <Menu.Root>
@@ -207,26 +204,45 @@ export default function GroupsScreen() {
                         </Menu.Root>
                       </ListTable.ActionCell>
                     )}
-                  </Table.Row>
+                  </ListTable.Row>
                 ))}
-                {canManage && (
-                  <Table.Row
-                    cursor="pointer"
-                    onClick={() => setCreating(true)}
-                    _hover={{ bg: "bg.muted" }}
-                    color="fg.muted"
-                  >
-                    <Table.Cell colSpan={5}>
-                      <chakra.button type="button" cursor="pointer" data-testid="groups-add-manual">
-                        <HStack gap={2}>
-                          <Plus size={14} />
-                          <Text textStyle="body">Add a group</Text>
-                        </HStack>
-                      </chakra.button>
-                    </Table.Cell>
-                  </Table.Row>
+                {(groups.data ?? []).length === 0 && (
+                  <ListTable.EmptyRow
+                    columns={canManage ? 5 : 4}
+                    state="empty"
+                    title="No groups yet"
+                    description="Groups assign access to many people at once."
+                    next={[
+                      {
+                        kind: "docs",
+                        label: "How directory groups work",
+                        href: "https://langwatch.ai/docs/platform/scim-groups",
+                      },
+                    ]}
+                  />
                 )}
-              </Table.Body>
+                {canManage && (
+                  <ListTable.SpanRow columns={5}>
+                    <chakra.button
+                      type="button"
+                      width="full"
+                      textAlign="start"
+                      cursor="pointer"
+                      color="fg.muted"
+                      paddingX={4}
+                      paddingY={3}
+                      _hover={{ bg: "bg.muted" }}
+                      onClick={() => setCreating(true)}
+                      data-testid="groups-add-manual"
+                    >
+                      <HStack gap={2}>
+                        <Plus size={14} />
+                        <Text textStyle="body">Add a group</Text>
+                      </HStack>
+                    </chakra.button>
+                  </ListTable.SpanRow>
+                )}
+              </ListTable.Body>
             </ListTable>
           </Box>
         )}

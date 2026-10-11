@@ -13,7 +13,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -170,9 +169,6 @@ async function collectAuditLogs<T>({
   return collected;
 }
 
-/** A 28px band; the row's selector outweighs the table's default cell padding. */
-const DAY_BAND = { "& > td": { height: "28px", paddingTop: 0, paddingBottom: 0 } } as const;
-
 /** Filter controls share one 32px line, 13px text and a 4px radius. */
 const FILTER_CONTROL = {
   height: "32px",
@@ -201,28 +197,28 @@ function AuditFeed({
     >
       <AuditTableHead />
       {auditFeedDays({ rows, now: toDate(now) }).map((day) => (
-        <Table.Body key={day.heading} aria-label={day.label}>
-          <Table.Row css={DAY_BAND}>
-            <Table.Cell
-              colSpan={AUDIT_TABLE_COLUMNS.length}
-              bg="bg.muted"
+        <ListTable.Body key={day.heading} aria-label={day.label}>
+          <ListTable.SpanRow columns={AUDIT_TABLE_COLUMNS.length} band>
+            <HStack
+              justify="flex-start"
+              gap={3}
+              height="28px"
+              paddingX={4}
               fontSize="xs"
               lineHeight="16px"
               fontWeight="medium"
               color="fg"
             >
-              <HStack justify="flex-start" gap={3}>
-                <Text>{day.heading}</Text>
-                <Text color="fg.muted" fontWeight="normal">
-                  {currentTimeZone()}
-                </Text>
-              </HStack>
-            </Table.Cell>
-          </Table.Row>
+              <Text>{day.heading}</Text>
+              <Text color="fg.muted" fontWeight="normal">
+                {currentTimeZone()}
+              </Text>
+            </HStack>
+          </ListTable.SpanRow>
           {day.runs.map((run) => (
             <AuditLogEntry key={run.id} run={run} projectLabel={projectLabel} />
           ))}
-        </Table.Body>
+        </ListTable.Body>
       ))}
     </ListTable>
   );
