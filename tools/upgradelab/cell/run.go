@@ -70,6 +70,9 @@ type run struct {
 	traffic            *Traffic
 	privateTraffic     *Traffic // a private organization's project (hybrid), on privateLabel's stores
 	privateLabel       string
+	otherPrivate       *Traffic // the second private organization's project (tier M), on otherPrivateLabel's stores
+	otherPrivateLabel  string
+	routeRecords       string // H7: the organizations head's worker recorded as privately routed
 	drills             drillState
 	poller             *Poller
 	queue              []QueueSample
@@ -221,7 +224,7 @@ func (cell *run) partialChecks(ctx context.Context) {
 
 // partialVerdicts are the checks a stopped cell can still judge from its traffic, phases and queue readings.
 func (cell *run) partialVerdicts() []Verdict {
-	verdicts := []Verdict{cell.holdingVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic),
+	verdicts := []Verdict{cell.holdingVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic, cell.downExcused()),
 		ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), queueVerdict(cell.report.Queue)}
 	for index := range verdicts {
 		verdicts[index].Scenarios = scenarioIDs[verdicts[index].ID]
@@ -285,7 +288,7 @@ func (cell *run) freshStores(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	cell.private = PrivateTargetsFor(shape.PrivateTargets(), cell.options.Tier)
+	cell.private = PrivateTargetsFor(shape.PrivateTargets(), cell.options.Tier, cell.options.FromSnapshot != "")
 	for label := range cell.private {
 		cell.stores.Private = append(cell.stores.Private, label)
 	}
@@ -491,6 +494,9 @@ func (cell *run) useSeed(session http.Header) error {
 	if private, label, ok := cell.privateClient(); ok {
 		cell.privateTraffic, cell.privateLabel = &Traffic{Client: private, Kinds: PrivateMix(cell.options.Rate), Origin: cell.origin, Hold: cell.options.Hold}, label
 	}
+	if other, label, ok := cell.privateClientAt(1); ok {
+		cell.otherPrivate, cell.otherPrivateLabel = &Traffic{Client: other, Kinds: OtherPrivateMix(cell.options.Rate), Origin: cell.origin, Hold: cell.options.Hold}, label
+	}
 	return nil
 }
 
@@ -522,6 +528,9 @@ func (cell *run) trafficBefore(ctx context.Context) error {
 		if cell.privateTraffic != nil {
 			private.Go(func() { cell.privateTraffic.Run(trafficCtx) })
 		}
+		if cell.otherPrivate != nil {
+			private.Go(func() { cell.otherPrivate.Run(trafficCtx) })
+		}
 		cell.traffic.Run(trafficCtx)
 		private.Wait()
 		close(cell.trafficDone)
@@ -536,10 +545,13 @@ func (cell *run) trafficBefore(ctx context.Context) error {
 
 // allCalls is every call the cell's traffic sent, the private project's included.
 func (cell *run) allCalls() []Call {
-	if cell.privateTraffic == nil {
-		return cell.traffic.Calls()
+	calls := cell.traffic.Calls()
+	for _, each := range []*Traffic{cell.privateTraffic, cell.otherPrivate} {
+		if each != nil {
+			calls = append(calls, each.Calls()...)
+		}
 	}
-	return append(cell.traffic.Calls(), cell.privateTraffic.Calls()...)
+	return calls
 }
 
 func sleep(ctx context.Context, span time.Duration) error {

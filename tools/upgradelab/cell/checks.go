@@ -43,7 +43,7 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Verdicts = append(cell.report.Verdicts,
 		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
-		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), queueVerdict(cell.report.Queue), cell.opsVerdict(final))
+		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic, cell.downExcused()), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), queueVerdict(cell.report.Queue), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.ssoVerdicts(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.legacyVerdicts(ctx, final)...)
@@ -295,7 +295,8 @@ func unansweredVerdict(calls []Call) Verdict {
 	return verdict("N6", len(unanswered) == 0, fmt.Sprintf("unanswered per kind: %v", unanswered))
 }
 
-func droppedVerdict(summaries []KindSummary) Verdict {
+// droppedVerdict (N2) leaves out the down organization's failed calls inside the H8 window: H8 judges those.
+func droppedVerdict(summaries []KindSummary, excused int) Verdict {
 	failed, sent, retries, window := 0, 0, 0, int64(0)
 	var detail []string
 	for _, each := range summaries {
@@ -307,7 +308,7 @@ func droppedVerdict(summaries []KindSummary) Verdict {
 			detail = append(detail, fmt.Sprintf("%s %d/%d", each.Kind, each.Failed, each.Sent))
 		}
 	}
-	return verdict("N2", failed == 0, fmt.Sprintf("%d of %d failed: %v; %d upgrade_in_progress retries, longest retry window %d ms", failed, sent, detail, retries, window))
+	return verdict("N2", failed-excused <= 0, fmt.Sprintf("%d of %d failed: %v, of them %d the down organization's inside the H8 window (left to H8); %d upgrade_in_progress retries, longest retry window %d ms", failed, sent, detail, excused, retries, window))
 }
 
 // lostByPhase notes, per kind, which api phase each lost write was sent in, and its first and last ms.
@@ -473,10 +474,20 @@ func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
 		}
 		privateStored = private
 	}
+	otherStored := map[string]map[string]bool{}
+	if cell.otherPrivate != nil {
+		if otherStored, err = StoredIDs(ctx, cell.stores, cell.otherPrivateLabel, cell.otherPrivate.Client.Project); err != nil {
+			return nil, err
+		}
+	}
 	visible := map[string]bool{}
 	seen := evidence{stored: stored, versions: cell.promptVersions(ctx)}
 	for _, call := range cell.allCalls() {
 		if !call.Write || !call.ok() {
+			continue
+		}
+		if strings.HasPrefix(call.Kind, otherPrivatePrefix) {
+			visible[call.Kind+"/"+call.ID] = otherStored[storedTable[strings.TrimPrefix(call.Kind, otherPrivatePrefix)]][call.ID]
 			continue
 		}
 		if strings.HasPrefix(call.Kind, privatePrefix) {
