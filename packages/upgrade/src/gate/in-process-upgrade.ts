@@ -63,29 +63,25 @@ export const PASS_REQUEST_TASK = "request-system-migrations-pass";
 export const PASS_REQUEST_WAIT_MS = 60_000;
 
 /**
- * The pass request. `pnpm task upgrade` waits for its jobs on a list ahead of any backlog (T6),
- * which the serving workers run; a serving worker only sends it, its own consumers starting after
- * this run (T0-F12). One that does not settle in time is a warning: the hourly re-drive reaches it.
+ * The pass request with its queue jobs on a list ahead of any backlog (T6), which a consuming
+ * worker runs: the serving worker sends it after it takes jobs (T0-F11). One that does not settle
+ * in time is a warning: the hourly re-drive still reaches every tenant step.
  */
 export function passRequestReconciler({
   modules,
-  waitForPass,
 }: {
   modules: Pick<UpgradeModules, "tasks" | "runListedWork">;
-  waitForPass: boolean;
 }): UpgradeReconciler {
   return {
     name: "system-migrations-pass-request",
     async run({ signal }) {
       const task = modules.tasks(isModuleTask).find((each) => each.name === PASS_REQUEST_TASK);
       if (!task) return;
-      const work = () => task.run({ args: [], signal });
       try {
-        if (!waitForPass) return await work();
         await modules.runListedWork({
           name: `task:${PASS_REQUEST_TASK}`,
           timeoutMs: PASS_REQUEST_WAIT_MS,
-          work,
+          work: () => task.run({ args: [], signal }),
         });
       } catch (error) {
         signal.throwIfAborted();
@@ -181,64 +177,93 @@ export function runnerPoolConfig({ databaseUrl }: { databaseUrl: string }): pg.P
   };
 }
 
-/**
- * One upgrade run in this process: boots the installed modules, runs the image's upgrade over them
- * and answers the runner's outcome. A boot or connection failure answers `failed` with its message.
- */
-export function inProcessUpgrade({
-  boot,
-  databaseUrl,
-  environment,
-  development,
-  waitForPass,
-  openPublisher = () => null,
-  signal = new AbortController().signal,
-  run = runImageUpgrade,
-}: {
+/** Said by a serving worker that takes jobs while its run's reconcilers finish. */
+const BLOCKING_DONE: UpgradeRunResult = {
+  code: "done",
+  logTail: ["the blocking part is done; the reconcilers finish beside the worker"],
+};
+
+type InProcessUpgradeInput = {
   boot: BootUpgradeModules;
   databaseUrl: string;
   environment: ImageUpgradeInputs["environment"];
   development: boolean;
-  /** Only a run-once upgrade waits for its pass request: a serving worker would wait on itself. */
-  waitForPass: boolean;
+  /** True for a serving worker; `pnpm task upgrade` waits for the whole run and its exit code. */
+  admitAtBlockingDone: boolean;
   openPublisher?: OpenReadHintPublisher;
   signal?: AbortSignal;
   /** The image's upgrade; a test hands its own to read what the run was given. */
   run?: typeof runImageUpgrade;
-}): FirstInstallUpgrade {
+};
+
+/**
+ * One upgrade run in this process over the booted modules; a boot or connection failure answers
+ * `failed`. With `admitAtBlockingDone` it answers `done` once the schema and blocking steps are
+ * (T0-F11), and the reconcilers finish beside the serving worker, logged and recorded on the run.
+ */
+export function inProcessUpgrade(input: InProcessUpgradeInput): FirstInstallUpgrade {
   return async (): Promise<UpgradeRunResult> => {
-    const pool = new pg.Pool(runnerPoolConfig({ databaseUrl }));
-    const publisher = openPublisher();
-    try {
-      const outcome = await boot((modules) =>
-        run({
-          inputs: {
-            postgres: pool,
-            databaseUrl,
-            environment,
-            development,
-            steps: modules.migrationSteps(isDeclaredMigrationStep),
-            upcasts: upcastStepsOf({ app: modules }),
-            reconcilers: [
-              langWatchQlReconciler({ environment }),
-              passRequestReconciler({ modules, waitForPass }),
-            ],
-            ...(publisher ? { publish: publisher.publish } : {}),
-          },
-          signal,
-        }),
-      );
-      return { code: outcome.code, logTail: [outcome.message] };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      upgradeRunnerLog().warn(`the upgrade could not run in this process: ${message}`, {
-        phase: "preflight",
-        next: "fix what the error names; this worker tries again",
-      });
-      return { code: "failed", logTail: [message] };
-    } finally {
-      await pool.end();
-      await publisher?.close();
-    }
+    let onBlockingDone = () => {};
+    const blockingDone = new Promise<UpgradeRunResult>((resolve) => {
+      onBlockingDone = () => resolve(BLOCKING_DONE);
+    });
+    const whole = runWhole({ ...input, onBlockingDone: () => onBlockingDone() });
+    if (!input.admitAtBlockingDone) return whole;
+    const first = await Promise.race([whole, blockingDone]);
+    if (first === BLOCKING_DONE) void whole.then(sayReconcileOutcome);
+    return first;
   };
+}
+
+/** A run that finished after its worker took jobs: a failed reconciler is said, never swallowed. */
+function sayReconcileOutcome(result: UpgradeRunResult): void {
+  if (result.code === "done") return;
+  upgradeRunnerLog().warn(`the upgrade's reconcilers ended ${result.code}: ${result.logTail[0]}`, {
+    phase: "reconcile",
+    next: "the run is recorded on Ops > Upgrades; fix what it names, then Retry",
+  });
+}
+
+/** The whole run over the booted modules; never throws, a failure answers `failed`. */
+async function runWhole({
+  boot,
+  databaseUrl,
+  environment,
+  development,
+  openPublisher = () => null,
+  signal = new AbortController().signal,
+  run = runImageUpgrade,
+  onBlockingDone,
+}: InProcessUpgradeInput & { onBlockingDone: () => void }): Promise<UpgradeRunResult> {
+  const pool = new pg.Pool(runnerPoolConfig({ databaseUrl }));
+  const publisher = openPublisher();
+  try {
+    const outcome = await boot((modules) =>
+      run({
+        inputs: {
+          postgres: pool,
+          databaseUrl,
+          environment,
+          development,
+          steps: modules.migrationSteps(isDeclaredMigrationStep),
+          upcasts: upcastStepsOf({ app: modules }),
+          reconcilers: [langWatchQlReconciler({ environment }), passRequestReconciler({ modules })],
+          onBlockingDone,
+          ...(publisher ? { publish: publisher.publish } : {}),
+        },
+        signal,
+      }),
+    );
+    return { code: outcome.code, logTail: [outcome.message] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    upgradeRunnerLog().warn(`the upgrade could not run in this process: ${message}`, {
+      phase: "preflight",
+      next: "fix what the error names; this worker tries again",
+    });
+    return { code: "failed", logTail: [message] };
+  } finally {
+    await pool.end();
+    await publisher?.close();
+  }
 }

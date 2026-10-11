@@ -31,7 +31,6 @@ describe("passRequestReconciler()", () => {
   it("runs ops' pass request inside the queue's listed work", async () => {
     const ran: string[] = [];
     const reconciler = passRequestReconciler({
-      waitForPass: true,
       modules: {
         tasks: <Task>(isTask: (contribution: unknown) => contribution is Task) =>
           [
@@ -50,30 +49,8 @@ describe("passRequestReconciler()", () => {
     expect(ran).toEqual(["listed task:request-system-migrations-pass", "pass"]);
   });
 
-  /** @scenario "A serving worker's upgrade sends its pass request and does not wait on itself" */
-  it("sends the request without waiting where the run's own worker consumes it", async () => {
-    const ran: string[] = [];
-    const reconciler = passRequestReconciler({
-      waitForPass: false,
-      modules: {
-        tasks: <Task>(isTask: (contribution: unknown) => contribution is Task) =>
-          [
-            { name: "request-system-migrations-pass", run: async () => void ran.push("pass") },
-          ].flatMap((each) => (isTask(each) ? [each] : [])),
-        runListedWork: async () => {
-          throw new Error("a serving worker never waits for its own consumers");
-        },
-      },
-    });
-
-    await reconciler.run({ signal });
-
-    expect(ran).toEqual(["pass"]);
-  });
-
   it("warns and lets the run go on when the request does not settle", async () => {
     const reconciler = passRequestReconciler({
-      waitForPass: true,
       modules: {
         tasks: <Task>(isTask: (contribution: unknown) => contribution is Task) =>
           [{ name: "request-system-migrations-pass", run: async () => undefined }].flatMap(
@@ -106,7 +83,7 @@ describe("inProcessUpgrade()", () => {
       databaseUrl: "postgresql://localhost:1/never",
       environment: {},
       development: false,
-      waitForPass: false,
+      admitAtBlockingDone: false,
       openPublisher: () => ({
         publish: async (channel, message) => void published.push(`${channel} ${message}`),
         close: async () => void (closed += 1),
@@ -120,5 +97,64 @@ describe("inProcessUpgrade()", () => {
     expect(await upgrade()).toEqual({ code: "done", logTail: ["upgraded"] });
     expect(published).toEqual(["eventing:read_invalidated hint"]);
     expect(closed).toBe(1);
+  });
+
+  /** @scenario "A serving worker takes jobs once the blocking part is done, before the reconcilers end" */
+  it("answers done at the blocking part's end while the reconcilers still run", async () => {
+    let finishReconcilers = () => {};
+    const reconcilersEnd = new Promise<void>((resolve) => {
+      finishReconcilers = resolve;
+    });
+    let ended = false;
+    const upgrade = inProcessUpgrade({
+      boot: (use) => use(modules),
+      databaseUrl: "postgresql://localhost:1/never",
+      environment: {},
+      development: false,
+      admitAtBlockingDone: true,
+      run: async ({ inputs }) => {
+        inputs.onBlockingDone?.();
+        await reconcilersEnd;
+        ended = true;
+        return upgradeOutcome({ code: "done", message: "upgraded" });
+      },
+    });
+
+    const answer = await upgrade();
+
+    expect(answer.code).toBe("done");
+    expect(answer.logTail[0]).toMatch(/the reconcilers finish beside the worker/);
+    expect(ended).toBe(false);
+    finishReconcilers();
+  });
+
+  it("answers the run's own failure when it fails before the blocking part is done", async () => {
+    const upgrade = inProcessUpgrade({
+      boot: (use) => use(modules),
+      databaseUrl: "postgresql://localhost:1/never",
+      environment: {},
+      development: false,
+      admitAtBlockingDone: true,
+      run: async () => upgradeOutcome({ code: "failed", message: "schema refused" }),
+    });
+
+    expect(await upgrade()).toEqual({ code: "failed", logTail: ["schema refused"] });
+  });
+
+  /** @scenario "`pnpm task upgrade` waits for the reconcilers and answers the whole run's outcome" */
+  it("waits for the whole run on the run-once path, a failed reconciler failing it", async () => {
+    const upgrade = inProcessUpgrade({
+      boot: (use) => use(modules),
+      databaseUrl: "postgresql://localhost:1/never",
+      environment: {},
+      development: false,
+      admitAtBlockingDone: false,
+      run: async ({ inputs }) => {
+        inputs.onBlockingDone?.();
+        return upgradeOutcome({ code: "failed", message: "reconciler langwatchql failed" });
+      },
+    });
+
+    expect(await upgrade()).toEqual({ code: "failed", logTail: ["reconciler langwatchql failed"] });
   });
 });

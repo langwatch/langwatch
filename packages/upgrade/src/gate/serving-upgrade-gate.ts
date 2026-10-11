@@ -648,9 +648,9 @@ export async function servingUpgradeGate({
           const databaseUrl = database?.trim();
           if (!databaseUrl) return { ...NO_LEDGER_GATE, runOnce: refuseWithoutDatabase };
           const stores = { bootModules, databaseUrl, clickhouse, redis, environment };
-          const upgrade = upgradeIn({ ...stores, waitForPass: false });
+          const upgrade = upgradeIn({ ...stores, admitAtBlockingDone: true });
           const runOnce = async () =>
-            EXIT_CODES[(await upgradeIn({ ...stores, waitForPass: true })()).code];
+            EXIT_CODES[(await upgradeIn({ ...stores, admitAtBlockingDone: false })()).code];
           if (!clickhouse?.trim() && routes.size === 0) return { ...NO_CLICKHOUSE_GATE, runOnce };
           const pool = guardGatePool({
             pool: new pg.Pool(gatePoolConfig({ databaseUrl })),
@@ -682,15 +682,15 @@ function upgradeIn({
   clickhouse,
   redis,
   environment,
-  waitForPass,
+  admitAtBlockingDone,
 }: {
   bootModules: BootUpgradeModules | undefined;
   databaseUrl: string;
   clickhouse: string | undefined;
   redis: string | undefined;
   environment: Readonly<Record<string, string | undefined>>;
-  /** True for `pnpm task upgrade`, whose pass request the serving workers run. */
-  waitForPass: boolean;
+  /** True for the serving worker, which takes jobs while the run's reconcilers finish. */
+  admitAtBlockingDone: boolean;
 }): FirstInstallUpgrade {
   if (!bootModules) return refuseWithoutModules;
   const sharedUrl = clickhouse?.trim();
@@ -703,7 +703,7 @@ function upgradeIn({
       ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
     },
     development: environment.NODE_ENV === "development",
-    waitForPass,
+    admitAtBlockingDone,
     openPublisher: redisReadHintPublisher({ url: redis?.trim() || undefined, environment }),
   });
 }

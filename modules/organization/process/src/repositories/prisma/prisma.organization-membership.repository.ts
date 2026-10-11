@@ -1016,28 +1016,38 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     try {
       // The membership stays disabled while the founder's two grants make
       // their round trip, so committing the organization first exposes no access.
-      await this.writer.attachBindings({
-        organizationId: created.organization.id,
-        bindings: [
-          { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: created.organization.id },
-          { scopeType: RoleBindingScopeType.TEAM, scopeId: created.team.id },
-        ].map((scope) => ({
-          bindingId: newAuthzGrantId(),
-          principal: { userId: input.userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          ...scope,
-          membershipStamp: created.membershipStamp,
-          membershipBootstrap: true,
-        })),
-        caller: { type: "system" },
-        actor: ledgerActorFor({
-          userId: input.userId,
-          fallback: "organizationService",
+      const landed = await landedInTime(() =>
+        this.writer.attachBindings({
+          organizationId: created.organization.id,
+          bindings: [
+            { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: created.organization.id },
+            { scopeType: RoleBindingScopeType.TEAM, scopeId: created.team.id },
+          ].map((scope) => ({
+            bindingId: newAuthzGrantId(),
+            principal: { userId: input.userId },
+            role: TeamUserRole.ADMIN,
+            customRoleId: null,
+            ...scope,
+            membershipStamp: created.membershipStamp,
+            membershipBootstrap: true,
+          })),
+          caller: { type: "system" },
+          actor: ledgerActorFor({
+            userId: input.userId,
+            fallback: "organizationService",
+          }),
+          onDuplicate: "skip",
+          requireProjection: true,
         }),
-        onDuplicate: "skip",
-        requireProjection: true,
-      });
+      );
+      // Slow is not refused: the append is durable and fenced to this membership, so the
+      // organization stays and its grants land when a worker takes them (T0-F11).
+      if (!landed) {
+        logger.warn(
+          { organizationId: created.organization.id, userId: input.userId },
+          "the founder's grants had not landed yet; kept the organization, they converge",
+        );
+      }
 
       await this.prisma.organizationUser.update({
         where: {

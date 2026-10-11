@@ -62,6 +62,8 @@ export interface UpgradeRunnerOptions {
   /** Contract ids, each with the tables its `-- archive:` notes name; else read from the image. */
   archives?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
+  /** Called once the schema and blocking steps are done, before the reconcilers (T0-F11). */
+  onBlockingDone?: () => void;
   /** The image's declared event upcasts and the stored events each covers (record §9). */
   upcasts?: () => Promise<readonly UpcastStepInput[]>;
   identity: { image: string; host: string };
@@ -582,6 +584,7 @@ export class UpgradeRunnerService {
       }
     }
     await this.catchUpTargets({ signal });
+    this.options.onBlockingDone?.();
     await phases.start({ name: "reconcile" });
     await this.runReconcilers({ signal });
     await phases.end({ name: "reconcile", outcome: "succeeded" });

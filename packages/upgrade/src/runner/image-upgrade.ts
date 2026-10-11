@@ -74,6 +74,8 @@ export type ImageUpgradeInputs = Readonly<{
   upcasts?: () => Promise<readonly UpcastStepInput[]>;
   /** Module work after the schema (LangWatchQL, the pass request), after the TTL reconcilers. */
   reconcilers?: readonly UpgradeReconciler[];
+  /** Told when the blocking part is done: a serving worker takes jobs then (T0-F11). */
+  onBlockingDone?: () => void;
   /** Publishes on Redis, for the read hints the api relays; absent publishes none. */
   publish?: (channel: string, message: string) => Promise<unknown>;
 }>;
@@ -535,6 +537,7 @@ export async function withImageUpgradeRunner<Result>({
         say: writeUpgradeLine,
       }),
       reconcilers: reconcilers({ inputs }),
+      ...(inputs.onBlockingDone ? { onBlockingDone: inputs.onBlockingDone } : {}),
       identity: { image: release ?? "unreleased", host: hostname() },
       log: upgradeRunnerLog(),
       ...(inputs.publish ? { hints: readHints({ inputs }) } : {}),

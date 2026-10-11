@@ -37,12 +37,18 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     # T0-F12: the line listed about 480 ids; `pnpm task upgrade status` lists every one.
 
   @unit
-  Scenario: A serving worker's upgrade sends its pass request and does not wait on itself
+  Scenario: A serving worker takes jobs once the blocking part is done, before the reconcilers end
     Given a worker running the upgrade before it takes jobs
-    When the upgrade asks for one system-migrations pass
-    Then it sends the request and goes on without waiting for its jobs
-    And the worker runs them once it takes jobs
-    # T0-F12: the request's jobs need this worker's consumers, so a wait always ran its full minute.
+    When the schema and every blocking step are done
+    Then it takes jobs while LangWatchQL provisioning and the system-migrations pass request finish
+    And a reconciler that fails afterwards is logged and recorded on the run, never holding jobs
+    # T0-F11: the api served for about a minute while the worker still sat in its reconcilers.
+
+  @unit
+  Scenario: `pnpm task upgrade` waits for the reconcilers and answers the whole run's outcome
+    Given a run-once upgrade
+    When a reconciler fails after the blocking part is done
+    Then the run answers failed and the command exits 1
 
   @unit
   Scenario: An image whose gate refuses runs nothing and refuses by name
