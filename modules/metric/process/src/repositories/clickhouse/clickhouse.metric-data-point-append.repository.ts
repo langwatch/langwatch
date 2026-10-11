@@ -16,7 +16,10 @@ import {
   type BucketReadRange,
   type BucketSeek,
   bucketReadRanges,
+  newestVersions,
+  payloadWindows,
   pointsForBucketSeeks,
+  type SeriesWindow,
 } from "../../rules/metric-rollup-bucket-reads.rules.ts";
 import {
   MetricDataPointAppendRepository,
@@ -114,6 +117,9 @@ const SUCCESSOR_PARAM_BUDGET_CHARS = 3500;
  */
 const PREDECESSOR_LOOKBACK_MS = 60 * 60 * 1000;
 
+/** A payload row with the version FINAL would have kept the newest of. */
+type VersionedRollupSourceRow = RollupSourceRow & { DedupVersion: string };
+
 /**
  * The seeks whose predecessor the near pass failed to find.
  */
@@ -123,7 +129,7 @@ function seeksWithoutPredecessor({
   lookbackMs,
 }: {
   seeks: readonly { seriesId: string; start: number }[];
-  points: Iterable<MetricRollupSourcePoint>;
+  points: Iterable<MetricSequencePoint>;
   lookbackMs: number;
 }): { seriesId: string; start: number }[] {
   const seenBySeries = new Map<string, number[]>();
@@ -355,7 +361,8 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
 
   /**
    * Every point in the affected buckets, each preceded by the sample the fold differences it
-   * against, grouped by series.
+   * against, grouped by series. No read is FINAL: keys are picked from narrow reads, then only
+   * the picked rows' payload is read and deduplicated here (T6-F2).
    */
   private async pointsForAffectedBuckets({
     affectedBySeries,
@@ -375,9 +382,8 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     const client = await this.resolveClient(tenantId);
     // A bucket's predecessor may itself sit in an earlier affected bucket, so
     // the ranges overlap by design; the fold needs each point exactly once.
-    // Identity is (series, point) because one query now spans many series, and
-    // a point id is only ever unique within its own.
-    const unique = new Map<string, MetricRollupSourcePoint>();
+    // Identity is (series, point) because one query spans many series.
+    const picked = new Map<string, MetricSequencePoint>();
 
     const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
     // A retention window shorter than the near pass would make that pass read
@@ -385,14 +391,14 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     // retention does and the far pass has nothing left to cover.
     const nearMs = Math.min(PREDECESSOR_LOOKBACK_MS, retentionMs);
 
-    await this.readBucketRanges({ client, tenantId, seeks, unique, lookbackMs: nearMs });
+    await this.readBucketRanges({ client, tenantId, seeks, picked, lookbackMs: nearMs });
 
     const unresolved =
       nearMs >= retentionMs
         ? []
         : seeksWithoutPredecessor({
             seeks,
-            points: unique.values(),
+            points: picked.values(),
             lookbackMs: nearMs,
           });
     if (unresolved.length > 0) {
@@ -400,12 +406,13 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
         client,
         tenantId,
         seeks: unresolved,
-        unique,
+        picked,
         predecessor: { fromMs: retentionMs, toMs: nearMs },
       });
     }
+    if (picked.size === 0) return found;
 
-    for (const point of unique.values()) {
+    for (const point of await this.readPayloads({ client, tenantId, seeks, picked })) {
       const existing = found.get(point.seriesId);
       if (existing) existing.push(point);
       else found.set(point.seriesId, [point]);
@@ -414,27 +421,31 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /**
-   * The near pass: each series' affected buckets as merged key ranges in one FINAL statement,
-   * so the server reads each row once; the per-bucket predecessor and bucket rows are picked
-   * here. Rows read stay within what a seek per bucket scanned (T6-F2).
+   * The near pass: each series' affected buckets as merged key ranges, reading keys only, so the
+   * scan never decompresses a payload column; the per-bucket predecessor and bucket rows are
+   * picked here. Keys are identical across a row's versions, so no FINAL is needed.
    */
   private async readBucketRanges({
     client,
     tenantId,
     seeks,
-    unique,
+    picked,
     lookbackMs,
   }: {
     client: MetricClickHouseClient;
     tenantId: string;
     seeks: readonly BucketSeek[];
-    unique: Map<string, MetricRollupSourcePoint>;
+    picked: Map<string, MetricSequencePoint>;
     lookbackMs: number;
   }): Promise<void> {
-    for (const ranges of ClickHouseMetricDataPointAppendRepository.bucketRangeChunks({
-      tenantId,
-      lookbackMs,
+    for (const ranges of ClickHouseMetricDataPointAppendRepository.rangeChunks({
       ranges: bucketReadRanges({ seeks, lookbackMs }),
+      paramsOf: (candidate) =>
+        ClickHouseMetricDataPointAppendRepository.bucketRangeParams({
+          tenantId,
+          lookbackMs,
+          ranges: candidate,
+        }),
     })) {
       const result = await client.query({
         query: ClickHouseMetricDataPointAppendRepository.bucketRangeQuery(ranges.length),
@@ -454,10 +465,12 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
               seek.start <= range.to,
           ),
         ),
-        points: (await result.json<RollupSourceRow>()).map(metricRollupSourceFromRow),
+        points: ClickHouseMetricDataPointAppendRepository.distinctKeys(
+          await result.json<SeekMetricRow>(),
+        ),
         lookbackMs,
       })) {
-        unique.set(`${point.seriesId}\u0000${point.pointId}`, point);
+        picked.set(`${point.seriesId}\u0000${point.pointId}`, point);
       }
     }
   }
@@ -470,8 +483,8 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
           AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackMs:Int64})
           AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({to${index}:Int64} + {bucketMs:Int64}))`,
     );
-    return `SELECT ${ROLLUP_SELECT}
-      FROM metric_data_points FINAL
+    return `SELECT ${SEEK_SELECT}
+      FROM metric_data_points
       WHERE TenantId = {tenantId:String}
         AND (${ranges.join("\n        OR ")})`;
   }
@@ -499,28 +512,21 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   }
 
   /** Splits ranges by encoded parameter bytes first, half of {@link SEEKS_PER_QUERY} as the cap. */
-  private static bucketRangeChunks({
-    tenantId,
-    lookbackMs,
+  private static rangeChunks<T>({
     ranges,
+    paramsOf,
   }: {
-    tenantId: string;
-    lookbackMs: number;
-    ranges: readonly BucketReadRange[];
-  }): BucketReadRange[][] {
-    const chunks: BucketReadRange[][] = [];
-    let current: BucketReadRange[] = [];
+    ranges: readonly T[];
+    paramsOf: (candidate: readonly T[]) => Record<string, unknown>;
+  }): T[][] {
+    const chunks: T[][] = [];
+    let current: T[] = [];
     for (const range of ranges) {
       const candidate = [...current, range];
       const outgrown =
         candidate.length > Math.floor(SEEKS_PER_QUERY / 2) ||
-        ClickHouseMetricDataPointAppendRepository.encodedParamLength(
-          ClickHouseMetricDataPointAppendRepository.bucketRangeParams({
-            tenantId,
-            lookbackMs,
-            ranges: candidate,
-          }),
-        ) > SUCCESSOR_PARAM_BUDGET_CHARS;
+        ClickHouseMetricDataPointAppendRepository.encodedParamLength(paramsOf(candidate)) >
+          SUCCESSOR_PARAM_BUDGET_CHARS;
       if (outgrown && current.length > 0) {
         chunks.push(current);
         current = [range];
@@ -532,8 +538,16 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     return chunks;
   }
 
+  /** A key read without FINAL returns one row per unmerged version; the keys are the same. */
+  private static distinctKeys(rows: readonly SeekMetricRow[]): MetricSequencePoint[] {
+    const keys = new Map<string, MetricSequencePoint>();
+    for (const row of rows)
+      keys.set(`${row.SeriesId}\u0000${row.PointId}`, metricPointFromSeekRow(row));
+    return [...keys.values()];
+  }
+
   /**
-   * The far pass, for buckets with no point in the near lookback: a reverse seek per bucket,
+   * The far pass, for buckets with no point in the near lookback: a reverse key seek per bucket,
    * since a range read here could span all of retention. `predecessor` is the half-open window
    * behind each bucket start, as distances so both bounds stay shared scalars.
    */
@@ -541,13 +555,13 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     client,
     tenantId,
     seeks,
-    unique,
+    picked,
     predecessor,
   }: {
     client: MetricClickHouseClient;
     tenantId: string;
     seeks: readonly BucketSeek[];
-    unique: Map<string, MetricRollupSourcePoint>;
+    picked: Map<string, MetricSequencePoint>;
     predecessor: { fromMs: number; toMs: number };
   }): Promise<void> {
     for (const chunk of ClickHouseMetricDataPointAppendRepository.chunked(
@@ -562,8 +576,8 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
       const selects = chunk.map(({ seriesId, start }, index) => {
         params[`series${index}`] = seriesId;
         params[`from${index}`] = start;
-        return `(SELECT ${ROLLUP_SELECT}
-            FROM metric_data_points FINAL
+        return `(SELECT ${SEEK_SELECT}
+            FROM metric_data_points
             WHERE TenantId = {tenantId:String} AND SeriesId = {series${index}:String}
               AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackToMs:Int64})
               AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64} - {lookbackFromMs:Int64})
@@ -574,10 +588,78 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
         query_params: params,
         format: "JSONEachRow",
       });
-      for (const row of await result.json<RollupSourceRow>()) {
-        unique.set(`${row.SeriesId}\u0000${row.PointId}`, metricRollupSourceFromRow(row));
+      for (const row of await result.json<SeekMetricRow>()) {
+        picked.set(`${row.SeriesId}\u0000${row.PointId}`, metricPointFromSeekRow(row));
       }
     }
+  }
+
+  /**
+   * The payload of the picked points only, read over each seek's exact window and reduced to the
+   * newest version of each, which is what FINAL kept. Rows outside the picked set are dropped, so
+   * a point written between the two reads changes nothing.
+   */
+  private async readPayloads({
+    client,
+    tenantId,
+    seeks,
+    picked,
+  }: {
+    client: MetricClickHouseClient;
+    tenantId: string;
+    seeks: readonly BucketSeek[];
+    picked: ReadonlyMap<string, MetricSequencePoint>;
+  }): Promise<MetricRollupSourcePoint[]> {
+    const rows: { point: MetricRollupSourcePoint; version: bigint }[] = [];
+    for (const windows of ClickHouseMetricDataPointAppendRepository.rangeChunks({
+      ranges: payloadWindows({ seeks, picked: picked.values() }),
+      paramsOf: (candidate) =>
+        ClickHouseMetricDataPointAppendRepository.payloadParams({ tenantId, windows: candidate }),
+    })) {
+      const result = await client.query({
+        query: ClickHouseMetricDataPointAppendRepository.payloadQuery(windows.length),
+        query_params: ClickHouseMetricDataPointAppendRepository.payloadParams({
+          tenantId,
+          windows,
+        }),
+        format: "JSONEachRow",
+      });
+      for (const row of await result.json<VersionedRollupSourceRow>()) {
+        if (!picked.has(`${row.SeriesId}\u0000${row.PointId}`)) continue;
+        rows.push({ point: metricRollupSourceFromRow(row), version: BigInt(row.DedupVersion) });
+      }
+    }
+    return newestVersions({ rows });
+  }
+
+  /** Exact `[from, to)` windows; the key predicate prunes, and moves to PREWHERE without FINAL. */
+  private static payloadQuery(windowCount: number): string {
+    const windows = Array.from(
+      { length: windowCount },
+      (_, index) => `(SeriesId = {series${index}:String}
+          AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({from${index}:Int64})
+          AND metric_data_points.TimeUnixMs < fromUnixTimestamp64Milli({to${index}:Int64}))`,
+    );
+    return `SELECT ${ROLLUP_SELECT}, DedupVersion
+      FROM metric_data_points
+      WHERE TenantId = {tenantId:String}
+        AND (${windows.join("\n        OR ")})`;
+  }
+
+  private static payloadParams({
+    tenantId,
+    windows,
+  }: {
+    tenantId: string;
+    windows: readonly SeriesWindow[];
+  }): Record<string, unknown> {
+    const params: Record<string, unknown> = { tenantId };
+    windows.forEach(({ seriesId, from, to }, index) => {
+      params[`series${index}`] = seriesId;
+      params[`from${index}`] = from;
+      params[`to${index}`] = to;
+    });
+    return params;
   }
 
   /**
@@ -605,7 +687,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     ),
     series_points AS (
       SELECT ${SEEK_SELECT}, metric_data_points.TimeUnixMs AS SeekTime
-      FROM metric_data_points FINAL
+      FROM metric_data_points
       WHERE TenantId = {tenantId:String}
         AND SeriesId IN {seriesIds:Array(String)}
         AND metric_data_points.TimeUnixMs >= fromUnixTimestamp64Milli({scanFrom:Int64})

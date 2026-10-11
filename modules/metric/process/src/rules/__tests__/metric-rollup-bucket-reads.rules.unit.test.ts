@@ -5,6 +5,8 @@ import {
   type BucketReadRange,
   type BucketSeek,
   bucketReadRanges,
+  newestVersions,
+  payloadWindows,
   pointsForBucketSeeks,
 } from "../metric-rollup-bucket-reads.rules.ts";
 
@@ -146,6 +148,86 @@ describe("pointsForBucketSeeks", () => {
         lookbackMs: HOUR,
       });
       expect(ids(picked)).toEqual(["a/00000a05"]);
+    });
+  });
+});
+
+/** The old far pass: the last point anywhere before the near lookback. */
+function farSeek({ seriesId, start }: BucketSeek): MetricSequencePoint[] {
+  return table
+    .filter((point) => point.seriesId === seriesId && point.timeUnixMs < start - HOUR)
+    .toSorted(storedDescending)
+    .slice(0, 1);
+}
+
+describe("payloadWindows", () => {
+  describe("given keys picked by the near and far passes", () => {
+    const picked = [
+      ...pointsForBucketSeeks({
+        seeks,
+        points: rangeRead({
+          ranges: bucketReadRanges({ seeks, lookbackMs: HOUR }),
+          lookbackMs: HOUR,
+        }),
+        lookbackMs: HOUR,
+      }),
+      ...seeks
+        .filter((seek) =>
+          oldSeek({ ...seek, lookbackMs: HOUR }).every((p) => p.timeUnixMs >= seek.start),
+        )
+        .flatMap(farSeek),
+    ];
+    const pickedIds = new Set(ids(picked));
+    const windows = payloadWindows({ seeks, picked });
+    const payload = table.filter(
+      (point) =>
+        pickedIds.has(`${point.seriesId}/${point.pointId}`) &&
+        windows.some(
+          (window) =>
+            window.seriesId === point.seriesId &&
+            point.timeUnixMs >= window.from &&
+            point.timeUnixMs < window.to,
+        ),
+    );
+
+    it("reads back every row the old near and far seeks returned, and only those", () => {
+      const old = seeks.flatMap((seek) => {
+        const near = oldSeek({ ...seek, lookbackMs: HOUR });
+        const hasPredecessor = near.some((point) => point.timeUnixMs < seek.start);
+        return hasPredecessor ? near : [...farSeek(seek), ...near];
+      });
+      expect(ids(payload)).toEqual(ids(old));
+    });
+
+    it("starts each window at its predecessor's millisecond, so only its ties are extra", () => {
+      expect(windows.filter((window) => window.seriesId === "b")).toEqual([
+        { seriesId: "b", from: base - 3 * HOUR, to: base + 4 * HOUR + B },
+      ]);
+      const covered = table.filter((point) =>
+        windows.some(
+          (window) =>
+            window.seriesId === point.seriesId &&
+            point.timeUnixMs >= window.from &&
+            point.timeUnixMs < window.to,
+        ),
+      );
+      const extra = covered.filter((point) => !pickedIds.has(`${point.seriesId}/${point.pointId}`));
+      expect(ids(extra)).toEqual(["a/00000a03", "a/00000a04"]);
+    });
+  });
+});
+
+describe("newestVersions", () => {
+  describe("given unmerged versions of the same point", () => {
+    it("keeps the highest dedup version, as FINAL did", () => {
+      const [first] = table;
+      const rows = [
+        { point: { ...first!, metricKind: "old" }, version: 5n },
+        { point: { ...first!, metricKind: "new" }, version: 9n },
+        { point: { ...first!, metricKind: "older" }, version: 1n },
+        { point: { ...table[1]!, metricKind: "other" }, version: 1n },
+      ];
+      expect(newestVersions({ rows }).map((point) => point.metricKind)).toEqual(["new", "other"]);
     });
   });
 });

@@ -105,7 +105,12 @@ function rollupSourceRow(from: CanonicalMetricDataPoint): Record<string, unknown
     PositiveBucketCounts: from.positiveBucketCounts,
     NegativeOffset: from.negativeOffset,
     NegativeBucketCounts: from.negativeBucketCounts,
+    DedupVersion: "1",
   };
+}
+
+function isPayloadRead(sql: string): boolean {
+  return sql.includes("DedupVersion");
 }
 
 /**
@@ -208,7 +213,8 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     expect(queries[0]).toContain("LIMIT 1 BY SeriesId");
     expect(queries[0]).toContain("SeekTime > spans.SpanToTime");
     expect(queries[0]).not.toContain("CanonicalPayload");
-    expect(queries[1]).toContain("BucketCounts");
+    // The near pass reads keys only; nothing was picked, so no payload read.
+    expect(queries[1]).not.toContain("BucketCounts");
     expect(queries[1]).not.toContain("CanonicalPayload");
   });
 
@@ -342,10 +348,10 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
 
     await repository(client({ query })).recomputeAffectedRollupsMany({ points });
 
-    // T6-F2: a UNION ALL of a FINAL seek per bucket ran ~1 GiB per statement.
+    // T6-F2: FINAL over wide columns ran ~1 GiB per statement.
     const near = reads[0]!;
     expect(near.sql).not.toContain("UNION ALL");
-    expect(near.sql.match(/FINAL/g)).toHaveLength(1);
+    expect(near.sql).not.toContain("FINAL");
     expect(near.params.from0).toBe(base);
     expect(near.params.to0).toBe(base + 30 * METRIC_ROLLUP_INTERVAL_MS);
     expect(near.params).not.toHaveProperty("series1");
@@ -353,13 +359,9 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
 
   /** @scenario "A rollup bucket read asks only for the columns a rollup uses" */
   it("leaves behind every column the fold never reads", async () => {
-    let bucketRead: string | undefined;
-    const query: MetricClickHouseClient["query"] = async ({ query: sql }) => {
-      if (!isSuccessorRead(sql)) bucketRead ??= sql;
-      return response([]);
-    };
+    const { queries, client: reader } = readerWithPredecessor();
 
-    await repository(client({ query })).recomputeAffectedRollupsMany({
+    await repository(reader).recomputeAffectedRollupsMany({
       points: [pointAt({ timeUnixMs: base + 1 })],
     });
 
@@ -367,6 +369,8 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
     // covers, not the rows returned — this read returns ~100 rows out of
     // millions scanned. Each column was decompressed millions of times and
     // discarded; the server OOMed inside one by name (`PointAttributesJson`).
+    const bucketRead = queries.find(isPayloadRead);
+    expect(bucketRead).not.toContain("FINAL");
     for (const column of [
       "CanonicalPayload",
       "PointAttributesJson",
@@ -406,9 +410,10 @@ describe("ClickHouseMetricDataPointAppendRepository", () => {
       retentionDays: 49,
     });
 
-    // Successors, then one bucket read. A live series never opens the
-    // partitions a retention-wide reverse seek would.
-    expect(queries).toHaveLength(2);
+    // Successors, the near key read, then the picked payload. A live series
+    // never opens the partitions a retention-wide reverse seek would.
+    expect(queries).toHaveLength(3);
+    expect(queries.filter(isPayloadRead)).toHaveLength(1);
   });
 
   /** @scenario "A rollup bucket read looks close before it looks far" */

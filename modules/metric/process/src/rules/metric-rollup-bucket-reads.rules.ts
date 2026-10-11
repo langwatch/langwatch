@@ -95,6 +95,76 @@ export function pointsForBucketSeeks<T extends MetricSequencePoint>({
   return picked;
 }
 
+/** An exact half-open time window `[from, to)` of one series. */
+export interface SeriesWindow {
+  seriesId: string;
+  from: number;
+  to: number;
+}
+
+/**
+ * Where the picked points' payload lives: per seek, `[its predecessor's time, end of bucket)`.
+ * The predecessor is the last stored point before the bucket, so nothing unpicked sits between
+ * them; windows that touch are merged.
+ */
+export function payloadWindows({
+  seeks,
+  picked,
+}: {
+  seeks: readonly BucketSeek[];
+  picked: Iterable<MetricSequencePoint>;
+}): SeriesWindow[] {
+  const timesBySeries = new Map<string, number[]>();
+  for (const { seriesId, timeUnixMs } of picked) {
+    const times = timesBySeries.get(seriesId);
+    if (times) times.push(timeUnixMs);
+    else timesBySeries.set(seriesId, [timeUnixMs]);
+  }
+  const windowsBySeries = new Map<string, SeriesWindow[]>();
+  for (const { seriesId, start } of seeks) {
+    const before = (timesBySeries.get(seriesId) ?? []).filter((time) => time < start);
+    const window = {
+      seriesId,
+      from: before.length > 0 ? Math.max(...before) : start,
+      to: start + METRIC_ROLLUP_INTERVAL_MS,
+    };
+    const windows = windowsBySeries.get(seriesId);
+    if (windows) windows.push(window);
+    else windowsBySeries.set(seriesId, [window]);
+  }
+  return [...windowsBySeries.values()].flatMap((windows) => mergeTouching(windows));
+}
+
+/** One series' windows, those that overlap or touch folded into one. */
+function mergeTouching(windows: readonly SeriesWindow[]): SeriesWindow[] {
+  const merged: SeriesWindow[] = [];
+  let current: SeriesWindow | undefined;
+  for (const window of windows.toSorted((a, b) => a.from - b.from)) {
+    if (current && window.from <= current.to) {
+      current.to = Math.max(current.to, window.to);
+      continue;
+    }
+    current = { ...window };
+    merged.push(current);
+  }
+  return merged;
+}
+
+/** What FINAL returned: per (series, point), the row with the highest dedup version. */
+export function newestVersions<T extends { seriesId: string; pointId: string }>({
+  rows,
+}: {
+  rows: Iterable<{ point: T; version: bigint }>;
+}): T[] {
+  const newest = new Map<string, { point: T; version: bigint }>();
+  for (const row of rows) {
+    const key = `${row.point.seriesId}\u0000${row.point.pointId}`;
+    const current = newest.get(key);
+    if (!current || row.version > current.version) newest.set(key, row);
+  }
+  return [...newest.values()].map(({ point }) => point);
+}
+
 function firstAtOrAfter({
   sorted,
   timeUnixMs,
