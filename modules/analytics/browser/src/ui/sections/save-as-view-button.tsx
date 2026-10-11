@@ -4,11 +4,10 @@
  * active; renders nothing where no SavedViewsProvider is mounted (a borrowed sidebar).
  */
 
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
-import { Button, HStack, Input, Text } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Button, Field, Input, Text } from "@langwatch/design-system/primitives";
 import { Check, ChevronDown, User, Users } from "lucide-react";
-import type React from "react";
 import { useCallback, useRef, useState } from "react";
 
 import { useSavedViewsIfMounted } from "../../behavior/use-saved-views.tsx";
@@ -20,31 +19,29 @@ export function SaveAsViewButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [viewName, setViewName] = useState("");
   const [scope, setScope] = useState<"project" | "myself">("project");
+  const [attempted, setAttempted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleOpen = useCallback(() => {
     setViewName("");
     setScope("project");
+    setAttempted(false);
     setIsOpen(true);
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
   const handleConfirm = useCallback(() => {
     const trimmed = viewName.trim();
-    if (!trimmed || !saveView) return;
+    if (!saveView) return;
+    if (!trimmed) {
+      setAttempted(true);
+      inputRef.current?.focus();
+      return;
+    }
     saveView(trimmed, scope);
     setIsOpen(false);
     setViewName("");
   }, [viewName, scope, saveView]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") {
-        handleConfirm();
-      }
-    },
-    [handleConfirm],
-  );
 
   if (!saveView) return null;
 
@@ -54,43 +51,29 @@ export function SaveAsViewButton() {
         Save as view
       </Button>
 
-      <Dialog.Root open={isOpen} onOpenChange={(e) => setIsOpen(e.open)} size="sm">
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Save as view</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Input
-              ref={inputRef}
-              placeholder="View name..."
-              value={viewName}
-              onChange={(e) => setViewName(e.target.value.slice(0, MAX_VIEW_NAME_LENGTH))}
-              onKeyDown={handleKeyDown}
-              data-testid="save-view-name-input"
-            />
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack width="full" justify="space-between">
-              <ScopeSelector scope={scope} onScopeChange={setScope} />
-              <HStack gap={2}>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsOpen(false);
-                    setViewName("");
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button colorPalette="orange" onClick={handleConfirm} disabled={!viewName.trim()}>
-                  Save
-                </Button>
-              </HStack>
-            </HStack>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
+      <Dialog
+        open={isOpen}
+        onClose={() => {
+          setIsOpen(false);
+          setViewName("");
+        }}
+        title="Save as view"
+        onSubmit={handleConfirm}
+        note={<ScopeSelector scope={scope} onScopeChange={setScope} />}
+        primaryAction={{ label: "Save", type: "submit" }}
+      >
+        <Field.Root invalid={attempted && !viewName.trim()}>
+          <Input
+            ref={inputRef}
+            aria-label="View name"
+            placeholder="View name..."
+            value={viewName}
+            onChange={(e) => setViewName(e.target.value.slice(0, MAX_VIEW_NAME_LENGTH))}
+            data-testid="save-view-name-input"
+          />
+          <Field.ErrorText>Enter a view name.</Field.ErrorText>
+        </Field.Root>
+      </Dialog>
     </>
   );
 }

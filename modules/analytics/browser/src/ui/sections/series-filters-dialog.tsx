@@ -5,7 +5,7 @@
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../../model/analytics-filter-params.ts";
@@ -27,36 +27,28 @@ export function SeriesFiltersDialog({
   const filters = seriesFilters ?? emptyFilters;
 
   return (
-    <Dialog.Root open={open} size="lg" onOpenChange={({ open: isOpen }) => onOpenChange(isOpen)}>
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Edit series filter</Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="start" gap={3}>
-            <Text textStyle="sm" color="fg.muted">
-              Add or remove filters for this analytics series.
-            </Text>
-            <FieldsFilters
-              filters={filters}
-              setFilters={(next) => {
-                const updated = Object.fromEntries(
-                  Object.entries(next).filter(([, value]) => value !== void 0),
-                ) as Record<FilterField, FilterParam>;
-                onChange({ filters: updated });
-              }}
-            />
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack justifyContent="flex-end" width="full">
-            <Button colorPalette="orange" onClick={() => onOpenChange(false)}>
-              Done
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      size="lg"
+      onClose={() => onOpenChange(false)}
+      title="Edit series filter"
+      cancelLabel={null}
+      primaryAction={{ label: "Done", onClick: () => onOpenChange(false) }}
+    >
+      <VStack align="start" gap={3}>
+        <Text textStyle="sm" color="fg.muted">
+          Add or remove filters for this analytics series.
+        </Text>
+        <FieldsFilters
+          filters={filters}
+          setFilters={(next) => {
+            const updated = Object.fromEntries(
+              Object.entries(next).filter(([, value]) => value !== void 0),
+            ) as Record<FilterField, FilterParam>;
+            onChange({ filters: updated });
+          }}
+        />
+      </VStack>
+    </Dialog>
   );
 }

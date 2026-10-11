@@ -1,4 +1,5 @@
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { Card } from "@langwatch/design-system/card";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -9,7 +10,6 @@ import {
   Accordion,
   Box,
   Button,
-  Card,
   Center,
   createListCollection,
   Field,
@@ -390,8 +390,8 @@ function AnalyticsCustomGraphContent({
               customId={customId}
               filterParams={filterParams}
             />
-            <Card.Root width="full">
-              <Card.Header paddingTop={3} paddingBottom={1} paddingX={3}>
+            <Card padding="lg">
+              <VStack align="stretch" gap={4}>
                 <HStack width="full" justify="space-between">
                   <Input
                     {...form.control.register(`title`)}
@@ -421,8 +421,6 @@ function AnalyticsCustomGraphContent({
                     </Menu.Root>
                   </HStack>
                 </HStack>
-              </Card.Header>
-              <Card.Body>
                 {debouncedCustomGraphInput && (
                   <CustomGraph
                     input={debouncedCustomGraphInput}
@@ -433,45 +431,35 @@ function AnalyticsCustomGraphContent({
                     }
                   />
                 )}
-              </Card.Body>
-            </Card.Root>
+              </VStack>
+            </Card>
             {showFilters && <FilterSidebar hideTopics={true} />}
           </HStack>
         </VStack>
       </PageLayout.Container>
-      <Dialog.Root
+      <Dialog
         open={jsonModal.open}
-        onOpenChange={({ open }) => jsonModal.setOpen(open)}
+        onClose={() => jsonModal.setOpen(false)}
+        title="Graph JSON"
         size="lg"
+        cancelLabel="Close"
       >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Graph JSON</Dialog.Title>
-            <Dialog.CloseTrigger />
-          </Dialog.Header>
-          <Dialog.Body>
-            <Textarea rows={16}>{JSON.stringify(debouncedCustomGraphInput, null, 2)}</Textarea>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
-      <Dialog.Root
+        <Textarea rows={16}>{JSON.stringify(debouncedCustomGraphInput, null, 2)}</Textarea>
+      </Dialog>
+      <Dialog
         open={apiModal.open}
-        onOpenChange={({ open }) => apiModal.setOpen(open)}
+        onClose={() => apiModal.setOpen(false)}
+        title="JSON API"
         size="lg"
+        cancelLabel="Close"
       >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>JSON API</Dialog.Title>
-            <Dialog.CloseTrigger />
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text paddingBottom={8}>
-              Incorporate the following JSON payload within the body of your HTTP POST request to
-              access identical data tailored for the custom graphs.
-            </Text>
-            <Box>
-              <CodePreview
-                code={`# Set your API key and endpoint URL
+        <Text paddingBottom={8}>
+          Incorporate the following JSON payload within the body of your HTTP POST request to access
+          identical data tailored for the custom graphs.
+        </Text>
+        <Box>
+          <CodePreview
+            code={`# Set your API key and endpoint URL
 API_KEY="your_langwatch_api_key"
 ENDPOINT="${langwatchEndpoint()}/api/analytics"
 
@@ -482,12 +470,10 @@ curl -X POST "$ENDPOINT" \\
      -d @- <<EOF
 ${JSON.stringify(debouncedCustomAPIInput, null, 2)}
 EOF`}
-                language="bash"
-              />
-            </Box>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+            language="bash"
+          />
+        </Box>
+      </Dialog>
     </SavedViewsScope>
   );
 }
