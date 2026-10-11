@@ -1,12 +1,8 @@
-// biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty
-// blocks in this file are deliberate no-ops.
-
 import { Banner } from "@langwatch/design-system/banner";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Alert,
   Box,
-  Button,
   Code,
   HStack,
   IconButton,
@@ -93,142 +89,123 @@ export function VirtualKeySecretReveal({
   };
 
   return (
-    // role="alertdialog" + closeOnInteractOutside/Escape=false prevent
-    // the operator from losing the show-once secret to an accidental
-    // outside-click or Escape — the only way out is the Close button
-    // at the footer, which itself is gated on the "I've saved this"
-    // checkbox. Cheap belt-and-suspenders vs. orphan VKs.
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={() => {}}
+      onClose={close}
+      title={kind === "rotate" ? "Save your rotated secret" : "Save your virtual key secret"}
+      size="lg"
       role="alertdialog"
-      closeOnInteractOutside={false}
-      closeOnEscape={false}
+      dismissible={false}
+      note={
+        <HStack>
+          <input
+            type="checkbox"
+            id="vk-secret-confirm"
+            data-testid="gateway-virtual-key-secret-confirm"
+            checked={confirmed}
+            onChange={(e) => setConfirmed(e.target.checked)}
+          />
+          <label htmlFor="vk-secret-confirm">
+            <Text fontSize="sm">I've saved the secret in a safe place.</Text>
+          </label>
+        </HStack>
+      }
+      primaryAction={{
+        label: "Close",
+        onClick: close,
+        disabledReason: confirmed ? void 0 : "Confirm you've saved the secret first",
+        "data-testid": "gateway-virtual-key-secret-close",
+      }}
     >
-      <Dialog.Content maxWidth="560px">
-        <Dialog.Header>
-          <Dialog.Title>
-            {kind === "rotate" ? "Save your rotated secret" : "Save your virtual key secret"}
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={4}>
-            <Alert.Root status="warning">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>You will only see this secret once.</Alert.Title>
-                <Alert.Description>
-                  LangWatch stores only a hash. Copy and save the raw secret in your password
-                  manager or secret store before closing.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
-            {kind === "rotate" && (
-              <Alert.Root status="info">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Title>24-hour grace window active.</Alert.Title>
-                  <Alert.Description>
-                    The previous secret keeps working for 24 hours so clients can roll over
-                    gradually. After that it hard-fails with a 401 even though this key stays
-                    active.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert.Root>
-            )}
+      <VStack align="stretch" gap={4}>
+        <Alert.Root status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>You will only see this secret once.</Alert.Title>
+            <Alert.Description>
+              LangWatch stores only a hash. Copy and save the raw secret in your password manager or
+              secret store before closing.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+        {kind === "rotate" && (
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>24-hour grace window active.</Alert.Title>
+              <Alert.Description>
+                The previous secret keeps working for 24 hours so clients can roll over gradually.
+                After that it hard-fails with a 401 even though this key stays active.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        )}
 
-            <VStack align="start" gap={1}>
-              <Text fontSize="sm" color="fg.muted">
-                Virtual key name
-              </Text>
-              <Text fontWeight="medium">{keyName}</Text>
-            </VStack>
+        <VStack align="start" gap={1}>
+          <Text fontSize="sm" color="fg.muted">
+            Virtual key name
+          </Text>
+          <Text fontWeight="medium">{keyName}</Text>
+        </VStack>
 
-            <VStack align="stretch" gap={2}>
-              <Text fontSize="sm" color="fg.muted">
-                Secret
-              </Text>
-              <HStack
-                data-tour="vk-secret"
-                border="1px solid"
-                borderColor="border.subtle"
-                borderRadius="md"
-                padding={2}
-                gap={2}
+        <VStack align="stretch" gap={2}>
+          <Text fontSize="sm" color="fg.muted">
+            Secret
+          </Text>
+          <HStack
+            data-tour="vk-secret"
+            border="1px solid"
+            borderColor="border.subtle"
+            borderRadius="md"
+            padding={2}
+            gap={2}
+          >
+            <Box flex={1} overflowX="auto">
+              <Code
+                fontSize="sm"
+                bg="transparent"
+                paddingX={0}
+                whiteSpace="nowrap"
+                userSelect="all"
+                data-testid="gateway-virtual-key-secret"
               >
-                <Box flex={1} overflowX="auto">
-                  <Code
-                    fontSize="sm"
-                    bg="transparent"
-                    paddingX={0}
-                    whiteSpace="nowrap"
-                    userSelect="all"
-                    data-testid="gateway-virtual-key-secret"
-                  >
-                    {revealed ? secret : maskSecret(secret)}
-                  </Code>
-                </Box>
-                <IconButton
-                  data-testid="gateway-virtual-key-secret-reveal"
-                  aria-label={revealed ? "Hide secret" : "Reveal secret"}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setRevealed((v) => !v)}
-                >
-                  {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
-                </IconButton>
-                <IconButton
-                  data-testid="gateway-virtual-key-secret-copy"
-                  aria-label="Copy secret"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void handleCopy()}
-                >
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                </IconButton>
-              </HStack>
-              {copyFailed && (
-                <Banner
-                  status="error"
-                  title="Couldn't copy to the clipboard."
-                  data-testid="gateway-virtual-key-secret-copy-failed"
-                >
-                  Reveal the secret and copy it by hand, or try again.
-                </Banner>
-              )}
-            </VStack>
-
-            <Separator />
-            <VirtualKeyUsageSnippet secret={secret} model={model} />
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack width="full" gap={4}>
-            <HStack>
-              <input
-                type="checkbox"
-                id="vk-secret-confirm"
-                data-testid="gateway-virtual-key-secret-confirm"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-              />
-              <label htmlFor="vk-secret-confirm">
-                <Text fontSize="sm">I've saved the secret in a safe place.</Text>
-              </label>
-            </HStack>
-            <Box flex={1} />
-            <Button
-              colorPalette="orange"
-              data-testid="gateway-virtual-key-secret-close"
-              onClick={close}
-              disabled={!confirmed}
+                {revealed ? secret : maskSecret(secret)}
+              </Code>
+            </Box>
+            <IconButton
+              data-testid="gateway-virtual-key-secret-reveal"
+              aria-label={revealed ? "Hide secret" : "Reveal secret"}
+              variant="ghost"
+              size="sm"
+              onClick={() => setRevealed((v) => !v)}
             >
-              Close
-            </Button>
+              {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
+            </IconButton>
+            <IconButton
+              data-testid="gateway-virtual-key-secret-copy"
+              aria-label="Copy secret"
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleCopy()}
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+            </IconButton>
           </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+          {copyFailed && (
+            <Banner
+              status="error"
+              title="Couldn't copy to the clipboard."
+              data-testid="gateway-virtual-key-secret-copy-failed"
+            >
+              Reveal the secret and copy it by hand, or try again.
+            </Banner>
+          )}
+        </VStack>
+
+        <Separator />
+        <VirtualKeyUsageSnippet secret={secret} model={model} />
+      </VStack>
+    </Dialog>
   );
 }
 
