@@ -5,15 +5,17 @@ import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { CodePreview } from "@langwatch/design-system/code-preview";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import {
   API_KEY_PLACEHOLDER,
   PersonalAccessTokenBanner,
 } from "@langwatch/design-system/personal-access-token-banner";
-import { Box, Heading, HStack, Tabs, Tag, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Heading, HStack, Tag, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
+import { useState } from "react";
 import { Info } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 
@@ -162,6 +164,7 @@ export function EvaluationManualIntegration({
   checkSlug?: string;
 }) {
   const isGuardrail = executionMode === EvaluationExecutionMode.AS_GUARDRAIL;
+  const [language, setLanguage] = useState("python");
   const checkSlug = storeSettingsOnCode ? checkType : slug;
 
   const { project, organization } = useOrganizationTeamProject();
@@ -236,47 +239,75 @@ export function EvaluationManualIntegration({
           </Tooltip>
         </HStack>
       )}
-      <Tabs.Root defaultValue="python" width="full" colorPalette="orange">
-        <Tabs.List marginBottom={4}>
-          <Tabs.Trigger value="python">Python</Tabs.Trigger>
-          <Tabs.Trigger value="python-async">Python (Async)</Tabs.Trigger>
-          <Tabs.Trigger value="typescript">TypeScript</Tabs.Trigger>
-          <Tabs.Trigger value="go">Go</Tabs.Trigger>
-          <Tabs.Trigger value="curl">Curl</Tabs.Trigger>
-        </Tabs.List>
-
-        <Tabs.Content value="python" padding={0}>
-          <PythonInstructions async={false} snippet={snippet} />
-        </Tabs.Content>
-        <Tabs.Content value="python-async" padding={0}>
-          <PythonInstructions async={true} snippet={snippet} />
-        </Tabs.Content>
-        <Tabs.Content value="typescript" padding={0}>
-          <TypeScriptInstructions snippet={snippet} />
-        </Tabs.Content>
-        <Tabs.Content value="go" padding={0}>
-          <GoInstructions snippet={snippet} />
-        </Tabs.Content>
-        <Tabs.Content value="curl" padding={0}>
-          <VStack align="start" width="full" gap={3}>
-            {project && organization && (
-              <PersonalAccessTokenBanner
-                token={token}
-                isCreating={minting.isMinting}
-                scopeNote={minting.scopeNote}
-                onCreate={() =>
-                  void minting.mint().catch((error: unknown) =>
-                    showErrorToast({
-                      error,
-                      fallbackTitle: "Couldn't create the personal access token",
-                    }),
-                  )
-                }
-              />
-            )}
-            <Box className="markdown" width="full">
-              <CodePreview
-                code={`# Set your API key and endpoint URL
+      <Box width="full">
+        <ContentTabs
+          label="Integration language"
+          value={language}
+          onValueChange={({ value }) => setLanguage(value)}
+          density="default"
+          body="flush"
+          mount="all"
+          items={[
+            {
+              value: "python",
+              label: "Python",
+              content: (
+                <Box paddingTop={4}>
+                  <PythonInstructions async={false} snippet={snippet} />
+                </Box>
+              ),
+            },
+            {
+              value: "python-async",
+              label: "Python (Async)",
+              content: (
+                <Box paddingTop={4}>
+                  <PythonInstructions async={true} snippet={snippet} />
+                </Box>
+              ),
+            },
+            {
+              value: "typescript",
+              label: "TypeScript",
+              content: (
+                <Box paddingTop={4}>
+                  <TypeScriptInstructions snippet={snippet} />
+                </Box>
+              ),
+            },
+            {
+              value: "go",
+              label: "Go",
+              content: (
+                <Box paddingTop={4}>
+                  <GoInstructions snippet={snippet} />
+                </Box>
+              ),
+            },
+            {
+              value: "curl",
+              label: "Curl",
+              content: (
+                <Box paddingTop={4}>
+                  <VStack align="start" width="full" gap={3}>
+                    {project && organization && (
+                      <PersonalAccessTokenBanner
+                        token={token}
+                        isCreating={minting.isMinting}
+                        scopeNote={minting.scopeNote}
+                        onCreate={() =>
+                          void minting.mint().catch((error: unknown) =>
+                            showErrorToast({
+                              error,
+                              fallbackTitle: "Couldn't create the personal access token",
+                            }),
+                          )
+                        }
+                      />
+                    )}
+                    <Box className="markdown" width="full">
+                      <CodePreview
+                        code={`# Set your API key and endpoint URL
 API_KEY="${token ?? API_KEY_PLACEHOLDER}"
 
 # Use curl to send the POST request, e.g.:
@@ -299,28 +330,32 @@ curl -X POST "${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate" \\
   }${isGuardrail ? `,\n  "as_guardrail": true` : ""}${settingsParamsCurl}
 }
 EOF`}
-                language="bash"
-              />
-            </Box>
-            <Text>Response:</Text>
-            <Box className="markdown" width="full">
-              <CodePreview
-                code={JSON.stringify(
-                  {
-                    status: "processed",
-                    passed: true,
-                    score: 1,
-                    details: "possible explanation",
-                  },
-                  null,
-                  2,
-                )}
-                language="json"
-              />
-            </Box>
-          </VStack>
-        </Tabs.Content>
-      </Tabs.Root>
+                        language="bash"
+                      />
+                    </Box>
+                    <Text>Response:</Text>
+                    <Box className="markdown" width="full">
+                      <CodePreview
+                        code={JSON.stringify(
+                          {
+                            status: "processed",
+                            passed: true,
+                            score: 1,
+                            details: "possible explanation",
+                          },
+                          null,
+                          2,
+                        )}
+                        language="json"
+                      />
+                    </Box>
+                  </VStack>
+                </Box>
+              ),
+            },
+          ]}
+        />
+      </Box>
     </VStack>
   );
 }
