@@ -1,5 +1,13 @@
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Card, Grid, GridItem, Heading, Tabs } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Card as LegacyCard,
+  Grid,
+  GridItem,
+  Heading,
+  Tabs,
+} from "@langwatch/design-system/primitives";
 import { Users } from "lucide-react";
 
 import { analyticsMetrics } from "../../model/analytics-registry.ts";
@@ -113,8 +121,8 @@ export function UserMetrics() {
       gap={6}
     >
       <GridItem>
-        <Card.Root>
-          <Card.Body paddingTop={2}>
+        <Card padding="none">
+          <Box paddingX={5} paddingBottom={5} paddingTop={2}>
             <Tabs.Root
               variant="line"
               defaultValue="messages"
@@ -164,28 +172,28 @@ export function UserMetrics() {
                 <CustomGraph input={usersGraph} emptyState={userEmptyState} />
               </Tabs.Content>
             </Tabs.Root>
-          </Card.Body>
-        </Card.Root>
+          </Box>
+        </Card>
       </GridItem>
       <GridItem rowSpan={2}>
-        <Card.Root width="100%" height="100%">
-          <Card.Header paddingBottom={4}>
+        <LegacyCard.Root width="100%" height="100%">
+          <LegacyCard.Header paddingBottom={4}>
             <Heading textStyle="cardTitle">Top topics</Heading>
-          </Card.Header>
-          <Card.Body overflowY="auto">
+          </LegacyCard.Header>
+          <LegacyCard.Body overflowY="auto">
             <TopicsSelector showTitle={false} />
-          </Card.Body>
-        </Card.Root>
+          </LegacyCard.Body>
+        </LegacyCard.Root>
       </GridItem>
       <GridItem>
-        <Card.Root overflow="auto">
-          <Card.Header>
+        <LegacyCard.Root overflow="auto">
+          <LegacyCard.Header>
             <Heading textStyle="cardTitle">Thread metrics</Heading>
-          </Card.Header>
-          <Card.Body>
+          </LegacyCard.Header>
+          <LegacyCard.Body>
             <CustomGraph input={threadMetrics} />
-          </Card.Body>
-        </Card.Root>
+          </LegacyCard.Body>
+        </LegacyCard.Root>
       </GridItem>
     </Grid>
   );

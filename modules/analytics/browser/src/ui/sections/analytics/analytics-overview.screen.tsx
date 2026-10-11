@@ -1,13 +1,14 @@
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
+import { MetricTabs } from "@langwatch/design-system/metric-tabs";
 import {
   Box,
   Button,
-  Card,
+  Card as LinkCard,
   Flex,
   Grid,
   Heading,
   HStack,
-  Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -66,6 +67,9 @@ function AnalyticsContent() {
   );
 }
 
+/** The documents section has one metric, so there is no other tab to select. */
+function keepOnlyTab() {}
+
 function DocumentsMetrics() {
   const { filterParams, queryOpts } = useFilterParams();
   const params = useMemo(() => ({ filterParams, queryOpts }), [filterParams, queryOpts]);
@@ -86,25 +90,21 @@ function DocumentsMetrics() {
           Documents
         </Heading>
       </HStack>
-      <Card.Root width="full">
-        <Card.Body>
-          <Tabs.Root variant="line" defaultValue="total-documents">
-            <Tabs.List gap={12}>
-              <Tabs.Trigger value="total-documents" paddingX={0} paddingBottom={4}>
-                <VStack align="start">
-                  <Text color="fg">Total documents</Text>
-                  <Box textStyle="2xl" color="fg" fontWeight="bold">
-                    <DocumentsCountsSummary params={params} />
-                  </Box>
-                </VStack>
-              </Tabs.Trigger>
-            </Tabs.List>
-            <Tabs.Content value="total-documents">
-              <DocumentsCountsTable params={params} />
-            </Tabs.Content>
-          </Tabs.Root>
-        </Card.Body>
-      </Card.Root>
+      <Card padding="lg">
+        <MetricTabs
+          value="total-documents"
+          onValueChange={keepOnlyTab}
+          label="Documents"
+          items={[
+            {
+              value: "total-documents",
+              label: "Total documents",
+              figure: <DocumentsCountsSummary params={params} />,
+              content: <DocumentsCountsTable params={params} />,
+            },
+          ]}
+        />
+      </Card>
     </>
   );
 }
@@ -123,8 +123,8 @@ function CustomReportsSection({ slug }: { slug: string }) {
         <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
           Custom Dashboards
         </Heading>
-        <Card.Root borderStyle="dashed">
-          <Card.Body padding={5}>
+        <LinkCard.Root borderStyle="dashed">
+          <LinkCard.Body padding={5}>
             <HStack gap={4}>
               <Box color="fg.subtle">
                 <BarChart2 size={20} />
@@ -143,8 +143,8 @@ function CustomReportsSection({ slug }: { slug: string }) {
                 </Button>
               </Link>
             </HStack>
-          </Card.Body>
-        </Card.Root>
+          </LinkCard.Body>
+        </LinkCard.Root>
       </>
     );
   }
@@ -163,14 +163,14 @@ function CustomReportsSection({ slug }: { slug: string }) {
             href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
             _hover={{ textDecoration: "none" }}
           >
-            <Card.Root
+            <LinkCard.Root
               width="full"
               cursor="pointer"
               borderColor="border"
               _hover={{ borderColor: "orange.emphasized", shadow: "sm" }}
               transition="all 0.15s ease"
             >
-              <Card.Body paddingX={4} paddingY={3}>
+              <LinkCard.Body paddingX={4} paddingY={3}>
                 <Flex gap={3} alignItems="center">
                   <Box padding={2} borderRadius="md" bg="orange.subtle" color="orange.fg">
                     <BarChart2 size={16} />
@@ -187,8 +187,8 @@ function CustomReportsSection({ slug }: { slug: string }) {
                     <ArrowUpRight size={14} />
                   </Box>
                 </Flex>
-              </Card.Body>
-            </Card.Root>
+              </LinkCard.Body>
+            </LinkCard.Root>
           </Link>
         ))}
       </Grid>

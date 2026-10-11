@@ -1,5 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import {
-  Card,
+  Card as LegacyCard,
   Grid,
   GridItem,
   Heading,
@@ -166,74 +167,72 @@ export function LLMMetrics() {
       </HStack>
       <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
         <GridItem colSpan={2}>
-          <Card.Root>
-            <Card.Body>
-              <Tabs.Root
-                variant="line"
-                defaultValue="llmCallsGraph"
-                // Every panel here is a read-only CustomGraph analytics
-                // query with no user-entered state, so fully unmounting
-                // inactive tabs is safe and avoids firing/holding queries
-                // for graphs the user never looks at.
-                lazyMount
-                unmountOnExit
-              >
-                <Tabs.List gap={12}>
-                  <Tabs.Trigger value="llmCallsGraph" paddingX={0} paddingBottom={4}>
-                    <CustomGraph
-                      input={{
-                        ...llmCallsGraph,
-                        graphType: "summary",
-                        groupBy: undefined,
-                      }}
-                      titleProps={{
-                        textStyle: "sm",
-                        color: "fg",
-                      }}
-                    />
-                  </Tabs.Trigger>
-                  {hasPermission("cost:view") && (
-                    <Tabs.Trigger value="totalCostGraph" paddingX={0} paddingBottom={4}>
-                      <CustomGraph
-                        input={{ ...totalCostGraph, graphType: "summary" }}
-                        titleProps={{
-                          textStyle: "sm",
-                          color: "fg",
-                        }}
-                      />
-                    </Tabs.Trigger>
-                  )}
-                  <Tabs.Trigger value="tokensGraph" paddingX={0} paddingBottom={4}>
-                    <CustomGraph
-                      input={totalTokensSummary}
-                      titleProps={{
-                        textStyle: "sm",
-                        color: "fg",
-                      }}
-                    />
-                  </Tabs.Trigger>
-                </Tabs.List>
-                <Tabs.Content value="llmCallsGraph">
-                  <CustomGraph input={llmCallsGraph} />
-                </Tabs.Content>
+          <Card padding="lg">
+            <Tabs.Root
+              variant="line"
+              defaultValue="llmCallsGraph"
+              // Every panel here is a read-only CustomGraph analytics
+              // query with no user-entered state, so fully unmounting
+              // inactive tabs is safe and avoids firing/holding queries
+              // for graphs the user never looks at.
+              lazyMount
+              unmountOnExit
+            >
+              <Tabs.List gap={12}>
+                <Tabs.Trigger value="llmCallsGraph" paddingX={0} paddingBottom={4}>
+                  <CustomGraph
+                    input={{
+                      ...llmCallsGraph,
+                      graphType: "summary",
+                      groupBy: undefined,
+                    }}
+                    titleProps={{
+                      textStyle: "sm",
+                      color: "fg",
+                    }}
+                  />
+                </Tabs.Trigger>
                 {hasPermission("cost:view") && (
-                  <Tabs.Content value="totalCostGraph">
-                    <CustomGraph input={totalCostGraph} />
-                  </Tabs.Content>
+                  <Tabs.Trigger value="totalCostGraph" paddingX={0} paddingBottom={4}>
+                    <CustomGraph
+                      input={{ ...totalCostGraph, graphType: "summary" }}
+                      titleProps={{
+                        textStyle: "sm",
+                        color: "fg",
+                      }}
+                    />
+                  </Tabs.Trigger>
                 )}
-                <Tabs.Content value="tokensGraph">
-                  <CustomGraph input={tokensGraph} />
+                <Tabs.Trigger value="tokensGraph" paddingX={0} paddingBottom={4}>
+                  <CustomGraph
+                    input={totalTokensSummary}
+                    titleProps={{
+                      textStyle: "sm",
+                      color: "fg",
+                    }}
+                  />
+                </Tabs.Trigger>
+              </Tabs.List>
+              <Tabs.Content value="llmCallsGraph">
+                <CustomGraph input={llmCallsGraph} />
+              </Tabs.Content>
+              {hasPermission("cost:view") && (
+                <Tabs.Content value="totalCostGraph">
+                  <CustomGraph input={totalCostGraph} />
                 </Tabs.Content>
-              </Tabs.Root>
-            </Card.Body>
-          </Card.Root>
+              )}
+              <Tabs.Content value="tokensGraph">
+                <CustomGraph input={tokensGraph} />
+              </Tabs.Content>
+            </Tabs.Root>
+          </Card>
         </GridItem>
         <GridItem>
           <LLMSummary />
         </GridItem>
         <GridItem>
-          <Card.Root height="full">
-            <Card.Header>
+          <LegacyCard.Root height="full">
+            <LegacyCard.Header>
               <HStack gap={1}>
                 <Heading textStyle="cardTitle">Evaluations summary</Heading>
                 <Tooltip content="View online evaluations">
@@ -249,36 +248,36 @@ export function LLMMetrics() {
                   </Link>
                 </Tooltip>
               </HStack>
-            </Card.Header>
-            <Card.Body>
+            </LegacyCard.Header>
+            <LegacyCard.Body>
               <CustomGraph
                 input={{
                   ...evaluationsSummary,
                   graphType: "summary",
                 }}
               />
-            </Card.Body>
-          </Card.Root>
+            </LegacyCard.Body>
+          </LegacyCard.Root>
         </GridItem>
         <GridItem>
-          <Card.Root height="full">
-            <Card.Header>
+          <LegacyCard.Root height="full">
+            <LegacyCard.Header>
               <Heading textStyle="cardTitle">Error trend</Heading>
-            </Card.Header>
-            <Card.Body>
+            </LegacyCard.Header>
+            <LegacyCard.Body>
               <CustomGraph input={errorTrend} />
-            </Card.Body>
-          </Card.Root>
+            </LegacyCard.Body>
+          </LegacyCard.Root>
         </GridItem>
         <GridItem>
-          <Card.Root height="full">
-            <Card.Header>
+          <LegacyCard.Root height="full">
+            <LegacyCard.Header>
               <Heading textStyle="cardTitle">Latency trend</Heading>
-            </Card.Header>
-            <Card.Body>
+            </LegacyCard.Header>
+            <LegacyCard.Body>
               <CustomGraph input={latencyTrend} />
-            </Card.Body>
-          </Card.Root>
+            </LegacyCard.Body>
+          </LegacyCard.Root>
         </GridItem>
       </Grid>
     </>

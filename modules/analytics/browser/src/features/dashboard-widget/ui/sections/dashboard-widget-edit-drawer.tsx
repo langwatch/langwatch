@@ -5,8 +5,9 @@
  */
 
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
-import { Box, Button, Spacer, Tabs } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Button } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 
@@ -44,6 +45,20 @@ interface DashboardWidgetEditDrawerProps {
   onTabChange: (tab: "code" | "queries") => void;
 }
 
+/** Why Save is off, or undefined when the draft can be saved. */
+function saveBlockedReason({
+  isDirty,
+  queries,
+}: {
+  isDirty: boolean;
+  queries: DashboardWidgetQuery[];
+}): string | undefined {
+  if (!isDirty) return "No changes to save";
+  if (!queryNamesAreValid(queries)) return "Give every query a non-empty, unique name";
+  if (!declaredParamsAreValid(queries)) return "A declared parameter has an invalid name";
+  return void 0;
+}
+
 export function DashboardWidgetEditDrawer({
   open,
   projectId,
@@ -64,60 +79,45 @@ export function DashboardWidgetEditDrawer({
   activeTab,
   onTabChange,
 }: DashboardWidgetEditDrawerProps) {
-  const canSave = isDirty && queryNamesAreValid(queries) && declaredParamsAreValid(queries);
-
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      onOpenChange={(e) => {
-        if (!e.open) onClose();
-      }}
+      onClose={onClose}
       size="xl"
+      title={name === "" ? "Widget" : name}
+      titleContent={
+        <EditableWidgetName name={name} id={id} onRename={onNameChange} fontSize="md" />
+      }
+      bodyScroll="content"
+      footer={{
+        cancel: { onClick: onClose, "data-testid": "analytics-widget-cancel" },
+        primaryAction: {
+          label: "Save",
+          onClick: onSave,
+          loading: isSaving,
+          disabledReason: saveBlockedReason({ isDirty, queries }),
+          "data-testid": "analytics-widget-save",
+        },
+        busy: isSaving,
+      }}
     >
-      <Drawer.Content display="flex" flexDirection="column">
-        <Drawer.Header>
-          <EditableWidgetName name={name} id={id} onRename={onNameChange} fontSize="md" />
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body display="flex" flexDirection="column" minHeight={0} flex={1}>
-          {chart && (
-            <Box flexShrink={0} marginBottom={3}>
-              {chart}
-            </Box>
-          )}
-          <WidgetEditTabs
-            projectId={projectId}
-            activeTab={activeTab}
-            onTabChange={onTabChange}
-            code={code}
-            onCodeChange={onCodeChange}
-            queries={queries}
-            onQueriesChange={onQueriesChange}
-            lastRuns={lastRuns}
-            onRun={onRun}
-          />
-        </Drawer.Body>
-        <Drawer.Footer flexShrink={0}>
-          <Button
-            variant="outline"
-            data-testid="analytics-widget-cancel"
-            onClick={onClose}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            data-testid="analytics-widget-save"
-            loading={isSaving}
-            disabled={!canSave}
-            onClick={onSave}
-          >
-            Save
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      {chart && (
+        <Box flexShrink={0} marginBottom={3}>
+          {chart}
+        </Box>
+      )}
+      <WidgetEditTabs
+        projectId={projectId}
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        code={code}
+        onCodeChange={onCodeChange}
+        queries={queries}
+        onQueriesChange={onQueriesChange}
+        lastRuns={lastRuns}
+        onRun={onRun}
+      />
+    </Drawer>
   );
 }
 
@@ -152,75 +152,62 @@ function WidgetEditTabs({
     [queries, lastRuns],
   );
   return (
-    <Tabs.Root
+    <ContentTabs
       value={activeTab}
-      onValueChange={(e) => onTabChange(e.value as "code" | "queries")}
-      colorPalette="orange"
-      size="sm"
-      display="flex"
-      flexDirection="column"
-      flex={1}
-      minHeight={0}
-    >
-      {/* Same Tabs setup as the HTTP agent's Body/Auth toggle
-          (`components/agents/http/HttpConfigEditor.tsx`) — a bottom
-          border on the list plus `colorPalette` is enough for Chakra's
-          own recipe to show the selected tab; no hand-rolled
-          `Tabs.Indicator`. */}
-      <Tabs.List flexShrink={0} alignItems="center" borderBottomWidth="1px" borderColor="border">
-        <Tabs.Trigger value="code" data-testid="analytics-widget-tab-code">
-          Code
-        </Tabs.Trigger>
-        <Tabs.Trigger value="queries" data-testid="analytics-widget-tab-queries">
-          Queries ({queries.length})
-        </Tabs.Trigger>
-        <Spacer />
-        {activeTab === "queries" && (
+      onValueChange={({ value }) => onTabChange(value)}
+      label="Widget editor"
+      body="flush"
+      scroll="content"
+      mount="all"
+      actions={
+        activeTab === "queries" ? (
           <AddQueryButton queries={queries} onQueriesChange={onQueriesChange} />
-        )}
-      </Tabs.List>
-
-      <Tabs.Content
-        value="code"
-        flex={1}
-        minHeight={0}
-        display="flex"
-        flexDirection="column"
-        paddingTop={3}
-      >
-        <Box
-          flex={1}
-          minHeight={0}
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          overflow="hidden"
-        >
-          <DashboardWidgetCodeEditor
-            value={code}
-            onChange={onCodeChange}
-            queryColumns={queryColumns}
-          />
-        </Box>
-      </Tabs.Content>
-
-      <Tabs.Content
-        value="queries"
-        flex={1}
-        minHeight={0}
-        display="flex"
-        flexDirection="column"
-        paddingTop={3}
-      >
-        <DashboardWidgetQueriesPanel
-          projectId={projectId}
-          queries={queries}
-          onChange={onQueriesChange}
-          lastRuns={lastRuns}
-          onRun={onRun}
-        />
-      </Tabs.Content>
-    </Tabs.Root>
+        ) : (
+          void 0
+        )
+      }
+      items={[
+        {
+          value: "code",
+          label: "Code",
+          testId: "analytics-widget-tab-code",
+          content: (
+            <Box flex={1} minHeight={0} display="flex" flexDirection="column" paddingTop={3}>
+              <Box
+                flex={1}
+                minHeight={0}
+                borderWidth="1px"
+                borderColor="border"
+                borderRadius="md"
+                overflow="hidden"
+              >
+                <DashboardWidgetCodeEditor
+                  value={code}
+                  onChange={onCodeChange}
+                  queryColumns={queryColumns}
+                />
+              </Box>
+            </Box>
+          ),
+        },
+        {
+          value: "queries",
+          label: `Queries (${queries.length})`,
+          testId: "analytics-widget-tab-queries",
+          content: (
+            <Box flex={1} minHeight={0} display="flex" flexDirection="column" paddingTop={3}>
+              <DashboardWidgetQueriesPanel
+                projectId={projectId}
+                queries={queries}
+                onChange={onQueriesChange}
+                lastRuns={lastRuns}
+                onRun={onRun}
+              />
+            </Box>
+          ),
+        },
+      ]}
+    />
   );
 }
 
