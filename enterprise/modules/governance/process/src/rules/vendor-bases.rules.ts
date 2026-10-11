@@ -10,6 +10,8 @@ export type VendorBases = Readonly<{
   microsoftGraph: string;
   /** The one Databricks workspace origin accepted beside the three clouds, when one is named. */
   databricksWorkspace: string | undefined;
+  /** The one Dataverse environment address accepted beside the real Dynamics clouds, when one is named. */
+  dataverseEnvironment: string | undefined;
 }>;
 
 export const REAL_VENDOR_BASES: VendorBases = {
@@ -18,6 +20,7 @@ export const REAL_VENDOR_BASES: VendorBases = {
   microsoftLogin: "https://login.microsoftonline.com",
   microsoftGraph: "https://graph.microsoft.com",
   databricksWorkspace: undefined,
+  dataverseEnvironment: undefined,
 };
 
 function withoutTrailingSlash(value: string): string {
@@ -36,6 +39,7 @@ export function vendorBasesOf({
         | "microsoftLoginBase"
         | "microsoftGraphApiBase"
         | "databricksWorkspaceBase"
+        | "dataverseEnvironmentBase"
       >
     | undefined;
 }): VendorBases {
@@ -48,6 +52,9 @@ export function vendorBasesOf({
     microsoftGraph: pick(config?.microsoftGraphApiBase, REAL_VENDOR_BASES.microsoftGraph),
     databricksWorkspace: config?.databricksWorkspaceBase
       ? withoutTrailingSlash(config.databricksWorkspaceBase)
+      : undefined,
+    dataverseEnvironment: config?.dataverseEnvironmentBase
+      ? withoutTrailingSlash(config.dataverseEnvironmentBase)
       : undefined,
   };
 }
@@ -63,6 +70,7 @@ export function exemptOriginsOf({ bases }: { bases: VendorBases }): string[] {
     bases.microsoftLogin,
     bases.microsoftGraph,
     bases.databricksWorkspace,
+    bases.dataverseEnvironment,
   ];
   const real = new Set<string | undefined>(Object.values(REAL_VENDOR_BASES));
   return configured.flatMap((base) => {

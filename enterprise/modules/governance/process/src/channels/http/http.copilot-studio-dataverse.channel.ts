@@ -296,7 +296,7 @@ export class HttpCopilotStudioDataverseChannel
   ): HttpCopilotStudioDataverseChannel {
     return new HttpCopilotStudioDataverseChannel(http, {
       directory: HttpMicrosoftDirectoryChannel.create({ http, vendorBases }),
-      copilotBots: HttpCopilotBotsChannel.create({ http }),
+      copilotBots: HttpCopilotBotsChannel.create({ http, vendorBases }),
       bases: vendorBases,
     });
   }
@@ -306,7 +306,7 @@ export class HttpCopilotStudioDataverseChannel
     // The same check the write path runs, repeated here so a config that
     // reached the adapter by any other route still cannot send the secret
     // somewhere Microsoft does not serve.
-    if (!isEnvironmentOrigin(parsed.environmentUrl)) {
+    if (!isEnvironmentOrigin(parsed.environmentUrl, this.bases.dataverseEnvironment)) {
       throw new Error("environmentUrl must be an https Power Platform environment address");
     }
     return parsed;
@@ -775,6 +775,7 @@ export class HttpCopilotStudioDataverseChannel
         HttpCopilotStudioDataverseChannel.refusesNextLink({
           link: nextLink,
           environmentUrl: config.environmentUrl,
+          configuredBase: this.bases.dataverseEnvironment,
           walk,
         })
       ) {
@@ -1276,10 +1277,11 @@ export class HttpCopilotStudioDataverseChannel
   private static refusesNextLink(params: {
     link: string | null;
     environmentUrl: string;
+    configuredBase?: string;
     walk: TranscriptWalk;
   }): boolean {
-    const { link, environmentUrl, walk } = params;
-    if (!link || isSameEnvironment({ value: link, environmentUrl })) return false;
+    const { link, environmentUrl, configuredBase, walk } = params;
+    if (!link || isSameEnvironment({ value: link, environmentUrl, configuredBase })) return false;
     walk.errorCount += 1;
     // The host, not the URL: the refused link carries a skip token and query
     // shape that add nothing here, and the host is the whole of what an

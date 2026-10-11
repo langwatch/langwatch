@@ -8,6 +8,7 @@ const unset = {
   microsoftLoginBase: undefined,
   microsoftGraphApiBase: undefined,
   databricksWorkspaceBase: undefined,
+  dataverseEnvironmentBase: undefined,
 };
 
 describe("vendorBasesOf()", () => {
@@ -39,8 +40,14 @@ describe("exemptOriginsOf()", () => {
         ...unset,
         anthropicAdminApiBase: "http://localhost:6970/anthropic",
         databricksWorkspaceBase: "http://localhost:6970",
+        dataverseEnvironmentBase: "http://localhost:6970/dataverse/",
       },
     });
-    expect(exemptOriginsOf({ bases })).toEqual(["http://localhost:6970", "http://localhost:6970"]);
+    expect(bases.dataverseEnvironment).toBe("http://localhost:6970/dataverse");
+    expect(exemptOriginsOf({ bases })).toEqual([
+      "http://localhost:6970",
+      "http://localhost:6970",
+      "http://localhost:6970",
+    ]);
   });
 });

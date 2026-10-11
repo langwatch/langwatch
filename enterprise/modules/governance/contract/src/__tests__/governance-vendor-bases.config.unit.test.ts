@@ -9,6 +9,7 @@ const leaves = [
   ["MICROSOFT_LOGIN_BASE", "microsoftLoginBase"],
   ["MICROSOFT_GRAPH_API_BASE", "microsoftGraphApiBase"],
   ["DATABRICKS_WORKSPACE_BASE", "databricksWorkspaceBase"],
+  ["DATAVERSE_ENVIRONMENT_BASE", "dataverseEnvironmentBase"],
 ] as const;
 
 function parse(environment: Record<string, string>) {

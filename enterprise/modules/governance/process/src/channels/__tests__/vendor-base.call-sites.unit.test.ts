@@ -26,6 +26,7 @@ const configured: VendorBases = {
   microsoftLogin: `${SIM}/microsoft-login`,
   microsoftGraph: `${SIM}/microsoft-graph`,
   databricksWorkspace: SIM,
+  dataverseEnvironment: `${SIM}/dataverse`,
 };
 
 class RecordingHttp implements GovernanceHttpClient {

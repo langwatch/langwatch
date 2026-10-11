@@ -862,7 +862,7 @@ export class GovernanceModule implements GovernanceRestApi {
       sourceCredentials,
       signIn,
       genieSpaces: channels.genieSpaces.create({ http }),
-      copilotBots: channels.copilotBots.create({ http }),
+      copilotBots: channels.copilotBots.create({ http, vendorBases }),
     });
     this.personListing = PersonListingService.create({
       sourceCredentials,

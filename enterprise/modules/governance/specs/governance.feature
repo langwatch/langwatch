@@ -325,6 +325,15 @@ Feature: Enterprise governance package boundary
       And a different origin, a path, a port change or credentials in the URL are still refused
 
     @unit
+    Scenario: Dataverse accepts the configured environment base and nothing wider
+      Given DATAVERSE_ENVIRONMENT_BASE names an address
+      When an admin saves a Copilot Studio Dataverse source
+      Then an environment URL equal to that address is accepted and the source reads from it
+      And a different port, host or scheme, a longer path or credentials in the URL are still refused
+      And with no base configured only a real Dynamics environment is accepted
+      And a next-page link is followed only when it leads to the configured origin
+
+    @unit
     Scenario: The OpenAI admin API is reached at the configured base
       Given OPENAI_ADMIN_API_BASE names a base
       When the cost report, the member list or the account lookup is read

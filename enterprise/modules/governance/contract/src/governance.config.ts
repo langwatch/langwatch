@@ -51,6 +51,8 @@ export const governanceConfig = Config.define((c) => ({
   microsoftGraphApiBase: c.env("MICROSOFT_GRAPH_API_BASE", optionalVendorBase),
   /** The one Databricks workspace origin accepted beside the three vendor clouds. */
   databricksWorkspaceBase: c.env("DATABRICKS_WORKSPACE_BASE", optionalVendorBase),
+  /** The one Dataverse environment address accepted beside the real Dynamics clouds. */
+  dataverseEnvironmentBase: c.env("DATAVERSE_ENVIRONMENT_BASE", optionalVendorBase),
   /** The hosted product, whose default gateway is the SaaS one rather than the local one. */
   isSaas,
   /** This deployment's public origin (`BASE_HOST`), absent where it named none; the CLI's links lead back to it. */
