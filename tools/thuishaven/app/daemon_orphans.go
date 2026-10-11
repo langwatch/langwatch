@@ -41,12 +41,12 @@ func (o *Orchestrator) sweepRepoOrphans() {
 	o.orphanSweptAt = now
 	samples := o.sys.ProcessSamples()
 	byPID, children := processTree(samples)
-	o.killIgnoredTerms(byPID, now)
+	killed := o.killIgnoredTerms(byPID, now)
 	roots := o.orphanRoots()
 	if len(roots) == 0 {
 		return
 	}
-	for _, t := range o.orphanTargets(samples, byPID, children, roots) {
+	for _, t := range o.orphanTargets(samples, byPID, children, roots, killed) {
 		o.terminateTree(t, children, byPID, now)
 	}
 }
@@ -84,7 +84,7 @@ func (o *Orchestrator) repoWorktrees() []string {
 }
 
 // orphanTargets applies both rules, then reads cwds for the few survivors.
-func (o *Orchestrator) orphanTargets(samples []ProcessSample, byPID map[int]ProcessSample, children map[int][]int, roots []string) []orphanTarget {
+func (o *Orchestrator) orphanTargets(samples []ProcessSample, byPID map[int]ProcessSample, children map[int][]int, roots []string, killed map[int]bool) []orphanTarget {
 	protected := o.protectedTrees(byPID, children)
 	l := o.cfg.Orphans
 	var candidates []orphanTarget
@@ -92,7 +92,7 @@ func (o *Orchestrator) orphanTargets(samples []ProcessSample, byPID map[int]Proc
 		if protected[s.PID] || s.PID <= 1 {
 			continue
 		}
-		if _, termed := o.orphanTermed[s.PID]; termed {
+		if _, termed := o.orphanTermed[s.PID]; termed || killed[s.PID] {
 			continue
 		}
 		switch {
@@ -176,7 +176,10 @@ func (o *Orchestrator) terminateTree(t orphanTarget, children map[int][]int, byP
 
 // killIgnoredTerms SIGKILLs every termed process still alive past KillGrace,
 // and forgets the ones that went (or whose pid now names another process).
-func (o *Orchestrator) killIgnoredTerms(byPID map[int]ProcessSample, now time.Time) {
+// It returns the pids it just killed: this sweep's samples still list them,
+// and they are not new orphans. Reported once, at the SIGTERM; debug here.
+func (o *Orchestrator) killIgnoredTerms(byPID map[int]ProcessSample, now time.Time) map[int]bool {
+	killed := map[int]bool{}
 	for pid, term := range o.orphanTermed {
 		s, alive := byPID[pid]
 		if !alive || now.Add(-s.Elapsed).Sub(term.started).Abs() > 5*time.Second {
@@ -185,9 +188,12 @@ func (o *Orchestrator) killIgnoredTerms(byPID map[int]ProcessSample, now time.Ti
 		}
 		if now.Sub(term.at) >= o.cfg.Orphans.KillGrace {
 			o.sys.Kill(pid)
+			o.log.Debug("force-killed orphaned dev tooling that ignored SIGTERM", zap.Int("pid", pid))
+			killed[pid] = true
 			delete(o.orphanTermed, pid)
 		}
 	}
+	return killed
 }
 
 // shortCommand is the binary's base name and the start of its arguments.

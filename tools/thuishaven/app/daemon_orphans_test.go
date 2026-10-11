@@ -83,6 +83,29 @@ func TestOrphanSweepKillsWhatIgnoredTermOnALaterSweep(t *testing.T) {
 	}
 }
 
+func TestOrphanSweepReportsATreeOnceAcrossTermAndKill(t *testing.T) {
+	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+	samples, cwds := orphanMachine()
+	sys := &fakeSystem{now: now, procSamples: samples, cwds: cwds}
+	store := &fakeStore{stacks: []domain.Stack{{Slug: "w", WorktreeDir: "/w", LauncherPID: 300}}}
+	o := orphanOrch(sys, store)
+	o.sweepRepoOrphans()
+
+	sys.now = now.Add(time.Minute)
+	for i := range samples {
+		samples[i].Elapsed += time.Minute
+	}
+	sys.procSamples = samples
+	o.sweepRepoOrphans()
+
+	if !slices.Equal(sys.killed, []int{500, 501}) && !slices.Equal(sys.killed, []int{501, 500}) {
+		t.Fatalf("killed = %v, want the termed tree", sys.killed)
+	}
+	if len(store.reapEvents) != 1 || !slices.Equal(sys.terminated, []int{500, 501}) {
+		t.Fatalf("reap events = %d, terminated = %v, want one report and one TERM", len(store.reapEvents), sys.terminated)
+	}
+}
+
 func TestOrphanSweepReapsOnlyLongTypecheckRunsInTheCheckout(t *testing.T) {
 	now := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
 	old := 50 * time.Minute
