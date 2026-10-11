@@ -78,7 +78,7 @@ export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video
           ref={ref}
           playsInline
           preload={introduction ? "none" : "metadata"}
-          poster={introduction ? "/posters/introduction.jpg" : rest.poster}
+          poster={introduction ? "/media/posters/introduction.jpg" : rest.poster}
           style={{
             display: "block",
             width: "100%",
