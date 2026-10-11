@@ -90,9 +90,12 @@ Passkeys, security keys and TOTP codes: `haven browser mfa add|list|remove|uv|to
 
 - The machine's browser holds 24 lanes across every stack. A lane idle for 10 minutes is closed; its next command says
   `lane X was closed after idling; reopen with open`, and `open` brings it back.
-- A new lane is refused (not crashed) when the browser's memory passes 3 GB.
-- One shared browser costs about 230 MB, plus about 0.7 GB per signed-in dev page (about
-  0.4 GB on a built UI: `haven up` or `--watch`). Close your lane when done.
+- After 2 minutes idle a lane's page is unloaded (cookies, storage, routes and lean kept)
+  and reopened at the same url by its next command, in about 3 s. Refs from before are
+  gone: take a snapshot. Form input and anything not in the url is lost.
+- A new lane first unloads idle pages, then is refused (not crashed) above the memory ceiling.
+- One shared browser costs about 0.5 GB, plus about 0.4 GB per signed-in page in use
+  (traces table) and almost nothing per idle lane. Close your lane when done.
 - The stack allows 30 sign-ins per 15 minutes; a lane reuses its saved session.
 - Commands wait on page events (shell mounted, network idle, `--wait-for`), never sleeps.
   A backend reload is waited out on its ready line.

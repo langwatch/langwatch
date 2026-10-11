@@ -71,6 +71,8 @@ const env = (name: string) => {
 const TOKEN = env("HAVEN_BROWSER_TOKEN");
 const IDLE_MS = Number(process.env.HAVEN_BROWSER_IDLE_MS ?? 5 * 60_000);
 const LANE_IDLE_MS = Number(process.env.HAVEN_BROWSER_LANE_IDLE_MS ?? 10 * 60_000);
+/** An idle lane's page is closed (its renderer freed) and reopened on the lane's next verb. */
+const LANE_UNLOAD_MS = Number(process.env.HAVEN_BROWSER_LANE_UNLOAD_MS ?? 2 * 60_000);
 const MAX_LANES = Number(process.env.HAVEN_BROWSER_MAX_LANES ?? 24);
 const MAX_RSS_MB = Number(process.env.HAVEN_BROWSER_MAX_RSS_MB ?? 8192);
 const MAX_BUSY = Number(process.env.HAVEN_BROWSER_MAX_PAGES ?? 6);
@@ -124,6 +126,8 @@ const browser = await chromium.launch({
     "--no-first-run",
     "--mute-audio",
     "--renderer-process-limit=4",
+    // About a quarter less renderer memory on signed-in pages, same load time and pixels.
+    "--js-flags=--optimize-for-size",
     "--disable-features=Translate,MediaRouter,OptimizationHints",
   ],
 });
@@ -139,6 +143,11 @@ type Lane = {
   page: Page;
   signedOut: boolean;
   idle?: NodeJS.Timeout;
+  /** Set while the page is closed for idling: the url it is reopened at. */
+  unload?: NodeJS.Timeout;
+  unloadedFrom?: string;
+  /** Verbs running on the lane; its page is never unloaded under one. */
+  busy: number;
   /** App queries seen since the last action began; `recording` keeps the steps so far. */
   seen: Query[];
   inflight: number;
@@ -392,7 +401,11 @@ async function laneFor({
       `the browser already holds ${MAX_LANES} lanes; close one (haven browser close --lane <name>)`,
     );
   }
-  const rss = await treeRssMb();
+  let rss = await treeRssMb();
+  if (rss > MAX_RSS_MB) {
+    for (const idle of lanes.values()) await unloadPage({ lane: idle });
+    rss = await treeRssMb();
+  }
   if (rss > MAX_RSS_MB) {
     throw new Error(
       `the browser uses ${Math.round(rss)} MB (ceiling ${MAX_RSS_MB} MB): refusing a new lane; close one (haven browser close --lane <name>)`,
@@ -432,6 +445,7 @@ async function laneFor({
     consoleCursor: 0,
     lean: false,
     leanRoute,
+    busy: 0,
   };
   watchLane({ lane });
   lanes.set(key, lane);
@@ -443,6 +457,7 @@ async function closeLane({ key }: { key: string }) {
   if (!lane) return;
   lanes.delete(key);
   clearTimeout(lane.idle);
+  clearTimeout(lane.unload);
   if (profiling?.key === key) {
     profiling = undefined;
     await browser.stopTracing().catch(() => undefined);
@@ -465,6 +480,30 @@ function touch({ lane }: { lane: Lane }) {
     console.error(`lane ${lane.key} closed after idling ${LANE_IDLE_MS} ms`);
     void closeLane({ key: lane.key });
   }, LANE_IDLE_MS);
+  clearTimeout(lane.unload);
+  if (LANE_UNLOAD_MS > 0) lane.unload = setTimeout(() => void unloadPage({ lane }), LANE_UNLOAD_MS);
+}
+
+/** Closes an idle lane's page, keeping its context (cookies, storage, routes, lean). */
+async function unloadPage({ lane }: { lane: Lane }) {
+  if (lane.busy || lane.unloadedFrom || lane.webauthn || profiling?.key === lane.key) return;
+  if (lanes.get(lane.key) !== lane) return;
+  lane.unloadedFrom = lane.page.url();
+  console.error(`lane ${lane.key} page unloaded after idling ${LANE_UNLOAD_MS} ms`);
+  await lane.page.close().catch(() => undefined);
+}
+
+/** A new page for an unloaded lane, back at the url it was on. */
+async function reopenPage({ lane, timeout }: { lane: Lane; timeout: number }) {
+  const from = lane.unloadedFrom;
+  if (from === undefined) return;
+  lane.page = await lane.context.newPage();
+  lane.unloadedFrom = undefined;
+  lane.inflight = 0;
+  watchLane({ lane });
+  if (from === "about:blank") return;
+  await lane.page.goto(from, { waitUntil: "domcontentloaded", timeout });
+  await settle({ page: lane.page, waitFor: "", timeout }).catch(() => undefined);
 }
 
 /** The app shell mounted (precedent: apps/ui/scripts/smoke-boot.mjs), then the network settles. */
@@ -1339,10 +1378,49 @@ async function handle({ verb, body }: { verb: string; body: Request }): Promise<
   const timeout = body.timeoutMs ?? 30_000;
   const stateFile = verb === "state-load" ? body.file : undefined;
   const lane = await laneFor({ stack, name, as: body.as ?? "", timeout, stateFile });
-  touch({ lane });
-  if (body.lean) await setLean({ lane, on: true });
-  return dispatch({ lane, verb, body, timeout, mfaVerb, routeVerb, observeVerb });
+  return onLane({
+    lane,
+    verb,
+    body,
+    timeout,
+    run: () => dispatch({ lane, verb, body, timeout, mfaVerb, routeVerb, observeVerb }),
+  });
 }
+
+/** Runs a verb with the lane marked busy, first reopening its page if idling unloaded it. */
+async function onLane({
+  lane,
+  verb,
+  body,
+  timeout,
+  run,
+}: {
+  lane: Lane;
+  verb: string;
+  body: Request;
+  timeout: number;
+  run: () => unknown;
+}) {
+  lane.busy += 1;
+  touch({ lane });
+  const reopened = lane.unloadedFrom !== undefined && !PAGELESS_VERBS.has(verb);
+  try {
+    if (reopened) await reopenPage({ lane, timeout });
+    // A new page numbers its refs afresh, so an old ref could name another element.
+    if (reopened && [body.ref, body.targetRef].some((ref) => /^(f\d+)?e\d+$/.test(ref ?? "")))
+      throw new Error(
+        `lane ${lane.name}'s page was reopened after idling, so earlier refs are gone; take a snapshot`,
+      );
+    if (body.lean) await setLean({ lane, on: true });
+    return await run();
+  } finally {
+    lane.busy -= 1;
+    if (lanes.get(lane.key) === lane) touch({ lane });
+  }
+}
+
+/** Verbs that read the lane's buffers or its context, so an unloaded page stays closed. */
+const PAGELESS_VERBS = new Set(["network", "network-show", "console", ...ROUTE_VERBS]);
 
 /** Hands a lane's verb to its family: record, mfa, route, observe, else a page action. */
 function dispatch({
