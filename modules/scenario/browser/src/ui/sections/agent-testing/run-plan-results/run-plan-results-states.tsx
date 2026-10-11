@@ -5,15 +5,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import {
-  Box,
-  EmptyState,
-  HStack,
-  Skeleton,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, HStack, Skeleton, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { RefreshCw } from "lucide-react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
@@ -39,16 +31,14 @@ export function nextWiderWindow(period: Period): {
 
 export function RunsLoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (
-    <EmptyState.Root paddingY={12}>
-      <EmptyState.Content>
-        <Box maxWidth="420px" width="100%">
-          <HandledErrorAlert error={error} fallbackTitle="Couldn't load runs" />
-        </Box>
-        <SmallButton onClick={onRetry}>
-          <RefreshCw size={13} /> Try again
-        </SmallButton>
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <VStack align="center" gap={4} paddingY={12}>
+      <Box maxWidth="420px" width="100%">
+        <HandledErrorAlert error={error} fallbackTitle="Couldn't load runs" />
+      </Box>
+      <SmallButton onClick={onRetry}>
+        <RefreshCw size={13} /> Try again
+      </SmallButton>
+    </VStack>
   );
 }
 

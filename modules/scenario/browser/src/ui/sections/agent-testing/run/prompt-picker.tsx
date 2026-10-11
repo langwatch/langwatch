@@ -4,6 +4,7 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, FileText, Folder } from "lucide-react";
 
@@ -149,9 +150,18 @@ export function PromptPicker({
         />
       ))}
       {prompts.length === 0 && (
-        <Text textStyle="caption" color="fg.muted" paddingX={1} paddingY={2}>
-          No saved prompts in this project yet.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No saved prompts in this project yet."
+          next={[
+            {
+              kind: "docs",
+              label: "Read about prompts",
+              href: "https://docs.langwatch.ai/prompt-management/overview",
+            },
+          ]}
+          testId="run-dialog-prompts-empty"
+        />
       )}
     </VStack>
   );

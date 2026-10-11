@@ -4,6 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
+import { Card } from "@langwatch/design-system/card";
 import {
   Box,
   chakra,
@@ -183,78 +184,71 @@ function CompareTargetRow({
   const position = index + 1;
 
   return (
-    <HStack
-      gap={2}
-      alignItems="flex-start"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="lg"
-      paddingX={3}
-      paddingY={2}
-      data-testid={`run-dialog-compare-row-${index}`}
-    >
-      <Box
-        boxSize="8px"
-        borderRadius="full"
-        flexShrink={0}
-        marginTop="7px"
-        background={targetColor(colorIndex)}
-        data-testid={`run-dialog-compare-dot-${index}`}
-        data-color={targetColor(colorIndex)}
-      />
-      <NativeSelect.Root size="sm" flex="0 0 180px" disabled={isBusy}>
-        <NativeSelect.Field
-          {...DIALOG_FIELD_STYLE}
-          textStyle="caption"
-          aria-label={`Agent of target ${position}`}
-          value={row.target.id}
-          onChange={(event) => {
-            const agent = agents.find((a) => a.id === event.target.value);
-            if (agent) {
-              onChangeRow(index, {
-                target: { type: agent.type, id: agent.id },
-              });
-            }
-          }}
-          data-testid={`run-dialog-compare-agent-${index}`}
+    <Card variant="nested" padding="sm" data-testid={`run-dialog-compare-row-${index}`}>
+      <HStack gap={2} alignItems="flex-start">
+        <Box
+          boxSize="8px"
+          borderRadius="full"
+          flexShrink={0}
+          marginTop="7px"
+          background={targetColor(colorIndex)}
+          data-testid={`run-dialog-compare-dot-${index}`}
+          data-color={targetColor(colorIndex)}
+        />
+        <NativeSelect.Root size="sm" flex="0 0 180px" disabled={isBusy}>
+          <NativeSelect.Field
+            {...DIALOG_FIELD_STYLE}
+            textStyle="caption"
+            aria-label={`Agent of target ${position}`}
+            value={row.target.id}
+            onChange={(event) => {
+              const agent = agents.find((a) => a.id === event.target.value);
+              if (agent) {
+                onChangeRow(index, {
+                  target: { type: agent.type, id: agent.id },
+                });
+              }
+            }}
+            data-testid={`run-dialog-compare-agent-${index}`}
+          >
+            {agents.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agentOptionLabel(agent)}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+        <ParameterLineField
+          flex={1}
+          minWidth={0}
+          ariaLabel={`Parameters of target ${position}`}
+          placeholder={parameterPlaceholder(definitions)}
+          value={row.parameterLine}
+          onChange={(parameterLine) => onChangeRow(index, { parameterLine })}
+          definitions={definitions}
+          error={error}
+          disabled={isBusy}
+          testId={`run-dialog-compare-parameters-${index}`}
+        />
+        <chakra.button
+          type="button"
+          display="flex"
+          alignItems="center"
+          marginTop="1.5"
+          color="fg.muted"
+          cursor="pointer"
+          boxShadow="none"
+          _hover={{ color: "red.fg" }}
+          title="Remove"
+          aria-label={`Remove target ${position}`}
+          disabled={isBusy}
+          onClick={() => onRemoveRow(index)}
+          data-testid={`run-dialog-compare-remove-${index}`}
         >
-          {agents.map((agent) => (
-            <option key={agent.id} value={agent.id}>
-              {agentOptionLabel(agent)}
-            </option>
-          ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
-      <ParameterLineField
-        flex={1}
-        minWidth={0}
-        ariaLabel={`Parameters of target ${position}`}
-        placeholder={parameterPlaceholder(definitions)}
-        value={row.parameterLine}
-        onChange={(parameterLine) => onChangeRow(index, { parameterLine })}
-        definitions={definitions}
-        error={error}
-        disabled={isBusy}
-        testId={`run-dialog-compare-parameters-${index}`}
-      />
-      <chakra.button
-        type="button"
-        display="flex"
-        alignItems="center"
-        marginTop="1.5"
-        color="fg.muted"
-        cursor="pointer"
-        boxShadow="none"
-        _hover={{ color: "red.fg" }}
-        title="Remove"
-        aria-label={`Remove target ${position}`}
-        disabled={isBusy}
-        onClick={() => onRemoveRow(index)}
-        data-testid={`run-dialog-compare-remove-${index}`}
-      >
-        <X size={13} />
-      </chakra.button>
-    </HStack>
+          <X size={13} />
+        </chakra.button>
+      </HStack>
+    </Card>
   );
 }
