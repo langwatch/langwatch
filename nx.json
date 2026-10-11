@@ -15,7 +15,8 @@
       "!{projectRoot}/**/*.md",
       "!{projectRoot}/tsconfig.test.json",
       "!{projectRoot}/vitest.config.*",
-      "!{projectRoot}/vitest.integration.config.*"
+      "!{projectRoot}/vitest.integration.config.*",
+      "!{projectRoot}/vitest.repo.config.*"
     ],
     "lintGlobals": [
       "sharedGlobals",
@@ -342,6 +343,9 @@
         }
       ],
       "outputs": []
+    },
+    "test:repo": {
+      "cache": false
     },
     "lint": [
       {

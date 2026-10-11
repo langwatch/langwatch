@@ -1034,6 +1034,11 @@ jobs:
           export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--require $GITHUB_WORKSPACE/dev/nx/test-reads-hook.cjs"
           node --experimental-strip-types .github/scripts/run-package-suites.ts
 
+      # The suites that walk the whole tree, uncached and on every change (ADR-150).
+      - name: Run the repo-scanning suites
+        if: ${{ matrix.shard == 1 }}
+        run: pnpm exec nx run-many -t test:repo --outputStyle=static
+
       # A read outside what the test cache key hashes replays a stale pass once that file
       # changes; this names the `reads` row that closes it. Runs after a red suite too.
       - name: Check suites declare what they read outside their package

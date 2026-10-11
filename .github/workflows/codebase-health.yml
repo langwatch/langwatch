@@ -45,6 +45,9 @@ jobs:
       - name: Type-check cost per program
         run: node dev/scripts/ts-program-metrics.mjs --out=ts-program-metrics.jsonl
 
+      - name: Repo-scanning suites
+        run: pnpm exec nx run-many -t test:repo --outputStyle=static
+
       # Exit 1 means findings, which are what this step counts.
       - name: Architecture findings
         run: pnpm lint:architecture > architecture.txt 2>&1 || test $? -eq 1

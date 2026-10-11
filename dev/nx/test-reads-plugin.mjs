@@ -7,18 +7,9 @@ import { memberPatterns } from "./workspace-members.mjs";
 // package that its tests read from disk (measured, not guessed: ADR-150). The
 // test targets take it, so editing one of those files misses the cache and
 // makes the reader affected. A member absent from the table reads nothing.
-
-// The repo-scanning guards walk TypeScript only, so a JSON, Markdown or Go edit
-// leaves their cache warm; each row names only the roots its walk opens.
-const typescriptIn = (roots) => roots.map((area) => `${area}/**/*.{ts,tsx}`);
+// Suites that walk the whole tree run uncached as `test:repo` and need no row.
 export const reads = {
-  "@langwatch/time": [
-    ...typescriptIn(["apps", "packages", "sdks", "mcp", "services"]),
-    "{apps,packages,sdks,mcp,services}/**/package.json",
-    "pnpm-workspace.yaml",
-  ],
   "@langwatch/handled-error": [
-    ...typescriptIn(["apps/api/src", "apps/worker/src", "packages", "modules", "enterprise"]),
     "docs/agent-testing/**/*",
     "docs/api-reference/**/*",
     "docs/evaluations/**/*",
@@ -27,8 +18,6 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
   ],
-  "@langwatch/csv": typescriptIn(["packages", "apps", "modules", "enterprise"]),
-  "@langwatch/scenario-contract": typescriptIn(["apps", "packages", "modules", "enterprise"]),
   "@langwatch/agent-process": [
     "modules/agent/**/*",
     "modules/workflow/process/src/**/*",

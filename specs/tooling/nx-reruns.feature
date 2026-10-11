@@ -3,11 +3,11 @@ Feature: test:affected and lint:changed rerun only what an edit can change
   Nx caches test results by their inputs and lint:changed lints a change (ADR-150).
   An edit that cannot change a verdict must not cost a rerun.
 
-  Scenario: A repo-scanning suite hashes only the TypeScript its walk reads
-    Given a package whose tests walk source trees for a forbidden pattern
-    When a JSON, Markdown or Go file in one of those trees changes
+  Scenario: A repo-scanning suite runs uncached, outside the cached test target
+    Given a package whose tests walk the whole source tree for a forbidden pattern
+    When a source file anywhere outside that package changes
     Then the package's test cache key is unchanged
-    And a TypeScript edit under a walked root still misses the cache
+    And the walking suites run every time as the uncached test:repo target
 
   Scenario: Tests and Markdown are not part of a package's production input
     Given a package another package depends on
