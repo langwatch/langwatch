@@ -242,7 +242,7 @@ func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog,
 }
 
 // downSignatures: what a line says when it met the private target H8's gate held closed.
-var downSignatures = []string{"ClickHouseUnavailableError", "clickhouse_unavailable", "Cannot connect to ClickHouse at", "[@clickhouse/client][Connection]"}
+var downSignatures = []string{"ClickHouseUnavailableError", "clickhouse_unavailable", "Cannot connect to ClickHouse at", "[@clickhouse/client][Connection]", "read ECONNRESET"}
 
 // inDownWindow: a ClickHouse-unavailable error line logged while H8's gate held the private target closed (as N2 does).
 func inDownWindow(line string, downAt, upAt int64, origin time.Time) bool {
