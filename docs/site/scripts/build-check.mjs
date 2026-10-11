@@ -3,13 +3,21 @@ import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildNav } from "../docs-nav.mjs";
 import { pageTargets } from "../docs-output.mjs";
+
+function configuredSlugs({ node }) {
+  if (typeof node === "string") return [node];
+  return [...(node.groups ?? []), ...(node.pages ?? [])].flatMap((child) =>
+    configuredSlugs({ node: child }),
+  );
+}
 
 export async function checkBuild({ outDir }) {
   const docsRoot = fileURLToPath(new URL("../..", import.meta.url));
-  const nav = buildNav({ docsRoot });
-  const slugs = Object.keys(nav.pages).toSorted();
+  const config = JSON.parse(await readFile(path.join(docsRoot, "docs.json"), "utf8"));
+  const slugs = [
+    ...new Set(config.navigation.anchors.flatMap((node) => configuredSlugs({ node }))),
+  ];
   const expectedHtml = ["404.html"];
   for (const slug of slugs) {
     await access(path.join(outDir, `${slug}.md`));
@@ -25,9 +33,9 @@ export async function checkBuild({ outDir }) {
   );
   const search = JSON.parse(await readFile(path.join(outDir, "search-index.json"), "utf8"));
   assert.deepEqual(
-    search.map((entry) => entry.slug).toSorted(),
+    search.map((entry) => entry.slug),
     slugs,
-    "Search must match the configured inventory",
+    "Search must match the configured inventory in authored order",
   );
   assert.deepEqual(JSON.parse(await readFile(path.join(outDir, "skipped.json"), "utf8")), []);
   await access(path.join(outDir, "redirects.json"));

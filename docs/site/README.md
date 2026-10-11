@@ -121,6 +121,11 @@ Chromium in cleanup, and captures the introduction, quick start and trace API
 page at 1440 and 390 pixels in light and dark. It checks clipboard copying,
 keyboard search, API authentication validation, the complete page inventory,
 redirects and 404 responses. API requests are intercepted; no real key is used.
+Additional regressions exercise the agent picker, full authored prompt copying,
+mobile navigation and focus restoration, diagrams with JavaScript disabled, and
+video failure followed by a successful retry. Clipboard rejection is injected at
+the browser API boundary to exercise the visible recovery state deterministically.
+Every browser context and temporary server closes even when an assertion fails.
 
 The link checker checks every built HTML page, local link and fragment, following
 configured redirects. It treats links to `docs.langwatch.ai` as local, skips

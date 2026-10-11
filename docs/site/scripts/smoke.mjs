@@ -5,8 +5,15 @@ import path from "node:path";
 import { it } from "node:test";
 import { parseArgs } from "node:util";
 
-import { chromium } from "playwright";
-
+import {
+  checkAgentSetup,
+  checkCapabilityErrors,
+  checkMobileNavigation,
+  checkSkillCopy,
+  checkStaticDiagrams,
+  tracingPrompt,
+} from "./browser-checks.mjs";
+import { withPreviewBrowser, withReader } from "./browser-fixture.mjs";
 import { checkBuild } from "./build-check.mjs";
 import { startPreview } from "./preview-server.mjs";
 
@@ -91,29 +98,77 @@ async function checkVariant({ browser, base, width, mode }) {
   }
 }
 
-/** @scenario "Build all configured documentation" */
+/**
+ * @scenario "Build all configured documentation"
+ * @scenario "Publish only the configured API inventory"
+ */
 await it("publishes exactly the configured inventory and its supporting files", async () => {
   await checkBuild({ outDir });
 });
 
-/** @scenario "Read the three key pages in both themes and viewport sizes" */
+/**
+ * @scenario "Read the three key pages in both themes and viewport sizes"
+ * @scenario "Inspect an API request before sending"
+ */
 await it("renders and operates the key pages at 1440 and 390 in light and dark", async () => {
-  const server = await startPreview({ outDir, port: 0 });
-  let browser;
-  try {
-    browser = await chromium.launch();
-    const base = server.resolvedUrls.local[0];
-    for (const width of [1440, 390])
-      for (const mode of ["light", "dark"]) {
-        await checkVariant({ browser, base, width, mode });
-      }
-    console.log(`Screenshots: ${screenshots}`);
-  } finally {
-    await browser?.close();
-    await new Promise((resolve, reject) =>
-      server.httpServer.close((error) => (error ? reject(error) : resolve())),
-    );
-  }
+  await withPreviewBrowser({
+    outDir,
+    run: async ({ browser, base }) => {
+      for (const width of [1440, 390])
+        for (const mode of ["light", "dark"]) {
+          await checkVariant({ browser, base, width, mode });
+        }
+      console.log(`Screenshots: ${screenshots}`);
+    },
+  });
+});
+
+/** @scenario "Start with a coding agent" */
+await it("selects a coding agent and copies the complete authored setup prompt", async () => {
+  const prompt = await tracingPrompt({ outDir });
+  await withReader({ outDir, run: ({ page, base }) => checkAgentSetup({ page, base, prompt }) });
+});
+
+/** @scenario "Copy a skill prompt" */
+await it("copies the full prompt from the generated skill card", async () => {
+  const prompt = await tracingPrompt({ outDir });
+  await withReader({ outDir, run: ({ page, base }) => checkSkillCopy({ page, base, prompt }) });
+});
+
+/** @scenario "Navigate on a small screen" */
+await it("scrolls the mobile page tree and restores focus when dismissed", async () => {
+  await withReader({ outDir, run: checkMobileNavigation });
+});
+
+/** @scenario "Recover from unavailable browser capabilities" */
+await it("reports denied clipboard access and retries unavailable media", async () => {
+  await withReader({ outDir, run: checkCapabilityErrors });
+});
+
+/** @scenario "Read diagrams without JavaScript" */
+await it("publishes both diagram themes and usable source without JavaScript", async () => {
+  await withPreviewBrowser({ outDir, run: checkStaticDiagrams });
+});
+
+/** @scenario "Recover from an unknown route" */
+await it("offers working search on an unknown route", async () => {
+  await withReader({
+    outDir,
+    run: async ({ page, base }) => {
+      const response = await page.goto(`${base}nonexistent-docs-smoke-route`);
+      assert.equal(response.status(), 404);
+      await page
+        .getByRole("main")
+        .getByRole("button", { name: "Search the docs", exact: true })
+        .click();
+      await page.getByRole("searchbox").fill("traces");
+      const result = page.locator("#docs-search-results a").first();
+      await result.waitFor();
+      await result.click();
+      await page.waitForURL((url) => !url.pathname.includes("nonexistent-docs-smoke-route"));
+      assert.ok((await page.locator("h1").textContent()).trim().length > 0);
+    },
+  });
 });
 
 /** @scenario "Serve directory URLs consistently" */
