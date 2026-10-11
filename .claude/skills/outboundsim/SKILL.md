@@ -104,9 +104,9 @@ Tester recipes:
   the secret picks the failure: `revoked`, `noscope`). Sign-in, seats (`subscribedSkus`), the
   directory (`users`) and `directoryAudits` work. Environment URL = `<outbound>/dataverse`: expect
   2 agents and 7 conversations over 3 pages, then 0 on the next run (the cursor continues after
-  the last row). Caveat: the product only accepts an https `*.dynamics.com` environment URL
-  (`isEnvironmentOrigin`) and refuses next links off it; until the product admits the Dataverse
-  origin the transcript read cannot reach the sim, and the source reports the URL as invalid.
+  the last row). haven's `+outbound` sets `DATAVERSE_ENVIRONMENT_BASE` to `<outbound>/dataverse`,
+  which the product accepts as an environment URL beside real `*.dynamics.com` ones; next links to
+  any other origin are still refused.
 - GOV-44 reports: OpenAI admin cost source (`sk-admin-good`): 3 daily buckets, 6 cost rows, one page
   each; `sk-admin-nokeys` drops the key dimension, `sk-admin-flaky` fails after page one and resumes.
   Anthropic usage and cost sources (`sk-ant-admin-good`) page the same. Claude compliance and the

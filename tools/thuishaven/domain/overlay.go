@@ -510,7 +510,7 @@ func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string 
 // and its Slack Web API and webhook addresses at outboundsim's haven route, and
 // admits local webhook URLs, each only when the resolved environment leaves it unset.
 // It also names outboundsim as the base of each governance pull vendor (Databricks,
-// OpenAI, Anthropic, Microsoft sign-in and Graph), on the same rule.
+// Dataverse, OpenAI, Anthropic, Microsoft sign-in and Graph), on the same rule.
 func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
 	var env []string
 	for _, c := range []struct{ key, bucket string }{
@@ -533,6 +533,7 @@ func OutboundProviderEnv(resolved map[string]string, endpoint string) []string {
 	}
 	for _, v := range [][2]string{
 		{"DATABRICKS_WORKSPACE_BASE", endpoint},
+		{"DATAVERSE_ENVIRONMENT_BASE", endpoint + "/dataverse"},
 		{"OPENAI_ADMIN_API_BASE", endpoint + "/openai"},
 		{"ANTHROPIC_ADMIN_API_BASE", endpoint + "/anthropic"},
 		{"MICROSOFT_LOGIN_BASE", endpoint + "/microsoft-login"},

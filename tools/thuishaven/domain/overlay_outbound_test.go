@@ -43,8 +43,8 @@ func TestOutboundProviderEnvLeavesChosenSettingsAlone(t *testing.T) {
 			t.Errorf("overlay %v overrides a setting .env chose", env)
 		}
 	}
-	if len(env) != 10 {
-		t.Errorf("overlay %v should still set the other three Slack channels, both Slack addresses and the five vendor bases", env)
+	if len(env) != 11 {
+		t.Errorf("overlay %v should still set the other three Slack channels, both Slack addresses and the six vendor bases", env)
 	}
 }
 
@@ -71,6 +71,7 @@ func TestOutboundProviderEnvPointsPullVendorsAtOutboundsimUnlessChosen(t *testin
 	env := OutboundProviderEnv(map[string]string{}, endpoint)
 	for _, want := range []string{
 		"DATABRICKS_WORKSPACE_BASE=" + endpoint,
+		"DATAVERSE_ENVIRONMENT_BASE=" + endpoint + "/dataverse",
 		"OPENAI_ADMIN_API_BASE=" + endpoint + "/openai",
 		"ANTHROPIC_ADMIN_API_BASE=" + endpoint + "/anthropic",
 		"MICROSOFT_LOGIN_BASE=" + endpoint + "/microsoft-login",
