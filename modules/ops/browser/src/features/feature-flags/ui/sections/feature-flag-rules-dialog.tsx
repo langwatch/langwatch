@@ -19,8 +19,10 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
+  Box,
   Button,
   createListCollection,
   Field,
@@ -227,79 +229,76 @@ function RuleEditorRow({
   });
 
   return (
-    <HStack
+    <Box
       ref={setNodeRef}
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
         opacity: isDragging ? 0.6 : 1,
       }}
-      align="flex-end"
-      gap={2}
-      padding={2}
-      borderWidth="1px"
-      borderRadius="md"
-      borderColor="border.muted"
-      background="bg.panel"
       zIndex={isDragging ? 1 : void 0}
     >
-      <IconButton
-        aria-label="Reorder rule"
-        size="sm"
-        variant="ghost"
-        color="fg.subtle"
-        cursor="grab"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical size={14} />
-      </IconButton>
-      <Field.Root flexBasis="180px" flexShrink={0}>
-        <Field.Label fontSize="xs">Scope</Field.Label>
-        <Select.Root
-          collection={SCOPE_COLLECTION}
-          value={[rule.scopeKind]}
-          onValueChange={(details: { value: string[] }) => {
-            const next = details.value[0] as ScopeKind | undefined;
-            if (!next) return;
-            onChange({
-              scopeKind: next,
-              // The field beside the picker means something different per
-              // scope — an id, a date, nothing — so a leftover value from the
-              // previous scope would be a rule that cannot match.
-              target: next === rule.scopeKind ? rule.target : "",
-            });
-          }}
-          size="sm"
-        >
-          <Select.Trigger>
-            <Select.ValueText placeholder="Pick scope" />
-          </Select.Trigger>
-          <Select.Content>
-            {SCOPE_COLLECTION.items.map((item) => (
-              <Select.Item key={item.value} item={item}>
-                {item.label}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
-      </Field.Root>
-      <RuleTargetField rule={rule} onChange={onChange} />
-      <Field.Root flexBasis="120px" flexShrink={0}>
-        <Field.Label fontSize="xs">Enabled</Field.Label>
-        <HStack height="32px" alignItems="center">
-          <Switch
-            colorPalette="accent"
-            checked={rule.enabled}
-            onCheckedChange={(details) => onChange({ enabled: details.checked })}
-          />
-          <Text fontSize="xs">{rule.enabled ? "on" : "off"}</Text>
+      <Card variant="nested" padding="sm">
+        <HStack align="flex-end" gap={2}>
+          <IconButton
+            aria-label="Reorder rule"
+            size="sm"
+            variant="ghost"
+            color="fg.subtle"
+            cursor="grab"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={14} />
+          </IconButton>
+          <Field.Root flexBasis="180px" flexShrink={0}>
+            <Field.Label fontSize="xs">Scope</Field.Label>
+            <Select.Root
+              collection={SCOPE_COLLECTION}
+              value={[rule.scopeKind]}
+              onValueChange={(details: { value: string[] }) => {
+                const next = details.value[0] as ScopeKind | undefined;
+                if (!next) return;
+                onChange({
+                  scopeKind: next,
+                  // The field beside the picker means something different per
+                  // scope — an id, a date, nothing — so a leftover value from the
+                  // previous scope would be a rule that cannot match.
+                  target: next === rule.scopeKind ? rule.target : "",
+                });
+              }}
+              size="sm"
+            >
+              <Select.Trigger>
+                <Select.ValueText placeholder="Pick scope" />
+              </Select.Trigger>
+              <Select.Content>
+                {SCOPE_COLLECTION.items.map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </Field.Root>
+          <RuleTargetField rule={rule} onChange={onChange} />
+          <Field.Root flexBasis="120px" flexShrink={0}>
+            <Field.Label fontSize="xs">Enabled</Field.Label>
+            <HStack height="32px" alignItems="center">
+              <Switch
+                colorPalette="accent"
+                checked={rule.enabled}
+                onCheckedChange={(details) => onChange({ enabled: details.checked })}
+              />
+              <Text fontSize="xs">{rule.enabled ? "on" : "off"}</Text>
+            </HStack>
+          </Field.Root>
+          <IconButton aria-label="Remove rule" size="sm" variant="ghost" onClick={onRemove}>
+            <Trash2 size={14} />
+          </IconButton>
         </HStack>
-      </Field.Root>
-      <IconButton aria-label="Remove rule" size="sm" variant="ghost" onClick={onRemove}>
-        <Trash2 size={14} />
-      </IconButton>
-    </HStack>
+      </Card>
+    </Box>
   );
 }
 

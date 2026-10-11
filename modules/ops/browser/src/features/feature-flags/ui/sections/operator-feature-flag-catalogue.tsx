@@ -10,7 +10,6 @@ import {
   HStack,
   IconButton,
   Stack,
-  Table,
   Text,
   VStack,
   VisuallyHidden,
@@ -119,34 +118,29 @@ export function OperatorFeatureFlagCatalogueView({
             Dynamically named flags sharing a prefix. Instances appear above after an operator row
             is written.
           </Text>
-          <ListTable
-            density="compact"
-            columnRules={false}
-            containerProps={{ overflowX: "auto" }}
-            size="sm"
-          >
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                <Table.ColumnHeader>Default</Table.ColumnHeader>
-                <Table.ColumnHeader>Description</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
+          <ListTable density="compact" scroll="x" scrollLabel="Flag families table">
+            <ListTable.Header>
+              <ListTable.Row>
+                <ListTable.ColumnHeader>Prefix</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Default</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Description</ListTable.ColumnHeader>
+              </ListTable.Row>
+            </ListTable.Header>
+            <ListTable.Body>
               {catalogue.families.map((family) => (
-                <Table.Row key={family.keyPrefix}>
-                  <Table.Cell>
+                <ListTable.Row key={family.keyPrefix}>
+                  <ListTable.Cell>
                     <InlineCode>{`${family.keyPrefix}*`}</InlineCode>
-                  </Table.Cell>
-                  <Table.Cell>
+                  </ListTable.Cell>
+                  <ListTable.Cell>
                     <ScopeBadge scope={family.scope} />
-                  </Table.Cell>
-                  <Table.Cell>{family.defaultValue ? "on" : "off"}</Table.Cell>
-                  <Table.Cell>{family.description}</Table.Cell>
-                </Table.Row>
+                  </ListTable.Cell>
+                  <ListTable.Cell>{family.defaultValue ? "on" : "off"}</ListTable.Cell>
+                  <ListTable.Cell>{family.description}</ListTable.Cell>
+                </ListTable.Row>
               ))}
-            </Table.Body>
+            </ListTable.Body>
           </ListTable>
         </Box>
       )}
@@ -190,22 +184,17 @@ function ScopeSection({
           description="Try another name or description. Registered flags appear in their product or system scope."
         />
       ) : (
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Flag</Table.ColumnHeader>
-              <Table.ColumnHeader minWidth="150px">Effective</Table.ColumnHeader>
-              <Table.ColumnHeader minWidth="120px">Source</Table.ColumnHeader>
-              <Table.ColumnHeader>Default</Table.ColumnHeader>
-              <Table.ColumnHeader>Last edit</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel={`${heading} flags table`}>
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Flag</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader minWidth={150}>Effective</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader minWidth={120}>Source</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Default</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Last edit</ListTable.ColumnHeader>
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {rows.map((row) => (
               <FlagRow
                 sharedInstall={sharedInstall}
@@ -218,7 +207,7 @@ function ScopeSection({
                 onSetRules={onSetRules}
               />
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       )}
     </Box>
@@ -268,8 +257,8 @@ function FlagRow({
   };
 
   return (
-    <Table.Row>
-      <Table.Cell>
+    <ListTable.Row>
+      <ListTable.Cell>
         <VStack align="start" gap={2}>
           <HStack gap={2} wrap="wrap">
             <Text textStyle="monoSm" overflowWrap="anywhere">
@@ -290,8 +279,8 @@ function FlagRow({
             {row.description}
           </Text>
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <VStack align="start" gap={1}>
           <HStack gap={2}>
             <Switch
@@ -333,18 +322,18 @@ function FlagRow({
           initialRules={row.rules}
           onSave={onSetRules}
         />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge variant="subtle" colorPalette="gray">
           {sourceFor(row)}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge variant="outline" colorPalette="gray">
           {row.defaultValue ? "On" : "Off"}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {row.storedValue === null ? (
           <Text fontSize="xs" color="fg.muted">
             never
@@ -372,8 +361,8 @@ function FlagRow({
             </HStack>
           </VStack>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
