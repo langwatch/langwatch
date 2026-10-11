@@ -1,6 +1,7 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
-import { Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Pagination } from "@langwatch/design-system/pagination";
+import { Button, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant } from "@langwatch/time";
 import { RotateCcw, XCircle } from "lucide-react";
@@ -216,26 +217,14 @@ function Pager({
   onPage: (page: number) => void;
 }) {
   if (total <= PAGE_SIZE) return null;
-  const start = (page - 1) * PAGE_SIZE + 1;
-  const end = start + shown - 1;
   return (
-    <HStack justify="space-between">
-      <Text textStyle="xs" color="fg.muted">
-        {start}–{end} of {total}
-      </Text>
-      <HStack gap={2}>
-        <Button size="sm" variant="outline" disabled={page === 1} onClick={() => onPage(page - 1)}>
-          Previous
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={end >= total}
-          onClick={() => onPage(page + 1)}
-        >
-          Next
-        </Button>
-      </HStack>
-    </HStack>
+    <Pagination
+      page={page}
+      pageSize={PAGE_SIZE}
+      totalCount={total}
+      visibleCount={shown}
+      unitLabel="dead messages"
+      onPageChange={onPage}
+    />
   );
 }
