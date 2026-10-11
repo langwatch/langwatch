@@ -1,3 +1,4 @@
+import { Config, type ConfigOf } from "@langwatch/config";
 import type { Named } from "@langwatch/module";
 import { Secret } from "@langwatch/secrets/secret";
 import { z } from "zod";
@@ -20,6 +21,19 @@ export const managedBedrockDirectorySchema: ManagedBedrockDirectorySchema =
   managedBedrockDirectorySchemaDefinition;
 
 export type ManagedBedrockDirectory = z.infer<typeof managedBedrockDirectorySchema>;
+
+/** A base unset or blank reads as the real AWS endpoint; a value that is set must be a URL. */
+const optionalAwsBase = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().url().optional(),
+);
+
+/** Where STS is reached for the role hops: unset is the region's own (+outbound: outboundsim). */
+export const managedProviderConfig = Config.define((c) => ({
+  stsBase: c.env("MANAGED_BEDROCK_STS_BASE", optionalAwsBase),
+}));
+
+export type ManagedProviderServerConfig = ConfigOf<typeof managedProviderConfig>;
 
 /** AWS role and key material for every managed Bedrock deployment: a credential, not config. */
 export const managedProviderSecrets = {

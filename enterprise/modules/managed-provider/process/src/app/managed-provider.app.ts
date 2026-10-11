@@ -1,7 +1,9 @@
 import {
   ManagedProviderApi,
   type ManagedProviderApi as ManagedProviderApiContract,
+  managedProviderConfig,
   managedProviderSecrets,
+  type ManagedProviderServerConfig,
   parseManagedBedrockDirectory,
 } from "@langwatch/enterprise-managed-provider-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -13,7 +15,7 @@ import { ManagedProviderService } from "../services/managed-provider.service.ts"
 /** The directory is a credential (ADR-132): this App's own declared secret, not config. */
 type ManagedProviderSetup = FeatureSetup<
   typeof ManagedProviderModule.dependencies,
-  undefined,
+  ManagedProviderServerConfig,
   never,
   ManagedProviderChannels
 >;
@@ -21,6 +23,7 @@ type ManagedProviderSetup = FeatureSetup<
 export class ManagedProviderModule implements ManagedProviderApiContract {
   static readonly contract = ManagedProviderApi;
   static readonly dependencies = {};
+  static readonly config = managedProviderConfig;
   static readonly secrets = managedProviderSecrets;
 
   readonly #service: ManagedProviderService;
