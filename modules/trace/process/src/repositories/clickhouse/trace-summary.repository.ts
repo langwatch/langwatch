@@ -2,6 +2,7 @@ import type { Authorization } from "@langwatch/authorization";
 import {
   type AuthorizedClickHouse,
   DEFAULT_PARTITION_WINDOW_MS,
+  type IdIndexFlags,
   queryWindowed,
   type TenantScopedReader,
   tenantScope,
@@ -30,9 +31,13 @@ import type {
   TraceSummaryRead,
   TraceSummaryRepository,
 } from "../trace-summary.repository.ts";
+import { TRACE_SUMMARIES_ID_INDEX } from "./clickhouse.trace-id-index-fill.repository.ts";
+import { ClickHouseTraceIdIndexReadRepository } from "./clickhouse.trace-id-index-read.repository.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chBoolean, chNumber, chString, chStringMap } from "./stored-span-row.mapper.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
+
+const TRACE_ID_INDEX_READS = ClickHouseTraceIdIndexReadRepository.create();
 
 /**
  * Fields shared between trace summary and list repositories from trace_summaries.
@@ -419,13 +424,18 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       return this.#findInExplicitWindow({ authorization, traceId, window: options.window });
     }
 
-    // Two-stage read: hinted window for partition pruning, fallback unbounded.
+    // Hinted window first; then the index's range when its flag is on, else today's ladder.
     const hasHint = options.occurredAtMs !== undefined;
 
     try {
-      return await queryWindowed<TraceSummaryRead | null>({
+      return await TRACE_ID_INDEX_READS.read<TraceSummaryRead | null>({
+        authorization,
+        reader: this.reader(authorization),
+        idIndex: options.idIndex,
         table: TABLE_NAME,
-        hintMs: options.occurredAtMs ?? null,
+        index: TRACE_SUMMARIES_ID_INDEX,
+        traceId,
+        occurredAtMs: options.occurredAtMs,
         fallback: "unbounded",
         isEmpty: (result) => result === null,
         run: async (window) => {
@@ -454,23 +464,40 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
   async findTenantIdsByTraceId({
     authorization,
     traceId,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<string[]> {
+    const reader = this.reader(authorization);
     try {
-      const result = await this.reader(authorization).query({
-        query: `
-          SELECT DISTINCT TenantId
-          FROM ${TABLE_NAME}
-          WHERE ${tenantScope("OccurredAt")}
-            AND TraceId = {traceId:String}
-          ORDER BY TenantId
-        `,
-        query_params: { traceId },
-        format: "JSONEachRow",
+      return await TRACE_ID_INDEX_READS.read<string[]>({
+        authorization,
+        reader,
+        idIndex,
+        table: TABLE_NAME,
+        index: TRACE_SUMMARIES_ID_INDEX,
+        traceId,
+        occurredAtMs: undefined,
+        fallback: "unbounded",
+        isEmpty: (tenantIds) => tenantIds.length === 0,
+        run: async (window) => {
+          const result = await reader.query({
+            query: `
+              SELECT DISTINCT TenantId
+              FROM ${TABLE_NAME}
+              WHERE ${tenantScope("OccurredAt")}
+                AND TraceId = {traceId:String}
+                ${window?.sqlFor("OccurredAt") ?? ""}
+              ORDER BY TenantId
+            `,
+            query_params: { traceId, ...window?.params },
+            format: "JSONEachRow",
+          });
+          return tenantIdRowsSchema.parse(await result.json()).map((row) => row.TenantId);
+        },
       });
-      return tenantIdRowsSchema.parse(await result.json()).map((row) => row.TenantId);
     } catch (error) {
       logger.warn(
         {

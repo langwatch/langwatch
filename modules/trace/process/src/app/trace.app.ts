@@ -7,6 +7,7 @@ import { internalActor, narrowAuthorization, projectIdsReadBy } from "@langwatch
  */
 import type { Authorization, AuthorizationPurpose, PrincipalRef } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   type CodingAgentTranscript,
   shouldFilterCodingAgentSpan,
@@ -341,6 +342,7 @@ import type { TraceAttributeSpendRepository } from "../repositories/trace-attrib
 import type { TraceAttributedRollupRepository } from "../repositories/trace-attributed-rollup.repository.ts";
 import type { TraceEvaluationRunsReadRepository } from "../repositories/trace-evaluation-runs.repository.ts";
 import type { TraceExistenceRepository } from "../repositories/trace-existence.repository.ts";
+import type { TraceIdIndexReadRepository } from "../repositories/trace-id-index-read.repository.ts";
 import type { TraceModelSpendRepository } from "../repositories/trace-model-spend.repository.ts";
 import type { TracePayloadReaderRepository } from "../repositories/trace-payload-reader.repository.ts";
 import type { TraceProjectedReadRepository } from "../repositories/trace-projected-read.repository.ts";
@@ -366,6 +368,8 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import { TraceExistenceService } from "../services/trace-existence.service.ts";
+import { TraceIdIndexFlagsService } from "../services/trace-id-index-flags.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import {
   TraceMetadataWriteService,
@@ -696,6 +700,8 @@ export interface TraceAppDependencies {
   annotationCommands?: TraceAnnotationCommands;
   traces: Readonly<{
     existence: TraceExistenceRepository;
+    /** Existence bounded by trace's id index, confirmed on the source; absent, `existence`. */
+    existenceReads?: TraceExistenceService | undefined;
     /** The legacy trace read the `traces.*` and `spans.*` surfaces call. */
     read: TraceLegacyRead;
     list: TracesListReader;
@@ -874,6 +880,8 @@ type TraceLegacyReadCompositionOptions = {
   blobResolutionDeps?: BlobResolutionDeps | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionResolver?: DataRetentionApi | undefined;
+  idIndex?: IdIndexFlags | undefined;
+  idIndexReads?: TraceIdIndexReadRepository | undefined;
 };
 
 type TraceTreeCompositionOptions = {
@@ -889,6 +897,8 @@ type TraceTreeCompositionOptions = {
   payloads: TracePayloadReaderRepository;
   fullIo: TraceFullIo;
   authorize: FoldReadAuthorizer;
+  idIndex?: IdIndexFlags | undefined;
+  idIndexReads?: TraceIdIndexReadRepository | undefined;
 };
 
 /** Trace implements its public API and the collector's internal transport seam. */
@@ -1016,6 +1026,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     const ioExtractionService = TraceIOExtractionService.create(options.canonicalisation);
     const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
     const spanStorageRepository = options.repositories.spanStorage;
+    // Trace's id-index flags, read through a latch so no lookup waits on a flag (id-index §2).
+    const idIndex = options.featureFlags
+      ? TraceIdIndexFlagsService.create({ featureFlags: options.featureFlags })
+      : undefined;
     const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
     const ingestSourceBilling = TraceIngestSourceBillingService.create({
       repository: options.repositories.ingestSourceBilling,
@@ -1050,6 +1064,8 @@ export class TraceModule implements TraceApi, CollectorApp {
         traceCanonicalisation: options.canonicalisation,
         retentionResolver: options.dataRetention,
         blobResolutionDeps,
+        idIndex,
+        idIndexReads: options.repositories.idIndexReads,
       }),
       editOverlay,
       logRecordStorage: logRecords,
@@ -1075,6 +1091,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       TraceSummaryStore.create({
         storage: options.repositories.summaryProjection,
         defaultRetentionDays: () => options.dataRetention.getPlatformDefaultRetentionDays(),
+        idIndex,
         authorize: foldReadAuthorizer({
           authz: options.protections.authz,
           codePath: FOLD_READ_CODE_PATH,
@@ -1091,6 +1108,8 @@ export class TraceModule implements TraceApi, CollectorApp {
             evaluation: TraceModule.#composeQuery().evaluation,
           }),
           summaryReader: FoldedTraceSummaryReader.create(summaryStore),
+          idIndex,
+          idIndexReads: options.repositories.idIndexReads,
           records: {
             getById: async ({ projectId, traceId }) => {
               const resolved = await protections.resolve({
@@ -1116,6 +1135,8 @@ export class TraceModule implements TraceApi, CollectorApp {
           },
           eventDerivation: TraceEventDerivationService.create({
             spans: options.repositories.derivationSpans,
+            idIndex,
+            idIndexReads: options.repositories.idIndexReads,
             authorize: foldReadAuthorizer({
               authz: options.protections.authz,
               codePath: FOLD_READ_CODE_PATH,
@@ -1132,15 +1153,25 @@ export class TraceModule implements TraceApi, CollectorApp {
     return {
       traces: {
         existence: options.repositories.existence,
+        existenceReads: TraceExistenceService.create({
+          existence: options.repositories.existence,
+          idIndexReads: options.repositories.idIndexReads,
+          idIndex,
+        }),
         read,
         list,
         sessionGroups: SessionGroupsService.create({
           repository: options.repositories.sessionGroups,
         }),
-        spans: SpanStorageService.create({ repository: spanStorageRepository, blobResolutionDeps }),
+        spans: SpanStorageService.create({
+          repository: spanStorageRepository,
+          blobResolutionDeps,
+          idIndex,
+        }),
         summary: TraceSummaryService.create({
           repository: options.repositories.summary,
           fullResolutionDeps: { spanStorageRepository, ...blobResolutionDeps },
+          idIndex,
         }),
         tree,
         logRecords,
@@ -1207,6 +1238,8 @@ export class TraceModule implements TraceApi, CollectorApp {
       publicBaseUrl: options.publicBaseUrl,
       scenarioRoleMetrics: ScenarioRoleMetricsDerivationService.create({
         spans: options.repositories.derivationSpans,
+        idIndex,
+        idIndexReads: options.repositories.idIndexReads,
         spanCosts: SpanCostService.create({ modelCosts: TraceModelCostService.create() }),
       }),
       topicClustering: TraceTopicClusteringReadService.create({
@@ -1273,6 +1306,8 @@ export class TraceModule implements TraceApi, CollectorApp {
         options.fullIo,
       ),
       authorize: options.authorize,
+      idIndex: options.idIndex,
+      idIndexReads: options.idIndexReads,
     });
   }
 
@@ -2317,7 +2352,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     projectId: string;
     traceIds: readonly string[];
   }): Promise<string[]> {
-    return this.#dependencies.traces.existence.findExistingTraceIds(input);
+    const { existence, existenceReads } = this.#dependencies.traces;
+    return (existenceReads ?? existence).findExistingTraceIds(input);
   }
 
   findTraceCosts(input: {

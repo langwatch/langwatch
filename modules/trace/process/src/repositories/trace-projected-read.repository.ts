@@ -1,4 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { ModelCostEstimateInput } from "@langwatch/model-provider-contract";
 import type {
   EvaluationTraceEvent,
@@ -29,12 +30,14 @@ export abstract class TraceProjectedReadRepository {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationTraceSpan[]>;
 
   abstract findEvaluationEvents(input: {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationTraceEvent[]>;
 
   abstract findIngestLag(input: {
@@ -47,6 +50,7 @@ export abstract class TraceProjectedReadRepository {
     limit: number;
     cursor?: SpanTreeCursor;
     occurredAtMs?: number;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<TraceSpanPage>;
 
   /**

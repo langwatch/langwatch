@@ -1,5 +1,10 @@
 import type { Authorization } from "@langwatch/authorization";
-import { type AuthorizedClickHouse, tenantScope } from "@langwatch/clickhouse-client";
+import {
+  type AuthorizedClickHouse,
+  type IdIndexFlags,
+  tenantScope,
+  type WindowFragment,
+} from "@langwatch/clickhouse-client";
 import { nowInstant } from "@langwatch/time";
 import {
   evaluationTraceEventSchema,
@@ -16,12 +21,15 @@ import {
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace-projected-read.repository.ts";
+import { STORED_SPANS_ID_INDEX } from "./clickhouse.trace-id-index-fill.repository.ts";
+import { ClickHouseTraceIdIndexReadRepository } from "./clickhouse.trace-id-index-read.repository.ts";
 import { chString, chStringMap } from "./stored-span-row.mapper.ts";
+
+const TRACE_ID_INDEX_READS = ClickHouseTraceIdIndexReadRepository.create();
 
 const STORED_SPANS_TABLE = "stored_spans";
 const evaluationTraceSpansSchema = evaluationTraceSpanSchema.array();
 const evaluationTraceEventsSchema = evaluationTraceEventSchema.array();
-const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 const MAX_LIGHT_SPAN_READ_ROWS = 10_000;
 
@@ -147,12 +155,32 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationTraceSpan[]> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const window =
-      input.occurredAtMs === void 0
-        ? ""
-        : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
+    return TRACE_ID_INDEX_READS.read<EvaluationTraceSpan[]>({
+      authorization: input.authorization,
+      reader: client,
+      idIndex: input.idIndex,
+      table: STORED_SPANS_TABLE,
+      index: STORED_SPANS_ID_INDEX,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      fallback: "unbounded",
+      isEmpty: (spans) => spans.length === 0,
+      run: (fragment) => this.queryEvaluationSpans({ input, fragment }),
+    });
+  }
+
+  private async queryEvaluationSpans({
+    input,
+    fragment,
+  }: {
+    input: { authorization: Authorization; traceId: string };
+    fragment: WindowFragment | null;
+  }): Promise<EvaluationTraceSpan[]> {
+    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const window = fragment?.sqlFor("StartTime") ?? "";
     const result = await client.query({
       query: `
         SELECT
@@ -167,24 +195,10 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         ORDER BY StartTime ASC
         LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
-      query_params: {
-        traceId: input.traceId,
-        ...(input.occurredAtMs === void 0
-          ? {}
-          : {
-              fromMs: input.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-              toMs: input.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
-            }),
-      },
+      query_params: { traceId: input.traceId, ...fragment?.params },
       format: "JSONEachRow",
     });
     const rows = evaluationSpanRowsSchema.parse(await result.json());
-    if (rows.length === 0 && input.occurredAtMs !== void 0) {
-      return this.findEvaluationSpans({
-        authorization: input.authorization,
-        traceId: input.traceId,
-      });
-    }
     return evaluationTraceSpansSchema.parse(
       rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationSpan(row)),
     );
@@ -194,12 +208,32 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationTraceEvent[]> {
     const client = this.clickhouse.as(input.authorization, { reads: "traces" });
-    const window =
-      input.occurredAtMs === void 0
-        ? ""
-        : "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
+    return TRACE_ID_INDEX_READS.read<EvaluationTraceEvent[]>({
+      authorization: input.authorization,
+      reader: client,
+      idIndex: input.idIndex,
+      table: STORED_SPANS_TABLE,
+      index: STORED_SPANS_ID_INDEX,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      fallback: "unbounded",
+      isEmpty: (events) => events.length === 0,
+      run: (fragment) => this.queryEvaluationEvents({ input, fragment }),
+    });
+  }
+
+  private async queryEvaluationEvents({
+    input,
+    fragment,
+  }: {
+    input: { authorization: Authorization; traceId: string };
+    fragment: WindowFragment | null;
+  }): Promise<EvaluationTraceEvent[]> {
+    const client = this.clickhouse.as(input.authorization, { reads: "traces" });
+    const window = fragment?.sqlFor("StartTime") ?? "";
     const result = await client.query({
       query: `
         SELECT event_name AS EventType, event_attrs AS Attributes
@@ -221,24 +255,10 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
         WHERE event_name != 'exception'
         ORDER BY event_timestamp DESC
       `,
-      query_params: {
-        traceId: input.traceId,
-        ...(input.occurredAtMs === void 0
-          ? {}
-          : {
-              fromMs: input.occurredAtMs - DEFAULT_PARTITION_WINDOW_MS,
-              toMs: input.occurredAtMs + DEFAULT_PARTITION_WINDOW_MS,
-            }),
-      },
+      query_params: { traceId: input.traceId, ...fragment?.params },
       format: "JSONEachRow",
     });
     const rows = evaluationEventRowsSchema.parse(await result.json());
-    if (rows.length === 0 && input.occurredAtMs !== void 0) {
-      return this.findEvaluationEvents({
-        authorization: input.authorization,
-        traceId: input.traceId,
-      });
-    }
     return evaluationTraceEventsSchema.parse(
       rows.map((row) => ClickHouseTraceSpanRepository.mapEvaluationEvent(row)),
     );
@@ -283,20 +303,26 @@ export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository 
     limit: number;
     cursor?: SpanTreeCursor;
     occurredAtMs?: number;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<TraceSpanPage> {
     if (input.cursor) {
       return this.queryPage(input, void 0);
     }
 
-    const occurredAtMs =
-      input.occurredAtMs ??
-      (await this.resolveTraceOccurredAtMs(input.authorization, input.traceId));
-    if (occurredAtMs === void 0) {
-      return this.queryPage(input, void 0);
-    }
-
-    const bounded = await this.queryPage(input, occurredAtMs - DEFAULT_PARTITION_WINDOW_MS);
-    return bounded.rows.length > 0 ? bounded : this.queryPage(input, void 0);
+    // Lower bound only: a live trace can run past any upper bound a hint would set.
+    return TRACE_ID_INDEX_READS.read<TraceSpanPage>({
+      authorization: input.authorization,
+      reader: this.clickhouse.as(input.authorization, { reads: "traces" }),
+      idIndex: input.idIndex,
+      table: STORED_SPANS_TABLE,
+      index: STORED_SPANS_ID_INDEX,
+      traceId: input.traceId,
+      occurredAtMs: input.occurredAtMs,
+      resolveHint: () => this.resolveTraceOccurredAtMs(input.authorization, input.traceId),
+      fallback: "unbounded",
+      isEmpty: (page) => page.rows.length === 0,
+      run: (fragment) => this.queryPage(input, fragment?.fromMs),
+    });
   }
 
   async findSummarySince(input: {

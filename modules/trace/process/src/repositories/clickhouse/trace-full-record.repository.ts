@@ -27,6 +27,7 @@ import {
   withoutEventReferences,
 } from "../../rules/trace-full-record.rules.ts";
 import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
+import type { TraceIdIndexWindow } from "../trace-id-index-read.repository.ts";
 import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
 import type {
   TraceClickHouseClient,
@@ -114,13 +115,19 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
     return new ClickHouseTraceFullRecordRepository(clickhouse, payloads, io);
   }
 
-  async get(input: TraceFullReadInput): Promise<TraceFullRecord> {
+  async get(
+    input: TraceFullReadInput,
+    options: { window?: TraceIdIndexWindow | undefined } = {},
+  ): Promise<TraceFullRecord> {
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
       "ClickHouseTraceFullRecordRepository.get",
     );
     const client = await this.clickhouse.resolve(input.tenantId);
-    const summary = await this.summary(client, input);
+    // Inside the id index's range first; a miss there reads as today, unbounded.
+    const summary =
+      (options.window === undefined ? null : await this.summary(client, input, options.window)) ??
+      (await this.summary(client, input));
     if (!summary) throw new TraceNotFoundError(input.traceId);
 
     const rows = await this.spans(client, input, input.occurredAtMs ?? summary.OccurredAtMs);
@@ -208,15 +215,24 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
   private async summary(
     client: TraceClickHouseClient,
     input: TraceFullReadInput,
+    window?: TraceIdIndexWindow,
   ): Promise<SummaryRow | null> {
+    const bound =
+      window === undefined
+        ? ""
+        : "AND OccurredAt BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})";
     const result = await client.query({
       query: `SELECT TraceId, Attributes, ComputedInput, ComputedOutput, ContainsErrorStatus, ErrorMessage,
         TimeToFirstTokenMs, TotalDurationMs, TotalPromptTokenCount, TotalCompletionTokenCount, TotalCost, TokensEstimated,
         toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs, toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
         toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs FROM trace_summaries WHERE TenantId = {tenantId:String}
-        AND TraceId = {traceId:String} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} GROUP BY TenantId, TraceId) LIMIT 1`,
-      query_params: { tenantId: input.tenantId, traceId: input.traceId },
+        AND TraceId = {traceId:String} ${bound} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} ${bound} GROUP BY TenantId, TraceId) LIMIT 1`,
+      query_params: {
+        tenantId: input.tenantId,
+        traceId: input.traceId,
+        ...(window === undefined ? {} : { fromMs: window.fromMs, toMs: window.toMs }),
+      },
       format: "JSONEachRow",
     });
     return summaryRowsSchema.parse(await result.json())[0] ?? null;

@@ -9,6 +9,7 @@ import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { z } from "zod";
 
+import type { TraceIdIndexWindow } from "../trace-id-index-read.repository.ts";
 import type { TraceClickHouseWriteResolver } from "./clickhouse.trace-member-client.repository.ts";
 import {
   chNumber,
@@ -73,6 +74,26 @@ const DERIVATION_FETCH_SETTINGS = {
   max_execution_time: "30",
 } as const;
 
+/**
+ * A caller's time centres the window as today; with none, the id index's range is the window
+ * (centre and half-width), and an empty read still widens to today's unbounded fallback.
+ */
+function hintOf({
+  occurredAtMs,
+  window,
+}: {
+  occurredAtMs?: number | undefined;
+  window?: TraceIdIndexWindow | undefined;
+}): { hintMs: number | null; windowMs: number } {
+  if (occurredAtMs === undefined && window !== undefined) {
+    return {
+      hintMs: (window.fromMs + window.toMs) / 2,
+      windowMs: (window.toMs - window.fromMs) / 2,
+    };
+  }
+  return { hintMs: occurredAtMs ?? null, windowMs: DEFAULT_PARTITION_WINDOW_MS };
+}
+
 // Every stored span of one trace for scenario role derivation; uses argMax with
 // UpdatedAt (not LIMIT 1 BY which materializes columns for whole granules)
 export class TraceDerivationSpanClickHouseRepository {
@@ -89,6 +110,7 @@ export class TraceDerivationSpanClickHouseRepository {
     traceId: string;
     occurredAtMs?: number;
     limit?: number;
+    window?: TraceIdIndexWindow | undefined;
   }): Promise<NormalizedSpan[]> {
     EventUtils.validateTenantId(
       { tenantId: input.tenantId },
@@ -98,8 +120,7 @@ export class TraceDerivationSpanClickHouseRepository {
     try {
       return await queryWindowed<NormalizedSpan[]>({
         table: TABLE_NAME,
-        hintMs: input.occurredAtMs ?? null,
-        windowMs: DEFAULT_PARTITION_WINDOW_MS,
+        ...hintOf(input),
         fallback: "unbounded",
         isEmpty: (rows) => rows.length === 0,
         run: (window) => this.fetchTraceSpanRows(input, window),
@@ -126,6 +147,7 @@ export class TraceDerivationSpanClickHouseRepository {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    window?: TraceIdIndexWindow | undefined;
   }): Promise<DerivedTraceEvent[]> {
     // shortcut: this read still filters one TenantId, so it takes the proof's own project;
     // fence it through AuthorizedClickHouse once an aggregate derives events.
@@ -138,8 +160,7 @@ export class TraceDerivationSpanClickHouseRepository {
     try {
       return await queryWindowed<DerivedTraceEvent[]>({
         table: TABLE_NAME,
-        hintMs: input.occurredAtMs ?? null,
-        windowMs: DEFAULT_PARTITION_WINDOW_MS,
+        ...hintOf(input),
         fallback: "unbounded",
         isEmpty: (rows) => rows.length === 0,
         run: (window) => this.fetchTraceEventRows(input, window),

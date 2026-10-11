@@ -3,7 +3,6 @@ import {
   type AuthorizedClickHouse,
   DEFAULT_PARTITION_WINDOW_MS,
   RESOLVER_RECENT_WINDOW_MS,
-  queryWindowed,
   type TenantScopedReader,
   tenantScope,
   tenantScopeKey,
@@ -28,6 +27,8 @@ import {
 
 import { mapNormalizedSpansToSpans } from "../../features/legacy/rules/trace-legacy-span-mapping.rules.ts";
 import { computeSpanCost } from "../../features/span/rules/trace-span-cost-matching.rules.ts";
+import { STORED_SPANS_ID_INDEX } from "./clickhouse.trace-id-index-fill.repository.ts";
+import { ClickHouseTraceIdIndexReadRepository } from "./clickhouse.trace-id-index-read.repository.ts";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "./clickhouse.trace-member-client.repository.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as
@@ -75,6 +76,8 @@ import {
   MAX_STORED_TRACE_SPAN_ROWS,
   type StoredTraceSpan,
 } from "../span-storage.repository.ts";
+
+const TRACE_ID_INDEX_READS = ClickHouseTraceIdIndexReadRepository.create();
 
 const TABLE_NAME = "stored_spans" as const;
 
@@ -817,6 +820,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     limit,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
@@ -828,7 +832,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
     try {
       return await this.readTraceSpans<Span[]>(
-        { authorization, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs, idIndex },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
@@ -875,6 +879,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     limit,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
@@ -888,7 +893,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // trace duration, so a derivation read can't realistically split across it.
     try {
       return await this.readTraceSpans<NormalizedSpan[]>(
-        { authorization, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs, idIndex },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
@@ -936,6 +941,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     limit,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
@@ -947,7 +953,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
 
     try {
       return await this.readTraceSpans<StoredTraceSpan[]>(
-        { authorization, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs, idIndex },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
@@ -1003,6 +1009,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     spanId,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
@@ -1010,7 +1017,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   } & OccurredAtHint): Promise<Span | null> {
     try {
       return await this.readTraceSpans<Span | null>(
-        { authorization, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs, idIndex },
         (span) => span === null,
         async (window) => {
           const row = await this.fetchNormalizedSpanRow({
@@ -1046,12 +1053,17 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     spanId,
     occurredAtMs,
+    idIndex,
   }: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
     try {
-      return await queryWindowed<NormalizedSpan | null>({
+      return await TRACE_ID_INDEX_READS.read<NormalizedSpan | null>({
+        authorization,
+        reader: this.reader(authorization),
+        idIndex,
         table: TABLE_NAME,
-        hintMs: occurredAtMs,
-        windowMs: DEFAULT_PARTITION_WINDOW_MS,
+        index: STORED_SPANS_ID_INDEX,
+        traceId,
+        occurredAtMs,
         fallback: "none",
         isEmpty: (row) => row === null,
         run: (window) =>
@@ -1123,12 +1135,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     authorization,
     traceId,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<SpanResourceInfo[]> {
     return this.readTraceSpans<SpanResourceInfo[]>(
-      { authorization, traceId, occurredAtMs },
+      { authorization, traceId, occurredAtMs, idIndex },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1230,15 +1243,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       authorization,
       traceId,
       occurredAtMs,
+      idIndex,
     }: { authorization: Authorization; traceId: string } & OccurredAtHint,
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
-    const hintMs =
-      occurredAtMs ?? (await this.resolveTraceOccurredAtMs({ authorization, traceId }));
-    return queryWindowed<T>({
+    return TRACE_ID_INDEX_READS.read<T>({
+      authorization,
+      reader: this.reader(authorization),
+      idIndex,
       table: TABLE_NAME,
-      hintMs: hintMs ?? null,
-      windowMs: DEFAULT_PARTITION_WINDOW_MS,
+      index: STORED_SPANS_ID_INDEX,
+      traceId,
+      occurredAtMs,
+      resolveHint: () => this.resolveTraceOccurredAtMs({ authorization, traceId }),
       fallback: "none",
       // `fallback: "none"` never widens, so `isEmpty` is never consulted.
       isEmpty: () => false,
@@ -1254,16 +1271,22 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       authorization,
       traceId,
       occurredAtMs,
+      idIndex,
     }: { authorization: Authorization; traceId: string } & OccurredAtHint,
     isEmpty: (result: T) => boolean,
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
-    const hintMs =
-      occurredAtMs ?? (await this.resolveTraceOccurredAtMs({ authorization, traceId }));
-    return queryWindowed<T>({
+    // Flag off, the summary's OccurredAt names the window as today; flag on, the span index does,
+    // so spans stored before their summary is projected are found too.
+    return TRACE_ID_INDEX_READS.read<T>({
+      authorization,
+      reader: this.reader(authorization),
+      idIndex,
       table: TABLE_NAME,
-      hintMs: hintMs ?? null,
-      windowMs: DEFAULT_PARTITION_WINDOW_MS,
+      index: STORED_SPANS_ID_INDEX,
+      traceId,
+      occurredAtMs,
+      resolveHint: () => this.resolveTraceOccurredAtMs({ authorization, traceId }),
       fallback: "unbounded",
       isEmpty,
       run,
@@ -1274,13 +1297,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     authorization,
     traceId,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<DerivedTraceEvent[]> {
     try {
       return await this.readTraceEvents<DerivedTraceEvent[]>(
-        { authorization, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs, idIndex },
         async (window) => {
           const partition = partitionFragment(window);
           const client = this.reader(authorization);
@@ -1378,13 +1402,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     authorization,
     traceId,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
     try {
       return await this.readTraceEvents<ElasticSearchEvent[]>(
-        { authorization, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs, idIndex },
         async (window) => {
           const partition = partitionFragment(window);
           const client = this.reader(authorization);
@@ -1445,6 +1470,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     traceId,
     spanId,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
@@ -1452,7 +1478,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
     try {
       return await this.readTraceEvents<ElasticSearchEvent[]>(
-        { authorization, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs, idIndex },
         async (window) => {
           const partition = partitionFragment(window);
           const client = this.reader(authorization);
@@ -1520,12 +1546,13 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     authorization,
     traceId,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<SpanSummaryRow[]> {
     return this.readTraceSpans<SpanSummaryRow[]>(
-      { authorization, traceId, occurredAtMs },
+      { authorization, traceId, occurredAtMs, idIndex },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1555,6 +1582,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     authorization,
     traceId,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
@@ -1562,7 +1590,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // Emptiness is judged on the rows ClickHouse returned, before the signal-less
     // spans are dropped: a trace with no signals is not a stale hint.
     const bySpan = await this.readTraceSpans<SpanLangwatchSignalsRow[]>(
-      { authorization, traceId, occurredAtMs },
+      { authorization, traceId, occurredAtMs, idIndex },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1624,6 +1652,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     limit,
     offset,
     occurredAtMs,
+    idIndex,
   }: {
     authorization: Authorization;
     traceId: string;
@@ -1631,7 +1660,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     offset: number;
   } & OccurredAtHint): Promise<{ spans: Span[]; total: number }> {
     return this.readTraceSpans<{ spans: Span[]; total: number }>(
-      { authorization, traceId, occurredAtMs },
+      { authorization, traceId, occurredAtMs, idIndex },
       (result) => result.spans.length === 0,
       async (window) => {
         const partition = partitionFragment(window);

@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   type FoldProjectionStore,
   type ProjectionStoreContext,
@@ -29,22 +30,31 @@ const DECODABLE_PROJECTION_VERSIONS: ReadonlySet<string> = new Set([
  * read through an own-only proof on the context's tenant from `authorize` (ADR-177 block C).
  */
 export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsData> {
-  private constructor(
-    private readonly storage: TraceAnalyticsProjectionRepository,
-    private readonly defaultRetentionDays: () => number,
-    private readonly authorize: FoldReadAuthorizer,
-  ) {}
+  private readonly storage: TraceAnalyticsProjectionRepository;
+  private readonly defaultRetentionDays: () => number;
+  private readonly authorize: FoldReadAuthorizer;
+  private readonly idIndex: IdIndexFlags | undefined;
+
+  private constructor(options: {
+    storage: TraceAnalyticsProjectionRepository;
+    defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
+    idIndex?: IdIndexFlags | undefined;
+  }) {
+    this.storage = options.storage;
+    this.defaultRetentionDays = options.defaultRetentionDays;
+    this.authorize = options.authorize;
+    this.idIndex = options.idIndex;
+  }
 
   static create(options: {
     storage: TraceAnalyticsProjectionRepository;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
+    /** Trace's id-index flags: a read with no window is bounded by the index when on. */
+    idIndex?: IdIndexFlags | undefined;
   }): TraceAnalyticsStore {
-    return new TraceAnalyticsStore(
-      options.storage,
-      options.defaultRetentionDays,
-      options.authorize,
-    );
+    return new TraceAnalyticsStore(options);
   }
 
   async store(state: TraceAnalyticsData, context: ProjectionStoreContext): Promise<void> {
@@ -115,6 +125,7 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
       }),
       traceId: aggregateId,
       window: context.readWindow,
+      idIndex: this.idIndex,
     });
     if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
     // Stale schema snapshot: read-back columns didn't exist when this row was

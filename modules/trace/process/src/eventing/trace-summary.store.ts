@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   type FoldProjectionStore,
   type ProjectionStoreContext,
@@ -15,18 +16,31 @@ import type { TraceSummaryProjectionRepository } from "../repositories/trace-sum
  * tenant from `authorize` (ADR-177 block C), so the fold reads back exactly the row it wrote.
  */
 export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> {
-  private constructor(
-    private readonly storage: TraceSummaryProjectionRepository,
-    private readonly defaultRetentionDays: () => number,
-    private readonly authorize: FoldReadAuthorizer,
-  ) {}
+  private readonly storage: TraceSummaryProjectionRepository;
+  private readonly defaultRetentionDays: () => number;
+  private readonly authorize: FoldReadAuthorizer;
+  private readonly idIndex: IdIndexFlags | undefined;
+
+  private constructor(options: {
+    storage: TraceSummaryProjectionRepository;
+    defaultRetentionDays: () => number;
+    authorize: FoldReadAuthorizer;
+    idIndex?: IdIndexFlags | undefined;
+  }) {
+    this.storage = options.storage;
+    this.defaultRetentionDays = options.defaultRetentionDays;
+    this.authorize = options.authorize;
+    this.idIndex = options.idIndex;
+  }
 
   static create(options: {
     storage: TraceSummaryProjectionRepository;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
+    /** Trace's id-index flags: a read with no window is bounded by the index when on. */
+    idIndex?: IdIndexFlags | undefined;
   }): TraceSummaryStore {
-    return new TraceSummaryStore(options.storage, options.defaultRetentionDays, options.authorize);
+    return new TraceSummaryStore(options);
   }
 
   /**
@@ -82,6 +96,7 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
       }),
       traceId: aggregateId,
       window: context.readWindow,
+      idIndex: this.idIndex,
     });
     return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };
   }

@@ -1,9 +1,14 @@
-import { type Authorization, readScopeKeyOf } from "@langwatch/authorization";
+import { type Authorization, ownProjectIdReadBy, readScopeKeyOf } from "@langwatch/authorization";
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { FoldReadAuthorizer } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import type { DerivedTraceEvent, TraceDerivedEventsInput } from "@langwatch/trace-contract";
 
 import type { TraceDerivationSpanReaderRepository } from "../../../repositories/trace-derivation-span-reader.repository.ts";
+import type {
+  TraceIdIndexReadRepository,
+  TraceIdIndexWindow,
+} from "../../../repositories/trace-id-index-read.repository.ts";
 
 /**
  * How long an unused memo entry lingers. Correctness comes from the fold
@@ -29,16 +34,31 @@ export class TraceEventDerivationService {
   static create(options: {
     spans: TraceDerivationSpanReaderRepository;
     authorize: FoldReadAuthorizer;
+    /** Trace's id-index flags and their reads: with no time, the index names the window. */
+    idIndex?: IdIndexFlags | undefined;
+    idIndexReads?: TraceIdIndexReadRepository | undefined;
   }): TraceEventDerivationService {
-    return new TraceEventDerivationService(options.spans, options.authorize);
+    return new TraceEventDerivationService(options);
   }
 
   private readonly memo = new Map<string, MemoEntry>();
 
-  private constructor(
-    private readonly spans: TraceDerivationSpanReaderRepository,
-    private readonly authorize: FoldReadAuthorizer,
-  ) {}
+  private readonly spans: TraceDerivationSpanReaderRepository;
+  private readonly authorize: FoldReadAuthorizer;
+  private readonly idIndex: IdIndexFlags | undefined;
+  private readonly idIndexReads: TraceIdIndexReadRepository | undefined;
+
+  private constructor(options: {
+    spans: TraceDerivationSpanReaderRepository;
+    authorize: FoldReadAuthorizer;
+    idIndex?: IdIndexFlags | undefined;
+    idIndexReads?: TraceIdIndexReadRepository | undefined;
+  }) {
+    this.spans = options.spans;
+    this.authorize = options.authorize;
+    this.idIndex = options.idIndex;
+    this.idIndexReads = options.idIndexReads;
+  }
 
   async derive({ projectId, ...input }: TraceDerivedEventsInput): Promise<DerivedTraceEvent[]> {
     const authorization = await this.authorize({
@@ -55,11 +75,13 @@ export class TraceEventDerivationService {
     occurredAtMs?: number | undefined;
     foldVersion?: number | undefined;
   }): Promise<DerivedTraceEvent[]> {
-    const read = () =>
+    const read = async () =>
       this.spans.findDerivedEventsByTraceId({
         authorization: input.authorization,
         traceId: input.traceId,
-        ...(input.occurredAtMs === undefined ? {} : { occurredAtMs: input.occurredAtMs }),
+        ...(input.occurredAtMs === undefined
+          ? { window: await this.indexWindow(input) }
+          : { occurredAtMs: input.occurredAtMs }),
       });
     if (input.foldVersion === undefined) {
       return read();
@@ -119,5 +141,23 @@ export class TraceEventDerivationService {
 
       this.memo.delete(oldest);
     }
+  }
+
+  /** The stored_spans index's range for the proof's own project; none when off or unseen. */
+  private async indexWindow({
+    authorization,
+    traceId,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<TraceIdIndexWindow | undefined> {
+    if (this.idIndexReads === undefined) return undefined;
+    const [window] = await this.idIndexReads.findWindows({
+      tenantId: ownProjectIdReadBy(authorization),
+      traceIds: [traceId],
+      source: "stored_spans",
+      idIndex: this.idIndex,
+    });
+    return window;
   }
 }

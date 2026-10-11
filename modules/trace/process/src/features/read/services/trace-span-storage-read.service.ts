@@ -1,4 +1,5 @@
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import type {
   DerivedTraceEvent,
@@ -83,11 +84,14 @@ export class SpanStorageService {
   static create({
     repository,
     blobResolutionDeps,
+    idIndex,
   }: {
     repository: SpanStorageRepository;
     blobResolutionDeps?: SpanReadBlobResolutionDeps;
+    /** Trace's id-index flags, handed to every read by trace id. */
+    idIndex?: IdIndexFlags | undefined;
   }): SpanStorageService {
-    return new SpanStorageService(repository, blobResolutionDeps);
+    return new SpanStorageService(repository, blobResolutionDeps, idIndex);
   }
 
   private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
@@ -96,8 +100,14 @@ export class SpanStorageService {
   private constructor(
     readonly repository: SpanStorageRepository,
     blobResolutionDeps?: SpanReadBlobResolutionDeps,
+    private readonly idIndex?: IdIndexFlags,
   ) {
     this.blobResolutionDeps = blobResolutionDeps;
+  }
+
+  /** A read's params with trace's id-index flags, so a read with no time can use the index. */
+  private indexed<P extends object>(params: P): P & { idIndex?: IdIndexFlags | undefined } {
+    return { ...params, idIndex: this.idIndex };
   }
 
   async insertSpan(span: SpanInsertData): Promise<void> {
@@ -114,13 +124,15 @@ export class SpanStorageService {
   ): Promise<Span[]> {
     if (!this.blobResolutionDeps) {
       return applyVisibilityGate(
-        await this.repository.findSpansByTraceId(params),
+        await this.repository.findSpansByTraceId(this.indexed(params)),
         params.visibilityCutoffMs,
       );
     }
 
     // Fetch normalized spans so resolution can access raw spanAttributes.
-    const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(params);
+    const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(
+      this.indexed(params),
+    );
     const resolvedSpans = await this.resolveOffloadedBodies({
       authorization: params.authorization,
       normalizedSpans,
@@ -133,14 +145,14 @@ export class SpanStorageService {
   async getNormalizedSpansByTraceId(
     params: ByTraceId & { limit?: number },
   ): Promise<NormalizedSpan[]> {
-    return this.repository.findNormalizedSpansByTraceId(params);
+    return this.repository.findNormalizedSpansByTraceId(this.indexed(params));
   }
 
   /** A trace's spans with their attributes as stored, unparsed, for a reader that hands them on. */
   async findStoredSpansByTraceId(
     params: ByTraceId & { limit?: number },
   ): Promise<StoredTraceSpan[]> {
-    return this.repository.findStoredSpansByTraceId(params);
+    return this.repository.findStoredSpansByTraceId(this.indexed(params));
   }
 
   /**
@@ -149,7 +161,7 @@ export class SpanStorageService {
    * callers retry. The partition hint is required: the read behind it has no unbounded fallback.
    */
   async findNormalizedSpanById(params: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
-    return this.repository.findNormalizedSpanById(params);
+    return this.repository.findNormalizedSpanById(this.indexed(params));
   }
 
   /**
@@ -162,11 +174,13 @@ export class SpanStorageService {
       span ? (applyVisibilityGate([span], params.visibilityCutoffMs)[0] ?? null) : null;
 
     if (!this.blobResolutionDeps) {
-      return gateOne(await this.repository.findSpanByIds(params));
+      return gateOne(await this.repository.findSpanByIds(this.indexed(params)));
     }
 
     // Resolve the single span via the normalized+resolve path.
-    const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(params);
+    const normalizedSpans = await this.repository.findNormalizedSpansByTraceId(
+      this.indexed(params),
+    );
     const resolvedSpans = await this.resolveOffloadedBodies({
       authorization: params.authorization,
       normalizedSpans,
@@ -210,7 +224,7 @@ export class SpanStorageService {
   }
 
   async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {
-    return this.repository.findTraceEventsByTraceId(params);
+    return this.repository.findTraceEventsByTraceId(this.indexed(params));
   }
 
   /**
@@ -225,29 +239,29 @@ export class SpanStorageService {
   }
 
   async getEventsByTraceId(params: ByTraceId): Promise<ElasticSearchEvent[]> {
-    return this.repository.findEventsByTraceId(params);
+    return this.repository.findEventsByTraceId(this.indexed(params));
   }
 
   async getSpanEvents(params: BySpanId): Promise<ElasticSearchEvent[]> {
-    return this.repository.findSpanEvents(params);
+    return this.repository.findSpanEvents(this.indexed(params));
   }
 
   async getSpanSummaryByTraceId(params: ByTraceId): Promise<SpanSummaryRow[]> {
-    return this.repository.findSpanSummaryByTraceId(params);
+    return this.repository.findSpanSummaryByTraceId(this.indexed(params));
   }
 
   async getLangwatchSignalsByTraceId(params: ByTraceId): Promise<SpanLangwatchSignalsRow[]> {
-    return this.repository.findLangwatchSignalsByTraceId(params);
+    return this.repository.findLangwatchSignalsByTraceId(this.indexed(params));
   }
 
   async getSpanResourcesByTraceId(params: ByTraceId): Promise<SpanResourceInfo[]> {
-    return this.repository.findSpanResourcesByTraceId(params);
+    return this.repository.findSpanResourcesByTraceId(this.indexed(params));
   }
 
   async getSpansPaginated(
     params: Paginated & VisibilityGate,
   ): Promise<{ spans: Span[]; total: number }> {
-    const page = await this.repository.listSpansPaginated(params);
+    const page = await this.repository.listSpansPaginated(this.indexed(params));
 
     return {
       ...page,

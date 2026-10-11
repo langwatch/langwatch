@@ -16,6 +16,7 @@ import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-co
 import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
+import { TraceIdIndexFlagsService } from "../services/trace-id-index-flags.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
 import {
@@ -100,6 +101,8 @@ export class TraceProcessingRuntimeAdapter {
     const { peers, repositories, canonicalisation, authorizeFoldRead } = this.input;
     const defaultRetentionDays = (): number =>
       peers.dataRetention.getPlatformDefaultRetentionDays();
+    // Fold read-backs with no window are bounded by trace's id index once its flag is on.
+    const idIndex = TraceIdIndexFlagsService.create({ featureFlags: peers.featureFlags });
     return EventingTracePipelineAdapter.create({
       spanStore: SpanStorageStore.create({
         storage: repositories.spanStorage,
@@ -110,6 +113,7 @@ export class TraceProcessingRuntimeAdapter {
           storage: repositories.summaryProjection,
           defaultRetentionDays,
           authorize: authorizeFoldRead,
+          idIndex,
         }),
       ),
       derivedStore: repositories.analyticsFoldCache.cached(
@@ -117,6 +121,7 @@ export class TraceProcessingRuntimeAdapter {
           storage: repositories.analyticsProjection,
           defaultRetentionDays,
           authorize: authorizeFoldRead,
+          idIndex,
         }),
       ),
       rollupStore: TraceAnalyticsRollupStore.create({

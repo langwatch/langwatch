@@ -14,6 +14,7 @@ import { traceProjectMilestonesEventing } from "./eventing/trace-project-milesto
 import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import { TraceIdIndexFillService } from "./services/trace-id-index-fill.service.ts";
 import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
 import { traceMonthIdsReportSchema } from "./services/trace-month-ids-migration.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
@@ -80,7 +81,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
     .withEventing(traceIngestSourceBillingEventing)
-    .withMigrations(({ app, repositories }) => [
+    .withMigrations(({ app, repositories, dependencies }) => [
       defineMigrationStep({
         id: "trace:track-updated-at-index-materialisation",
         kind: "data",
@@ -114,5 +115,20 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             onPage: (report) => checkpoint.save({ report }),
           });
         },
+      }),
+      defineMigrationStep({
+        id: "trace:fill-id-indexes",
+        kind: "data",
+        mode: "background",
+        description:
+          "Fills the trace id indexes from rows older than their views, then turns their flag on.",
+        // Old releases fire the server-side views too, so no writer has to be gone.
+        needsOldWritersGone: false,
+        run: ({ checkpoint, dryRun, signal }) =>
+          TraceIdIndexFillService.create({
+            indexes: repositories.idIndexFill,
+            dataRetention: dependencies.dataRetention,
+            featureFlags: dependencies.featureFlags,
+          }).fill({ checkpoint, dryRun, signal }),
       }),
     ]);

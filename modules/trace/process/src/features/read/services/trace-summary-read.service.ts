@@ -3,6 +3,7 @@ import {
   narrowAuthorization,
   projectIdsReadBy,
 } from "@langwatch/authorization";
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
 import { teaserOf, TraceNotFoundError } from "@langwatch/trace-contract";
 
@@ -38,11 +39,14 @@ export class TraceSummaryService {
   static create({
     repository,
     fullResolutionDeps,
+    idIndex,
   }: {
     repository: TraceSummaryRepository;
     fullResolutionDeps?: TraceSummaryFullResolutionDeps;
+    /** Trace's id-index flags, handed to every read by trace id. */
+    idIndex?: IdIndexFlags | undefined;
   }): TraceSummaryService {
-    return new TraceSummaryService(repository, fullResolutionDeps);
+    return new TraceSummaryService(repository, fullResolutionDeps, idIndex);
   }
 
   private readonly logger = createLogger("langwatch:traces:trace-summary-service");
@@ -50,6 +54,7 @@ export class TraceSummaryService {
   private constructor(
     readonly repository: TraceSummaryRepository,
     private readonly fullResolutionDeps?: TraceSummaryFullResolutionDeps,
+    private readonly idIndex?: IdIndexFlags,
   ) {}
 
   /**
@@ -71,7 +76,14 @@ export class TraceSummaryService {
       return authorization;
     }
     const projectId =
-      tenantId ?? (await this.repository.findTenantIdsByTraceId({ authorization, traceId }))[0];
+      tenantId ??
+      (
+        await this.repository.findTenantIdsByTraceId({
+          authorization,
+          traceId,
+          idIndex: this.idIndex,
+        })
+      )[0];
     if (projectId === undefined) {
       return authorization;
     }
@@ -88,7 +100,7 @@ export class TraceSummaryService {
     full,
     ...read
   }: GetByTraceIdParams): Promise<TraceSummaryRead> {
-    const result = await this.repository.findByTraceId(read);
+    const result = await this.repository.findByTraceId({ ...read, idIndex: this.idIndex });
     if (!result) {
       throw new TraceNotFoundError(read.traceId);
     }
@@ -141,6 +153,7 @@ export class TraceSummaryService {
         authorization: narrowed,
         traceId: summary.traceId,
         occurredAtMs: summary.occurredAt,
+        idIndex: this.idIndex,
       });
       const { recomputedInput, recomputedOutput, anyResolved } =
         await TraceOffloadResolutionService.create().resolveOffloadedTraces({

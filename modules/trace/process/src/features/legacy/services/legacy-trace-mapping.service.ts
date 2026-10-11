@@ -1,5 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
-import type { RetentionDaysProvider } from "@langwatch/clickhouse-client";
+import type { IdIndexFlags, RetentionDaysProvider } from "@langwatch/clickhouse-client";
 import type {
   GetAllTracesForProjectInput,
   GetAllTracesForProjectOptions,
@@ -18,6 +18,7 @@ import {
   traceSpansBatchResolverMisalignedError,
 } from "#rules/trace-spans-batch-resolver-contract-error.rules";
 
+import type { TraceIdIndexReadRepository } from "../../../repositories/trace-id-index-read.repository.ts";
 import {
   mapClickHouseEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
@@ -48,6 +49,9 @@ type MappingInputs = {
   resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionDays?: RetentionDaysProvider | undefined;
+  /** Trace's id-index flags and their reads: with no time, the index names the range. */
+  idIndex?: IdIndexFlags | undefined;
+  idIndexReads?: TraceIdIndexReadRepository | undefined;
 };
 
 /** Maps the legacy read's stored rows to legacy traces: canonical IO, offload, protections. */
@@ -64,6 +68,29 @@ export class LegacyTraceMappingService {
     this.resolveTraceSpans = inputs.resolveTraceSpans;
     this.resolveTraceSpansBatch = inputs.resolveTraceSpansBatch;
     this.retentionDays = inputs.retentionDays;
+    this.idIndex = inputs.idIndex;
+    this.idIndexReads = inputs.idIndexReads;
+  }
+
+  private readonly idIndex: IdIndexFlags | undefined;
+  private readonly idIndexReads: TraceIdIndexReadRepository | undefined;
+
+  /** The summaries' index range for traces read with no time; undefined keeps today's resolve. */
+  private async indexRange({
+    projectId,
+    traceIds,
+  }: {
+    projectId: string;
+    traceIds: string[];
+  }): Promise<OccurredAtRange | undefined> {
+    if (this.idIndexReads === undefined) return undefined;
+    const [window] = await this.idIndexReads.findWindows({
+      tenantId: projectId,
+      traceIds,
+      source: "trace_summaries",
+      idIndex: this.idIndex,
+    });
+    return window === undefined ? undefined : { from: window.fromMs, to: window.toMs };
   }
 
   static create(inputs: MappingInputs): LegacyTraceMappingService {
@@ -90,7 +117,7 @@ export class LegacyTraceMappingService {
       authorization,
       projectId,
       traceIds,
-      occurredAt,
+      occurredAt: occurredAt ?? (await this.indexRange({ projectId, traceIds })),
       retentionDays: this.retentionDays,
     });
     return this.resolveAndMerge({

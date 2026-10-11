@@ -1,6 +1,8 @@
 import type { Authorization } from "@langwatch/authorization";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 
+import type { TraceIdIndexWindow } from "./trace-id-index-read.repository.ts";
+
 /**
  * All spans of one trace for derivations. occurredAtMs partitions the scan;
  * returns spans with empty events and links.
@@ -11,6 +13,8 @@ export abstract class TraceDerivationSpanReaderRepository {
     traceId: string;
     occurredAtMs?: number;
     limit?: number;
+    /** The id index's range for the trace, read first when no time is given. */
+    window?: TraceIdIndexWindow | undefined;
   }): Promise<NormalizedSpan[]>;
 
   /**
@@ -21,5 +25,6 @@ export abstract class TraceDerivationSpanReaderRepository {
     authorization: Authorization;
     traceId: string;
     occurredAtMs?: number;
+    window?: TraceIdIndexWindow | undefined;
   }): Promise<DerivedTraceEvent[]>;
 }
