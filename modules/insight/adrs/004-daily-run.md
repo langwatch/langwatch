@@ -48,11 +48,33 @@ never borrowed from a running worker, and it carries no GitHub token. Every late
 in the run's conversation keeps the same key ceiling. Filing is the
 one write of a run, and the insight module does it.
 
-**The answer is untrusted.** Langy ends its answer with one fenced block tagged
-`langwatch-insights` holding `{ "findings": [...] }`. The module refuses the whole
-answer when the block is missing, repeated, not JSON, holds a key the schema does not
-list, or hands back the example finding the brief shows. So an answer cannot name an
-owner, a project or a board. A finding's title is at most 120 characters and its body 4,000,
+**The method is Langy's own skill.** How a board is read and how the answer is shaped
+lives in the skill `daily-insights` (`skills/daily-insights/SKILL.mdx`): the commands,
+one query per command and on one line, the hourly steps before a total, what counts as
+a finding, the key, when to use `renews`, no link, no file, ask nothing, write nothing.
+The brief names the skill in one line and holds the facts of one run. The skill is
+listed in `NATIVE_ONLY_SKILLS`, so it ships in the Langy image and never in the public
+skills package, and its front matter says `internal: true`, so the composer's palette
+never offers it. No skill chip can name it. An unattended turn withholds only the
+flag-gated chart skills, so the skill reaches a run.
+
+**The answer is untrusted.** Langy ends its answer with one insights card: a fenced
+`langy-card` block of kind `insights` in its reply, which Langy's relay validates
+against the card's schema and stamps as a typed part of the turn (Langy's ADR-060). The
+card's schema is Langy's and the run maps it to its own finding schema, so Langy never
+imports insight. The run reads the stamped part of the settled turn
+(`LangyTurnSettlement.parts`) and never the prose. Writing a card is no command, so it
+needs no permission the read-only key lacks. The module refuses the whole answer when
+the turn holds no insights card, holds two, holds a card the relay had to repair from
+JSON that was cut off, holds a key the card's strict schema does not list (the relay
+then stamps no card), or hands back the example finding the skill shows. So an answer
+cannot name an owner, a project or a board. A board and a window the card itself names
+are for a person who saves a finding by hand; a run takes neither. For one release an
+answer that carries no insights card at all may still end with the fenced block tagged
+`langwatch-insights` holding `{ "findings": [...] }`, held to the same checks. The card
+is read first: an answer with a card is never read for a block, and a card that fails a
+check is not rescued by a block beside it.
+A finding's title is at most 120 characters and its body 4,000,
 and a finding that holds a web address refuses the answer with the reason
 `finding_has_url`. What passes is cut to the run's maximum, and a widget id that is not
 on the board is dropped. A finding's query is never Langy's own text. It is kept only when it
@@ -77,16 +99,15 @@ a person wrote inside one marked block that it calls data. A renewal is stamped 
 the slot too, and keeps an open insight open at that slot, so a repeat reads the same
 open insights, writes the same brief and renews or files the same things. A new
 insight's id is named by its finding's place in the answer, whatever the findings
-before it did. It tells Langy to write no file,
-to run one query per command and on one line, to start from a widget's stored query, to hand
-that query back as stored, and to read the window's hourly steps before it reports a total.
+before it did. The brief gives each window as the two flags a query is run with, the
+step in seconds and the maximum, and names no command and no field of a finding.
 A repeat whose brief differs is refused by Langy and recorded as `failed` with
 `brief_changed`. The row keeps the first outcome a run recorded.
 
 **A finding that repeats an insight renews it.** A finding may carry a `key`, a short
 name for what was found that stays the same on a later day, and `renews`, the id of
 the open insight it repeats. The brief lists the person's open insights for the board
-by id, title and key, and tells Langy to report a repeat with `renews`, not as new. The
+by id, title and key, and the skill tells Langy to report a repeat with `renews`, not as new. The
 key is kept in one spelling (lower case, words joined by hyphens) on the `filed` event
 and the row, as `findingKey`. The run reads the person's insights again when Langy has
 answered and matches each finding in this order: the insight `renews` names, then the
@@ -193,7 +214,20 @@ stays off when the person turned it off since. A pass changes no setting.
   an outcome stored before it reads as none renewed. `InsightProjection` gained the
   nullable `findingKey` (migration `20261010120032`).
 - A brief written before renewal differs from one written after it, so a run in flight
-  across that deploy that is retried ends `failed` with `brief_changed`, once.
+  across that deploy that is retried ends `failed` with `brief_changed`, once. The same
+  holds across the deploy that moved the method into the skill.
+- The fenced block is still read for one release. It settles a run whose answer ends
+  with the block and carries no card: a model that kept the older shape, or a turn a
+  worker of the older release is still waiting on. Remove it, with
+  `INSIGHT_RUN_FINDINGS_FENCE_TAG`, in the release after.
+- A run names a skill the worker image must hold. An image older than the skill gives
+  Langy a brief with no method, and such a run most likely ends `failed` with
+  `bad_output`. Roll the Langy image out no later than the app.
+- A card cut off mid-stream is repaired by the relay, as every card is, and marked
+  `repaired` on its part. A run files nothing from a repaired card.
+- The card's limits are Langy's and wider than a run's (a title of 200 characters, a
+  body of 20,000). A card within them and over a run's draws in the panel and fails the
+  run with `bad_output`.
 - An insight saved from a chat holds no key. A run renews it only when Langy names its
   id, and it stays without a key after that.
 - A renewed insight keeps the query it was filed with. The later finding's own query is
@@ -212,8 +246,9 @@ stays off when the person turned it off since. A pass changes no setting.
   written before them still reads.
 - Langy's command line fills the window of a stored query (`langwatch query --start --end`)
   but not its step: `query` has no flag for `dashboard_context_granularity_seconds`, and a
-  reserved name passed as `--param` is refused. The brief tells Langy to write the step into
-  the copy it runs. A flag for the step would let Langy run a stored query unchanged.
+  reserved name passed as `--param` is refused. The brief gives the step and the skill tells
+  Langy to write it into the copy it runs. A flag for the step would let Langy run a stored
+  query unchanged.
 - A finding from a query of Langy's own keeps no query, so its insight shows no evidence
   chart. Only a widget's stored query is evidence.
 - A run's brief names custom chart widgets only. Builder graphs and saved charts

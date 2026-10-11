@@ -231,6 +231,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
 
     const answer = checkRunAnswer({
       text: settlement.text,
+      parts: settlement.parts,
       maxInsights,
       widgets: ready.gate.widgets,
     });

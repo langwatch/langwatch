@@ -181,6 +181,61 @@ Feature: The daily insights run
       And the unknown kind is refused
 
   Rule: Langy's answer is untrusted
+    The findings are the insights card among the settled turn's typed parts, which Langy's
+    relay stamped. For one release an answer that carries no insights card may still end with
+    the fenced block a run before the card wrote. Both are held to the same checks.
+
+    @unit
+    Scenario: A run's answer is the insights card among the settled turn's parts
+      Given a settled turn whose parts hold prose and one insights card
+      When the answer is checked
+      Then each finding's words are taken from the card, with the defaults it left out
+
+    @unit
+    Scenario: A run takes its findings from the typed card of the settled turn
+      Given Langy answers two findings in an insights card, and prose that holds neither
+      When the run is carried out
+      Then two insights are filed and the run is recorded as filed with a count of 2
+
+    @unit
+    Scenario: A run that still ends with the fenced block files its findings
+      Given Langy answers one finding in the fenced block and no insights card
+      When the run is carried out
+      Then the finding is filed with its widget, its stored query and its key, as a card's is
+
+    @unit
+    Scenario: A card is taken before a fenced block in the same answer
+      Given an answer that holds an insights card and a fenced block with other findings
+      When the run is carried out
+      Then the card's findings are filed and none of the block's
+
+    @unit
+    Scenario: A card that fails a run's checks is not rescued by a fenced block
+      Given an answer whose card holds a finding over a run's limits, and a good fenced block
+      When the run is carried out
+      Then no insight is filed
+      And the run is recorded as failed with the reason bad_output
+
+    @unit
+    Scenario: Two insights cards in one answer are refused
+      Given an answer that holds two insights cards
+      When the run is carried out
+      Then no insight is filed
+      And the run is recorded as failed with the reason bad_output
+
+    @unit
+    Scenario: A card that was cut off files nothing
+      Given an answer whose card stops inside its last finding, which the relay repaired
+      When the run is carried out
+      Then no insight is filed
+      And the run is recorded as failed with the reason bad_output
+
+    @unit
+    Scenario: A card's own board and window are not a run's
+      Given an answer whose card names another board and another window
+      When the run files its finding
+      Then the insight points at the run's board, under the board's own name for the widget
+      And it replays over the run's window
 
     @unit
     Scenario: An answer with no findings files nothing
@@ -191,7 +246,7 @@ Feature: The daily insights run
 
     @unit
     Scenario: An answer without the agreed block fails the run
-      Given Langy answers prose with no findings block
+      Given Langy answers prose with no insights card and no findings block
       When the run is carried out
       Then no insight is filed
       And the run is recorded as failed with the reason bad_output
@@ -250,10 +305,17 @@ Feature: The daily insights run
       Then the answer is refused whole
 
     @unit
-    Scenario: An answer that hands back the brief's own example is refused
-      Given an answer that repeats the example finding the brief shows
+    Scenario: An answer that hands back the skill's own example is refused
+      Given an answer that repeats the example finding the daily-insights skill shows
       When the answer is checked
       Then the answer is refused whole
+
+    @unit
+    Scenario: The skill names the limits and the parameters a run holds an answer to
+      Given the daily-insights skill as the manager embeds it
+      When it is read beside the run's own limits
+      Then it names the 120 and 4,000 character limits of a title and a body, and the 80 of a key
+      And the three tones, the card's fence and the reserved period parameters by their names
 
     @unit
     Scenario: Two findings blocks in one answer are refused
@@ -540,6 +602,7 @@ Feature: The daily insights run
       Then no row changes
 
   Rule: The brief Langy is given
+    The brief holds the facts of one run and names the skill that holds the method.
 
     @unit
     Scenario: The brief is the same for the same run
@@ -553,7 +616,22 @@ Feature: The daily insights run
       When the brief is written
       Then it names the board and each widget by id and name
       And the fixed window and the window before it, in epoch milliseconds
-      And the maximum of 3, and that Langy must not ask or write
+      And the maximum of 3
+
+    # `langwatch query` fills the window from --start and --end and has no flag for the step.
+    @unit
+    Scenario: The brief gives both windows as the flags that fill them, and the step
+      Given a run's brief
+      When it is written
+      Then it gives each window as the two flags a query is run with
+      And the step in seconds
+
+    @unit
+    Scenario: The brief names the daily-insights skill and holds no method
+      Given a run's brief
+      When it is written
+      Then one line tells Langy to load the daily-insights skill and follow it
+      And the brief names no command, no reserved parameter, no field of a finding and no limit
 
     @unit
     Scenario: Names written by customers are cleaned before they reach the brief
@@ -584,59 +662,16 @@ Feature: The daily insights run
       And it says how many widgets were left out
 
     @unit
-    Scenario: The brief asks for no link in a finding
-      Given a run's brief
-      When it is written
-      Then it tells Langy to write no link or web address in a finding
-      And it names the 120 and 4,000 character limits of a title and a body
-
-    @unit
-    Scenario: The brief tells Langy to write no file and to run one query per command
-      Given a run's brief
-      When it is written
-      Then it tells Langy to write no file and no script, not even in its own workspace
-      And to run one command at a time with one query in it
-      And to write a query on one line, because a literal \n in it fails
-
-    # `langwatch query` fills the window from --start and --end and has no flag for the step.
-    @unit
-    Scenario: The brief names the commands that read a widget and run its query over the window
-      Given a run's brief
-      When it is written
-      Then it names the command that shows a widget's stored queries
-      And the command that runs a query, with the flags that fill the reserved period parameters
-      And both windows as those flags
-      And that no flag fills the step, and the number to write in its place in the copy that is run
-
-    @unit
-    Scenario: The brief asks for the hours inside the window before a total
-      Given a run's brief
-      When it is written
-      Then it tells Langy to read the window's hourly steps before it reports a total
-      And to name the hours and their numbers when a change falls in a few of them
-      And its example finding names the hour most of the change fell in
-
-    @unit
-    Scenario: The brief asks for the widget's stored query back, as stored
-      Given a run's brief
-      When it is written
-      Then it tells Langy to start from the widget's stored query
-      And to hand it back as stored, with its parameters and no date or database name
-      And says that any other query is not kept
-
-    @unit
     Scenario: The brief lists the person's open insights for the board
       Given the person has an open insight, a done insight and an insight from another board
       When the brief is written
       Then it lists the open insight of this board and neither of the others
 
     @unit
-    Scenario: The brief names each open insight by its id and key and asks for a repeat to renew it
+    Scenario: The brief names each open insight by its id and key
       Given the person has an open insight with a key and one without for the board
       When the brief is written
       Then each is listed with its id and its title, and the first with its key
-      And the brief tells Langy to report a repeat with renews set to that id, not as new
-      And asks for a key on every finding that stays the same when the finding is found again
 
     @unit
     Scenario: The run reads the last full day before it started

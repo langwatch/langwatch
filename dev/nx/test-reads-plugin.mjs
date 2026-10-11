@@ -99,6 +99,9 @@ export const reads = {
   "@langwatch/egress": ["pkg/ssrf/testdata/**/*", "go.work"],
   "@langwatch/langy-browser": ["services/langyagent/**/*", "infra/docker/Dockerfile.langyagent"],
   "@langwatch/langy-contract": ["services/langyagent/**/*"],
+  "@langwatch/insight-process": [
+    "services/langyagent/internal/assets/skills/daily-insights/SKILL.md",
+  ],
   "@langwatch/enterprise-billing-process": ["docs/pricing/**/*", "docs/pricing.mdx"],
   "@langwatch/trace-process": [
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",

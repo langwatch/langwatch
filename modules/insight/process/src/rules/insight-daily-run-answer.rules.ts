@@ -5,15 +5,25 @@
  * @see modules/insight/adrs/004-daily-run.md
  */
 
+import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "@langwatch/analytics-contract";
 import {
   INSIGHT_RUN_FINDINGS_FENCE_TAG,
   type InsightRunFailureReason,
   type InsightRunFinding,
   insightRunFindingsSchema,
 } from "@langwatch/insight-contract";
+import { type LangyInsightsCardFinding, langyInsightsCardPartsOf } from "@langwatch/langy-contract";
 
-import { EXAMPLE_FINDING, PERIOD_STEP } from "./insight-daily-run-brief.rules.ts";
 import { DAILY_RUN_GRANULARITY_SECONDS } from "./insight-daily-run.rules.ts";
+
+/**
+ * The title of the finding the daily-insights skill shows the shape with. An answer that hands
+ * it back copied the skill and read nothing, so the check refuses it by this title.
+ */
+export const SKILL_EXAMPLE_TITLE = "Checkout errors doubled";
+
+/** The step parameter as a stored query declares it; Langy runs a copy with the step written in. */
+const PERIOD_STEP = `{${LWQL_PERIOD_GRANULARITY_PARAMETER}:UInt32}`;
 
 /** An answer longer than this is refused unread; a real one is a few kilobytes. */
 const MAX_ANSWER_LENGTH = 400_000;
@@ -69,13 +79,13 @@ function findingsBlockOf(text: string): string | undefined {
   return lines.slice(opening + 1, closing).join("\n");
 }
 
-/** A query as one line: the brief asks for it so, and the board may store it on several. */
+/** A query as one line: the skill asks for it so, and the board may store it on several. */
 function onOneLine(sql: string): string {
   return sql.trim().replaceAll(/\s+/g, " ");
 }
 
 /**
- * The stored query as Langy may hand it back: as stored, or as the brief had it run, with the
+ * The stored query as Langy may hand it back: as stored, or as the skill had it run, with the
  * run's step written in place of the parameter. Either way the board's own text is filed.
  */
 function isHandedBack({ stored, handedBack }: { stored: string; handedBack: string }): boolean {
@@ -104,23 +114,51 @@ function parsedJson(raw: string): unknown {
   }
 }
 
+/**
+ * A card's finding as a run takes it: the fields a run's finding lists, named one by one, so
+ * a field Langy's card gains later is not one a run starts to trust.
+ */
+function runFindingOf(finding: LangyInsightsCardFinding): Record<string, unknown> {
+  const { title, body, tone, topic, validDays, widgetId, lwql, key, renews } = finding;
+  return { title, body, tone, topic, validDays, widgetId, lwql, key, renews };
+}
+
+/**
+ * What the answer hands back, unchecked. The typed card of the settled turn comes first; the
+ * fenced block in the prose is read only when the turn carries no insights card at all, for
+ * one release. Undefined for several cards, a repaired card, or neither a card nor one block.
+ */
+function findingsHandedBack({ text, parts }: { text: string; parts: readonly unknown[] }): unknown {
+  const cards = langyInsightsCardPartsOf(parts);
+  const [card] = cards;
+  if (card === undefined) {
+    const block = findingsBlockOf(text);
+    return block === undefined ? void 0 : parsedJson(block);
+  }
+  // A card cut off mid-stream was repaired to what was left of it: never filed in part.
+  if (cards.length > 1 || card.repaired) return void 0;
+  return { findings: card.card.findings.map(runFindingOf) };
+}
+
 export function checkRunAnswer({
   text,
+  parts,
   maxInsights,
   widgets,
 }: {
+  /** The answer's prose, where a run that started before the card still ends with its block. */
   text: string;
+  /** The settled turn's parts: Langy's relay stamped the insights card among them. */
+  parts: readonly unknown[];
   maxInsights: number;
   /** The widgets on the board as the run read it; the answer names none into being. */
   widgets: readonly BoardWidget[];
 }): RunAnswerCheck {
   if (text.length > MAX_ANSWER_LENGTH) return REFUSED;
-  const block = findingsBlockOf(text);
-  if (block === undefined) return REFUSED;
-  const parsed = insightRunFindingsSchema.safeParse(parsedJson(block));
+  const parsed = insightRunFindingsSchema.safeParse(findingsHandedBack({ text, parts }));
   if (!parsed.success) return REFUSED;
-  // The brief's own example, handed back: the answer copied the brief and found nothing.
-  if (parsed.data.findings.some(({ title }) => title === EXAMPLE_FINDING.title)) return REFUSED;
+  // The skill's own example, handed back: the answer copied the skill and found nothing.
+  if (parsed.data.findings.some(({ title }) => title === SKILL_EXAMPLE_TITLE)) return REFUSED;
   // Asked of every finding the answer holds, filed or not: one link taints the whole answer.
   if (parsed.data.findings.some(holdsWebAddress)) return { ok: false, reason: "finding_has_url" };
 

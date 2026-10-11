@@ -31,11 +31,19 @@ import {
   insightRunSettledEventDataSchema,
 } from "@langwatch/insight-contract";
 import {
+  extractLangyTextFromParts,
+  LANGY_CARD_FAILED_PART_TYPE,
+  LANGY_CARD_FENCE_TAG,
+  LANGY_CARD_PART_TYPE,
   LangyIdempotencyMismatchError,
   type LangyApi,
+  type LangyMessagePart,
+  langyMessagePartSchema,
   type LangyStartUnattendedTurnInput,
   type LangyTurnSettlementWait,
   type LangyTurnSettlementWaitInput,
+  salvageLangyDerivedCard,
+  splitLangyCardFences,
 } from "@langwatch/langy-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -101,16 +109,53 @@ export function finding(overrides: Record<string, unknown> = {}): Record<string,
   };
 }
 
-/** An answer as Langy ends it: prose, then the one fenced block of findings. */
-export function answerWith(findings: readonly Record<string, unknown>[]): string {
-  const fence = "```";
+const FENCE = "```";
+
+/** An answer as the daily-insights skill ends it: prose, then the one card of findings. */
+export function answerWith(
+  findings: readonly Record<string, unknown>[],
+  card: Record<string, unknown> = {},
+): string {
   return [
     "I read each widget over the window.",
     "",
-    `${fence}${INSIGHT_RUN_FINDINGS_FENCE_TAG}`,
-    JSON.stringify({ findings }),
-    fence,
+    `${FENCE}${LANGY_CARD_FENCE_TAG}`,
+    JSON.stringify({ kind: "insights", blockId: "daily-insights", ...card, findings }),
+    FENCE,
   ].join("\n");
+}
+
+/** An answer as a run that started before the card ends it: prose, then the fenced block. */
+export function blockAnswerWith(findings: readonly Record<string, unknown>[]): string {
+  return [
+    "I read each widget over the window.",
+    "",
+    `${FENCE}${INSIGHT_RUN_FINDINGS_FENCE_TAG}`,
+    JSON.stringify({ findings }),
+    FENCE,
+  ].join("\n");
+}
+
+/**
+ * The parts of a settled answer as Langy's relay stamps them, by the contract's own scanner
+ * and salvage: each card fence is a typed part, or a failed one, and the rest is prose.
+ */
+export function stampedParts(answer: string): LangyMessagePart[] {
+  return splitLangyCardFences(answer).map((segment, at): LangyMessagePart => {
+    if (segment.type === "text") return { type: "text", text: segment.text, role: "assistant" };
+    const parsed = salvageLangyDerivedCard(segment.raw);
+    if (!parsed.ok) {
+      return { type: LANGY_CARD_FAILED_PART_TYPE, blockId: `failed-block-${at}`, raw: segment.raw };
+    }
+    return langyMessagePartSchema.parse({
+      type: LANGY_CARD_PART_TYPE,
+      blockId: parsed.card.blockId,
+      kind: parsed.card.kind,
+      provenance: "derived",
+      card: parsed.card,
+      ...(parsed.repaired ? { repaired: true } : {}),
+    });
+  });
 }
 
 function project({ kind, archived }: { kind: string; archived: boolean }): Project {
@@ -252,14 +297,15 @@ function scriptedLangy(world: RunWorld) {
     awaitTurnSettlement: async (input) => {
       waits.push(input);
       if (world.langy.settle) return world.langy.settle(input);
+      const parts = stampedParts(world.langy.answer);
       return {
         kind: "settled",
         settlement: {
           succeeded: true,
           outcome: "completed",
-          text: world.langy.answer,
+          text: extractLangyTextFromParts(parts),
           messageId: `message-of-${input.turnId}`,
-          parts: [{ type: "text", text: world.langy.answer }],
+          parts,
           error: null,
         },
       };

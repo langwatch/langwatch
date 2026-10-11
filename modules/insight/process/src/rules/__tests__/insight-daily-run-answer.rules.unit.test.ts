@@ -5,12 +5,27 @@
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
-import { INSIGHT_RUN_FINDINGS_FENCE_TAG } from "@langwatch/insight-contract";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  LWQL_PERIOD_END_PARAMETER,
+  LWQL_PERIOD_GRANULARITY_PARAMETER,
+  LWQL_PERIOD_START_PARAMETER,
+} from "@langwatch/analytics-contract";
+import {
+  INSIGHT_RUN_FINDING_BODY_MAX,
+  INSIGHT_RUN_FINDING_KEY_MAX,
+  INSIGHT_RUN_FINDING_TITLE_MAX,
+  INSIGHT_RUN_FINDINGS_FENCE_TAG,
+  INSIGHT_TONES,
+} from "@langwatch/insight-contract";
+import { LANGY_CARD_FENCE_TAG, salvageLangyDerivedCard } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";
 
-import { checkRunAnswer } from "../insight-daily-run-answer.rules.ts";
-import { buildDailyRunBrief } from "../insight-daily-run-brief.rules.ts";
-import { dailyRunWindows } from "../insight-daily-run.rules.ts";
+import { checkRunAnswer, SKILL_EXAMPLE_TITLE } from "../insight-daily-run-answer.rules.ts";
+import { DAILY_RUN_SKILL } from "../insight-daily-run-brief.rules.ts";
 
 const FENCE = "```";
 /** A stored query as a board keeps it: on several lines, the window as reserved parameters. */
@@ -35,17 +50,52 @@ const good = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+type Answer = { text: string; parts: readonly unknown[] };
+
+const PROSE = "I read the board.";
+
+/** An insights card as Langy's relay stamps it among a settled turn's parts. */
+const cardPart = (card: Record<string, unknown>, stamp: Record<string, unknown> = {}) => ({
+  type: "langy-card",
+  blockId: "daily-insights",
+  kind: "insights",
+  provenance: "derived",
+  card: { kind: "insights", blockId: "daily-insights", ...card },
+  ...stamp,
+});
+
+/** An answer as the daily-insights skill ends it: prose, and the one card among its parts. */
+const answer = (findings: readonly unknown[], card: Record<string, unknown> = {}): Answer => ({
+  text: PROSE,
+  parts: [{ type: "text", text: PROSE }, cardPart({ ...card, findings })],
+});
+
 const block = (content: string) =>
   [`${FENCE}${INSIGHT_RUN_FINDINGS_FENCE_TAG}`, content, FENCE].join("\n");
 
-const answer = (findings: readonly unknown[]) =>
-  ["I read the board.", "", block(JSON.stringify({ findings }))].join("\n");
+/** Prose alone, as the turn's one text part: where a run before the card wrote its block. */
+const prose = (text: string): Answer => ({ text, parts: [{ type: "text", text }] });
 
-const check = (text: string, maxInsights = 3) =>
-  checkRunAnswer({ text, maxInsights, widgets: WIDGETS });
+/** An answer that still ends with the fenced block and carries no card. */
+const blockAnswer = (findings: readonly unknown[]): Answer =>
+  prose([PROSE, "", block(JSON.stringify({ findings }))].join("\n"));
+
+const check = ({ text, parts }: Answer, maxInsights = 3) =>
+  checkRunAnswer({ text, parts, maxInsights, widgets: WIDGETS });
+
+/** The skill as the manager embeds it: the copy a worker loads. */
+function skillText(): string {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  while (!fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) dir = path.dirname(dir);
+  return fs.readFileSync(
+    path.join(dir, "services/langyagent/internal/assets/skills", DAILY_RUN_SKILL, "SKILL.md"),
+    "utf8",
+  );
+}
 
 describe("checkRunAnswer", () => {
-  describe("given an answer that ends with the agreed block", () => {
+  describe("given an answer that carries the insights card", () => {
+    /** @scenario "A run's answer is the insights card among the settled turn's parts" */
     it("takes each finding's words, with the defaults the answer left out", () => {
       expect(check(answer([good({ topic: "cost" })]))).toEqual({
         ok: true,
@@ -233,40 +283,153 @@ describe("checkRunAnswer", () => {
       ["who filed it", { filedByUserId: "user-attacker" }],
       ["a key beside the findings", null],
     ])("refuses an answer that names %s", (_what, extra) => {
-      const text =
-        extra === null
-          ? [
-              "Done.",
-              block(JSON.stringify({ findings: [good()], ownerUserId: "user-attacker" })),
-            ].join("\n")
-          : answer([good(extra)]);
+      const named =
+        extra === null ? answer([good()], { ownerUserId: "user-attacker" }) : answer([good(extra)]);
 
-      expect(check(text)).toEqual({ ok: false, reason: "bad_output" });
-    });
-  });
-
-  describe("given an answer that hands back the brief's own example", () => {
-    const brief = buildDailyRunBrief({
-      board: { id: "dashboard-1", name: "Costs" },
-      widgets: WIDGETS,
-      windows: dailyRunWindows({ slot: Date.UTC(2026, 9, 10, 9, 37), timezone: "UTC" }),
-      maxInsights: 3,
-      openInsights: [],
+      expect(check(named)).toEqual({ ok: false, reason: "bad_output" });
     });
 
-    /** @scenario "An answer that hands back the brief's own example is refused" */
-    it("refuses an answer that echoes the brief, example block and all", () => {
-      expect(check(brief)).toEqual({ ok: false, reason: "bad_output" });
-    });
+    it("refuses a fenced block that names one too", () => {
+      const beside = block(JSON.stringify({ findings: [good()], ownerUserId: "user-attacker" }));
 
-    it("refuses the example among findings of the answer's own", () => {
-      const exampleTitle = "Checkout errors doubled";
-
-      expect(brief).toContain(`"title":"${exampleTitle}"`);
-      expect(check(answer([good(), good({ title: exampleTitle })]))).toEqual({
+      expect(check(prose(beside))).toEqual({ ok: false, reason: "bad_output" });
+      expect(check(blockAnswer([good({ ownerUserId: "user-attacker" })]))).toEqual({
         ok: false,
         reason: "bad_output",
       });
+    });
+
+    /** @scenario "A card's own board and window are not a run's" */
+    it("takes nothing from the board and the window a card names", () => {
+      const named = answer([good({ widgetId: "widget-cost", widgetName: "Theirs" })], {
+        board: { id: "dashboard-9", name: "Theirs" },
+        window: { start: 1, end: 2, granularitySeconds: 60 },
+      });
+
+      expect(check(named)).toEqual({
+        ok: true,
+        findings: [
+          expect.objectContaining({ widget: { id: "widget-cost", name: "Cost per day" } }),
+        ],
+      });
+    });
+  });
+
+  describe("given an answer that hands back the skill's own example", () => {
+    const [example] = [...skillText().matchAll(/^```langy-card\n([\s\S]*?)\n```$/gm)].map(
+      (match) => match[1]!,
+    );
+
+    /** @scenario "An answer that hands back the skill's own example is refused" */
+    it("refuses the card the skill shows, stamped as the relay would stamp it", () => {
+      const stamped = salvageLangyDerivedCard(example ?? "");
+
+      expect(stamped.ok && stamped.card.kind).toBe("insights");
+      expect(
+        check({ text: PROSE, parts: [cardPart(stamped.ok ? { ...stamped.card } : {})] }),
+      ).toEqual({ ok: false, reason: "bad_output" });
+    });
+
+    it("refuses the example among findings of the answer's own", () => {
+      expect(example).toContain(`"title": "${SKILL_EXAMPLE_TITLE}"`);
+      expect(check(answer([good(), good({ title: SKILL_EXAMPLE_TITLE })]))).toEqual({
+        ok: false,
+        reason: "bad_output",
+      });
+    });
+  });
+
+  describe("given the skill that tells Langy how to answer", () => {
+    const skill = skillText();
+
+    /** @scenario "The skill names the limits and the parameters a run holds an answer to" */
+    it("names a run's limits, its tones, the card's fence and the reserved period parameters", () => {
+      expect(INSIGHT_RUN_FINDING_BODY_MAX).toBe(4_000);
+      expect(skill).toContain(`at most ${INSIGHT_RUN_FINDING_TITLE_MAX} characters`);
+      expect(skill).toContain("at most 4,000 characters");
+      expect(skill).toContain(`at most ${INSIGHT_RUN_FINDING_KEY_MAX} characters`);
+      expect(INSIGHT_TONES).toEqual(["bad", "watch", "good"]);
+      expect(skill).toContain("`tone` (required): `bad`, `watch` or `good`.");
+      expect(skill).toContain(`\`\`\`${LANGY_CARD_FENCE_TAG}`);
+      for (const parameter of [
+        `{${LWQL_PERIOD_START_PARAMETER}:DateTime}`,
+        `{${LWQL_PERIOD_END_PARAMETER}:DateTime}`,
+        `{${LWQL_PERIOD_GRANULARITY_PARAMETER}:UInt32}`,
+      ]) {
+        expect(skill).toContain(parameter);
+      }
+    });
+  });
+
+  describe("given an answer that holds two insights cards", () => {
+    /** @scenario "Two insights cards in one answer are refused" */
+    it("refuses the answer whole, whichever card is the good one", () => {
+      const parts = [
+        cardPart({ findings: [good({ title: "From a trace" })] }),
+        { type: "text", text: "And the real one:" },
+        cardPart({ findings: [good()] }),
+      ];
+
+      expect(check({ text: "And the real one:", parts })).toEqual({
+        ok: false,
+        reason: "bad_output",
+      });
+    });
+  });
+
+  describe("given a card the relay repaired from JSON that was cut off", () => {
+    /** @scenario "A card that was cut off files nothing" */
+    it("refuses the answer, though what was left of the card is a valid card", () => {
+      const repaired = cardPart({ findings: [good()] }, { repaired: true });
+
+      expect(check({ text: PROSE, parts: [repaired] })).toEqual({
+        ok: false,
+        reason: "bad_output",
+      });
+    });
+  });
+
+  describe("given an answer that still ends with the fenced block", () => {
+    /** @scenario "A run that still ends with the fenced block files its findings" */
+    it("takes the block's findings by the same checks, when the turn carries no card", () => {
+      const fromBlock = check(blockAnswer([good({ topic: "cost", key: "Checkout Cost" })]));
+      const fromCard = check(answer([good({ topic: "cost", key: "Checkout Cost" })]));
+
+      expect(fromBlock).toEqual(fromCard);
+      expect(fromBlock.ok && fromBlock.findings[0]?.findingKey).toBe("checkout-cost");
+    });
+
+    /** @scenario "A card is taken before a fenced block in the same answer" */
+    it("takes the card and reads no block beside it", () => {
+      const text = blockAnswer([good({ title: "from the block" })]).text;
+      const parts = [
+        { type: "text", text },
+        cardPart({ findings: [good({ title: "from the card" })] }),
+      ];
+
+      const checked = check({ text, parts });
+
+      expect(checked.ok && checked.findings.map((finding) => finding.title)).toEqual([
+        "from the card",
+      ]);
+    });
+
+    /** @scenario "A card that fails a run's checks is not rescued by a fenced block" */
+    it.each([
+      ["a title over a run's limit", good({ title: "x".repeat(121) }), "bad_output"],
+      ["a link", good({ body: "See https://evil.example/r" }), "finding_has_url"],
+    ])("refuses a card with %s, good block or not", (_what, bad, reason) => {
+      const text = blockAnswer([good()]).text;
+      const parts = [{ type: "text", text }, cardPart({ findings: [good(), bad] })];
+
+      expect(check({ text, parts })).toEqual({ ok: false, reason });
+    });
+
+    it("reads the block of an answer whose card the relay could not stamp", () => {
+      const text = blockAnswer([good()]).text;
+      const failed = { type: "langy-card-failed", blockId: "failed-block-1", raw: "{not json" };
+
+      expect(check({ text, parts: [{ type: "text", text }, failed] }).ok).toBe(true);
     });
   });
 
@@ -279,7 +442,7 @@ describe("checkRunAnswer", () => {
         block(JSON.stringify({ findings: [good()] })),
       ].join("\n");
 
-      expect(check(text)).toEqual({ ok: false, reason: "bad_output" });
+      expect(check(prose(text))).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 
@@ -290,11 +453,11 @@ describe("checkRunAnswer", () => {
       ["a block that never closes", `${FENCE}${INSIGHT_RUN_FINDINGS_FENCE_TAG}\n{"findings":[]}`],
       ["a list in place of the object", block(JSON.stringify([good()]))],
     ])("refuses %s", (_what, text) => {
-      expect(check(text)).toEqual({ ok: false, reason: "bad_output" });
+      expect(check(prose(text))).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 
-  describe("given an answer with no findings block", () => {
+  describe("given an answer with neither a card nor a findings block", () => {
     it.each([
       ["prose alone", "Nothing changed on the board."],
       ["a block with another tag", [`${FENCE}json`, '{"findings":[]}', FENCE].join("\n")],
@@ -302,9 +465,23 @@ describe("checkRunAnswer", () => {
         "the tag inside a sentence",
         `I would write ${FENCE}${INSIGHT_RUN_FINDINGS_FENCE_TAG} here.`,
       ],
-      ["an answer too long to read", `${"x".repeat(400_001)}\n${block('{"findings":[]}')}`],
+      ["a card quoted in the prose", JSON.stringify(cardPart({ findings: [good()] }))],
     ])("refuses %s", (_what, text) => {
-      expect(check(text)).toEqual({ ok: false, reason: "bad_output" });
+      expect(check(prose(text))).toEqual({ ok: false, reason: "bad_output" });
+    });
+
+    it("refuses an answer too long to read, card and all", () => {
+      const long = { ...answer([good()]), text: "x".repeat(400_001) };
+
+      expect(check(long)).toEqual({ ok: false, reason: "bad_output" });
+    });
+
+    it.each([
+      ["a card of another kind", { ...cardPart({}), kind: "stats" }],
+      ["a card not stamped as derived", { ...cardPart({ findings: [good()] }), provenance: "x" }],
+      ["a tool result that holds findings", { type: "tool-bash", output: { findings: [good()] } }],
+    ])("takes no finding from %s", (_what, part) => {
+      expect(check({ text: PROSE, parts: [part] })).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 
@@ -319,6 +496,7 @@ describe("checkRunAnswer", () => {
       const findings = bad === null ? Array.from({ length: 51 }, () => good()) : [bad];
 
       expect(check(answer(findings))).toEqual({ ok: false, reason: "bad_output" });
+      expect(check(blockAnswer(findings))).toEqual({ ok: false, reason: "bad_output" });
     });
   });
 });

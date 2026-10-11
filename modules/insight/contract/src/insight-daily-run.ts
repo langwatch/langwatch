@@ -216,7 +216,7 @@ export const requestInsightDailyRunInputSchema: RequestInsightDailyRunInputSchem
   requestInsightDailyRunInputSchemaDefinition;
 export type RequestInsightDailyRunInput = z.input<typeof requestInsightDailyRunInputSchema>;
 
-/** The fence tag of the one block a run's answer ends with. */
+/** The fence tag of the block an answer ended with before the card; read for one release. */
 export const INSIGHT_RUN_FINDINGS_FENCE_TAG = "langwatch-insights";
 
 /** A run's answer may name more than it may file, never an unbounded list. */
@@ -229,8 +229,8 @@ export const INSIGHT_RUN_FINDING_BODY_MAX = 4_000;
 export const INSIGHT_RUN_FINDING_KEY_MAX = 80;
 
 /**
- * One finding as Langy hands it back. Strict: a key that is not listed here refuses the whole
- * answer, so an answer cannot name an owner, a project or a board.
+ * One finding as a run takes it from Langy's insights card. Strict: a key that is not listed
+ * here refuses the whole answer, so an answer cannot name an owner, a project or a board.
  */
 const insightRunFindingSchemaDefinition = z
   .object({

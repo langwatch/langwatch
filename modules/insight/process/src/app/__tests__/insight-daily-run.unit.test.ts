@@ -13,6 +13,7 @@ import {
   type InsightRunBoard,
 } from "@langwatch/insight-contract";
 import {
+  extractLangyTextFromParts,
   LangyInsufficientScopeError,
   LangyTurnsRateLimitedError,
   LangyUnattendedTurnRefusedError,
@@ -23,6 +24,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { dailyRunWindows } from "../../rules/insight-daily-run.rules.ts";
 import {
   answerWith,
+  blockAnswerWith,
   BOARD,
   COST_QUERY,
   ERRORS_QUERY,
@@ -34,6 +36,7 @@ import {
   OTHER_MEMBER,
   PROTECTIONS,
   refusal,
+  stampedParts,
 } from "./insight-daily-run.fixture.ts";
 import { OTHER_PROJECT, PROJECT } from "./insight.fixture.ts";
 
@@ -632,6 +635,119 @@ describe("given Langy's answer, which is untrusted", () => {
     expect(await insightsOf()).toEqual([]);
     expect(await insightsOf(OTHER_MEMBER)).toEqual([]);
     expect(await lastRunOf()).toMatchObject({ outcome: "failed", reason: "bad_output" });
+  });
+
+  /** @scenario "A run takes its findings from the typed card of the settled turn" */
+  it("files from the card among the turn's parts, whose prose holds no finding", async () => {
+    installed.world.langy.answer = TWO_FINDINGS;
+
+    await run();
+
+    const parts = stampedParts(TWO_FINDINGS);
+    expect(parts.map((part) => part.type)).toEqual(["text", "langy-card"]);
+    expect(extractLangyTextFromParts(parts)).toBe("I read each widget over the window.\n");
+    expect((await insightsOf()).map((entry) => entry.title).toSorted()).toEqual([
+      "Checkout cost doubled",
+      "Errors fell by half",
+    ]);
+    expect(await lastRunOf()).toMatchObject({ outcome: "filed", filedCount: 2 });
+  });
+
+  /** @scenario "A run that still ends with the fenced block files its findings" */
+  it("files the findings of an answer that ends with the fenced block and carries no card", async () => {
+    installed.world.langy.answer = blockAnswerWith([
+      finding({ widgetId: "widget-cost", lwql: COST_QUERY, key: "Checkout Cost Doubled" }),
+    ]);
+
+    await run();
+
+    expect(await insightsOf()).toEqual([
+      expect.objectContaining({
+        title: "Checkout cost doubled",
+        filedVia: "run",
+        lwql: COST_QUERY,
+        findingKey: "checkout-cost-doubled",
+        board: { id: BOARD.id, name: "Costs", widget: { id: "widget-cost", name: "Cost per day" } },
+      }),
+    ]);
+    expect(await lastRunOf()).toMatchObject({ outcome: "filed", filedCount: 1 });
+  });
+
+  /** @scenario "A card is taken before a fenced block in the same answer" */
+  it("files the card's findings and none of a fenced block beside it", async () => {
+    installed.world.langy.answer = [
+      blockAnswerWith([finding({ title: "from the block" })]),
+      answerWith([finding({ title: "from the card" })]),
+    ].join("\n\n");
+
+    await run();
+
+    expect((await insightsOf()).map((entry) => entry.title)).toEqual(["from the card"]);
+  });
+
+  /** @scenario "A card that fails a run's checks is not rescued by a fenced block" */
+  it("fails the run when the card holds a finding over a run's limits, good block or not", async () => {
+    installed.world.langy.answer = [
+      answerWith([finding(), finding({ title: "x".repeat(121) })]),
+      blockAnswerWith([finding({ title: "from the block" })]),
+    ].join("\n\n");
+
+    await run();
+
+    expect(await insightsOf()).toEqual([]);
+    expect(await lastRunOf()).toMatchObject({
+      outcome: "failed",
+      reason: "bad_output",
+      filedCount: 0,
+    });
+  });
+
+  /** @scenario "Two insights cards in one answer are refused" */
+  it("fails the run for an answer that holds two insights cards", async () => {
+    installed.world.langy.answer = [
+      answerWith([finding({ title: "From a trace" })]),
+      answerWith([finding()]),
+    ].join("\n\n");
+
+    await run();
+
+    expect(await insightsOf()).toEqual([]);
+    expect(await lastRunOf()).toMatchObject({ outcome: "failed", reason: "bad_output" });
+  });
+
+  /** @scenario "A card that was cut off files nothing" */
+  it("fails the run for a card the relay repaired, whose last finding stops mid-sentence", async () => {
+    const whole = answerWith([
+      finding(),
+      { title: "Errors fell by half", tone: "good", body: "Errors fell from 96 to 41 overnight." },
+    ]);
+    installed.world.langy.answer = whole.slice(0, whole.indexOf(" to 41 overnight"));
+
+    await run();
+
+    expect(await insightsOf()).toEqual([]);
+    expect(await lastRunOf()).toMatchObject({ outcome: "failed", reason: "bad_output" });
+  });
+
+  /** @scenario "A card's own board and window are not a run's" */
+  it("files with the run's board and window, whatever board and window the card names", async () => {
+    installed.world.langy.answer = answerWith(
+      [finding({ widgetId: "widget-cost", widgetName: "Theirs", lwql: COST_QUERY })],
+      {
+        board: { id: "dashboard-9", name: "Theirs" },
+        window: { start: 1, end: 2, granularitySeconds: 60 },
+      },
+    );
+
+    const { payload } = await run();
+
+    const { window } = dailyRunWindows({ slot: payload.slot, timezone: "UTC" });
+    expect(await insightsOf()).toEqual([
+      expect.objectContaining({
+        board: { id: BOARD.id, name: "Costs", widget: { id: "widget-cost", name: "Cost per day" } },
+        replay: { ...window, granularitySeconds: 3_600, period: null, parameters: {} },
+      }),
+    ]);
   });
 
   /** @scenario "More findings than the maximum are cut to the maximum" */
