@@ -5,6 +5,7 @@ import { MemoryGdprUserDataEraseRepository } from "./memory.user-data-erase.repo
 import { MemoryUserOrganizationDirectoryRepository } from "./memory.user-organization-directory.repository.ts";
 import { MemoryUserRateLimitRepository } from "./memory.user-rate-limit.repository.ts";
 import { MemoryUserCredentialRepository } from "./memory.user-signin-credential.repository.ts";
+import { MemoryUserStandingRepository } from "./memory.user-standing.repository.ts";
 import { MemoryUserDatabase } from "./memory.user.database.ts";
 import { MemoryUserRepository } from "./memory.user.repository.ts";
 
@@ -18,6 +19,7 @@ export function memoryUserRepositoriesOver({
     rateLimits: MemoryUserRateLimitRepository.create(),
     organizationDirectory: MemoryUserOrganizationDirectoryRepository.create(),
     dataErase: MemoryGdprUserDataEraseRepository.create({ database }),
+    standings: MemoryUserStandingRepository.create(),
   };
 }
 

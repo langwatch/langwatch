@@ -63,13 +63,24 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
 
   @unit @operator-seed
   Scenario: A set ADMIN_EMAILS waits for a named verified user and never falls back
-    Given ADMIN_EMAILS names only an unverified user, or an address nobody holds
+    Given the installation has email configured
+    And ADMIN_EMAILS names only an unverified user, or an address nobody holds
     And the installation has exactly one organization with an active administrator
     When the seed runs on two wakes
     Then nobody is granted and nothing is recorded
     And one warning says the seed waits for a user ADMIN_EMAILS names
     When the named user is verified and the seed runs
     Then only the named user is decided
+
+  @unit @operator-seed
+  Scenario: An install with no email configured seeds the named user unverified
+    Given the installation has no email configured, so no account can verify its address
+    And ADMIN_EMAILS names an active user whose address was never verified
+    And the installation has exactly one organization whose administrator is somebody else
+    When the seed runs
+    Then the named user is decided and recorded, and the administrator is not
+    And the ops:seed-platform-operators upgrade step grants the named user too
+    And a deactivated named user is still skipped
 
   @unit @operator-seed
   Scenario: The upgrade step grants the verified users a still-set ADMIN_EMAILS names

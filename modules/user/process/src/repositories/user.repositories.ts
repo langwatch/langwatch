@@ -2,6 +2,7 @@ import type { GdprUserDataEraseRepository } from "./user-data-erase.repository.t
 import type { UserOrganizationDirectoryRepository } from "./user-organization-directory.repository.ts";
 import type { UserRateLimitRepository } from "./user-rate-limit.repository.ts";
 import type { UserCredentialRepository } from "./user-signin-credential.repository.ts";
+import type { UserStandingRepository } from "./user-standing.repository.ts";
 import type { UserRepository } from "./user.repository.ts";
 
 export interface UserRepositories {
@@ -10,4 +11,6 @@ export interface UserRepositories {
   readonly rateLimits: UserRateLimitRepository;
   readonly organizationDirectory: UserOrganizationDirectoryRepository;
   readonly dataErase: GdprUserDataEraseRepository;
+  /** An account's deactivated and reactivated facts, read off the event log in every role. */
+  readonly standings: UserStandingRepository;
 }

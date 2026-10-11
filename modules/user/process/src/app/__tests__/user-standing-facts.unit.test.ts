@@ -7,9 +7,9 @@
  */
 import {
   createTenantId,
+  type EventReadSeat,
   EventUtils,
   InMemoryProcessStore,
-  type OwnEventStore,
 } from "@langwatch/eventing";
 import {
   USER_AGGREGATE_TYPE,
@@ -24,6 +24,7 @@ import type {
   UserDeactivatedEvent,
   UserReactivatedEvent,
 } from "../../eventing/user-lifecycle.events.ts";
+import { EventingUserStandingRepository } from "../../repositories/eventing/eventing.user-standing.repository.ts";
 import { MemoryUserRepositories } from "../../repositories/memory/memory.user.repositories.ts";
 import type { UserLifecycleSenders } from "../../services/user-lifecycle-notice.service.ts";
 import { createUserTestApp, createUserTestLifecycle } from "./user.fixture.ts";
@@ -71,26 +72,23 @@ function lifecycleLog() {
     recordUserDeactivated: append("deactivated"),
     recordUserReactivated: append("reactivated"),
   };
-  const eventStore: Pick<OwnEventStore, "read"> = {
-    read: async ({ aggregateId, accepts }) =>
-      facts
-        .filter(({ data }) => data.userId === aggregateId)
-        .map(standingEventOf)
-        .flatMap((event) => (accepts(event) ? [event] : [])),
+  const eventReadSeat: Pick<EventReadSeat, "findAggregateEvents"> = {
+    findAggregateEvents: async ({ aggregateId }) =>
+      facts.filter(({ data }) => data.userId === aggregateId).map(standingEventOf),
   };
-  return { senders: logged, facts, eventStore };
+  return { senders: logged, facts, eventReadSeat };
 }
 
 /** Three accounts on one app whose lifecycle log the test reads, ids sorted. */
 async function storedAccounts() {
   const log = lifecycleLog();
   const app = createUserTestApp({
-    repositories: MemoryUserRepositories.create({
-      processStore: InMemoryProcessStore.createForTesting(),
-    }),
+    repositories: {
+      ...MemoryUserRepositories.create({ processStore: InMemoryProcessStore.createForTesting() }),
+      standings: EventingUserStandingRepository.create({ eventReadSeat: log.eventReadSeat }),
+    },
     lifecycle: log.senders,
   });
-  app.keepLifecycleEventStore({ participation: "consume", eventStore: log.eventStore });
   const ids: string[] = [];
   for (const email of ["a@example.com", "b@example.com", "c@example.com"]) {
     ids.push((await app.create({ name: "Stored", email })).id);

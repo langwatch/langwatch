@@ -103,6 +103,14 @@ describe("the License page", () => {
       expect(screen.getByText("Valid")).toBeDefined();
     });
 
+    /** @scenario "The expiry date fits its tile and keeps the full date on hover" */
+    it("shows the expiry with a short month and the full date as its title", () => {
+      renderCard(valid);
+
+      const figure = within(screen.getByTestId("license-expires")).getByTitle("September 30, 2099");
+      expect(figure.textContent).toBe("Sep 30, 2099");
+    });
+
     /** @scenario Seats in use are drawn against the seats bought */
     it("fills the seat meter with the share of seats in use", () => {
       renderCard(valid);
@@ -126,6 +134,28 @@ describe("the License page", () => {
 
       expect(within(screen.getByTestId("license-seats")).getByText(/Unlimited/)).toBeDefined();
       expect(screen.queryByTestId("license-seats-meter")).toBeNull();
+    });
+  });
+
+  describe("given a license with a finite Lite seat limit", () => {
+    /** @scenario "A finite Lite seat limit is shown next to the seats" */
+    it("shows the Lite seats in use against the limit, right after the seats tile", () => {
+      renderCard({ ...valid, currentMembersLite: 3, maxMembersLite: 50 });
+
+      const tile = screen.getByTestId("license-lite-seats");
+      expect(within(tile).getByText("Lite seats")).toBeDefined();
+      expect(within(tile).getByText("3 / 50")).toBeDefined();
+      expect(screen.getByTestId("license-seats").nextElementSibling).toBe(tile);
+    });
+  });
+
+  describe("given a license whose Lite seats are unlimited", () => {
+    /** @scenario "Unlimited Lite seats are not shown" */
+    it("shows no Lite seats tile", () => {
+      renderCard({ ...valid, maxMembersLite: Number.MAX_SAFE_INTEGER });
+
+      expect(screen.queryByTestId("license-lite-seats")).toBeNull();
+      expect(screen.getByTestId("license-seats")).toBeDefined();
     });
   });
 

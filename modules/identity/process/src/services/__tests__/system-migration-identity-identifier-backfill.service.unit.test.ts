@@ -6,7 +6,7 @@ import { IdentityIdentifierBackfillMigrationService } from "../system-migration-
 describe("the identifier backfill migration", () => {
   describe("when the runner drives a tenant", () => {
     /** @scenario "The backfill adopts existing accounts and proves itself per user" */
-    /** @scenario "The identifier backfill waits for enrollment and migrates one user per tenant" */
+    /** @scenario "The identifier backfill reaches every user on its own and migrates one user per tenant" */
     it("hands the tenant to the backfill service as the user and returns its outcome", async () => {
       const migrateUser = vi.fn(async () => ({
         status: "migrated" as const,
@@ -28,18 +28,16 @@ describe("the identifier backfill migration", () => {
 
   describe("when the runner reads its declaration", () => {
     /** @scenario "Finalizing a user's backfill opens their write gate" */
-    /** @scenario "The identifier backfill waits for enrollment and migrates one user per tenant" */
+    /** @scenario "The identifier backfill reaches every user on its own and migrates one user per tenant" */
     it("registers under the name the write gate reads, dark and operator-free", () => {
       const migration = IdentityIdentifierBackfillMigrationService.create({
         migrateUser: vi.fn(),
       });
       expect(migration.name).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
       expect(migration.requiresOperatorConfirmation).toBe(false);
-      expect(migration.runsAutomaticallyOnSelfHosted).toBe(false);
-      // Still paced by enrollment on cloud: the identity rollout has not
-      // finished, so deploying it must keep changing nothing until an
-      // operator enrolls an organization.
-      expect(migration.enrolledAutomatically).toBe(false);
+      // The front door reads an identity history, so no user waits for an operator to enrol them.
+      expect(migration.runsAutomaticallyOnSelfHosted).toBe(true);
+      expect(migration.enrolledAutomatically).toBe(true);
     });
   });
 });
