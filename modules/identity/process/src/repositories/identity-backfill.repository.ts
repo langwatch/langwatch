@@ -35,5 +35,9 @@ export abstract class IdentityBackfillRepository {
   abstract findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]>;
   /** The legacy `Passkey` rows this user holds, counted. */
   abstract countPasskeys(args: { userId: string }): Promise<number>;
+  /** Every `User` whose address matches this one, case-insensitively, the asker included. */
+  abstract findAddressSharers(args: { normalizedValue: string }): Promise<BackfillUserRow[]>;
+  /** Who holds the address lock on this value: none or one user id. */
+  abstract findAddressLockHolders(args: { normalizedValue: string }): Promise<string[]>;
   abstract findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]>;
 }

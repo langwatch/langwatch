@@ -400,6 +400,33 @@ Feature: The identifier model - identity as an event-sourced pipeline
     And the sign-in screen no longer offers "sam" a password
     And "sam" is finalized again
 
+  # Two User rows on one address (it normalises the same, e.g. a case twin): one
+  # keeps it, the other finalizes without claiming it. Nothing is deleted
+  # (Alex, 2026-10-11). The step report names user ids only.
+  @unit
+  Scenario: Two accounts sharing an address: the most recent sign-in keeps it and the other finalizes without it
+    Given "sam" and "sam's twin" hold addresses that normalise the same
+    And "sam's twin" signed in more recently, or already holds the address lock
+    When the identity backfill migrates "sam"
+    Then "sam" is finalized with the address attached, unverified, and no account identifier
+    And with neither ever signed in, the older account keeps the address
+    And the report names "sam's twin" by user id and no address
+
+  @unit @integration
+  Scenario: the other still signs in with its own GitHub link
+    Given "gil" yields a shared address and holds a GitHub Account row
+    When the identity backfill migrates "gil"
+    Then no identifier is stated for the GitHub link, so no dead end drops its Account row
+    And the GitHub callback falls through to that Account row
+
+  @unit @integration
+  Scenario: Two email-only accounts sharing an address each get a plus-tagged duplicate address
+    Given "eve" and "eve's twin" share an address and carry nothing else
+    When the identity backfill migrates either of them
+    Then the most recent sign-in, else the older account, gets "local+duplicate-1@domain" and the other "+duplicate-2"
+    And an address already tagged gets "-duplicate-N" on its tag, skipping an N already taken
+    And both stay unverified, through user's updateEmail, with the old and new address audited
+
   @integration
   Scenario: An unproven account finalized with only its address is confirmed with nothing to wipe
     Given an earlier pass finalized "ana", unproven and carrying only her address

@@ -1,11 +1,14 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   accountLivenessKey,
   type BackfillDiff,
   backfillParityDiffs,
   IdentityCommandRefusedError,
+  normalizeIdentifierValue,
   orphanedIdentifierRows,
 } from "@langwatch/identity-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
 import type {
   BackfillAccountRow,
@@ -18,6 +21,7 @@ import {
   establishUserEmailCommandId,
 } from "../rules/identity-command-id.rules.ts";
 import type { IdentityAdoptionWrites } from "../rules/identity-writes.rules.ts";
+import { addressKeeperOrder, duplicateAddress } from "../rules/shared-address.rules.ts";
 import { carriesPreProofSignInMethod, isUnprovenAccount } from "../rules/unproven-account.rules.ts";
 import { mintUserHashKey } from "../rules/user-hash-key.rules.ts";
 import {
@@ -34,9 +38,21 @@ const IDENTITY_BACKFILL_ACTOR = {
 /** Reports stay bounded however far a projection has drifted. */
 const MAX_REPORTED_DIFFS = 50;
 
+/** How a pass settled an address another `User` shares; user ids only, never addresses. */
+type SharedAddress =
+  | { kind: "sole" }
+  | { kind: "kept" | "yielded" | "retagged"; userIds: string[] };
+
 export type IdentityBackfillOutcome =
   | { status: "finalized"; report: { kind: "user_missing" | "no_email" } }
-  | { status: "finalized"; report: { kind: "adopted"; identifiers: number } }
+  | {
+      status: "finalized";
+      report: {
+        kind: "adopted";
+        identifiers: number;
+        sharedAddress?: Exclude<SharedAddress, { kind: "sole" }>;
+      };
+    }
   | { status: "migrated"; report: { kind: "parity"; diffs: BackfillDiff[] } }
   | { status: "migrated"; report: { kind: "unproven_account" } };
 
@@ -54,6 +70,8 @@ export class IdentityBackfillService {
     identity,
     secrets,
     plan,
+    userApi,
+    auditLog,
     deps = {},
   }: {
     reads: IdentityBackfillRepository;
@@ -61,9 +79,20 @@ export class IdentityBackfillService {
     identity: IdentityAdoptionWrites;
     secrets: IdentitySecretCarryService;
     plan: IdentityBackfillPlanService;
+    userApi: Pick<UserApi, "updateEmail">;
+    auditLog: Pick<AuditLogApi, "record">;
     deps?: IdentityBackfillServiceDeps;
   }): IdentityBackfillService {
-    return new IdentityBackfillService({ reads, users, identity, secrets, plan, deps });
+    return new IdentityBackfillService({
+      reads,
+      users,
+      identity,
+      secrets,
+      plan,
+      userApi,
+      auditLog,
+      deps,
+    });
   }
 
   private readonly now: () => number;
@@ -73,6 +102,8 @@ export class IdentityBackfillService {
   private readonly identity: IdentityAdoptionWrites;
   private readonly secrets: IdentitySecretCarryService;
   private readonly plan: IdentityBackfillPlanService;
+  private readonly userApi: Pick<UserApi, "updateEmail">;
+  private readonly auditLog: Pick<AuditLogApi, "record">;
 
   private constructor({
     reads,
@@ -80,6 +111,8 @@ export class IdentityBackfillService {
     identity,
     secrets,
     plan,
+    userApi,
+    auditLog,
     deps,
   }: {
     reads: IdentityBackfillRepository;
@@ -87,6 +120,8 @@ export class IdentityBackfillService {
     identity: IdentityAdoptionWrites;
     secrets: IdentitySecretCarryService;
     plan: IdentityBackfillPlanService;
+    userApi: Pick<UserApi, "updateEmail">;
+    auditLog: Pick<AuditLogApi, "record">;
     deps: IdentityBackfillServiceDeps;
   }) {
     this.reads = reads;
@@ -94,6 +129,8 @@ export class IdentityBackfillService {
     this.identity = identity;
     this.secrets = secrets;
     this.plan = plan;
+    this.userApi = userApi;
+    this.auditLog = auditLog;
     this.now = deps.now ?? Date.now;
   }
 
@@ -125,7 +162,14 @@ export class IdentityBackfillService {
       return { status: "migrated", report: { kind: "unproven_account" } };
     }
 
-    if (user.userHashKey === null) {
+    const shared = await this.settleSharedAddress({ user, email: user.email, accounts });
+    const settled = shared.kind === "retagged" ? await this.reads.getUser({ userId }) : user;
+    const email = settled.email ?? user.email;
+    // A user yielding a shared address claims no lock: no account identifier (whose attach would
+    // dead-end and drop its Account row) and an address that stays unverified (Alex, 2026-10-11).
+    const yields = shared.kind === "yielded";
+
+    if (settled.userHashKey === null) {
       await this.users.storeUserHashKeyIfMissing({
         userId,
         userHashKey: mintUserHashKey(),
@@ -133,15 +177,15 @@ export class IdentityBackfillService {
     }
 
     const planned = this.plan.planIdentifiers({
-      user: { ...user, email: user.email },
-      accounts,
+      user: { ...settled, email, emailVerified: settled.emailVerified && !yields },
+      accounts: yields ? [] : accounts,
     });
 
-    await this.adoptPlanned({ userId, email: user.email, planned });
+    await this.adoptPlanned({ userId, email, planned });
     await this.establishEmail({
       userId,
-      emailVerified: user.emailVerified,
-      createdAtMs: user.createdAtMs,
+      emailVerified: settled.emailVerified && !yields,
+      createdAtMs: settled.createdAtMs,
       planned,
     });
     await this.detachOrphanedIdentifiers({ userId, accounts });
@@ -153,7 +197,87 @@ export class IdentityBackfillService {
       await this.secrets.carryForUser({ userId });
     }
 
-    return outcome;
+    return withSharedAddress({ outcome, shared });
+  }
+
+  /**
+   * Two `User` rows on one address: whoever already holds its lock keeps it, else the most
+   * recent sign-in (the older account when nobody signed in). When every one of them carries
+   * only the address, each gets a plus-tagged duplicate instead (Alex, 2026-10-11).
+   */
+  private async settleSharedAddress({
+    user,
+    email,
+    accounts,
+  }: {
+    user: BackfillUserRow;
+    email: string;
+    accounts: BackfillAccountRow[];
+  }): Promise<SharedAddress> {
+    const normalizedValue = normalizeIdentifierValue(email);
+    const others = (await this.reads.findAddressSharers({ normalizedValue })).filter(
+      (sharer) => sharer.id !== user.id,
+    );
+    if (others.length === 0) return { kind: "sole" };
+    const userIds = others.map((other) => other.id);
+    const group = [user, ...others];
+
+    if (await this.everyoneCarriesOnlyTheAddress({ user, accounts, others })) {
+      await this.retagSharedAddress({ group });
+      return { kind: "retagged", userIds };
+    }
+
+    const holders = await this.reads.findAddressLockHolders({ normalizedValue });
+    const holder = holders.find((id) => group.some((member) => member.id === id));
+    const keeperId = holder ?? addressKeeperOrder(group)[0]?.id;
+    return { kind: keeperId === user.id ? "kept" : "yielded", userIds };
+  }
+
+  private async everyoneCarriesOnlyTheAddress({
+    user,
+    accounts,
+    others,
+  }: {
+    user: BackfillUserRow;
+    accounts: BackfillAccountRow[];
+    others: BackfillUserRow[];
+  }): Promise<boolean> {
+    if (await this.carriesPreProofMethod({ user, accounts })) return false;
+    for (const other of others) {
+      const theirs = await this.reads.findAccountRows({ userId: other.id });
+      if (await this.carriesPreProofMethod({ user: other, accounts: theirs })) return false;
+    }
+    return true;
+  }
+
+  /** Each account in keeper order takes the next free `+duplicate-N`; the change is audited. */
+  private async retagSharedAddress({ group }: { group: BackfillUserRow[] }): Promise<void> {
+    let n = 1;
+    for (const member of addressKeeperOrder(group)) {
+      const from = member.email;
+      if (from === null) continue;
+      let address = duplicateAddress({ email: from, n });
+      while (await this.addressIsTaken({ address })) {
+        n += 1;
+        address = duplicateAddress({ email: from, n });
+      }
+      await this.userApi.updateEmail({ id: member.id, email: address });
+      await this.auditLog.record({
+        userId: member.id,
+        action: "user.email.duplicate_address_tagged",
+        args: { from, to: address },
+        targetKind: "user",
+        targetId: member.id,
+      });
+      n += 1;
+    }
+  }
+
+  private async addressIsTaken({ address }: { address: string }): Promise<boolean> {
+    const sharers = await this.reads.findAddressSharers({
+      normalizedValue: normalizeIdentifierValue(address),
+    });
+    return sharers.length > 0;
   }
 
   private async carriesPreProofMethod({
@@ -316,6 +440,19 @@ export class IdentityBackfillService {
       report: { kind: "adopted", identifiers: planned.length },
     };
   }
+}
+
+/** A finalized adoption names how a shared address settled; every other outcome is as proven. */
+function withSharedAddress({
+  outcome,
+  shared,
+}: {
+  outcome: IdentityBackfillOutcome;
+  shared: SharedAddress;
+}): IdentityBackfillOutcome {
+  if (shared.kind === "sole" || outcome.status !== "finalized") return outcome;
+  if (outcome.report.kind !== "adopted") return outcome;
+  return { status: "finalized", report: { ...outcome.report, sharedAddress: shared } };
 }
 
 /** A command the guards refused is a parity fact, never a park. */

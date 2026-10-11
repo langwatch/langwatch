@@ -18,6 +18,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
+import { userProfileSchema } from "@langwatch/user-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -29,12 +30,24 @@ import { IdentitySecretCarryService } from "../services/identity-secret-carry.se
 import { liveRepositories } from "./support/live-repositories.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
+const PROFILE_COLUMNS = {
+  id: true,
+  name: true,
+  email: true,
+  emailVerified: true,
+  image: true,
+  pendingSsoSetup: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+  deactivatedAt: true,
+} as const;
 const PRE_PROOF_PASSWORD = "pre-proof-password-hash";
 const identifierIdentity = CryptoIdentifierIdentityService.create();
 
 describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => {
   const namespace = `unproven-${nanoid(8)}`;
-  const ids = { sam: "", kim: "", lee: "", ana: "" };
+  const ids = { sam: "", kim: "", lee: "", ana: "", gil: "", gilTwin: "", eve: "", eveTwin: "" };
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
     logger: createLogger("langwatch:identity:test:unproven-account"),
@@ -47,6 +60,18 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
     identity: projectionWrites(prisma),
     secrets: IdentitySecretCarryService.create(repositories.secretCarry),
     plan: IdentityBackfillPlanService.create(identifierIdentity),
+    // user's updateEmail, as its repository writes it (trimmed, lower-cased).
+    userApi: {
+      updateEmail: async ({ id, email }) =>
+        userProfileSchema.parse(
+          await prisma.user.update({
+            where: { id },
+            data: { email: email.trim().toLowerCase() },
+            select: PROFILE_COLUMNS,
+          }),
+        ),
+    },
+    auditLog: { record: async () => ({ id: nanoid(), occurredAt: Date.now() }) },
   });
   const samEmail = `sam-${namespace}@example.com`;
   const samAccountId = `${namespace}-sam-password`;
@@ -213,6 +238,95 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
     });
     expect(live).toEqual([{ provider: "email", accountId: null }]);
     expect((await stateOf(ids.ana))?.status).toBe("finalized");
+  });
+
+  /** @scenario "the other still signs in with its own GitHub link" */
+  it("finalizes the account yielding a shared address and leaves its GitHub link in place", async () => {
+    const address = `gil-${namespace}@example.com`;
+    const gil = await prisma.user.create({
+      data: {
+        name: "gil",
+        email: address,
+        emailVerified: true,
+        lastLoginAt: new Date("2025-01-01"),
+      },
+    });
+    ids.gil = gil.id;
+    await prisma.account.create({
+      data: {
+        id: `${namespace}-gil-github`,
+        userId: gil.id,
+        provider: "github",
+        issuer: "https://github.com",
+        providerAccountId: `${namespace}-gh`,
+      },
+    });
+    const twin = await prisma.user.create({
+      data: {
+        name: "gil twin",
+        email: address.toUpperCase(),
+        emailVerified: true,
+        lastLoginAt: new Date("2026-01-01"),
+      },
+    });
+    ids.gilTwin = twin.id;
+
+    const outcome = await backfill.migrateUser({ userId: gil.id });
+
+    expect(outcome).toMatchObject({
+      status: "finalized",
+      report: { sharedAddress: { kind: "yielded", userIds: [twin.id] } },
+    });
+    expect(await prisma.account.count({ where: { userId: gil.id, provider: "github" } })).toBe(1);
+    // No identifier names the subject, so the GitHub callback falls through to the Account row.
+    expect(await prisma.identifier.count({ where: { providerAccountId: `${namespace}-gh` } })).toBe(
+      0,
+    );
+    const kept = await backfill.migrateUser({ userId: twin.id });
+    expect(kept).toMatchObject({ report: { sharedAddress: { kind: "kept", userIds: [gil.id] } } });
+  });
+
+  /** @scenario "Two email-only accounts sharing an address each get a plus-tagged duplicate address" */
+  it("tags two email-only accounts sharing an address and finalizes both unverified", async () => {
+    const eve = await prisma.user.create({
+      data: {
+        name: "eve",
+        email: `eve-${namespace}@example.com`,
+        emailVerified: false,
+        createdAt: new Date("2026-01-01"),
+      },
+    });
+    ids.eve = eve.id;
+    const eveTwin = await prisma.user.create({
+      data: {
+        name: "eve twin",
+        email: `EVE-${namespace}@example.com`,
+        emailVerified: false,
+        createdAt: new Date("2026-02-01"),
+      },
+    });
+    ids.eveTwin = eveTwin.id;
+
+    const first = await backfill.migrateUser({ userId: eveTwin.id });
+    const second = await backfill.migrateUser({ userId: eve.id });
+
+    const emails = await prisma.user.findMany({
+      where: { id: { in: [eve.id, eveTwin.id] } },
+      select: { id: true, email: true, emailVerified: true },
+    });
+    expect(new Map(emails.map((row) => [row.id, row.email]))).toEqual(
+      new Map([
+        // user's updateEmail lower-cases the whole address.
+        [eve.id, `eve-${namespace}+duplicate-1@example.com`.toLowerCase()],
+        [eveTwin.id, `eve-${namespace}+duplicate-2@example.com`.toLowerCase()],
+      ]),
+    );
+    expect(emails.every((row) => !row.emailVerified)).toBe(true);
+    expect(first).toMatchObject({
+      status: "finalized",
+      report: { sharedAddress: { kind: "retagged" } },
+    });
+    expect(second).toMatchObject({ status: "finalized", report: { kind: "adopted" } });
   });
 });
 

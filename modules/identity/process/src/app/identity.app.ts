@@ -553,6 +553,8 @@ export class IdentityModule
       identity,
       secrets,
       plan: IdentityBackfillPlanService.create(CryptoIdentifierIdentityService.create()),
+      userApi: setup.dependencies.users,
+      auditLog: setup.dependencies.auditLog,
     });
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
