@@ -526,5 +526,53 @@
     "reason": "A picker row with a trailing menu; a Card opener cannot hold controls and ResourceTile would triple the list height (R3a2 review).",
     "owner": "agent",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/blocks/evaluator-category-picker.tsx",
+    "rule": "card-box",
+    "line": 124,
+    "reason": "A selectable picker tile with a green hover tint; Card opener has no tone. (R3e1 review)",
+    "owner": "evaluator",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/blocks/evaluator-type-picker.tsx",
+    "rule": "card-box",
+    "line": 153,
+    "reason": "A selectable tile with a disabled state and an inner call-to-action button. (R3e1 review)",
+    "owner": "evaluator",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/blocks/evaluator-list-item.tsx",
+    "rule": "card-box",
+    "line": 67,
+    "reason": "A row with a whole-row opener and a menu beside it, with a green hover tint. (R3e1 review)",
+    "owner": "evaluator",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/elements/workflow/workflow-icons.tsx",
+    "rule": "card-box",
+    "line": 90,
+    "reason": "False positive: a dotted icon swatch. (R3e1 review)",
+    "owner": "evaluator",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/evaluator-llm-config-field.tsx",
+    "rule": "card-box",
+    "line": 105,
+    "reason": "False positive: a popover trigger styled as a select. (R3e1 review)",
+    "owner": "evaluator",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/try-it-out.tsx",
+    "rule": "page-title-size",
+    "line": 235,
+    "reason": "False positive: an in-page Try it out section heading; the page title is in the page header. (R3e1 review)",
+    "owner": "evaluator",
+    "disposition": "reviewed"
   }
 ]
