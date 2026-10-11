@@ -1,4 +1,4 @@
-/** Spec: modules/entitlement/specs/usage.feature (the trace count). */
+/** Spec: modules/entitlement/specs/usage.feature (trace usage). */
 import {
   ClickHouseQueryClient,
   routingDriver,
@@ -9,7 +9,6 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import type { TraceCountState } from "../../trace-count.repository.ts";
 import { TraceCountClickHouseRepository } from "../clickhouse.trace-count.repository.ts";
 
 /** A routed ClickHouse that answers one organization, recording every lookup and statement. */
@@ -42,85 +41,86 @@ function countOver(rows: unknown[]) {
   return { counts, organizationsResolved, statements, inserts };
 }
 
-const STATE: TraceCountState = {
-  projectId: "project_1",
-  month: "2026-10",
-  counted: 40,
-  live: 2,
-  LastEventOccurredAt: 5,
-};
+const ORGANIZATION = "organization_1";
 
 describe("TraceCountClickHouseRepository", () => {
-  describe("when the fold reads a project's month back", () => {
-    /** @scenario "The month's trace count is read off the organization-keyed count" */
-    it("reads the newest row of the project's month on the organization's cluster", async () => {
-      const { counts, statements, organizationsResolved } = countOver([
-        { foldState: JSON.stringify(STATE), appliedEventIds: ["evt_1"] },
-      ]);
+  describe("when trace usage rows are written", () => {
+    /** @scenario "The upgrade's trace ids write one row per trace" */
+    it("inserts one row per trace on the organization's cluster, ids and month only", async () => {
+      const { counts, inserts, organizationsResolved } = countOver([]);
 
-      await expect(
-        counts.find({ organizationId: "org_1", projectId: "project_1", month: "2026-10" }),
-      ).resolves.toEqual([{ state: STATE, appliedEventIds: ["evt_1"] }]);
-      expect(organizationsResolved).toEqual(["org_1"]);
-      const sql = statements[0]?.query.replace(/\s+/g, " ");
-      expect(sql).toContain("argMax(FoldState, UpdatedAt) AS foldState");
-      expect(sql).toContain("AND Month = {month:Date} AND TenantId = {tenantId:String}");
-      expect(statements[0]?.query_params).toMatchObject({ month: "2026-10-01" });
+      await counts.insert({
+        organizationId: ORGANIZATION,
+        rows: [
+          { projectId: "project_1", traceId: "trace_1", month: "2026-10" },
+          { projectId: "project_1", traceId: "trace_2", month: "2026-10" },
+        ],
+      });
+
+      expect(organizationsResolved).toContain(ORGANIZATION);
+      expect(inserts[0]?.table).toBe("usage_trace_meter");
+      expect(inserts[0]?.values).toEqual([
+        {
+          OrganizationId: ORGANIZATION,
+          TenantId: "project_1",
+          Month: "2026-10-01",
+          TraceId: "trace_1",
+        },
+        {
+          OrganizationId: ORGANIZATION,
+          TenantId: "project_1",
+          Month: "2026-10-01",
+          TraceId: "trace_2",
+        },
+      ]);
+    });
+
+    it("writes nothing for an empty list", async () => {
+      const { counts, inserts } = countOver([]);
+
+      await counts.insert({ organizationId: ORGANIZATION, rows: [] });
+
+      expect(inserts).toEqual([]);
     });
   });
 
   describe("when the month is counted", () => {
-    /** @scenario "The month's trace count is read off the organization-keyed count" */
-    it("sums each project's newest total for the organization's month", async () => {
-      const { counts, statements } = countOver([{ total: "42" }]);
+    /** @scenario "The month's trace count is read off the organization-keyed rows" */
+    it("counts distinct traces first seen in the month on the organization's cluster", async () => {
+      const { counts, statements, organizationsResolved } = countOver([{ total: "42" }]);
 
-      await expect(counts.findTotal({ organizationId: "org_1", month: "2026-10" })).resolves.toBe(
-        42,
-      );
-      const sql = statements[0]?.query.replace(/\s+/g, " ");
-      expect(sql).toContain("SELECT TenantId, argMax(Traces, UpdatedAt) AS Traces");
-      expect(sql).toContain(
-        "FROM usage_trace_count WHERE OrganizationId = {organizationId:String}",
-      );
+      await expect(
+        counts.findTotal({ organizationId: ORGANIZATION, month: "2026-10" }),
+      ).resolves.toBe(42);
+
+      const sql = statements[0]?.query.replace(/\s+/g, " ") ?? "";
+      expect(organizationsResolved).toContain(ORGANIZATION);
+      expect(sql).toContain("SELECT TenantId, TraceId, min(Month) AS FirstMonth");
+      expect(sql).toContain("GROUP BY TenantId, TraceId");
+      expect(sql).not.toContain("FINAL");
+      expect(statements[0]?.query_params).toMatchObject({
+        organizationId: ORGANIZATION,
+        month: "2026-10-01",
+        previousMonth: "2026-09-01",
+      });
     });
 
-    it("answers each named project's newest total", async () => {
+    /** @scenario "The month's trace count is read off the organization-keyed rows" */
+    it("counts per named project, and asks nothing for none", async () => {
       const { counts, statements } = countOver([{ projectId: "project_1", total: "7" }]);
 
       await expect(
+        counts.countByProjects({ organizationId: ORGANIZATION, projectIds: [], month: "2026-10" }),
+      ).resolves.toEqual([]);
+      expect(statements).toEqual([]);
+      await expect(
         counts.countByProjects({
-          organizationId: "org_1",
-          projectIds: ["project_1", "project_2"],
+          organizationId: ORGANIZATION,
+          projectIds: ["project_1"],
           month: "2026-10",
         }),
       ).resolves.toEqual([{ projectId: "project_1", count: 7 }]);
-      expect(statements[0]?.query).toContain("AND TenantId IN {projectIds:Array(String)}");
-    });
-  });
-
-  describe("when the fold writes a project's month", () => {
-    it("writes the state, its total and the applied ids under the organization", async () => {
-      const { counts, inserts } = countOver([]);
-
-      await counts.save({
-        organizationId: "org_1",
-        state: STATE,
-        traces: 42,
-        appliedEventIds: ["e"],
-      });
-
-      expect(inserts).toHaveLength(1);
-      expect(inserts[0]?.table).toContain("usage_trace_count");
-      expect(inserts[0]?.values).toEqual([
-        expect.objectContaining({
-          OrganizationId: "org_1",
-          TenantId: "project_1",
-          Month: "2026-10-01",
-          Traces: 42,
-          FoldState: JSON.stringify(STATE),
-          AppliedEventIds: ["e"],
-        }),
-      ]);
+      expect(statements[0]?.query).toContain("TenantId IN {projectIds:Array(String)}");
     });
   });
 });

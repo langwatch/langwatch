@@ -8,9 +8,7 @@ type HitRow = { hit: number };
 /** How far before a window a counted trace may have started, and been seen first. */
 const FIRST_SEEN_LOOKBACK_MS = 31 * 24 * 60 * 60 * 1_000;
 
-const COUNT_MOMENT_TABLE = "trace_count_moment" as const;
-
-type MomentRow = { countedUntil: string };
+type TraceIdRow = { traceId: string };
 type AttributeCountRow = { value: string; count: string | number };
 
 /** ClickHouse reads of per-project trace counts over `trace_summaries`. */
@@ -27,68 +25,43 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
   }
 
   /**
-   * A trace counts where its earliest summary version was written; `OccurredAt` bounds the
+   * A trace is listed where its earliest summary version was written. The sort key is
+   * (TenantId, TraceId), so `afterTraceId` skips earlier pages by index; `OccurredAt` bounds the
    * partitions read to traces starting at most {@link FIRST_SEEN_LOOKBACK_MS} before the window.
    */
-  async countTracesFirstSeen(input: {
+  async findTraceIdsFirstSeen(input: {
     tenantId: string;
     fromMs: number;
     toMs: number;
-  }): Promise<number> {
-    const result = await this.#clickhouse.query<TotalRow>({
+    afterTraceId: string;
+    limit: number;
+  }): Promise<string[]> {
+    const result = await this.#clickhouse.query<TraceIdRow>({
       tenantId: input.tenantId,
       table: "trace_summaries",
       sql: `
-        SELECT toString(count()) AS total
-        FROM (
-          SELECT TraceId, min(CreatedAt) AS FirstSeenAt
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({occurredFrom:Int64})
-            AND CreatedAt >= fromUnixTimestamp64Milli({createdFrom:Int64})
-            AND CreatedAt < fromUnixTimestamp64Milli({to:Int64})
-          GROUP BY TraceId
-        )
-        WHERE FirstSeenAt >= fromUnixTimestamp64Milli({from:Int64})
+        SELECT TraceId AS traceId
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND TraceId > {afterTraceId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({lookbackFrom:Int64})
+          AND CreatedAt >= fromUnixTimestamp64Milli({lookbackFrom:Int64})
+          AND CreatedAt < fromUnixTimestamp64Milli({to:Int64})
+        GROUP BY TraceId
+        HAVING min(CreatedAt) >= fromUnixTimestamp64Milli({from:Int64})
+        ORDER BY TraceId
+        LIMIT {limit:UInt32}
       `,
       params: {
         tenantId: input.tenantId,
-        occurredFrom: input.fromMs - FIRST_SEEN_LOOKBACK_MS,
-        createdFrom: input.fromMs - FIRST_SEEN_LOOKBACK_MS,
+        afterTraceId: input.afterTraceId,
+        lookbackFrom: input.fromMs - FIRST_SEEN_LOOKBACK_MS,
         from: input.fromMs,
         to: input.toMs,
+        limit: input.limit,
       },
     });
-
-    return Number.parseInt(String(result.rows[0]?.total ?? "0"), 10);
-  }
-
-  /** One row per deployment; the earliest stored moment wins if the upgrade ever stored two. */
-  async findCountMoment(): Promise<number[]> {
-    const result = await this.#clickhouse.query<MomentRow>({
-      tenantId: "",
-      table: COUNT_MOMENT_TABLE,
-      sql: `
-        SELECT toString(min(CountedUntilMs)) AS countedUntil
-        FROM ${COUNT_MOMENT_TABLE}
-        HAVING count() > 0
-      `,
-      // One row for the whole deployment, owned by no tenant.
-      SKIP_TENANT_CHECK: true,
-    });
-    return result.rows.map((row) => Number(row.countedUntil));
-  }
-
-  async recordCountMoment({ countedUntil }: { countedUntil: number }): Promise<void> {
-    await this.#clickhouse.insert({
-      tenantId: "",
-      table: COUNT_MOMENT_TABLE,
-      rows: [{ Id: "deployment", CountedUntilMs: countedUntil }],
-      // Readers must see the moment before the first trace at or after it is first seen.
-      settings: { async_insert: 0 },
-      // One row for the whole deployment, owned by no tenant.
-      SKIP_TENANT_CHECK: true,
-    });
+    return result.rows.map((row) => row.traceId);
   }
 
   /** Main's automation runaway count: exact distinct traces over the trailing 24 hours. */

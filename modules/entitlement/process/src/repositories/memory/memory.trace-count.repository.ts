@@ -1,12 +1,10 @@
-import {
-  type StoredTraceCount,
-  TraceCountRepository,
-  type TraceCountState,
-} from "../trace-count.repository.ts";
+import { Temporal } from "@langwatch/time";
 
-type Row = StoredTraceCount & { organizationId: string; traces: number };
+import { TraceCountRepository, type TraceUsageRow } from "../trace-count.repository.ts";
 
-/** In-memory twin: one row per organization, project and month, the last write kept. */
+type Row = TraceUsageRow & { organizationId: string };
+
+/** In-memory twin: one row per key, as the table's merge leaves it, read as ClickHouse reads it. */
 export class MemoryTraceCountRepository extends TraceCountRepository {
   readonly #rows = new Map<string, Row>();
 
@@ -18,57 +16,63 @@ export class MemoryTraceCountRepository extends TraceCountRepository {
     return new MemoryTraceCountRepository();
   }
 
-  async find(input: {
-    organizationId: string;
-    projectId: string;
-    month: string;
-  }): Promise<StoredTraceCount[]> {
-    const row = this.#rows.get(keyOf(input));
-    return row ? [{ state: row.state, appliedEventIds: row.appliedEventIds }] : [];
+  /** Every row written, one per key. */
+  get rows(): Row[] {
+    return [...this.#rows.values()];
   }
 
-  async save({
+  async insert({
     organizationId,
-    state,
-    traces,
-    appliedEventIds,
+    rows,
   }: {
     organizationId: string;
-    state: TraceCountState;
-    traces: number;
-    appliedEventIds: readonly string[];
+    rows: readonly TraceUsageRow[];
   }): Promise<void> {
-    const key = keyOf({ organizationId, projectId: state.projectId, month: state.month });
-    this.#rows.set(key, { organizationId, state, traces, appliedEventIds: [...appliedEventIds] });
-  }
-
-  async findTotal(input: { organizationId: string; month: string }): Promise<number> {
-    let total = 0;
-    for (const row of this.#rows.values()) {
-      if (row.organizationId === input.organizationId && row.state.month === input.month) {
-        total += row.traces;
-      }
+    for (const row of rows) {
+      const key = [organizationId, row.month, row.projectId, row.traceId].join("\u0000");
+      this.#rows.set(key, { ...row, organizationId });
     }
-    return total;
   }
 
-  async countByProjects(input: {
+  async findTotal({
+    organizationId,
+    month,
+  }: {
+    organizationId: string;
+    month: string;
+  }): Promise<number> {
+    const counts = await this.countByProjects({
+      organizationId,
+      projectIds: [...new Set(this.rows.map((row) => row.projectId))],
+      month,
+    });
+    return counts.reduce((total, { count }) => total + count, 0);
+  }
+
+  async countByProjects({
+    organizationId,
+    projectIds,
+    month,
+  }: {
     organizationId: string;
     projectIds: readonly string[];
     month: string;
   }): Promise<{ projectId: string; count: number }[]> {
-    const named = new Set(input.projectIds);
-    return [...this.#rows.values()]
-      .filter(
-        (row) =>
-          row.organizationId === input.organizationId &&
-          row.state.month === input.month &&
-          named.has(row.state.projectId),
-      )
-      .map((row) => ({ projectId: row.state.projectId, count: row.traces }));
+    const previous = Temporal.PlainYearMonth.from(month).subtract({ months: 1 }).toString();
+    const named = new Set(projectIds);
+    const firstMonths = new Map<string, Row>();
+    for (const row of this.#rows.values()) {
+      if (row.organizationId !== organizationId || !named.has(row.projectId)) continue;
+      if (row.month !== month && row.month !== previous) continue;
+      const key = `${row.projectId}\u0000${row.traceId}`;
+      const first = firstMonths.get(key);
+      if (first === undefined || row.month < first.month) firstMonths.set(key, row);
+    }
+    const counts = new Map<string, number>();
+    for (const first of firstMonths.values()) {
+      if (first.month !== month) continue;
+      counts.set(first.projectId, (counts.get(first.projectId) ?? 0) + 1);
+    }
+    return [...counts].map(([projectId, count]) => ({ projectId, count }));
   }
-}
-
-function keyOf(input: { organizationId: string; projectId: string; month: string }): string {
-  return `${input.organizationId}\u0000${input.projectId}\u0000${input.month}`;
 }

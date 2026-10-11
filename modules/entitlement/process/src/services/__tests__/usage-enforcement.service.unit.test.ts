@@ -392,21 +392,17 @@ describe("UsageService over the trace count", () => {
     { projectId: "project-3", count: 0 },
   ];
 
-  /** The month's traces on the count: half from the upgrade's count, half from new-trace events. */
+  /** The month's traces as usage rows, one per trace. */
   async function meterHolding(): Promise<MemoryTraceCountRepository> {
     const meter = MemoryTraceCountRepository.create();
     const month = UsageCountingService.monthOf(Date.now());
     for (const { projectId, count } of liveCounts) {
-      if (count === 0) continue;
-      const counted = Math.floor(count / 2);
-      const state = {
+      const rows = Array.from({ length: count }, (_, index) => ({
         projectId,
+        traceId: `${projectId}-trace-${index}`,
         month,
-        counted,
-        live: count - counted,
-        LastEventOccurredAt: 0,
-      };
-      await meter.save({ organizationId: "org-1", state, traces: count, appliedEventIds: [] });
+      }));
+      await meter.insert({ organizationId: "org-1", rows });
     }
     return meter;
   }

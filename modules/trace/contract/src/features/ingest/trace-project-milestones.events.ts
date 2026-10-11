@@ -45,40 +45,21 @@ export const traceReceivedEventDataSchema: TraceReceivedEventDataSchema =
   traceReceivedEventDataSchemaDefinition;
 export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema>;
 
-/** A trace's first span reached its summary: once per trace, the fact entitlement counts. */
-export const TRACE_FIRST_SEEN_EVENT_TYPE = "lw.trace.trace_first_seen" as const;
-/** How many traces a project first saw in a month before the upgrade's count moment. */
-export const MONTH_TRACES_COUNTED_EVENT_TYPE = "lw.trace.month_traces_counted" as const;
+/** A page of a project's trace ids first seen in a month, sent by trace's upgrade step. */
+export const MONTH_TRACE_IDS_LISTED_EVENT_TYPE = "lw.trace.month_trace_ids_listed" as const;
+/** The most trace ids one listing event carries. */
+export const MONTH_TRACE_IDS_PAGE_SIZE = 5_000;
 
-const traceFirstSeenEventDataSchemaDefinition = z.object({
+const monthTraceIdsListedEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   projectId: z.string().min(1),
-  traceId: z.string().min(1),
-  /** Epoch ms the trace's summary was first written: `trace_summaries.CreatedAt`. */
-  firstSeenAt: z.number().int().nonnegative(),
-});
-export interface TraceFirstSeenEventDataSchema extends Named<
-  typeof traceFirstSeenEventDataSchemaDefinition
-> {}
-export const traceFirstSeenEventDataSchema: TraceFirstSeenEventDataSchema =
-  traceFirstSeenEventDataSchemaDefinition;
-export type TraceFirstSeenEventData = z.infer<typeof traceFirstSeenEventDataSchema>;
-
-const monthTracesCountedEventDataSchemaDefinition = z.object({
-  tenantId: z.string().min(1),
-  projectId: z.string().min(1),
-  /** `YYYY-MM`, the UTC month counted from its first instant. */
+  /** `YYYY-MM`, the UTC month the traces' summaries were first written in. */
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
-  /**
-   * Epoch ms the count runs up to. Traces first seen from here on arrive one by one as
-   * {@link TRACE_FIRST_SEEN_EVENT_TYPE}; none first seen before it ever does.
-   */
-  countedUntil: z.number().int().nonnegative(),
-  traces: z.number().int().nonnegative(),
+  traceIds: z.array(z.string().min(1)).min(1).max(MONTH_TRACE_IDS_PAGE_SIZE),
 });
-export interface MonthTracesCountedEventDataSchema extends Named<
-  typeof monthTracesCountedEventDataSchemaDefinition
+export interface MonthTraceIdsListedEventDataSchema extends Named<
+  typeof monthTraceIdsListedEventDataSchemaDefinition
 > {}
-export const monthTracesCountedEventDataSchema: MonthTracesCountedEventDataSchema =
-  monthTracesCountedEventDataSchemaDefinition;
-export type MonthTracesCountedEventData = z.infer<typeof monthTracesCountedEventDataSchema>;
+export const monthTraceIdsListedEventDataSchema: MonthTraceIdsListedEventDataSchema =
+  monthTraceIdsListedEventDataSchemaDefinition;
+export type MonthTraceIdsListedEventData = z.infer<typeof monthTraceIdsListedEventDataSchema>;

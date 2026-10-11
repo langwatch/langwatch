@@ -26,11 +26,6 @@ import {
   projectMetadataGroupKey,
 } from "./project-metadata.subscriber.ts";
 import { SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS } from "./span-storage-broadcast.subscriber.ts";
-import {
-  isTraceFirstSighting,
-  TRACE_FIRST_SEEN_DEDUP,
-  TRACE_FIRST_SEEN_SUBSCRIBER_NAME,
-} from "./trace-first-seen.subscriber.ts";
 import type {
   TraceProcessingPipelineDefinition,
   EventingTracePipelineAdapter,
@@ -54,7 +49,6 @@ interface TraceProcessingReactions {
   trackedEventSync: SummaryHandler;
   traceUpdateBroadcast: SummaryHandler;
   projectMetadata: SummaryHandler;
-  traceFirstSeen: SummaryHandler;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
@@ -94,69 +88,58 @@ export function buildTraceProcessingConsumer(
   projections: ReturnType<EventingTracePipelineAdapter["build"]>,
   reactions: TraceProcessingReactions,
 ): TraceProcessingPipelineDefinition {
-  return (
-    projections
-      .withProjectionSubscriber(DEFERRED_ORIGIN_SUBSCRIBER_NAME, {
-        fold: "traceSummary",
-        events: [SPAN_RECEIVED_EVENT_TYPE],
-        when: (event, context) => needsOriginResolution({ event, foldState: context.state }),
-        delay: DEFERRED_ORIGIN_DELAY_MS,
-        dedup: DEFERRED_ORIGIN_DEDUP,
-        handler: (_event, context) =>
-          reactions.resolveDeferredOrigin({
-            tenantId: context.tenantId,
-            traceId: context.aggregateId,
-          }),
-      })
-      .withProjectionSubscriber("trackedEventSync", {
-        fold: "traceSummary",
-        events: [SPAN_RECEIVED_EVENT_TYPE],
-        when: (event) => hasSyncableFeedback(event),
-        delay: TRACKED_EVENT_SYNC_DELAY_MS,
-        ttl: TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
-        dedupId: (event) => trackedEventSyncDedupId(event),
-        handler: (event, context) => reactions.trackedEventSync(event, context),
-      })
-      .withProjectionSubscriber("traceUpdateBroadcast", {
-        fold: "traceSummary",
-        runIn: ["worker"],
-        disabled: reactions.broadcastDisabled,
-        ...throttledWindow<TraceProcessingEvent>({
-          makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
-          windowMs: TRACE_UPDATE_BROADCAST_WINDOW_MS,
+  return projections
+    .withProjectionSubscriber(DEFERRED_ORIGIN_SUBSCRIBER_NAME, {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
+      when: (event, context) => needsOriginResolution({ event, foldState: context.state }),
+      delay: DEFERRED_ORIGIN_DELAY_MS,
+      dedup: DEFERRED_ORIGIN_DEDUP,
+      handler: (_event, context) =>
+        reactions.resolveDeferredOrigin({
+          tenantId: context.tenantId,
+          traceId: context.aggregateId,
         }),
-        handler: (event, context) => reactions.traceUpdateBroadcast(event, context),
-      })
-      .withProjectionSubscriber("projectMetadata", {
-        fold: "traceSummary",
-        runIn: ["worker"],
-        when: (_event, context) => isRealFirstIngest(context.state),
-        groupKeyFn: (event) => projectMetadataGroupKey(event),
-        ...throttledWindow<TraceProcessingEvent>({
-          makeId: (event) => event.tenantId,
-          windowMs: PROJECT_METADATA_WINDOW_MS,
-        }),
-        handler: (event, context) => reactions.projectMetadata(event, context),
-      })
-      // Entitlement's trace count: one fact per trace, at its summary's first write.
-      .withProjectionSubscriber(TRACE_FIRST_SEEN_SUBSCRIBER_NAME, {
-        fold: "traceSummary",
-        runIn: ["worker"],
-        events: [SPAN_RECEIVED_EVENT_TYPE],
-        when: (event, context) => isTraceFirstSighting({ event, foldState: context.state }),
-        dedup: TRACE_FIRST_SEEN_DEDUP,
-        handler: (event, context) => reactions.traceFirstSeen(event, context),
-      })
-      .withProjectionSubscriber("spanStorageBroadcast", {
-        map: "spanStorage",
-        runIn: ["worker"],
-        disabled: reactions.broadcastDisabled,
-        ttl: SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
-        handler: (event, context) => reactions.spanStorageBroadcast(event, context),
-      })
-      .withLaneAliases(MAIN_ORIGIN_LANE_ALIASES)
-      .build()
-  );
+    })
+    .withProjectionSubscriber("trackedEventSync", {
+      fold: "traceSummary",
+      events: [SPAN_RECEIVED_EVENT_TYPE],
+      when: (event) => hasSyncableFeedback(event),
+      delay: TRACKED_EVENT_SYNC_DELAY_MS,
+      ttl: TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
+      dedupId: (event) => trackedEventSyncDedupId(event),
+      handler: (event, context) => reactions.trackedEventSync(event, context),
+    })
+    .withProjectionSubscriber("traceUpdateBroadcast", {
+      fold: "traceSummary",
+      runIn: ["worker"],
+      disabled: reactions.broadcastDisabled,
+      ...throttledWindow<TraceProcessingEvent>({
+        makeId: (event) => `${event.tenantId}:${event.aggregateId}`,
+        windowMs: TRACE_UPDATE_BROADCAST_WINDOW_MS,
+      }),
+      handler: (event, context) => reactions.traceUpdateBroadcast(event, context),
+    })
+    .withProjectionSubscriber("projectMetadata", {
+      fold: "traceSummary",
+      runIn: ["worker"],
+      when: (_event, context) => isRealFirstIngest(context.state),
+      groupKeyFn: (event) => projectMetadataGroupKey(event),
+      ...throttledWindow<TraceProcessingEvent>({
+        makeId: (event) => event.tenantId,
+        windowMs: PROJECT_METADATA_WINDOW_MS,
+      }),
+      handler: (event, context) => reactions.projectMetadata(event, context),
+    })
+    .withProjectionSubscriber("spanStorageBroadcast", {
+      map: "spanStorage",
+      runIn: ["worker"],
+      disabled: reactions.broadcastDisabled,
+      ttl: SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
+      handler: (event, context) => reactions.spanStorageBroadcast(event, context),
+    })
+    .withLaneAliases(MAIN_ORIGIN_LANE_ALIASES)
+    .build();
 }
 
 /** trace_processing, built by the app in both roles; its senders carry every trace write. */

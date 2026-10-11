@@ -28,8 +28,7 @@ import {
 } from "@langwatch/eventing/testing";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
-  TRACE_FIRST_SEEN_EVENT_TYPE,
-  MONTH_TRACES_COUNTED_EVENT_TYPE,
+  MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -37,7 +36,7 @@ import { z } from "zod";
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
 import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
 import { BillableEventsMeterAppendService } from "../../services/billable-events-meter-append.service.ts";
-import { TraceCountStoreService } from "../../services/trace-count-store.service.ts";
+import { TraceUsageService } from "../../services/trace-usage.service.ts";
 import { UsageCountingService } from "../../services/usage-counting.service.ts";
 import { CountMonthCommand, RecordLimitDecisionCommand } from "../usage.commands.ts";
 import { USAGE_AGGREGATE_TYPE } from "../usage.events.ts";
@@ -76,7 +75,7 @@ function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["s
         billing: { getPricingModel: async () => ({ pricingModel: PricingModel.TIERED }) },
       }),
     }),
-    traceCount: TraceCountStoreService.create({
+    traceUsage: TraceUsageService.create({
       counts: MemoryTraceCountRepository.create(),
       projects,
     }),
@@ -107,10 +106,7 @@ function traceMilestonesStandIn() {
     name: "trace_milestones_stand_in",
     aggregate: defineAggregate({ type: "trace_project_milestone" }),
   })
-    .withEvents([
-      testEventSchema(TRACE_FIRST_SEEN_EVENT_TYPE, z.object({})),
-      testEventSchema(MONTH_TRACES_COUNTED_EVENT_TYPE, z.object({})),
-    ])
+    .withEvents([testEventSchema(MONTH_TRACE_IDS_LISTED_EVENT_TYPE, z.object({}))])
     .build();
 }
 

@@ -16,8 +16,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
-  TRACE_FIRST_SEEN_EVENT_TYPE,
-  MONTH_TRACES_COUNTED_EVENT_TYPE,
+  MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
   TraceApi,
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
@@ -77,10 +76,7 @@ function eventingFor(role: "api" | "worker"): EventSourcing {
       name: "trace_milestones_stand_in",
       aggregate: defineAggregate({ type: "trace_project_milestone" }),
     })
-      .withEvents([
-        testEventSchema(TRACE_FIRST_SEEN_EVENT_TYPE, z.object({})),
-        testEventSchema(MONTH_TRACES_COUNTED_EVENT_TYPE, z.object({})),
-      ])
+      .withEvents([testEventSchema(MONTH_TRACE_IDS_LISTED_EVENT_TYPE, z.object({}))])
       .build(),
   );
   return eventing;

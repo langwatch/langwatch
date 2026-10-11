@@ -33,7 +33,7 @@ export type CodeStepId =
   | "topic:seed-topic-model-history"
   | "topic:seed-clustering-schedules"
   | "trace:track-updated-at-index-materialisation"
-  | "trace:record-month-trace-counts"
+  | "trace:send-month-trace-ids"
   | "user:record-created-facts"
   | "user:record-standing-facts"
   | "workflow:record-current-version-fields"

@@ -366,17 +366,16 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
-import { TraceCountMomentService } from "../services/trace-count-moment.service.ts";
-import {
-  TraceCountSeedService,
-  type TraceCountSeedInput,
-  type TraceCountSeedReport,
-} from "../services/trace-count-seed.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import {
   TraceMetadataWriteService,
   type TraceSpanIngest,
 } from "../services/trace-metadata-write.service.ts";
+import {
+  TraceMonthIdsMigrationService,
+  type TraceMonthIdsInput,
+  type TraceMonthIdsReport,
+} from "../services/trace-month-ids-migration.service.ts";
 import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
 import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
@@ -975,11 +974,9 @@ export class TraceModule implements TraceApi, CollectorApp {
     setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
-    const countMoment = TraceCountMomentService.create({ moments: setup.repositories.usageCount });
-    app.#traceCountSeed = TraceCountSeedService.create({
+    app.#traceMonthIds = TraceMonthIdsMigrationService.create({
       projects: setup.dependencies.projects,
       usageCount: setup.repositories.usageCount,
-      countMoment,
       milestones,
     });
     app.#retention = {
@@ -1003,7 +1000,6 @@ export class TraceModule implements TraceApi, CollectorApp {
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
       broadcast: setup.dependencies.presence,
       milestones,
-      countMoment,
     });
     return app;
   }
@@ -1281,7 +1277,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   #processing: TraceProcessingRuntimeAdapter | null = null;
   #milestones: TraceProjectMilestonesService | null = null;
-  #traceCountSeed: TraceCountSeedService | null = null;
+  #traceMonthIds: TraceMonthIdsMigrationService | null = null;
   #retention: RetentionPolicyResolver | null = null;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
@@ -1327,12 +1323,12 @@ export class TraceModule implements TraceApi, CollectorApp {
     this.#milestones?.connect(commands);
   }
 
-  /** Counts each project's traces first seen this month, for the upgrade step. */
-  recordMonthTraceCounts(input: TraceCountSeedInput): Promise<TraceCountSeedReport> {
-    if (!this.#traceCountSeed) {
-      throw new TraceCapabilityUnavailableError("this process", "the trace count seed");
+  /** Sends each project's trace ids first seen this month, for the upgrade step. */
+  sendMonthTraceIds(input: TraceMonthIdsInput): Promise<TraceMonthIdsReport> {
+    if (!this.#traceMonthIds) {
+      throw new TraceCapabilityUnavailableError("this process", "the month trace ids migration");
     }
-    return this.#traceCountSeed.recordMonthCounts(input);
+    return this.#traceMonthIds.sendMonthTraceIds(input);
   }
 
   /** trace_collector_evaluations: the same in every role; evaluation reports from its side (§9). */

@@ -48,7 +48,6 @@ function consumer({ resolveDeferredOrigin }: Pick<Reactions, "resolveDeferredOri
     trackedEventSync: noop,
     traceUpdateBroadcast: noop,
     projectMetadata: noop,
-    traceFirstSeen: noop,
     spanStorageBroadcast: noop,
     broadcastDisabled: false,
   });

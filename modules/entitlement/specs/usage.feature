@@ -11,69 +11,68 @@ Feature: Entitlement's meters, decisions and who learns them
   Background:
     Given an organization with two projects on a plan capped at 1,000 traces a month
 
-  # --- The trace count ---------------------------------------------------------
-  # Ruling (Alex, 2026-10-11): a count per project and month, built from trace's events. Trace's
-  # upgrade counts each project's month up to a moment it stores first; after that moment trace
-  # sends one event per new trace. Trace keeps the two apart, so entitlement only adds them up.
-  # Entitlement never asks trace: a peer fold over the two events, replayable from trace's log.
+  # --- Trace usage -------------------------------------------------------------
+  # Ruling (Alex, 2026-10-11): trace usage is the number of distinct trace ids per project per
+  # month. Entitlement writes one row per trace and month keyed so that writing the same trace
+  # twice collapses. Live rows come from trace's span-received event, one debounced job per trace;
+  # trace's upgrade step sends this month's trace ids as events. Entitlement never asks trace.
 
   @unit @usage
-  Scenario: A new-trace event adds one to its project's month
-    Given new-trace events of a project this month and one first seen last month
+  Scenario: A trace's spans settle into one job per trace
+    When the usage pipeline registers its trace usage subscriber on trace's span-received event
+    Then its jobs are grouped per project and trace and debounced for 30 seconds
+    And the job keeps the window's first span
+
+  @unit @usage
+  Scenario: A trace's span writes one usage row for its project and month
+    Given a span of a trace in a project
+    When the span-received job runs
+    Then one row names the organization, the project, the month the span was appended and the trace
+
+  @unit @usage
+  Scenario: The upgrade's trace ids write one row per trace
+    Given trace's upgrade sends a page of a project's trace ids for a month
+    When the page is delivered
+    Then one row is written per trace id for that project and month
+
+  @unit @usage
+  Scenario: The month counts distinct traces, however often each was written
+    Given the same trace written by live jobs, a redelivery and the upgrade's page
     When the month's trace count is read for the organization
-    Then each trace counts once, in the month it was first seen
+    Then each trace counts once
 
   @unit @usage
-  Scenario: A redelivered new-trace event does not count its trace twice
-    Given a new-trace event was counted
-    When the same event is delivered again
-    Then the month's trace count is unchanged
+  Scenario: A trace counts in the first month it was seen
+    Given a trace seen last month and again this month, and a trace first seen this month
+    When this month's trace count is read
+    Then only the trace first seen this month counts
 
   @unit @usage
-  Scenario: The upgrade's count is added once, however often it is delivered
-    Given trace's upgrade counted 40 traces for a project's month
-    When that event is delivered twice, or re-sent under a new id
-    Then the month's count is 40
-
-  @unit @usage
-  Scenario: The month is the upgrade's count plus one per new-trace event
-    Given new-trace events arriving before and after the upgrade's count
-    When the month is counted
-    Then it is the upgrade's count plus one per new-trace event
-
-  @unit @usage
-  Scenario: A replay of trace's events reaches the live count, in any order
-    Given the live lane counted a month from new-trace events and the upgrade's count
-    When the same events are replayed from trace's log, deduplicated by idempotency key
-    Then the replayed count equals the live count whatever the order
-
-  @unit @usage
-  Scenario: A new-trace event from a project in no organization is skipped, loudly
+  Scenario: A trace from a project in no organization is skipped, loudly
     Given a project that belongs to no organization
-    When a new-trace event arrives for it
-    Then no trace count is written
+    When a trace usage job runs for it
+    Then no row is written
     And a warning is logged naming the project
 
   # Round 22 (2026-10-07): count everywhere; the billable-events meter stays SaaS only.
   @unit @usage
-  Scenario: The trace count registers on every deployment, the billable-events meter on SaaS only
+  Scenario: Trace usage registers on every deployment, the billable-events meter on SaaS only
     When the usage pipeline registers its global projections
-    Then the trace count is registered as the peer fold "entitlement.usageTraceCount" on every deployment
+    Then the trace usage subscribers "entitlement.traceUsageSpan" and "entitlement.traceUsageMonthIds" register on every deployment
     And only a SaaS deployment registers the billable-events meter
 
   @unit @usage
-  Scenario: The month's trace count is read off the organization-keyed count
-    Given the trace count's rows are routed by organization
-    When the fold reads a project's month back, or the month is counted
-    Then each project's newest row is read on the organization's cluster
+  Scenario: The month's trace count is read off the organization-keyed rows
+    Given trace usage rows are routed by organization
+    When the month is counted
+    Then distinct traces are counted on the organization's cluster, grouped by trace and never with FINAL
 
   @integration @usage @unimplemented
-  Scenario: A counted month's trace count equals trace's own count for that month
-    Given ClickHouse holding a month of trace summaries and no trace count
-    When trace's upgrade counts the month and new traces arrive after its stored moment
+  Scenario: A month's trace count equals trace's own count for that month
+    Given ClickHouse holding a month of trace summaries and no trace usage rows
+    When trace's upgrade sends the month's trace ids and new traces arrive live
     Then each project's trace count equals its traces first seen in the month
 
-  @unit @usage
   Scenario: The trace count decides a limit as the live trace count did, over the same traces
     Given an organization metered in traces whose projects' traces this month are on the trace count
     When the limit is checked and the month is counted per project

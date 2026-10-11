@@ -16,9 +16,7 @@ import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-co
 import { OtlpSpanTokenEstimationService } from "../features/span/services/span-token-estimation.service.ts";
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import type { TraceCountMomentService } from "../services/trace-count-moment.service.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
-import type { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
 import {
   createProjectMetadataHandler,
@@ -29,7 +27,6 @@ import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
 import { TraceAnalyticsStore } from "./trace-derived.store.ts";
-import { createTraceFirstSeenHandler } from "./trace-first-seen.subscriber.ts";
 import { createTraceProcessingProducerPipeline } from "./trace-processing-producer.pipeline.ts";
 import type { TraceProcessingPipelineDefinition } from "./trace-processing-projections.pipeline.ts";
 import { EventingTracePipelineAdapter } from "./trace-processing-projections.pipeline.ts";
@@ -72,11 +69,8 @@ export interface TraceProcessingPipelineInput {
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
   /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
   broadcast: Pick<PresenceApi, "publishProjectEvent">;
-  /** Where a project's first and later traces, and each trace's first sighting, are recorded. */
-  milestones: ProjectMetadataSubscriberDeps["milestones"] &
-    Pick<TraceProjectMilestonesService, "recordTraceFirstSeen">;
-  /** The upgrade's trace-count moment; new traces before it are in the count, not sent. */
-  countMoment: Pick<TraceCountMomentService, "find">;
+  /** Where a project's first and later traces are recorded. */
+  milestones: ProjectMetadataSubscriberDeps["milestones"];
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
 }
@@ -181,10 +175,6 @@ export class TraceProcessingRuntimeAdapter {
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         milestones: this.input.milestones,
-      }),
-      traceFirstSeen: createTraceFirstSeenHandler({
-        milestones: this.input.milestones,
-        countMoment: this.input.countMoment,
       }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,

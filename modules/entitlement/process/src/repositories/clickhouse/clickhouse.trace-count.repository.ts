@@ -1,20 +1,17 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { Temporal } from "@langwatch/time";
 
-import {
-  type StoredTraceCount,
-  TRACE_COUNT_PROJECTION_VERSION,
-  TraceCountRepository,
-  type TraceCountState,
-  traceCountStateSchema,
-} from "../trace-count.repository.ts";
+import { TraceCountRepository, type TraceUsageRow } from "../trace-count.repository.ts";
 
-const TABLE_NAME = "usage_trace_count" as const;
+const TABLE_NAME = "usage_trace_meter" as const;
 
 type TotalRow = { total: string | number };
 type ProjectTotalRow = TotalRow & { projectId: string };
-type StateRow = { foldState: string; appliedEventIds: string[] };
 
-/** ClickHouse twin of the trace count; the table is migration 00107, deduped on read by argMax. */
+/**
+ * ClickHouse twin of the trace count; the table is migration 00104. Reads group by trace instead
+ * of FINAL, and count a trace only in the earliest month it has a row, looking back one month.
+ */
 export class TraceCountClickHouseRepository extends TraceCountRepository {
   readonly #clickhouse: ClickHouseQueryClient;
 
@@ -27,64 +24,25 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
     return new TraceCountClickHouseRepository(clickhouse);
   }
 
-  async find({
+  async insert({
     organizationId,
-    projectId,
-    month,
+    rows,
   }: {
     organizationId: string;
-    projectId: string;
-    month: string;
-  }): Promise<StoredTraceCount[]> {
-    const result = await this.#clickhouse.query<StateRow>({
-      tenantId: projectId,
-      organizationId,
-      table: TABLE_NAME,
-      sql: `
-        SELECT
-          argMax(FoldState, UpdatedAt) AS foldState,
-          argMax(AppliedEventIds, UpdatedAt) AS appliedEventIds
-        FROM ${TABLE_NAME}
-        WHERE OrganizationId = {organizationId:String}
-          AND Month = {month:Date}
-          AND TenantId = {tenantId:String}
-        GROUP BY TenantId
-      `,
-      params: { organizationId, tenantId: projectId, month: `${month}-01` },
-    });
-    return result.rows.map((row) => ({
-      state: traceCountStateSchema.parse(JSON.parse(row.foldState)),
-      appliedEventIds: row.appliedEventIds,
-    }));
-  }
-
-  async save({
-    organizationId,
-    state,
-    traces,
-    appliedEventIds,
-  }: {
-    organizationId: string;
-    state: TraceCountState;
-    traces: number;
-    appliedEventIds: readonly string[];
+    rows: readonly TraceUsageRow[];
   }): Promise<void> {
+    const first = rows[0];
+    if (!first) return;
     await this.#clickhouse.insert({
-      tenantId: state.projectId,
+      tenantId: first.projectId,
       organizationId,
       table: TABLE_NAME,
-      rows: [
-        {
-          OrganizationId: organizationId,
-          TenantId: state.projectId,
-          Month: `${state.month}-01`,
-          Traces: traces,
-          FoldState: JSON.stringify(state),
-          AppliedEventIds: [...appliedEventIds],
-          ProjectionVersion: TRACE_COUNT_PROJECTION_VERSION,
-        },
-      ],
-      // The next fold of this project's month reads the row back.
+      rows: rows.map((row) => ({
+        OrganizationId: organizationId,
+        TenantId: row.projectId,
+        Month: `${row.month}-01`,
+        TraceId: row.traceId,
+      })),
       settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
   }
@@ -101,16 +59,17 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
       organizationId,
       table: TABLE_NAME,
       sql: `
-        SELECT sum(Traces) AS total
+        SELECT countIf(FirstMonth = {month:Date}) AS total
         FROM (
-          SELECT TenantId, argMax(Traces, UpdatedAt) AS Traces
+          SELECT TenantId, TraceId, min(Month) AS FirstMonth
           FROM ${TABLE_NAME}
           WHERE OrganizationId = {organizationId:String}
-            AND Month = {month:Date}
-          GROUP BY TenantId
+            AND Month >= {previousMonth:Date}
+            AND Month <= {month:Date}
+          GROUP BY TenantId, TraceId
         )
       `,
-      params: { organizationId, month: `${month}-01` },
+      params: { organizationId, ...monthParams(month) },
       // The organization's count sums every project the organization owns.
       SKIP_TENANT_CHECK: true,
     });
@@ -132,19 +91,33 @@ export class TraceCountClickHouseRepository extends TraceCountRepository {
       organizationId,
       table: TABLE_NAME,
       sql: `
-        SELECT TenantId AS projectId, argMax(Traces, UpdatedAt) AS total
-        FROM ${TABLE_NAME}
-        WHERE OrganizationId = {organizationId:String}
-          AND Month = {month:Date}
-          AND TenantId IN {projectIds:Array(String)}
+        SELECT TenantId AS projectId, countIf(FirstMonth = {month:Date}) AS total
+        FROM (
+          SELECT TenantId, TraceId, min(Month) AS FirstMonth
+          FROM ${TABLE_NAME}
+          WHERE OrganizationId = {organizationId:String}
+            AND Month >= {previousMonth:Date}
+            AND Month <= {month:Date}
+            AND TenantId IN {projectIds:Array(String)}
+          GROUP BY TenantId, TraceId
+        )
         GROUP BY TenantId
+        HAVING total > 0
       `,
-      params: { organizationId, month: `${month}-01`, projectIds: [...projectIds] },
+      params: { organizationId, projectIds: [...projectIds], ...monthParams(month) },
       // The organization's count reads every project the organization owns.
       SKIP_TENANT_CHECK: true,
     });
     return result.rows.map((row) => ({ projectId: row.projectId, count: totalOf(row.total) }));
   }
+}
+
+function monthParams(month: string): { month: string; previousMonth: string } {
+  const start = Temporal.PlainYearMonth.from(month);
+  return {
+    month: `${start.toString()}-01`,
+    previousMonth: `${start.subtract({ months: 1 }).toString()}-01`,
+  };
 }
 
 function totalOf(total: string | number | undefined): number {

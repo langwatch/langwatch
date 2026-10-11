@@ -493,7 +493,7 @@ describe("the worker process installation", () => {
       );
       expect(
         usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
-      ).toEqual(["entitlement.usageTraceCount", "orgBillableEventsMeter"]);
+      ).toEqual(["entitlement.traceUsageSpan", "entitlement.traceUsageMonthIds", "orgBillableEventsMeter"]);
     } finally {
       await runtime.stop();
     }

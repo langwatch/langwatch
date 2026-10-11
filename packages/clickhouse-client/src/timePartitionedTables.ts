@@ -15,7 +15,6 @@ export const TIME_PARTITIONED_TABLES = {
   event_log: ["EventOccurredAt"],
   billable_events: ["EventTimestamp"],
   usage_trace_meter: ["Month"],
-  usage_trace_count: ["Month"],
   governance_ocsf_events: ["EventTime"],
 
   // Fold / projection tables. Read by aggregate id, which is NOT a sort-key

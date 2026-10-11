@@ -16,7 +16,6 @@ type CountedTrace = {
 /** In-memory twin of the trace count reads, exact over the rows a test records. */
 export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
   readonly #traces: CountedTrace[] = [];
-  #countMoment: number | undefined;
 
   static create(): MemoryTraceUsageCountRepository {
     return new MemoryTraceUsageCountRepository();
@@ -31,11 +30,13 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
     this.#traces.push(trace);
   }
 
-  async countTracesFirstSeen(input: {
+  async findTraceIdsFirstSeen(input: {
     tenantId: string;
     fromMs: number;
     toMs: number;
-  }): Promise<number> {
+    afterTraceId: string;
+    limit: number;
+  }): Promise<string[]> {
     const firstSeen = new Map<string, number>();
     for (const trace of this.#traces) {
       if (trace.tenantId !== input.tenantId) continue;
@@ -45,15 +46,13 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
       const known = firstSeen.get(trace.traceId);
       if (known === undefined || createdAtMs < known) firstSeen.set(trace.traceId, createdAtMs);
     }
-    return [...firstSeen.values()].filter((at) => at >= input.fromMs && at < input.toMs).length;
-  }
-
-  async findCountMoment(): Promise<number[]> {
-    return this.#countMoment === undefined ? [] : [this.#countMoment];
-  }
-
-  async recordCountMoment({ countedUntil }: { countedUntil: number }): Promise<void> {
-    this.#countMoment = Math.min(this.#countMoment ?? countedUntil, countedUntil);
+    return [...firstSeen]
+      .filter(
+        ([traceId, at]) => traceId > input.afterTraceId && at >= input.fromMs && at < input.toMs,
+      )
+      .map(([traceId]) => traceId)
+      .toSorted()
+      .slice(0, input.limit);
   }
 
   async countTracesInLastDay(input: { tenantId: string }): Promise<number> {

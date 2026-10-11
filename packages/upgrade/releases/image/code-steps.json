@@ -257,11 +257,11 @@
     "needsOldWritersGone": false
   },
   {
-    "id": "trace:record-month-trace-counts",
+    "id": "trace:send-month-trace-ids",
     "kind": "data",
     "mode": "background",
     "owner": "trace",
-    "description": "Records each project's traces seen so far this month, so plan trace limits count from a complete month.",
+    "description": "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
     "needsOldWritersGone": true
   },
   {

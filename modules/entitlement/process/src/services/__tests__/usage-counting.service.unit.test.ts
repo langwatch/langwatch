@@ -83,17 +83,13 @@ function compose({
 }) {
   const traceMeter = new ReadCountingTraceMeter();
   const log = new WarningLog();
-  void traceMeter.save({
+  void traceMeter.insert({
     organizationId: ORGANIZATION,
-    state: {
+    rows: ["trace_1", "trace_2", "trace_3"].map((traceId) => ({
       projectId: "project_a",
+      traceId,
       month: MONTH,
-      counted: 0,
-      live: 3,
-      LastEventOccurredAt: 0,
-    },
-    traces: 3,
-    appliedEventIds: [],
+    })),
   });
   const counting = UsageCountingService.create({
     meter,

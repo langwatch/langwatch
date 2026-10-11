@@ -10,7 +10,6 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
-  type FoldProjectionStore,
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -18,7 +17,7 @@ import {
 import type { EntitlementModule } from "../app/entitlement.app.ts";
 import type { BillableEventRecord } from "../repositories/billable-events-meter.repository.ts";
 import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
-import type { TraceCountState } from "../repositories/trace-count.repository.ts";
+import type { TraceUsageService } from "../services/trace-usage.service.ts";
 import { BillableEventsMeterProjection } from "./billable-events-meter.projection.ts";
 import {
   limitStateSchema,
@@ -26,7 +25,12 @@ import {
   REFUSED_ORGANIZATIONS_PROCESS_NAME,
   refusedOrganizationWake,
 } from "./refused-organizations.process.ts";
-import { traceCountPeerFold } from "./trace-count.projection.ts";
+import {
+  TRACE_USAGE_MONTH_IDS_SUBSCRIBER_NAME,
+  TRACE_USAGE_SPAN_SUBSCRIBER_NAME,
+  traceUsageMonthIdsSubscriber,
+  traceUsageSpanSubscriber,
+} from "./trace-usage.subscriber.ts";
 import { usageMeterCountSubscriber } from "./usage-meter-count.subscriber.ts";
 import {
   CountMonthCommand,
@@ -62,18 +66,18 @@ export type UsageSenders = Readonly<{
 }>;
 
 /**
- * The metering pipeline. The trace count is folded on every deployment (round 22); the
+ * The metering pipeline. Trace usage is written on every deployment (round 22); the
  * billable-events meter, its subscriber and the limit decider stay SaaS only.
  */
 export function buildUsagePipeline({
   countMonth,
-  traceCount,
+  traceUsage,
   billableEventsMeter,
   projects,
   send,
 }: {
   countMonth: CountMonthCommand;
-  traceCount: FoldProjectionStore<TraceCountState>;
+  traceUsage: Pick<TraceUsageService, "recordTraces">;
   billableEventsMeter: AppendStore<BillableEventRecord> | undefined;
   projects: Pick<TenancyRepository, "getProjectPlacement">;
   send: () => UsageSenders;
@@ -120,7 +124,11 @@ export function buildUsagePipeline({
     })
     .withCommand("recordLimitDecision", RecordLimitDecisionCommand)
     .withCommand("recordUsageWarning", RecordUsageWarningCommand)
-    .withPeerFoldProjection(traceCountPeerFold(traceCount));
+    .withPeerSubscriber(TRACE_USAGE_SPAN_SUBSCRIBER_NAME, traceUsageSpanSubscriber(traceUsage))
+    .withPeerSubscriber(
+      TRACE_USAGE_MONTH_IDS_SUBSCRIBER_NAME,
+      traceUsageMonthIdsSubscriber(traceUsage),
+    );
   if (!billableEventsMeter) return pipeline.build();
   return (
     pipeline

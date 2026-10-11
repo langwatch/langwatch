@@ -38,7 +38,6 @@ function compose({ storedSummary }: { storedSummary: TraceSummaryData | null }) 
     findSummary,
     recordTrackedEvent: async () => undefined,
     broadcast: createApiFixture<Input["broadcast"]>(),
-    countMoment: createApiFixture<Input["countMoment"]>(),
     milestones: createApiFixture<Input["milestones"]>(),
   }).build({ participation: "consume" });
   const subscriber = pipeline.foldSubscribers.get(DEFERRED_ORIGIN_SUBSCRIBER_NAME);

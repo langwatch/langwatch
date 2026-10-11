@@ -3,9 +3,8 @@ import { TraceCapabilityUnavailableError } from "@langwatch/trace-contract";
 
 import type {
   RecordFirstTraceCommandData,
-  RecordTraceFirstSeenCommandData,
   RecordTraceReceivedCommandData,
-  RecordMonthTracesCountedCommandData,
+  RecordMonthTraceIdsCommandData,
 } from "../eventing/trace-project-milestones.events.ts";
 
 type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
@@ -13,8 +12,7 @@ type Sender<Data> = Pick<EventingCommandSender<Data>, "send">;
 type TraceProjectMilestonesSenders = Readonly<{
   recordFirstTrace: Sender<RecordFirstTraceCommandData>;
   recordTraceReceived: Sender<RecordTraceReceivedCommandData>;
-  recordTraceFirstSeen: Sender<RecordTraceFirstSeenCommandData>;
-  recordMonthTracesCounted: Sender<RecordMonthTracesCountedCommandData>;
+  recordMonthTraceIds: Sender<RecordMonthTraceIdsCommandData>;
 }>;
 
 /** Records a project's trace milestones on trace's own pipeline; unbound, each refuses by name. */
@@ -39,12 +37,8 @@ export class TraceProjectMilestonesService {
     await this.#connected().recordTraceReceived.send(data);
   }
 
-  async recordTraceFirstSeen(data: RecordTraceFirstSeenCommandData): Promise<void> {
-    await this.#connected().recordTraceFirstSeen.send(data);
-  }
-
-  async recordMonthTracesCounted(data: RecordMonthTracesCountedCommandData): Promise<void> {
-    await this.#connected().recordMonthTracesCounted.send(data);
+  async recordMonthTraceIds(data: RecordMonthTraceIdsCommandData): Promise<void> {
+    await this.#connected().recordMonthTraceIds.send(data);
   }
 
   #connected(): TraceProjectMilestonesSenders {
