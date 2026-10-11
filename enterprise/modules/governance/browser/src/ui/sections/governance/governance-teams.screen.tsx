@@ -1,16 +1,9 @@
 import { BackLink } from "@langwatch/design-system/back-link";
+import { Card } from "@langwatch/design-system/card";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Box,
-  Button,
-  Card,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
@@ -181,7 +174,7 @@ function TeamSpendPanel({
         <HandledErrorAlert error={teamsQuery.error} fallbackTitle="Couldn't load team activity" />
       ) : null}
 
-      <Card.Root variant="showcase">
+      <Card variant="showcase" padding="none" bodyLayout="stack">
         {isLoading && (
           <Box padding={6}>
             <SkeletonRows rows={4} label="Loading teams" />
@@ -208,7 +201,7 @@ function TeamSpendPanel({
             </Table.Body>
           </ListTable>
         )}
-      </Card.Root>
+      </Card>
       <Text fontSize="xs" color="fg.muted">
         {teams.length} team{teams.length === 1 ? "" : "s"} shown.
       </Text>

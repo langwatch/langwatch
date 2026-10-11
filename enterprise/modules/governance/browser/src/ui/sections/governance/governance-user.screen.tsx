@@ -1,7 +1,8 @@
 import { BackLink } from "@langwatch/design-system/back-link";
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, Card, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
@@ -103,7 +104,7 @@ function GovernanceUserDetailPage() {
           {showSpinner && <SkeletonRows rows={3} label="Loading activity" />}
           {showNoData && (
             <>
-              <Card.Root variant="showcase" padding={4}>
+              <Card variant="showcase" padding="md" bodyLayout="stack">
                 <Text
                   fontSize="xs"
                   fontWeight="semibold"
@@ -127,8 +128,8 @@ function GovernanceUserDetailPage() {
                     View {personalProject.displayName}'s personal workspace →
                   </Link>
                 )}
-              </Card.Root>
-              <Card.Root variant="showcase">
+              </Card>
+              <Card variant="showcase" padding="none" bodyLayout="stack">
                 <NoDataInfoBlock
                   icon={<Wallet />}
                   title="No spend yet"
@@ -138,7 +139,7 @@ function GovernanceUserDetailPage() {
                     View all people
                   </Link>
                 </NoDataInfoBlock>
-              </Card.Root>
+              </Card>
             </>
           )}
           {isSettled && user && (
@@ -150,7 +151,7 @@ function GovernanceUserDetailPage() {
                 <Stat label="Most used" value={user.mostUsedTarget ?? "—"} />
               </SimpleGrid>
 
-              <Card.Root variant="showcase" padding={4}>
+              <Card variant="showcase" padding="md" bodyLayout="stack">
                 <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
                   Detail metrics
                 </Text>
@@ -180,7 +181,7 @@ function GovernanceUserDetailPage() {
                   The chart's {`'By User'`} toggle exercises the same data through one orthogonal
                   lens until the dedicated drilldown ships.
                 </Text>
-              </Card.Root>
+              </Card>
             </>
           )}
         </VStack>

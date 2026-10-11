@@ -1,8 +1,9 @@
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
-  Card,
+  Box,
   Button,
   createListCollection,
   Field,
@@ -206,17 +207,19 @@ function ExploreChart({
   timeWindow: ExploreWindow;
 }) {
   return (
-    <Card.Root variant="showcase" padding={5} minHeight="320px">
-      <Text fontWeight="semibold">{exploreChartTitle(selection)}</Text>
-      <Text fontSize="sm" color="fg.muted">
-        {orgName} · last {timeWindow}
-      </Text>
-      <NoDataInfoBlock
-        icon={<ChartNoAxesCombined />}
-        title="This chart is not connected to your data yet"
-        description="Choose a template or adjust the controls to preview a query. Running it is coming."
-      />
-    </Card.Root>
+    <Box display="flex" minHeight="320px">
+      <Card variant="showcase" padding="lg" bodyLayout="stack">
+        <Text fontWeight="semibold">{exploreChartTitle(selection)}</Text>
+        <Text fontSize="sm" color="fg.muted">
+          {orgName} · last {timeWindow}
+        </Text>
+        <NoDataInfoBlock
+          icon={<ChartNoAxesCombined />}
+          title="This chart is not connected to your data yet"
+          description="Choose a template or adjust the controls to preview a query. Running it is coming."
+        />
+      </Card>
+    </Box>
   );
 }
 

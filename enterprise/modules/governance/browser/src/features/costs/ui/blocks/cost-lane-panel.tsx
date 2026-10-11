@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { Card } from "@langwatch/design-system/card";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
-import { Card, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatTileFigure } from "@langwatch/design-system/stat-tile";
 import {
   type GovernanceSeatLane,
@@ -112,7 +113,7 @@ export function CostLanePanel({
   const otherCurrencies = (currencyTotals ?? []).filter((total) => total.currencyCode !== "USD");
   const footNote = cellsWithoutAmount > 0 ? laneWithheldTotalNote() : belowTotalNote;
   return (
-    <Card.Root variant="showcase" data-testid={testId} padding={4}>
+    <Card variant="showcase" data-testid={testId} padding="md" bodyLayout="stack">
       <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
           <Heading textStyle="cardTitle">{label}</Heading>
@@ -176,7 +177,7 @@ export function CostLanePanel({
           </Text>
         ) : null}
       </VStack>
-    </Card.Root>
+    </Card>
   );
 }
 
@@ -210,11 +211,12 @@ export function SeatLanePanel({
 }) {
   const reported = seats.status === "reported";
   return (
-    <Card.Root
+    <Card
       variant="showcase"
       data-testid={testId}
-      borderStyle={reported ? "solid" : "dashed"}
-      padding={4}
+      placeholder={!reported}
+      padding="md"
+      bodyLayout="stack"
     >
       <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
@@ -232,7 +234,7 @@ export function SeatLanePanel({
           <SeatLaneWithoutCounts status={seats.status} />
         )}
       </VStack>
-    </Card.Root>
+    </Card>
   );
 }
 
