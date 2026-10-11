@@ -166,7 +166,9 @@ const rulesOf = (button: HTMLElement): string => {
 const rowOf = (name: RegExp) => screen.getByRole("row", { name });
 const figure = (key: string) => screen.getByTestId(`people-summary-strip-${key}`);
 const sampleBanner = (): HTMLElement => {
-  const banner = screen.getAllByRole("status").find((el) => el.hasAttribute("data-banner-placement"));
+  const banner = screen
+    .getAllByRole("status")
+    .find((el) => el.hasAttribute("data-banner-placement"));
   if (!banner) throw new Error("expected the sample-data banner");
   return banner;
 };
@@ -634,7 +636,9 @@ describe("given sam, a delegated viewer, opens the People page", () => {
       expect(
         within(figure("departments")).getByText(String(SAMPLE_DEPARTMENTS.length)),
       ).toBeInTheDocument();
-      const order = sampleBanner().compareDocumentPosition(screen.getByTestId("people-summary-strip"));
+      const order = sampleBanner().compareDocumentPosition(
+        screen.getByTestId("people-summary-strip"),
+      );
       expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
