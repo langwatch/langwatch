@@ -65,6 +65,7 @@ async function checkControls({ page, base }) {
   await page.keyboard.press("Escape");
   await page.goto(`${base}api-reference/traces/get-trace`);
   await page.getByRole("button", { name: "Try it", exact: true }).click();
+  assert.equal(await page.getByRole("button", { name: "Use my LangWatch session" }).count(), 0);
   const key = page.getByRole("textbox", { name: "X-Auth-Token value" });
   await key.waitFor({ state: "visible" });
   assert.equal(await key.getAttribute("type"), "password");

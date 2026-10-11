@@ -14,11 +14,15 @@ import { Eye, EyeOff } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
+import type { SessionView } from "../auth/session-controller.ts";
+import { SessionSlot } from "../auth/session-slot.tsx";
+import { useDocsSession } from "../auth/use-docs-session.ts";
 import type { RequestState } from "./codegen.ts";
 import { liveRequest, paramKey } from "./codegen.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import type { Operation, Parameter, Scheme } from "./operation.ts";
 import { Panel } from "./panel.tsx";
+import { requestErrorOutcome } from "./playground-outcome.ts";
 import type { Outcome } from "./playground-outcome.ts";
 import { ResponseArea } from "./playground-response.tsx";
 
@@ -206,6 +210,7 @@ function AuthField({
 }
 function SendActions({
   outcome,
+  unavailable,
   mutating,
   jsonOnly,
   host,
@@ -213,6 +218,7 @@ function SendActions({
   onCancel,
 }: {
   outcome: Outcome;
+  unavailable: boolean;
   mutating: boolean;
   jsonOnly: boolean;
   host: string;
@@ -238,7 +244,7 @@ function SendActions({
             bg="fg"
             color="fg.inverted"
             _hover={{ bg: "docs.body" }}
-            disabled={outcome.kind === "sending"}
+            disabled={unavailable || outcome.kind === "sending"}
             id="pg-send"
             onClick={onSend}
           >
@@ -274,10 +280,12 @@ function validateRequest({
   operation,
   state,
   key,
+  hasSession,
 }: {
   operation: Operation;
   state: RequestState;
   key: string;
+  hasSession: boolean;
 }) {
   const { values, body } = state;
   const required = operation.parameters.filter((param) => param.required);
@@ -287,7 +295,7 @@ function validateRequest({
     if (!values[paramKey({ location: param.in, name: param.name })]?.trim())
       nextErrors[paramKey({ location: param.in, name: param.name })] = `${param.name} is required.`;
   }
-  if (scheme && !key.trim()) nextErrors.auth = "Enter an API key.";
+  if (scheme && !key.trim() && !hasSession) nextErrors.auth = "Enter an API key.";
   if (operation.body?.required && !body.trim()) nextErrors.body = "Enter a request body.";
   if (body.trim()) {
     try {
@@ -429,6 +437,7 @@ export function PlaygroundRequest({
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   const [key, setKey] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const session = useDocsSession();
   const controller = useRef<AbortController | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const { tryOpen, setTryOpen } = useEndpointState();
@@ -438,6 +447,13 @@ export function PlaygroundRequest({
   const mutating = operation.method !== "GET";
   const host = operation.origin.replace(/^https?:\/\//, "");
   useEffect(() => () => controller.current?.abort(), []);
+
+  useEffect(() => {
+    if (session.selected && session.view.kind !== "ready") {
+      controller.current?.abort();
+      setOutcome({ kind: "idle" });
+    }
+  }, [session.selected, session.view.kind]);
 
   useEffect(() => {
     if (!tryOpen) return;
@@ -451,7 +467,7 @@ export function PlaygroundRequest({
   };
 
   const send = async () => {
-    const nextErrors = validateRequest({ operation, state, key });
+    const nextErrors = validateRequest({ operation, state, key, hasSession: session.selected });
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       const first = Object.keys(nextErrors)[0];
@@ -466,13 +482,17 @@ export function PlaygroundRequest({
     setOutcome({ kind: "sending" });
     const started = performance.now();
     try {
-      const response = await fetch(request.url, {
-        method: operation.method,
-        headers: request.headers,
-        body: request.body,
-        signal: abort.signal,
-      });
+      const response =
+        session.selected && session.controller
+          ? await session.controller.send({ operation, state, signal: abort.signal })
+          : await fetch(request.url, {
+              method: operation.method,
+              headers: request.headers,
+              body: request.body,
+              signal: abort.signal,
+            });
       const text = await response.text();
+      if (abort.signal.aborted) return;
       setOutcome({
         kind: "response",
         status: response.status,
@@ -482,21 +502,8 @@ export function PlaygroundRequest({
         body: text,
         headers: [...response.headers.entries()],
       });
-    } catch {
-      if (abort.signal.aborted) {
-        setOutcome({
-          kind: "error",
-          message: abort.signal.reason === "timeout" ? "Request timed out" : "Request cancelled",
-          retry: true,
-        });
-      } else {
-        setOutcome({
-          kind: "error",
-          message:
-            "The browser could not reach this endpoint. Copy the curl request to run it locally.",
-          retry: true,
-        });
-      }
+    } catch (error) {
+      setOutcome(requestErrorOutcome({ error, signal: abort.signal }));
     } finally {
       window.clearTimeout(timeout);
     }
@@ -531,7 +538,27 @@ export function PlaygroundRequest({
             <Text margin="0" fontSize="12px" color="fg.muted">
               {host}
             </Text>
-            <AuthField scheme={scheme} value={key} error={errors.auth} onChange={setKey} />
+            <PlaygroundAuthentication
+              scheme={scheme}
+              value={key}
+              error={errors.auth}
+              enabled={Boolean(session.controller)}
+              selected={session.selected}
+              view={session.view}
+              onKeyChange={setKey}
+              onConnect={() => {
+                controller.current?.abort();
+                setKey("");
+                setErrors({});
+                setOutcome({ kind: "idle" });
+                void session.connect();
+              }}
+              onDisconnect={() => {
+                controller.current?.abort();
+                setOutcome({ kind: "idle" });
+                void session.disconnect();
+              }}
+            />
 
             <ParameterFields
               parameters={operation.parameters}
@@ -553,7 +580,8 @@ export function PlaygroundRequest({
 
             <SendActions
               outcome={outcome}
-              mutating={mutating}
+              unavailable={session.selected && session.view.kind !== "ready"}
+              mutating={mutating && !session.selected}
               jsonOnly={jsonOnly}
               host={host}
               onSend={send}
@@ -569,6 +597,44 @@ export function PlaygroundRequest({
             <ResponseArea outcome={outcome} onRetry={send} curl={curl} />
           </Box>
         </Panel>
+      ) : null}
+    </>
+  );
+}
+
+function PlaygroundAuthentication({
+  scheme,
+  value,
+  error,
+  enabled,
+  selected,
+  view,
+  onKeyChange,
+  onConnect,
+  onDisconnect,
+}: {
+  scheme?: Scheme;
+  value: string;
+  error?: string;
+  enabled: boolean;
+  selected: boolean;
+  view: SessionView;
+  onKeyChange: (value: string) => void;
+  onConnect: () => void;
+  onDisconnect: () => void;
+}) {
+  return (
+    <>
+      {enabled && scheme ? (
+        <SessionSlot
+          view={view}
+          selected={selected}
+          onConnect={onConnect}
+          onDisconnect={onDisconnect}
+        />
+      ) : null}
+      {!selected ? (
+        <AuthField scheme={scheme} value={value} error={error} onChange={onKeyChange} />
       ) : null}
     </>
   );

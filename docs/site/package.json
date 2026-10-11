@@ -8,7 +8,8 @@
     "preview": "node scripts/preview.mjs",
     "test": "vitest run",
     "test:smoke": "node scripts/smoke.mjs",
-    "test:links": "node scripts/check-links.mjs"
+    "test:links": "node scripts/check-links.mjs",
+    "test:session": "node scripts/session-smoke.mjs"
   },
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
