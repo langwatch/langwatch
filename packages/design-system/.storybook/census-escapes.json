@@ -2416,5 +2416,166 @@
     "reason": "False positive: the view mode toggle (R7t review).",
     "owner": "scenario",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 86,
+    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 95,
+    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 102,
+    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 103,
+    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 105,
+    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 106,
+    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 142,
+    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 136,
+    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 141,
+    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 416,
+    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 422,
+    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 423,
+    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 424,
+    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 446,
+    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 450,
+    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/chat/synced-chat-input.tsx",
+    "rule": "card-box",
+    "line": 174,
+    "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/deploy-prompt-dialog.tsx",
+    "rule": "card-box",
+    "line": 99,
+    "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/deploy-prompt-dialog.tsx",
+    "rule": "card-box",
+    "line": 144,
+    "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/fields/model-select-field-mini.tsx",
+    "rule": "card-box",
+    "line": 117,
+    "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/model-selection/llm-config-field.tsx",
+    "rule": "card-box",
+    "line": 74,
+    "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/model-selection/llm-config-popover.tsx",
+    "rule": "card-box",
+    "line": 221,
+    "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/variables/variable-mapping-input.tsx",
+    "rule": "card-box",
+    "line": 872,
+    "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
+    "owner": "prompt",
+    "disposition": "reviewed"
   }
 ]
