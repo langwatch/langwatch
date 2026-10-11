@@ -32,7 +32,7 @@ const VIEW = ["analytics:view"];
 const SCOPE = { projectId: PROJECT, board: { kind: BOARD.kind, id: BOARD.id } };
 const ON = { projectId: PROJECT, board: BOARD, hour: 9, timezone: "Europe/Amsterdam" };
 const OFF = { projectId: PROJECT, board: BOARD };
-const UNDECIDED = { state: "undecided", settings: null, lastRun: null };
+const UNDECIDED = { state: "undecided", settings: null, lastRun: null, offReason: null };
 const TEMPLATE: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
 const PRIVATE_BOARD: InsightRunBoard = { kind: "dashboard", id: "dashboard-private", name: "Mine" };
 
@@ -128,12 +128,14 @@ describe("given a member with analytics:view and a board they can open", () => {
         state: "on",
         settings: { hour: 9, timezone: "Europe/Amsterdam", maxInsights: 3 },
         lastRun: null,
+        offReason: null,
       });
       expect(changed.settings).toEqual({ hour: 17, timezone: "Europe/Amsterdam", maxInsights: 10 });
       expect(off).toEqual({
         state: "off",
         settings: { hour: 17, timezone: "Europe/Amsterdam", maxInsights: 10 },
         lastRun: null,
+        offReason: null,
       });
       expect(await daily.runEventsOf()).toEqual([CONFIGURED, CONFIGURED, TURNED_OFF]);
     });
@@ -162,7 +164,7 @@ describe("given a member with analytics:view and a board they can open", () => {
       const declined = await member.getBoardDailyRun(SCOPE);
       await member.configureBoardDailyRun({ ...ON, maxInsights: 5 });
 
-      expect(declined).toEqual({ state: "off", settings: null, lastRun: null });
+      expect(declined).toEqual({ state: "off", settings: null, lastRun: null, offReason: null });
       expect(await member.getBoardDailyRun(SCOPE)).toMatchObject({ state: "on" });
     });
   });
@@ -232,6 +234,7 @@ describe("given a member turned their daily run on for a board", () => {
         state: "on",
         settings: { hour: 9, timezone: "Europe/Amsterdam", maxInsights: 3 },
         lastRun: null,
+        offReason: null,
       });
       expect(await daily.runEventsOf({ userId: MEMBER })).toEqual([CONFIGURED]);
     });

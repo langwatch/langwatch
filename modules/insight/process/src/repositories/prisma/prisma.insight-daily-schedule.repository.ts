@@ -6,6 +6,8 @@ import {
   byNewestRun,
   dailyRunFromState,
   dailyRunSettingFromState,
+  decidedScheduleFromState,
+  type InsightDecidedSchedule,
   type InsightOnSchedule,
   onScheduleFromState,
 } from "../../rules/insight-daily-schedule-row.rules.ts";
@@ -15,7 +17,7 @@ import {
   type InsightDailyScheduleRow,
 } from "./prisma.insight-daily-schedule.mapper.ts";
 
-/** The run rows, plus the raw SQL the reconcile pass needs to read across projects. */
+/** The run rows, plus the raw SQL a read across projects needs. */
 type InsightDailyScheduleDatabase = PrismaModelClient<"InsightDailyScheduleProjection"> &
   Pick<PrismaClient, "$queryRaw">;
 
@@ -85,6 +87,46 @@ export class PrismaInsightDailyScheduleRepository implements InsightDailySchedul
     `;
     return rows.flatMap((row) =>
       onScheduleFromState({
+        scheduleId: row.id,
+        projectId: row.projectId,
+        state: dailyScheduleStateFromRow(row),
+      }),
+    );
+  }
+
+  async findOnInProject({
+    projectId,
+    userId,
+  }: {
+    projectId: string;
+    userId?: string;
+  }): Promise<InsightOnSchedule[]> {
+    const rows = await this.database.insightDailyScheduleProjection.findMany({
+      where: { projectId, state: "on", ...(userId === undefined ? {} : { userId }) },
+    });
+    return rows.flatMap((row) =>
+      onScheduleFromState({
+        scheduleId: row.id,
+        projectId: row.projectId,
+        state: dailyScheduleStateFromRow(row),
+      }),
+    );
+  }
+
+  async findDecided({ take }: { take: number }): Promise<InsightDecidedSchedule[]> {
+    const rows = await this.database.$queryRaw<InsightDailyScheduleRow[]>`
+      SELECT *
+      FROM "InsightDailyScheduleProjection"
+      WHERE "state" IN ('on', 'off')
+      ORDER BY ("state" = 'on') DESC, "id" ASC
+      LIMIT ${take}
+      ${skipTenantCheck({
+        // The operator's list acts for no person and reads every project's schedules.
+        SKIP_TENANT_CHECK: true,
+      })}
+    `;
+    return rows.flatMap((row) =>
+      decidedScheduleFromState({
         scheduleId: row.id,
         projectId: row.projectId,
         state: dailyScheduleStateFromRow(row),

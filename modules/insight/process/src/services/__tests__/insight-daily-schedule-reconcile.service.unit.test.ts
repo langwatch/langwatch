@@ -70,7 +70,10 @@ async function row({
         boardId,
         boardName: "Costs",
         state,
+        offReason: null,
         ...SETTINGS,
+        consecutiveSkips: 0,
+        skipStreakSlot: null,
         lastRunId: null,
         lastRunAt: null,
         lastRunOutcome: null,
@@ -169,6 +172,18 @@ describe("given schedules that are on", () => {
     it("asks nothing of it", async () => {
       const scheduleId = await row();
       await instance({ scheduleId, state: { ...ON, active: false }, nextWakeAt: null });
+
+      expect(await service.reconcile({ passAt: PASS_AT })).toEqual({ repaired: 0 });
+      expect(rearms).toEqual([]);
+    });
+  });
+
+  describe("when an off reached an instance that never took a setting, and the row is a fold behind", () => {
+    /** @scenario "A request to arm that arrives after an off arms nothing" */
+    it("counts the instance as settled and asks nothing of it", async () => {
+      const scheduleId = await row();
+      const off = { ...INITIAL_INSIGHT_DAILY_RUN_STATE, turnedOff: true };
+      await instance({ scheduleId, state: off, nextWakeAt: null });
 
       expect(await service.reconcile({ passAt: PASS_AT })).toEqual({ repaired: 0 });
       expect(rearms).toEqual([]);

@@ -18,6 +18,9 @@ import {
 import {
   buildProcessDefinition,
   createTenantId,
+  defineAggregate,
+  definePipeline,
+  EventSchema,
   type IntentContext,
   ProcessManagerService,
 } from "@langwatch/eventing";
@@ -45,10 +48,23 @@ import {
   salvageLangyDerivedCard,
   splitLangyCardFences,
 } from "@langwatch/langy-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import {
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+  ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION,
+  type OrganizationMemberRemovedEventData,
+  organizationMemberRemovedEventDataSchema,
+} from "@langwatch/organization-contract";
+import {
+  PROJECT_ARCHIVED_EVENT_TYPE,
+  PROJECT_ARCHIVED_EVENT_VERSION,
+  type ProjectArchivedEventData,
+  projectArchivedEventDataSchema,
+  type ProjectApi,
+} from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
+import { z } from "zod";
 
 import { INSIGHT_DAILY_RUN_INTENT } from "../../eventing/insight-daily-run.intent.ts";
 import {
@@ -260,6 +276,10 @@ export function runWorld() {
     boardReadError: null as Error | null,
     /** The queries the analytics module refuses, and its refusal to say what the person sees. */
     lwql: { refused: new Set<string>(), protectionsError: null as Error | null },
+    /** Whether the project took any trace since a run's window began. */
+    hasNewTraces: true,
+    /** The projects of the member's organisation, as the project module lists them. */
+    organizationProjects: [PROJECT],
     langy: {
       /** Thrown by the start when set, as Langy refuses or fails it. */
       startError: null as Error | null,
@@ -386,7 +406,12 @@ function scriptedDashboard(world: RunWorld) {
 function scriptedAnalytics(world: RunWorld) {
   const validations: { sql: string; protections: unknown; timeWindow: unknown }[] = [];
   const protectionAsks: { userId: string; projectId: string }[] = [];
+  const traceAsks: { projectId: string; source: string; since: number }[] = [];
   const analytics = createApiFixture<AnalyticsApi>({
+    findLastOccurredAt: async ({ projectId, source, since }) => {
+      traceAsks.push({ projectId, source, since: since.epochMilliseconds });
+      return world.hasNewTraces ? [since.add({ hours: 1 })] : [];
+    },
     resolveProtections: async (input) => {
       protectionAsks.push(input);
       if (world.lwql.protectionsError) throw world.lwql.protectionsError;
@@ -398,7 +423,7 @@ function scriptedAnalytics(world: RunWorld) {
       return { parameters: [], appFunctions: [] };
     },
   });
-  return { analytics, validations, protectionAsks };
+  return { analytics, validations, protectionAsks, traceAsks };
 }
 
 function scriptedPeers(world: RunWorld) {
@@ -427,6 +452,29 @@ function scriptedPeers(world: RunWorld) {
   return { user, authz };
 }
 
+const FACTS_AGGREGATE_TYPE = "insight_fact_stand_in";
+
+/** Organization's and project's pipelines as their contracts name the facts a clean-up hears. */
+function factsStandIn() {
+  return definePipeline({
+    name: "insight_facts_stand_in",
+    aggregate: defineAggregate({ type: FACTS_AGGREGATE_TYPE }),
+  })
+    .withEvents([
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE),
+        data: organizationMemberRemovedEventDataSchema,
+      }),
+      z.object({
+        ...EventSchema.shape,
+        type: z.literal(PROJECT_ARCHIVED_EVENT_TYPE),
+        data: projectArchivedEventDataSchema,
+      }),
+    ])
+    .build();
+}
+
 function intentContext({ attempt }: { attempt: number }): IntentContext {
   return {
     processName: INSIGHT_DAILY_RUN_PROCESS_NAME,
@@ -442,6 +490,8 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
   const langy = scriptedLangy(world);
   const { dashboard, boardReads } = scriptedDashboard(world);
   const { analytics, ...lwql } = scriptedAnalytics(world);
+  /** The organisations whose projects a clean-up asked for, one entry per fact it heard. */
+  const listedOrganizations: string[] = [];
   const installed = await installInsight({
     isEnabled: () => world.flagOn,
     peers: {
@@ -449,10 +499,46 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
       dashboard,
       analytics,
       langy: langy.api,
-      project: { findById: async () => (world.project ? project(world.project) : null) },
+      project: {
+        findById: async () => (world.project ? project(world.project) : null),
+        listIdsByOrganization: async ({ organizationId }) => {
+          listedOrganizations.push(organizationId);
+          return world.organizationProjects;
+        },
+      },
     },
   });
   const { eventing, eventStore, processStore } = installed;
+  const facts = eventing.register(factsStandIn());
+
+  /** Stores a peer's fact the way its own pipeline would, for the clean-up to hear. */
+  const storeFact = ({
+    id,
+    tenantId,
+    occurredAt,
+    ...fact
+  }: { id: string; tenantId: string; occurredAt: number } & (
+    | {
+        type: typeof ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE;
+        version: string;
+        data: OrganizationMemberRemovedEventData;
+      }
+    | { type: typeof PROJECT_ARCHIVED_EVENT_TYPE; version: string; data: ProjectArchivedEventData }
+  )) =>
+    facts.service.storeEvents(
+      [
+        {
+          id,
+          aggregateId: tenantId,
+          aggregateType: FACTS_AGGREGATE_TYPE,
+          tenantId: createTenantId(tenantId),
+          createdAt: occurredAt,
+          occurredAt,
+          ...fact,
+        },
+      ],
+      { tenantId: createTenantId(tenantId) },
+    );
 
   const scheduleIdOf = ({ userId = MEMBER, board = BOARD } = {}) =>
     dailyScheduleId({ projectId: PROJECT, userId, board });
@@ -487,6 +573,7 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
     langy,
     boardReads,
     lwql,
+    listedOrganizations,
     scheduleIdOf,
     /** Every outbox message the schedule's process wrote, oldest first. */
     intentsOf: (scope: { userId?: string; board?: InsightRunBoard } = {}) =>
@@ -494,15 +581,43 @@ export async function installDailyRuns(world: RunWorld = runWorld()) {
     /** The schedule's process instance: its state, and the wake it has armed. */
     instanceOf: (scope: { userId?: string; board?: InsightRunBoard } = {}) =>
       processStore.findByRef<InsightDailyRunState>({ ref: scheduleRefOf(scope) }),
-    /** Handles every schedule wake due at `now`, as the wake worker does; answers how many. */
-    wakeDue: async ({ now }: { now: number }) => {
+    /** The organisation's fact that a member left it, as its own pipeline records it. */
+    memberRemoved: ({
+      userId,
+      occurredAt,
+      id,
+    }: {
+      userId: string;
+      occurredAt: number;
+      id: string;
+    }) =>
+      storeFact({
+        id,
+        tenantId: ORGANIZATION,
+        occurredAt,
+        type: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+        version: ORGANIZATION_MEMBER_REMOVED_EVENT_VERSION,
+        data: { tenantId: ORGANIZATION, organizationId: ORGANIZATION, userId, occurredAt },
+      }),
+    /** The project's fact that it was archived, as its own pipeline records it. */
+    projectArchived: ({ occurredAt, id }: { occurredAt: number; id: string }) =>
+      storeFact({
+        id,
+        tenantId: PROJECT,
+        occurredAt,
+        type: PROJECT_ARCHIVED_EVENT_TYPE,
+        version: PROJECT_ARCHIVED_EVENT_VERSION,
+        data: { tenantId: PROJECT, projectId: PROJECT, organizationId: ORGANIZATION, occurredAt },
+      }),
+    /** Handles the schedule wakes due at `now`, as the wake worker does; answers how many. */
+    wakeDue: async ({ now, limit = 20 }: { now: number; limit?: number }) => {
       const manager = new ProcessManagerService({
         definition: buildProcessDefinition(processOf(INSIGHT_DAILY_RUN_PROCESS_NAME).config),
         store: processStore,
       });
       const due = await processStore.findDueWakes({
         now,
-        limit: 20,
+        limit,
         processNames: [INSIGHT_DAILY_RUN_PROCESS_NAME],
       });
       for (const wake of due) await manager.handleWake({ wake, now });

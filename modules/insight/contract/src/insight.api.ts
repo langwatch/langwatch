@@ -5,6 +5,7 @@ import type {
   InsightBoardDailyRunScope,
   InsightDailyRun,
   InsightDailyRunSetting,
+  InsightOperatorDailySchedule,
   RequestInsightDailyRunInput,
   TurnOffInsightDailyRunInput,
 } from "./insight-daily-run.ts";
@@ -47,6 +48,11 @@ export interface InsightApi {
   configureDailyRun(input: ConfigureInsightDailyRunInput & Reader): Promise<void>;
   /** Turns the reader's daily run off for a board; "No thanks" on the offer stores the same. */
   turnOffDailyRun(input: TurnOffInsightDailyRunInput & Reader): Promise<void>;
+  /**
+   * Every person's daily run that is on or off, in every project, for the operator's list: the
+   * ones that are on first. It names no reader and asks no flag; its door asks the operator.
+   */
+  findOperatorDailySchedules(input: { limit: number }): Promise<InsightOperatorDailySchedule[]>;
 }
 
 export const InsightApi = moduleApi<InsightApi>()("insight");

@@ -15,9 +15,9 @@ import { currentTimeZone, format, nowInstant } from "@langwatch/time";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
-import { SKIP_REASON_WORDS } from "../../../model/daily-run.ts";
+import { OFF_REASON_WORDS, SKIP_REASON_WORDS } from "../../../model/daily-run.ts";
 import {
   insightEntry,
   renderWithInsightHost,
@@ -33,12 +33,14 @@ const CONFIGURE = "insights.configureBoardDailyRun";
 const TURN_OFF = "insights.turnOffBoardDailyRun";
 const OFFER = "Turn on daily insights for Checkout health?";
 
-const UNDECIDED: InsightDailyRunSetting = { state: "undecided", settings: null, lastRun: null };
-const DECLINED: InsightDailyRunSetting = { state: "off", settings: null, lastRun: null };
+const NOTHING_YET = { settings: null, lastRun: null, offReason: null };
+const UNDECIDED: InsightDailyRunSetting = { state: "undecided", ...NOTHING_YET };
+const DECLINED: InsightDailyRunSetting = { state: "off", ...NOTHING_YET };
 const ON: InsightDailyRunSetting = {
   state: "on",
   settings: { hour: 9, timezone: AMSTERDAM, maxInsights: 3 },
   lastRun: null,
+  offReason: null,
 };
 
 type LastRun = NonNullable<InsightDailyRunSetting["lastRun"]>;
@@ -294,6 +296,7 @@ describe("given a member turned a board's daily run off", () => {
           state: "off",
           settings: { hour: 17, timezone: "Asia/Tokyo", maxInsights: 5 },
           lastRun: null,
+          offReason: null,
         },
       });
       await waitFor(() => expect(quietControl()).toBeInTheDocument());
@@ -305,6 +308,17 @@ describe("given a member turned a board's daily run off", () => {
           { hour: 17, timezone: "Asia/Tokyo", maxInsights: 5 },
         ]),
       );
+    });
+  });
+
+  describe("when they open the board", () => {
+    /** @scenario "A board its person turned off shows the quiet control and no reason" */
+    it("shows the quiet switch and no notice", async () => {
+      openBoard({ setting: { ...ON, state: "off" } });
+
+      await waitFor(() => expect(quietControl()).toBeInTheDocument());
+      expect(screen.queryByRole("button", { name: /^Daily insights/ })).toBeNull();
+      expect(screen.queryByText(/Turned off/)).toBeNull();
     });
   });
 
@@ -470,6 +484,54 @@ describe("given a member turned a board's daily run on", () => {
       const dropdown = await openDropdown(board.user);
 
       expect(dropdown.getByText(line)).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a board whose daily run the system turned off after 7 skipped days", () => {
+  const TURNED_OFF: InsightDailyRunSetting = {
+    ...ranToday({ outcome: "skipped", reason: "no_access" }),
+    state: "off",
+    settings: { hour: 17, timezone: AMSTERDAM, maxInsights: 5 },
+    offReason: "skipped_days",
+  };
+  const turnedOffButton = () => screen.findByRole("button", { name: "Daily insights: turned off" });
+
+  describe("when the member opens the control in the board's header", () => {
+    let board: ReturnType<typeof openBoard>;
+    let dropdown: ReturnType<typeof within>;
+
+    beforeEach(async () => {
+      board = openBoard({ setting: TURNED_OFF });
+      await board.user.click(await turnedOffButton());
+      dropdown = within(await screen.findByRole("dialog"));
+    });
+
+    /** @scenario "A board the system turned off says why and can be turned on again" */
+    it("says the run was turned off and why, and how the last run ended", () => {
+      expect(dropdown.getByText(OFF_REASON_WORDS.skipped_days)).toBeInTheDocument();
+      expect(
+        dropdown.getByText(`Did not run ${RAN_AT} · ${SKIP_REASON_WORDS.no_access}`),
+      ).toBeInTheDocument();
+      expect(dropdown.getByLabelText("Turn on daily insights")).not.toBeChecked();
+      expect(dropdown.queryByText("Settings")).toBeNull();
+      // The reason is in the dropdown: no offer, and no second switch beside it.
+      expect(screen.queryByRole("dialog", { name: OFFER })).toBeNull();
+      expect(board.writes()).toEqual([]);
+    });
+
+    /** @scenario "A board the system turned off says why and can be turned on again" */
+    it("sends what they last chose when they turn it on from the control", async () => {
+      await board.user.click(dropdown.getByLabelText("Turn on daily insights"));
+
+      await waitFor(() =>
+        expect(board.sent(CONFIGURE)).toMatchObject([
+          { hour: 17, timezone: AMSTERDAM, maxInsights: 5 },
+        ]),
+      );
+      // The write shows before the server answers: the board is on, and the reason is gone.
+      expect(await dropdownButton()).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Daily insights: turned off" })).toBeNull();
     });
   });
 });

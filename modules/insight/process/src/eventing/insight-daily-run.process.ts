@@ -27,6 +27,12 @@ import { z } from "zod";
 import { isOwnScheduleId } from "../rules/insight-daily-run.rules.ts";
 import { isDueSlot, nextDailySlot } from "../rules/insight-daily-schedule.rules.ts";
 import {
+  foldSkipStreak,
+  NO_SKIP_STREAK,
+  restartSkipStreak,
+  scheduledRunId,
+} from "../rules/insight-daily-skip-streak.rules.ts";
+import {
   INSIGHT_DAILY_RUN_INTENT,
   INSIGHT_DAILY_RUN_LEASE_MS,
   INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
@@ -55,6 +61,12 @@ export const insightDailyRunStateSchema = z.object({
   active: z.boolean().default(false),
   /** The slot of the last wake that ran: a schedule runs once per calendar date in its zone. */
   lastSlot: z.number().nullable().default(null),
+  /** The scheduled days in a row that ended skipped, folded from each run's outcome. */
+  skipStreak: z
+    .object({ count: z.number().int().nonnegative(), slot: z.number().nullable() })
+    .default(NO_SKIP_STREAK),
+  /** An off reached this instance, so a reconcile pass's request arms it no more. */
+  turnedOff: z.boolean().default(false),
 });
 export type InsightDailyRunState = z.infer<typeof insightDailyRunStateSchema>;
 
@@ -64,6 +76,8 @@ export const INITIAL_INSIGHT_DAILY_RUN_STATE: InsightDailyRunState = {
   schedule: null,
   active: false,
   lastSlot: null,
+  skipStreak: NO_SKIP_STREAK,
+  turnedOff: false,
 };
 
 /** A run that recorded no outcome within every attempt's lease is lost, and blocks no more. */
@@ -108,7 +122,7 @@ function settle({
 
 type RunToStart = Pick<
   z.input<typeof runBoardIntentSchema>,
-  "runId" | "slot" | "userId" | "board" | "maxInsights"
+  "runId" | "slot" | "userId" | "board" | "maxInsights" | "skippedDaysBefore"
 >;
 type Started = { state: InsightDailyRunState; intents: ProcessIntent[] };
 
@@ -145,7 +159,10 @@ function startRun({
   };
 }
 
-/** Turning the run on, or changing it, arms the next slot from now: never a run at once. */
+/**
+ * Turning the run on, or changing it, arms the next slot from now: never a run at once. The
+ * person looked at it, so the skipped days start over.
+ */
 export const insightScheduleConfigured: Handler<InsightScheduleConfiguredEventData> = (
   state,
   data,
@@ -154,7 +171,13 @@ export const insightScheduleConfigured: Handler<InsightScheduleConfiguredEventDa
   if (!isOwnSchedule(data, context)) return settle({ state, context });
   const { userId, board, hour, timezone, maxInsights } = data;
   return settle({
-    state: { ...state, schedule: { userId, board, hour, timezone, maxInsights }, active: true },
+    state: {
+      ...state,
+      schedule: { userId, board, hour, timezone, maxInsights },
+      active: true,
+      turnedOff: false,
+      skipStreak: restartSkipStreak(state.skipStreak),
+    },
     context,
   });
 };
@@ -164,18 +187,22 @@ export const insightScheduleTurnedOff: Handler<InsightScheduleTurnedOffEventData
   state,
   data,
   context,
-) => settle({ state: isOwnSchedule(data, context) ? { ...state, active: false } : state, context });
+) =>
+  settle({
+    state: isOwnSchedule(data, context) ? { ...state, active: false, turnedOff: true } : state,
+    context,
+  });
 
 /**
  * A reconcile pass found the row on with no wake armed. An instance that never took the
- * setting takes it now; one the person turned off since stays off.
+ * setting takes it now; one that an off reached since stays off, whoever turned it off.
  */
 export const insightScheduleRearmRequested: Handler<InsightScheduleConfiguredEventData> = (
   state,
   data,
   context,
 ) =>
-  state.schedule === null
+  state.schedule === null && !state.turnedOff
     ? insightScheduleConfigured(state, data, context)
     : settle({ state, context });
 
@@ -200,10 +227,12 @@ export const insightRunRequested: Handler<InsightRunRequestedEventData> = (
   return settle({ ...started, context });
 };
 
-/** The run's outcome is on the record, so another may start. */
+/** The run's outcome is on the record: another may start, and the skipped days are counted. */
 export const insightRunSettled: Handler<InsightRunSettledEventData> = (state, data, context) => {
-  const isSettled = isOwnSchedule(data, context) && state.pendingRun?.runId === data.runId;
-  return settle({ state: isSettled ? { ...state, pendingRun: null } : state, context });
+  if (!isOwnSchedule(data, context)) return settle({ state, context });
+  const pendingRun = state.pendingRun?.runId === data.runId ? null : state.pendingRun;
+  const skipStreak = foldSkipStreak({ streak: state.skipStreak, run: data });
+  return settle({ state: { ...state, pendingRun, skipStreak }, context });
 };
 
 /**
@@ -222,7 +251,10 @@ export const insightScheduleWake: WakeHandler<InsightDailyRunState, InsightDaily
     return settle({ state, context });
   }
   const { userId, board, maxInsights } = schedule;
-  const run = { runId: `slot:${slot}`, slot, userId, board, maxInsights };
+  // A lost run is recorded as failed before this one, and a failed run starts the count over.
+  const skippedDaysBefore = state.pendingRun === null ? state.skipStreak.count : 0;
+  const runId = scheduledRunId({ slot });
+  const run = { runId, slot, userId, board, maxInsights, skippedDaysBefore };
   const started: Started = isRunInFlight(state, context)
     ? { state, intents: [] }
     : startRun({ state, context, run });

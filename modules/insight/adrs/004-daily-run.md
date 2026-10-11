@@ -2,8 +2,9 @@
 
 **Status:** Accepted
 
-**Behavioural contract:** [The daily insights run](../specs/insight-daily-run.feature) and
-[Unattended Langy turns](../../langy/specs/langy-unattended-turn.feature).
+**Behavioural contract:** [The daily insights run](../specs/insight-daily-run.feature),
+[The daily insights run before a wider rollout](../specs/insight-daily-run-hardening.feature)
+and [Unattended Langy turns](../../langy/specs/langy-unattended-turn.feature).
 
 ## Context
 
@@ -200,6 +201,66 @@ asks the process of each one with no wake armed to arm itself (`rearm_requested`
 process arms from its own setting, takes the row's only when it never had one, and
 stays off when the person turned it off since. A pass changes no setting.
 
+**A project that took no trace costs no model call.** After the gate and before Langy,
+a run asks the analytics module once for the project's newest trace since the start of
+the run's window (`AnalyticsApi.findLastOccurredAt`). None ends the run as `nothing`
+with the reason `no_new_traces`: Langy is never called. This is an assumption the owner
+may overrule. It is `nothing` and not `skipped`, because a skipped day counts towards
+turning the schedule off (below) and a quiet project is no fault of its person. The
+control's last run line says "no new traces, so Langy was not asked". The gate comes
+first, so a person without access is still skipped and the project's traces are not
+asked for them.
+
+**Seven skipped days in a row turn a schedule off.** A scheduled run that ends
+`skipped` is a skipped day. The count is a fold over `run_settled`, one pure rule
+(`foldSkipStreak`) that the process state and the row both use: it holds the count and
+the slot of the newest run folded, so an outcome folded twice counts once and an
+outcome older than the newest changes nothing. `filed`, `nothing` and `failed` start
+the count over. An operator's run that is skipped is no skipped day. Turning the run
+on starts the count over. A wake hands its run the skipped days before it
+(`skippedDaysBefore` on the `runBoard` intent), and the run that records the seventh
+turns the schedule off, by `system` with the reason `skipped_days`, on the path
+`board_deleted` already took. No side counter exists, so a replay rebuilds the count.
+
+**A person who left and a project that was archived turn their schedules off.** Two
+peer subscribers on the pipeline hear the organisation's member removed fact and the
+project's archived fact. Each reads the rows that are on (a member's in every project of
+the organisation they left; every person's in the archived project) and sends the
+existing turn-off command by `system`, with the reason `member_removed` or
+`project_archived`, stamped with the fact's own instant. A fact delivered twice finds no
+row that is on the second time. A schedule its person turned off is not touched and
+keeps no reason.
+
+**An off holds a reason only when the system did it.** `turned_off` carries one of
+`board_deleted`, `skipped_days`, `member_removed` and `project_archived`, or none. The
+row keeps it (`offReason`), the person's read hands it over, and the board's control
+then keeps its dropdown: it says "turned off" and why, and its switch turns the run on
+again with what they last chose. An off by the person shows the quiet switch.
+
+**An off is never armed again by the reconcile pass.** The process state marks that an
+off reached it (`turnedOff`). A request to arm takes the row's setting only for an
+instance that never had one and that no off reached, and the pass counts such an
+instance as settled. This also closes the same hole for an off by the person that
+reached an instance with no setting.
+
+**Every run leaves an audit line and is counted.** A subscriber on `run_settled`, in
+its own lane, writes one line through `AuditLogApi`: the action
+`insight.dailyRun.settled`, the project, the person the run acted for as its user, the
+schedule as its target, and the run, slot, board, outcome, reason and counts filed and
+renewed as metadata. Its key is an audit id derived from the schedule and the run and
+stamped with the run's slot, so a repeat writes the same line. A run skipped at the
+gate settles too, so it has a line. The run itself counts each outcome it records:
+`insight_daily_run_total` by `outcome` and `reason` (`none` without one), and
+`insight_daily_run_duration_milliseconds` by `outcome`. Neither names a project, a
+person or a board.
+
+**An operator reads every schedule.** `InsightApi.findOperatorDailySchedules` answers
+the rows a person decided on, the ones that are on first, each with its off reason, its
+skipped days, how its last run ended and the wake its process has armed. Ops lists them
+on its Schedules page under the report schedules, behind `ops:view`, and adds the
+project's and the owner's name. The list is read only. Ops depends on insight's
+contract; insight knows nothing of ops.
+
 ## Consequences
 
 - The module gains five peers: `LangyApi`, `DashboardApi`, `AuthzApi`, `UserApi` and
@@ -262,5 +323,29 @@ stays off when the person turned it off since. A pass changes no setting.
 - The control's "N new" tag counts the person's unseen insights whose pointer has the
   board's id. A From LangWatch board is pointed at by its template id in a run and by
   `curated/<template id>` in a chat, so chat insights from a template are not counted.
+- Hardening adds one peer, `AuditLogApi`, and two fact types of other modules'
+  contracts (the organisation's member removed, the project's archived). Ops gains
+  `InsightApi` as a peer.
+- `InsightDailyScheduleProjection` gained `offReason`, `consecutiveSkips` and
+  `skipStreakSlot` (migration `20261011090000`). The projection's version did not
+  change: a row folded before the migration reads no reason and no skipped day, and
+  counts from its next run. A schedule a missing board turned off before the migration
+  reads off with no reason, so its control shows the quiet switch.
+- The pre-check asks for a trace since the window's start, with no upper bound. A
+  trace that arrived after the window's end lets the run reach Langy, which may then
+  find nothing. A project whose traffic stopped gets "no new traces" and never an
+  insight about the stop.
+- A member removed from an organisation who is added again finds their runs off, with
+  the reason. Nothing turns them on again but the person.
+- An archived project's schedules stay off when the project is restored.
+- The count of skipped days is per schedule and reads scheduled runs only. Seven days
+  of `failed` runs never turn a schedule off.
+- A run the outbox carries out twice is counted twice by the metrics; its audit line
+  and its outcome are written once.
+- The operator's list asks the process store once per row for the armed wake, for at
+  most 500 rows. It has no filter, no paging and no index of its own.
+- The clean-up reads a member's rows per project of the organisation. The row has no
+  index on the person; a project's rows that are on are few.
+- There is still no cap on how many boards a person turns on.
 - The run events and a pass's request are per-run rows and age with the `traces`
   retention class. `configured` and `turned_off` are a person's setting and never expire.

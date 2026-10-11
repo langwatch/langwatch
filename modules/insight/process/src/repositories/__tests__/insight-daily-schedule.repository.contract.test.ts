@@ -55,9 +55,12 @@ function settled(overrides: Partial<InsightDailyScheduleState> = {}): InsightDai
     boardId: BOARD.id,
     boardName: BOARD.name,
     state: "undecided",
+    offReason: null,
     hour: null,
     timezone: null,
     maxInsights: null,
+    consecutiveSkips: 0,
+    skipStreakSlot: null,
     lastRunId: "run-1",
     lastRunAt: RAN_AT,
     lastRunOutcome: "filed",
@@ -185,6 +188,71 @@ function contractCases(backend: Backend): void {
 
   const ON = { state: "on", hour: 9, timezone: "Europe/Amsterdam", maxInsights: 5 } as const;
 
+  describe("when rows are on, off and undecided in two projects", () => {
+    const ownProjects = () => [backend.projectId(), backend.otherProjectId()];
+    /** The table is shared with other suites: only this suite's own projects are compared. */
+    const decided = async (take: number) =>
+      (await backend.repositories().dailySchedules.findDecided({ take })).filter((row) =>
+        ownProjects().includes(row.projectId),
+      );
+
+    /** @scenario "The operator's read of the rows is the same in both tiers" */
+    it("reads the ones that are on first, then by id, and never an undecided one", async () => {
+      const on = [
+        await store(ON),
+        await store({ ...ON, userId: OTHER }),
+        await store({ ...ON, projectId: backend.otherProjectId() }),
+      ];
+      const off = await store({
+        boardId: "dashboard-off",
+        state: "off",
+        offReason: "skipped_days",
+      });
+      await store({ boardId: "dashboard-undecided" });
+
+      const rows = await decided(500);
+
+      expect(rows.map(({ state, scheduleId }) => [state, scheduleId])).toEqual([
+        ...on.toSorted().map((scheduleId) => ["on", scheduleId]),
+        ["off", off],
+      ]);
+      expect(rows.at(-1)).toMatchObject({
+        projectId: backend.projectId(),
+        userId: OWNER,
+        board: { ...BOARD, id: "dashboard-off" },
+        offReason: "skipped_days",
+        settings: null,
+        consecutiveSkips: 0,
+      });
+      expect(await backend.repositories().dailySchedules.findDecided({ take: 2 })).toHaveLength(2);
+    });
+
+    it("reads a project's rows that are on for everyone, or for one person", async () => {
+      const mine = await store(ON);
+      const theirs = await store({ ...ON, userId: OTHER });
+      await store({ ...ON, projectId: backend.otherProjectId() });
+      await store({ boardId: "dashboard-off", state: "off" });
+      const inProject = (userId?: string) =>
+        backend
+          .repositories()
+          .dailySchedules.findOnInProject({ projectId: backend.projectId(), userId });
+
+      expect((await inProject()).map(({ scheduleId }) => scheduleId).toSorted()).toEqual(
+        [mine, theirs].toSorted(),
+      );
+      expect(await inProject(OTHER)).toEqual([
+        {
+          scheduleId: theirs,
+          projectId: backend.projectId(),
+          userId: OTHER,
+          board: BOARD,
+          settings: { hour: 9, timezone: "Europe/Amsterdam", maxInsights: 5 },
+        },
+      ]);
+      expect(await inProject("user-nobody")).toEqual([]);
+    });
+  });
+
   const settingOf = ({
     userId,
     scheduleId,
@@ -194,6 +262,25 @@ function contractCases(backend: Backend): void {
     scheduleId: string;
     projectId?: string;
   }) => backend.repositories().dailySchedules.findSetting({ projectId, userId, scheduleId });
+
+  describe("when the system turned a row off after skipped days", () => {
+    /** @scenario "Why a schedule is off and its skipped days are stored with its row" */
+    it("answers its person off with the reason, and reads the count back as stored", async () => {
+      const skipped = { consecutiveSkips: 7, skipStreakSlot: RAN_AT - 60_000 };
+      const state = { ...ON, state: "off", offReason: "skipped_days", ...skipped } as const;
+      const scheduleId = await store(state);
+
+      const read = await backend.repositories().dailyScheduleProjection.get(scheduleId, {
+        tenantId: createTenantId(backend.projectId()),
+        aggregateId: scheduleId,
+      });
+
+      expect(await settingOf({ userId: OWNER, scheduleId })).toMatchObject([
+        { state: "off", offReason: "skipped_days" },
+      ]);
+      expect(read.kind === "folded" && read.projection.state).toEqual(settled(state));
+    });
+  });
 
   describe("when two people set the same board, one on and one off", () => {
     /** @scenario "A daily run setting is stored per person and board in the project" */
@@ -213,10 +300,11 @@ function contractCases(backend: Backend): void {
             renewedCount: 1,
             conversationId: "conversation-1",
           },
+          offReason: null,
         },
       ]);
       expect(await settingOf({ userId: OTHER, scheduleId: theirs })).toEqual([
-        { state: "off", settings: null, lastRun: null },
+        { state: "off", settings: null, lastRun: null, offReason: null },
       ]);
       expect(await settingOf({ userId: OTHER, scheduleId: mine })).toEqual([]);
       expect(

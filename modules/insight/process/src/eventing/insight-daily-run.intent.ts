@@ -27,6 +27,11 @@ export const runBoardIntentSchema = z.object({
   supersedes: z
     .object({ runId: z.string().min(1), slot: z.number().int().nonnegative() })
     .optional(),
+  /**
+   * The scheduled days in a row that ended skipped before this run. Absent on an operator's
+   * run, which is no scheduled day, and on a run handed over before the count existed.
+   */
+  skippedDaysBefore: z.number().int().nonnegative().optional(),
 });
 export type RunBoardIntent = z.infer<typeof runBoardIntentSchema>;
 

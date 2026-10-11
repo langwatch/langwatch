@@ -1,7 +1,7 @@
 /**
- * insight_daily_run: one aggregate per person and board, one Postgres projection (the run's
- * row), the process that wakes each schedule and hands its run to the outbox, and the hourly
- * reconcile pass. The api and the tasks send; the worker folds, wakes and carries the run out.
+ * insight_daily_run: one aggregate per person and board, its row, the process that wakes each
+ * schedule, the hourly reconcile pass, the audit line of each run and the clean-up after a
+ * member or a project is gone. The api and the tasks send; the worker does the rest.
  * @see modules/insight/adrs/004-daily-run.md
  */
 
@@ -13,12 +13,23 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import {
+  INSIGHT_DAILY_RUN_EVENT_TYPES,
   INSIGHT_DAILY_RUN_PIPELINE_NAME,
   INSIGHT_DAILY_SCHEDULE_AGGREGATE_TYPE,
 } from "@langwatch/insight-contract";
+import {
+  ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+  organizationMemberRemovedEventDataSchema,
+} from "@langwatch/organization-contract";
+import {
+  PROJECT_ARCHIVED_EVENT_TYPE,
+  projectArchivedEventDataSchema,
+} from "@langwatch/project-contract";
 
 import type { InsightModule } from "../app/insight.app.ts";
 import type { InsightRepositories } from "../repositories/insight.repositories.ts";
+import type { InsightDailyRunAuditService } from "../services/insight-daily-run-audit.service.ts";
+import type { InsightDailyScheduleCleanupService } from "../services/insight-daily-schedule-cleanup.service.ts";
 import {
   ConfigureInsightScheduleCommand,
   RecordInsightRunStartedCommand,
@@ -78,6 +89,8 @@ interface InsightDailyRunPipelineDeps {
   scheduleStore: StateProjectionStore<InsightDailyScheduleState>;
   runs: InsightDailyRunExecutor;
   reconcile: InsightDailyScheduleReconciler;
+  audit: Pick<InsightDailyRunAuditService, "recordSettled">;
+  cleanup: Pick<InsightDailyScheduleCleanupService, "memberRemoved" | "projectArchived">;
 }
 
 /** A run is a model call that takes minutes: few at once per pod, and no more leased than run. */
@@ -96,6 +109,27 @@ const defineInsightDailyRunPipeline = (deps: InsightDailyRunPipelineDeps) =>
     .withCommand("requestRun", RequestInsightRunCommand)
     .withCommand("recordRunStarted", RecordInsightRunStartedCommand)
     .withCommand("settleRun", SettleInsightRunCommand)
+    // One line per run, in its own lane: a slow audit log holds no run back.
+    .withEventSubscriber("dailyRunAudit", {
+      events: [INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED],
+      handler: async (event) => {
+        if (event.type !== INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED) return;
+        await deps.audit.recordSettled({ projectId: String(event.tenantId), run: event.data });
+      },
+    })
+    // Who left and what was archived are organization's and project's facts (§9).
+    .withPeerSubscriber("memberRemoved", {
+      eventType: ORGANIZATION_MEMBER_REMOVED_EVENT_TYPE,
+      data: organizationMemberRemovedEventDataSchema,
+      handle: ({ organizationId, userId, occurredAt }) =>
+        deps.cleanup.memberRemoved({ organizationId, userId, occurredAt }),
+    })
+    .withPeerSubscriber("projectArchived", {
+      eventType: PROJECT_ARCHIVED_EVENT_TYPE,
+      data: projectArchivedEventDataSchema,
+      handle: ({ projectId, occurredAt }) =>
+        deps.cleanup.projectArchived({ projectId, occurredAt }),
+    })
     .withProcessManager(INSIGHT_DAILY_RUN_PROCESS_NAME, (pm) =>
       pm
         .state(insightDailyRunStateSchema, INITIAL_INSIGHT_DAILY_RUN_STATE)

@@ -4,6 +4,7 @@
  */
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import { createTenantId, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -65,6 +66,8 @@ export async function installInsight({
   const eventing = new EventSourcing({ eventStore, processStore });
   /** The projects the release gate was asked about: empty while no handler has run. */
   const gateAsks: string[] = [];
+  /** Every line written to the audit log, oldest first; a key written twice is one line. */
+  const auditLines: RecordAuditLogCommand[] = [];
   const runtime = await createApp({ role: "worker" })
     .withModules([insightProcessModule])
     .withStores(memoryStores())
@@ -85,6 +88,13 @@ export async function installInsight({
       dashboard: peers.dashboard ?? createApiFixture<DashboardApi>(),
       langy: peers.langy ?? createApiFixture<LangyApi>(),
       analytics: peers.analytics ?? createApiFixture<AnalyticsApi>(),
+      "audit-log": createApiFixture<AuditLogApi>({
+        record: async (line) => {
+          const known = auditLines.some((held) => held.idempotencyKey === line.idempotencyKey);
+          if (!known) auditLines.push(line);
+          return { id: `audit-${auditLines.length}`, occurredAt: 0 };
+        },
+      }),
     })
     .boot();
 
@@ -94,6 +104,7 @@ export async function installInsight({
     eventStore,
     processStore,
     gateAsks,
+    auditLines,
     /**
      * Files an insight the way the scheduled run will: through the pipeline's own command,
      * for a named owner and with no person who saved it. No door does this yet.

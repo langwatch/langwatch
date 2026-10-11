@@ -42,7 +42,10 @@ export const DEFAULT_INSIGHT_RUN_MAX_INSIGHTS = 3;
 export const insightRunMaxInsightsSchema = z.literal(INSIGHT_RUN_MAX_INSIGHTS_CHOICES);
 export type InsightRunMaxInsights = z.infer<typeof insightRunMaxInsightsSchema>;
 
-/** `skipped` is a run that never reached Langy; `nothing` is one Langy found no news in. */
+/**
+ * `skipped` is a run its person could not have; `nothing` is one that found no news: Langy
+ * read the board and reported none, or the project took no trace and Langy was not asked.
+ */
 export const INSIGHT_RUN_OUTCOMES = ["filed", "nothing", "failed", "skipped"] as const;
 export const insightRunOutcomeSchema = z.enum(INSIGHT_RUN_OUTCOMES);
 export type InsightRunOutcome = z.infer<typeof insightRunOutcomeSchema>;
@@ -81,11 +84,36 @@ export const INSIGHT_RUN_FAILURE_REASONS = [
 ] as const;
 export type InsightRunFailureReason = (typeof INSIGHT_RUN_FAILURE_REASONS)[number];
 
+/**
+ * Why a run that could start found nothing without asking Langy. `no_new_traces`: the project
+ * took no trace since the run's window began, so no widget had anything new to show.
+ */
+export const INSIGHT_RUN_QUIET_REASONS = ["no_new_traces"] as const;
+export type InsightRunQuietReason = (typeof INSIGHT_RUN_QUIET_REASONS)[number];
+
 export const insightRunReasonSchema = z.enum([
   ...INSIGHT_RUN_SKIP_REASONS,
   ...INSIGHT_RUN_FAILURE_REASONS,
+  ...INSIGHT_RUN_QUIET_REASONS,
 ]);
 export type InsightRunReason = z.infer<typeof insightRunReasonSchema>;
+
+/** A schedule whose runs ended `skipped` on this many scheduled days in a row turns itself off. */
+export const INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF = 7;
+
+/**
+ * Why the system turned a schedule off. `board_deleted`: a run found its board gone.
+ * `skipped_days`: its runs were skipped too many days in a row. `member_removed` and
+ * `project_archived`: the person left the organisation, or the project was archived.
+ */
+export const INSIGHT_SCHEDULE_OFF_REASONS = [
+  "board_deleted",
+  "skipped_days",
+  "member_removed",
+  "project_archived",
+] as const;
+export const insightScheduleOffReasonSchema = z.enum(INSIGHT_SCHEDULE_OFF_REASONS);
+export type InsightScheduleOffReason = z.infer<typeof insightScheduleOffReasonSchema>;
 
 /** How a run ended, as its person reads it. */
 const insightLastRunSchema = z.object({
@@ -158,6 +186,8 @@ const insightDailyRunSettingSchemaDefinition = z.object({
   settings: insightRunSettingsSchema.nullable(),
   /** Null until a run settled. */
   lastRun: insightLastRunSchema.nullable(),
+  /** Why the system turned it off; null while it is on, and when the person turned it off. */
+  offReason: insightScheduleOffReasonSchema.nullable(),
 });
 export interface InsightDailyRunSettingSchema extends Named<
   typeof insightDailyRunSettingSchemaDefinition
@@ -165,6 +195,32 @@ export interface InsightDailyRunSettingSchema extends Named<
 export const insightDailyRunSettingSchema: InsightDailyRunSettingSchema =
   insightDailyRunSettingSchemaDefinition;
 export type InsightDailyRunSetting = z.infer<typeof insightDailyRunSettingSchema>;
+
+/**
+ * One schedule as an operator lists it, across projects: whose it is, which board, whether it
+ * is on and why not, when it next runs and how its last run ended. Instants are epoch
+ * milliseconds.
+ */
+const insightOperatorDailyScheduleSchemaDefinition = z.object({
+  scheduleId: z.string(),
+  projectId: z.string(),
+  userId: z.string(),
+  board: insightRunBoardSchema,
+  state: z.enum(["on", "off"]),
+  offReason: insightScheduleOffReasonSchema.nullable(),
+  settings: insightRunSettingsSchema.nullable(),
+  /** The wake the schedule's process has armed; null when it is off or lost its wake. */
+  nextRunAt: z.number().nullable(),
+  lastRun: insightLastRunSchema.nullable(),
+  /** The scheduled days in a row whose run ended `skipped`. */
+  consecutiveSkips: z.number().int().nonnegative(),
+});
+export interface InsightOperatorDailyScheduleSchema extends Named<
+  typeof insightOperatorDailyScheduleSchemaDefinition
+> {}
+export const insightOperatorDailyScheduleSchema: InsightOperatorDailyScheduleSchema =
+  insightOperatorDailyScheduleSchemaDefinition;
+export type InsightOperatorDailySchedule = z.infer<typeof insightOperatorDailyScheduleSchema>;
 
 /** Which board's daily run a person reads: the pointer's kind and id, no name. */
 const insightBoardDailyRunScopeSchemaDefinition = z.object({

@@ -13,10 +13,12 @@ import {
   type InsightRunMaxInsights,
   type InsightRunOutcome,
   type InsightRunReason,
+  type InsightScheduleOffReason,
   type InsightScheduleState,
 } from "@langwatch/insight-contract";
 
 import { isOwnScheduleId } from "../rules/insight-daily-run.rules.ts";
+import { foldSkipStreak } from "../rules/insight-daily-skip-streak.rules.ts";
 import type { InsightDailyRunEvent } from "./insight-daily-run.events.ts";
 
 export interface InsightDailyScheduleState {
@@ -26,6 +28,8 @@ export interface InsightDailyScheduleState {
   readonly boardName: string;
   /** `undecided` until the person turned the run on or said no to it. */
   readonly state: InsightScheduleState;
+  /** Why the system turned it off; null while it is on, and when the person turned it off. */
+  readonly offReason: InsightScheduleOffReason | null;
   /** What they last chose, kept while the run is off; null until they turned it on once. */
   readonly hour: number | null;
   readonly timezone: string | null;
@@ -40,6 +44,9 @@ export interface InsightDailyScheduleState {
   /** How many insights the run found still true and renewed. */
   readonly lastRunRenewed: number | null;
   readonly lastRunConversationId: string | null;
+  /** The scheduled days in a row whose run ended skipped, and the slot of the newest counted. */
+  readonly consecutiveSkips: number;
+  readonly skipStreakSlot: number | null;
 }
 
 const INITIAL_INSIGHT_DAILY_SCHEDULE_STATE: InsightDailyScheduleState = {
@@ -48,6 +55,7 @@ const INITIAL_INSIGHT_DAILY_SCHEDULE_STATE: InsightDailyScheduleState = {
   boardId: "",
   boardName: "",
   state: "undecided",
+  offReason: null,
   hour: null,
   timezone: null,
   maxInsights: null,
@@ -58,6 +66,8 @@ const INITIAL_INSIGHT_DAILY_SCHEDULE_STATE: InsightDailyScheduleState = {
   lastRunFiled: null,
   lastRunRenewed: null,
   lastRunConversationId: null,
+  consecutiveSkips: 0,
+  skipStreakSlot: null,
 };
 
 /** Whether the event leaves the row as it is: no event of the row's, or one it does not take. */
@@ -77,15 +87,23 @@ function leavesRow(state: InsightDailyScheduleState, event: InsightDailyRunEvent
 }
 
 /** What the event writes on the row it changes. */
-function changeOf(event: InsightDailyRunEvent): Partial<InsightDailyScheduleState> {
+function changeOf(
+  state: InsightDailyScheduleState,
+  event: InsightDailyRunEvent,
+): Partial<InsightDailyScheduleState> {
   switch (event.type) {
     case INSIGHT_DAILY_RUN_EVENT_TYPES.CONFIGURED: {
       const { hour, timezone, maxInsights } = event.data;
-      return { state: "on", hour, timezone, maxInsights };
+      // The person looked at it: the reason it was off is gone and its skipped days start over.
+      return { state: "on", offReason: null, hour, timezone, maxInsights, consecutiveSkips: 0 };
     }
     case INSIGHT_DAILY_RUN_EVENT_TYPES.TURNED_OFF:
-      return { state: "off" };
-    case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED:
+      return { state: "off", offReason: event.data.reason };
+    case INSIGHT_DAILY_RUN_EVENT_TYPES.RUN_SETTLED: {
+      const streak = foldSkipStreak({
+        streak: { count: state.consecutiveSkips, slot: state.skipStreakSlot },
+        run: event.data,
+      });
       return {
         lastRunId: event.data.runId,
         lastRunAt: event.occurredAt,
@@ -94,7 +112,10 @@ function changeOf(event: InsightDailyRunEvent): Partial<InsightDailyScheduleStat
         lastRunFiled: event.data.filedCount,
         lastRunRenewed: event.data.renewedCount,
         lastRunConversationId: event.data.conversationId,
+        consecutiveSkips: streak.count,
+        skipStreakSlot: streak.slot,
       };
+    }
     default:
       return {};
   }
@@ -115,7 +136,7 @@ export function applyInsightDailyRunEvent(
     boardKind: board.kind,
     boardId: board.id,
     boardName: board.name,
-    ...changeOf(event),
+    ...changeOf(state, event),
   };
 }
 

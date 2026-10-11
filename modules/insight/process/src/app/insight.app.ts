@@ -4,6 +4,7 @@
  */
 
 import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
 import type { EventingCommands, ProcessStore } from "@langwatch/eventing";
@@ -17,6 +18,7 @@ import {
   type InsightDailyRunSetting,
   type InsightEntry,
   type InsightApi as InsightApiContract,
+  type InsightOperatorDailySchedule,
   type RequestInsightDailyRunInput,
   type TurnOffInsightDailyRunInput,
 } from "@langwatch/insight-contract";
@@ -35,8 +37,12 @@ import {
 } from "../eventing/insight.pipeline.ts";
 import type { InsightRepositories } from "../repositories/insight.repositories.ts";
 import { InsightCommandsService } from "../services/insight-commands.service.ts";
+import { InsightDailyRunAuditService } from "../services/insight-daily-run-audit.service.ts";
 import { InsightDailyRunCommandsService } from "../services/insight-daily-run-commands.service.ts";
+import { InsightDailyRunMetricsService } from "../services/insight-daily-run-metrics.service.ts";
 import { InsightDailyRunService } from "../services/insight-daily-run.service.ts";
+import { InsightDailyScheduleCleanupService } from "../services/insight-daily-schedule-cleanup.service.ts";
+import { InsightDailyScheduleOperatorService } from "../services/insight-daily-schedule-operator.service.ts";
 import { InsightDailyScheduleReconcileService } from "../services/insight-daily-schedule-reconcile.service.ts";
 import { InsightDailyScheduleService } from "../services/insight-daily-schedule.service.ts";
 import { InsightRolloutService } from "../services/insight-rollout.service.ts";
@@ -60,8 +66,10 @@ export class InsightModule implements InsightApiContract {
     dashboards: DashboardApi,
     /** The turn a daily run reads the board with, as the person and read-only. */
     langy: LangyApi,
-    /** Admits the query a finding keeps, before a reader ever replays it. */
+    /** Admits the query a finding keeps, and says whether the project took any trace. */
     analytics: AnalyticsApi,
+    /** Where each run's outcome is written down, for the person it acted for. */
+    auditLog: AuditLogApi,
   };
 
   readonly #insights: InsightService;
@@ -70,6 +78,7 @@ export class InsightModule implements InsightApiContract {
   readonly #pipeline: InsightPipelineDefinition;
   readonly #dailySchedules: InsightDailyScheduleService;
   readonly #scheduleReconcile: InsightDailyScheduleReconcileService;
+  readonly #scheduleOperator: InsightDailyScheduleOperatorService;
   readonly #dailyRunCommands: InsightDailyRunCommandsService;
   readonly #dailyRunPipeline: InsightDailyRunPipelineDefinition;
 
@@ -80,6 +89,7 @@ export class InsightModule implements InsightApiContract {
     pipeline: InsightPipelineDefinition;
     dailySchedules: InsightDailyScheduleService;
     scheduleReconcile: InsightDailyScheduleReconcileService;
+    scheduleOperator: InsightDailyScheduleOperatorService;
     dailyRunCommands: InsightDailyRunCommandsService;
     dailyRunPipeline: InsightDailyRunPipelineDefinition;
   }) {
@@ -89,6 +99,7 @@ export class InsightModule implements InsightApiContract {
     this.#pipeline = parts.pipeline;
     this.#dailySchedules = parts.dailySchedules;
     this.#scheduleReconcile = parts.scheduleReconcile;
+    this.#scheduleOperator = parts.scheduleOperator;
     this.#dailyRunCommands = parts.dailyRunCommands;
     this.#dailyRunPipeline = parts.dailyRunPipeline;
   }
@@ -111,9 +122,11 @@ export class InsightModule implements InsightApiContract {
       }),
       langy: dependencies.langy,
       insights: repositories.insights,
+      traces: dependencies.analytics,
       queries: InsightRunQueryService.create({ analytics: dependencies.analytics }),
       insightCommands: commands,
       runCommands: dailyRunCommands,
+      metrics: InsightDailyRunMetricsService.create(),
     });
     const scheduleReconcile = InsightDailyScheduleReconcileService.create({
       schedules: repositories.dailySchedules,
@@ -133,11 +146,20 @@ export class InsightModule implements InsightApiContract {
         dashboards: dependencies.dashboards,
       }),
       scheduleReconcile,
+      scheduleOperator: InsightDailyScheduleOperatorService.create({
+        schedules: repositories.dailySchedules,
+      }),
       dailyRunCommands,
       dailyRunPipeline: buildInsightDailyRunPipeline({
         scheduleStore: repositories.dailyScheduleProjection,
         runs,
         reconcile: scheduleReconcile,
+        audit: InsightDailyRunAuditService.create({ auditLog: dependencies.auditLog }),
+        cleanup: InsightDailyScheduleCleanupService.create({
+          schedules: repositories.dailySchedules,
+          commands: dailyRunCommands,
+          projects: dependencies.projects,
+        }),
       }),
     });
   }
@@ -154,7 +176,8 @@ export class InsightModule implements InsightApiContract {
 
   /**
    * The pipeline `insight_daily_run` registers, built once by {@link create}. The process that
-   * hosts it lends its process store, which the reconcile pass reads each schedule's wake from.
+   * hosts it lends its process store, which the reconcile pass and the operator's list read
+   * each schedule's wake from.
    */
   dailyRunPipeline({
     processStore,
@@ -162,6 +185,7 @@ export class InsightModule implements InsightApiContract {
     processStore: ProcessStore;
   }): InsightDailyRunPipelineDefinition {
     this.#scheduleReconcile.connect(processStore);
+    this.#scheduleOperator.connect(processStore);
     return this.#dailyRunPipeline;
   }
 
@@ -225,5 +249,10 @@ export class InsightModule implements InsightApiContract {
   async turnOffDailyRun(input: TurnOffInsightDailyRunInput & Reader): Promise<void> {
     await this.#rollout.assertEnabled(input);
     await this.#dailySchedules.turnOff(input);
+  }
+
+  /** Across projects, so no project's flag is asked: the operator's door asks the operator. */
+  findOperatorDailySchedules(input: { limit: number }): Promise<InsightOperatorDailySchedule[]> {
+    return this.#scheduleOperator.find(input);
   }
 }

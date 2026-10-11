@@ -6,6 +6,7 @@
 
 import {
   INSIGHT_RUN_SKIP_REASONS,
+  INSIGHT_SCHEDULE_OFF_REASONS,
   INSIGHT_SCHEDULE_STATES,
   type InsightRunReason,
 } from "@langwatch/insight-contract";
@@ -16,6 +17,7 @@ import {
   hourWords,
   type InsightLastRun,
   lastRunWords,
+  OFF_REASON_WORDS,
   RUN_HOURS,
   RUN_MAXIMUMS,
   runMaximum,
@@ -142,6 +144,14 @@ describe("given a board that is on", () => {
       expect(words({ outcome: "nothing" })).toBe("Ran 12:34 · nothing new");
     });
 
+    /** @scenario "The last run line says when a project had no new traces" */
+    it("says there were no new traces, so Langy was not asked", () => {
+      expect(words({ outcome: "nothing", reason: "no_new_traces" })).toBe(
+        "Ran 12:34 · no new traces, so Langy was not asked",
+      );
+      expect(words({ outcome: "nothing", reason: null })).toBe("Ran 12:34 · nothing new");
+    });
+
     /** @scenario "The dropdown says how many insights the last run saw again" */
     it("names what it saw again beside what it filed, and alone when it filed none", () => {
       expect(words({ outcome: "filed", filedCount: 2, renewedCount: 1 })).toBe(
@@ -226,6 +236,21 @@ describe("given a board that opened with widgets, without widgets, or while its 
           closedThisVisit: true,
         }),
       ).toBe(false);
+    });
+  });
+});
+
+describe("given a daily run the system turned off", () => {
+  describe("when the reason is one the contract lists", () => {
+    /** @scenario "Each reason the system turns a daily run off for has its own words" */
+    it("reads as one plain sentence of its own, and skipped_days names the 7 days", () => {
+      const said = INSIGHT_SCHEDULE_OFF_REASONS.map((reason) => OFF_REASON_WORDS[reason]);
+
+      expect(new Set(said).size).toBe(INSIGHT_SCHEDULE_OFF_REASONS.length);
+      for (const sentence of said) expect(sentence).toMatch(/^Turned off .+\.$/);
+      expect(OFF_REASON_WORDS.skipped_days).toBe(
+        "Turned off after 7 days in a row without a run. Turn it on to try again.",
+      );
     });
   });
 });

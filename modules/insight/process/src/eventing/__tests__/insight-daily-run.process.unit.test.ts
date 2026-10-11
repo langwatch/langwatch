@@ -134,7 +134,9 @@ describe("the daily run process", () => {
     it("keeps waiting when another run's outcome arrives", () => {
       const state = inFlight();
 
-      expect(insightRunSettled(state, settled("run-0"), context(T0 + 1_000)).state).toBe(state);
+      const after = insightRunSettled(state, settled("run-0"), context(T0 + 1_000)).state;
+
+      expect(after.pendingRun).toBe(state.pendingRun);
     });
   });
 

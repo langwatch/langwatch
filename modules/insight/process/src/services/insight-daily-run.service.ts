@@ -5,6 +5,7 @@
  * @see modules/insight/adrs/004-daily-run.md
  */
 
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   InsightEntry,
@@ -12,11 +13,12 @@ import type {
   InsightRunFailureReason,
   InsightRunOutcome,
   InsightRunReason,
+  InsightScheduleOffReason,
   InsightSource,
 } from "@langwatch/insight-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 
 import type {
   InsightDailyRunExecutor,
@@ -35,8 +37,10 @@ import {
   openInsightsOfBoard,
   runInsightId,
 } from "../rules/insight-daily-run.rules.ts";
+import { isLastSkippedDay } from "../rules/insight-daily-skip-streak.rules.ts";
 import type { InsightCommandsService } from "./insight-commands.service.ts";
 import type { InsightDailyRunCommandsService } from "./insight-daily-run-commands.service.ts";
+import type { InsightDailyRunMetricsService } from "./insight-daily-run-metrics.service.ts";
 import type { InsightRunGateService, RunGateResult } from "./insight-run-gate.service.ts";
 import type { InsightRunQueryService } from "./insight-run-query.service.ts";
 
@@ -99,16 +103,35 @@ function failed(reason: InsightRunFailureReason, conversationId: string | null):
   return { outcome: "failed", reason, ...NOTHING_WRITTEN, conversationId };
 }
 
+/**
+ * Whether a run's end turns its schedule off: the board is gone for this person, or this
+ * skipped day is one too many in a row. Only a scheduled run carries the days before it.
+ */
+function turnsScheduleOff({
+  end,
+  skippedDaysBefore,
+}: {
+  end: Pick<RunEnd, "outcome" | "reason">;
+  skippedDaysBefore: number | undefined;
+}): boolean {
+  if (end.reason === "board_deleted") return true;
+  if (end.outcome !== "skipped" || skippedDaysBefore === undefined) return false;
+  return isLastSkippedDay({ skippedDaysBefore });
+}
+
 type InsightDailyRunMembers = Readonly<{
   gate: Pick<InsightRunGateService, "check">;
   langy: Pick<LangyApi, "startUnattendedTurn" | "awaitTurnSettlement" | "stopTurn">;
   insights: Pick<InsightRepository, "findForReader">;
+  /** The one cheap read before Langy is asked: whether the project took any trace. */
+  traces: Pick<AnalyticsApi, "findLastOccurredAt">;
   queries: Pick<InsightRunQueryService, "keepValid">;
   insightCommands: Pick<InsightCommandsService, "fileInsight" | "renewInsight">;
   runCommands: Pick<
     InsightDailyRunCommandsService,
     "recordRunStarted" | "settleRun" | "turnOffSchedule"
   >;
+  metrics: Pick<InsightDailyRunMetricsService, "settled">;
   /** Injected by tests that cannot wait ten minutes. */
   turnDeadlineMs?: number;
 }>;
@@ -125,37 +148,58 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
    * run never ends without an outcome on its row.
    */
   async run(input: RunInput): Promise<void> {
+    const startedAt = nowInstant().epochMilliseconds;
+    const settle = (end: RunEnd) => this.settle({ input, end, startedAt });
     let conversationId: string | null = null;
     try {
       await this.settleSuperseded(input);
       const ready = await this.prepare(input);
-      if ("outcome" in ready) return await this.settle(input, ready);
+      if ("outcome" in ready) return await settle(ready);
       const turn = await this.start(input, ready);
-      if ("outcome" in turn) return await this.settle(input, { ...turn, board: ready.board });
+      if ("outcome" in turn) return await settle({ ...turn, board: ready.board });
       conversationId = turn.conversationId;
       const end = await this.finish(input, ready, turn);
-      await this.settle(input, { ...end, board: ready.board });
+      await settle({ ...end, board: ready.board });
     } catch (error) {
       if (!input.isFinalAttempt) throw error;
       logger.warn({ error, projectId: input.projectId, runId: input.runId }, "daily run failed");
       const reason = codeOf(error) === "langy_turns_rate_limited" ? "rate_limited" : "error";
-      await this.settle(input, failed(reason, conversationId));
+      await settle(failed(reason, conversationId));
       throw error;
     }
   }
 
   private async prepare(input: RunInput): Promise<ReadyRun | RunEnd> {
-    const { projectId, userId, board, slot } = input;
-    const gate = await this.members.gate.check({ projectId, userId, board });
+    const { projectId, userId, slot } = input;
+    const gate = await this.members.gate.check({ projectId, userId, board: input.board });
     if (!gate.ok) {
       return { outcome: "skipped", reason: gate.reason, ...NOTHING_WRITTEN, conversationId: null };
     }
-    return {
-      gate,
-      // The pointer keeps the board's name as the run found it.
-      board: { ...board, name: gate.board.name },
-      windows: dailyRunWindows({ slot, timezone: RUN_TIMEZONE }),
-    };
+    // The pointer keeps the board's name as the run found it.
+    const board = { ...input.board, name: gate.board.name };
+    const windows = dailyRunWindows({ slot, timezone: RUN_TIMEZONE });
+    if (!(await this.hasNewTraces({ projectId, windows }))) {
+      // Nothing new to read is no skipped day: the person could have had the run.
+      const quiet = { outcome: "nothing", reason: "no_new_traces" } as const;
+      return { ...quiet, ...NOTHING_WRITTEN, conversationId: null, board };
+    }
+    return { gate, board, windows };
+  }
+
+  /** Asked after the gate and before Langy: a project that took no trace costs no model call. */
+  private async hasNewTraces({
+    projectId,
+    windows,
+  }: {
+    projectId: string;
+    windows: DailyRunWindows;
+  }): Promise<boolean> {
+    const newest = await this.members.traces.findLastOccurredAt({
+      projectId,
+      source: "trace",
+      since: Temporal.Instant.fromEpochMilliseconds(windows.window.start),
+    });
+    return newest.length > 0;
   }
 
   private async start(input: RunInput, ready: ReadyRun): Promise<StartedTurn | RunEnd> {
@@ -349,26 +393,43 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       ...supersedes,
       ...failed("timeout", null),
     });
+    this.members.metrics.settled({ outcome: "failed", reason: "timeout" });
   }
 
-  private async settle(input: RunInput, end: RunEnd): Promise<void> {
-    const { projectId, scheduleId, userId, runId, slot } = input;
+  /**
+   * Records how the run ended, and turns its schedule off when that end leaves it nothing to
+   * run for. A run the outbox carries out twice is counted twice; its outcome is recorded once.
+   */
+  private async settle({
+    input,
+    end,
+    startedAt,
+  }: {
+    input: RunInput;
+    end: RunEnd;
+    startedAt: number;
+  }): Promise<void> {
+    const { projectId, scheduleId, userId, runId, slot, skippedDaysBefore } = input;
     const { board = input.board, ...result } = end;
     const envelope = { tenantId: projectId, scheduleId, userId, board };
+    const settledAt = nowInstant().epochMilliseconds;
     await this.members.runCommands.settleRun({
       ...envelope,
-      occurredAt: nowInstant().epochMilliseconds,
+      occurredAt: settledAt,
       runId,
       slot,
       ...result,
     });
-    if (result.reason !== "board_deleted") return;
-    // The board is gone for this person, so the schedule on it has nothing left to read.
+    const { outcome, reason } = result;
+    this.members.metrics.settled({ outcome, reason, durationMs: settledAt - startedAt });
+    if (!turnsScheduleOff({ end: result, skippedDaysBefore })) return;
+    const offReason: InsightScheduleOffReason =
+      reason === "board_deleted" ? "board_deleted" : "skipped_days";
     await this.members.runCommands.turnOffSchedule({
       ...envelope,
       occurredAt: nowInstant().epochMilliseconds,
       by: "system",
-      reason: result.reason,
+      reason: offReason,
     });
   }
 }

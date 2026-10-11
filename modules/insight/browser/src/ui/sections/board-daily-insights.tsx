@@ -1,7 +1,7 @@
 /**
  * "Daily insights" in a board's header, lent through analytics' board-header extension point
- * (§10.1). A personal setting: none yet (a quiet switch, and the offer), off (the quiet
- * switch), or on (one dropdown with the schedule, the last run, Insights and the settings).
+ * (§10.1). A personal setting: none yet (a quiet switch and the offer), off (the quiet switch),
+ * or on (one dropdown). A run the system turned off keeps the dropdown, which says why.
  */
 
 import type { BoardHeaderActionProps } from "@langwatch/analytics-client";
@@ -17,6 +17,7 @@ import { useBoardDailyInsights } from "../../behavior/use-board-daily-insights.t
 import { useInsightInbox } from "../../behavior/use-insight-inbox.ts";
 import {
   lastRunWords,
+  OFF_REASON_WORDS,
   scheduleWords,
   shouldOfferDailyInsights,
   TEMPLATE_BOARD_NOTE,
@@ -50,6 +51,8 @@ function DailyInsightsControl({
   const isOn = setting.state === "on";
   // Turning it on here would promise a run that has nothing to read.
   if (!isOn && (widgetCount ?? 0) === 0) return null;
+  // Set only while the system turned it off: the person is owed the reason.
+  const turnedOff = setting.offReason === null ? undefined : OFF_REASON_WORDS[setting.offReason];
 
   const offering = shouldOfferDailyInsights({
     state: setting.state,
@@ -59,14 +62,15 @@ function DailyInsightsControl({
 
   return (
     <>
-      {isOn ? (
+      {isOn || turnedOff !== undefined ? (
         <DailyInsightsDropdown
           boardId={boardId}
           isEmpty={widgetCount === 0}
           settings={settings}
           lastRun={setting.lastRun}
+          turnedOff={isOn ? undefined : turnedOff}
           insightsHref={daily.insightsHref}
-          onTurnOff={daily.turnOff}
+          onToggle={isOn ? daily.turnOff : () => daily.turnOn(settings)}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       ) : (
@@ -109,14 +113,18 @@ function DailyInsightsControl({
   );
 }
 
-/** The control of a board that is on: one button with one short tag, and the rest inside. */
+/**
+ * The control of a board that is on, or that the system turned off: one button with one short
+ * tag, and the rest inside.
+ */
 function DailyInsightsDropdown({
   boardId,
   isEmpty,
   settings,
   lastRun,
+  turnedOff,
   insightsHref,
-  onTurnOff,
+  onToggle,
   onOpenSettings,
 }: {
   boardId: string;
@@ -124,8 +132,11 @@ function DailyInsightsDropdown({
   isEmpty: boolean;
   settings: InsightRunSettings;
   lastRun: InsightDailyRunSetting["lastRun"];
+  /** Why the system turned the run off; undefined while it is on. */
+  turnedOff: string | undefined;
   insightsHref: string | undefined;
-  onTurnOff: () => void;
+  /** Turns the run off while it is on, and on again with what was last chosen while it is off. */
+  onToggle: () => void;
   onOpenSettings: () => void;
 }) {
   const host = useInsightHost();
@@ -135,8 +146,10 @@ function DailyInsightsDropdown({
   const [now, setNow] = useState(() => nowInstant().epochMilliseconds);
   // The control counts this board's own insights; Insights, where it leads, shows every board's.
   const unread = inbox?.unseen.filter((entry) => entry.board?.id === boardId).length ?? 0;
+  const isOn = turnedOff === undefined;
   const news = unread > 0 ? `${unread} new` : "nothing new";
   const status = isEmpty ? "waiting for a widget" : news;
+  const label = isOn ? `Daily insights: on, ${status}` : "Daily insights: turned off";
   const leave = (then: () => void) => {
     setOpen(false);
     then();
@@ -154,8 +167,8 @@ function DailyInsightsDropdown({
       <Popover.Trigger asChild>
         <Button
           variant="outline"
-          aria-label={`Daily insights: on, ${status}`}
-          title={`Daily insights: on, ${status}`}
+          aria-label={label}
+          title={label}
           height={8}
           paddingX={2.5}
           gap={1.5}
@@ -170,8 +183,9 @@ function DailyInsightsDropdown({
             <Inbox size={13} aria-hidden />
           </Box>
           Daily insights
-          {isEmpty && <Tag>waiting</Tag>}
-          {!isEmpty && unread > 0 && <Tag isNews>{unread} new</Tag>}
+          {!isOn && <Tag>turned off</Tag>}
+          {isOn && isEmpty && <Tag>waiting</Tag>}
+          {isOn && !isEmpty && unread > 0 && <Tag isNews>{unread} new</Tag>}
           <Box as="span" color="fg.subtle">
             <ChevronDown size={12} aria-hidden />
           </Box>
@@ -185,13 +199,13 @@ function DailyInsightsDropdown({
             </Text>
             <Switch
               size="sm"
-              checked
-              onCheckedChange={() => leave(onTurnOff)}
-              inputProps={{ "aria-label": "Turn off daily insights" }}
+              checked={isOn}
+              onCheckedChange={() => leave(onToggle)}
+              inputProps={{ "aria-label": `Turn ${isOn ? "off" : "on"} daily insights` }}
             />
           </HStack>
           <Text fontSize="11.5px" lineHeight="relaxed" color="fg.muted">
-            {scheduleWords({ settings, hasWidgets: !isEmpty })}
+            {turnedOff ?? scheduleWords({ settings, hasWidgets: !isEmpty })}
           </Text>
           {/* A run that filed nothing says so, and why. */}
           <Text fontSize="11.5px" lineHeight="relaxed" color="fg.muted">
@@ -207,9 +221,14 @@ function DailyInsightsDropdown({
               Open Insights
             </MenuRow>
           )}
-          <MenuRow icon={<Settings2 size={13} aria-hidden />} onClick={() => leave(onOpenSettings)}>
-            Settings
-          </MenuRow>
+          {isOn && (
+            <MenuRow
+              icon={<Settings2 size={13} aria-hidden />}
+              onClick={() => leave(onOpenSettings)}
+            >
+              Settings
+            </MenuRow>
+          )}
         </VStack>
       </Popover.Content>
     </Popover.Root>

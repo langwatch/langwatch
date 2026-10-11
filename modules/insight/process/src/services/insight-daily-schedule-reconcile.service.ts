@@ -72,7 +72,7 @@ export class InsightDailyScheduleReconcileService implements InsightDailySchedul
     if (instance.nextWakeAt !== null) return true;
     const state = insightDailyRunStateSchema.parse(instance.state);
     // Off in the process and on in the row: the row is a fold behind, and off is the newer word.
-    return state.schedule !== null && !state.active;
+    return !state.active && (state.schedule !== null || state.turnedOff);
   }
 
   private async rearm({

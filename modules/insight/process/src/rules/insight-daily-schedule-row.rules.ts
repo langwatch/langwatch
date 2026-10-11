@@ -6,6 +6,7 @@
 import type {
   InsightDailyRun,
   InsightDailyRunSetting,
+  InsightOperatorDailySchedule,
   InsightRunBoard,
   InsightRunSettings,
 } from "@langwatch/insight-contract";
@@ -46,6 +47,7 @@ export const UNDECIDED_DAILY_RUN_SETTING: InsightDailyRunSetting = {
   state: "undecided",
   settings: null,
   lastRun: null,
+  offReason: null,
 };
 
 /** The row's setting as its person reads it; `settings` is null until they turned it on once. */
@@ -58,6 +60,7 @@ export function dailyRunSettingFromState(state: InsightDailyScheduleState): Insi
         ? null
         : { hour, timezone, maxInsights },
     lastRun: lastRunOf(state),
+    offReason: state.offReason,
   };
 }
 
@@ -89,4 +92,32 @@ export function onScheduleFromState({
   if (state.state !== "on" || settings === null) return [];
   const board = { kind: state.boardKind, id: state.boardId, name: state.boardName };
   return [{ scheduleId, projectId, userId: state.userId, board, settings }];
+}
+
+/** A schedule as an operator lists it, before its armed wake is read from its process. */
+export type InsightDecidedSchedule = Omit<InsightOperatorDailySchedule, "nextRunAt">;
+
+/** The row as an operator lists it; none while its person never turned it on or off. */
+export function decidedScheduleFromState({
+  scheduleId,
+  projectId,
+  state,
+}: {
+  scheduleId: string;
+  projectId: string;
+  state: InsightDailyScheduleState;
+}): InsightDecidedSchedule[] {
+  if (state.state === "undecided") return [];
+  const board = { kind: state.boardKind, id: state.boardId, name: state.boardName };
+  const { userId, consecutiveSkips } = state;
+  const setting = dailyRunSettingFromState(state);
+  return [
+    { scheduleId, projectId, userId, board, ...setting, state: state.state, consecutiveSkips },
+  ];
+}
+
+/** The operator's order: the schedules that are on first, then by id. */
+export function byOnThenId(a: InsightDecidedSchedule, b: InsightDecidedSchedule): number {
+  if (a.state !== b.state) return a.state === "on" ? -1 : 1;
+  return a.scheduleId < b.scheduleId ? -1 : 1;
 }

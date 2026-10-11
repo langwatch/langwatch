@@ -2349,8 +2349,11 @@ model InsightDailyScheduleProjection {
   boardKind             String
   boardId               String
   boardName             String
-  /// on | off | undecided. Nothing writes it before the schedule itself is built.
+  /// on | off | undecided.
   state                 String  @default("undecided")
+  /// board_deleted | skipped_days | member_removed | project_archived. Why the system turned
+  /// it off. NULL while it is on, and when the person turned it off.
+  offReason             String?
   hour                  Int?
   timezone              String?
   maxInsights           Int?
@@ -2364,6 +2367,9 @@ model InsightDailyScheduleProjection {
   /// How many insights the run found still true and renewed.
   lastRunRenewed        Int?
   lastRunConversationId String?
+  /// The scheduled days in a row whose run ended skipped, and the slot of the newest counted.
+  consecutiveSkips      Int     @default(0)
+  skipStreakSlot        Float?
   createdAt             Float
   updatedAt             Float
   occurredAt            Float

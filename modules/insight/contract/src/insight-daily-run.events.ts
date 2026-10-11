@@ -12,6 +12,7 @@ import {
   insightRunMaxInsightsSchema,
   insightRunOutcomeSchema,
   insightRunReasonSchema,
+  insightScheduleOffReasonSchema,
 } from "./insight-daily-run.ts";
 
 const scheduleRefShape = {
@@ -89,11 +90,14 @@ export type InsightScheduleConfiguredEventData = z.infer<
   typeof insightScheduleConfiguredEventDataSchema
 >;
 
-/** The daily run is off. `system`: a run found the board gone, and `reason` says how it ended. */
+/**
+ * The daily run is off. `person`: they turned it off, and `reason` is null. `system`: a run or
+ * a clean-up did, and `reason` says why. Before the other reasons it held `board_deleted` alone.
+ */
 const insightScheduleTurnedOffEventDataSchemaDefinition = z.object({
   ...scheduleRefShape,
   by: z.enum(["person", "system"]),
-  reason: insightRunReasonSchema.nullable(),
+  reason: insightScheduleOffReasonSchema.nullable(),
 });
 export interface InsightScheduleTurnedOffEventDataSchema extends Named<
   typeof insightScheduleTurnedOffEventDataSchemaDefinition

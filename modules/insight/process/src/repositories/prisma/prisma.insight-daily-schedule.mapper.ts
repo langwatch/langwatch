@@ -3,6 +3,7 @@ import {
   insightRunMaxInsightsSchema,
   insightRunOutcomeSchema,
   insightRunReasonSchema,
+  insightScheduleOffReasonSchema,
   insightScheduleStateSchema,
 } from "@langwatch/insight-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
@@ -12,8 +13,8 @@ import type { InsightDailyScheduleState } from "../../eventing/insight-daily-sch
 export type InsightDailyScheduleRow = Prisma.InsightDailyScheduleProjectionGetPayload<object>;
 
 /**
- * The kind, the state, the outcome and the reason are TEXT and the maximum an integer, so the
- * read narrows them back; an unknown one refuses loudly.
+ * The kind, the state, the outcome and both reasons are TEXT and the maximum an integer, so
+ * the read narrows them back; an unknown one refuses loudly.
  */
 export function dailyScheduleStateFromRow(row: InsightDailyScheduleRow): InsightDailyScheduleState {
   const board = insightRunBoardSchema.parse({
@@ -27,6 +28,7 @@ export function dailyScheduleStateFromRow(row: InsightDailyScheduleRow): Insight
     boardId: board.id,
     boardName: board.name,
     state: insightScheduleStateSchema.parse(row.state),
+    offReason: row.offReason === null ? null : insightScheduleOffReasonSchema.parse(row.offReason),
     hour: row.hour,
     timezone: row.timezone,
     maxInsights:
@@ -40,5 +42,7 @@ export function dailyScheduleStateFromRow(row: InsightDailyScheduleRow): Insight
     lastRunFiled: row.lastRunFiled,
     lastRunRenewed: row.lastRunRenewed,
     lastRunConversationId: row.lastRunConversationId,
+    consecutiveSkips: row.consecutiveSkips,
+    skipStreakSlot: row.skipStreakSlot,
   };
 }

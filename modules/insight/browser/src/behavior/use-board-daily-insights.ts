@@ -17,7 +17,12 @@ import { defaultRunSettings, runTimeWords } from "../model/daily-run.ts";
 import { useInsightHost } from "../model/insight-host.ts";
 import { insightApi } from "./insight-api.ts";
 
-const NEVER_DECIDED: InsightDailyRunSetting = { state: "undecided", settings: null, lastRun: null };
+const NEVER_DECIDED: InsightDailyRunSetting = {
+  state: "undecided",
+  settings: null,
+  lastRun: null,
+  offReason: null,
+};
 
 type Write = {
   next: (current: InsightDailyRunSetting) => InsightDailyRunSetting;
@@ -67,14 +72,14 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     fallbackTitle: string;
   }) =>
     write({
-      next: (current) => ({ ...current, state: "on", settings }),
+      next: (current) => ({ ...current, state: "on", settings, offReason: null }),
       send: (handlers) => configure.mutate({ projectId, board, ...settings }, handlers),
       done: `${done} Langy reads this board every day ${runTimeWords(settings)}.`,
       fallbackTitle,
     });
   const turnOffWith = ({ done, fallbackTitle }: { done: string; fallbackTitle: string }) =>
     write({
-      next: (current) => ({ ...current, state: "off" }),
+      next: (current) => ({ ...current, state: "off", offReason: null }),
       send: (handlers) => turnOffRun.mutate({ projectId, board }, handlers),
       done,
       fallbackTitle,

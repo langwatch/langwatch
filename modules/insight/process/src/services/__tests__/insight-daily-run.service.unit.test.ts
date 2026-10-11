@@ -5,6 +5,7 @@
  * @see modules/insight/specs/insight-daily-run.feature
  */
 
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { InsightRunSettledEventData } from "@langwatch/insight-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -13,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import type { InsightRepository } from "../../repositories/insight.repository.ts";
 import type { InsightCommandsService } from "../insight-commands.service.ts";
 import type { InsightDailyRunCommandsService } from "../insight-daily-run-commands.service.ts";
+import { InsightDailyRunMetricsService } from "../insight-daily-run-metrics.service.ts";
 import { InsightDailyRunService } from "../insight-daily-run.service.ts";
 import type { InsightRunGateService } from "../insight-run-gate.service.ts";
 import type { InsightRunQueryService } from "../insight-run-query.service.ts";
@@ -61,6 +63,10 @@ function harness({ stopTurn }: { stopTurn?: Langy["stopTurn"] } = {}) {
     insights: createApiFixture<Pick<InsightRepository, "findForReader">>({
       findForReader: async () => [],
     }),
+    traces: createApiFixture<Pick<AnalyticsApi, "findLastOccurredAt">>({
+      findLastOccurredAt: async ({ since }) => [since],
+    }),
+    metrics: InsightDailyRunMetricsService.create(),
     queries: createApiFixture<Pick<InsightRunQueryService, "keepValid">>({
       keepValid: async ({ findings }) => [...findings],
     }),

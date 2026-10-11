@@ -156,7 +156,7 @@ describe("given a schedule that is on and its slot is due", () => {
       {
         intentType: "runBoard",
         messageKey: `run:slot:${slot}`,
-        payload: { ...SCHEDULE, maxInsights: 3, runId: `slot:${slot}`, slot },
+        payload: { ...SCHEDULE, maxInsights: 3, runId: `slot:${slot}`, slot, skippedDaysBefore: 0 },
       },
     ]);
     // The same intent a request writes, but for the run's name.

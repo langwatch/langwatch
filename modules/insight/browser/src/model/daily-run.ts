@@ -9,9 +9,11 @@ import {
   DEFAULT_INSIGHT_RUN_MAX_INSIGHTS,
   INSIGHT_RUN_MAX_INSIGHTS_CHOICES,
   INSIGHT_RUN_SKIP_REASONS,
+  INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF,
   type InsightDailyRunSetting,
   type InsightRunSettings,
   type InsightRunSkipReason,
+  type InsightScheduleOffReason,
   type InsightScheduleState,
 } from "@langwatch/insight-contract";
 import { differenceInCalendarDays, format, toZonedDateTime } from "@langwatch/time";
@@ -130,8 +132,21 @@ function runWhen({ at, now, timezone }: { at: number; now: number; timezone: str
     : format(at, "MMM d", zone);
 }
 
-/** "filed 2 new, seen again 1": what a run that read the board did, or "nothing new". */
-function ranWords({ filedCount, renewedCount }: InsightLastRun): string {
+/**
+ * Why the system turned a board's daily run off, as its person reads it. One sentence per
+ * reason the contract lists; the last run's own line says the rest.
+ */
+export const OFF_REASON_WORDS: Record<InsightScheduleOffReason, string> = {
+  board_deleted: "Turned off because this board could not be found.",
+  skipped_days: `Turned off after ${INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF} days in a row without a run. Turn it on to try again.`,
+  member_removed: "Turned off when you left the organisation. Turn it on to start again.",
+  project_archived: "Turned off when this project was archived.",
+};
+
+/** "filed 2 new, seen again 1": what a run did, or why it had nothing to do. */
+function ranWords({ filedCount, renewedCount, reason }: InsightLastRun): string {
+  // The project took no trace, so the run ended before Langy was asked.
+  if (reason === "no_new_traces") return "no new traces, so Langy was not asked";
   const parts = [
     ...(filedCount > 0 ? [`filed ${filedCount} new`] : []),
     ...(renewedCount > 0 ? [`seen again ${renewedCount}`] : []),

@@ -73,6 +73,7 @@ describe("given a run that settled", () => {
       boardId: "dashboard-1",
       boardName: "Costs",
       state: "undecided",
+      offReason: null,
       hour: null,
       timezone: null,
       maxInsights: null,
@@ -83,6 +84,8 @@ describe("given a run that settled", () => {
       lastRunFiled: 2,
       lastRunRenewed: 0,
       lastRunConversationId: "conversation-1",
+      consecutiveSkips: 0,
+      skipStreakSlot: T0,
     });
   });
 
@@ -261,6 +264,59 @@ describe("given a person turned their daily run on", () => {
 
     expect(PROJECTION.eventTypes).not.toContain(INSIGHT_DAILY_RUN_EVENT_TYPES.REARM_REQUESTED);
     expect(applyInsightDailyRunEvent(on, rearm)).toBe(on);
+  });
+});
+
+describe("given a person turned their daily run on and scheduled runs are skipped", () => {
+  const DAY = 24 * 60 * 60_000;
+  const skipped = (day: number) =>
+    settled(T0 + day * DAY + 60_000, {
+      runId: `slot:${T0 + day * DAY}`,
+      slot: T0 + day * DAY,
+      outcome: "skipped",
+      reason: "no_access",
+      filedCount: 0,
+      conversationId: null,
+    });
+  const on = applyInsightDailyRunEvent(PROJECTION.init(), configured(T0 - 60_000));
+  const first = applyInsightDailyRunEvent(on, skipped(0));
+  const second = applyInsightDailyRunEvent(first, skipped(1));
+
+  /** @scenario "The row holds the skipped days beside why the schedule is off" */
+  it("counts each skipped day, holds why it is off, and starts over when turned on", () => {
+    const off = applyInsightDailyRunEvent(
+      second,
+      turnedOff(T0 + DAY + 120_000, { by: "system", reason: "skipped_days" }),
+    );
+    const onAgain = applyInsightDailyRunEvent(off, configured(T0 + 2 * DAY));
+
+    expect([first.consecutiveSkips, second.consecutiveSkips]).toEqual([1, 2]);
+    expect(off).toMatchObject({ state: "off", offReason: "skipped_days", consecutiveSkips: 2 });
+    expect(onAgain).toMatchObject({ state: "on", offReason: null, consecutiveSkips: 0 });
+  });
+
+  it("leaves the count as it is when an earlier day's outcome arrives late", () => {
+    const late = applyInsightDailyRunEvent(second, skipped(0));
+
+    expect(late.consecutiveSkips).toBe(2);
+  });
+
+  it("starts over on a run that found nothing, and keeps no reason when the person turns it off", () => {
+    const quiet = applyInsightDailyRunEvent(
+      second,
+      settled(T0 + 2 * DAY + 60_000, {
+        runId: `slot:${T0 + 2 * DAY}`,
+        slot: T0 + 2 * DAY,
+        outcome: "nothing",
+        reason: "no_new_traces",
+        filedCount: 0,
+        conversationId: null,
+      }),
+    );
+    const off = applyInsightDailyRunEvent(quiet, turnedOff(T0 + 2 * DAY + 120_000));
+
+    expect(quiet).toMatchObject({ consecutiveSkips: 0, lastRunReason: "no_new_traces" });
+    expect(off).toMatchObject({ state: "off", offReason: null });
   });
 });
 
