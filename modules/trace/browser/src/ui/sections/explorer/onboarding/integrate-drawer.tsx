@@ -3,8 +3,8 @@ import {
   PROJECT_READ_PERMISSIONS,
   useMintPersonalToken,
 } from "@langwatch/api-key-client";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { Box, HStack, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
+import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyNotice } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import type React from "react";
@@ -98,8 +98,6 @@ export function IntegrateDrawer({
   });
   const [segment, setSegment] = useState<Segment>("skill");
 
-  const activeSegment = SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
-
   if (!project || !organization) return null;
 
   const activeProjectContext: ActiveProjectContextValue = {
@@ -133,7 +131,6 @@ export function IntegrateDrawer({
                 minting={minting}
                 segment={segment}
                 onSegmentChange={setSegment}
-                activeSegmentDescription={activeSegment?.description ?? ""}
                 enabled={open}
               />
             </ActiveProjectProvider>
@@ -142,6 +139,21 @@ export function IntegrateDrawer({
       </Drawer.Content>
     </Drawer.Root>
   );
+}
+
+/** What a segment shows: the lifted onboarding screens, unchanged. */
+function SegmentPanel({ segment }: { segment: Segment }): React.ReactElement {
+  switch (segment) {
+    case "mcp":
+      return <ViaMcpClientScreen />;
+    case "skill":
+      // Traces onboarding leads with tracing — that's the job here.
+      return <SkillList primarySkillId={TRACING_SKILL_ID} />;
+    case "prompt":
+      return <PromptList primarySkillId={TRACING_SKILL_ID} />;
+    case "sdk":
+      return <SdkSetup />;
+  }
 }
 
 /**
@@ -154,7 +166,6 @@ interface IntegrationContentProps {
   minting: PersonalTokenMint;
   segment: Segment;
   onSegmentChange: (segment: Segment) => void;
-  activeSegmentDescription: string;
   /**
    * When false, the S/M/P/I keyboard shortcuts are suppressed. The drawer passes
    * `enabled={open}` so shortcuts only fire while the drawer is open.
@@ -167,7 +178,6 @@ function IntegrationContent({
   minting,
   segment,
   onSegmentChange,
-  activeSegmentDescription,
   enabled = true,
 }: IntegrationContentProps): React.ReactElement {
   // Tab letter shortcuts (S/M/P/I) fire whenever this component is
@@ -200,53 +210,39 @@ function IntegrationContent({
             automatically pick up the freshly-scoped credential. */}
         <ApiKeyIntegrationInfoCard projectId={projectId} minting={minting} />
 
-        <Tabs.Root
-          value={segment}
-          onValueChange={(e) => onSegmentChange(e.value as Segment)}
-          variant="line"
-          size="sm"
-          colorPalette="orange"
-        >
+        <Box>
           <Text textStyle="xs" color="fg.muted" marginBottom={2}>
             All four end up in the same explorer.
           </Text>
-          <Tabs.List>
-            {SEGMENTS.map((s) => (
-              <Tabs.Trigger key={s.value} value={s.value}>
-                <HStack gap={1.5}>
-                  <Box as="span">{s.label}</Box>
-                  <Kbd>{s.shortcut}</Kbd>
-                </HStack>
-              </Tabs.Trigger>
-            ))}
-          </Tabs.List>
-
-          <Box paddingTop={3} paddingBottom={4}>
-            <Text
-              color="fg"
-              textStyle="md"
-              fontWeight="medium"
-              letterSpacing="-0.01em"
-              lineHeight="snug"
-            >
-              {activeSegmentDescription}
-            </Text>
-          </Box>
-
-          <Tabs.Content value="mcp" padding={0}>
-            <ViaMcpClientScreen />
-          </Tabs.Content>
-          <Tabs.Content value="skill" padding={0}>
-            {/* Traces onboarding leads with tracing — that's the job here. */}
-            <SkillList primarySkillId={TRACING_SKILL_ID} />
-          </Tabs.Content>
-          <Tabs.Content value="prompt" padding={0}>
-            <PromptList primarySkillId={TRACING_SKILL_ID} />
-          </Tabs.Content>
-          <Tabs.Content value="sdk" padding={0}>
-            <SdkSetup />
-          </Tabs.Content>
-        </Tabs.Root>
+          <ContentTabs
+            label="Integration method"
+            value={segment}
+            onValueChange={({ value }) => onSegmentChange(value)}
+            body="flush"
+            mount="all"
+            items={SEGMENTS.map((s) => ({
+              value: s.value,
+              label: s.label,
+              shortcut: s.shortcut,
+              content: (
+                <>
+                  <Box paddingTop={3} paddingBottom={4}>
+                    <Text
+                      color="fg"
+                      textStyle="md"
+                      fontWeight="medium"
+                      letterSpacing="-0.01em"
+                      lineHeight="snug"
+                    >
+                      {s.description}
+                    </Text>
+                  </Box>
+                  <SegmentPanel segment={s.value} />
+                </>
+              ),
+            }))}
+          />
+        </Box>
       </VStack>
     </AnalyticsBoundary>
   );
