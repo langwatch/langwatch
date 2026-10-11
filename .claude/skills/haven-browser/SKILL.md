@@ -93,7 +93,9 @@ Passkeys, security keys and TOTP codes: `haven browser mfa add|list|remove|uv|to
 - After 2 minutes idle a lane's page is unloaded (cookies, storage, routes and lean kept)
   and reopened at the same url by its next command, in about 3 s. Refs from before are
   gone: take a snapshot. Form input and anything not in the url is lost.
-- A new lane first unloads idle pages, then is refused (not crashed) above the memory ceiling.
+- Memory has one limit, browser-memory-mb (an eighth of RAM, 2-8 GiB; `haven machine limits`). Above 3/4
+  of it idle pages unload, oldest first; above it new lanes are refused; haven kills the browser only above
+  the limit plus a quarter (at least 1 GiB). `haven browser status` shows all three.
 - One shared browser costs about 0.5 GB, plus about 0.4 GB per signed-in page in use
   (traces table) and almost nothing per idle lane. Close your lane when done.
 - The stack allows 30 sign-ins per 15 minutes; a lane reuses its saved session.

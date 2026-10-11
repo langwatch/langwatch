@@ -120,8 +120,9 @@ Feature: The TypeScript compiler can never take the machine down
   # shells started from a checkout (haven browser, upgradelab walkers, e2e)
   # climb to cores and gigabytes after hours under software GL. Only a shell
   # from the Playwright cache whose parent runs a path under the checkout (or is
-  # haven's browser daemon) is touched. Knobs: HAVEN_BROWSER_SHELL_MAX_RSS_MB,
-  # _MAX_CPU_PCT, _CPU_SUSTAIN, _MAX_AGE, _IDLE_TTL (0 disables each).
+  # haven's browser daemon) is touched. Its memory ceiling is the browser-memory-mb
+  # limit plus headroom; knobs: HAVEN_BROWSER_SHELL_MAX_CPU_PCT, _CPU_SUSTAIN,
+  # _MAX_AGE, _IDLE_TTL (0 disables each).
 
   @unit
   Scenario: The browser governor only ever touches LangWatch's headless browsers
@@ -158,3 +159,9 @@ Feature: The TypeScript compiler can never take the machine down
     Given haven's headless browser was reaped and its daemon exited
     When a lane runs its next haven browser command
     Then a fresh browser daemon is started for it
+
+  @unit
+  Scenario: The shared browser between its memory limit and the headroom is not reaped
+    Given the shared browser between its memory limit and the limit plus headroom
+    When the daemon takes its next sample
+    Then the browser is not reaped
