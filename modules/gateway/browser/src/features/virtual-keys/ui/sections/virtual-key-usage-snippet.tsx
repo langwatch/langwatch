@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ensureShikiLangLoaded, useShikiAdapter } from "@langwatch/design-system/shiki";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { useEffect } from "react";
 
 import { useGatewayDeployment } from "../../../../behavior/gateway-session.ts";
@@ -60,6 +61,7 @@ export function VirtualKeyUsageSnippet({
   model = "gpt-5-mini",
 }: VirtualKeyUsageSnippetProps) {
   const { colorMode } = useColorMode();
+  const accent = useProductAccent();
   const deployment = useGatewayDeployment();
   const credential = secret ?? "$LANGWATCH_VK_SECRET";
   const resolvedBaseUrl = resolveSnippetGatewayBaseUrl(gatewayBaseUrl, deployment.gatewayBaseUrl);
@@ -187,14 +189,14 @@ func main() {
         Aider).{" "}
         <Link
           href="https://langwatch.ai/docs/ai-gateway/quickstart"
-          color="orange.fg"
+          color={accent.roles.fg}
           target="_blank"
           rel="noreferrer"
         >
           Read more →
         </Link>
       </Text>
-      <Tabs.RootProvider value={tabs} size="sm" variant="line" colorPalette="accent">
+      <Tabs.RootProvider value={tabs} size="sm" variant="line" colorPalette={accent.colorPalette}>
         <CodeBlock.AdapterProvider value={shikiAdapter}>
           <ClientOnly>
             {() => (
@@ -216,7 +218,7 @@ func main() {
                     <Tabs.List w="full" border="0" ms="-1">
                       {tabItems.map((t) => (
                         <Tabs.Trigger
-                          colorPalette="accent"
+                          colorPalette={accent.colorPalette}
                           key={t.key}
                           value={t.key}
                           textStyle="xs"

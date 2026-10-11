@@ -1,5 +1,6 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -10,14 +11,12 @@ import {
   Button,
   HStack,
   Spacer,
-  Table,
-  Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
-import { TabCount } from "@langwatch/design-system/tab-count";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { formatBudgetUsd, type VirtualKeySpendThisMonth } from "@langwatch/gateway-contract";
 import { toEpochMs, readableDate } from "@langwatch/time";
 import {
@@ -199,6 +198,7 @@ function VirtualKeysPage() {
     name: string;
   } | null>(null);
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
+  const accent = useProductAccent();
 
   const allRows = listQuery.data ?? [];
   // A disabled key belongs with the live ones: it is paused, not finished,
@@ -272,21 +272,17 @@ function VirtualKeysPage() {
           {listView === "empty" && <VirtualKeysEmptyState />}
           {listView === "list" && (
             <VStack align="stretch" gap={3} width="full">
-              <Tabs.Root
+              <FilterChips
+                groupLabel="Filter keys by status"
+                countNoun={{ singular: "key", plural: "keys" }}
+                colorPalette={accent.colorPalette}
                 value={statusTab}
-                onValueChange={(d) => setStatusTab(d.value === "revoked" ? "revoked" : "active")}
-                colorPalette="orange"
-                width="full"
-              >
-                <Tabs.List>
-                  <Tabs.Trigger value="active" gap={2}>
-                    Active <TabCount value={activeRows.length} />
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="revoked" gap={2}>
-                    Revoked <TabCount value={revokedRows.length} />
-                  </Tabs.Trigger>
-                </Tabs.List>
-              </Tabs.Root>
+                onChange={(next) => setStatusTab(next === "revoked" ? "revoked" : "active")}
+                items={[
+                  { value: "active", label: "Active", count: activeRows.length },
+                  { value: "revoked", label: "Revoked", count: revokedRows.length },
+                ]}
+              />
               {rows.length === 0 ? (
                 <NoDataInfoBlock
                   icon={<KeyRound />}
@@ -294,52 +290,46 @@ function VirtualKeysPage() {
                   description="Keys with this status will appear here."
                 />
               ) : (
-                <Box as="section" overflowX="auto" tabIndex={0} aria-label="Virtual keys table">
-                  <ListTable
-                    containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                    size="md"
-                    width="full"
-                  >
-                    <Table.Header>
-                      <Table.Row>
-                        <Table.ColumnHeader>Name</Table.ColumnHeader>
-                        <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                        <Table.ColumnHeader>Status</Table.ColumnHeader>
-                        <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-                        <Table.ColumnHeader>Routing</Table.ColumnHeader>
-                        <Table.ColumnHeader>
-                          <Tooltip content="Spend this calendar month, from the same cost data the Usage tab shows. Click a value to open Usage filtered to that key.">
-                            <Text as="span">Spent this month</Text>
-                          </Tooltip>
-                        </Table.ColumnHeader>
-                        <Table.ColumnHeader>Last used</Table.ColumnHeader>
-                        <Table.ColumnHeader></Table.ColumnHeader>
-                      </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                      {rows.map((vk) => (
-                        <VirtualKeyTableRow
-                          key={vk.id}
-                          vk={vk}
-                          scopes={scopeEntriesWithNames(vk.scopes)}
-                          policyNameById={policyNameById}
-                          spend={spendByKeyId.get(vk.id)}
-                          spendIsLoading={spendQuery.isLoading}
-                          spendIsError={spendQuery.isError}
-                          budget={budgetByKeyId.get(vk.id)}
-                          traceHref={traceHrefByKeyId.get(vk.id)}
-                          canUpdate={canUpdate}
-                          canRotate={canRotate}
-                          canRevoke={canRevoke}
-                          onNavigate={(href) => router.push(href)}
-                          onEdit={() => setEditing(vk)}
-                          onRotate={() => setRotating({ id: vk.id, name: vk.name })}
-                          onRevoke={() => setRevoking({ id: vk.id, name: vk.name })}
-                        />
-                      ))}
-                    </Table.Body>
-                  </ListTable>
-                </Box>
+                <ListTable variant="card" scroll="x" scrollLabel="Virtual keys table">
+                  <ListTable.Header>
+                    <ListTable.Row>
+                      <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Prefix</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Scopes</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Routing</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>
+                        <Tooltip content="Spend this calendar month, from the same cost data the Usage tab shows. Click a value to open Usage filtered to that key.">
+                          <Text as="span">Spent this month</Text>
+                        </Tooltip>
+                      </ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Last used</ListTable.ColumnHeader>
+                      <ListTable.ActionHeader />
+                    </ListTable.Row>
+                  </ListTable.Header>
+                  <ListTable.Body>
+                    {rows.map((vk) => (
+                      <VirtualKeyTableRow
+                        key={vk.id}
+                        vk={vk}
+                        scopes={scopeEntriesWithNames(vk.scopes)}
+                        policyNameById={policyNameById}
+                        spend={spendByKeyId.get(vk.id)}
+                        spendIsLoading={spendQuery.isLoading}
+                        spendIsError={spendQuery.isError}
+                        budget={budgetByKeyId.get(vk.id)}
+                        traceHref={traceHrefByKeyId.get(vk.id)}
+                        canUpdate={canUpdate}
+                        canRotate={canRotate}
+                        canRevoke={canRevoke}
+                        onNavigate={(href) => router.push(href)}
+                        onEdit={() => setEditing(vk)}
+                        onRotate={() => setRotating({ id: vk.id, name: vk.name })}
+                        onRevoke={() => setRevoking({ id: vk.id, name: vk.name })}
+                      />
+                    ))}
+                  </ListTable.Body>
+                </ListTable>
               )}
             </VStack>
           )}
@@ -437,17 +427,16 @@ function VirtualKeyTableRow({
   onRevoke: () => void;
 }) {
   return (
-    <Table.Row
-      cursor="pointer"
-      _hover={{ bg: "bg.subtle" }}
-      onClick={() => onNavigate(`/gateway/virtual-keys/${vk.id}`)}
-    >
-      <Table.Cell>
+    <ListTable.Row onActivate={() => onNavigate(`/gateway/virtual-keys/${vk.id}`)}>
+      <ListTable.Cell>
         <VStack align="start" gap={1}>
           <HStack gap={2} align="center">
-            <Link href={`/gateway/virtual-keys/${vk.id}`} fontWeight="medium">
+            <ListTable.RowAction
+              href={`/gateway/virtual-keys/${vk.id}`}
+              onNavigate={({ href }) => onNavigate(href)}
+            >
               {vk.name}
-            </Link>
+            </ListTable.RowAction>
           </HStack>
           {vk.description && (
             <Text fontSize="xs" color="fg.muted">
@@ -473,13 +462,13 @@ function VirtualKeyTableRow({
             );
           })()}
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text fontFamily="mono" fontSize="xs">
           {vk.displayPrefix}…
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {(() => {
           const badge = statusBadge(vk);
           return (
@@ -488,8 +477,8 @@ function VirtualKeyTableRow({
             </Badge>
           );
         })()}
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <ProviderScopeChips
           scopes={scopes}
           size="xs"
@@ -502,15 +491,15 @@ function VirtualKeyTableRow({
               : undefined
           }
         />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <RoutingPolicyCell
           routingPolicyId={vk.routingPolicyId}
           routingMode={vk.routingMode}
           policyNameById={policyNameById}
         />
-      </Table.Cell>
-      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default" minWidth="140px">
+      </ListTable.Cell>
+      <ListTable.Cell stopRowActivation minWidth={140}>
         <VStack align="stretch" gap={1.5} width="full">
           <Link
             className="group"
@@ -547,8 +536,8 @@ function VirtualKeyTableRow({
           </Link>
           <VirtualKeyBudgetBar value={budget} virtualKeyId={vk.id} />
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {vk.lastUsedAt ? (
           <Tooltip content={readableDate(vk.lastUsedAt).toLocaleString()}>
             <Text fontSize="sm">{formatTimeAgo(toEpochMs(vk.lastUsedAt))}</Text>
@@ -558,8 +547,8 @@ function VirtualKeyTableRow({
             never
           </Text>
         )}
-      </Table.Cell>
-      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         {vk.status !== "revoked" && (
           <Menu.Root>
             <Menu.Trigger asChild>
@@ -619,8 +608,8 @@ function VirtualKeyTableRow({
             </Menu.Content>
           </Menu.Root>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }
 
