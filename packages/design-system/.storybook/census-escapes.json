@@ -73,7 +73,7 @@
   {
     "path": "modules/project/browser/src/ui/sections/home/components/welcome-header.tsx",
     "rule": "page-title-h1",
-    "line": 75,
+    "line": 15,
     "reason": "Approved home escape: the Langy home greeting is the page title (astra review, headings row).",
     "owner": "project"
   },
@@ -1630,6 +1630,100 @@
     "line": 519,
     "reason": "Approved: part of the protected scenario grid, its run rows and transcript drawer, or a shell kept as today (R7g review).",
     "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/project/browser/src/ui/sections/home/components/home-card.tsx",
+    "rule": "legacy-card-part",
+    "line": 7,
+    "reason": "Approved: the home card keeps the default home card style until its callers move to Card (R6f2 review).",
+    "owner": "project"
+  },
+  {
+    "path": "modules/project/browser/src/ui/sections/home/components/home-card.tsx",
+    "rule": "legacy-card-part",
+    "line": 8,
+    "reason": "Approved: the home card keeps the default home card style until its callers move to Card (R6f2 review).",
+    "owner": "project"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/elements/observability/copyable-input-with-prefix.tsx",
+    "rule": "card-box",
+    "line": 35,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/intent-selection-screen.tsx",
+    "rule": "card-box",
+    "line": 94,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/product-selection-screen.tsx",
+    "rule": "card-box",
+    "line": 114,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/via-claude-code-screen.tsx",
+    "rule": "card-box",
+    "line": 417,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/via-claude-code-screen.tsx",
+    "rule": "card-box",
+    "line": 591,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/via-claude-desktop-screen.tsx",
+    "rule": "card-box",
+    "line": 97,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/via-claude-desktop-screen.tsx",
+    "rule": "card-box",
+    "line": 160,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/via-platform-screen.tsx",
+    "rule": "card-box",
+    "line": 88,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "onboarding",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/project/browser/src/ui/elements/langy-panel-surface.tsx",
+    "rule": "card-box",
+    "line": 33,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "project",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/project/browser/src/ui/sections/home/components/traces-overview.tsx",
+    "rule": "empty-text",
+    "line": 51,
+    "reason": "Kept as today: a selectable option, switcher, code block, step row, brand tile or expressive panel, not a plain card (R6f2 review).",
+    "owner": "project",
     "disposition": "reviewed"
   }
 ]
