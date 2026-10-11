@@ -36,15 +36,20 @@ Drawers and popovers keep their translucent, blurred panel (`Drawer`, `Popover` 
 recipe) and the blur belongs to the backdrop behind it. Never set `bg`, `background` or a
 blur on `Dialog.Content`; never build a dialog from a fixed-position `Box`.
 
-### One dialog
+### One dialog, one drawer: shapes, not parts
 
-| Part   | Standard                                                                                                                                                                                                                                  |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Shell  | `Dialog` from `@langwatch/design-system/dialog`; width by `size` or one `maxWidth`, nothing else on `Content`.                                                                                                                            |
-| Header | `Dialog.Title` in sentence case, recipe style (no `fontSize`/`fontWeight`); optional `Dialog.Description` in `fg.muted`.                                                                                                                  |
-| Close  | `<Dialog.CloseTrigger />` on every dismissible dialog. Only a takeover, a command palette or a must-acknowledge reveal (`role="alertdialog"`) goes without.                                                                               |
-| Body   | Field labels in sentence case (`Field.Label`, never an uppercase `SmallLabel` in a form).                                                                                                                                                 |
-| Footer | Right-aligned in `Dialog.Footer`: `variant="outline"` Cancel, then one solid primary: `colorPalette="orange"` (the product primary, as `PageLayout.HeaderButton primary`), `red` when it destroys. Never a full-width button in the body. |
+Render the shape and pass content and intent; the shape draws the frame (ADR-002,
+`packages/design-system/adrs/002-overlay-and-card-shapes.md`). The `Drawer.*` and `Dialog.*`
+parts are deprecated.
+
+| Part    | Standard                                                                                                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shell   | `<Dialog open onClose title>` / `<Drawer title onClose>`; width by `size` (`sm` 28rem, `md` 32rem, `lg` 42rem, `xl` 56rem, drawer `full`). No style props exist.          |
+| Header  | `title` in sentence case; dialog `description` and `icon`; drawer `eyebrow`, `subtitle`, `badges`, one `headerAction`, compact `headerTools`, a pinned `toolbar`.         |
+| Close   | The shape draws the X. A must-acknowledge dialog passes `dismissible={false}` (no X, Cancel or Escape) and `role="alertdialog"`.                                          |
+| Body    | Children. Fields stack. `loading` and `error` replace the body; `body="flush"` and `bodyScroll="content"` for editors.                                                    |
+| Footer  | Action descriptors (`primaryAction`, `secondaryAction`, `destructiveAction`, `utilityActions`, `note`, `summary`); the row picks variant and colour. Dialogs keep Cancel. |
+| Drawers | A drawer footer never has Cancel: the X and Escape close.                                                                                                                 |
 
 A plain confirmation is `ConfirmDialog`; a type-to-confirm delete is `DeleteConfirmationDialog`.
 
@@ -172,11 +177,13 @@ Exemplar: `workflows-screen.tsx:56`.
 a module-local copy or a raw `EmptyState`. Inside the chrome, loading is `Skeleton` in the content
 region; `LoadingScreen` is for screens outside the chrome only. Exemplar: `workflows-screen.tsx:58`.
 
-### Drawers
+### Drawers and cards
 
-Use `Drawer.*` from `@langwatch/design-system/drawer` with `Drawer.Title` inside `Drawer.Header`
-(Chakra wires `aria-labelledby` to it; a bare `Heading` leaves the drawer unnamed).
-Exemplar: `modules/organization/browser/src/ui/sections/invite-member-drawer.tsx:61`.
+Render `<Drawer title onClose footer={{ primaryAction }}>` from `@langwatch/design-system/drawer`
+(§2); `title` names the drawer. A framed surface is `Card` from `@langwatch/design-system/card`
+(`panel`, `nested`, `frame`, `elevated`, `showcase`), laid out by `CardGrid`; a clickable
+resource is `ResourceTile`. An appending list ends in `LoadMore`; a one-line empty picker is
+`NoDataInfoBlock size="line"`. ADR-002 records the rulings.
 
 ### Front door
 

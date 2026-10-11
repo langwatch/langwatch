@@ -2386,7 +2386,9 @@ closes the top one and a reload restores the stack. No module-level drawer store
 whole browser.
 
 How a screen is laid out (titles, header actions, containers, drawers, empty and loading
-states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4.
+states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4. Drawers,
+dialogs and cards are prop-driven shapes, not assembled parts (ADR-002 in
+`packages/design-system/adrs/`, ruled 2026-10-11).
 
 **An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
 
