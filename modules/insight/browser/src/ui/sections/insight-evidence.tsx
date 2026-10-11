@@ -29,7 +29,7 @@ export function InsightEvidence({ entry }: { entry: InsightEntry }) {
       background="bg.panel"
       overflow="hidden"
     >
-      <Box height="176px" paddingX={2} paddingTop={2} paddingBottom={1} overflowY="auto">
+      <Box paddingX={2} paddingTop={2} paddingBottom={1}>
         <Suspense fallback={null}>
           <Chart
             sql={lwql}
