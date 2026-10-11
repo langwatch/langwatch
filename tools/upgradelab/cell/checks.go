@@ -727,6 +727,7 @@ func (cell *run) storedEventsVerdict(ctx context.Context) Verdict {
 		"STORED_EVENTS_CLICKHOUSE_URLS": strings.Join(urls, ","),
 		"STORED_EVENTS_REPORT":          reportPath,
 		"VITEST_MAX_WORKERS":            "2",
+		"NX_DAEMON":                     "false", // the suite's setup builds through nx; a daemon would outlive the cell
 	})
 	out, runErr := command.CombinedOutput()
 	_ = os.WriteFile(cell.logPath("stored-events"), out, 0o600)

@@ -246,18 +246,71 @@ func (proc *Proc) Wait(ctx context.Context) error {
 	}
 }
 
-// Stop resumes a paused group, asks it to end, and kills it after grace.
+// Stop resumes a paused group, asks it to end, and kills it after grace. It returns once every
+// descendant is gone too: pnpm puts node in a group of its own and exits before it, while node
+// still talks to Redis on its way out.
 func (proc *Proc) Stop(grace time.Duration) {
-	if exited, _ := proc.Exited(); exited {
+	descendants := proc.descendants()
+	if exited, _ := proc.Exited(); exited && len(alive(descendants)) == 0 {
 		return
 	}
 	proc.Signal(syscall.SIGCONT)
 	proc.Signal(syscall.SIGTERM)
 	ctx, cancel := context.WithTimeout(context.Background(), grace)
 	defer cancel()
-	if proc.Wait(ctx) != nil {
-		proc.Signal(syscall.SIGKILL)
+	_ = proc.Wait(ctx)
+	for len(alive(descendants)) > 0 && ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
+	if ctx.Err() != nil {
+		proc.Signal(syscall.SIGKILL)
+		for _, pid := range alive(descendants) {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+		}
+	}
+}
+
+// descendants lists every process below the group's leader, read from ps before any signal.
+func (proc *Proc) descendants() []int {
+	out, err := exec.CommandContext(context.Background(), "ps", "-A", "-o", "pid=,ppid=").Output()
+	if err != nil {
+		return nil
+	}
+	children := map[int][]int{}
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		pid, errPid := strconv.Atoi(fields[0])
+		parent, errParent := strconv.Atoi(fields[1])
+		if errPid == nil && errParent == nil {
+			children[parent] = append(children[parent], pid)
+		}
+	}
+	var found []int
+	queue := []int{proc.command.Process.Pid}
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+		found = append(found, children[next]...)
+		queue = append(queue, children[next]...)
+	}
+	return found
+}
+
+// alive keeps the pids that still run.
+func alive(pids []int) []int {
+	var running []int
+	for _, pid := range pids {
+		if syscall.Kill(pid, 0) == nil {
+			running = append(running, pid)
+		}
+	}
+	return running
 }
 
 // Env renders a map as KEY=value lines, sorted for a stable log.
