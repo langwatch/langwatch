@@ -19,6 +19,7 @@ import {
   detectColdScan,
   RetryPolicy,
   routingDriver,
+  setIdIndexMissLogger,
   setWindowedReadMetrics,
   StatementReporter,
   TenantGuard,
@@ -291,6 +292,7 @@ export function buildClickHouse(options: {
   }).connect(configuration);
 
   setWindowedReadMetrics(clickHouseWindowedReadMetrics());
+  setIdIndexMissLogger(createLogger("langwatch:clickhouse:id-index"));
   const reporter = new StatementReporter({
     metrics: clickHouseStatementMetrics(),
     noticeLogger: createLogger("langwatch:clickhouse:resilient"),

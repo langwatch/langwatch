@@ -14,6 +14,7 @@ import {
   TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
+import { partsAfterPartitionPruning } from "@langwatch/clickhouse-client/testing";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -35,7 +36,8 @@ const eightWeeksAgo = Date.now() - 56 * DAY_MS;
 let ch: ClickHouseClient;
 let spans: SpanStorageClickHouseRepository;
 let summaries: TraceSummaryClickHouseRepository;
-let statements: { sql: string; params: Record<string, unknown> }[];
+type Statement = { sql: string; params: Record<string, unknown> };
+let statements: Statement[];
 let outcomes: { table: string; outcome: WindowedReadOutcome }[];
 
 /** The test ClickHouse behind the fence, recording every statement the reads send. */
@@ -148,9 +150,42 @@ function lastBound({ table }: { table: string }) {
   return { fromMs: Number(read?.params.fromMs), toMs: Number(read?.params.toMs) };
 }
 
+/** The last statement that read `table`'s source rows, not its index. */
+function lastRead({ table }: { table: string }) {
+  const read = statements.findLast(
+    (statement) => statement.sql.includes(`FROM ${table}`) && !statement.sql.includes("_id_index"),
+  );
+  if (!read) throw new Error(`no source read of ${table} was sent`);
+  return read;
+}
+
+/** One query on the test server, its rows as JSONEachRow parses them. */
+async function queryRows(query: string, params?: Record<string, unknown>): Promise<unknown[]> {
+  const result = await ch.query({
+    query,
+    format: "JSONEachRow",
+    ...(params === undefined ? {} : { query_params: params }),
+  });
+  return result.json();
+}
+
+/** Parts a bounded read reaches against the same read with no index, as the planner prunes. */
+async function prunedParts({ bounded, unbounded }: { bounded: Statement; unbounded: Statement }) {
+  return {
+    bounded: await partsAfterPartitionPruning({ query: queryRows, request: bounded }),
+    unbounded: await partsAfterPartitionPruning({ query: queryRows, request: unbounded }),
+  };
+}
+
 beforeAll(async () => {
   if (!clickHouseConfigured) return;
   ch = await startMigratedTraceClickHouse();
+  // Decoy traces in weeks no fixture uses, so an unbounded read reaches partitions a bound skips.
+  for (const daysAgo of [150, 250]) {
+    const traceId = `decoy-${nanoid()}`;
+    await insertSpans([spanRow({ traceId, startMs: Date.now() - daysAgo * DAY_MS })]);
+    await insertSummary({ traceId, occurredAtMs: Date.now() - daysAgo * DAY_MS });
+  }
   const clickhouse = recordingAuthorizedClickHouse(ch);
   spans = SpanStorageClickHouseRepository.create({ resolveClient: async () => ch, clickhouse });
   summaries = TraceSummaryClickHouseRepository.create({
@@ -195,6 +230,11 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
         toMs: range.toMs + ID_INDEX_WIDEN_MS,
       });
       expect(outcomes).toContainEqual({ table: "stored_spans", outcome: "index_hit" });
+      const bounded = lastRead({ table: "stored_spans" });
+      statements = [];
+      await spans.findSpansByTraceId({ authorization: ownProof({ projectId: tenantId }), traceId });
+      const parts = await prunedParts({ bounded, unbounded: lastRead({ table: "stored_spans" }) });
+      expect(parts.bounded).toBeLessThan(parts.unbounded);
     });
 
     /** @scenario "a trace opens with no time" */
@@ -218,6 +258,20 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
       expect(lastBound({ table: "trace_summaries" }).fromMs).toBeGreaterThan(
         eightWeeksAgo - 2 * DAY_MS,
       );
+      const bounded = {
+        summary: lastRead({ table: "trace_summaries" }),
+        spans: lastRead({ table: "stored_spans" }),
+      };
+      statements = [];
+      await summaries.findByTraceId({ authorization, traceId });
+      await spans.findSpansByTraceId({ authorization, traceId });
+      for (const table of ["trace_summaries", "stored_spans"] as const) {
+        const parts = await prunedParts({
+          bounded: table === "trace_summaries" ? bounded.summary : bounded.spans,
+          unbounded: lastRead({ table }),
+        });
+        expect(parts.bounded).toBeLessThan(parts.unbounded);
+      }
     });
   });
 
@@ -280,23 +334,26 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
     });
   });
 
-  describe("given a trace in a project with a 30-day retention", () => {
+  describe("given a trace whose short retention has passed, beside one kept forever", () => {
     /** @scenario "the index expires with the data it points at" */
-    it("copies the retention and expires a week after the source's last row", async () => {
-      const traceId = `trace-${nanoid()}`;
-      await insertSpans([spanRow({ traceId, startMs: Date.now() - DAY_MS, retentionDays: 30 })]);
+    it("drops the expired trace's index row on a merge and keeps the forever one", async () => {
+      const expired = `trace-${nanoid()}`;
+      const forever = `trace-${nanoid()}`;
+      // One day's retention plus the index's seven days of slack is long past at thirty days.
+      const thirtyDaysAgo = Date.now() - 30 * DAY_MS;
+      await insertSpans([
+        spanRow({ traceId: expired, startMs: thirtyDaysAgo, retentionDays: 1 }),
+        spanRow({ traceId: forever, startMs: thirtyDaysAgo, retentionDays: 0 }),
+      ]);
+      expect((await indexRange({ index: "stored_spans_id_index", traceId: expired })).n).toBe(1);
 
-      const range = await indexRange({ index: "stored_spans_id_index", traceId });
-      const result = await ch.query({
-        query: "SELECT create_table_query FROM system.tables WHERE name = 'stored_spans_id_index'",
-        format: "JSONEachRow",
+      await ch.command({ query: "OPTIMIZE TABLE stored_spans_id_index FINAL" });
+
+      expect((await indexRange({ index: "stored_spans_id_index", traceId: expired })).n).toBe(0);
+      expect(await indexRange({ index: "stored_spans_id_index", traceId: forever })).toMatchObject({
+        n: 1,
+        retention: 65_535,
       });
-      const [table] = await result.json<{ create_table_query: string }>();
-
-      expect(range.retention).toBe(30);
-      expect(table?.create_table_query).toContain(
-        "toDateTime(ToAt) + toIntervalDay(_retention_days + 7)",
-      );
     });
   });
 });

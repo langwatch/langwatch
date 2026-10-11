@@ -45,6 +45,37 @@ Feature: A lookup by id reads only the partitions its id index names
     And it never scans without a time bound
     And it is recorded as an index miss
 
+  @unit
+  Scenario: a miss whose source still holds rows is counted as a missing index row
+    Given the index's backfill has completed
+    And the index has no row for an id whose rows the recent source still holds
+    When it is looked up by its id alone
+    Then the rows are returned as before
+    And it is recorded as an index miss that found rows
+    And one warning per table names the tenant and the table, never the id
+
+  @unit
+  Scenario: a ledger replay is never taken for a new request on an index miss alone
+    Given the ledger's index is ready and has no row for a request
+    When a debit for that request arrives
+    Then the recent ledger is checked before the debit is written
+    And a request the recent ledger already holds is not debited again
+
+  @unit
+  Scenario: a batch that times out is halved, and a stuck target does not stop the others
+    Given a backfill whose batches fail with a memory or timeout error
+    When the backfill step runs
+    Then each failure halves the batch, down to a floor
+    And a target still failing at the floor is recorded as failed while the others are filled
+    And the step reports failure at the end, so the ledger retries it
+
+  @unit @integration
+  Scenario: a retention raise is one statement per index, never lowering a row
+    Given tenants whose retentions were lengthened, shortened and made forever
+    When a target's id index is raised to each tenant's retention
+    Then one mutation rewrites the index, each tenant to its own days
+    And no row is lowered, kept forever stays forever, and the marker row is untouched
+
   @integration
   Scenario: the index expires with the data it points at
     Given a record in a project with a 30-day retention

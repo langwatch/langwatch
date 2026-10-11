@@ -15,6 +15,21 @@ import {
   windowFragment,
 } from "./windowedRead.ts";
 
+/** Where a found miss is warned about; process-owned, like the windowed read metrics. */
+export interface IdIndexMissLogger {
+  warn(fields: Record<string, unknown>, message: string): void;
+}
+
+let missLogger: IdIndexMissLogger | null = null;
+
+/** Tables already warned about a found miss; the counter carries every later one. */
+const warnedMissFound = new Set<string>();
+
+/** Registers the process's logger for found misses. Called once, at composition. */
+export function setIdIndexMissLogger(logger: IdIndexMissLogger): void {
+  missLogger = logger;
+}
+
 /** How far an index range is widened each side, absorbing clock skew and anchor differences. */
 export const ID_INDEX_WIDEN_MS = 24 * 60 * 60 * 1000;
 
@@ -53,10 +68,17 @@ export function indexWindow({ fromMs, toMs }: { fromMs: number; toMs: number }):
   );
 }
 
+/** The recent window a miss confirms against: the miss probe's frame, ending a little past now. */
+export function idIndexMissWindow(): WindowFragment {
+  const window = fallbackFragment(ID_INDEX_MISS_PROBE, DEFAULT_PARTITION_WINDOW_MS);
+  if (window === null) throw new Error("The id index miss probe is always bounded.");
+  return window;
+}
+
 /**
  * Reads by id: a given time first; then, once ready, the index's range (`index_hit`) or, for an
- * unseen id, the miss probe (`index_miss`); not ready, today's windowed read unchanged. Every
- * path counts exactly one outcome.
+ * unseen id, the miss probe (`index_miss`, or `index_miss_found` when the probe finds rows the
+ * index lacks); not ready, today's windowed read unchanged. Every path counts exactly one outcome.
  */
 export async function indexedRead<T>(options: IndexedReadOptions<T>): Promise<T> {
   const { client, idIndex, tenantId, table, fallback, isEmpty, run } = options;
@@ -82,7 +104,11 @@ export async function indexedRead<T>(options: IndexedReadOptions<T>): Promise<T>
     });
     if (bounds.n === 0) {
       const probed = await run(fallbackFragment(options.onMiss ?? ID_INDEX_MISS_PROBE, windowMs));
-      incrementWindowedReadCount(table, "index_miss");
+      if (isEmpty(probed)) {
+        incrementWindowedReadCount(table, "index_miss");
+      } else {
+        reportIndexMissFound({ table, tenantId });
+      }
       return probed;
     }
     const result = await run(indexWindow(bounds));
@@ -92,4 +118,15 @@ export async function indexedRead<T>(options: IndexedReadOptions<T>): Promise<T>
     incrementWindowedReadCount(table, "error");
     throw error;
   }
+}
+
+/**
+ * Counts a ready index's miss whose source read found rows: an index row went missing. Warns once
+ * per table with the tenant, never the ids; the counter carries every later one.
+ */
+export function reportIndexMissFound({ table, tenantId }: { table: string; tenantId: string }) {
+  incrementWindowedReadCount(table, "index_miss_found");
+  if (missLogger === null || warnedMissFound.has(table)) return;
+  warnedMissFound.add(table);
+  missLogger.warn({ table, tenantId }, "id index missed rows its source holds");
 }

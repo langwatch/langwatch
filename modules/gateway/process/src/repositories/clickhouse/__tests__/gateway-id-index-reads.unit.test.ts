@@ -1,4 +1,14 @@
-import type { IdIndexBounds, IdIndexFlags, IdIndexReader } from "@langwatch/clickhouse-client";
+/**
+ * Gateway lookups by request id through the id index.
+ * Spec: specs/clickhouse/id-index-reads.feature
+ */
+import {
+  type IdIndexBounds,
+  type IdIndexFlags,
+  type IdIndexReader,
+  setWindowedReadMetrics,
+  type WindowedReadOutcome,
+} from "@langwatch/clickhouse-client";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -43,6 +53,13 @@ function indexHolding(n: number): IdIndexReader & { reads: string[] } {
       return { n, fromMs: FROM_MS, toMs: TO_MS };
     },
   };
+}
+
+/** Collects the windowed read outcomes counted from here on. */
+function recordOutcomes(): { table: string; outcome: WindowedReadOutcome }[] {
+  const outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
+  setWindowedReadMetrics({ record: (entry) => outcomes.push(entry) });
+  return outcomes;
 }
 
 const spendRepository = (
@@ -168,13 +185,29 @@ describe("gateway lookups by request id with the id index", () => {
       expect(inserts).toHaveLength(0);
     });
 
-    it("inserts a request the index has never seen, with no ledger probe at all", async () => {
+    it("confirms a request the index has never seen against the recent ledger, then inserts", async () => {
       const { client, queries, inserts } = clientAnswering([]);
 
       await budgetRepository(client, indexHolding(0)).insertDebit([debit()], { idIndex: ON });
 
-      expect(queries).toHaveLength(0);
+      expect(queries).toHaveLength(1);
+      expect(queries[0]?.query).toContain("OccurredAt >= fromUnixTimestamp64Milli");
+      const params = queries[0]?.query_params ?? {};
+      expect(Number(params.toMs) - Number(params.fromMs)).toBeLessThan(40 * DAY_MS);
       expect(inserts).toHaveLength(1);
+    });
+
+    /** @scenario "a ledger replay is never taken for a new request on an index miss alone" */
+    it("never inserts a replay whose index row went missing, and counts the found miss", async () => {
+      const outcomes = recordOutcomes();
+      const { client, inserts } = clientAnswering([{ "1": 1 }]);
+
+      await budgetRepository(client, indexHolding(0)).insertDebit([debit()], { idIndex: ON });
+
+      expect(inserts).toHaveLength(0);
+      expect(outcomes).toEqual([
+        { table: "gateway_budget_ledger_events", outcome: "index_miss_found" },
+      ]);
     });
 
     it("probes the ledger as before while the flag is off", async () => {
@@ -189,15 +222,30 @@ describe("gateway lookups by request id with the id index", () => {
   });
 
   describe("given the ledger probes the budgets already debited on a request", () => {
-    it("skips the probe for a request the index has never seen", async () => {
+    it("probes only the recent ledger for a request the index has never seen", async () => {
       const { client, queries, inserts } = clientAnswering([]);
 
       await budgetRepository(client, indexHolding(0)).insertDebitsForBudgets([debit()], {
         idIndex: ON,
       });
 
-      expect(queries).toHaveLength(0);
+      expect(queries).toHaveLength(1);
+      const params = queries[0]?.query_params ?? {};
+      expect(Number(params.toMs) - Number(params.fromMs)).toBeLessThan(40 * DAY_MS);
       expect(inserts).toHaveLength(1);
+    });
+
+    /** @scenario "a ledger replay is never taken for a new request on an index miss alone" */
+    it("skips a budget the recent ledger already holds despite an index miss", async () => {
+      const outcomes = recordOutcomes();
+      const { client, inserts } = clientAnswering([{ BudgetId: "budget-1", ScopeId: "vk-1" }]);
+
+      await budgetRepository(client, indexHolding(0)).insertDebitsForBudgets([debit()], {
+        idIndex: ON,
+      });
+
+      expect(inserts).toHaveLength(0);
+      expect(outcomes.map((each) => each.outcome)).toEqual(["index_miss_found"]);
     });
 
     it("bounds the probe to the index range for a request it has seen", async () => {

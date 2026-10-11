@@ -2,7 +2,14 @@
  * The gateway budget ledger in ClickHouse.
  */
 
-import { type IdIndexBounds, type IdIndexReader, indexWindow } from "@langwatch/clickhouse-client";
+import {
+  type IdIndexBounds,
+  type IdIndexReader,
+  idIndexMissWindow,
+  indexWindow,
+  reportIndexMissFound,
+  type WindowFragment,
+} from "@langwatch/clickhouse-client";
 import {
   type GatewayBudgetLedgerStatus,
   type GatewayBudgetResource,
@@ -271,7 +278,10 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     }
 
     const bounds = await this.ledgerIndexBounds({ tenantId, gatewayRequestId, ...options });
-    const seen = bounds ? bounds.n > 0 : await this.requestInLedger({ tenantId, gatewayRequestId });
+    const seen =
+      bounds === undefined
+        ? await this.requestInLedger({ tenantId, gatewayRequestId, window: null })
+        : bounds.n > 0 || (await this.requestInLedgerDespiteMiss({ tenantId, gatewayRequestId }));
     if (seen) {
       logger.debug(
         { tenantId, gatewayRequestId, batchSize: rows.length },
@@ -283,18 +293,37 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     await this.insertRows(rows);
   }
 
-  /** The unbounded probe the id index replaces while it is not ready. */
-  private async requestInLedger({
+  /**
+   * An index miss never alone declares a request new: the recent ledger confirms it, so a lost
+   * index row cannot double-debit a replay. A hit there is counted as a found miss.
+   */
+  private async requestInLedgerDespiteMiss({
     tenantId,
     gatewayRequestId,
   }: {
     tenantId: string;
     gatewayRequestId: string;
   }): Promise<boolean> {
+    const window = idIndexMissWindow();
+    const found = await this.requestInLedger({ tenantId, gatewayRequestId, window });
+    if (found) reportIndexMissFound({ table: EVENTS_TABLE, tenantId });
+    return found;
+  }
+
+  /** Whether the ledger holds the request: unbounded while the index is not ready. */
+  private async requestInLedger({
+    tenantId,
+    gatewayRequestId,
+    window,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+    window: WindowFragment | null;
+  }): Promise<boolean> {
     const client = await this.resolveClient(tenantId);
     const probe = await client.query({
-      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} LIMIT 1`,
-      query_params: { tenantId, gatewayRequestId },
+      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} ${window?.sqlFor("OccurredAt") ?? ""} LIMIT 1`,
+      query_params: { tenantId, gatewayRequestId, ...window?.params },
       format: "JSONEachRow",
     });
     return ((await probe.json()) as unknown[]).length > 0;
@@ -542,20 +571,19 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     };
   }
 
-  /** The budgets already on one request; the index range (when known) bounds the scan. */
+  /** The budgets already on one request; `window` (when known) bounds the scan. */
   private async budgetsOnRequest({
     tenantId,
     gatewayRequestId,
     budgetIds,
-    bounds,
+    window,
   }: {
     tenantId: string;
     gatewayRequestId: string;
     budgetIds: string[];
-    bounds: IdIndexBounds | undefined;
+    window: WindowFragment | null;
   }): Promise<{ BudgetId: string; ScopeId: string }[]> {
     const client = await this.resolveClient(tenantId);
-    const window = bounds ? indexWindow(bounds) : null;
     const probe = await client.query({
       query: `SELECT DISTINCT BudgetId, ScopeId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)} ${window?.sqlFor("OccurredAt") ?? ""}`,
       query_params: { tenantId, requestId: gatewayRequestId, budgetIds, ...window?.params },
@@ -588,11 +616,12 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     }
     const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
     const bounds = await this.ledgerIndexBounds({ tenantId, gatewayRequestId, ...options });
-    // A request the index has never seen has no ledger row, so there is nothing to probe.
-    const probed =
-      bounds?.n === 0
-        ? []
-        : await this.budgetsOnRequest({ tenantId, gatewayRequestId, budgetIds, bounds });
+    // A miss confirms against the recent ledger: a lost index row must not double-debit.
+    const missed = bounds?.n === 0;
+    let window: WindowFragment | null = null;
+    if (bounds !== undefined) window = missed ? idIndexMissWindow() : indexWindow(bounds);
+    const probed = await this.budgetsOnRequest({ tenantId, gatewayRequestId, budgetIds, window });
+    if (missed && probed.length > 0) reportIndexMissFound({ table: EVENTS_TABLE, tenantId });
     const existing = new Map(probed.map((r) => [r.BudgetId, r.ScopeId]));
     // A budget already on this request suppresses the row (idempotent replay) — unless the
     // existing row names a DIFFERENT bucket, since the ledger key has no bucket in it. That

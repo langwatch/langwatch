@@ -18,6 +18,7 @@ import {
 import {
   nativeClickHouseBaseUrl,
   startTestClickHouseEndpoints,
+  partsAfterPartitionPruning,
 } from "@langwatch/clickhouse-client/testing";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -111,35 +112,6 @@ function httpParam(value: unknown): string {
       : `'${String(each).replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`,
   );
   return `[${quoted.join(",")}]`;
-}
-
-/** The parts left once the planner has pruned by partition alone, as the trace suites count. */
-async function partsAfterPartitionPruning(request: QueryRequest): Promise<number> {
-  const lines = (await sql(`EXPLAIN indexes = 1 ${request.sql}`, request.params)).map((row) =>
-    String(Reflect.get(Object(row), "explain")).trim(),
-  );
-  let total = 0;
-  let section = "";
-  let entering: number | undefined;
-  let pruned: number | undefined;
-  const settle = () => {
-    if (entering !== undefined) total += pruned ?? entering;
-    entering = undefined;
-    pruned = undefined;
-  };
-  for (const text of lines) {
-    if (text.startsWith("ReadFromMergeTree")) {
-      settle();
-      continue;
-    }
-    if (/^[A-Za-z]+$/.test(text)) section = text;
-    const parts = /^Parts: (\d+)\/(\d+)$/.exec(text);
-    if (!parts) continue;
-    entering ??= Number(parts[2]);
-    if (section === "Partition") pruned = Number(parts[1]);
-  }
-  settle();
-  return total;
 }
 
 /** Active `event_log` parts in the weekly partitions these occurred times fall in, any tenant's. */
@@ -295,11 +267,11 @@ describe.skipIf(!clickHouseConfigured)("the event log's aggregate index", () => 
         sql: bounded.sql.replace(/AND \(\s*EventOccurredAt = 0[\s\S]*?\)\s*\)/, ""),
       };
       // Exactly the parts of its three weeks and the unknown-time partition, never a decoy's week.
-      expect(await partsAfterPartitionPruning(bounded)).toBe(
+      expect(await partsAfterPartitionPruning({ query: sql, request: bounded })).toBe(
         await activeParts([...replayedDays.map(daysAgo), 0]),
       );
-      expect(await partsAfterPartitionPruning(bounded)).toBeLessThan(
-        await partsAfterPartitionPruning(unbounded),
+      expect(await partsAfterPartitionPruning({ query: sql, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({ query: sql, request: unbounded }),
       );
     });
 

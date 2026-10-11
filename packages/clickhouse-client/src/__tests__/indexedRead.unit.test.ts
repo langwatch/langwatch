@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
 import type { IdIndexFlags } from "../idIndexFlags.ts";
-import { ID_INDEX_WIDEN_MS, indexedRead } from "../indexedRead.ts";
+import { ID_INDEX_WIDEN_MS, indexedRead, setIdIndexMissLogger } from "../indexedRead.ts";
 import type { QueryDriver, QueryRequest } from "../query.ts";
 import { TenantGuard } from "../tenantGuard.ts";
 import {
@@ -142,6 +142,37 @@ describe("indexedRead", () => {
       expect(windows[0]).not.toBeNull();
       expect(windows[0]?.fromMs).toBe(NOW - RESOLVER_RECENT_WINDOW_MS);
       expect(outcomes).toEqual([{ table: "stored_spans", outcome: "index_miss" }]);
+    });
+  });
+
+  describe("given the index misses an id whose rows the recent source still holds", () => {
+    /** @scenario "a miss whose source still holds rows is counted as a missing index row" */
+    it("returns the rows, counts a found miss and warns once per table without the id", async () => {
+      const { client } = clientWith({ index: { n: 0, fromMs: 0, toMs: 0 } });
+      const warnings: Record<string, unknown>[] = [];
+      setIdIndexMissLogger({ warn: (fields) => warnings.push(fields) });
+      const lookUpFound = () =>
+        indexedRead({
+          client,
+          idIndex: sharedOnly,
+          tenantId: SHARED_TENANT,
+          table: "found_miss_table",
+          index: "found_miss_table_id_index",
+          key: { TraceId: "t1" },
+          fallback: "unbounded",
+          isEmpty: (result: string[]) => result.length === 0,
+          run: async () => ["span"],
+        });
+
+      const first = await lookUpFound();
+      await lookUpFound();
+
+      expect(first).toEqual(["span"]);
+      expect(outcomes.map((each) => each.outcome)).toEqual([
+        "index_miss_found",
+        "index_miss_found",
+      ]);
+      expect(warnings).toEqual([{ table: "found_miss_table", tenantId: SHARED_TENANT }]);
     });
   });
 

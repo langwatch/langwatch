@@ -14,6 +14,7 @@ import {
   TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
+import { partsAfterPartitionPruning } from "@langwatch/clickhouse-client/testing";
 import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -62,6 +63,16 @@ function recordingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
     },
   };
   return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+}
+
+/** One query on the test server, its rows as JSONEachRow parses them. */
+async function queryRows(query: string, params?: Record<string, unknown>): Promise<unknown[]> {
+  const result = await clickHouse.query({
+    query,
+    format: "JSONEachRow",
+    ...(params === undefined ? {} : { query_params: params }),
+  });
+  return result.json();
 }
 
 const runRow = ({
@@ -141,6 +152,20 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
       // Both the outer scope and the inner dedup subquery carry the bound.
       expect(read?.sql.match(/scheduledAtFrom/g)).toHaveLength(2);
       expect(outcomes).toEqual([{ table: "evaluation_runs", outcome: "index_hit" }]);
+      if (read === undefined) throw new Error("no source read of evaluation_runs was sent");
+      statements = [];
+      await repository.getByEvaluationId({
+        authorization: ownProof({ projectId: tenantId }),
+        evaluationId: targetId,
+        retention,
+      });
+      const unflagged = statements.findLast((statement) =>
+        statement.sql.includes("FROM evaluation_runs AS t"),
+      );
+      if (unflagged === undefined) throw new Error("no read without the index was sent");
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: read })).toBeLessThan(
+        await partsAfterPartitionPruning({ query: queryRows, request: unflagged }),
+      );
     });
 
     it("reads the same run through today's ladder when the flag is off", async () => {

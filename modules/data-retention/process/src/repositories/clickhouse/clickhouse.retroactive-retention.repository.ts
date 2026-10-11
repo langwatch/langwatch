@@ -1,4 +1,9 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  ID_INDEX_RETENTION_RAISE,
+  idIndexRetentionDays,
+  idIndexRetentionRaises,
+} from "@langwatch/clickhouse-client";
 import {
   RetroactiveMutationInProgressError,
   retentionCategorySchema,
@@ -57,26 +62,8 @@ const keepForeverRowsSchema = z.array(
 
 const tenantFilterSql = "position(command, {tenantFilterNeedle:String}) > 0";
 
-/** An id index writes "kept forever" as the highest value, so `max` never loses it. */
-const INDEX_KEPT_FOREVER_DAYS = 65_535;
-/** Tenants per index rewrite, so the bound tenant list stays far below the HTTP URI limit. */
-const INDEX_REWRITE_TENANTS = 1_000;
-
 const tableNameRowsSchema = z.array(z.object({ name: z.string() }));
 const tenantRowsSchema = z.array(z.object({ TenantId: z.string() }));
-
-/** A source's `0` (kept forever) as an id index writes it. */
-function indexRetentionDays(retentionDays: number): number {
-  return retentionDays === 0 ? INDEX_KEPT_FOREVER_DAYS : retentionDays;
-}
-
-function chunked<T>({ values, size }: { values: readonly T[]; size: number }): T[][] {
-  const chunks: T[][] = [];
-  for (let start = 0; start < values.length; start += size) {
-    chunks.push(values.slice(start, start + size));
-  }
-  return chunks;
-}
 
 /** Each id index this repository rewrites itself, with its source's category. */
 const ID_INDEX_CATEGORIES: ReadonlyMap<string, RetentionCategory> = new Map(
@@ -187,7 +174,7 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
           "AND _retention_days < {retentionDays:UInt16}",
         params: {
           tenantId: input.projectId,
-          retentionDays: indexRetentionDays(input.newRetentionDays),
+          retentionDays: idIndexRetentionDays(input.newRetentionDays),
         },
       });
     }
@@ -339,7 +326,10 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     return raised;
   }
 
-  /** One raise per retention value and chunk of tenants, over every tenant on the target. */
+  /**
+   * One raise over every tenant on the target, each to its own days, never lower; split only when
+   * the tenant list passes the URL budget. Each raise rewrites every part of the index.
+   */
   private async raiseCategoryIdIndex({
     target,
     index,
@@ -351,31 +341,20 @@ export class ClickHouseRetroactiveRetentionRepository implements RetroactiveRete
     category: RetentionCategory;
     retentionByTenant: ReadonlyMap<string, ResolvedRetention>;
   }): Promise<void> {
-    const tenantsByDays = new Map<number, string[]>();
-    for (const [tenantId, retention] of retentionByTenant) {
-      const days = indexRetentionDays(retention[category]);
-      tenantsByDays.set(days, [...(tenantsByDays.get(days) ?? []), tenantId]);
-    }
-    for (const [retentionDays, tenantIds] of tenantsByDays) {
-      for (const chunk of chunked({
-        values: tenantIds.toSorted((left, right) => left.localeCompare(right)),
-        size: INDEX_REWRITE_TENANTS,
-      })) {
-        await this.clickhouse.command({
-          tenantId: "",
-          ...target,
-          table: index,
-          kind: "write",
-          sql:
-            `ALTER TABLE ${index} ` +
-            "UPDATE _retention_days = {retentionDays:UInt16} " +
-            "WHERE TenantId IN {tenantIds:Array(String)} " +
-            "AND _retention_days < {retentionDays:UInt16}",
-          params: { tenantIds: chunk, retentionDays },
-          // One raise per ClickHouse target over the tenants it names, which span organizations.
-          SKIP_TENANT_CHECK: true,
-        });
-      }
+    const daysByTenant = new Map(
+      [...retentionByTenant].map(([tenantId, retention]) => [tenantId, retention[category]]),
+    );
+    for (const params of idIndexRetentionRaises({ daysByTenant })) {
+      await this.clickhouse.command({
+        tenantId: "",
+        ...target,
+        table: index,
+        kind: "write",
+        sql: `ALTER TABLE ${index} ${ID_INDEX_RETENTION_RAISE}`,
+        params,
+        // One raise per ClickHouse target over the tenants it names, which span organizations.
+        SKIP_TENANT_CHECK: true,
+      });
     }
   }
 

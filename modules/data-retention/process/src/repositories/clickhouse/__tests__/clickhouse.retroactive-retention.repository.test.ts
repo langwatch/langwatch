@@ -269,7 +269,7 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       ["project-c", { traces: 365, scenarios: 63, experiments: 49 }],
     ]);
 
-    it("raises each index per retention value over the tenants holding it, on that target", async () => {
+    it("raises each index in one statement, each tenant to its own days, on that target", async () => {
       const { commands, repository } = createRepository([], {
         heldTables: ["stored_spans_id_index", "suite_runs_id_index"],
       });
@@ -281,20 +281,11 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
       });
 
       expect(tables).toEqual(["stored_spans_id_index", "suite_runs_id_index"]);
+      const tenantIds = ["project-a", "project-b", "project-c"];
       expect(commands.map(({ table, params }) => ({ table, params }))).toEqual([
-        {
-          table: "stored_spans_id_index",
-          params: { tenantIds: ["project-a", "project-c"], retentionDays: 365 },
-        },
-        { table: "stored_spans_id_index", params: { tenantIds: ["project-b"], retentionDays: 30 } },
-        {
-          table: "suite_runs_id_index",
-          params: { tenantIds: ["project-a"], retentionDays: 65_535 },
-        },
-        {
-          table: "suite_runs_id_index",
-          params: { tenantIds: ["project-b", "project-c"], retentionDays: 63 },
-        },
+        { table: "stored_spans_id_index", params: { tenantIds, retentionDays: [365, 30, 365] } },
+        // A source's 0 (kept forever) is the index's highest value.
+        { table: "suite_runs_id_index", params: { tenantIds, retentionDays: [65_535, 63, 63] } },
       ]);
       for (const command of commands) {
         expect(command).toMatchObject({
@@ -303,8 +294,12 @@ describe("ClickHouseRetroactiveRetentionRepository", () => {
           // Each raise covers the target's tenants at once, which span organizations.
           SKIP_TENANT_CHECK: true,
         });
-        expect(command.sql).toContain(
-          "WHERE TenantId IN {tenantIds:Array(String)} AND _retention_days < {retentionDays:UInt16}",
+        // Raise-only: greatest() never lowers a row, and a forever row is never rewritten.
+        expect(command.sql).toBe(
+          `ALTER TABLE ${command.table} UPDATE _retention_days = greatest(_retention_days, ` +
+            "transform(TenantId, {tenantIds:Array(String)}, {retentionDays:Array(UInt16)}, " +
+            "_retention_days)) WHERE TenantId IN {tenantIds:Array(String)} " +
+            "AND _retention_days < 65535",
         );
       }
     });

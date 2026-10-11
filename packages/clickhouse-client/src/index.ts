@@ -237,8 +237,24 @@ export {
   isIdIndexReadinessStatement,
   writeIdIndexMarker,
 } from "./idIndexReadiness.ts";
-export type { IndexedReadOptions } from "./indexedRead.ts";
-export { ID_INDEX_MISS_PROBE, ID_INDEX_WIDEN_MS, indexedRead, indexWindow } from "./indexedRead.ts";
+export type { IdIndexMissLogger, IndexedReadOptions } from "./indexedRead.ts";
+export {
+  ID_INDEX_MISS_PROBE,
+  ID_INDEX_WIDEN_MS,
+  idIndexMissWindow,
+  indexedRead,
+  indexWindow,
+  reportIndexMissFound,
+  setIdIndexMissLogger,
+} from "./indexedRead.ts";
+export type { IdIndexRetentionBatch } from "./idIndexRetention.ts";
+export {
+  ID_INDEX_KEPT_FOREVER_DAYS,
+  ID_INDEX_RAISE_PARAM_BYTES,
+  ID_INDEX_RETENTION_RAISE,
+  idIndexRetentionDays,
+  idIndexRetentionRaises,
+} from "./idIndexRetention.ts";
 export type {
   FillIdIndexesOptions,
   IdIndexDeclaration,

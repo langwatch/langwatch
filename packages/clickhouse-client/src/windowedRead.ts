@@ -20,6 +20,7 @@ export type WindowedReadOutcome =
   | "hit"
   | "index_hit"
   | "index_miss"
+  | "index_miss_found"
   | "unbounded_empty"
   | "unbounded_hit"
   | "unwindowed"

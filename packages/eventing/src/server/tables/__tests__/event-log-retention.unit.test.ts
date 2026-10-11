@@ -289,7 +289,7 @@ describe("EventLogRetention", () => {
       ["project-b", { traces: 30, scenarios: 63, experiments: 30 }],
     ]);
 
-    it("raises each category's rows per retention, kept forever as the highest", async () => {
+    it("raises each category's rows in one statement, each tenant to its own days, kept forever as the highest", async () => {
       const { retention, statements } = retentionOver({ holdsIdIndex: true });
 
       const tables = await retention.raiseIdIndexRetention({
@@ -306,19 +306,15 @@ describe("EventLogRetention", () => {
       ).toEqual([
         {
           aggregates: "AggregateType IN ('trace')",
-          params: { tenantIds: ["project-a", "project-b"], retentionDays: 30 },
+          params: { tenantIds: ["project-a", "project-b"], retentionDays: [30, 30] },
         },
         {
           aggregates: "AggregateType IN ('simulation_run', 'suite_run')",
-          params: { tenantIds: ["project-a"], retentionDays: 65_535 },
-        },
-        {
-          aggregates: "AggregateType IN ('simulation_run', 'suite_run')",
-          params: { tenantIds: ["project-b"], retentionDays: 63 },
+          params: { tenantIds: ["project-a", "project-b"], retentionDays: [65_535, 63] },
         },
         {
           aggregates: "AggregateType IN ('experiment_run')",
-          params: { tenantIds: ["project-a", "project-b"], retentionDays: 30 },
+          params: { tenantIds: ["project-a", "project-b"], retentionDays: [30, 30] },
         },
         {
           aggregates:
@@ -332,7 +328,13 @@ describe("EventLogRetention", () => {
           // Each raise covers the target's tenants at once, which span organizations.
           SKIP_TENANT_CHECK: true,
         });
-        expect(statement.sql).toContain("_retention_days < ");
+        expect(statement.sql).toContain("_retention_days < 65535");
+      }
+      for (const statement of statements.slice(0, 3)) {
+        expect(statement.sql).toContain(
+          "UPDATE _retention_days = greatest(_retention_days, transform(TenantId, " +
+            "{tenantIds:Array(String)}, {retentionDays:Array(UInt16)}, _retention_days))",
+        );
       }
     });
 

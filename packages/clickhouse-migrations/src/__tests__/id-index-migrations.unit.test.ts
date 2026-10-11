@@ -76,7 +76,7 @@ describe("id index migrations", () => {
       }
     });
 
-    // Fails until slices 3 to 7 land every owner's goose file; then `it.fails` becomes `it`.
+    // A tenth file or a sixteenth index needs its owner's fill and readiness too (plan §2).
     it("holds exactly the 15 index tables across 9 files", () => {
       const tables = indexTables();
       expect(tables.map((table) => table.name).toSorted()).toEqual(EXPECTED_INDEXES.toSorted());

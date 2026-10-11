@@ -166,6 +166,98 @@ describe("fillIdIndexes", () => {
     });
   });
 
+  describe("given a target whose batches time out at every size", () => {
+    /** @scenario "a batch that times out is halved, and a stuck target does not stop the others" */
+    it("halves the batch on code 159 down to the floor, fails that target and fills the next", async () => {
+      const attempts: { target: string; throughTenantId: unknown }[] = [];
+      const statements = {
+        query: async <Row>(request: QueryRequest) => {
+          if (request.table === "system.parts") {
+            return { rows: [{ partition_id: "202641", rows: "40" }] as Row[] };
+          }
+          return {
+            rows: [
+              { TenantId: "tenant_a", rows: "10" },
+              { TenantId: "tenant_b", rows: "15" },
+              { TenantId: "tenant_c", rows: "15" },
+            ] as Row[],
+          };
+        },
+        command: async (request: QueryRequest) => {
+          if (request.params?.marker !== undefined) return;
+          const target = request.organizationId ?? "shared";
+          attempts.push({ target, throughTenantId: request.params?.throughTenantId });
+          if (target === "shared") {
+            throw Object.assign(new Error("Timeout exceeded: elapsed 600 s"), { code: "159" });
+          }
+        },
+      };
+      const { saved, checkpoint } = checkpointFrom(null);
+
+      await expect(
+        fillIdIndexes({
+          statements,
+          targets: idIndexFillTargets({ privateRoutes: new Map([["org_p", "http://p"]]) }),
+          indexes: [SPANS],
+          batchRows: 40,
+          minBatchRows: 10,
+          checkpoint,
+          signal: new AbortController().signal,
+          beforeMarker: async () => {},
+          sleep: async () => {},
+        }),
+      ).rejects.toMatchObject({ name: "IdIndexFillIncompleteError" });
+
+      const shared = attempts.filter((each) => each.target === "shared");
+      // 40 rows whole, then 20 (tenant_a alone), then the 10-row floor until its retries run out.
+      expect(shared.map((each) => each.throughTenantId)).toEqual([
+        undefined,
+        "tenant_a",
+        ...Array.from({ length: 5 }, () => "tenant_a"),
+      ]);
+      expect(attempts.filter((each) => each.target === "org_p")).toHaveLength(1);
+      expect(saved.at(-1)).toMatchObject({
+        targetsDone: ["org_p"],
+        targetsFailed: [{ target: "shared" }],
+      });
+    });
+  });
+
+  describe("given a partition whose parts live on the cold volume", () => {
+    it("starts it at a quarter of the batch", async () => {
+      const through: unknown[] = [];
+      const statements = {
+        query: async <Row>(request: QueryRequest) => {
+          if (request.table === "system.parts") {
+            return { rows: [{ partition_id: "202601", rows: "40", cold: 1 }] as Row[] };
+          }
+          return {
+            rows: [
+              { TenantId: "tenant_a", rows: "10" },
+              { TenantId: "tenant_b", rows: "30" },
+            ] as Row[],
+          };
+        },
+        command: async (request: QueryRequest) => {
+          if (request.params?.marker === undefined) through.push(request.params?.throughTenantId);
+        },
+      };
+
+      await fillIdIndexes({
+        statements,
+        targets: idIndexFillTargets({ privateRoutes: new Map() }),
+        indexes: [SPANS],
+        batchRows: 40,
+        minBatchRows: 1,
+        checkpoint: checkpointFrom(null).checkpoint,
+        signal: new AbortController().signal,
+        beforeMarker: async () => {},
+      });
+
+      expect(through).toEqual(["tenant_a", "tenant_b", "tenant_b", "tenant_b"]);
+    });
+  });
+
   describe("given an owner's fill over the shared target and a private one", () => {
     it("raises each target's copied-retention indexes before it writes that target's markers", async () => {
       const order: string[] = [];

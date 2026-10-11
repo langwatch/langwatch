@@ -21,6 +21,7 @@ import {
   migrateTestClickHouseOnce,
   nativeClickHouseBaseUrl,
   startTestClickHouseEndpoints,
+  partsAfterPartitionPruning,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { createTenantId } from "@langwatch/eventing";
@@ -88,40 +89,14 @@ function recordingClient(client: ClickHouseClient): ClickHouseQueryClient {
   return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
 }
 
-/**
- * The parts left once the planner has pruned by partition, summed over every table scan the
- * statement makes. The key is left out on purpose: this counts what the time bound alone rules out.
- */
-async function partsAfterPartitionPruning(request: QueryRequest): Promise<number> {
+/** One query on the test server, its rows as JSONEachRow parses them. */
+async function queryRows(query: string, params?: Record<string, unknown>): Promise<unknown[]> {
   const result = await ch.query({
-    query: `EXPLAIN indexes = 1 ${request.sql}`,
+    query,
     format: "JSONEachRow",
-    ...(request.params === undefined ? {} : { query_params: request.params }),
+    ...(params === undefined ? {} : { query_params: params }),
   });
-  const lines = (await result.json<{ explain: string }>()).map((row) => row.explain);
-  let total = 0;
-  let section = "";
-  let enteringParts: number | undefined;
-  let prunedParts: number | undefined;
-  const settle = () => {
-    if (enteringParts !== undefined) total += prunedParts ?? enteringParts;
-    enteringParts = undefined;
-    prunedParts = undefined;
-  };
-  for (const line of lines) {
-    const text = line.trim();
-    if (text.startsWith("ReadFromMergeTree")) {
-      settle();
-      continue;
-    }
-    if (/^[A-Za-z]+$/.test(text)) section = text;
-    const parts = /^Parts: (\d+)\/(\d+)$/.exec(text);
-    if (!parts) continue;
-    enteringParts ??= Number(parts[2]);
-    if (section === "Partition") prunedParts = Number(parts[1]);
-  }
-  settle();
-  return total;
+  return result.json();
 }
 
 /** The one statement that read `table`'s source rows, not its index. */
@@ -254,8 +229,11 @@ describe.skipIf(!clickHouseConfigured)("experiment lookups by id with the id ind
       await ClickHouseExperimentIdLookupRepository.create({
         clickhouse: ClickhouseExperimentClickHouseRepository.create(resolveClient),
       }).findExperimentId({ tenantId, runId });
-      expect(await partsAfterPartitionPruning(bounded)).toBeLessThan(
-        await partsAfterPartitionPruning(sourceReadOf("experiment_runs")),
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({
+          query: queryRows,
+          request: sourceReadOf("experiment_runs"),
+        }),
       );
     });
 
@@ -283,8 +261,11 @@ describe.skipIf(!clickHouseConfigured)("experiment lookups by id with the id ind
         clickhouse: ClickhouseExperimentClickHouseRepository.create(resolveClient),
         defaultRetentionDays: () => 308,
       }).findProjection(`${experimentId}:${runId}`, { tenantId: createTenantId(tenantId) });
-      expect(await partsAfterPartitionPruning(bounded)).toBeLessThan(
-        await partsAfterPartitionPruning(sourceReadOf("experiment_runs")),
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({
+          query: queryRows,
+          request: sourceReadOf("experiment_runs"),
+        }),
       );
     });
 
@@ -318,8 +299,11 @@ describe.skipIf(!clickHouseConfigured)("experiment lookups by id with the id ind
       });
       statements = [];
       await repository.findRun({ projectId: tenantId, experimentId, runId });
-      expect(await partsAfterPartitionPruning(bounded)).toBeLessThan(
-        await partsAfterPartitionPruning(sourceReadOf("experiment_runs")),
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({
+          query: queryRows,
+          request: sourceReadOf("experiment_runs"),
+        }),
       );
     });
 
@@ -347,8 +331,8 @@ describe.skipIf(!clickHouseConfigured)("experiment lookups by id with the id ind
       });
       statements = [];
       await repository.findStep({ tenantId, experimentId, runId, stepIndex: "0" });
-      expect(await partsAfterPartitionPruning(bounded)).toBeLessThan(
-        await partsAfterPartitionPruning(sourceReadOf("dspy_steps")),
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({ query: queryRows, request: sourceReadOf("dspy_steps") }),
       );
 
       outcomes = [];

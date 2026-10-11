@@ -16,6 +16,7 @@ import {
   TenantGuard,
   type WindowedReadOutcome,
 } from "@langwatch/clickhouse-client";
+import { partsAfterPartitionPruning } from "@langwatch/clickhouse-client/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startMigratedClickHouse } from "../../../__tests__/migrated-clickhouse.harness.ts";
@@ -35,6 +36,7 @@ const flagsOn: IdIndexFlags = { isOn: () => true };
 
 let clickHouse: ClickHouseClient;
 let repository: ClickHouseAnalyticsEvaluationRepository;
+let unflagged: ClickHouseAnalyticsEvaluationRepository;
 let statements: QueryRequest[] = [];
 const outcomes: { table: string; outcome: WindowedReadOutcome }[] = [];
 
@@ -64,6 +66,16 @@ function recordingQueryClient(client: ClickHouseClient): ClickHouseQueryClient {
     },
   };
   return new ClickHouseQueryClient({ tenantGuard: new TenantGuard(), driver });
+}
+
+/** One query on the test server, its rows as JSONEachRow parses them. */
+async function queryRows(query: string, params?: Record<string, unknown>): Promise<unknown[]> {
+  const result = await clickHouse.query({
+    query,
+    format: "JSONEachRow",
+    ...(params === undefined ? {} : { query_params: params }),
+  });
+  return result.json();
 }
 
 const evaluationRow = ({
@@ -108,13 +120,14 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation's analytics row by id
     ({ client: clickHouse } = await startMigratedClickHouse());
     setWindowedReadMetrics({ record: (outcome) => void outcomes.push(outcome) });
     const queryClient = recordingQueryClient(clickHouse);
-    repository = ClickHouseAnalyticsEvaluationRepository.create({
-      resolveClient: async (tenant) =>
+    const options = {
+      resolveClient: async (tenant: string) =>
         ClickHouseAnalyticsSessionRepository.create({ clickhouse: queryClient, tenantId: tenant }),
       defaultRetentionDays: () => 365,
       clickhouse: queryClient,
-      idIndex: flagsOn,
-    });
+    };
+    repository = ClickHouseAnalyticsEvaluationRepository.create({ ...options, idIndex: flagsOn });
+    unflagged = ClickHouseAnalyticsEvaluationRepository.create(options);
     await repository.upsertBatch([
       {
         row: evaluationRow({ evaluationId: targetId, occurredAtMs: eightWeeksAgoMs }),
@@ -154,6 +167,16 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation's analytics row by id
       });
       expect(read?.sql.match(/\{fromMs:Int64\}/g)).toHaveLength(2);
       expect(outcomes).toEqual([{ table: "evaluation_analytics", outcome: "index_hit" }]);
+      if (read === undefined) throw new Error("no source read of evaluation_analytics was sent");
+      statements = [];
+      await unflagged.findLatest({ tenantId, evaluationId: targetId });
+      const unbounded = statements.find((statement) =>
+        statement.sql.includes("SELECT * FROM evaluation_analytics"),
+      );
+      if (unbounded === undefined) throw new Error("no unbounded read was sent");
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: read })).toBeLessThan(
+        await partsAfterPartitionPruning({ query: queryRows, request: unbounded }),
+      );
     });
 
     it("keeps the caller's window, and its unbounded inner subquery, when the window finds the row", async () => {

@@ -74,6 +74,8 @@ export type FillIdIndexesOptions = {
   dryRun?: boolean | undefined;
   /** Source rows per batch; a larger partition is split by tenant range. */
   batchRows?: number | undefined;
+  /** The floor a memory or timeout error halves the batch down to, before the target fails. */
+  minBatchRows?: number | undefined;
   /** Runs once a target is filled, before its marker rows: the retention raise. */
   beforeMarker: (input: { target: IdIndexFillTarget }) => Promise<void>;
   /** The pause between retries; a timer by default. */
@@ -81,10 +83,14 @@ export type FillIdIndexesOptions = {
 };
 
 export const DEFAULT_ID_INDEX_BATCH_ROWS = 20_000_000;
+const MIN_ID_INDEX_BATCH_ROWS = 250_000;
+/** A partition with parts on the cold volume starts at a quarter of the batch: S3 reads slower. */
+const COLD_BATCH_DIVISOR = 4;
 const MAX_BATCH_RETRIES = 5;
 const FIRST_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 const MEMORY_LIMIT_EXCEEDED = "241";
+const TIMEOUT_EXCEEDED = "159";
 
 const FILL_SETTINGS = {
   optimize_aggregation_in_order: 1,
@@ -96,7 +102,7 @@ const FILL_SETTINGS = {
 /** One batch of one partition: a tenant range, and a hash slice of a tenant above the size. */
 type Batch = Pick<IdIndexFillCursor, "afterTenantId" | "throughTenantId" | "slice" | "slices">;
 
-type Partition = { partition: string; rows: number };
+type Partition = { partition: string; rows: number; cold?: boolean | undefined };
 
 /** `shared` first, then one target per private URL, keyed and routed by its first organisation. */
 export function idIndexFillTargets({
@@ -236,11 +242,19 @@ const timer = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-function isMemoryLimit(error: unknown): boolean {
+/** A memory limit (241) or a timeout (159, or the driver's own): a smaller batch may pass. */
+function isBatchTooLarge(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
+  const code = String(Reflect.get(error, "code"));
+  const message = messageOf(error);
   return (
-    String(Reflect.get(error, "code")) === MEMORY_LIMIT_EXCEEDED ||
-    messageOf(error).includes("MEMORY_LIMIT_EXCEEDED")
+    code === MEMORY_LIMIT_EXCEEDED ||
+    code === TIMEOUT_EXCEEDED ||
+    message.includes("MEMORY_LIMIT_EXCEEDED") ||
+    message.includes("TIMEOUT_EXCEEDED") ||
+    message.startsWith("Code: 159.") ||
+    Reflect.get(error, "name") === "TimeoutError" ||
+    /^timeout error\.?$/i.test(message.trim())
   );
 }
 
@@ -320,11 +334,13 @@ export async function fillIdIndexes(options: FillIdIndexesOptions): Promise<IdIn
 class IdIndexFill {
   private readonly report: IdIndexFillReport;
   private readonly batchRows: number;
+  private readonly minBatchRows: number;
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(private readonly options: FillIdIndexesOptions) {
     this.report = fillReportOf({ resumeFrom: options.checkpoint.resumeFrom });
     this.batchRows = options.batchRows ?? DEFAULT_ID_INDEX_BATCH_ROWS;
+    this.minBatchRows = Math.min(this.batchRows, options.minBatchRows ?? MIN_ID_INDEX_BATCH_ROWS);
     this.sleep = options.sleep ?? timer;
   }
 
@@ -427,7 +443,9 @@ class IdIndexFill {
     partition: Partition;
     cursor: IdIndexFillCursor | null;
   }): Promise<boolean> {
-    let batchRows = this.batchRows;
+    let batchRows = partition.cold
+      ? Math.max(this.minBatchRows, Math.ceil(this.batchRows / COLD_BATCH_DIVISOR))
+      : this.batchRows;
     let tenants: { tenantId: string; rows: number }[] | null = null;
     let committed = cursor;
     let failures = 0;
@@ -442,8 +460,11 @@ class IdIndexFill {
       if (this.options.signal.aborted) return false;
       const attempt = await this.insertBatch({ target, index, partition, batch: next });
       if (!attempt.ok) {
-        failures += 1;
-        batchRows = await this.backOff({ error: attempt.error, failures, batchRows });
+        const smaller = this.smallerBatch({ error: attempt.error, batchRows });
+        // A halved batch is a fresh attempt; retries run out only at the floor.
+        failures = smaller < batchRows ? 1 : failures + 1;
+        batchRows = smaller;
+        await this.backOff({ error: attempt.error, failures });
         continue;
       }
       committed = {
@@ -491,20 +512,17 @@ class IdIndexFill {
     }
   }
 
-  /** Pauses 1 s doubling to 30 s; a memory-limit error halves the batch first. */
-  private async backOff({
-    error,
-    failures,
-    batchRows,
-  }: {
-    error: unknown;
-    failures: number;
-    batchRows: number;
-  }): Promise<number> {
+  /** Half the batch, down to the floor, after a memory or timeout error; else unchanged. */
+  private smallerBatch({ error, batchRows }: { error: unknown; batchRows: number }): number {
+    if (!isBatchTooLarge(error)) return batchRows;
+    return Math.max(this.minBatchRows, Math.ceil(batchRows / 2));
+  }
+
+  /** Pauses 1 s doubling to 30 s; past the retries the target fails and the walk moves on. */
+  private async backOff({ error, failures }: { error: unknown; failures: number }): Promise<void> {
     this.report.retries += 1;
     if (failures > MAX_BATCH_RETRIES) throw error;
     await this.sleep(Math.min(MAX_BACKOFF_MS, FIRST_BACKOFF_MS * 2 ** (failures - 1)));
-    return isMemoryLimit(error) ? Math.max(1, Math.ceil(batchRows / 2)) : batchRows;
   }
 
   private route(target: IdIndexFillTarget): Pick<QueryRequest, "tenantId" | "organizationId"> {
@@ -523,10 +541,13 @@ class IdIndexFill {
     const result = await this.options.statements.query<{
       partition_id: string;
       rows: string | number;
+      cold?: string | number | undefined;
     }>({
       ...this.route(target),
       sql:
-        "SELECT partition_id, sum(rows) AS rows FROM system.parts " +
+        "SELECT partition_id, sum(rows) AS rows, max(disk_name IN (" +
+        "SELECT arrayJoin(disks) FROM system.storage_policies WHERE volume_name = 'cold'" +
+        ")) AS cold FROM system.parts " +
         "WHERE database = currentDatabase() AND table = {source:String} AND active " +
         "GROUP BY partition_id ORDER BY partition_id DESC",
       params: { source: assertIdentifier({ name: index.source }) },
@@ -534,7 +555,11 @@ class IdIndexFill {
       // The part list describes the server, which no tenant owns.
       SKIP_TENANT_CHECK: true,
     });
-    return result.rows.map((row) => ({ partition: row.partition_id, rows: Number(row.rows) }));
+    return result.rows.map((row) => ({
+      partition: row.partition_id,
+      rows: Number(row.rows),
+      cold: Number(row.cold ?? 0) > 0,
+    }));
   }
 
   private async tenantsOf({

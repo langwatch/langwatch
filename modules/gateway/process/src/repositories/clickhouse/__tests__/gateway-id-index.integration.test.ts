@@ -18,6 +18,7 @@ import {
   migrateTestClickHouseOnce,
   nativeClickHouseBaseUrl,
   startTestClickHouseEndpoints,
+  partsAfterPartitionPruning,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { nowInstant } from "@langwatch/time";
@@ -83,6 +84,16 @@ async function partsReached(request: QueryRequest): Promise<number> {
   });
   const rows = await result.json<{ parts: number | string }>();
   return rows.reduce((total, row) => total + Number(row.parts), 0);
+}
+
+/** One query on the test server, its rows as JSONEachRow parses them. */
+async function queryRows(query: string, params?: Record<string, unknown>): Promise<unknown[]> {
+  const result = await ch.query({
+    query,
+    format: "JSONEachRow",
+    ...(params === undefined ? {} : { query_params: params }),
+  });
+  return result.json();
 }
 
 function sourceReadOf(table: string): QueryRequest {
@@ -230,9 +241,20 @@ describe.skipIf(!clickHouseConfigured)("gateway lookups by request id with the i
       });
 
       expect(row?.gatewayRequestId).toBe("req-old");
-      expect(sourceReadOf("gateway_spend").params).toMatchObject({
-        fromMs: eightWeeksAgoMs - DAY_MS,
+      const bounded = sourceReadOf("gateway_spend");
+      expect(bounded.params).toMatchObject({ fromMs: eightWeeksAgoMs - DAY_MS });
+      statements = [];
+      await spend.findSpendEventAcrossTenants({
+        tenantIds: [tenantId],
+        gatewayRequestId: "req-old",
+        statuses: ["confirmed"],
       });
+      expect(await partsAfterPartitionPruning({ query: queryRows, request: bounded })).toBeLessThan(
+        await partsAfterPartitionPruning({
+          query: queryRows,
+          request: sourceReadOf("gateway_spend"),
+        }),
+      );
     });
 
     /** @scenario "a lookup by id reads only the partitions the index names" */

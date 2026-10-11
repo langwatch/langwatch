@@ -1,3 +1,10 @@
+import {
+  ID_INDEX_KEPT_FOREVER_DAYS,
+  ID_INDEX_RETENTION_RAISE,
+  idIndexRetentionDays,
+  idIndexRetentionRaises,
+} from "@langwatch/clickhouse-client";
+
 import { ConfigurationError, ValidationError } from "../../services/errorHandling.ts";
 import { EVENT_TABLES } from "./event-table-declarations.ts";
 
@@ -5,10 +12,6 @@ const EVENT_LOG_TABLE = EVENT_TABLES[0].table;
 const EVENT_LOG_ID_INDEX_TABLE = EVENT_TABLES[1].table;
 const MUTATION_CATEGORY_MARKER_PREFIX = "langwatch:event-log-retention-category:";
 const MAX_RETENTION_DAYS = 65_535;
-/** The id index writes "kept forever" as the highest value, so `max` never loses it. */
-const INDEX_KEPT_FOREVER_DAYS = 65_535;
-/** Tenants per index rewrite, so the bound tenant list stays far below the HTTP URI limit. */
-const INDEX_REWRITE_TENANTS = 1_000;
 
 /** The one statement the operation runs, in the routed ClickHouse member's own vocabulary. */
 export interface EventLogRetentionClient {
@@ -117,7 +120,7 @@ export class EventLogRetention {
         "AND _retention_days < {retentionDays:UInt16}" +
         ` AND AggregateType IN (${sqlList(own)})` +
         ` AND length(${sqlString(markerOf(category))}) > 0`,
-      params: { tenantId, retentionDays: indexRetentionDays(retentionDays) },
+      params: { tenantId, retentionDays: idIndexRetentionDays(retentionDays) },
     });
     return [EVENT_LOG_TABLE, EVENT_LOG_ID_INDEX_TABLE];
   }
@@ -142,20 +145,20 @@ export class EventLogRetention {
     for (const category of this.classification.categories) {
       const own = this.aggregateTypesWhere((candidate) => candidate === category);
       if (own.length === 0) continue;
-      for (const { retentionDays, tenantIds } of indexRaises({ retentionByTenant, category })) {
+      // One raise per category, so each rewrite keeps the marker that names it.
+      for (const params of idIndexRetentionRaises({
+        daysByTenant: categoryDays({ retentionByTenant, category }),
+      })) {
         await this.client.command({
           tenantId: "",
           ...(organizationId === undefined ? {} : { organizationId }),
           table: EVENT_LOG_ID_INDEX_TABLE,
           kind: "write",
           sql:
-            `ALTER TABLE ${EVENT_LOG_ID_INDEX_TABLE} ` +
-            "UPDATE _retention_days = {retentionDays:UInt16} " +
-            "WHERE TenantId IN {tenantIds:Array(String)} " +
-            "AND _retention_days < {retentionDays:UInt16}" +
+            `ALTER TABLE ${EVENT_LOG_ID_INDEX_TABLE} ${ID_INDEX_RETENTION_RAISE}` +
             ` AND AggregateType IN (${sqlList(own)})` +
             ` AND length(${sqlString(markerOf(category))}) > 0`,
-          params: { tenantIds, retentionDays },
+          params,
           // One raise per ClickHouse target over the tenants it names, which span organizations.
           SKIP_TENANT_CHECK: true,
         });
@@ -237,8 +240,8 @@ export class EventLogRetention {
       kind: "write",
       sql:
         `ALTER TABLE ${EVENT_LOG_ID_INDEX_TABLE} ` +
-        `UPDATE _retention_days = ${INDEX_KEPT_FOREVER_DAYS} ` +
-        `WHERE _retention_days < ${INDEX_KEPT_FOREVER_DAYS}` +
+        `UPDATE _retention_days = ${ID_INDEX_KEPT_FOREVER_DAYS} ` +
+        `WHERE _retention_days < ${ID_INDEX_KEPT_FOREVER_DAYS}` +
         ` AND (${kept.join(" OR ")})` +
         ` AND length(${sqlString(markerOf(this.classification.indefiniteClass))}) > 0`,
       // A replicated table refuses a mutation's subquery unless allowed; a raise is safe to repeat.
@@ -326,34 +329,20 @@ function assertRetentionDays(retentionDays: number): void {
   }
 }
 
-/** A source's `0` (kept forever) as the index writes it. */
-function indexRetentionDays(retentionDays: number): number {
-  return retentionDays === 0 ? INDEX_KEPT_FOREVER_DAYS : retentionDays;
-}
-
-/** One raise per index retention value and chunk of tenants, tenants sorted for a stable plan. */
-function indexRaises({
+/** Each tenant's source days in one category; a tenant without the category is left out. */
+function categoryDays({
   retentionByTenant,
   category,
 }: {
   retentionByTenant: ReadonlyMap<string, Readonly<Record<string, number>>>;
   category: string;
-}): { retentionDays: number; tenantIds: string[] }[] {
-  const tenantsByDays = new Map<number, string[]>();
+}): Map<string, number> {
+  const days = new Map<string, number>();
   for (const [tenantId, retention] of retentionByTenant) {
-    const days = retention[category];
-    if (days === undefined) continue;
-    const retentionDays = indexRetentionDays(days);
-    tenantsByDays.set(retentionDays, [...(tenantsByDays.get(retentionDays) ?? []), tenantId]);
+    const value = retention[category];
+    if (value !== undefined) days.set(tenantId, value);
   }
-  return [...tenantsByDays].flatMap(([retentionDays, tenantIds]) => {
-    const sorted = tenantIds.toSorted((left, right) => left.localeCompare(right));
-    const raises: { retentionDays: number; tenantIds: string[] }[] = [];
-    for (let start = 0; start < sorted.length; start += INDEX_REWRITE_TENANTS) {
-      raises.push({ retentionDays, tenantIds: sorted.slice(start, start + INDEX_REWRITE_TENANTS) });
-    }
-    return raises;
-  });
+  return days;
 }
 
 function markerOf(category: string): string {
