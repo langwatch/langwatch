@@ -246,3 +246,22 @@ Feature: Guardrails wrap every gateway dispatch
       And the edited_text is NOT written to the stream
       # Provider-shape-specific chunk rewriting is deferred to a future iter.
       # "redact on stream" in v1 = block + client-retry.
+
+  Rule: The guardrail form checks on submit
+
+    @integration
+    Scenario: Saving an incomplete guardrail names the missing name and evaluator
+      Given the new-guardrail form is open and nothing is filled in
+      Then the save action is enabled and no error is shown
+      When the save action is pressed
+      Then "Enter a name." and "Choose an evaluator." are shown
+      And the name field is focused
+      And nothing is sent
+      And once a name is entered the evaluator field is the one focused
+
+    @integration
+    Scenario: An edit whose guardrail is no longer available offers no save
+      Given the form is opened for a guardrail that is not in the project
+      Then it says the guardrail is no longer available
+      And no save action is offered
+      And Cancel is still offered

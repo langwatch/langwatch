@@ -165,6 +165,7 @@ describe("WebhookEndpointDrawer", () => {
     expect(onSave).toHaveBeenCalledTimes(1);
   });
 
+  /** @scenario Saving requires a URL and at least one selected event */
   it("names each delivery control that is out of bounds, in order", async () => {
     const user = userEvent.setup();
     const { onSave } = renderDrawer();

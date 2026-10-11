@@ -112,6 +112,7 @@ describe("given the guardrail form is saved incomplete", () => {
   });
   afterEach(cleanup);
 
+  /** @scenario Saving an incomplete guardrail names the missing name and evaluator */
   it("explains the missing name and evaluator, focuses the first and sends nothing", async () => {
     const user = userEvent.setup();
     renderDrawer();
@@ -130,6 +131,7 @@ describe("given the guardrail form is saved incomplete", () => {
     expect(state.mutate).not.toHaveBeenCalled();
   });
 
+  /** @scenario An edit whose guardrail is no longer available offers no save */
   it("offers no save for an edit whose guardrail is not there", async () => {
     renderDrawer("gr-missing");
 
