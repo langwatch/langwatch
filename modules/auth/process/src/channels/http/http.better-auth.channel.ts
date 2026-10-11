@@ -365,32 +365,33 @@ function createBeforeRequestHook({
   };
 }
 
+type CallbackEvidenceArgs = {
+  evidence: SessionMintClaims["evidence"];
+  account: Partial<Record<"providerId" | "accountId" | "idToken", unknown>>;
+  context: { path?: string; params?: Record<string, string | undefined> } | null | undefined;
+};
+
 /**
  * What an Auth0 or Okta callback proved, kept for the session it is about to mint: the
  * verified ID token first, then the account it accepted (main's database hooks).
  */
-function recordCallbackEvidence({
-  evidence,
-  account,
-  context,
-}: {
-  evidence: SessionMintClaims["evidence"];
-  account: Partial<Record<"providerId" | "accountId" | "idToken", unknown>>;
-  context: { path?: string; params?: Record<string, string | undefined> } | null | undefined;
-}): void {
+export function recordCallbackEvidence({ evidence, account, context }: CallbackEvidenceArgs): void {
   if (typeof account.providerId !== "string") return;
-  const path =
-    context?.path === undefined ? undefined : toConcretePath(context.path, context.params);
   evidence.recordVerifiedCallbackToken({
     providerId: account.providerId,
-    path,
+    path: context?.path === undefined ? undefined : toConcretePath(context.path, context.params),
     verifiedIdToken: typeof account.idToken === "string" ? account.idToken : undefined,
   });
-  if (typeof account.accountId !== "string") return;
+  recordCallbackAccount({ evidence, account, context });
+}
+
+/** The written account row: a sign-in's update carries no accountId until after it lands. */
+export function recordCallbackAccount({ evidence, account, context }: CallbackEvidenceArgs): void {
+  if (typeof account.providerId !== "string" || typeof account.accountId !== "string") return;
   evidence.recordAuthenticatedCallbackAccount({
     providerId: account.providerId,
     providerAccountId: account.accountId,
-    path,
+    path: context?.path === undefined ? undefined : toConcretePath(context.path, context.params),
   });
 }
 
@@ -660,7 +661,8 @@ export const createAuthOptions = ({
           const pin = await identity.createAccountIdentifier(account);
           return pin.pinned ? { data: pin.data } : undefined;
         },
-        after: async (account) => {
+        after: async (account, context) => {
+          recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
           if (!account.userId || !account.providerId || !account.accountId) return;
           await afterAccountCreate({
             repo,
@@ -678,7 +680,8 @@ export const createAuthOptions = ({
           recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
           return undefined;
         },
-        after: async (account) => {
+        after: async (account, context) => {
+          recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
           // BetterAuth refreshes tokens on the linked Account row on every
           // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
           // for users whose correct-provider account is already linked.
