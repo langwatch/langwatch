@@ -4,10 +4,9 @@
 
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { PromptListDrawerToken } from "@langwatch/prompt-client";
 import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
-import { LuArrowLeft } from "react-icons/lu";
 
 import type {
   ComparisonEvaluatorConfig,
@@ -123,56 +122,34 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="md"
-      modal={false}
+      onClose={onClose}
+      onBack={canGoBack ? goBack : void 0}
+      backButtonTestId="back-button"
+      size="sm"
+      title="Add to Evaluation"
+      body="flush"
+      bodyScroll="content"
+      footer={{ cancel: { onClick: onClose } }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <Drawer.Title>Add to Evaluation</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Choose what you want to evaluate - a prompt from your library or a custom agent.
-            </Text>
+      <VStack gap={4} align="stretch" flex={1} overflow="hidden">
+        <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
+          Choose what you want to evaluate - a prompt from your library or a custom agent.
+        </Text>
 
-            {/* Target type cards */}
-            <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
-              {targetTypes.map((targetType) => (
-                <TargetTypeCard
-                  key={targetType.type}
-                  {...targetType}
-                  onClick={() => handleSelectType(targetType.type)}
-                />
-              ))}
-            </VStack>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        {/* Target type cards */}
+        <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
+          {targetTypes.map((targetType) => (
+            <TargetTypeCard
+              key={targetType.type}
+              {...targetType}
+              onClick={() => handleSelectType(targetType.type)}
+            />
+          ))}
+        </VStack>
+      </VStack>
+    </Drawer>
   );
 }
 

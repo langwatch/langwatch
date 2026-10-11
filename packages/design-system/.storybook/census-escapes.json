@@ -3961,5 +3961,665 @@
     "reason": "Not a plain card: entry point field well, secrets indicator hint or chat box surface (R10w2 review).",
     "owner": "workflow",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 454,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 455,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 521,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 536,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 538,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "native-table",
+    "line": 747,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 748,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 750,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 752,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 779,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 783,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 785,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 795,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 796,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 808,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 814,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 823,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 824,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "hand-table",
+    "line": 161,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 162,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 163,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 171,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 195,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 197,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 198,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 199,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 209,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 210,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 213,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 243,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 371,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 386,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "hand-table",
+    "line": 452,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 453,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 454,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 455,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 457,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 463,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 465,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "legacy-table-part",
+    "line": 466,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "native-table",
+    "line": 462,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 463,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 465,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 467,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 476,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 480,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 482,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 492,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 493,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 505,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 511,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 520,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/single-run-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 521,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+    "rule": "native-table",
+    "line": 776,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 778,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 779,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 794,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/evaluations-v3-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 811,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 281,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 292,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 297,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 304,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 313,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 316,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 317,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 322,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 440,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 441,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 442,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 443,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 444,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 445,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 446,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 447,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 448,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "legacy-table-part",
+    "line": 452,
+    "reason": "Approved: protected experiments table, workbench grid, leaderboard or win matrix (R10e2 review).",
+    "owner": "experiment"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-leaderboard-chart.tsx",
+    "rule": "card-box",
+    "line": 290,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/comparison-leaderboard-drawer.tsx",
+    "rule": "card-box",
+    "line": 156,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+    "rule": "card-box",
+    "line": 58,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pareto-scatter-chart.tsx",
+    "rule": "empty-text",
+    "line": 244,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pareto-scatter-chart.tsx",
+    "rule": "card-box",
+    "line": 384,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/pareto-scatter-chart.tsx",
+    "rule": "empty-text",
+    "line": 431,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/tradeoff-summary-line.tsx",
+    "rule": "card-box",
+    "line": 35,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/batch-results/win-rate-chart.tsx",
+    "rule": "card-box",
+    "line": 173,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx",
+    "rule": "card-box",
+    "line": 296,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/TargetSection/target-cell.tsx",
+    "rule": "empty-text",
+    "line": 557,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/comparison-cell.tsx",
+    "rule": "empty-text",
+    "line": 233,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/comparison-cell.tsx",
+    "rule": "empty-text",
+    "line": 324,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/target-type-selector-drawer.tsx",
+    "rule": "card-box",
+    "line": 191,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments-v3/version-history-list.tsx",
+    "rule": "empty-text",
+    "line": 244,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/experiments.screen.tsx",
+    "rule": "list-page-inference",
+    "line": 406,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/experiment/browser/src/ui/sections/experiments/workbench.screen.tsx",
+    "rule": "card-box",
+    "line": 240,
+    "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
+    "owner": "experiment",
+    "disposition": "reviewed"
   }
 ]
