@@ -9,7 +9,7 @@ import { Button, chakra, HStack, Text, Textarea } from "@langwatch/design-system
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
 import { Info, Plus } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   type AvailableSource,
@@ -82,6 +82,8 @@ export type VariablesSectionProps = {
   isMappingDisabled?: boolean;
   /** Draws a source's icon; the consumer owns the icon set. */
   renderSourceIcon?: RenderSourceIcon;
+  /** Lines a literal value opens with (defaults to 1). */
+  valueRows?: 1 | 2;
 };
 
 // ============================================================================
@@ -109,10 +111,24 @@ export const VariablesSection = ({
   disabledMappings = new Set(),
   isMappingDisabled = false,
   renderSourceIcon,
+  valueRows = 1,
 }: VariablesSectionProps) => {
   // Default showAddButton to canAddRemove if not specified
   const shouldShowAddButton = showAddButton ?? canAddRemove;
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [focusAfterRemove, setFocusAfterRemove] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (focusAfterRemove === null) return;
+    const frame = requestAnimationFrame(() => {
+      const target =
+        document.querySelector<HTMLElement>(`[data-testid="${focusAfterRemove}"]`) ??
+        document.querySelector<HTMLElement>('[data-testid="add-variable-button"]');
+      target?.focus();
+      setFocusAfterRemove(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusAfterRemove]);
 
   const handleAddVariable = useCallback(
     (type: FieldType = "str") => {
@@ -130,6 +146,9 @@ export const VariablesSection = ({
 
   const handleRemoveVariable = useCallback(
     (identifier: string) => {
+      const index = variables.findIndex((v) => v.identifier === identifier);
+      const neighbour = variables[index + 1] ?? variables[index - 1];
+      setFocusAfterRemove(neighbour ? `variable-name-${neighbour.identifier}` : "");
       onChange(variables.filter((v) => v.identifier !== identifier));
       // Also remove the mapping if it exists
       if (onMappingChange) {
@@ -241,6 +260,7 @@ export const VariablesSection = ({
         onUpdate={handleUpdateVariable}
         onRemove={handleRemoveVariable}
         renderSourceIcon={renderSourceIcon}
+        valueRows={valueRows}
       />
     </FieldEditor>
   );
@@ -264,7 +284,10 @@ type VariableListProps = Required<
     | "isMappingDisabled"
   >
 > &
-  Pick<VariablesSectionProps, "onMappingChange" | "onValueChange" | "renderSourceIcon"> & {
+  Pick<
+    VariablesSectionProps,
+    "onMappingChange" | "onValueChange" | "renderSourceIcon" | "valueRows"
+  > & {
     editingId: string | null;
     setEditingId: (identifier: string | null) => void;
     onUpdate: (identifier: string, updates: Partial<Variable>) => boolean;
@@ -292,6 +315,7 @@ function VariableList({
   onUpdate,
   onRemove,
   renderSourceIcon,
+  valueRows,
 }: VariableListProps) {
   return (
     <>
@@ -329,6 +353,7 @@ function VariableList({
             infoTooltip={infoTooltip}
             isMappingDisabled={isMappingDisabled_internal}
             renderSourceIcon={renderSourceIcon}
+            valueRows={valueRows}
           />
         );
       })}
@@ -380,6 +405,7 @@ type VariableRowProps = {
   isMappingDisabled?: boolean;
   /** Draws a source's icon; the consumer owns the icon set. */
   renderSourceIcon?: RenderSourceIcon;
+  valueRows?: 1 | 2;
 };
 
 const VariableRow = ({
@@ -402,6 +428,7 @@ const VariableRow = ({
   infoTooltip,
   isMappingDisabled = false,
   renderSourceIcon,
+  valueRows = 1,
 }: VariableRowProps) => {
   const [editValue, setEditValue] = useState(variable.identifier);
   const [hasError, setHasError] = useState(false);
@@ -454,7 +481,7 @@ const VariableRow = ({
       borderColor="border"
       autoresize
       resize="none"
-      rows={1}
+      rows={valueRows}
       minHeight={ROW_HEIGHT}
       maxHeight="240px"
       data-testid={`variable-value-input-${variable.identifier}`}

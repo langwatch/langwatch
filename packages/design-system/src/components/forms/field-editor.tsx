@@ -193,8 +193,10 @@ export function FieldEditorName({
   useEffect(() => {
     if (editing) {
       const frame = requestAnimationFrame(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
+        const input = inputRef.current;
+        if (!input) return;
+        input.focus();
+        if (input.value === value) input.select();
       });
       return () => cancelAnimationFrame(frame);
     }
@@ -202,7 +204,7 @@ export function FieldEditorName({
       returnFocus.current = false;
       buttonRef.current?.focus();
     }
-  }, [editing]);
+  }, [editing, value]);
 
   const settle = (action: () => void) => {
     ignoreBlur.current = true;

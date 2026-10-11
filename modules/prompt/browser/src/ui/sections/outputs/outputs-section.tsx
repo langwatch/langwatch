@@ -95,6 +95,19 @@ export const OutputsSection = ({
   availableTypes = LLM_OUTPUT_TYPES,
 }: OutputsSectionProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [focusAfterRemove, setFocusAfterRemove] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (focusAfterRemove === null) return;
+    const frame = requestAnimationFrame(() => {
+      const target =
+        document.querySelector<HTMLElement>(`[data-testid="${focusAfterRemove}"]`) ??
+        document.querySelector<HTMLElement>('[data-testid="add-output-button"]');
+      target?.focus();
+      setFocusAfterRemove(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusAfterRemove]);
   const jsonSchemaDialog = useDisclosure();
   const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<number | null>(null);
 
@@ -129,6 +142,9 @@ export const OutputsSection = ({
 
   const handleRemoveOutput = useCallback(
     (identifier: string) => {
+      const index = outputs.findIndex((o) => o.identifier === identifier);
+      const neighbour = outputs[index + 1] ?? outputs[index - 1];
+      setFocusAfterRemove(neighbour ? `output-name-${neighbour.identifier}` : "");
       onChange(outputs.filter((o) => o.identifier !== identifier));
     },
     [outputs, onChange],
