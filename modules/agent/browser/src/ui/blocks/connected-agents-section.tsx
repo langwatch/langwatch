@@ -227,7 +227,6 @@ export function ConnectedAgentCard({
   return (
     <AgentCardShell
       agentId={agent.id}
-      agentName={agent.name}
       onClick={onOpen}
       testId={`connected-agent-card-${agent.id}`}
       leading={<AgentCardIcon icon={Bot} />}
@@ -235,27 +234,14 @@ export function ConnectedAgentCard({
       menu={
         <ConnectedAgentMenu agent={agent} onOpen={onOpen} onDelete={onDelete} onTest={onTest} />
       }
-      title={
-        <HStack gap={2} width="full" minWidth={0}>
-          <Text color="fg.muted" fontSize="sm" fontWeight={500} truncate>
-            {agent.name}
-          </Text>
+      title={agent.name}
+      badges={
+        <>
           {agent.environment && <EnvironmentLabel environment={agent.environment} />}
-        </HStack>
-      }
-      info={
-        <HStack
-          gap={2}
-          width="full"
-          minWidth={0}
-          overflow="hidden"
-          color="fg.subtle"
-          textStyle="caption"
-        >
-          {facts.length > 0 && <Text truncate>{facts.join(" · ")}</Text>}
           <ScopeChip agent={agent} />
-        </HStack>
+        </>
       }
+      meta={facts.length > 0 ? facts.join(" · ") : null}
     />
   );
 }
