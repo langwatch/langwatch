@@ -73,7 +73,7 @@ const preview: Preview = {
           "Brand",
           ["Overview", "*"],
           "Patterns",
-          ["Using them together", "*"],
+          ["Using them together", "Create, edit and delete", "*"],
           "Consistency",
           ["Scoreboard", "*"],
         ],
