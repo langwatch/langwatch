@@ -119,7 +119,7 @@ function LabelChoices({
   if (labels.length === 0) {
     return (
       <Text textStyle="caption" color="fg.muted">
-        No label on any scenario yet.
+        No label on any scenario yet. Add one when you edit a scenario.
       </Text>
     );
   }
@@ -179,7 +179,7 @@ function CaseChoices({
   if (groups.length === 0) {
     return (
       <Text textStyle="caption" color="fg.muted">
-        No scenario yet.
+        No scenario yet. Create one in the scenario library, then run it from here.
       </Text>
     );
   }
