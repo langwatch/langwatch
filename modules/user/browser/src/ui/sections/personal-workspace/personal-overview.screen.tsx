@@ -83,6 +83,7 @@ export function PersonalOverviewScreen() {
   const [showTheoretical, setShowTheoretical] = useState(true);
   const [showBilled, setShowBilled] = useState(true);
 
+  const lastDay = spendByDay.at(-1);
   const maxDay = Math.max(
     ...spendByDay.map((d) => Math.max(showTheoretical ? d.usd : 0, showBilled ? d.billedUsd : 0)),
     0.01,
@@ -228,11 +229,7 @@ export function PersonalOverviewScreen() {
                   <Text>
                     {spendByDay[0] && <FormattedDate value={spendByDay[0].day} display="date" />}
                   </Text>
-                  <Text>
-                    {spendByDay.length > 0 && (
-                      <FormattedDate value={spendByDay[spendByDay.length - 1].day} display="date" />
-                    )}
-                  </Text>
+                  <Text>{lastDay && <FormattedDate value={lastDay.day} display="date" />}</Text>
                 </HStack>
               </VStack>
             )}
