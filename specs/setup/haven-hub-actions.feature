@@ -33,13 +33,6 @@ Feature: The haven hub — one place to see and act on every stack
     And no interactive UI is started
 
   @unit
-  Scenario: Jumping into a stack's git view from the hub
-    Given a stack is selected in the hub
-    When I press "g"
-    Then the git TUI opens for that stack's worktree
-    And quitting the git TUI returns me to the hub
-
-  @unit
   Scenario: Shutting a stack down from the hub
     Given a running stack is selected in the hub
     When I press "d" and confirm

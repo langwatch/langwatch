@@ -380,8 +380,7 @@ the coding agents and dev tooling beside them, and everything that is not dev
 work as its own colour in the chart — with the daemon's pressure level when it
 is not green. Below it, every stack (liveness, branch, service health, RAM);
 idle worktrees stay collapsed behind `t` while stacks run and show by default
-otherwise. Actions run on the selected row — `g` opens its git view (and
-returns to the hub on quit), `Enter`/`l` opens its project viewer, `e` opens its mail
+otherwise. Actions run on the selected row — `Enter`/`l` opens its project viewer, `e` opens its mail
 inbox, `i` opens its identity simulator, `o` opens the stack's app, `r` restarts it, `d`
 shuts it down keeping its databases, and `x` destroys the worktree entirely:
 stack stopped, ClickHouse + Postgres databases dropped, directory deleted,
