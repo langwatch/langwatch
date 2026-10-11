@@ -11,8 +11,10 @@ import {
   driftKind,
   evaluateCheck,
   exitCodeOf,
+  gateRefusal,
   loadEscapes,
   matchesPath,
+  openOwners,
   summariseCensus,
   targetApi,
 } from "../.storybook/census.ts";
@@ -713,5 +715,82 @@ describe("shape census classifier", () => {
     const summary = summariseCensus({ sites: raw, literals: [] });
     expect(summary.families.tabs).toMatchObject({ roots: 2, affectedRoots: 2 });
     expect(summary.families.tables).toMatchObject({ roots: 1, affectedRoots: 1 });
+  });
+
+  /** @scenario "Raw tabs and tables are found by what they import, not by how they are spelled" */
+  it("finds flat, aliased, native, polymorphic and factory spellings, and not look-alikes", () => {
+    const rules = (source: string) =>
+      sitesOf(source)
+        .filter((site) => site.disposition === "violation")
+        .map((site) => `${site.rule}:${site.what}`);
+    const prim = imports.primitives("TabsRoot, TabsList as L, TableRoot, TableRow as R, chakra");
+    expect(
+      rules(
+        `${prim} export const A = () => <><TabsRoot><L /></TabsRoot><TableRoot><R /></TableRoot></>;`,
+      ),
+    ).toEqual([
+      "legacy-tabs-part:TabsRoot",
+      "legacy-tabs-part:TabsList",
+      "hand-table:TableRoot",
+      "legacy-table-part:TableRow",
+    ]);
+    expect(rules(`export const A = () => <table><tbody><tr><td /></tr></tbody></table>;`)).toEqual([
+      "native-table:<table> outside ListTable",
+      "legacy-table-part:<tbody> outside ListTable",
+      "legacy-table-part:<tr> outside ListTable",
+      "legacy-table-part:<td> outside ListTable",
+    ]);
+    const poly = `${imports.primitives("Box, chakra")}
+      const Grid = chakra("table");
+      export const A = () => <><Box as="table" /><chakra.table /><Box as="section" /></>;`;
+    expect(rules(poly)).toEqual([
+      'native-table:chakra("table") outside ListTable',
+      "native-table:<table> outside ListTable",
+      "native-table:<table> outside ListTable",
+    ]);
+    const hooks = `${imports.primitives("useTabs as useRawTabsHook")}
+      export const A = () => { useRawTabsHook({}); return null; };`;
+    expect(rules(hooks)).toEqual(["legacy-tabs-part:useTabs()"]);
+    expect(
+      rules(`import { useTabs } from "./local"; import { Table } from "./table";
+        export const A = ({ table }) => { useTabs(); return <Table data={table} />; };`),
+    ).toEqual([]);
+  });
+
+  /** @scenario "An escape names one rule and may name one line" */
+  it("approves only the named line, and the shipped registry has no wildcard rule", () => {
+    const at = "modules/a/browser/src/a.tsx";
+    const source = `export const A = () => <><table /><table /></>;`;
+    const sites = sitesOf(source, at);
+    const escape: Escape = { path: at, rule: "native-table", line: 1, reason: "r", owner: "x" };
+    expect(evaluateCheck({ sites, escapes: [escape] }).approvedEscapes).toHaveLength(2);
+    const lines = sitesOf("export const A = () => (\n<>\n<table />\n<table />\n</>\n);", at);
+    const one = evaluateCheck({ sites: lines, escapes: [{ ...escape, line: 4 }] });
+    expect(one.approvedEscapes.map((found) => found.line)).toEqual([4]);
+    expect(one.violations.map((found) => found.line)).toEqual([3]);
+    const dir = mkdtempSync(path.join(tmpdir(), "census-line-"));
+    const bad = path.join(dir, "bad.json");
+    writeFileSync(
+      bad,
+      JSON.stringify([{ path: "a", rule: "r", owner: "x", reason: "y", line: 0 }]),
+    );
+    expect(() => loadEscapes({ file: bad })).toThrow(/"line" to be a positive integer/);
+    expect(loadEscapes().filter((entry) => entry.rule === "*")).toEqual([]);
+  });
+
+  /** @scenario "A gate that proves nothing refuses instead of passing" */
+  it("refuses a glob that matches nothing and too few adopted roots, and lists open owners", () => {
+    const files = ["modules/a/browser/src/a.tsx"];
+    const base = { paths: ["modules/a/**"], files, adopted: 3, minimum: 0 };
+    expect(gateRefusal(base)).toBeUndefined();
+    expect(gateRefusal({ ...base, paths: ["modules/a/**", "modules/z/**"] })).toMatch(/modules\/z/);
+    expect(gateRefusal({ ...base, files: [] })).toMatch(/No browser source/);
+    expect(gateRefusal({ ...base, minimum: 4 })).toMatch(/3 adopted roots, fewer than/);
+    expect(gateRefusal({ ...base, minimum: -1 })).toMatch(/whole number/);
+    const upgrade = "modules/ops/browser/src/features/upgrades/ui/sections/step.tsx";
+    const source = `${imports.drawer} export const D = () => <Drawer.Root />;`;
+    const open = evaluateCheck({ sites: sitesOf(source, upgrade), escapes: [] });
+    expect(openOwners({ result: open })).toEqual(["upgrade"]);
+    expect(openOwners({ result: evaluateCheck({ sites: [], escapes: [] }) })).toEqual([]);
   });
 });

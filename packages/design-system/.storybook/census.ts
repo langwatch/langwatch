@@ -315,6 +315,47 @@ const RAW_EXPORTS: Record<string, Family> = {
   RawTabs: "tabs",
   RawTable: "tables",
 };
+/** Chakra's flat export names (`TabsRoot`, `TableRow`): the parts of the two raw families. */
+const FLAT_PARTS: Record<string, { family: Family; rule: string; parts: Set<string> }> = {
+  Tabs: {
+    family: "tabs",
+    rule: "legacy-tabs-part",
+    parts: new Set(["Root", "RootProvider", "List", "Trigger", "Content", "ContentGroup"]),
+  },
+  Table: {
+    family: "tables",
+    rule: "legacy-table-part",
+    parts: new Set([
+      "Root",
+      "Header",
+      "Body",
+      "Footer",
+      "Row",
+      "Cell",
+      "ColumnHeader",
+      "Column",
+      "ColumnGroup",
+      "Caption",
+      "ScrollArea",
+    ]),
+  },
+};
+const FLAT_PART_NAME = /^(Tabs|Table)(Root(?:Provider)?|[A-Z]\w*)$/;
+/** Hooks that build raw tabs by hand. */
+const TABS_HOOKS = new Set(["useTabs", "useTabsContext", "useTabsStyles", "useRawTabs"]);
+/** Elements that are a table by tag, native or through `as` and `chakra(...)`. */
+const TABLE_TAGS = new Set([
+  "table",
+  "thead",
+  "tbody",
+  "tfoot",
+  "tr",
+  "th",
+  "td",
+  "caption",
+  "colgroup",
+  "col",
+]);
 /** Roots of a legacy family: `Tabs.RootProvider` opens tabs as `Tabs.Root` does. */
 const LEGACY_ROOTS = new Set(["Root", "RootProvider"]);
 
@@ -342,14 +383,49 @@ function targetInfo({ head, source }: { head: string; source: string }): ShapeIn
   return { ...base, role: "unknown", rule: "unregistered-source", reason };
 }
 
+function flatShape({ head }: { head: string }): ShapeInfo | undefined {
+  const match = FLAT_PART_NAME.exec(head);
+  const flat = match?.[1] ? FLAT_PARTS[match[1]] : undefined;
+  const part = match?.[2];
+  if (!flat || !part || !flat.parts.has(part)) return undefined;
+  const root = part === "Root" || part === "RootProvider";
+  const rule = flat.family === "tables" && part === "Root" ? "hand-table" : flat.rule;
+  return shapeInfo({ family: flat.family, site: root, role: "legacy", rule });
+}
+
+function overlayFlatShape({ head }: { head: string }): ShapeInfo | undefined {
+  const flat = /^(Drawer|Dialog)(\w+)$/.exec(head);
+  if (!flat?.[2] || !OVERLAY_PARTS.has(flat[2])) return undefined;
+  const family = flat[1] === "Drawer" ? "drawers" : "dialogs";
+  return shapeInfo({
+    family,
+    site: flat[2] === "Root",
+    role: "legacy",
+    rule: "legacy-overlay-part",
+  });
+}
+
+function dottedShape({ head, member }: { head: string; member: string }): ShapeInfo | undefined {
+  const old = LEGACY[head];
+  if (!old) return undefined;
+  return shapeInfo({
+    family: old.family,
+    site: LEGACY_ROOTS.has(member),
+    role: "legacy",
+    rule: old.family === "tables" && member === "Root" ? "hand-table" : old.rule,
+  });
+}
+
 function legacyShape({
   head,
   member,
   ds,
+  chakra,
 }: {
   head: string;
   member?: string;
   ds: boolean;
+  chakra: boolean;
 }): ShapeInfo | undefined {
   const raw = ds ? RAW_EXPORTS[head] : undefined;
   if (raw) {
@@ -360,24 +436,9 @@ function legacyShape({
       rule: "raw-export",
     });
   }
-  const old = LEGACY[head];
-  if (old && member) {
-    return shapeInfo({
-      family: old.family,
-      site: LEGACY_ROOTS.has(member),
-      role: "legacy",
-      rule: old.family === "tables" && member === "Root" ? "hand-table" : old.rule,
-    });
-  }
-  const flat = ds && !member ? /^(Drawer|Dialog)(\w+)$/.exec(head) : undefined;
-  if (!flat?.[2] || !OVERLAY_PARTS.has(flat[2])) return undefined;
-  const family = flat[1] === "Drawer" ? "drawers" : "dialogs";
-  return shapeInfo({
-    family,
-    site: flat[2] === "Root",
-    role: "legacy",
-    rule: "legacy-overlay-part",
-  });
+  if (member) return dottedShape({ head, member });
+  if (!ds && !chakra) return undefined;
+  return flatShape({ head }) ?? (ds ? overlayFlatShape({ head }) : undefined);
 }
 
 function plainShape({
@@ -407,7 +468,7 @@ function classifyRef({ ref, source }: { ref: string; source: string }): ShapeInf
   if (!ds && !chakra) return undefined;
   const [head = "", member] = ref.split(".");
   const target = ds && member === undefined ? targetInfo({ head, source }) : undefined;
-  return target ?? legacyShape({ head, member, ds }) ?? plainShape({ head, member, ds });
+  return target ?? legacyShape({ head, member, ds, chakra }) ?? plainShape({ head, member, ds });
 }
 
 const LOCAL_COPIES: Record<string, Family> = {
@@ -580,6 +641,28 @@ function nestedMention({
   return undefined;
 }
 
+/** `chakra("table")`: the factory for a table tag is the site, wherever its result is used. */
+function recordTableFactory({ scan, init }: { scan: Scan; init: AstNode }) {
+  if (init.type !== "CallExpression") return;
+  const callee = child(init, "callee");
+  const local = callee?.type === "Identifier" ? text(callee, "name") : undefined;
+  const binding = local ? scan.bindings.get(local) : undefined;
+  if (!binding || binding.imported !== "chakra" || !isChakraSource(binding.source)) return;
+  const [argument] = children(init, "arguments");
+  const tag = argument?.type === "Literal" ? argument.value : undefined;
+  if (typeof tag !== "string" || !TABLE_TAGS.has(tag)) return;
+  const root = tag === "table";
+  emit({
+    scan,
+    loc: locOf({ scan, offset: init.start }),
+    family: "tables",
+    what: `chakra("${tag}") outside ListTable`,
+    site: root,
+    rule: root ? "native-table" : "legacy-table-part",
+    disposition: "violation",
+  });
+}
+
 const MAYBE_COMPONENT = new Set(["ConditionalExpression", "LogicalExpression", "CallExpression"]);
 
 function declareIdentifier({
@@ -594,6 +677,7 @@ function declareIdentifier({
   target?: Binding;
 }) {
   if (scan.imported.has(name)) return;
+  recordTableFactory({ scan, init });
   if (target) scan.bindings.set(name, target);
   else if (init.type === "ObjectExpression") scan.constObjects.set(name, init);
   else if (MAYBE_COMPONENT.has(init.type)) {
@@ -986,7 +1070,52 @@ function recordCopies({ visit }: { visit: Visit }) {
   }
 }
 
-function recordRoles({ visit }: { visit: Visit }) {
+/** The table tag an element is by name, `chakra.<tag>` or `as`. */
+function tableTagOf({ visit }: { visit: Visit }): string | undefined {
+  const { ref, binding, chakra, ds } = visit;
+  if (!binding) return TABLE_TAGS.has(ref) ? ref : undefined;
+  const [name, member] = ref.split(".");
+  if (chakra && name === "chakra" && member && TABLE_TAGS.has(member)) return member;
+  const as = literalText(visit.props.get("as"));
+  return (chakra || ds) && as !== undefined && TABLE_TAGS.has(as) ? as : undefined;
+}
+
+/** A table drawn from native tags, `as`, `chakra("table")` or ARIA roles: a hand table. */
+function recordHandTables({
+  visit,
+}: {
+  visit: Visit;
+}): Pick<Frame, "family" | "rootId"> | undefined {
+  const tag = tableTagOf({ visit });
+  const role = literalText(visit.props.get("role"));
+  if (tag) {
+    stateOf({ scan: visit.scan }).table = true;
+    const root = tag === "table";
+    const created = record({
+      visit,
+      family: "tables",
+      what: root ? "<table> outside ListTable" : `<${tag}> outside ListTable`,
+      site: root,
+      rule: root ? "native-table" : "legacy-table-part",
+      disposition: "violation",
+    });
+    return root ? { family: "tables", rootId: created.root } : undefined;
+  }
+  if (!role || visit.head.startsWith("Table")) return undefined;
+  if (/^(table|row|grid|rowgroup)$/.test(role)) {
+    stateOf({ scan: visit.scan }).table = true;
+    record({
+      visit,
+      family: "tables",
+      what: `role="${role}" div table`,
+      rule: "hand-table",
+      disposition: "violation",
+    });
+  }
+  return undefined;
+}
+
+function recordRoles({ visit }: { visit: Visit }): Pick<Frame, "family" | "rootId"> | undefined {
   const { ref, scan, chakra } = visit;
   if (chakra && ref === "Table.Root" && !visit.info) {
     stateOf({ scan }).table = true;
@@ -998,18 +1127,9 @@ function recordRoles({ visit }: { visit: Visit }) {
       disposition: "violation",
     });
   }
+  const frame = recordHandTables({ visit });
   const role = literalText(visit.props.get("role"));
-  if (!role || visit.head.startsWith("Table")) return;
-  if (/^(table|row|grid|rowgroup)$/.test(role)) {
-    stateOf({ scan }).table = true;
-    record({
-      visit,
-      family: "tables",
-      what: `role="${role}" div table`,
-      rule: "hand-table",
-      disposition: "violation",
-    });
-  } else if (/^(tab|tablist)$/.test(role)) {
+  if (role && /^(tab|tablist)$/.test(role) && !visit.head.startsWith("Table")) {
     record({
       visit,
       family: "tabs",
@@ -1018,6 +1138,7 @@ function recordRoles({ visit }: { visit: Visit }) {
       disposition: "violation",
     });
   }
+  return frame;
 }
 
 /** A layout primitive drawing a card (border or panel fill, and a radius) or a table row. */
@@ -1289,13 +1410,13 @@ function visitElement({ scan, element }: { scan: Scan; element: AstNode }): Fram
   const shape = recordShape({ visit });
   recordUnknown({ visit, ...(resolved.unknown ? { unknown: resolved.unknown } : {}) });
   recordCopies({ visit });
-  recordRoles({ visit });
+  const roles = recordRoles({ visit });
   recordLayout({ visit });
   recordHeading({ visit });
   recordHeaderButton({ visit });
   const marks = trackButtons({ visit });
   recordEmptyText({ visit });
-  return { ref, ds: visit.ds || chakra, ...shape, ...marks };
+  return { ref, ds: visit.ds || chakra, ...roles, ...shape, ...marks };
 }
 
 function closeFrame({ scan, frame }: { scan: Scan; frame: Frame }) {
@@ -1367,7 +1488,27 @@ function walkDeclarator({ scan, node }: { scan: Scan; node: AstNode }) {
   if (component) scan.components.pop();
 }
 
+/** `useTabs()` and its kin, called from a raw-tabs source: a part of hand-assembled tabs. */
+function recordTabsHook({ scan, node }: { scan: Scan; node: AstNode }) {
+  const callee = child(node, "callee");
+  const local = callee?.type === "Identifier" ? text(callee, "name") : undefined;
+  const hidden = local !== undefined && scan.shadow.some((names) => names.has(local));
+  const binding = local && !hidden ? scan.bindings.get(local) : undefined;
+  if (!binding || !TABS_HOOKS.has(binding.imported) || binding.members.length) return;
+  if (!isChakraSource(binding.source) && !isDsSource(binding.source)) return;
+  emit({
+    scan,
+    loc: locOf({ scan, offset: node.start }),
+    family: "tabs",
+    what: `${binding.imported}()`,
+    site: false,
+    rule: "legacy-tabs-part",
+    disposition: "violation",
+  });
+}
+
 function walk({ scan, node }: { scan: Scan; node: AstNode }) {
+  if (node.type === "CallExpression") recordTabsHook({ scan, node });
   if (node.type === "JSXAttribute") return walkAttribute({ scan, node });
   if (node.type === "Property") return walkProperty({ scan, node });
   if (FUNCTIONS.has(node.type)) return walkFunction({ scan, node });
@@ -1715,30 +1856,47 @@ export type Escape = {
   rule: string;
   reason: string;
   owner: string;
+  /** Narrows the entry to one source line; omitted, it covers the rule anywhere in the path. */
+  line?: number;
   /** `escape` approves a violation; `reviewed` gives a candidate or unknown its disposition. */
   disposition?: "escape" | "reviewed";
 };
+
+function readEscape({
+  entry,
+  index,
+  file,
+}: {
+  entry: unknown;
+  index: number;
+  file: string;
+}): Escape {
+  const read = (key: string) => {
+    const value = isRecord(entry) ? entry[key] : undefined;
+    if (typeof value === "string" && value.trim()) return value;
+    throw new Error(`${file} entry ${index} needs a non-empty "${key}"`);
+  };
+  const disposition = isRecord(entry) ? entry.disposition : undefined;
+  const line = isRecord(entry) ? entry.line : undefined;
+  if (line !== undefined && !(Number.isInteger(line) && Number(line) > 0)) {
+    throw new Error(`${file} entry ${index} needs "line" to be a positive integer`);
+  }
+  return {
+    ...(typeof line === "number" ? { line } : {}),
+    path: read("path"),
+    rule: read("rule"),
+    reason: read("reason"),
+    owner: read("owner"),
+    ...(disposition === "reviewed" || disposition === "escape" ? { disposition } : {}),
+  };
+}
 
 /** The approved escapes and reviewed candidates, read from `census-escapes.json`. */
 export function loadEscapes({ file = ESCAPES_FILE }: { file?: string } = {}): Escape[] {
   if (!existsSync(file)) return [];
   const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
   if (!Array.isArray(parsed)) throw new Error(`${file} must hold an array of escapes`);
-  return parsed.map((entry: unknown, index) => {
-    const read = (key: string) => {
-      const value = isRecord(entry) ? entry[key] : undefined;
-      if (typeof value === "string" && value.trim()) return value;
-      throw new Error(`${file} entry ${index} needs a non-empty "${key}"`);
-    };
-    const disposition = isRecord(entry) ? entry.disposition : undefined;
-    return {
-      path: read("path"),
-      rule: read("rule"),
-      reason: read("reason"),
-      owner: read("owner"),
-      ...(disposition === "reviewed" || disposition === "escape" ? { disposition } : {}),
-    };
-  });
+  return parsed.map((entry: unknown, index) => readEscape({ entry, index, file }));
 }
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -1830,7 +1988,8 @@ function sortSite({
   const escape = escapes.find(
     (entry) =>
       matchesPath({ file: site.file, glob: entry.path }) &&
-      (entry.rule === "*" || entry.rule === site.rule),
+      (entry.rule === "*" || entry.rule === site.rule) &&
+      (entry.line === undefined || entry.line === site.line),
   );
   if (escape) {
     result.approvedEscapes.push({
@@ -1888,6 +2047,34 @@ export function evaluateCheck({
 export function exitCodeOf({ result }: { result: CheckResult }): 0 | 1 | 2 {
   if (result.violations.length) return 1;
   return result.unclassifiedCandidates.length || result.unknown.length ? 2 : 0;
+}
+
+/** Why a gate proves nothing (exit 3): no sources, a glob matching none, too few adopted roots. */
+export function gateRefusal({
+  paths,
+  files,
+  adopted,
+  minimum,
+}: {
+  paths: string[];
+  files: string[];
+  adopted: number;
+  minimum: number;
+}): string | undefined {
+  if (!files.length) return `No browser source matches ${paths.join(" ")}`;
+  const empty = paths.filter((glob) => !files.some((file) => matchesPath({ file, glob })));
+  if (empty.length) return `No browser source matches ${empty.join(" ")}`;
+  if (!Number.isInteger(minimum) || minimum < 0) return "--min-adopted needs a whole number";
+  return adopted < minimum
+    ? `${adopted} adopted roots, fewer than --min-adopted ${minimum}`
+    : undefined;
+}
+
+/** The owners (upgrade) whose rows still hold a violation, candidate or unknown. */
+export function openOwners({ result }: { result: CheckResult }): string[] {
+  return Object.entries(result.ownedElsewhere)
+    .filter(([, entry]) => entry.violations + entry.candidates + entry.unknown > 0)
+    .map(([owner]) => owner);
 }
 
 /** The commit and a hash of the scanned sources: what the verdict is true of. */

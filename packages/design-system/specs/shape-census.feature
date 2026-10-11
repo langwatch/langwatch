@@ -120,3 +120,25 @@ Feature: The shape census measures how far screens are from the design system
     Given source using ContentTabs, CodeTabs, MetricTabs, TableToolbar, ColumnPicker, SelectionActionBar and ListTable parts
     Then each root counts as adopted and ListTable parts are adopted parts
     And raw Tabs and Table parts count as violations sharing their owning root
+
+  @unit
+  Scenario: Raw tabs and tables are found by what they import, not by how they are spelled
+    Given sources using flat, aliased, namespace, native, polymorphic and factory spellings of tabs and tables
+    When the census reads them
+    Then TabsRoot, TableRow, an aliased part, native table tags, as="table", chakra.table and chakra("table") are violations
+    And useTabs, even renamed on import, is a violation
+    And a local component or variable with the same name is not
+
+  @unit
+  Scenario: An escape names one rule and may name one line
+    Given an escape with a rule and a line and a violation of that rule on another line
+    When the check evaluates them
+    Then only the named line is approved
+    And the registry holds no wildcard rule
+
+  @unit
+  Scenario: A gate that proves nothing refuses instead of passing
+    Given a gate whose glob matches no source, or whose adopted roots fall below the minimum
+    When the gate is judged
+    Then it refuses with a reason
+    And another owner's open rows are listed so a global gate can require them closed

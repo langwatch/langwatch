@@ -1,7 +1,7 @@
 /**
- * Adoption numbers for the workshop, read at build time: who imports each entry point,
- * the debt and the shape census. `node .storybook/adoption.ts` prints it; `--report <path>`
- * also writes the census as markdown; `--check --paths <globs...>` is the wave gate.
+ * Adoption numbers for the workshop: who imports each entry point, the debt and the shape
+ * census. `--report <path>` writes the census; `--check --paths <globs...>` is the wave gate,
+ * with `--min-adopted <n>` and `--require-owned-closed` (specs/shape-census.feature).
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -13,7 +13,9 @@ import {
   collectCensus,
   evaluateCheck,
   exitCodeOf,
+  gateRefusal,
   loadEscapes,
+  openOwners,
   renderCensusMarkdown,
   revisionOf,
   targetApi,
@@ -209,6 +211,10 @@ function valuesAfter({ flag }: { flag: string }): string[] {
   return end === -1 ? rest : rest.slice(0, end);
 }
 
+function valueAfter({ flag }: { flag: string }): string | undefined {
+  return valuesAfter({ flag })[0];
+}
+
 /** The wave gate: 1 on an unsuppressed violation, 2 on an unclassified candidate or unknown. */
 function runCheck() {
   const paths = valuesAfter({ flag: "--paths" });
@@ -218,13 +224,22 @@ function runCheck() {
     return;
   }
   const { sites, sources } = collectCensus({ paths });
-  if (!sources.size) {
-    process.stderr.write(`No browser source matches ${paths.join(" ")}\n`);
+  const result = evaluateCheck({ sites, escapes: loadEscapes() });
+  const minimum = Number(valueAfter({ flag: "--min-adopted" }) ?? 0);
+  const refused = gateRefusal({
+    paths,
+    files: [...sources.keys()],
+    adopted: result.adoptedRoots.length,
+    minimum,
+  });
+  if (refused) {
+    process.stderr.write(`${refused}\n`);
     process.exitCode = 3;
     return;
   }
-  const result = evaluateCheck({ sites, escapes: loadEscapes() });
-  const code = exitCodeOf({ result });
+  const ownedOpen = openOwners({ result });
+  const requireClosed = process.argv.includes("--require-owned-closed");
+  const code = exitCodeOf({ result }) || (requireClosed && ownedOpen.length ? 1 : 0);
   const report = {
     revision: revisionOf({ sources }),
     scope: paths,
@@ -243,11 +258,12 @@ function runCheck() {
       adoptedRoots: result.adoptedRoots.length,
     },
     ownedElsewhere: result.ownedElsewhere,
+    ownedElsewhereOpen: ownedOpen,
     targetApi: targetApi(),
   };
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   process.stderr.write(
-    `census check: ${result.violations.length} violations, ${result.unclassifiedCandidates.length} unclassified candidates, ${result.unknown.length} unknown, ${result.adoptedRoots.length} adopted roots in ${sources.size} files\n`,
+    `census check: ${result.violations.length} violations, ${result.unclassifiedCandidates.length} unclassified candidates, ${result.unknown.length} unknown, ${result.adoptedRoots.length} adopted roots in ${sources.size} files; owned elsewhere still open: ${ownedOpen.join(", ") || "none"}\n`,
   );
   process.exitCode = code;
 }

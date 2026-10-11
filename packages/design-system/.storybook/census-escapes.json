@@ -1,19 +1,79 @@
 [
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-drawer-shell.tsx",
-    "rule": "*",
+    "rule": "local-copy",
+    "line": 70,
+    "reason": "Approved raw drawer: resize rail, pinned modality, compact full width, external overflow and pane scroll owners (astra review, call-site 23).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-drawer-shell.tsx",
+    "rule": "local-copy",
+    "line": 101,
     "reason": "Approved raw drawer: resize rail, pinned modality, compact full width, external overflow and pane scroll owners (astra review, call-site 23).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
-    "rule": "*",
+    "rule": "page-title-h1",
+    "line": 22,
+    "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
+    "rule": "list-page-inference",
+    "line": 22,
+    "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row). The header and table here are rendered content, not a list page.",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
+    "rule": "hand-table",
+    "line": 115,
+    "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
+    "rule": "legacy-table-part",
+    "line": 121,
+    "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
+    "rule": "legacy-table-part",
+    "line": 123,
+    "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
+    "rule": "legacy-table-part",
+    "line": 124,
+    "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
+    "rule": "legacy-table-part",
+    "line": 126,
+    "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
+    "rule": "legacy-table-part",
+    "line": 128,
     "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row).",
     "owner": "trace"
   },
   {
     "path": "modules/project/browser/src/ui/sections/home/components/welcome-header.tsx",
     "rule": "page-title-h1",
+    "line": 75,
     "reason": "Approved home escape: the Langy home greeting is the page title (astra review, headings row).",
     "owner": "project"
   }
