@@ -4803,5 +4803,189 @@
     "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
     "owner": "trace",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/filter-sidebar/attributes-section.tsx",
+    "rule": "empty-text",
+    "line": 131,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/filter-sidebar/facet-manager-popover.tsx",
+    "rule": "card-box",
+    "line": 586,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/filter-sidebar/facet-section.tsx",
+    "rule": "empty-text",
+    "line": 431,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/filter-sidebar/filter-sidebar.tsx",
+    "rule": "card-box",
+    "line": 583,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/filter-sidebar/range-section.tsx",
+    "rule": "card-box",
+    "line": 84,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/onboarding/density-spotlight.tsx",
+    "rule": "card-box",
+    "line": 187,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/onboarding/spotlights/spotlight-overlay.tsx",
+    "rule": "card-box",
+    "line": 264,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/onboarding/spotlights/spotlight-overlay.tsx",
+    "rule": "card-box",
+    "line": 401,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/attribute-table.tsx",
+    "rule": "card-box",
+    "line": 1063,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/attribute-table.tsx",
+    "rule": "card-box",
+    "line": 1098,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-context.tsx",
+    "rule": "card-box",
+    "line": 505,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-context.tsx",
+    "rule": "card-box",
+    "line": 531,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-context.tsx",
+    "rule": "card-box",
+    "line": 549,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-view/annotation-editor-card.tsx",
+    "rule": "card-box",
+    "line": 137,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-view/conversation-view.tsx",
+    "rule": "empty-text",
+    "line": 200,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-view/conversation-view.tsx",
+    "rule": "card-box",
+    "line": 428,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-view/conversation-view.tsx",
+    "rule": "card-box",
+    "line": 447,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-view/system-prompt-banner.tsx",
+    "rule": "card-box",
+    "line": 28,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/edit-mode/corrected-field.tsx",
+    "rule": "card-box",
+    "line": 164,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/edit-mode/editable-io-field.tsx",
+    "rule": "card-box",
+    "line": 117,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/eval-cards/eval-card.tsx",
+    "rule": "card-box",
+    "line": 34,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/eval-cards/eval-card.tsx",
+    "rule": "card-box",
+    "line": 289,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/eval-cards/evals-list.tsx",
+    "rule": "empty-text",
+    "line": 25,
+    "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
+    "owner": "trace",
+    "disposition": "reviewed"
   }
 ]
