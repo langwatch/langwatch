@@ -15,17 +15,32 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Check, Copy, ExternalLink } from "lucide-react";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 import { useCopyToClipboard } from "../../use-copy-to-clipboard.ts";
+import { isBrowserClick } from "../layout/back-link.tsx";
 
-/** Where an empty state sends the reader: never a dead end. */
-export type NoDataNext =
-  | { kind: "setting"; label: string; href: string }
+/**
+ * Where an empty, no-results or error state sends the reader: the setting that turns it on,
+ * the page that explains it, or a prompt for a coding agent. A callback is not a destination.
+ */
+export type EmptyNextStep =
+  | {
+      kind: "setting";
+      label: string;
+      href: string;
+      /** Routes in place; a click the browser keeps (new tab) never reaches it. */
+      onNavigate?: (args: { href: string }) => void;
+    }
   | { kind: "docs"; label: string; href: string }
   /** Copies `prompt` so the reader can paste it into their coding agent. */
-  | { kind: "agent-prompt"; prompt: string; label?: string }
-  | { kind: "action"; label: string; onClick: () => void };
+  | { kind: "agent-prompt"; prompt: string; label?: string };
+
+/** Non-empty: a state with no next step does not compile. */
+export type EmptyNext = readonly [EmptyNextStep, ...EmptyNextStep[]];
+
+/** @deprecated Pass `next: EmptyNext`; retry, clear and create are drawn beside it. */
+export type NoDataNext = EmptyNextStep | { kind: "action"; label: string; onClick: () => void };
 
 export type NoDataInfoBlockSize = "page" | "inline";
 
@@ -52,8 +67,8 @@ export interface NoDataInfoBlockBlockProps {
   children?: ReactNode;
   /** @deprecated ignored; the block has one colour. */
   color?: string;
-  /** The next step: a setting, a docs page, a prompt for a coding agent, or an action. */
-  next?: NoDataNext;
+  /** A setting, a docs page or a prompt for a coding agent. Required on new states. */
+  next?: EmptyNext;
   testId?: string;
 }
 
@@ -62,11 +77,16 @@ export interface NoDataInfoBlockLineProps {
   size: "line";
   title: string;
   action?: { label: string; onClick: () => void };
-  next?: NoDataNext;
+  next?: EmptyNext;
   testId?: string;
 }
 
 export type NoDataInfoBlockProps = NoDataInfoBlockBlockProps | NoDataInfoBlockLineProps;
+
+/** The block or line with its next step required: the shape page, list and row states use. */
+export type EmptyStateProps =
+  | (NoDataInfoBlockBlockProps & { next: EmptyNext })
+  | (NoDataInfoBlockLineProps & { next: EmptyNext });
 
 const PAGE = { minHeight: "320px", flex: 1, alignSelf: "stretch", padding: 6 } as const;
 const INLINE = {
@@ -81,43 +101,51 @@ const INLINE = {
 export const NoDataInfoBlock = (props: NoDataInfoBlockProps) =>
   props.size === "line" ? <NoDataLine {...props} /> : <NoDataBlock {...props} />;
 
-function NoDataNextStep({ next }: { next: NoDataNext }) {
+function NoDataNextStep({ step }: { step: EmptyNextStep }) {
   const { copied, copy } = useCopyToClipboard();
-  if (next.kind === "action") {
-    return (
-      <Button type="button" variant="plain" size="sm" color="fg" onClick={next.onClick}>
-        {next.label}
-      </Button>
-    );
-  }
-  if (next.kind === "agent-prompt") {
+  if (step.kind === "agent-prompt") {
     return (
       <Button
         type="button"
         variant="outline"
         size="sm"
         data-next="agent-prompt"
-        onClick={() => copy(next.prompt)}
+        onClick={() => copy(step.prompt)}
       >
         {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
-        {copied ? "Copied" : (next.label ?? "Copy a prompt for your coding agent")}
+        {copied ? "Copied" : (step.label ?? "Copy a prompt for your coding agent")}
       </Button>
     );
   }
-  const docs = next.kind === "docs";
+  const docs = step.kind === "docs";
+  const navigate = step.kind === "setting" ? step.onNavigate : undefined;
   return (
     <Link
-      href={next.href}
-      data-next={next.kind}
+      href={step.href}
+      data-next={step.kind}
       textStyle="sm"
       color="fg.muted"
       _hover={{ color: "fg" }}
       {...(docs ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+      {...(navigate
+        ? {
+            onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+              if (isBrowserClick(event)) return;
+              event.preventDefault();
+              navigate({ href: step.href });
+            },
+          }
+        : {})}
     >
-      {next.label}
+      {step.label}
       {docs && <ExternalLink size={12} aria-hidden />}
     </Link>
   );
+}
+
+/** Every next step of a state, side by side. */
+export function EmptyNextSteps({ next }: { next: EmptyNext }) {
+  return next.map((step, index) => <NoDataNextStep key={`${step.kind}-${index}`} step={step} />);
 }
 
 function NoDataLine({ title, action, next, testId }: NoDataInfoBlockLineProps) {
@@ -131,7 +159,7 @@ function NoDataLine({ title, action, next, testId }: NoDataInfoBlockLineProps) {
           {action.label}
         </Button>
       )}
-      {next && <NoDataNextStep next={next} />}
+      {next && <EmptyNextSteps next={next} />}
     </HStack>
   );
 }
@@ -182,7 +210,7 @@ const NoDataBlock = ({
             <Box display="flex" gap={2} justifyContent="center" flexWrap="wrap" paddingTop={1}>
               {primaryAction}
               {secondaryAction}
-              {next && <NoDataNextStep next={next} />}
+              {next && <EmptyNextSteps next={next} />}
             </Box>
           )}
           {docsHref && (

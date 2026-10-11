@@ -5,7 +5,7 @@ import { Database } from "lucide-react";
 import {
   NoDataInfoBlock,
   type NoDataInfoBlockBlockProps,
-  type NoDataNext,
+  type EmptyNextStep,
 } from "./no-data-info-block.tsx";
 
 /** The block sizes, so the stories' args stay typed; `Line` renders the line size itself. */
@@ -103,36 +103,49 @@ export const Line: Story = {
   ),
 };
 
-const settingNext: NoDataNext = {
+const settingNext: EmptyNextStep = {
   kind: "setting",
   label: "Open passkey settings",
   href: "/settings/security",
 };
-const docsNext: NoDataNext = {
+const docsNext: EmptyNextStep = {
   kind: "docs",
   label: "Read about passkeys",
   href: "https://langwatch.ai/docs",
 };
-const promptNext: NoDataNext = {
+const promptNext: EmptyNextStep = {
   kind: "agent-prompt",
   prompt: "Add passkey sign-in to this project.",
 };
-const actionNext: NoDataNext = { kind: "action", label: "Add a passkey", onClick: () => undefined };
 
-export const NextSetting: Story = { args: { next: settingNext } };
-export const NextDocs: Story = { args: { next: docsNext } };
-export const NextAgentPrompt: Story = { args: { next: promptNext } };
-export const NextAction: Story = { args: { next: actionNext } };
+export const NextSetting: Story = { args: { next: [settingNext] } };
+export const NextDocs: Story = { args: { next: [docsNext] } };
+export const NextAgentPrompt: Story = { args: { next: [promptNext] } };
+/** More than one way forward sit side by side; the callback action stays a separate button. */
+export const NextSeveral: Story = {
+  args: {
+    next: [settingNext, docsNext, promptNext],
+    primaryAction: <Button size="sm">Add a passkey</Button>,
+  },
+};
 
 export const LineNextSetting: Story = {
-  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={settingNext} />,
+  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={[settingNext]} />,
 };
 export const LineNextDocs: Story = {
-  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={docsNext} />,
+  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={[docsNext]} />,
 };
 export const LineNextAgentPrompt: Story = {
-  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={promptNext} />,
+  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={[promptNext]} />,
 };
-export const LineNextAction: Story = {
-  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={actionNext} />,
+/** A line with a callback action beside its required next step. */
+export const LineNextWithAction: Story = {
+  render: () => (
+    <NoDataInfoBlock
+      size="line"
+      title="No passkeys match."
+      action={{ label: "Clear filters", onClick: () => undefined }}
+      next={[docsNext]}
+    />
+  ),
 };
