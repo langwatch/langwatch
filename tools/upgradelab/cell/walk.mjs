@@ -139,6 +139,7 @@ try {
           throw new Error(`signed in but on no project; page showed ${await shown(page)}`);
       }
       const pages = [
+        ["home", `/${project}`],
         ["traces", `/${project}/messages`],
         ["prompts", `/${project}/prompts`],
         ["experiments", `/${project}/experiments`],

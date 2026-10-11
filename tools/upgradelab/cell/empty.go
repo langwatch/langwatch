@@ -48,6 +48,11 @@ func (cell *run) emptyAccount(ctx context.Context) {
 	cell.seeder.PlainWire = true
 	if err := cell.emptyOrganization(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "organization for the seed account after ready (O1 needs one): "+err.Error())
+		return
+	}
+	if cell.options.Shots { // the account and its organization exist only now, so the walk (B1) starts here
+		cell.walker, _ = StartWalker(ctx, WalkSpec{Dir: filepath.Join(cell.options.HeadDir, "apps", "ui"), RunDir: cell.options.RunDir,
+			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: cell.options.WalkEvery})
 	}
 }
 
@@ -102,7 +107,7 @@ func (cell *run) emptyChecks(ctx context.Context) error {
 	cell.report.Verdicts = append(cell.report.Verdicts,
 		cell.holdingVerdict(), ledgerVerdict(final), notNeededVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(),
-		queueVerdict(cell.report.Queue), cell.opsVerdict(final), cell.storedEventsVerdict(ctx), cell.emptyOrgVerdict(ctx))
+		queueVerdict(cell.report.Queue), cell.opsVerdict(final), cell.storedEventsVerdict(ctx), cell.emptyOrgVerdict(ctx), cell.browserVerdict())
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.signupVerdicts(ctx)...)
 	for index := range cell.report.Verdicts {
 		cell.report.Verdicts[index].Scenarios = scenarioIDs[cell.report.Verdicts[index].ID]
