@@ -5359,5 +5359,169 @@
     "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
+    "rule": "raw-export",
+    "line": 162,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
+    "rule": "raw-export",
+    "line": 199,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
+    "rule": "raw-export",
+    "line": 207,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
+    "rule": "raw-export",
+    "line": 220,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
+    "rule": "raw-export",
+    "line": 224,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
+    "rule": "raw-export",
+    "line": 247,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/datasets/add-dataset-record-drawer.tsx",
+    "rule": "local-copy",
+    "line": 255,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/dialog.tsx",
+    "rule": "raw-export",
+    "line": 61,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/dialog.tsx",
+    "rule": "raw-export",
+    "line": 69,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/dialog.tsx",
+    "rule": "raw-export",
+    "line": 70,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/dialog.tsx",
+    "rule": "raw-export",
+    "line": 84,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/dialog.tsx",
+    "rule": "raw-export",
+    "line": 98,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 85,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/instant-eval-confirm-dialog.tsx",
+    "rule": "local-copy",
+    "line": 46,
+    "reason": "Approved: protected instant evaluation (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/drawer-header/share-trace-dialog.tsx",
+    "rule": "local-copy",
+    "line": 55,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/keyboard-shortcuts-help.tsx",
+    "rule": "local-copy",
+    "line": 73,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/raw-json-dialog.tsx",
+    "rule": "local-copy",
+    "line": 91,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-edit-diff-dialog.tsx",
+    "rule": "local-copy",
+    "line": 52,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/pagination.tsx",
+    "rule": "local-copy",
+    "line": 102,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/trace-table-layout.tsx",
+    "rule": "local-copy",
+    "line": 97,
+    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/keyboard-shortcuts-help.tsx",
+    "rule": "card-box",
+    "line": 89,
+    "reason": "Kept as today: an illustration row or accent-banded shortcut tile (R11h review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/keyboard-shortcuts-help.tsx",
+    "rule": "card-box",
+    "line": 116,
+    "reason": "Kept as today: an illustration row or accent-banded shortcut tile (R11h review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/column-education-dialog.tsx",
+    "rule": "card-box",
+    "line": 60,
+    "reason": "Kept as today: an illustration row or accent-banded shortcut tile (R11h review).",
+    "owner": "trace",
+    "disposition": "reviewed"
   }
 ]
