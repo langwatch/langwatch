@@ -128,7 +128,9 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
                 onClick={() => setPopoverOpen((prev) => !prev)}
                 data-testid="prompt-model-popover-trigger"
               >
-                <LLMModelDisplay model={field.value?.model ?? ""} minWidth={0} overflow="hidden" />
+                <Box minWidth={0} overflow="hidden">
+                  <LLMModelDisplay model={field.value?.model ?? ""} />
+                </Box>
                 <Box color="fg.muted">
                   <ChevronDown size={14} />
                 </Box>
