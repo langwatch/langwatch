@@ -86,12 +86,9 @@ vi.mock("../../../../../behavior/lent-agent.tsx", () => ({
   HttpConfigEditor: () => null,
 }));
 
-vi.mock("../../../prompt/variables/variables-section.tsx", () => ({
-  VariablesSection: () => null,
-}));
-
 vi.mock("../../../../../behavior/lent-prompt.tsx", () => ({
   OutputsSection: () => null,
+  VariablesSection: () => null,
 }));
 
 vi.mock("../base-properties-panel.tsx", () => ({
