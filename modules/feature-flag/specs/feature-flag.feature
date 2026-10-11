@@ -157,6 +157,15 @@ Feature: Resolve a feature flag, roll it out, and let people opt into experiment
       When a caller resolves the flag
       Then the rules are treated as empty rather than raising
 
+    # A custom role without project:view is refused the project's flag read;
+    # "not answered yet" held the landing redirect on a blank page for good.
+    @unit
+    Scenario: A refused browser flag read answers every flag off
+      Given a reader whose browser flag read was refused
+      When a screen asks for a flag
+      Then the flag reads off rather than not yet answered
+      And a flag this browser overrides keeps its override
+
     @unit
     Scenario: An operator write is visible to the next resolution
       Given an operator switched a default-on flag off
