@@ -43,11 +43,21 @@ function copyAnnouncement({ state }: { state: CopyState }) {
   return "";
 }
 
-export function CopyAction({ code, label = "Copy code" }: { code: string; label?: string }) {
+export function CopyAction({
+  code,
+  label = "Copy code",
+  hidden = false,
+}: {
+  code: string;
+  label?: string;
+  hidden?: boolean;
+}) {
   const { state, copy, ready } = useCopy();
   return (
     <>
       <Button
+        hidden={hidden}
+        data-docs-copy={code}
         type="button"
         size="xs"
         variant="ghost"
@@ -87,6 +97,7 @@ export function CodeBody({ source, expanded }: { source: CodeSource; expanded: b
     <Box
       as="section"
       className="docs-code-region"
+      data-code={source.code}
       data-numbered={source.numbered ? "true" : undefined}
       tabIndex={0}
       aria-label={`${source.title || source.lang || "Code"} source`}
@@ -139,6 +150,7 @@ export function ExpandControl({
         variant="ghost"
         colorPalette="gray"
         minHeight="40px"
+        data-docs-expand=""
         onClick={onToggle}
         aria-expanded={expanded}
       >

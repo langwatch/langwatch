@@ -9,7 +9,10 @@
     "test": "vitest run",
     "test:smoke": "node scripts/smoke.mjs",
     "test:links": "node scripts/check-links.mjs",
-    "test:session": "node scripts/session-smoke.mjs"
+    "test:session": "node scripts/session-smoke.mjs",
+    "test:performance": "node scripts/performance-smoke.mjs",
+    "size": "node scripts/performance-report.mjs",
+    "test:layout": "node scripts/layout-smoke.mjs"
   },
   "dependencies": {
     "@langwatch/design-system": "workspace:*",

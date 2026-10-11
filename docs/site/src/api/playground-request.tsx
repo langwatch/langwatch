@@ -25,6 +25,7 @@ import { Panel } from "./panel.tsx";
 import { requestErrorOutcome } from "./playground-outcome.ts";
 import type { Outcome } from "./playground-outcome.ts";
 import { ResponseArea } from "./playground-response.tsx";
+import { validateRequest, errorFieldId } from "./request-validation.ts";
 
 const REQUEST_TIMEOUT_MS = 30000;
 function ParamInput({
@@ -276,43 +277,6 @@ function SendActions({
     </Box>
   );
 }
-function validateRequest({
-  operation,
-  state,
-  key,
-  hasSession,
-}: {
-  operation: Operation;
-  state: RequestState;
-  key: string;
-  hasSession: boolean;
-}) {
-  const { values, body } = state;
-  const required = operation.parameters.filter((param) => param.required);
-  const scheme = operation.schemes[0];
-  const nextErrors: Record<string, string> = {};
-  for (const param of required) {
-    if (!values[paramKey({ location: param.in, name: param.name })]?.trim())
-      nextErrors[paramKey({ location: param.in, name: param.name })] = `${param.name} is required.`;
-  }
-  if (scheme && !key.trim() && !hasSession) nextErrors.auth = "Enter an API key.";
-  if (operation.body?.required && !body.trim()) nextErrors.body = "Enter a request body.";
-  if (body.trim()) {
-    try {
-      JSON.parse(body);
-    } catch (error) {
-      nextErrors.body = `Invalid JSON: ${error instanceof Error ? error.message : "could not parse"}`;
-    }
-  }
-  return nextErrors;
-}
-
-function errorFieldId({ first }: { first: string }) {
-  if (first === "auth") return "pg-auth";
-  if (first === "body") return "pg-body";
-  return `pg-${first.replace(":", "-")}`;
-}
-
 function BodyEditor({
   body,
   error,
@@ -515,7 +479,7 @@ export function PlaygroundRequest({
   };
   return (
     <>
-      {tryOpen ? (
+      <div hidden={!tryOpen} data-docs-form="">
         <Panel
           id="try-it-form"
           title="Try this endpoint"
@@ -589,7 +553,7 @@ export function PlaygroundRequest({
             />
           </Flex>
         </Panel>
-      ) : null}
+      </div>
       {children}
       {outcome.kind !== "idle" ? (
         <Panel title="Live response">

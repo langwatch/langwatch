@@ -1,3 +1,7 @@
+import type { z } from "zod";
+
+import type { operationSchema } from "./operation-schema.ts";
+
 export type Schema = {
   type?: string | string[];
   format?: string;
@@ -23,21 +27,24 @@ export type Schema = {
 };
 
 export type Content = { type: string; schema: Schema | null; example?: unknown };
-export type Parameter = { in: string; name: string; required: boolean; deprecated: boolean; description: string; schema: Schema };
-export type Scheme = { id: string; type?: string; in?: string; name?: string; scheme?: string; description?: string };
-
-export type Operation = {
-  method: string;
-  path: string;
-  origin: string;
-  summary: string;
-  description: string;
+export type Parameter = {
+  in: string;
+  name: string;
+  required: boolean;
   deprecated: boolean;
-  schemes: Scheme[];
-  parameters: Parameter[];
-  body: { required: boolean; description: string; contents: Content[] } | null;
-  responses: { status: string; description: string; contents: Content[] }[];
+  description: string;
+  schema: Schema;
 };
+export type Scheme = {
+  id: string;
+  type?: string;
+  in?: string;
+  name?: string;
+  scheme?: string;
+  description?: string;
+};
+
+export type Operation = z.infer<typeof operationSchema>;
 
 export type ExampleLanguage = "python" | "typescript" | "curl";
 export const EXAMPLE_LANGUAGES: { id: ExampleLanguage; label: string; lang: string }[] = [

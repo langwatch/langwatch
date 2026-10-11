@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 export function ResponsiveExamples({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   useEffect(() => {
     const media = window.matchMedia("(min-width: 90rem)");
     const update = () => setOpen(media.matches);

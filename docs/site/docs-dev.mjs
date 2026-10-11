@@ -1,11 +1,14 @@
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { pageMarkdown } from "./docs-markdown.mjs";
 import { buildNav } from "./docs-nav.mjs";
 import { llmsDirectory } from "./docs-output.mjs";
 import { readRedirects, resolveRedirect } from "./docs-routing.mjs";
 import { bodyText, searchTrail } from "./docs-search.mjs";
+import { ISLANDS, islandHead, pageData, themeScript } from "./docs-static.mjs";
+import { extractStyles } from "./scripts/static-styles.mjs";
 
 export const STATIC_DIRS = ["images", "media", "logo"];
 export const STATIC_FILES = ["favicon.svg"];
@@ -81,6 +84,46 @@ export function docsDevPlugin({ docsRoot }) {
         }
         serveSource({ docsRoot, pathname, response, next });
       });
+      server.middlewares.use((request, response, next) =>
+        serveDocument({ request, response, next, server, docsRoot }),
+      );
     },
   };
+}
+
+async function serveDocument({ request, response, next, server, docsRoot }) {
+  const url = new URL(request.url ?? "/", "http://localhost");
+  if (
+    request.method !== "GET" ||
+    /\.[a-z0-9]+$/i.test(url.pathname) ||
+    /^\/(?:src|@|node_modules)/.test(url.pathname)
+  )
+    return next();
+  try {
+    const slug = url.pathname.replace(/^\/+|\/+$/g, "") || "introduction";
+    const known = Object.hasOwn(buildNav({ docsRoot }).pages, slug);
+    const { render } = await server.ssrLoadModule("/src/entry-server.tsx");
+    const result = await render({ slug: known ? slug : "404" });
+    const styled = extractStyles({ html: result.html });
+    const template = readFileSync(fileURLToPath(new URL("./index.html", import.meta.url)), "utf8");
+    const sources = Object.fromEntries(
+      ISLANDS.map((name) => [
+        name,
+        `/src/islands/${name}.${["search", "playground"].includes(name) ? "tsx" : "ts"}`,
+      ]),
+    );
+    const html = template
+      .replace("<!--islands-->", themeScript + islandHead({ sources }))
+      .replace(
+        "<!--head-->",
+        `<title>${result.title.replaceAll("<", "&lt;")}</title><style data-docs-style>${styled.css}</style>`,
+      )
+      .replace("<!--app-->", styled.html)
+      .replace("</body>", `${pageData({ slug, operation: result.operation })}</body>`);
+    response.statusCode = known ? 200 : 404;
+    response.setHeader("Content-Type", "text/html; charset=utf-8");
+    response.end(await server.transformIndexHtml(url.pathname, html));
+  } catch (error) {
+    next(error);
+  }
 }

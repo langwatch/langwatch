@@ -13,6 +13,7 @@ export function LegacyContent({
   if (text)
     return (
       <Button
+        data-docs-copy={text}
         variant="outline"
         colorPalette="gray"
         height="auto"

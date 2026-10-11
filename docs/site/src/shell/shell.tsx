@@ -8,7 +8,7 @@ import type { TypeMode } from "../lib/type-mode.tsx";
 import { SiteBanner } from "./banner.tsx";
 import { PageGround } from "./ground.tsx";
 import { Header } from "./header.tsx";
-import { ENDPOINT_QUERY, HEADER_HEIGHT, STICKY_TOP } from "./layout.ts";
+import { ENDPOINT_QUERY, HEADER_HEIGHT } from "./layout.ts";
 import type { PageKind } from "./layout.ts";
 import { MobileNav } from "./mobile-nav.tsx";
 import { PageFooter } from "./page-footer.tsx";
@@ -156,11 +156,7 @@ export function DocsShell({
                     gridArea: "play",
                     marginTop: 0,
                     marginInlineStart: "0",
-                    position: "sticky",
-                    top: STICKY_TOP,
                     alignSelf: "start",
-                    maxHeight: "calc(100vh - var(--docs-header-h) - 3rem)",
-                    overflowY: "auto",
                     marginBlock: "3rem 0",
                   },
                 }}
@@ -202,13 +198,13 @@ export function DocsShell({
           </Box>
         )}
         {showRail ? (
-          <Box gridArea="toc" paddingTop="12" display={{ base: "none", xl: "block" }}>
+          <Box gridArea="toc" paddingTop="0" display={{ base: "none", xl: "block" }}>
             <Box
               position="sticky"
-              top={STICKY_TOP}
+              top="var(--docs-header-h)"
+              paddingTop="10"
               maxHeight="calc(100vh - var(--docs-header-h) - 3rem)"
               overflowY="auto"
-              paddingTop="0"
             >
               <TocRail entries={toc} />
             </Box>

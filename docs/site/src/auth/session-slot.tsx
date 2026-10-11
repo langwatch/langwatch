@@ -15,7 +15,14 @@ export function SessionSlot({
   onDisconnect: () => void;
 }) {
   return (
-    <Box borderWidth="1px" borderColor="border" borderRadius="lg" padding="4" bg="bg.subtle">
+    <Box
+      data-docs-session=""
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      padding="4"
+      bg="bg.subtle"
+    >
       <Text fontSize="13px" fontWeight="600" color="fg" margin="0">
         LangWatch session
       </Text>

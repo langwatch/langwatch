@@ -1,0 +1,95 @@
+import { readFile, readdir, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { parseArgs } from "node:util";
+import { gzipSync } from "node:zlib";
+
+const { values } = parseArgs({
+  options: {
+    "out-dir": { type: "string" },
+    before: { type: "string" },
+    report: { type: "string" },
+  },
+});
+const outDir = path.resolve(values["out-dir"] ?? "dist");
+async function directorySize({ directory }) {
+  const files = await readdir(directory, { recursive: true });
+  let bytes = 0;
+  for (const file of files) {
+    const info = await stat(path.join(directory, file));
+    if (info.isFile()) bytes += info.size;
+  }
+  return bytes;
+}
+async function gzipFiles({ directory, files }) {
+  let bytes = 0;
+  for (const file of new Set(files))
+    bytes += gzipSync(await readFile(path.join(directory, file))).length;
+  return bytes;
+}
+async function measure({ directory }) {
+  const manifest = JSON.parse(await readFile(path.join(directory, ".vite/manifest.json"), "utf8"));
+  function entryFiles({ name }) {
+    const found = Object.entries(manifest).find(
+      ([, entry]) => entry.name === name && entry.isEntry,
+    );
+    if (!found) return [];
+    const result = new Set();
+    const collect = (key) => {
+      const entry = manifest[key];
+      if (!entry || result.has(entry.file)) return;
+      result.add(entry.file);
+      for (const child of entry.imports ?? []) collect(child);
+    };
+    collect(found[0]);
+    return [...result];
+  }
+  const html = await readFile(path.join(directory, "index.html"), "utf8");
+  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].reduce(
+    (sum, match) => sum + gzipSync(match[1]).length,
+    0,
+  );
+  const worker = gzipSync(await readFile(path.join(directory, "sw.js"))).length;
+  const initial = entryFiles({ name: "index" });
+  const idle = [...entryFiles({ name: "tabs" }), ...entryFiles({ name: "toc" })];
+  return {
+    initialGzip: inline + (await gzipFiles({ directory, files: initial })),
+    serviceWorkerGzip: worker,
+    withIdleControlsGzip:
+      inline + worker + (await gzipFiles({ directory, files: [...initial, ...idle] })),
+    simpleIslandsGzip: await gzipFiles({
+      directory,
+      files: ["controls", "copy", "tabs", "menus", "media", "toc", "disclosures"].flatMap((name) =>
+        entryFiles({ name }),
+      ),
+    }),
+    searchInteractionGzip: await gzipFiles({ directory, files: entryFiles({ name: "search" }) }),
+    playgroundInteractionGzip: await gzipFiles({
+      directory,
+      files: entryFiles({ name: "playground" }),
+    }),
+    assetsBytes: await directorySize({ directory: path.join(directory, "assets") }),
+    totalBytes: await directorySize({ directory }),
+  };
+}
+const after = await measure({ directory: outDir });
+if (after.withIdleControlsGzip >= 15_000)
+  throw new Error(`Initial JS budget exceeded: ${after.withIdleControlsGzip}`);
+let before;
+if (values.before) {
+  const directory = path.resolve(values.before);
+  const html = await readFile(path.join(directory, "index.html"), "utf8");
+  const files = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"/g)].map((match) => match[1]);
+  before = {
+    initialGzip: await gzipFiles({ directory, files }),
+    assetsBytes: await directorySize({ directory: path.join(directory, "assets") }),
+    totalBytes: await directorySize({ directory }),
+  };
+}
+const report = {
+  before,
+  after,
+  pageTypes: ["home", "guide", "API reference"],
+  note: "All page types share the same bootstrap. Interaction sizes include shared React/Zod chunks once. Assets and total sizes are uncompressed.",
+};
+console.log(JSON.stringify(report, null, 2));
+if (values.report) await writeFile(values.report, JSON.stringify(report, null, 2));

@@ -107,6 +107,7 @@ function NotFound() {
     >
       <Box paddingBottom="12">
         <Button
+          data-docs-search=""
           variant="outline"
           colorPalette="gray"
           height="44px"

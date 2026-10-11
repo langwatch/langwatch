@@ -48,6 +48,7 @@ export function Tabs({ children }: { children?: ReactNode }) {
   if (tabs.length === 0) return null;
   return (
     <ChakraTabs.Root
+      data-docs-preference={group ?? void 0}
       value={active}
       onValueChange={({ value }) =>
         group ? writePreference({ key: group, value }) : setLocal(value)

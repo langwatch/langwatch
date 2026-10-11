@@ -12,77 +12,10 @@ import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
-const searchEntrySchema = z.object({
-  slug: z.string(),
-  title: z.string(),
-  section: z.string(),
-  description: z.string(),
-  trail: z.string().default(""),
-  body: z.string().default(""),
-  headings: z.array(z.object({ id: z.string(), text: z.string() })),
-});
-export type SearchEntry = z.infer<typeof searchEntrySchema>;
-
+import { searchEntrySchema, searchIndex } from "../islands/search-model.ts";
+import type { SearchEntry } from "../islands/search-model.ts";
+export { searchIndex };
 type Result = { entry: SearchEntry; heading?: { id: string; text: string }; score: number };
-
-const MAX_RESULTS = 20;
-
-function similarWord({ word, term }: { word: string; term: string }) {
-  if (term.length < 5 || Math.abs(word.length - term.length) > 1) return false;
-  let left = 0;
-  while (left < term.length && word[left] === term[left]) left += 1;
-  if (word.length === term.length) {
-    const replacement = word.slice(left + 1) === term.slice(left + 1);
-    const transpose =
-      word[left] === term[left + 1] &&
-      word[left + 1] === term[left] &&
-      word.slice(left + 2) === term.slice(left + 2);
-    return replacement || transpose;
-  }
-  if (word.length > term.length) return word.slice(left + 1) === term.slice(left);
-  return word.slice(left) === term.slice(left + 1);
-}
-
-function scoreEntry({ entry, terms }: { entry: SearchEntry; terms: string[] }): Result | null {
-  const title = entry.title.toLowerCase();
-  const description = entry.description.toLowerCase();
-  let score = 0;
-  let heading: Result["heading"];
-  for (const term of terms) {
-    let best = 0;
-    if (title === term) best = 100;
-    else if (title.startsWith(term)) best = 60;
-    else if (title.includes(term)) best = 40;
-    const hit = entry.headings.find((candidate) => candidate.text.toLowerCase().includes(term));
-    if (hit && best < 25) {
-      best = 25;
-      heading = heading ?? hit;
-    }
-    if (description.includes(term) && best < 10) best = 10;
-    if (entry.slug.includes(term) && best < 8) best = 8;
-    if (entry.body.toLowerCase().includes(term) && best < 5) best = 5;
-    if (best === 0) {
-      const words = `${title} ${description} ${entry.trail}`.toLowerCase().split(/[^a-z0-9_]+/);
-      if (words.some((word) => similarWord({ word, term }))) best = 3;
-    }
-    if (best === 0) return null;
-    score += best;
-  }
-  return { entry, heading, score };
-}
-
-export function searchIndex({ index, query }: { index: SearchEntry[]; query: string }): Result[] {
-  const terms = query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((term) => term && !["how", "do", "i", "a", "the", "to", "is"].includes(term));
-  if (terms.length === 0) return [];
-  return index
-    .map((entry) => scoreEntry({ entry, terms }))
-    .filter((result): result is Result => result !== null)
-    .toSorted((a, b) => b.score - a.score)
-    .slice(0, MAX_RESULTS);
-}
 
 function Highlighted({ text, terms }: { text: string; terms: string[] }) {
   if (terms.length === 0) return <>{text}</>;

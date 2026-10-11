@@ -1,0 +1,277 @@
+[hidden] {
+  display: none !important;
+}
+.docs-island-dialog {
+  color: var(--chakra-colors-fg);
+  background: var(--chakra-colors-docs-paper);
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-xl);
+  padding: 0;
+  box-shadow: 0 20px 60px var(--chakra-colors-docs-shadow-strong);
+}
+.docs-island-dialog::backdrop {
+  background: var(--chakra-colors-bg-scrim);
+  backdrop-filter: blur(4px);
+}
+.docs-menu {
+  position: absolute;
+  z-index: 100;
+  right: 0;
+  top: 100%;
+  min-width: 10rem;
+  padding: 6px;
+  background: var(--chakra-colors-docs-raised);
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-lg);
+  box-shadow: 0 8px 24px var(--chakra-colors-docs-shadow-strong);
+}
+.docs-menu button,
+.docs-menu a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 14px;
+  border-radius: 6px;
+}
+.docs-menu :is(button, a):hover {
+  background: var(--chakra-colors-bg-hover);
+}
+.docs-agent-start [aria-pressed] {
+  background: transparent;
+  color: var(--chakra-colors-fg);
+  border-color: var(--chakra-colors-border);
+}
+.docs-agent-start [aria-pressed="true"] {
+  background: var(--chakra-colors-fg);
+  color: var(--chakra-colors-bg-surface);
+  border-color: var(--chakra-colors-fg);
+}
+.docs-agent-start [aria-pressed="true"]:hover {
+  background: var(--chakra-colors-docs-body);
+}
+.docs-mobile-dialog {
+  margin: 0;
+  max-width: 100%;
+  width: 360px;
+  height: 100dvh;
+  max-height: 100dvh;
+  border-radius: 0;
+}
+.docs-mobile-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 48rem) {
+  .docs-mobile-dialog {
+    width: 100%;
+  }
+}
+.docs-nav-label {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.docs-media-error {
+  color: var(--chakra-colors-red-fg);
+  font-size: 14px;
+  margin-top: 12px;
+}
+.docs-search-dialog {
+  margin: 6rem auto auto;
+  width: min(640px, calc(100% - 32px));
+  max-height: min(640px, calc(100dvh - 128px));
+}
+.docs-search-input {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--chakra-colors-border);
+}
+.docs-search-input input {
+  width: 100%;
+  min-width: 0;
+  height: 56px;
+  font-size: 16px;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+.docs-search-input button {
+  font-size: 13px;
+  min-height: 44px;
+}
+.docs-search-body {
+  overflow-y: auto;
+  max-height: 520px;
+  padding: 8px;
+}
+.docs-search-body p {
+  padding: 16px;
+  color: var(--chakra-colors-fg-muted);
+}
+#docs-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#docs-search-results a {
+  display: block;
+  padding: 12px;
+  min-height: 64px;
+  border-radius: var(--chakra-radii-lg);
+  border-inline-start: 2px solid transparent;
+  text-decoration: none;
+}
+#docs-search-results a:focus,
+#docs-search-results a:hover {
+  background: var(--chakra-colors-accent-subtle);
+  border-color: var(--chakra-colors-accent-fg);
+  outline: none;
+}
+#docs-search-results strong {
+  display: block;
+  font-size: 14px;
+  line-height: 20px;
+}
+#docs-search-results span,
+#docs-search-results small {
+  display: block;
+  color: var(--chakra-colors-fg-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+.docs-search-description {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@media (max-width: 48rem) {
+  .docs-search-dialog {
+    margin-top: 16px;
+    max-height: calc(100dvh - 32px);
+  }
+  .docs-search-body {
+    max-height: calc(100dvh - 100px);
+  }
+}
+.docs-request-error {
+  color: var(--chakra-colors-red-fg);
+  font-size: 12px;
+  margin-top: 4px;
+}
+.docs-island-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-lg);
+  background: transparent;
+}
+.docs-island-button:hover {
+  background: var(--chakra-colors-bg-hover);
+}
+.docs-island-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.docs-button-ghost {
+  border-color: transparent;
+}
+.docs-session-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.docs-session-description {
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--chakra-colors-docs-lede);
+  margin: 4px 0 12px;
+}
+.docs-session-status {
+  display: block;
+  font-size: 13px;
+  line-height: 22px;
+}
+.docs-session-status[data-selected="true"] {
+  margin-bottom: 12px;
+}
+.docs-session-status :is(strong, span) {
+  display: block;
+}
+.docs-session-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.docs-response-panel {
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-showcase);
+  overflow: hidden;
+}
+.docs-response-panel h2 {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--chakra-colors-bg-subtle);
+  border-bottom: 1px solid var(--chakra-colors-border);
+}
+.docs-response-content {
+  padding: 16px;
+  font-size: 13px;
+}
+.docs-response-content pre {
+  overflow: auto;
+  max-height: 33rem;
+  padding: 16px;
+  margin-top: 12px;
+  background: var(--chakra-colors-bg-nested);
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-lg);
+  font-size: 13px;
+  line-height: 22px;
+}
+.docs-offline {
+  max-width: 42rem;
+  margin: 15vh auto;
+  padding: 24px;
+  color: var(--chakra-colors-fg);
+}
+.docs-offline h1 {
+  font-size: 32px;
+  font-weight: 650;
+  margin-bottom: 24px;
+}
+.docs-offline p {
+  margin-block: 24px;
+}
+.docs-offline a {
+  text-decoration: underline;
+}
+body:has(dialog[open]) {
+  overflow: hidden;
+}
+[data-docs-toc] a {
+  color: var(--chakra-colors-docs-contents);
+  font-weight: 400;
+}
+[data-docs-toc] a[aria-current] {
+  color: var(--chakra-colors-accent-fg);
+  font-weight: 600;
+}
+.docs-island-dialog :is(button, input):focus-visible {
+  outline: 2px solid var(--chakra-colors-border-emphasized);
+  outline-offset: 2px;
+}

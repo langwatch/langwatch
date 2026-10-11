@@ -1,8 +1,7 @@
-import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, Flex, Heading, IconButton, Text } from "@langwatch/design-system/primitives";
 import { Check, ChevronDown, Copy, ExternalLink, FileText, Link2 } from "lucide-react";
 
-import { useCopy, writeClipboard } from "../lib/clipboard.ts";
+import { useCopy } from "../lib/clipboard.ts";
 import type { PageKind } from "./layout.ts";
 
 const ORIGIN = "https://docs.langwatch.ai";
@@ -17,10 +16,6 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
   const { state, copy, ready } = useCopy();
   const url = `${ORIGIN}/${slug}`;
   const prompt = `Read ${url} and help me understand this page.`;
-  const openIn = ({ base, note }: { base: string; note: string }) => {
-    window.open(`${base}${encodeURIComponent(prompt)}`, "_blank", "noopener");
-    return note;
-  };
   return (
     <Flex alignItems="center" gap="2">
       <Flex>
@@ -31,6 +26,7 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
           size="sm"
           height={{ base: "44px", xl: "34px" }}
           minHeight={{ base: "44px", xl: "34px" }}
+          data-docs-page-copy={slug}
           disabled={!ready}
           borderEndRadius="0"
           onClick={() =>
@@ -49,46 +45,49 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
           )}
           {state === "copied" ? "Copied" : "Copy page"}
         </Button>
-        <Menu.Root positioning={{ placement: "bottom-end" }}>
-          <Menu.Trigger asChild>
-            <IconButton
-              type="button"
-              variant="outline"
-              colorPalette="gray"
-              size="sm"
-              height={{ base: "44px", xl: "34px" }}
-              minHeight={{ base: "44px", xl: "34px" }}
-              disabled={!ready}
-              aria-label="More page actions"
-              borderStartRadius="0"
-              marginInlineStart="-1px"
+        <Box position="relative">
+          <IconButton
+            data-docs-page-menu=""
+            type="button"
+            variant="outline"
+            colorPalette="gray"
+            size="sm"
+            height={{ base: "44px", xl: "34px" }}
+            minHeight={{ base: "44px", xl: "34px" }}
+            disabled={!ready}
+            aria-label="More page actions"
+            aria-haspopup="menu"
+            aria-expanded={false}
+            borderStartRadius="0"
+            marginInlineStart="-1px"
+          >
+            <ChevronDown size={16} />
+          </IconButton>
+          <div className="docs-menu" role="menu" aria-label="Page actions" hidden>
+            <a role="menuitem" href={`/${slug}.md`}>
+              <FileText size={16} /> View as Markdown
+            </a>
+            <a
+              role="menuitem"
+              href={`https://claude.ai/new?q=${encodeURIComponent(prompt)}`}
+              target="_blank"
+              rel="noopener"
             >
-              <ChevronDown size={16} aria-hidden="true" />
-            </IconButton>
-          </Menu.Trigger>
-          <Menu.Content minWidth="14rem">
-            <Menu.Item value="markdown" asChild>
-              <a href={`/${slug}.md`}>
-                <FileText size={16} aria-hidden="true" /> View as Markdown
-              </a>
-            </Menu.Item>
-            <Menu.Item
-              value="claude"
-              onClick={() => openIn({ base: "https://claude.ai/new?q=", note: "claude" })}
+              <ExternalLink size={16} /> Open in Claude
+            </a>
+            <a
+              role="menuitem"
+              href={`https://chatgpt.com/?q=${encodeURIComponent(prompt)}`}
+              target="_blank"
+              rel="noopener"
             >
-              <ExternalLink size={16} aria-hidden="true" /> Open in Claude
-            </Menu.Item>
-            <Menu.Item
-              value="chatgpt"
-              onClick={() => openIn({ base: "https://chatgpt.com/?q=", note: "chatgpt" })}
-            >
-              <ExternalLink size={16} aria-hidden="true" /> Open in ChatGPT
-            </Menu.Item>
-            <Menu.Item value="link" onClick={() => writeClipboard({ text: url })}>
-              <Link2 size={16} aria-hidden="true" /> Copy page link
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Root>
+              <ExternalLink size={16} /> Open in ChatGPT
+            </a>
+            <button role="menuitem" type="button" data-docs-copy={url}>
+              <Link2 size={16} /> Copy page link
+            </button>
+          </div>
+        </Box>
       </Flex>
       {state === "failed" ? (
         <Text as="output" fontSize="13px" color="red.fg">

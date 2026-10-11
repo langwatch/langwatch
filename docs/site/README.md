@@ -24,10 +24,10 @@ optional fallback; building requires no credentials.
 pnpm --filter @langwatch/docs-site dev
 ```
 
-Open `http://localhost:5173`. Direct page URLs work. React mounts into the dev
-HTML template, and Vite recompiles MDX and its imported snippets when they
-change. Changes to MDX, navigation or either OpenAPI document reload the page;
-changes to React components use React refresh. Search is generated from the
+Open `http://localhost:5173`. Direct page URLs work. The server renders complete
+HTML, and Vite recompiles MDX and its imported snippets when they change.
+Changes to MDX, navigation or either OpenAPI document reload the page;
+interactive React islands use React refresh. Search is generated from the
 current navigation and source, so it works before a production build exists.
 Invalid MDX shows Vite's error overlay and recovers when corrected.
 
@@ -250,3 +250,38 @@ at 1440 and 390 pixels, including expiry, disconnect, clipboard redaction and
 zero API calls. Unit tests cover the default flag, cancelled acquisition, invalid
 credentials and restricted operations. Real popup, CSRF, CORS, server revocation
 and self-hosted behaviour remain proposed scenarios, explicitly unimplemented.
+
+## Static-first performance
+
+Pages are complete HTML with build-extracted, content-hashed design-system CSS.
+Chakra, Emotion, MDX and highlighting do not ship to readers. The bootstrap adds
+navigation and lazy controls; React loads only when search or Try it is opened.
+See [Revision 4: performance](./DESIGN.md) for the boundaries and alternatives.
+
+Internal links prefetch on hover/focus, with a small viewport prefetch allowance.
+Navigation preserves the header and handles history, focus and announcements.
+A build change or a failed transition falls back to a normal document navigation.
+The dev server renders the same static page structure and reloads authored MDX.
+
+The production-only service worker precaches shell CSS/JS, reading fonts and an offline page.
+It revalidates public HTML/search, caps page caches at 40 entries, and expires the
+stale-while-revalidate window after 60 seconds. API requests, authentication
+headers, query strings and private/no-store responses bypass caching. Updates
+activate on successful installation without forcing a reload; subsequent document
+navigation adopts the new version. CloudFront retains old hashed assets for open
+tabs and gives `sw.js` the same short cache policy as HTML. No cloud changes are
+required.
+
+```sh
+pnpm --filter @langwatch/docs-site size --out-dir "$TMPDIR/docs-performance"
+pnpm --filter @langwatch/docs-site test:performance --out-dir "$TMPDIR/docs-performance"
+pnpm --filter @langwatch/docs-site test:layout --out-dir "$TMPDIR/docs-performance" --screenshots "$TMPDIR/docs-layout"
+```
+
+`size` fails above 15 KB gzipped for the bootstrap, inline theme setup, idle
+controls and service worker combined. It separately reports the full search and
+playground interaction costs, including shared React/Zod. `test:performance`
+checks static reading, navigation, prefetch, worker replacement, offline fallback
+and credential isolation. `test:layout` checks 1280, 1440, 1670 and 390 pixel widths
+in light and dark. Run worker tests only against an isolated build: the update
+scenario temporarily changes that build’s `sw.js` and restores it afterwards.

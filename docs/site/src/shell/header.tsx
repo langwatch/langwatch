@@ -65,6 +65,7 @@ export function Header({
             minWidth="44px"
             height="44px"
             marginInlineStart="-2"
+            data-docs-mobile=""
             onClick={onMenu}
           >
             <MenuIcon size={20} aria-hidden="true" />
@@ -94,6 +95,7 @@ export function Header({
           type="button"
           variant="outline"
           colorPalette="gray"
+          data-docs-search=""
           onClick={onSearch}
           display={{ base: "none", lg: "flex" }}
           alignItems="center"
@@ -126,6 +128,7 @@ export function Header({
             display={{ base: "inline-flex", lg: "none" }}
             minWidth="44px"
             height="44px"
+            data-docs-search=""
             onClick={onSearch}
           >
             <Search size={20} aria-hidden="true" />

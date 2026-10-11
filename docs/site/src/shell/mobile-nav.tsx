@@ -1,15 +1,11 @@
-import { Drawer } from "@langwatch/design-system/drawer";
-import { Link } from "@langwatch/design-system/primitives";
+import { Box, Button, Flex, Link, Text } from "@langwatch/design-system/primitives";
 
 import { site } from "../lib/nav-model.ts";
 import type { Section } from "../lib/nav-model.ts";
 import { GithubLink } from "./github-link.tsx";
 import { SideNav } from "./side-nav.tsx";
 
-/** Modal navigation: the same two levels as the rail, with the header links in the footer. */
 export function MobileNav({
-  open,
-  onClose,
   active,
   slug,
 }: {
@@ -19,63 +15,38 @@ export function MobileNav({
   slug: string;
 }) {
   return (
-    <Drawer.Root
-      open={open}
-      onOpenChange={({ open: next }) => (next ? undefined : onClose())}
-      placement="start"
-      modal
-      preventScroll
-      closeOnInteractOutside
-      size="sm"
-      lazyMount
-      unmountOnExit
+    <dialog
+      id="docs-mobile-nav"
+      className="docs-island-dialog docs-mobile-dialog"
+      aria-labelledby="docs-mobile-title"
     >
-      <Drawer.Content
-        margin="0"
-        borderRadius="0"
-        width={{ base: "100%", md: "360px" }}
-        maxWidth="100%"
-        bg="bg.surface"
+      <Flex
+        padding="5"
+        alignItems="center"
+        justifyContent="space-between"
+        borderBottomWidth="1px"
+        borderColor="border"
       >
-        <Drawer.Header>
-          <Drawer.Title>Documentation</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body paddingX="4" data-docs-scroll="">
-          <SideNav active={active} slug={slug} />
-        </Drawer.Body>
-        <Drawer.Footer
-          paddingX="5"
-          paddingY="3"
-          gap="2"
-          borderTopWidth="1px"
-          borderColor="border.muted"
-          justifyContent="space-between"
-          flexWrap="wrap"
+        <Text id="docs-mobile-title" fontSize="18px" fontWeight="600">
+          Documentation
+        </Text>
+        <Button
+          data-docs-mobile-close=""
+          variant="ghost"
+          colorPalette="gray"
+          aria-label="Close navigation"
         >
-          <Link
-            href={site.llms}
-            fontSize="14px"
-            color="fg.muted"
-            minHeight="44px"
-            display="inline-flex"
-            alignItems="center"
-          >
-            Docs for agents
-          </Link>
-          <Link
-            href={site.signIn}
-            fontSize="14px"
-            color="fg.muted"
-            minHeight="44px"
-            display="inline-flex"
-            alignItems="center"
-          >
-            Open app
-          </Link>
-          <GithubLink compact />
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          Close
+        </Button>
+      </Flex>
+      <Box padding="4" overflowY="auto" minHeight="0" flex="1" data-docs-scroll="">
+        <SideNav active={active} slug={slug} />
+      </Box>
+      <Flex padding="4" gap="3" borderTopWidth="1px" borderColor="border" wrap="wrap">
+        <Link href={site.llms}>Docs for agents</Link>
+        <Link href={site.signIn}>Open app</Link>
+        <GithubLink compact />
+      </Flex>
+    </dialog>
   );
 }

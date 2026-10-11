@@ -47,7 +47,13 @@ export function Playground({
   );
 
   return (
-    <Flex direction="column" gap="6" minWidth="0" data-type-mode="productive">
+    <Flex
+      direction="column"
+      gap="6"
+      minWidth="0"
+      data-type-mode="productive"
+      data-docs-playground=""
+    >
       <PlaygroundRequest
         operation={operation}
         state={state}

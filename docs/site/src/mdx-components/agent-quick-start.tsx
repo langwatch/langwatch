@@ -91,6 +91,7 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
         <Flex as="fieldset" aria-label="Your coding agent" gap="2" wrap="wrap" marginBottom="5">
           {AGENTS.map((name) => (
             <Button
+              data-docs-agent={name}
               key={name}
               variant="outline"
               colorPalette="gray"
@@ -119,7 +120,8 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
             margin="0"
             maxWidth="32ch"
           >
-            Open your project in {agent}, then paste the full setup prompt.
+            Open your project in <span data-docs-agent-name="">{agent}</span>, then paste the full
+            setup prompt.
           </Text>
           <Button
             width={{ base: "100%", md: "auto" }}
@@ -128,6 +130,7 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
             color="bg.surface"
             _hover={{ bg: "docs.body" }}
             disabled={!ready}
+            data-docs-prompt=""
             onClick={() => copy({ text: prompt })}
           >
             {state === "copied" ? <Check size={16} /> : <Copy size={16} />}

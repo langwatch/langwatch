@@ -40,6 +40,7 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
   return (
     <CodeFrame>
       <Tabs.Root
+        data-docs-preference={group ?? void 0}
         value={active}
         onValueChange={({ value }) => {
           if (group) writePreference({ key: group, value });

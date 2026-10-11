@@ -31,7 +31,7 @@ function NavMethod({ method }: { method: string }) {
     <Text
       as="span"
       flexShrink={0}
-      minWidth="2.75rem"
+      minWidth="2.25rem"
       textAlign="center"
       paddingX="1"
       borderRadius="xs"
@@ -83,7 +83,9 @@ function PageRow({
       >
         {method ? <NavMethod method={method} /> : null}
         {!method && icon ? <Icon icon={icon} size={16} /> : null}
-        <span>{item.title}</span>
+        <span className="docs-nav-label" title={item.title}>
+          {item.title}
+        </span>
       </chakra.a>
     </Box>
   );

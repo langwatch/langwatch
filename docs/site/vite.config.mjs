@@ -6,6 +6,7 @@ import react from "@vitejs/plugin-react";
 
 import { docsDevPlugin } from "./docs-dev.mjs";
 import { docsPagesPlugin } from "./docs-pages.mjs";
+import { ISLANDS } from "./docs-static.mjs";
 export { STATIC_DIRS, STATIC_FILES } from "./docs-dev.mjs";
 import { docsMdxPlugin } from "./docs-mdx.mjs";
 import { docsNavPlugin, openapiPages } from "./docs-nav.mjs";
@@ -41,15 +42,50 @@ export function createViteConfig({ sourceRoot = docsRoot, outDir = "dist" } = {}
         ...["react/jsx-runtime", "react/jsx-dev-runtime", "@mdx-js/react"].map((name) => ({
           find: new RegExp(`^${name}$`),
           replacement: require.resolve(name),
+          customResolver(source, importer, options) {
+            return {
+              id: source,
+              external: Boolean(options.ssr || this.environment?.name === "ssr"),
+            };
+          },
         })),
       ],
     },
-    ssr: { noExternal: ["@langwatch/design-system"] },
+    ssr: {
+      noExternal: ["@langwatch/design-system"],
+      external: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        require.resolve("react/jsx-runtime"),
+        require.resolve("react/jsx-dev-runtime"),
+      ],
+      optimizeDeps: { include: ["react/jsx-runtime", "react/jsx-dev-runtime"] },
+    },
     server: {
       fs: { allow: [path.resolve(docsRoot, ".."), sourceRoot] },
       watch: { ignored: ["**/site/dist/**", "**/site/dist-ssr/**"] },
     },
-    build: { outDir, emptyOutDir: true },
+    build: {
+      outDir,
+      emptyOutDir: true,
+      manifest: true,
+      rollupOptions: {
+        input: {
+          index: path.join(siteRoot, "index.html"),
+          ...Object.fromEntries(
+            ISLANDS.map((name) => [
+              name,
+              path.join(
+                siteRoot,
+                `src/islands/${name}.${["search", "playground"].includes(name) ? "tsx" : "ts"}`,
+              ),
+            ]),
+          ),
+        },
+      },
+    },
   };
 }
 

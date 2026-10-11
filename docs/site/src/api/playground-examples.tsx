@@ -21,6 +21,7 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
   return (
     <Panel showHeader={false} title="Request example">
       <Tabs.Root
+        data-docs-preference="api-language"
         value={languageLabel}
         onValueChange={({ value }) => writePreference({ key: "api-language", value })}
         variant="line"
@@ -74,20 +75,10 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
 export function ResponseExample({ operation }: { operation: Operation }) {
   const { status, setStatus } = useEndpointState();
   const statuses = operation.responses.map((response) => response.status);
-  const chosen =
-    operation.responses.find((response) => response.status === status) ?? operation.responses[0];
-  const chosenContent = chosen?.contents[0];
-  const declared = chosenContent?.example;
-  const example =
-    declared ??
-    (chosenContent?.schema ? exampleFromSchema({ schema: chosenContent.schema }) : undefined);
-  const exampleCode =
-    example === undefined || example === null || JSON.stringify(example) === "{}"
-      ? ""
-      : JSON.stringify(example, null, 2);
   if (statuses.length === 0) return null;
-  let exampleLabel = "Response fields are not specified";
-  if (exampleCode) exampleLabel = declared !== void 0 ? "Declared example" : "Example from schema";
+  const response =
+    operation.responses.find((entry) => entry.status === status) ?? operation.responses[0];
+  const { exampleCode } = responseExampleData({ response });
   return (
     <Panel showHeader={false} title="Documented response">
       <Flex
@@ -120,8 +111,42 @@ export function ResponseExample({ operation }: { operation: Operation }) {
             ))}
           </Tabs.List>
         </Tabs.Root>
-        {exampleCode ? <CopyAction code={exampleCode} label="Copy example" /> : null}
+        <CopyAction code={exampleCode} label="Copy example" hidden={!exampleCode} />
       </Flex>
+      {operation.responses.map((response) => (
+        <div
+          key={response.status}
+          data-response-status={response.status}
+          data-docs-panel=""
+          hidden={response.status !== status}
+        >
+          <ResponseExampleBody response={response} />
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
+function responseExampleData({ response }: { response: Operation["responses"][number] }) {
+  const chosen = response;
+  const chosenContent = chosen.contents[0];
+  const declared = chosenContent?.example;
+  const example =
+    declared ??
+    (chosenContent?.schema ? exampleFromSchema({ schema: chosenContent.schema }) : void 0);
+  const exampleCode =
+    example === void 0 || example === null || JSON.stringify(example) === "{}"
+      ? ""
+      : JSON.stringify(example, null, 2);
+  let exampleLabel = "Response fields are not specified";
+  if (exampleCode) exampleLabel = declared !== void 0 ? "Declared example" : "Example from schema";
+  return { chosen, chosenContent, exampleCode, exampleLabel };
+}
+
+function ResponseExampleBody({ response }: { response: Operation["responses"][number] }) {
+  const { chosen, chosenContent, exampleCode, exampleLabel } = responseExampleData({ response });
+  return (
+    <>
       <Box paddingX="4" paddingTop="3" fontSize="12px" lineHeight="18px" color="fg.muted">
         <Text margin="0">{chosen?.description}</Text>
         {chosenContent ? (
@@ -137,6 +162,6 @@ export function ResponseExample({ operation }: { operation: Operation }) {
       ) : (
         <Box height="3" />
       )}
-    </Panel>
+    </>
   );
 }

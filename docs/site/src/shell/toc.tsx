@@ -68,7 +68,7 @@ function TocLinks({
 export function TocRail({ entries }: { entries: TocEntry[] }) {
   const active = useActiveId({ entries });
   return (
-    <Box as="nav" aria-label="On this page">
+    <Box as="nav" aria-label="On this page" data-docs-toc="">
       <Text margin="0" paddingBottom="2" fontSize="14px" lineHeight="20px" fontWeight="500">
         On this page
       </Text>
@@ -84,6 +84,7 @@ export function TocDisclosure({ entries, always }: { entries: TocEntry[]; always
   return (
     <Box
       as="details"
+      data-docs-toc=""
       ref={ref}
       marginBottom="6"
       borderWidth="1px"

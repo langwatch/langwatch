@@ -18,7 +18,7 @@ export async function checkBuild({ outDir }) {
   const slugs = [
     ...new Set(config.navigation.anchors.flatMap((node) => configuredSlugs({ node }))),
   ];
-  const expectedHtml = ["404.html"];
+  const expectedHtml = ["404.html", "offline.html"];
   for (const slug of slugs) {
     await access(path.join(outDir, `${slug}.md`));
     expectedHtml.push(...pageTargets({ slug }));

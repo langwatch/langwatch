@@ -37,6 +37,7 @@ export async function render({ slug }: { slug: string }) {
     title: `${meta?.title ?? slug} | LangWatch Docs`,
     description: meta?.description ?? operation?.description ?? "",
     examples,
+    operation,
     headings: page?.headings ?? [],
   };
 }

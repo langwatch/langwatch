@@ -67,6 +67,7 @@ async function checkSession({ browser, base, width, mode }) {
       .filter({ hasText: "Request and response examples" });
     if (await exampleToggle.isVisible()) await exampleToggle.click();
     await page.getByRole("button", { name: "Copy code", exact: true }).first().click();
+    await page.getByRole("button", { name: "Copied", exact: true }).first().waitFor();
     const copied = await page.evaluate(() => navigator.clipboard.readText());
     assert.ok(copied.includes("LANGWATCH_API_KEY"));
     assert.equal(copied.includes("docs-demo-not-a-credential"), false);

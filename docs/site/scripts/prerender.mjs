@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -9,8 +10,10 @@ import { buildNav } from "../docs-nav.mjs";
 import { llmsDirectory, pageTargets } from "../docs-output.mjs";
 import { readRedirects } from "../docs-routing.mjs";
 import { searchEntry } from "../docs-search.mjs";
+import { islandHead, pageData, themeScript } from "../docs-static.mjs";
 import { readBuildOptions } from "../scripts/options.mjs";
 import { render } from "../src/entry-server.tsx";
+import { extractStyles } from "./static-styles.mjs";
 
 const siteRoot = fileURLToPath(new URL("..", import.meta.url));
 const { outDir: dist } = readBuildOptions();
@@ -18,7 +21,18 @@ const docsRoot = path.resolve(siteRoot, "..");
 function escapeHtml({ text }) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 }
-const template = await readFile(path.join(dist, "index.html"), "utf8");
+const manifestText = await readFile(path.join(dist, ".vite/manifest.json"), "utf8");
+const manifest = JSON.parse(manifestText);
+const sources = Object.fromEntries(
+  Object.entries(manifest)
+    .filter(([, entry]) => entry.isEntry && entry.name !== "index")
+    .map(([, entry]) => [entry.name, `/${entry.file}`]),
+);
+const buildId = createHash("sha256").update(manifestText).digest("hex").slice(0, 16);
+const template = (await readFile(path.join(dist, "index.html"), "utf8")).replace(
+  "<!--islands-->",
+  themeScript + islandHead({ sources, build: buildId }),
+);
 const nav = buildNav({ docsRoot });
 const { pages } = nav;
 
@@ -30,25 +44,34 @@ async function copyMarkdown({ slug }) {
 await writeFile(path.join(dist, "redirects.json"), JSON.stringify(readRedirects({ docsRoot })));
 await writeFile(path.join(dist, "llms.txt"), llmsDirectory({ nav }));
 const searchIndex = [];
+const allStyles = new Set();
+const htmlTargets = [];
+function staticPage({ html }) {
+  const result = extractStyles({ html });
+  result.rules.forEach((rule) => allStyles.add(rule));
+  return { ...result, href: "/assets/prerender.css" };
+}
 let compiled = 0;
 const skipped = [];
 for (const slug of Object.keys(pages)) {
   try {
-    const { html, title, description, examples, headings } = await render({ slug });
+    const { html, title, description, operation, headings } = await render({ slug });
+    const styled = staticPage({ html });
     const head = `<title>${escapeHtml({ text: title })}</title>${description ? `<meta name="description" content="${escapeHtml({ text: description })}" />` : ""}`;
     const page = template
-      .replace("<!--head-->", head)
-      .replace("<!--app-->", html)
       .replace(
-        "</body>",
-        `<script>window.__DOCS_SLUG__=${JSON.stringify(slug)}${examples ? `;window.__DOCS_EXAMPLES__=${JSON.stringify(examples)}` : ""}</script></body>`,
-      );
+        "<!--head-->",
+        `${head}<link data-docs-style rel="stylesheet" href="${styled.href}">`,
+      )
+      .replace("<!--app-->", styled.html)
+      .replace("</body>", `${pageData({ slug, operation })}</body>`);
     searchIndex.push(searchEntry({ nav, slug, html, headings }));
     await copyMarkdown({ slug });
     const targets = pageTargets({ slug });
     for (const target of targets) {
       await mkdir(path.dirname(path.join(dist, target)), { recursive: true });
       await writeFile(path.join(dist, target), page);
+      htmlTargets.push(target);
     }
     compiled += 1;
   } catch (error) {
@@ -59,11 +82,24 @@ for (const slug of Object.keys(pages)) {
 await writeFile(path.join(dist, "search-index.json"), JSON.stringify(searchIndex));
 
 const missing = await render({ slug: "404" });
+const missingStyles = staticPage({ html: missing.html });
 const notFound = template
-  .replace("<!--head-->", "<title>Not found</title>")
-  .replace("<!--app-->", missing.html)
-  .replace("</body>", `<script>window.__DOCS_SLUG__="404"</script></body>`);
+  .replace(
+    "<!--head-->",
+    `<title>Not found</title><link data-docs-style rel="stylesheet" href="${missingStyles.href}">`,
+  )
+  .replace("<!--app-->", missingStyles.html)
+  .replace("</body>", `${pageData({ slug: "404", operation: null })}</body>`);
 await writeFile(path.join(dist, "404.html"), notFound);
+htmlTargets.push("404.html");
+const css = [...allStyles].join("\n");
+const cssHash = createHash("sha256").update(css).digest("hex").slice(0, 16);
+const cssHref = `/assets/prerender-${cssHash}.css`;
+await writeFile(path.join(dist, cssHref), css);
+for (const target of htmlTargets) {
+  const file = path.join(dist, target);
+  await writeFile(file, (await readFile(file, "utf8")).replace("/assets/prerender.css", cssHref));
+}
 
 for (const name of [...STATIC_DIRS, ...STATIC_FILES]) {
   if (existsSync(path.join(docsRoot, name)))

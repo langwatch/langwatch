@@ -25,6 +25,7 @@ export function SiteBanner() {
     <Box
       position="relative"
       className="docs-banner"
+      data-docs-banner={key}
       bg="docs.banner"
       color="docs.bannerText"
       minHeight="36px"

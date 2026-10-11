@@ -244,13 +244,15 @@ body {
   position: relative;
   z-index: 1;
   max-width: 1360px;
-  margin: 24px auto 0;
+  margin: 0 auto;
+  min-height: calc(100vh - var(--docs-header-h));
   padding-inline: 24px;
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "main" "footer";
   background: var(--chakra-colors-docs-paper);
   border: 1px solid var(--chakra-colors-border);
-  border-radius: 12px;
+  border-radius: 0;
+  border-block: 0;
   box-shadow:
     0 2px 4px var(--chakra-colors-docs-shadow),
     0 24px 80px var(--chakra-colors-docs-shadow);
@@ -338,7 +340,7 @@ body {
   .docs-layout {
     width: calc(100% - 48px);
     padding-inline: 0 40px;
-    grid-template-columns: 232px minmax(0, 1fr);
+    grid-template-columns: 280px minmax(0, 1fr);
     grid-template-areas: "nav main" "footer footer";
     column-gap: 32px;
   }
@@ -349,12 +351,12 @@ body {
   .docs-nav-plane {
     background: var(--chakra-colors-docs-sidebar);
     border-inline-end: 1px solid var(--chakra-colors-border);
-    border-start-start-radius: 12px;
+    border-start-start-radius: 0;
   }
 }
 @media (min-width: 80rem) {
   .docs-layout[data-has-toc="true"] {
-    grid-template-columns: 232px minmax(0, 1fr) 160px;
+    grid-template-columns: 280px minmax(0, 1fr) 160px;
     grid-template-areas: "nav main toc" "footer footer footer";
     column-gap: 32px;
   }
@@ -362,7 +364,7 @@ body {
 @media (min-width: 90rem) {
   .docs-layout[data-kind="endpoint"] {
     padding-inline-end: 32px;
-    grid-template-columns: 232px minmax(0, 1fr) 384px;
+    grid-template-columns: 280px minmax(0, 1fr) 384px;
     grid-template-areas: "nav top play" "nav ref play" "footer footer footer";
     grid-template-rows: auto 1fr;
     column-gap: 32px;

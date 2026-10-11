@@ -102,6 +102,7 @@ export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video
             justifyContent="center"
           >
             <Button
+              data-docs-video=""
               onClick={start}
               minHeight="48px"
               borderRadius="full"
