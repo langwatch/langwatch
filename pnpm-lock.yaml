@@ -12473,6 +12473,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
+      '@langwatch/insight-contract':
+        specifier: workspace:*
+        version: link:../../insight/contract
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../instant-eval/contract

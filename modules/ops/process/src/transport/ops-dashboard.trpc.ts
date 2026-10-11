@@ -51,6 +51,10 @@ export const opsDashboardTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.listSchedulerActions({ limit: input.limit }))
 
+    .procedure("listInsightSchedules")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.listInsightSchedules({ limit: input.limit }))
+
     .procedure("setScheduleActive")
     .withPermission("ops:manage", { at: "platform" })
     .handle(({ app, input, actor }) =>

@@ -96,6 +96,9 @@
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
+      "path": "../../insight/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../instant-eval/contract/tsconfig.build.json"
     },
     {

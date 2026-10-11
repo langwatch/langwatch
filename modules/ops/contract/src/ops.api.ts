@@ -113,9 +113,11 @@ import type {
 } from "./ops-bug-report.ts";
 import type { OpsPlatformOperator } from "./ops-operators.ts";
 import type {
+  ListInsightSchedulesInput,
   ListPausedSchedulesInput,
   ListScheduledJobsInput,
   ListSchedulerActionsInput,
+  OpsInsightSchedule,
   OpsScheduledJob,
   ScheduleControlInput,
   SchedulerAuditEntryView,
@@ -439,6 +441,8 @@ export interface OpsApi {
   listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]>;
   listPausedSchedules(input: ListPausedSchedulesInput): Promise<ListPausedSchedulesResult>;
   listSchedulerActions(input: ListSchedulerActionsInput): Promise<SchedulerAuditEntryView[]>;
+  /** Every person's daily insights schedule, across projects: the ones that are on first. */
+  listInsightSchedules(input: ListInsightSchedulesInput): Promise<OpsInsightSchedule[]>;
   setScheduleActive(input: SetScheduleActiveInput): Promise<OpsScheduledJob>;
   clearStuckScheduleSlot(input: ScheduleControlInput): Promise<OpsScheduledJob>;
   runScheduleNow(input: ScheduleControlInput): Promise<OpsScheduledJob>;
