@@ -4069,7 +4069,7 @@
   {
     "path": "modules/trace/browser/src/ui/sections/trace-find-bar.tsx",
     "rule": "card-box",
-    "line": 73,
+    "line": 96,
     "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
     "owner": "trace",
     "disposition": "reviewed"
@@ -4077,7 +4077,7 @@
   {
     "path": "modules/trace/browser/src/ui/sections/trace-find-bar.tsx",
     "rule": "card-box",
-    "line": 138,
+    "line": 184,
     "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
     "owner": "trace",
     "disposition": "reviewed"
@@ -4109,7 +4109,7 @@
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/filter-sidebar/filter-sidebar.tsx",
     "rule": "card-box",
-    "line": 583,
+    "line": 575,
     "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
     "owner": "trace",
     "disposition": "reviewed"
@@ -4165,7 +4165,7 @@
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-context.tsx",
     "rule": "card-box",
-    "line": 505,
+    "line": 507,
     "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
     "owner": "trace",
     "disposition": "reviewed"
@@ -4173,7 +4173,7 @@
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-context.tsx",
     "rule": "card-box",
-    "line": 531,
+    "line": 533,
     "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
     "owner": "trace",
     "disposition": "reviewed"
@@ -4181,7 +4181,7 @@
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/conversation-context.tsx",
     "rule": "card-box",
-    "line": 549,
+    "line": 551,
     "reason": "Kept as today: a protected trace viewer, sidebar, onboarding overlay or drawer shell (trace review).",
     "owner": "trace",
     "disposition": "reviewed"
@@ -5507,28 +5507,28 @@
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/toolbar/lens-tabs.tsx",
     "rule": "legacy-tabs-part",
-    "line": 153,
+    "line": 155,
     "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/toolbar/lens-tabs.tsx",
     "rule": "legacy-tabs-part",
-    "line": 167,
+    "line": 173,
     "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/span-tab-bar.tsx",
     "rule": "hand-tabs",
-    "line": 270,
+    "line": 278,
     "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/span-tab-bar.tsx",
     "rule": "hand-tabs",
-    "line": 608,
+    "line": 618,
     "reason": "Approved: a protected grid part (rich dataset cell, virtualised table body, experiments workbench header, trace table primitive, lens or span tab) kept exactly as today (leftover review).",
     "owner": "trace"
   },
