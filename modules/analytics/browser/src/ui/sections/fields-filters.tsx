@@ -1,6 +1,7 @@
 import { system } from "@langwatch/design-system";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Popover } from "@langwatch/design-system/popover";
 import {
@@ -36,6 +37,14 @@ import type { FilterDefinition, FilterField } from "../../model/analytics-filter
 import { filterOutEmptyFilters, type FilterParam } from "../../model/analytics-filter-params.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { SaveAsViewButton } from "./save-as-view-button.tsx";
+
+const FILTER_VALUES_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How to add metadata",
+    href: "https://docs.langwatch.ai/integration/metadata-and-labels",
+  },
+];
 
 /** An unparsable bound falls back to the slider's own end of the range. */
 function numberOrBound({
@@ -861,9 +870,11 @@ function ListSelection({
         )}
 
         {isEmpty && (
-          <Text fontSize="sm" paddingX={1} paddingY={2}>
-            No values yet. Filters fill in as traces arrive.
-          </Text>
+          <NoDataInfoBlock
+            size="line"
+            title="No values yet. Filters fill in as traces arrive."
+            next={FILTER_VALUES_NEXT}
+          />
         )}
         {filterData.isLoading &&
           Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map((_, i) => (
