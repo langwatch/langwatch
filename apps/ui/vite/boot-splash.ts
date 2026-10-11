@@ -79,12 +79,16 @@ export const BOOT_SPLASH_BODY = `<div id="lw-boot" class="lw-boot" data-testid="
 // Fades the screen off once the app has drawn a real page into #root: it stays over the app's
 // own loading screen, so a slow session or API read shows one screen, not two. A page with no
 // root (the bundling page) keeps it; reduced motion drops it at once.
+/** The API's health route, as `UI_API_HEALTH_PATH` in @langwatch/browser-host names it. */
+const HEALTH_PATH = "/api/health";
+
 const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
   var splash = document.getElementById("lw-boot");
   var root = document.getElementById("root");
   if (!splash || !root) return;
   function leave() {
     observer.disconnect();
+    clearInterval(countdown);
     document.dispatchEvent(new Event("lw-boot:done"));
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return splash.remove();
     requestAnimationFrame(function () { requestAnimationFrame(function () {
@@ -96,13 +100,36 @@ const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
   function drawn() {
     return root.firstElementChild && !root.querySelector('[data-testid="loading-screen"]');
   }
-  // A slow first read (a busy dev machine, a cold server) says so rather than looking stuck.
-  setTimeout(function () {
-    var note = document.getElementById("lw-boot-note");
+  // A slow start says what it is doing: it asks the API's health route, easing from 2s to 10s,
+  // and counts down to each retry, so a server that never answers never looks like a stuck page.
+  var note = document.getElementById("lw-boot-note");
+  var wait = 2000;
+  var countdown = 0;
+  function say(text) {
     if (!note || !splash.isConnected) return;
-    note.textContent = "Waiting for the server…";
+    note.textContent = text;
     note.setAttribute("data-on", "");
-  }, 6000);
+  }
+  function probe() {
+    if (!splash.isConnected) return;
+    say("Connecting to the server…");
+    fetch("${HEALTH_PATH}", { cache: "no-store" })
+      .then(function (response) { return response.ok; }, function () { return false; })
+      .then(function (answered) {
+        if (answered) return say("Connected. Opening LangWatch…");
+        var left = Math.round(wait / 1000);
+        clearInterval(countdown);
+        say("Can't reach the server yet. Trying again in " + left + "s…");
+        countdown = setInterval(function () {
+          left -= 1;
+          if (left > 0) return say("Can't reach the server yet. Trying again in " + left + "s…");
+          clearInterval(countdown);
+          probe();
+        }, 1000);
+        wait = Math.min(wait * 2, 10000);
+      });
+  }
+  setTimeout(probe, 3000);
   var observer = new MutationObserver(function () { if (drawn()) leave(); });
   observer.observe(root, { childList: true, subtree: true });
 })();</script>`;

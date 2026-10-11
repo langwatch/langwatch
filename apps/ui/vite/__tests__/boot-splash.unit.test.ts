@@ -47,7 +47,44 @@ describe("the boot splash", () => {
     it("holds the screen while the app shows its own loading screen", async () => {
       const html = await transform('<html><head></head><body><div id="root"></div></body></html>');
       expect(html).toContain('[data-testid="loading-screen"]');
-      expect(html).toContain("Waiting for the server…");
+    });
+
+    it("says it is connecting, counts down to each retry, and says when the server answers", async () => {
+      const html = await transform('<html><head></head><body><div id="root"></div></body></html>');
+      const script = [...html.matchAll(/<script data-boot-splash>([\s\S]*?)<\/script>/g)]
+        .map((match) => match[1])
+        .find((code) => code?.includes("MutationObserver"));
+      if (!script) throw new Error("expected the hand-off script");
+      const note = { textContent: "", setAttribute: () => undefined };
+      const splash = { isConnected: true };
+      const timers: { run: () => void; repeat: boolean }[] = [];
+      let healthy = false;
+      runInNewContext(script, {
+        document: {
+          getElementById: (id: string) =>
+            ({ "lw-boot": splash, root: {}, "lw-boot-note": note })[id],
+        },
+        MutationObserver: class {
+          observe() {}
+        },
+        setTimeout: (run: () => void) => timers.push({ run, repeat: false }),
+        setInterval: (run: () => void) => timers.push({ run, repeat: true }),
+        clearInterval: () => undefined,
+        fetch: async () => ({ ok: healthy }),
+      });
+      const flush = () => new Promise((resolve) => setImmediate(resolve));
+      timers.shift()?.run();
+      expect(note.textContent).toBe("Connecting to the server…");
+      await flush();
+      expect(note.textContent).toBe("Can't reach the server yet. Trying again in 2s…");
+      const tick = timers.find((timer) => timer.repeat);
+      tick?.run();
+      expect(note.textContent).toBe("Can't reach the server yet. Trying again in 1s…");
+      healthy = true;
+      tick?.run();
+      expect(note.textContent).toBe("Connecting to the server…");
+      await flush();
+      expect(note.textContent).toBe("Connected. Opening LangWatch…");
     });
   });
 
