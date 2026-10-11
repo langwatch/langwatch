@@ -53,8 +53,26 @@ drawers and dialogs on 2026-09-29 therefore did not keep them the same.
    variant, used on purpose; their local panels retire into it. `CardGrid` decides width;
    `ResourceTile` is the clickable tile with a native opener; `SettingsCard` delegates to `Card`.
 10. **Lists.** `LoadMore` ends an appending list; `NoDataInfoBlock size="line"` is the one-line
-    empty state.
-11. **Rules switch on tree-wide at zero** (Q4); reasoned disables only for
+    empty state. `ListPage` is controlled by one `state` (`loading`, `error`, `empty`,
+    `no-results`, `ready`): `error` and `empty` show their block alone, `loading` disables search,
+    `no-results` keeps the toolbar, and only `ready` pages, loads more or selects. `pagination`
+    and `loadMore` exclude each other. `refreshing` keeps the rows; an `error` beside `ready`
+    is an inline notice. A missing `empty`, `noResults` or `error` config falls back to one
+    generic line rather than a blank page. `back` is `{ label, href, onNavigate }`.
+11. **Page header closes by types, not by removal.** `PageLayout.Header`, `Heading`, `Subtitle`
+    and `HeaderButton` take closed props (no style props). `HeaderButton` keeps a link branch
+    (`asChild` with one element carrying `href`, `target`, `rel`) and composes with
+    `Menu.Trigger`. The old open props remain as a `@deprecated` overload until the callers
+    migrate (the review's rank 6). `Container` stays open until its `maxWidth="full"` callers
+    have a semantic replacement.
+12. **List table scrolling is the table's.** `ListTable` takes `scroll="x"` with a
+    `scrollLabel` (a focusable, named region) or `scroll="external"` (an outer virtual
+    scroller; nothing clips). `Table.*` parts, `tableLayout`, `minWidth` and column widths stay;
+    `containerProps` and open `Table.Root` props are the `@deprecated` overload. `RawTable`
+    remains the escape for virtual grids.
+13. **DeleteConfirmationDialog** is built on `Dialog` (`role="alertdialog"`), same public props;
+    its confirm is gated with a `disabledReason` naming the phrase.
+14. **Rules switch on tree-wide at zero** (Q4); reasoned disables only for
     `no-raw-overlay-parts`, `no-hand-drawn-card`, `no-raw-table` and `no-raw-page-title` (Q6).
 
 ## Consequences
