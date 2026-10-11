@@ -61,9 +61,11 @@ export interface SettingsMenuItem {
   icon: LucideIcon;
   /**
    * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
-   * in Enterprise", and the page opens on its upsell. A plan that includes it marks nothing.
+   * in Enterprise", and the page opens on its upsell.
    */
   isLocked?: boolean;
+  /** An Enterprise entry on a plan that includes it: the sidebar marks it with the "ENT" chip. */
+  isEnterprise?: boolean;
 }
 
 /** Settings entry active check by path prefix; uses pathname, not router pattern */
@@ -132,7 +134,9 @@ function enterpriseEntry({
   enterprisePlan: EnterprisePlanGate;
 }): SettingsMenuItem[] {
   if (enterprisePlan === "pending") return [];
-  return [enterprisePlan === "locked" ? { ...item, isLocked: true } : item];
+  return [
+    enterprisePlan === "locked" ? { ...item, isLocked: true } : { ...item, isEnterprise: true },
+  ];
 }
 
 /**

@@ -1,7 +1,7 @@
 /** Sidebar column: product pages and utilities. Host and search palette integration. */
 
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
-import { Box, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -196,6 +196,7 @@ function DetourMenuBody({
               showLabel={showExpanded}
               badgeNumber={badgeFor?.(item.href)}
               isLocked={item.isLocked}
+              rightElement={item.isEnterprise ? <EnterpriseChip /> : undefined}
             />
           ))}
         </SidebarSection>
@@ -451,5 +452,22 @@ export function ProductSidebar({
         </Box>
       </Box>
     </SideMenuDensityProvider>
+  );
+}
+
+/** The quiet "ENT" chip on an Enterprise entry the plan includes; a locked entry shows a lock. */
+function EnterpriseChip() {
+  return (
+    <Badge
+      title="Enterprise plan feature"
+      variant="outline"
+      textStyle="micro"
+      fontWeight="semibold"
+      letterSpacing="0.06em"
+      textTransform="uppercase"
+      {...QUIET_SIDEBAR_CHIP}
+    >
+      ENT
+    </Badge>
   );
 }

@@ -267,12 +267,12 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
     });
 
-    /** @scenario "Enterprise entries are marked only where the plan lacks them" */
-    it("marks no enterprise entry on a plan that includes them", () => {
+    /** @scenario "A plan with Enterprise sees its entries marked ENT, not locked" */
+    it("marks the enterprise entries ENT on a plan that includes them", () => {
       renderSettingsSidebar();
 
-      expect(screen.getByRole("link", { name: /^Roles/ })).toBeInTheDocument();
-      expect(screen.queryByText("ENT")).not.toBeInTheDocument();
+      const roles = screen.getByRole("link", { name: /^Roles/ });
+      expect(within(roles).getByText("ENT")).toBeInTheDocument();
       expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
     });
 
