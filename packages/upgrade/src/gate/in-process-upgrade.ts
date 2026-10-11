@@ -63,24 +63,29 @@ export const PASS_REQUEST_TASK = "request-system-migrations-pass";
 export const PASS_REQUEST_WAIT_MS = 60_000;
 
 /**
- * The pass request with its queue jobs ahead of any backlog (T6: it sat behind 800k jobs). One that
- * does not settle in time is a warning: the hourly re-drive still reaches every tenant step.
+ * The pass request. `pnpm task upgrade` waits for its jobs on a list ahead of any backlog (T6),
+ * which the serving workers run; a serving worker only sends it, its own consumers starting after
+ * this run (T0-F12). One that does not settle in time is a warning: the hourly re-drive reaches it.
  */
 export function passRequestReconciler({
   modules,
+  waitForPass,
 }: {
   modules: Pick<UpgradeModules, "tasks" | "runListedWork">;
+  waitForPass: boolean;
 }): UpgradeReconciler {
   return {
     name: "system-migrations-pass-request",
     async run({ signal }) {
       const task = modules.tasks(isModuleTask).find((each) => each.name === PASS_REQUEST_TASK);
       if (!task) return;
+      const work = () => task.run({ args: [], signal });
       try {
+        if (!waitForPass) return await work();
         await modules.runListedWork({
           name: `task:${PASS_REQUEST_TASK}`,
           timeoutMs: PASS_REQUEST_WAIT_MS,
-          work: () => task.run({ args: [], signal }),
+          work,
         });
       } catch (error) {
         signal.throwIfAborted();
@@ -185,6 +190,7 @@ export function inProcessUpgrade({
   databaseUrl,
   environment,
   development,
+  waitForPass,
   openPublisher = () => null,
   signal = new AbortController().signal,
   run = runImageUpgrade,
@@ -193,6 +199,8 @@ export function inProcessUpgrade({
   databaseUrl: string;
   environment: ImageUpgradeInputs["environment"];
   development: boolean;
+  /** Only a run-once upgrade waits for its pass request: a serving worker would wait on itself. */
+  waitForPass: boolean;
   openPublisher?: OpenReadHintPublisher;
   signal?: AbortSignal;
   /** The image's upgrade; a test hands its own to read what the run was given. */
@@ -213,7 +221,7 @@ export function inProcessUpgrade({
             upcasts: upcastStepsOf({ app: modules }),
             reconcilers: [
               langWatchQlReconciler({ environment }),
-              passRequestReconciler({ modules }),
+              passRequestReconciler({ modules, waitForPass }),
             ],
             ...(publisher ? { publish: publisher.publish } : {}),
           },

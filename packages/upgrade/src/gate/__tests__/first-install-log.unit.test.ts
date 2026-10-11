@@ -32,7 +32,7 @@ describe("admitAfterFirstInstall", () => {
       expect(verdict).toEqual({ admitted: true, outcome: "current" });
       expect(said.map((line) => line.message)).toEqual([
         expect.stringMatching(
-          /^first install: .*this worker runs `pnpm task upgrade` before it takes jobs/,
+          /^first install: .*this worker runs the upgrade itself before it takes jobs/,
         ),
         "upgrade ran",
         expect.stringMatching(/finished: the installation is current/),
@@ -59,13 +59,35 @@ describe("admitAfterFirstInstall", () => {
       });
 
       expect(verdict).toEqual({ admitted: true, outcome: "current" });
-      expect(said[0]?.message).toMatch(/behind this image: .*prisma:20261006180000_add_column/);
-      expect(said[0]?.message).toContain("`pnpm task upgrade`");
+      expect(said[0]?.message).toMatch(
+        /behind this image: 1 step not done: prisma:20261006180000_add_column, so this worker runs the upgrade itself/,
+      );
       expect(said[0]?.fields).toMatchObject({
         phase: "behind",
         next: expect.stringMatching(/^nothing to do/),
       });
       expect(said[1]?.message).toBe("upgrade ran");
+    });
+  });
+
+  describe("given a worker whose installation is behind its image on several hundred steps", () => {
+    /** @scenario "The worker's behind line counts the steps and names at most five" */
+    it("gives the count and names only the first five", async () => {
+      const said: string[] = [];
+      const blockingSteps = Array.from({ length: 480 }, (_, index) => `prisma:${index}`);
+      const answers: ServingVerdict[] = [
+        assertCurrent({ ledger: { steps: [] }, image: { release: "3.21.0", blockingSteps } }),
+        { admitted: true, outcome: "current" },
+      ];
+      await admitAfterFirstInstall({
+        gate: { admit: async () => answers.shift() ?? { admitted: true, outcome: "current" } },
+        firstInstall: async () => ({ code: "done", logTail: [] }),
+        warn: (message) => void said.push(message),
+      });
+
+      expect(said[0]).toBe(
+        "behind this image: 480 steps not done: prisma:0, prisma:1, prisma:2, prisma:3, prisma:4, …, so this worker runs the upgrade itself before it takes jobs; its lines follow",
+      );
     });
   });
 
@@ -88,7 +110,7 @@ describe("admitAfterFirstInstall", () => {
 
       expect(said.slice(1)).toEqual([
         "upgrade ran",
-        "`pnpm task upgrade` finished: the installation is current, so this worker takes jobs",
+        "the upgrade finished: the installation is current, so this worker takes jobs",
       ]);
     });
 

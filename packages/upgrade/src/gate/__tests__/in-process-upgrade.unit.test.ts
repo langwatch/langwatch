@@ -31,6 +31,7 @@ describe("passRequestReconciler()", () => {
   it("runs ops' pass request inside the queue's listed work", async () => {
     const ran: string[] = [];
     const reconciler = passRequestReconciler({
+      waitForPass: true,
       modules: {
         tasks: <Task>(isTask: (contribution: unknown) => contribution is Task) =>
           [
@@ -49,8 +50,30 @@ describe("passRequestReconciler()", () => {
     expect(ran).toEqual(["listed task:request-system-migrations-pass", "pass"]);
   });
 
+  /** @scenario "A serving worker's upgrade sends its pass request and does not wait on itself" */
+  it("sends the request without waiting where the run's own worker consumes it", async () => {
+    const ran: string[] = [];
+    const reconciler = passRequestReconciler({
+      waitForPass: false,
+      modules: {
+        tasks: <Task>(isTask: (contribution: unknown) => contribution is Task) =>
+          [
+            { name: "request-system-migrations-pass", run: async () => void ran.push("pass") },
+          ].flatMap((each) => (isTask(each) ? [each] : [])),
+        runListedWork: async () => {
+          throw new Error("a serving worker never waits for its own consumers");
+        },
+      },
+    });
+
+    await reconciler.run({ signal });
+
+    expect(ran).toEqual(["pass"]);
+  });
+
   it("warns and lets the run go on when the request does not settle", async () => {
     const reconciler = passRequestReconciler({
+      waitForPass: true,
       modules: {
         tasks: <Task>(isTask: (contribution: unknown) => contribution is Task) =>
           [{ name: "request-system-migrations-pass", run: async () => undefined }].flatMap(
@@ -83,6 +106,7 @@ describe("inProcessUpgrade()", () => {
       databaseUrl: "postgresql://localhost:1/never",
       environment: {},
       development: false,
+      waitForPass: false,
       openPublisher: () => ({
         publish: async (channel, message) => void published.push(`${channel} ${message}`),
         close: async () => void (closed += 1),

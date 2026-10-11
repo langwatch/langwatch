@@ -26,8 +26,23 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
   Scenario: The worker says it runs the upgrade because the installation is behind, naming the steps
     Given a worker whose installation is behind its image on one blocking step
     When its upgrade gate admits it
-    Then it reports that the installation is behind, naming the step and "pnpm task upgrade"
+    Then it reports that the installation is behind, naming the step, and that it runs the upgrade itself
     And the report says nothing is needed from the operator
+
+  @unit
+  Scenario: The worker's behind line counts the steps and names at most five
+    Given a worker whose installation is behind its image on several hundred steps
+    When its upgrade gate admits it
+    Then its line gives the number of steps not done and names only the first five
+    # T0-F12: the line listed about 480 ids; `pnpm task upgrade status` lists every one.
+
+  @unit
+  Scenario: A serving worker's upgrade sends its pass request and does not wait on itself
+    Given a worker running the upgrade before it takes jobs
+    When the upgrade asks for one system-migrations pass
+    Then it sends the request and goes on without waiting for its jobs
+    And the worker runs them once it takes jobs
+    # T0-F12: the request's jobs need this worker's consumers, so a wait always ran its full minute.
 
   @unit
   Scenario: An image whose gate refuses runs nothing and refuses by name

@@ -194,6 +194,13 @@ Feature: Private ClickHouse Routing
     Then resolution fails with an error naming the tenant
     And the shared client is not returned
 
+  @unit
+  Scenario: An organization created after a process booted resolves on its next lookup
+    Given a long-lived worker that looked up an organization before it was created
+    When the organization is created and the worker looks it up again
+    Then the lookup reads Postgres again and answers that organization
+    # T0-F11: a refusal is never remembered, so a new tenant is never stuck unroutable.
+
   # ---------------------------------------------------------------------------
   # Access discipline
   # ---------------------------------------------------------------------------

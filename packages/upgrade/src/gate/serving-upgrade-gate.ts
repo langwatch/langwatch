@@ -346,19 +346,25 @@ async function waitReason({
   };
 }
 
+/** The line names at most five ids; `pnpm task upgrade status` lists every one (T0-F5). */
+const NAMED_STEPS = 5;
+
+function stepsNotDone(outstanding: readonly string[]): string {
+  const count = `${outstanding.length} ${outstanding.length === 1 ? "step" : "steps"} not done`;
+  const more = outstanding.length > NAMED_STEPS ? ", …" : "";
+  return `${count}: ${outstanding.slice(0, NAMED_STEPS).join(", ")}${more}`;
+}
+
 function sayRun({ verdict, warn }: { verdict: ServingVerdict; warn: ServingGateWarn }): void {
   const why =
     verdict.outcome === "first-install"
       ? "first install: the ledger and the schema are empty"
-      : `behind this image: steps not done: ${"outstanding" in verdict ? verdict.outstanding.join(", ") : ""}`;
-  warn(
-    `${why}, so this worker runs \`${UPGRADE_COMMAND}\` before it takes jobs; its lines follow`,
-    {
-      phase: verdict.outcome,
-      waitingOn: `\`${UPGRADE_COMMAND}\``,
-      next: "nothing to do: the worker takes jobs when the upgrade finishes",
-    },
-  );
+      : `behind this image: ${stepsNotDone("outstanding" in verdict ? verdict.outstanding : [])}`;
+  warn(`${why}, so this worker runs the upgrade itself before it takes jobs; its lines follow`, {
+    phase: verdict.outcome,
+    waitingOn: "the upgrade",
+    next: "nothing to do: the worker takes jobs when the upgrade finishes",
+  });
 }
 
 /** Whether the worker stops asking; one that said it was behind also says it caught up. */
@@ -373,13 +379,10 @@ function settled({
 }): boolean {
   if (verdict.outcome === "first-install" || verdict.outcome === "behind") return false;
   if (wasBehind && verdict.admitted) {
-    warn(
-      `\`${UPGRADE_COMMAND}\` finished: the installation is current, so this worker takes jobs`,
-      {
-        phase: "current",
-        next: "nothing to do",
-      },
-    );
+    warn("the upgrade finished: the installation is current, so this worker takes jobs", {
+      phase: "current",
+      next: "nothing to do",
+    });
   }
   return true;
 }
@@ -644,8 +647,10 @@ export async function servingUpgradeGate({
         withStoreUrls(secrets, ({ redis, credentialKeys }) => {
           const databaseUrl = database?.trim();
           if (!databaseUrl) return { ...NO_LEDGER_GATE, runOnce: refuseWithoutDatabase };
-          const upgrade = upgradeIn({ bootModules, databaseUrl, clickhouse, redis, environment });
-          const runOnce = async () => EXIT_CODES[(await upgrade()).code];
+          const stores = { bootModules, databaseUrl, clickhouse, redis, environment };
+          const upgrade = upgradeIn({ ...stores, waitForPass: false });
+          const runOnce = async () =>
+            EXIT_CODES[(await upgradeIn({ ...stores, waitForPass: true })()).code];
           if (!clickhouse?.trim() && routes.size === 0) return { ...NO_CLICKHOUSE_GATE, runOnce };
           const pool = guardGatePool({
             pool: new pg.Pool(gatePoolConfig({ databaseUrl })),
@@ -677,12 +682,15 @@ function upgradeIn({
   clickhouse,
   redis,
   environment,
+  waitForPass,
 }: {
   bootModules: BootUpgradeModules | undefined;
   databaseUrl: string;
   clickhouse: string | undefined;
   redis: string | undefined;
   environment: Readonly<Record<string, string | undefined>>;
+  /** True for `pnpm task upgrade`, whose pass request the serving workers run. */
+  waitForPass: boolean;
 }): FirstInstallUpgrade {
   if (!bootModules) return refuseWithoutModules;
   const sharedUrl = clickhouse?.trim();
@@ -695,6 +703,7 @@ function upgradeIn({
       ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
     },
     development: environment.NODE_ENV === "development",
+    waitForPass,
     openPublisher: redisReadHintPublisher({ url: redis?.trim() || undefined, environment }),
   });
 }
