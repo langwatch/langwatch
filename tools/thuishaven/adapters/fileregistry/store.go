@@ -495,7 +495,6 @@ func readHeavyRunClaim(path string) (heavyRunClaim, bool) {
 // A timestamp in the FUTURE is expired, not fresh. Its age is negative, so it
 // would otherwise sit under the TTL until that date arrived — a clock rollback
 // or one corrupt record holding machine-wide capacity for as long as it likes.
-// The same rule as domain.LiveSpawns, for the same reason.
 func (s *Store) heavyRunExpired(path string) bool {
 	rec, ok := readHeavyRunClaim(path)
 	if !ok {

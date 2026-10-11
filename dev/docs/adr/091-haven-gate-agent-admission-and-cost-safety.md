@@ -4,6 +4,8 @@
 
 **Status:** Proposed
 
+**Status note (2026-10-12):** Repeat-call refusal and the spawn cap were never wired; removed 2026-10-12.
+
 **Relates to:** [ADR-090](./090-machine-wide-resource-governance-for-parallel-agents.md) (the governor this is the entry point to), [ADR-064](./064-haven-cli-redesign.md) (the CLI surface `haven gate` and `haven run` join).
 
 **Behavioural contract:** [specs/claude/agent-admission-gate.feature](../../../specs/claude/agent-admission-gate.feature), [specs/claude/llm-cost-safety.feature](../../../specs/claude/llm-cost-safety.feature).

@@ -2,14 +2,14 @@ Feature: The haven hub — one place to see and act on every stack
   Juggling several worktrees means asking "what is running, how much is it
   costing my machine, and how do I get rid of the one I'm done with?" without
   hunting terminals. The hub TUI answers that in one screen: every stack with
-  its health and footprint, and actions on the selected one — open its git
-  view, shut it down, or destroy the worktree entirely.
+  its health and footprint, and actions on the selected one — shut it down,
+  or destroy the worktree entirely.
 
   # Behavior lives in tools/thuishaven: `cmd/hub.go` + `app/hub.go`
   # (DownStack, DestroyWorktree and their guards), `domain/footprint.go`
   # (the memory partitioner) and `adapters/hubtui/` (the TUI itself).
   # Scenarios are bound by Go tests (`go test ./...` in tools/thuishaven):
-  # `adapters/hubtui/hubtui_test.go` (TestHubModel: g opens git,
+  # `adapters/hubtui/hubtui_test.go` (TestHubModel:
   # d+confirm downs, x+type-the-name destroys) and `app/hub_test.go`
   # (TestDownStack, TestDestroyWorktree with the primary-checkout and
   # running-from refusals). The parity checker

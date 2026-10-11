@@ -285,15 +285,6 @@ func (s *Server) seed(slug string, live bool) seedJSON {
 	return out
 }
 
-func newestMentioning(lines []logLine, needle string) (logLine, bool) {
-	for i := len(lines) - 1; i >= 0; i-- {
-		if strings.Contains(lines[i].Text, needle) {
-			return lines[i], true
-		}
-	}
-	return logLine{}, false
-}
-
 func (s *Server) facts(h homeState, extras Extras) factsJSON {
 	st := h.stack
 	f := factsJSON{

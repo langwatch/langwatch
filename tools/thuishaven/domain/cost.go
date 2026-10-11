@@ -1,10 +1,7 @@
 package domain
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"time"
 )
 
 // The gate's second duty: pricing an action before it silently invalidates a
@@ -140,108 +137,4 @@ func InvalidationWarning(kind CacheInvalidation, prefixTokens int, caller Caller
 	default:
 		return "editing instructions MAY invalidate the prefix (where the harness places them is unverified) — " + base
 	}
-}
-
-// --- unambiguous waste -------------------------------------------------------
-
-// RepeatKey identifies "the same call again". Hashed so a long command does not
-// bloat the state file, and so nothing sensitive is written to disk.
-func RepeatKey(toolName, input string) string {
-	sum := sha256.Sum256([]byte(toolName + "\x00" + input))
-	return hex.EncodeToString(sum[:8])
-}
-
-// RepeatThreshold is how many identical consecutive calls are tolerated before
-// the gate stops one.
-//
-// Three, not one: a retry after a transient failure is ordinary, and denying
-// the second attempt at anything would be worse than the loop it prevents.
-const RepeatThreshold = 3
-
-// RepeatState is what the gate remembers about the last call in a session.
-type RepeatState struct {
-	Key   string
-	Count int
-	// EditedSince records that a file changed after the last call. It is what
-	// keeps the red-green loop working: rerunning the same test command after an
-	// edit is the most common sequence there is, and a detector that cannot see
-	// the edit denies it.
-	EditedSince bool
-}
-
-// ObserveCall folds a call into the repeat state and reports whether it should
-// be denied.
-//
-// A different call, or any intervening file edit, resets the count. Only a run
-// of identical calls with nothing changing in between is waste.
-func ObserveCall(prev RepeatState, key string) (RepeatState, bool) {
-	if prev.Key != key || prev.EditedSince {
-		return RepeatState{Key: key, Count: 1}, false
-	}
-	next := RepeatState{Key: key, Count: prev.Count + 1}
-	return next, next.Count > RepeatThreshold
-}
-
-// RepeatDenialReason explains the stop in terms the model can act on.
-func RepeatDenialReason(count int) string {
-	return fmt.Sprintf(
-		"this exact command has run %d times in a row with nothing changing in between. "+
-			"Repeating it will produce the same result. Change the input, change the approach, "+
-			"or read the previous output again — do not retry it unchanged.", count)
-}
-
-// MaxConcurrentAgents caps machine-wide sub-agent fan-out.
-//
-// Ten is the working fleet size this whole ADR exists for; the cap sits just
-// above it so ordinary work is never refused and a runaway spawn loop is.
-const MaxConcurrentAgents = 12
-
-// SpawnEntryTTL bounds how long a counted spawn is believed.
-//
-// The cap MUST be able to lose count. PreToolUse fires before the permission
-// check, so a spawn the user then rejects is counted and never runs, and drift
-// is one-directional. A stale-high counter would refuse every spawn on the
-// machine forever, which is the fail-closed outcome ADR-091 calls
-// non-negotiable — so entries expire and an unverifiable count admits.
-const SpawnEntryTTL = 30 * time.Minute
-
-// LiveSpawns counts entries that have not expired, given when each was recorded.
-//
-// An entry stamped in the FUTURE is not counted. A negative age is under the TTL
-// by arithmetic, so a clock that went backwards — or one corrupt record — would
-// otherwise hold the machine-wide cap full until that timestamp passed, which is
-// precisely the stale-high count this design says must never be possible.
-func LiveSpawns(recorded []time.Time, now time.Time) int {
-	live := 0
-	for _, at := range recorded {
-		age := now.Sub(at)
-		if age >= 0 && age < SpawnEntryTTL {
-			live++
-		}
-	}
-	return live
-}
-
-// SpawnDenialReason names the count so the refusal is checkable rather than
-// mysterious.
-func SpawnDenialReason(live int) string {
-	return fmt.Sprintf(
-		"%d sub-agents are already running on this machine (cap %d). Wait for one to finish "+
-			"before spawning another — do not sleep or poll, just continue with work that "+
-			"does not need a new agent.", live, MaxConcurrentAgents)
-}
-
-// ParallelSpawnCachePrice is the cost N sub-agents launched together pay that
-// one launched alone does not.
-//
-// A cache entry is readable only once the first response using it begins
-// streaming, so simultaneous spawns sharing a prefix all pay the write rather
-// than the read. It is a better argument for the cap than RAM is.
-func ParallelSpawnCachePrice(n, prefixTokens int) float64 {
-	if n < 2 || prefixTokens <= 0 {
-		return 0
-	}
-	// The first pays the write regardless; the rest would have read.
-	return float64(n-1) * float64(prefixTokens) / 1_000_000 * opus5InputPerMTok *
-		(cacheWrite5mRate - cacheReadRate)
 }

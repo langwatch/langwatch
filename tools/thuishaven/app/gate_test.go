@@ -29,6 +29,9 @@ func ask(t *testing.T, o *Orchestrator, payload map[string]any) hookReply {
 	var out bytes.Buffer
 	o.Gate(bytes.NewReader(in), &out)
 
+	if bytes.Contains(out.Bytes(), []byte("updatedInput")) {
+		t.Fatalf("the gate never rewrites the command it admits, got %q", out.String())
+	}
 	var reply hookReply
 	if err := json.Unmarshal(out.Bytes(), &reply); err != nil {
 		t.Fatalf("the gate wrote something undecodable: %q", out.String())
@@ -60,6 +63,9 @@ func askCodex(t *testing.T, o *Orchestrator, payload map[string]any) hookReply {
 	var out bytes.Buffer
 	o.GateCodex(bytes.NewReader(in), &out)
 
+	if bytes.Contains(out.Bytes(), []byte("updatedInput")) {
+		t.Fatalf("the gate never rewrites the command it admits, got %q", out.String())
+	}
 	var reply hookReply
 	if err := json.Unmarshal(out.Bytes(), &reply); err != nil {
 		t.Fatalf("the gate wrote something undecodable: %q", out.String())
@@ -79,12 +85,6 @@ func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 		store := &fakeStore{heavyRuns: 1, observed: map[string]time.Duration{"unit": 20 * time.Second}}
 		sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
 		reply := ask(t, gateOrch(store, sys), bashPayload("pnpm lint"))
-
-		t.Run("the command is not rewritten", func(t *testing.T) {
-			if reply.Specific.UpdatedInput != nil {
-				t.Fatalf("expected no updatedInput at all, got %+v", reply.Specific)
-			}
-		})
 
 		t.Run("and no allow is handed out on its strength", func(t *testing.T) {
 			if reply.Specific.PermissionDecision == "allow" {
@@ -117,11 +117,6 @@ func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 			}
 		})
 
-		t.Run("and it still carries no updatedInput", func(t *testing.T) {
-			if reply.Specific.UpdatedInput != nil {
-				t.Fatalf("a refusal is not a rewrite: %+v", reply.Specific)
-			}
-		})
 	})
 
 	t.Run("given a command that is not heavy", func(t *testing.T) {
@@ -130,7 +125,7 @@ func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 		reply := ask(t, gateOrch(store, sys), bashPayload("git status"))
 
 		t.Run("it is waved through untouched", func(t *testing.T) {
-			if reply.Specific.PermissionDecision != "" || reply.Specific.UpdatedInput != nil {
+			if reply.Specific.PermissionDecision != "" {
 				t.Fatalf("gating `git status` is its own outage; got %+v", reply.Specific)
 			}
 		})
@@ -148,12 +143,6 @@ func TestCodexGateNeverRewritesTheCommandEither(t *testing.T) {
 
 		t.Run("when Codex's gate answers", func(t *testing.T) {
 			reply := askCodex(t, gateOrch(store, sys), bashPayload("pnpm lint"))
-
-			t.Run("the command is not rewritten", func(t *testing.T) {
-				if reply.Specific.UpdatedInput != nil {
-					t.Fatalf("expected no updatedInput at all, got %+v", reply.Specific)
-				}
-			})
 
 			t.Run("and no allow is handed out on its strength", func(t *testing.T) {
 				if reply.Specific.PermissionDecision == "allow" {
@@ -177,8 +166,8 @@ func TestCodexGateNeverRewritesTheCommandEither(t *testing.T) {
 
 		t.Run("permission_mode changes nothing: still no rewrite, only a message", func(t *testing.T) {
 			reply := askCodex(t, gateOrch(store, sys), payload)
-			if reply.Specific.UpdatedInput != nil {
-				t.Fatalf("expected no updatedInput regardless of permission mode, got %+v", reply.Specific)
+			if reply.Specific.PermissionDecision == "allow" {
+				t.Fatalf("expected no allow regardless of permission mode, got %+v", reply.Specific)
 			}
 		})
 	})
@@ -189,7 +178,7 @@ func TestCodexGateNeverRewritesTheCommandEither(t *testing.T) {
 
 		t.Run("it is waved through untouched, and keeps Codex's normal permission flow", func(t *testing.T) {
 			reply := askCodex(t, gateOrch(store, sys), bashPayload("git status"))
-			if reply.Specific.PermissionDecision != "" || reply.Specific.UpdatedInput != nil {
+			if reply.Specific.PermissionDecision != "" {
 				t.Fatalf("gating `git status` is its own outage; got %+v", reply.Specific)
 			}
 		})
@@ -282,8 +271,7 @@ func editPayload(t *testing.T, tool string) map[string]any {
 // warning, no rewrite.
 func isBareDefer(reply hookReply) bool {
 	return reply.Specific.PermissionDecision == "" &&
-		reply.SystemMessage == "" &&
-		reply.Specific.UpdatedInput == nil
+		reply.SystemMessage == ""
 }
 
 // gatedToolPayload builds a payload that SHOULD produce an answer for one tool.

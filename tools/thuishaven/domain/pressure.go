@@ -89,35 +89,6 @@ func ClassifyPressure(m MemStat) Pressure {
 // a reader can hold in their head.
 const heavyRunBudget = uint64(3) << 30
 
-// HeavySlots is how many heavy runs may be in flight across the whole machine.
-//
-// Sized from total RAM MINUS compressor occupancy — which is a partial answer,
-// and the honest description of it. What the limit should discount is everything
-// another tenant is already holding: on a laptop with a container VM holding
-// 8 GiB, total memory overstates what this process can have by nearly half. Only
-// the compressed part of that is visible here, because MemStat deliberately
-// carries no summed-RSS figure (it double-counts shared pages by several GB, so
-// it is worse than nothing as a control input). A free-memory signal would close
-// the gap; until MemStat carries one, this over-admits by whatever a quiet
-// tenant holds uncompressed, and the cores cap below is what bounds the damage.
-//
-// Capped by cores as well, because these runs saturate CPU as readily as RAM,
-// and never below one, or nothing would ever run.
-func HeavySlots(m MemStat, numCPU int) int {
-	usable := m.TotalBytes
-	if m.CompressedBytes < usable {
-		usable -= m.CompressedBytes
-	}
-	slots := 1
-	if usable >= heavyRunBudget {
-		slots = int(usable / heavyRunBudget)
-	}
-	if numCPU > 0 {
-		slots = min(slots, max(numCPU/4, 1))
-	}
-	return max(slots, 1)
-}
-
 // CallerKind is who asked for a heavy run. It decides the wait ceiling, because
 // it decides the prompt-cache floor.
 //

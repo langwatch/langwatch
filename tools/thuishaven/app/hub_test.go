@@ -146,17 +146,6 @@ func (f *fakeStore) AppendRunHistory(rec domain.RunRecord) error {
 }
 func (f *fakeStore) RunHistory() []domain.RunRecord { return f.runHistory }
 
-// fakeClaudeSettings records what `haven self setup` asked to install.
-type fakeClaudeSettings struct {
-	root    string
-	command string
-}
-
-func (f *fakeClaudeSettings) EnsureHook(repoRoot, command string) (bool, error) {
-	f.root, f.command = repoRoot, command
-	return true, nil
-}
-
 type fakeSystem struct {
 	alive           map[int]bool
 	starts          map[int]string

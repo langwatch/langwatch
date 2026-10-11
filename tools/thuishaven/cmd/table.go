@@ -689,8 +689,6 @@ var baseTable = []commandSpec{
 			{long: "--class", takesValue: true, value: "heavy", summary: "which slot pool to take (only \"heavy\" today)"},
 			// NOT --agent: that already means plain, token-free output everywhere
 			// else in this CLI, and ADR-064 rule 2 is one meaning per flag.
-			{long: "--agent-id", takesValue: true, value: "<id>", summary: "the sub-agent this run belongs to — picks the shorter wait ceiling its prompt cache needs"},
-			{long: "--workers", takesValue: true, value: "<n>", summary: "run this narrowed to n test workers, the width the gate admitted it at"},
 		},
 		run: runHeavy,
 	},

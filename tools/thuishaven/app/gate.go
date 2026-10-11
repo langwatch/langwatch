@@ -41,10 +41,9 @@ type hookReply struct {
 }
 
 type hookSpecificOutput struct {
-	HookEventName            string         `json:"hookEventName"`
-	PermissionDecision       string         `json:"permissionDecision,omitempty"`
-	PermissionDecisionReason string         `json:"permissionDecisionReason,omitempty"`
-	UpdatedInput             map[string]any `json:"updatedInput,omitempty"`
+	HookEventName            string `json:"hookEventName"`
+	PermissionDecision       string `json:"permissionDecision,omitempty"`
+	PermissionDecisionReason string `json:"permissionDecisionReason,omitempty"`
 }
 
 // deferReply is the neutral verdict: no opinion, so the tool call continues

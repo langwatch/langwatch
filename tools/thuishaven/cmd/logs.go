@@ -313,11 +313,6 @@ func parseLogLine(service, raw string) (logLine, bool) {
 	return logLine{ts: t, service: fileToCLIService(service), text: rest}, true
 }
 
-// readLogTail reads at most the last logReadCapBytes of path.
-func readLogTail(path string) (data []byte, size int64, capped bool, err error) {
-	return readLogTailCapped(path, logReadCapBytes)
-}
-
 // readLogTailCapped reads at most the last capBytes of path. It returns the
 // bytes, the file's full size (what a follow must continue from, not what was
 // read), and whether the cap truncated the history. A capped read lands

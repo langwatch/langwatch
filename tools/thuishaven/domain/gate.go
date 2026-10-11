@@ -248,51 +248,6 @@ const havenRunMarker = "machine run --class " + HeavySlotClass
 // it cannot come to disagree about its spelling.
 const HeavySlotClass = "heavy"
 
-// WrapOptions carries what the gate already decided into the wrapped command.
-//
-// Without it `haven run` re-derives its behaviour from nothing and the decision
-// is silently discarded: an unnamed caller resolves to a main session and waits
-// on the thirty-minute failsafe rather than the four-minute ceiling its
-// five-minute cache needs, and a narrowed run is indistinguishable from a
-// queued one.
-type WrapOptions struct {
-	// AgentID is the caller's agent id, which picks the wait ceiling because it
-	// picks the prompt-cache floor.
-	AgentID string
-	// Workers is the narrowed width. Zero means "not narrowed", and the run keeps
-	// whatever width its own config chooses.
-	Workers int
-}
-
-// WrapCommand rewrites a heavy command to run under haven's slot.
-//
-// The original is passed as a single argument for a shell to run, NOT spliced
-// after a separator: tool_input.command is a shell string, so `pnpm test && echo
-// done` spliced bare would gate only the first segment and let the rest run
-// outside the slot.
-//
-// havenPath is haven's own absolute path, because installing it onto PATH is
-// optional and a rewrite that yields "command not found" has broken a working
-// command in the name of failing open. It is quoted for the same reason it is
-// absolute: a checkout under a directory with a space would otherwise split
-// into two words and fail exactly the way the absolute path exists to prevent.
-func WrapCommand(havenPath, command string, opts WrapOptions) string {
-	var b strings.Builder
-	b.WriteString(ShellQuote(havenPath))
-	b.WriteString(" ")
-	b.WriteString(havenRunMarker)
-	if opts.AgentID != "" {
-		b.WriteString(" --agent-id ")
-		b.WriteString(ShellQuote(opts.AgentID))
-	}
-	if opts.Workers > 0 {
-		fmt.Fprintf(&b, " --workers %d", opts.Workers)
-	}
-	b.WriteString(" --sh ")
-	b.WriteString(ShellQuote(command))
-	return b.String()
-}
-
 // ShellQuote single-quotes s for safe interpolation, escaping embedded quotes.
 func ShellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
@@ -414,22 +369,6 @@ func RefusalReason(level Pressure, queueDepth int, hint *RetryHint) string {
 	b.WriteString("Continue with work that does not spawn processes (reading, editing, writing, planning) ")
 	b.WriteString("and come back to this at a natural stopping point.")
 	return b.String()
-}
-
-// BackgroundDescription is what replaces a backgrounded command's description.
-//
-// It has to say the run was queued AND that it is running in the background,
-// because a measured probe showed a model whose command was silently
-// substituted ran it, noticed the output did not match what it asked for, and
-// reported its environment as untrustworthy. An unexplained rewrite makes an
-// agent doubt its own tools.
-func BackgroundDescription(queueDepth int) string {
-	if queueDepth > 0 {
-		return fmt.Sprintf(
-			"haven queued this behind %d other heavy runs and is running it in the background; "+
-				"its result arrives when it finishes, not now", queueDepth)
-	}
-	return "haven is running this in the background; its result arrives when it finishes, not now"
 }
 
 // DurationKey reduces a command to the thing worth timing.

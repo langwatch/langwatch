@@ -604,6 +604,3 @@ const (
 // UIDirRel is where the browser application lives inside the workspace. Only
 // the Vite lane's own working directory needs it.
 const UIDirRel = "apps/ui"
-
-// UIDir is the Vite lane's working directory inside a checkout.
-func UIDir(repoDir string) string { return filepath.Join(repoDir, UIDirRel) }
