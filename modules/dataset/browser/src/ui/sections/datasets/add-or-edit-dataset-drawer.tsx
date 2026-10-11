@@ -12,7 +12,7 @@ import {
   datasetRecordFormSchema,
   type InMemoryDataset,
 } from "@langwatch/dataset-contract";
-import { DrawerActions } from "@langwatch/design-system/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Button,
   HStack,
@@ -22,7 +22,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SettingsField, SettingsFieldGroup } from "@langwatch/design-system/settings-field";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
@@ -309,135 +308,119 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   };
 
   return (
-    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="xl">
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack>
-            <Drawer.Title>
-              {datasetDrawerHeading({
-                datasetToSave: props.datasetToSave,
-                isEditing: Boolean(props.datasetToSave?.datasetId || props.localOnly),
-              })}
-            </Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <form id="dataset-form" onSubmit={handleSubmit(onSubmit)}>
-            <SettingsFieldGroup>
-              <SettingsField
-                label="Name"
-                hint="What this group of examples is going to focus on."
-                error={errors.name?.message}
-              >
-                <Input {...register("name")} data-testid="dataset-name-input" />
-                <DatasetSlugDisplay
-                  marginLeft={1}
-                  marginTop={1}
-                  displaySlug={displaySlug}
-                  slugWillChange={slugWillChange}
-                  dbSlug={dbSlug}
-                  slugInfo={slugInfo}
-                />
-              </SettingsField>
+    <Drawer
+      open={isOpen}
+      onClose={onClose}
+      size="xl"
+      title={datasetDrawerHeading({
+        datasetToSave: props.datasetToSave,
+        isEditing: Boolean(props.datasetToSave?.datasetId || props.localOnly),
+      })}
+      busy={upsertDataset.isPending}
+      formId="dataset-form"
+      onSubmit={handleSubmit(onSubmit)}
+      footer={{
+        cancel: { onClick: onClose },
+        primaryAction: {
+          label: datasetSubmitLabel({
+            datasetToSave: props.datasetToSave,
+            localOnly: Boolean(props.localOnly),
+          }),
+          type: "submit",
+          loading: upsertDataset.isPending,
+          "data-testid": "dataset-form-submit",
+        },
+      }}
+    >
+      <SettingsFieldGroup>
+        <SettingsField
+          label="Name"
+          hint="What this group of examples is going to focus on."
+          error={errors.name?.message}
+        >
+          <Input {...register("name")} data-testid="dataset-name-input" />
+          <DatasetSlugDisplay
+            marginLeft={1}
+            marginTop={1}
+            displaySlug={displaySlug}
+            slugWillChange={slugWillChange}
+            dbSlug={dbSlug}
+            slugInfo={slugInfo}
+          />
+        </SettingsField>
 
-              <SettingsField
-                label="Columns"
-                hint="The columns each row of the dataset carries."
-                error={errors.columnTypes?.message}
-              >
-                <VStack align="start">
-                  <VStack align="start" width="full">
-                    {fields.map((field, index) => {
-                      const columnName = watch(`columnTypes.${index}.name`);
-                      const isHidden = props.columnVisibility?.hiddenColumns.has(columnName);
-                      return (
-                        <HStack key={field.id} width="full" gap={2}>
-                          <Input
-                            {...register(`columnTypes.${index}.name`, {
-                              required: "Column name cannot be empty",
-                            })}
-                            placeholder="Column name"
-                            data-testid={`dataset-column-name-${index}`}
-                          />
-                          <NativeSelect.Root>
-                            <NativeSelect.Field {...register(`columnTypes.${index}.type`)}>
-                              <option value="string">string</option>
-                              <option value="number">number</option>
-                              <option value="boolean">boolean</option>
-                              <option value="date">date</option>
-                              <option value="list">list</option>
-                              <option value="json">json</option>
-                              <option value="image">image</option>
-                              <option value="file">file</option>
-                              <option value="chat_messages">
-                                json chat messages (OpenAI format)
-                              </option>
-                              <option value="spans">json spans</option>
-                            </NativeSelect.Field>
-                            <NativeSelect.Indicator />
-                          </NativeSelect.Root>
-                          {props.columnVisibility && (
-                            <IconButton
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => props.columnVisibility?.onToggleVisibility(columnName)}
-                              color={isHidden ? "fg.subtle" : "fg.muted"}
-                              aria-label={isHidden ? "Show column" : "Hide column"}
-                              title={isHidden ? "Show column" : "Hide column"}
-                            >
-                              {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
-                            </IconButton>
-                          )}
-                          {!props.isColumnsLocked && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              aria-label="Remove column"
-                              onClick={() => remove(index)}
-                            >
-                              <Trash2 size={32} />
-                            </Button>
-                          )}
-                        </HStack>
-                      );
-                    })}
+        <SettingsField
+          label="Columns"
+          hint="The columns each row of the dataset carries."
+          error={errors.columnTypes?.message}
+        >
+          <VStack align="start">
+            <VStack align="start" width="full">
+              {fields.map((field, index) => {
+                const columnName = watch(`columnTypes.${index}.name`);
+                const isHidden = props.columnVisibility?.hiddenColumns.has(columnName);
+                return (
+                  <HStack key={field.id} width="full" gap={2}>
+                    <Input
+                      {...register(`columnTypes.${index}.name`, {
+                        required: "Column name cannot be empty",
+                      })}
+                      placeholder="Column name"
+                      data-testid={`dataset-column-name-${index}`}
+                    />
+                    <NativeSelect.Root>
+                      <NativeSelect.Field {...register(`columnTypes.${index}.type`)}>
+                        <option value="string">string</option>
+                        <option value="number">number</option>
+                        <option value="boolean">boolean</option>
+                        <option value="date">date</option>
+                        <option value="list">list</option>
+                        <option value="json">json</option>
+                        <option value="image">image</option>
+                        <option value="file">file</option>
+                        <option value="chat_messages">json chat messages (OpenAI format)</option>
+                        <option value="spans">json spans</option>
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                    {props.columnVisibility && (
+                      <IconButton
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => props.columnVisibility?.onToggleVisibility(columnName)}
+                        color={isHidden ? "fg.subtle" : "fg.muted"}
+                        aria-label={isHidden ? "Show column" : "Hide column"}
+                        title={isHidden ? "Show column" : "Hide column"}
+                      >
+                        {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </IconButton>
+                    )}
                     {!props.isColumnsLocked && (
                       <Button
                         type="button"
-                        data-testid="dataset-column-add"
-                        onClick={() => append({ name: "", type: "string" })}
+                        size="sm"
+                        aria-label="Remove column"
+                        onClick={() => remove(index)}
                       >
-                        Add column
+                        <Trash2 size={32} />
                       </Button>
                     )}
-                  </VStack>
-                </VStack>
-              </SettingsField>
-            </SettingsFieldGroup>
-          </form>
-        </Drawer.Body>
-        <DrawerActions
-          onCancel={onClose}
-          busy={upsertDataset.isPending}
-          primary={
-            <Button
-              colorPalette="orange"
-              variant="solid"
-              type="submit"
-              form="dataset-form"
-              data-testid="dataset-form-submit"
-              minWidth="fit-content"
-              loading={upsertDataset.isPending}
-            >
-              {datasetSubmitLabel({
-                datasetToSave: props.datasetToSave,
-                localOnly: Boolean(props.localOnly),
+                  </HStack>
+                );
               })}
-            </Button>
-          }
-        />
-      </Drawer.Content>
-    </Drawer.Root>
+              {!props.isColumnsLocked && (
+                <Button
+                  type="button"
+                  data-testid="dataset-column-add"
+                  onClick={() => append({ name: "", type: "string" })}
+                >
+                  Add column
+                </Button>
+              )}
+            </VStack>
+          </VStack>
+        </SettingsField>
+      </SettingsFieldGroup>
+    </Drawer>
   );
 }

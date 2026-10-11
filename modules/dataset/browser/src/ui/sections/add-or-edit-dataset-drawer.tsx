@@ -10,7 +10,7 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, HStack, Input, NativeSelect, VStack } from "@langwatch/design-system/primitives";
 import { SettingsField, SettingsFieldGroup } from "@langwatch/design-system/settings-field";
 import { Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useDatasetSlugValidation } from "../../behavior/use-dataset-slug-validation.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
@@ -109,6 +109,17 @@ export function describeProblems({
   return problems;
 }
 
+/** The first column input to focus after a refused submit: an empty name, or a repeated one. */
+function firstProblemColumn(columns: DatasetColumns): number {
+  const seen = new Set<string>();
+  const at = columns.findIndex((column) => {
+    if (column.name.trim() === "" || seen.has(column.name)) return true;
+    seen.add(column.name);
+    return false;
+  });
+  return Math.max(at, 0);
+}
+
 export function AddOrEditDatasetDrawer({
   open,
   onClose,
@@ -133,6 +144,8 @@ export function AddOrEditDatasetDrawer({
     datasetToSave?.columnTypes ?? DATASET_DEFAULT_COLUMNS,
   );
   const [problems, setProblems] = useState<{ name?: string; columnTypes?: string }>({});
+  const nameInput = useRef<HTMLInputElement>(null);
+  const columnInputs = useRef<(HTMLInputElement | null)[]>([]);
 
   const { slugInfo, displaySlug, slugWillChange, dbSlug, resetSlugInfo } = useDatasetSlugValidation(
     {
@@ -161,7 +174,8 @@ export function AddOrEditDatasetDrawer({
   const submit = () => {
     const found = describeProblems({ name, columnTypes });
     setProblems(found);
-    if (found.name ?? found.columnTypes) return;
+    if (found.name) return nameInput.current?.focus();
+    if (found.columnTypes) return columnInputs.current[firstProblemColumn(columnTypes)]?.focus();
 
     if (localOnly) {
       onSuccess({ datasetId: datasetToSave?.datasetId ?? "", name, columnTypes });
@@ -216,125 +230,110 @@ export function AddOrEditDatasetDrawer({
     );
 
   return (
-    <Drawer.Root open={open} onOpenChange={({ open: next }) => !next && onClose()} size="xl">
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack>
-            <Drawer.Title>{heading}</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <form
-            id="dataset-form"
-            data-testid="dataset-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submit();
-            }}
-          >
-            <SettingsFieldGroup>
-              <SettingsField
-                label="Name"
-                hint="What this group of examples is going to focus on."
-                error={problems.name}
-              >
-                <Input
-                  name="name"
-                  value={name}
-                  data-testid="dataset-name-input"
-                  onChange={(event) => setName(event.target.value)}
-                />
-                <DatasetSlugDisplay
-                  marginLeft={1}
-                  marginTop={1}
-                  displaySlug={displaySlug}
-                  slugWillChange={slugWillChange}
-                  dbSlug={dbSlug}
-                  slugInfo={slugInfo}
-                />
-              </SettingsField>
+    <Drawer
+      open={open}
+      onClose={onClose}
+      size="xl"
+      title={heading}
+      busy={upsertDataset.isPending}
+      formId="dataset-form"
+      onSubmit={submit}
+      footer={{
+        cancel: { onClick: onClose },
+        primaryAction: {
+          label: submitLabel,
+          type: "submit",
+          loading: upsertDataset.isPending,
+          "data-testid": "dataset-form-submit",
+        },
+      }}
+    >
+      <SettingsFieldGroup>
+        <SettingsField
+          label="Name"
+          hint="What this group of examples is going to focus on."
+          error={problems.name}
+        >
+          <Input
+            ref={nameInput}
+            name="name"
+            value={name}
+            data-testid="dataset-name-input"
+            onChange={(event) => setName(event.target.value)}
+          />
+          <DatasetSlugDisplay
+            marginLeft={1}
+            marginTop={1}
+            displaySlug={displaySlug}
+            slugWillChange={slugWillChange}
+            dbSlug={dbSlug}
+            slugInfo={slugInfo}
+          />
+        </SettingsField>
 
-              <SettingsField
-                label="Columns"
-                hint="The columns each row of the dataset carries."
-                error={problems.columnTypes}
-              >
-                <VStack align="start" width="full">
-                  {columnTypes.map((column, index) => (
-                    <HStack key={index} width="full" gap={2}>
-                      <Input
-                        name={`columnTypes.${index}.name`}
-                        value={column.name}
-                        placeholder="Column name"
-                        aria-label={`Column ${index + 1} name`}
-                        data-testid={`dataset-column-name-${index}`}
-                        onChange={(event) => setColumn(index, { name: event.target.value })}
-                      />
-                      <NativeSelect.Root>
-                        <NativeSelect.Field
-                          name={`columnTypes.${index}.type`}
-                          value={column.type}
-                          aria-label={`Column ${index + 1} type`}
-                          onChange={(event) =>
-                            setColumn(index, {
-                              type: datasetColumnTypeSchema.parse(event.target.value),
-                            })
-                          }
-                        >
-                          {COLUMN_TYPE_LABELS.map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                      <Button
-                        type="button"
-                        size="sm"
-                        aria-label="Remove column"
-                        onClick={() =>
-                          setColumnTypes((current) => current.filter((_, at) => at !== index))
-                        }
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </HStack>
-                  ))}
-                  <Button
-                    type="button"
-                    data-testid="dataset-column-add"
-                    onClick={() =>
-                      setColumnTypes((current) => [...current, { name: "", type: "string" }])
+        <SettingsField
+          label="Columns"
+          hint="The columns each row of the dataset carries."
+          error={problems.columnTypes}
+        >
+          <VStack align="start" width="full">
+            {columnTypes.map((column, index) => (
+              <HStack key={index} width="full" gap={2}>
+                <Input
+                  ref={(element) => {
+                    columnInputs.current[index] = element;
+                  }}
+                  name={`columnTypes.${index}.name`}
+                  value={column.name}
+                  placeholder="Column name"
+                  aria-label={`Column ${index + 1} name`}
+                  data-testid={`dataset-column-name-${index}`}
+                  onChange={(event) => setColumn(index, { name: event.target.value })}
+                />
+                <NativeSelect.Root>
+                  <NativeSelect.Field
+                    name={`columnTypes.${index}.type`}
+                    value={column.type}
+                    aria-label={`Column ${index + 1} type`}
+                    onChange={(event) =>
+                      setColumn(index, {
+                        type: datasetColumnTypeSchema.parse(event.target.value),
+                      })
                     }
                   >
-                    Add column
-                  </Button>
-                </VStack>
-              </SettingsField>
-            </SettingsFieldGroup>
-          </form>
-        </Drawer.Body>
-        <Drawer.Actions
-          onCancel={onClose}
-          busy={upsertDataset.isPending}
-          primary={
+                    {COLUMN_TYPE_LABELS.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+                <Button
+                  type="button"
+                  size="sm"
+                  aria-label="Remove column"
+                  onClick={() =>
+                    setColumnTypes((current) => current.filter((_, at) => at !== index))
+                  }
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </HStack>
+            ))}
             <Button
-              colorPalette="orange"
-              variant="solid"
-              type="submit"
-              form="dataset-form"
-              data-testid="dataset-form-submit"
-              minWidth="fit-content"
-              loading={upsertDataset.isPending}
+              type="button"
+              data-testid="dataset-column-add"
+              onClick={() =>
+                setColumnTypes((current) => [...current, { name: "", type: "string" }])
+              }
             >
-              {submitLabel}
+              Add column
             </Button>
-          }
-        />
-      </Drawer.Content>
-    </Drawer.Root>
+          </VStack>
+        </SettingsField>
+      </SettingsFieldGroup>
+    </Drawer>
   );
 }
 
