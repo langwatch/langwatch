@@ -373,31 +373,49 @@ func (reads *queueReads) fail(err error) {
 	}
 }
 
-// queueSlack is the backlog live traffic keeps on top of the baseline; drainLimit is "around the baseline".
-const queueSlack = 100
+// queueSlack is the backlog live traffic keeps on top of the baseline. The baseline is 0: the depth
+// before the cut is the restored backlog itself, so it says nothing about the steady state.
+const (
+	queueSlack  = 100
+	queueBase   = 0
+	slopeWindow = int64(10 * 60 * 1000)
+)
 
-func drainLimit(baseline int) int { return baseline + max(queueSlack, baseline/4) }
+func drainLimit(baseline int) int { return baseline + queueSlack }
 
-// queueBaseline is the deepest reading while main's worker still ran, before the cut paused it.
-func queueBaseline(samples []QueueSample, pausedAt int64) int {
-	baseline := 0
+// queueSlope is the change in jobs per minute over the last ten minutes of readings.
+func queueSlope(samples []QueueSample) float64 {
+	if len(samples) < 2 {
+		return 0
+	}
+	last := samples[len(samples)-1]
+	first := last
 	for _, sample := range samples {
-		if pausedAt > 0 && sample.AtMs < pausedAt {
-			baseline = max(baseline, sample.Depth)
+		if sample.AtMs >= last.AtMs-slopeWindow {
+			first = sample
+			break
 		}
 	}
-	return baseline
+	if last.AtMs == first.AtMs {
+		return 0
+	}
+	return float64(last.Depth-first.Depth) / (float64(last.AtMs-first.AtMs) / 60000)
 }
 
-// summariseQueue finds the peak and the first reading after head's worker started that is back within the limit.
+// summariseQueue finds the peak and when, after head's worker started, the depth fell within the
+// limit and stayed there to the last reading (-1: never, or it grew again).
 func summariseQueue(samples []QueueSample, pausedAt, workerAt int64) QueueSummary {
-	summary := QueueSummary{Samples: samples, Baseline: queueBaseline(samples, pausedAt), DrainedMs: -1, Final: -1}
+	summary := QueueSummary{Samples: samples, Baseline: queueBase, DrainedMs: -1, Final: -1, SlopePerMin: queueSlope(samples)}
 	summary.Limit = drainLimit(summary.Baseline)
 	for _, sample := range samples {
 		if sample.Depth > summary.Peak {
 			summary.Peak, summary.PeakAtMs = sample.Depth, sample.AtMs
 		}
-		if summary.DrainedMs < 0 && workerAt > 0 && sample.AtMs >= workerAt && sample.Depth <= summary.Limit {
+		switch {
+		case workerAt <= 0 || sample.AtMs < workerAt:
+		case sample.Depth > summary.Limit:
+			summary.DrainedMs = -1
+		case summary.DrainedMs < 0:
 			summary.DrainedMs = sample.AtMs - workerAt
 		}
 	}
@@ -407,12 +425,13 @@ func summariseQueue(samples []QueueSample, pausedAt, workerAt int64) QueueSummar
 	return summary
 }
 
-// queueVerdict: the backlog fell back around the baseline after head's worker started, and stayed there at the end.
+// queueVerdict: the jobs present at the cut were handled, so the depth fell within the slack of the
+// baseline after head's worker started and stayed there to the end.
 func queueVerdict(queue QueueSummary) Verdict {
 	drained := queue.DrainedMs >= 0 && queue.Final >= 0 && queue.Final <= queue.Limit
 	return verdict("N4", drained,
-		fmt.Sprintf("group-queue jobs: baseline %d (limit %d), %d at the cut (-1: unread), peak %d at %d ms, within the limit %d ms after head's worker started (-1: never), %d at the end (-1: no reading); %d of %d reads failed%s",
-			queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.ReadErrors, queue.ReadErrors+len(queue.Samples), errSuffix(queue.FirstError)))
+		fmt.Sprintf("group-queue jobs: baseline %d (limit %d), %d at the cut (-1: unread), peak %d at %d ms, at baseline and staying there %d ms after head's worker started (-1: never), %d at the end (-1: no reading), slope over the last 10 min %.1f jobs/min; %d of %d reads failed%s",
+			queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.SlopePerMin, queue.ReadErrors, queue.ReadErrors+len(queue.Samples), errSuffix(queue.FirstError)))
 }
 
 // opsVerdict: the Upgrades page answered a state, and after settle a finished one.

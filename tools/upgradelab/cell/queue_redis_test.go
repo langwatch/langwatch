@@ -116,29 +116,38 @@ func TestQueueCountsFindQueuesWithoutTheRegistry(t *testing.T) {
 	}
 }
 
-func TestQueueVerdictPassesOnlyBackAroundTheBaseline(t *testing.T) {
+func TestQueueVerdictPassesOnlyBackAtTheBaseline(t *testing.T) {
 	const paused, worker = 1000, 5000
-	samples := []QueueSample{{AtMs: 500, Depth: 40}, {AtMs: 900, Depth: 60}, {AtMs: 3000, Depth: 780000}, {AtMs: 6000, Depth: 400000}}
+	// the restored backlog is already deep before the cut: it must not become the baseline
+	samples := []QueueSample{{AtMs: 500, Depth: 1970000}, {AtMs: 900, Depth: 1970000}, {AtMs: 6000, Depth: 1600000}, {AtMs: 700000, Depth: 1600000}}
 	stuck := summariseQueue(samples, paused, worker)
-	if stuck.Baseline != 60 || stuck.Limit != 160 || stuck.Peak != 780000 || stuck.DrainedMs != -1 || stuck.Final != 400000 {
+	if stuck.Baseline != 0 || stuck.Limit != 100 || stuck.Peak != 1970000 || stuck.DrainedMs != -1 || stuck.Final != 1600000 || stuck.SlopePerMin != 0 {
 		t.Fatalf("stuck summary %+v", stuck)
 	}
-	if queueVerdict(stuck).Result != "fail" {
-		t.Error("a backlog still 400k deep passed N4")
+	verdictStuck := queueVerdict(stuck)
+	if verdictStuck.Result != "fail" || !strings.Contains(verdictStuck.Detail, "1600000 at the end") || !strings.Contains(verdictStuck.Detail, "slope") {
+		t.Errorf("a restored backlog that never drained: %+v", verdictStuck)
 	}
-	drained := summariseQueue(append(samples, QueueSample{AtMs: 9000, Depth: 150}, QueueSample{AtMs: 11000, Depth: 20}), paused, worker)
-	if drained.DrainedMs != 4000 || queueVerdict(drained).Result != "pass" {
+	drained := summariseQueue(append(samples, QueueSample{AtMs: 900000, Depth: 150}, QueueSample{AtMs: 910000, Depth: 20}, QueueSample{AtMs: 920000, Depth: 60}), paused, worker)
+	if drained.DrainedMs != 905000 || queueVerdict(drained).Result != "pass" {
 		t.Errorf("drained summary %+v, verdict %v", drained, queueVerdict(drained))
 	}
-	relapsed := summariseQueue(append(samples, QueueSample{AtMs: 9000, Depth: 10}, QueueSample{AtMs: 11000, Depth: 5000}), paused, worker)
-	if queueVerdict(relapsed).Result != "fail" {
-		t.Error("a backlog that grew again by the end passed N4")
+	relapsed := summariseQueue(append(samples, QueueSample{AtMs: 900000, Depth: 10}, QueueSample{AtMs: 910000, Depth: 5000}), paused, worker)
+	if relapsed.DrainedMs != -1 || queueVerdict(relapsed).Result != "fail" {
+		t.Errorf("a backlog that grew again by the end passed N4: %+v", relapsed)
 	}
 	if blind := summariseQueue(nil, paused, worker); queueVerdict(blind).Result != "fail" {
 		t.Error("no readings at all passed N4")
 	}
-	if got := drainLimit(10000); got != 12500 {
+	if got := drainLimit(0); got != 100 {
 		t.Errorf("limit %d", got)
+	}
+}
+
+func TestQueueSlopeIsOverTheLastTenMinutes(t *testing.T) {
+	samples := []QueueSample{{AtMs: 0, Depth: 0}, {AtMs: 1200000, Depth: 1000}, {AtMs: 1800000, Depth: 1000}, {AtMs: 1860000, Depth: 1600}}
+	if got := queueSlope(samples); got < 599 || got > 601 {
+		t.Errorf("slope %.1f", got)
 	}
 }
 

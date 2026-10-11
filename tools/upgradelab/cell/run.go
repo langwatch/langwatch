@@ -538,16 +538,10 @@ func (cell *run) sampleQueueOnce(ctx context.Context) {
 	cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth})
 }
 
-// queueDrained reads the depth now and asks whether it is back around the pre-cut baseline.
+// queueDrained reads the depth now and asks whether it is within the slack of the baseline.
 func (cell *run) queueDrained(ctx context.Context) bool {
 	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
-	if err != nil {
-		return false
-	}
-	cell.queueMu.Lock()
-	samples := append([]QueueSample(nil), cell.queue...)
-	cell.queueMu.Unlock()
-	return depth <= drainLimit(queueBaseline(samples, cell.marks["fromWorkerPaused"]))
+	return err == nil && depth <= drainLimit(queueBase)
 }
 
 func (cell *run) sampleQueue(ctx context.Context) {

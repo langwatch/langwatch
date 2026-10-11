@@ -74,18 +74,19 @@ type PhaseStatuses struct {
 
 // QueueSummary is the group queues' waiting jobs over the run and when they fell back around the baseline.
 type QueueSummary struct {
-	Samples    []QueueSample `json:"samples"`
-	Baseline   int           `json:"baseline"`   // deepest reading before the cut
-	Limit      int           `json:"drainLimit"` // "around the baseline": drainLimit(Baseline)
-	AtCut      int           `json:"depthAtCut"` // -1: unread
-	Peak       int           `json:"peak"`
-	PeakAtMs   int64         `json:"peakAtMs"`
-	DrainedMs  int64         `json:"drainedAfterWorkerMs"` // -1: never within the limit
-	Final      int           `json:"finalDepth"`           // -1: no reading
-	ReadErrors int           `json:"readErrors"`
-	FirstError string        `json:"firstReadError,omitempty"`
-	ByQueue    string        `json:"byQueueAtEnd"`
-	ByKind     string        `json:"byKindAtEnd"` // waiting group-queue jobs per job kind, with when they are due
+	Samples     []QueueSample `json:"samples"`
+	Baseline    int           `json:"baseline"`   // steady-state depth: 0, the pre-cut depth is the backlog
+	Limit       int           `json:"drainLimit"` // "around the baseline": drainLimit(Baseline)
+	AtCut       int           `json:"depthAtCut"` // -1: unread
+	Peak        int           `json:"peak"`
+	PeakAtMs    int64         `json:"peakAtMs"`
+	DrainedMs   int64         `json:"drainedAfterWorkerMs"` // -1: never within the limit and staying
+	SlopePerMin float64       `json:"slopeLast10MinPerMin"`
+	Final       int           `json:"finalDepth"` // -1: no reading
+	ReadErrors  int           `json:"readErrors"`
+	FirstError  string        `json:"firstReadError,omitempty"`
+	ByQueue     string        `json:"byQueueAtEnd"`
+	ByKind      string        `json:"byKindAtEnd"` // waiting group-queue jobs per job kind, with when they are due
 }
 
 // Shot is one screenshot and the Upgrades page state it showed.
@@ -293,8 +294,8 @@ func (report *Report) writeTimeline(text *strings.Builder) {
 
 // write renders the backlog: its figures, a sampled table over time and what waited at the end.
 func (queue QueueSummary) write(text *strings.Builder) {
-	fmt.Fprintf(text, "Queue (group-queue jobs): baseline %d, limit %d, at the cut %d, peak %d at %d ms, within the limit %d ms after head's worker started, %d at the end; %d failed reads\n\n",
-		queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.ReadErrors)
+	fmt.Fprintf(text, "Queue (group-queue jobs): baseline %d, limit %d, at the cut %d, peak %d at %d ms, at baseline and staying %d ms after head's worker started, %d at the end, slope %.1f jobs/min over the last 10 min; %d failed reads\n\n",
+		queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.SlopePerMin, queue.ReadErrors)
 	if rows := queueRows(queue.Samples, queueTableRows); len(rows) > 0 {
 		text.WriteString("| Ms from start | Waiting jobs |\n| --- | --- |\n")
 		for _, sample := range rows {
