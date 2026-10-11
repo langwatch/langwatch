@@ -1,4 +1,5 @@
-import { Badge, Button, Card, HStack, Status, Text } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Badge, Button, Status } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
@@ -21,48 +22,49 @@ export function ReplayStatusBanner() {
   const activeProjectionNames = parseActiveProjections(status.currentProjection);
 
   return (
-    <Card.Root borderColor="blue.muted" borderWidth="1px">
-      <Card.Body padding={4}>
-        <HStack justify="space-between">
-          <HStack gap={2}>
-            <Status.Root colorPalette="blue">
-              <Status.Indicator />
-            </Status.Root>
-            <Text textStyle="sm" fontWeight="semibold">
-              Replay running
-            </Text>
-            {activeProjectionNames.length > 0 && (
-              <Badge size="sm" variant="subtle">
-                {activeProjectionNames.length === 1
-                  ? activeProjectionNames[0]
-                  : `${activeProjectionNames.length} projections`}
-              </Badge>
-            )}
-          </HStack>
-          <HStack gap={2}>
-            {status.runId && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => router.push(`/ops/projections/${status.runId}`)}
-              >
-                View Progress
-              </Button>
-            )}
-            {hasAccess && (
-              <Button
-                size="sm"
-                colorPalette="red"
-                variant="outline"
-                loading={cancelMutation.isPending}
-                onClick={() => cancelMutation.mutate()}
-              >
-                Cancel
-              </Button>
-            )}
-          </HStack>
-        </HStack>
-      </Card.Body>
-    </Card.Root>
+    <Card
+      padding="sm"
+      icon={
+        <Status.Root colorPalette="blue">
+          <Status.Indicator />
+        </Status.Root>
+      }
+      title="Replay running"
+      badge={
+        activeProjectionNames.length > 0 ? (
+          <Badge size="sm" variant="subtle">
+            {activeProjectionNames.length === 1
+              ? activeProjectionNames[0]
+              : `${activeProjectionNames.length} projections`}
+          </Badge>
+        ) : (
+          void 0
+        )
+      }
+      actions={
+        <>
+          {status.runId && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => router.push(`/ops/projections/${status.runId}`)}
+            >
+              View Progress
+            </Button>
+          )}
+          {hasAccess && (
+            <Button
+              size="sm"
+              colorPalette="red"
+              variant="outline"
+              loading={cancelMutation.isPending}
+              onClick={() => cancelMutation.mutate()}
+            >
+              Cancel
+            </Button>
+          )}
+        </>
+      }
+    />
   );
 }

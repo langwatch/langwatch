@@ -1,8 +1,8 @@
+import { Card } from "@langwatch/design-system/card";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
   Button,
-  Card,
   HStack,
   TagsInput,
   Text,
@@ -73,8 +73,8 @@ export function TenantSelector({
           </Text>
         )}
         {searchResults.data && searchResults.data.length > 0 && (
-          <Card.Root variant="outline">
-            <Card.Body gap={1} maxHeight="48" overflowY="auto">
+          <Card padding="sm">
+            <VStack align="stretch" gap={1} maxHeight="48" overflowY="auto">
               {searchResults.data.map((tenant) => (
                 <Button
                   key={tenant.id}
@@ -103,8 +103,8 @@ export function TenantSelector({
                   </HStack>
                 </Button>
               ))}
-            </Card.Body>
-          </Card.Root>
+            </VStack>
+          </Card>
         )}
       </VStack>
     </VStack>

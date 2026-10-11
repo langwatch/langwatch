@@ -1,5 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
-import { Box, Button, Card, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Skull } from "lucide-react";
@@ -60,35 +61,24 @@ function DeadLetterBanner({
 }) {
   const oldest = Math.min(...byProcess.map((row) => row.oldestUpdatedAt));
   return (
-    <Card.Root borderColor="red.fg" borderWidth="1px">
-      <Card.Body padding={4}>
-        <HStack align="start" gap={3}>
-          <Box color="red.fg" paddingTop={0.5}>
-            <Skull size={18} />
-          </Box>
-          <Box flex={1}>
-            <Text textStyle="sm" fontWeight="medium">
-              {total} dead {total === 1 ? "message" : "messages"}: this work will not run again
-              until an operator redrives it
-            </Text>
-            <Text textStyle="xs" color="fg.muted" marginTop={1}>
-              Across{" "}
-              {byProcess
-                .slice(0, 3)
-                .map((row) => `${row.processName} (${row.count})`)
-                .join(", ")}
-              {byProcess.length > 3 ? `, +${byProcess.length - 3} more` : ""} · oldest{" "}
-              {formatTimeAgo(oldest, now)}
-            </Text>
-          </Box>
-          <Button size="sm" variant="outline" asChild>
-            <Link href="/ops/event-sourcing/dead-letters">
-              View <ArrowRight size={12} />
-            </Link>
-          </Button>
-        </HStack>
-      </Card.Body>
-    </Card.Root>
+    <Card
+      status="bad"
+      icon={<Skull size={18} />}
+      title={`${total} dead ${total === 1 ? "message" : "messages"}: this work will not run again until an operator redrives it`}
+      description={`Across ${byProcess
+        .slice(0, 3)
+        .map((row) => `${row.processName} (${row.count})`)
+        .join(
+          ", ",
+        )}${byProcess.length > 3 ? `, +${byProcess.length - 3} more` : ""} · oldest ${formatTimeAgo(oldest, now)}`}
+      actions={
+        <Button size="sm" variant="outline" asChild>
+          <Link href="/ops/event-sourcing/dead-letters">
+            View <ArrowRight size={12} />
+          </Link>
+        </Button>
+      }
+    />
   );
 }
 
@@ -114,26 +104,17 @@ function HealthLine({
     );
   }
   return (
-    <Card.Root borderColor="orange.fg" borderWidth="1px">
-      <Card.Body padding={4}>
-        <HStack justify="space-between">
-          <Box>
-            <Text textStyle="sm" fontWeight="medium">
-              {troubledCount} of {processCount}{" "}
-              {troubledCount === 1 ? "process is" : "processes are"} behind
-            </Text>
-            <Text textStyle="xs" color="fg.muted" marginTop={1}>
-              {troubledNames.slice(0, 4).join(", ")}
-              {troubledNames.length > 4 ? `, +${troubledNames.length - 4} more` : ""}
-            </Text>
-          </Box>
-          <Button size="sm" variant="outline" asChild>
-            <Link href="/ops/event-sourcing/processes">
-              Inspect <ArrowRight size={12} />
-            </Link>
-          </Button>
-        </HStack>
-      </Card.Body>
-    </Card.Root>
+    <Card
+      status="warning"
+      title={`${troubledCount} of ${processCount} ${troubledCount === 1 ? "process is" : "processes are"} behind`}
+      description={`${troubledNames.slice(0, 4).join(", ")}${troubledNames.length > 4 ? `, +${troubledNames.length - 4} more` : ""}`}
+      actions={
+        <Button size="sm" variant="outline" asChild>
+          <Link href="/ops/event-sourcing/processes">
+            Inspect <ArrowRight size={12} />
+          </Link>
+        </Button>
+      }
+    />
   );
 }
