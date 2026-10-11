@@ -36,7 +36,7 @@ func DrillCommand(ctx context.Context, args []string, stdout io.Writer) (int, er
 	flags.StringVar(&options.FromSnapshot, "from-snapshot", "", "a produce entry directory or cache key (required)")
 	name := flags.String("drill", "", "kill-blocking | two-runners | held-lock")
 	table := flags.String("lock-table", "", "held-lock: the table to hold (default: the first ALTER TABLE of the next pending Prisma folder)")
-	holdFor := flags.Duration("hold-for", 30*time.Second, "held-lock: how long the lock is held")
+	holdFor := flags.Duration("hold-for", 90*time.Second, "held-lock: how long the lock is held; it must outlast the task's boot (about 20 s) and three attempts")
 	if err := flags.Parse(args); err != nil {
 		return 2, err
 	}
@@ -349,14 +349,19 @@ func (cell *run) heldLockDrill(ctx context.Context, table string, holdFor time.D
 	statement := fmt.Sprintf(`BEGIN; LOCK TABLE mydb."%s" IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(%d); COMMIT;`, strings.ReplaceAll(table, `"`, ""), int(holdFor.Seconds()))
 	held := make(chan error, 1)
 	go func() { _, err := psql(holdCtx, cell.stores.psqlURL(), statement); held <- err }()
-	if err := sleep(ctx, 2*time.Second); err != nil {
-		return Verdict{}, err
+	granted := `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation WHERE c.relname = '` + strings.ReplaceAll(table, "'", "") + `' AND l.mode = 'AccessExclusiveLock' AND l.granted`
+	if err := waitFor(ctx, 20*time.Second, func() bool { count, _ := psql(ctx, cell.stores.psqlURL(), granted); return count != "" && count != "0" }); err != nil {
+		return Verdict{}, fmt.Errorf("the lock on %q was never granted: %w", table, err)
 	}
 	started := time.Now()
 	heldCode, _ := cell.upgradeTask(ctx, "ud2-held", nil)
 	heldMs := time.Since(started).Milliseconds()
+	stillHeld, _ := psql(ctx, cell.stores.psqlURL(), granted)
 	release()
-	<-held
+	holdErr := <-held
+	if holdErr != nil && !errors.Is(holdCtx.Err(), context.Canceled) {
+		return Verdict{}, fmt.Errorf("the lock holder ended on its own: %w", holdErr)
+	}
 	named := append(cell.logLines("ud2-held", "rerunnable_migration_failed"), cell.logLines("ud2-held", "failed_prisma_migration")...)
 	rerunCode, _ := cell.upgradeTask(ctx, "ud2-rerun", nil)
 	rows, err := Ledger(ctx, cell.stores)
@@ -365,8 +370,8 @@ func (cell *run) heldLockDrill(ctx context.Context, table string, holdFor time.D
 	}
 	return Verdict{ID: "UD-2", Name: "a held lock fails by name; after release a re-run converges",
 		Result: passText(heldCode != 0 && len(named) > 0 && rerunCode == 0 && len(blockingLeft(rows)) == 0),
-		Detail: fmt.Sprintf("held %s on %q (folder %s) for %s; upgrade exit %d after %d ms naming %v; re-run exit %d, blocking steps left %d",
-			"ACCESS EXCLUSIVE", table, folder, holdFor, heldCode, heldMs, first(named), rerunCode, len(blockingLeft(rows)))}, nil
+		Detail: fmt.Sprintf("held %s on %q (folder %s) for %s, still granted when the upgrade ended: %s; upgrade exit %d after %d ms naming %v; re-run exit %d, blocking steps left %d",
+			"ACCESS EXCLUSIVE", table, folder, holdFor, stillHeld, heldCode, heldMs, first(named), rerunCode, len(blockingLeft(rows)))}, nil
 }
 
 // blockingLeft is every blocking step the task leaves undone; background steps belong to the worker.
