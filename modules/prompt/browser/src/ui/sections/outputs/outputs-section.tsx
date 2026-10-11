@@ -1,3 +1,4 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import {
   FieldEditor,
   FieldEditorName,
@@ -6,7 +7,6 @@ import {
 } from "@langwatch/design-system/field-editor";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Text, useDisclosure } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   outputsSchema,
@@ -460,60 +460,44 @@ const JsonSchemaDialog = ({
   );
 
   return (
-    <Dialog.Root
-      size="lg"
+    <Dialog
       open={open}
-      onOpenChange={({ open }) => {
-        if (!open) {
-          const isEdited = JSON.stringify(value, null, 2) !== code;
-          if (isEdited && !confirm("Changes will be lost. Are you sure?")) {
-            return;
-          }
-          onClose();
+      onClose={() => {
+        const isEdited = JSON.stringify(value, null, 2) !== code;
+        if (isEdited && !confirm("Changes will be lost. Are you sure?")) {
+          return;
         }
+        onClose();
+      }}
+      title="JSON Schema"
+      size="lg"
+      ground="card"
+      primaryAction={{
+        label: "Save",
+        onClick: () => {
+          if (error) return;
+          onChange(JSON.parse(code));
+          onClose();
+        },
       }}
     >
-      <Dialog.Content margin="16" background="bg.card" color="fg">
-        <Dialog.Header>
-          <Dialog.Title>JSON Schema</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger color="fg" _hover={{ color: "fg.muted" }} />
-        <Dialog.Body>
-          <Box height="400px">
-            {open && (
-              <WorkflowCodeEditor
-                code={code}
-                setCode={(code: string) => {
-                  setCode(code);
-                  checkForErrors(code);
-                }}
-                onClose={onClose}
-                language="json"
-                technologies={["json", "json schema"]}
-                // A JSON schema names no secrets, so the editor offers none.
-                secretNames={[]}
-              />
-            )}
-            {error && <Text>Error: {error}</Text>}
-          </Box>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button
-            onClick={() => {
-              onChange(JSON.parse(code));
-              onClose();
+      <Box height="400px">
+        {open && (
+          <WorkflowCodeEditor
+            code={code}
+            setCode={(code: string) => {
+              setCode(code);
+              checkForErrors(code);
             }}
-            variant="outline"
-            color="fg"
-            colorPalette="white"
-            size="lg"
-            disabled={!!error}
-            _hover={{ color: "fg.muted" }}
-          >
-            Save
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+            onClose={onClose}
+            language="json"
+            technologies={["json", "json schema"]}
+            // A JSON schema names no secrets, so the editor offers none.
+            secretNames={[]}
+          />
+        )}
+        {error && <Text role="alert">Error: {error}</Text>}
+      </Box>
+    </Dialog>
   );
 };
