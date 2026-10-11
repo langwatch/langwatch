@@ -67,8 +67,9 @@ ambient ground above rounded paper corners. Tall navigation and contents rails
 flow with the document; only rails that fit the available viewport become sticky.
 Code, tables, prompts and API responses have no vertical scroll limit. The sidebar is 280 pixels
 wide with compact method badges. Operation labels occupy at most two lines, with
-full text retained for assistive technology and in the title. On arrival, the window scrolls only enough to reveal a deeper active page when
-there is no fragment or restored scroll position. The mobile drawer and command
+full text retained for assistive technology and in the title. Only the current navigation branch starts expanded. Initial loading keeps the
+article and top gap in view; deeper active links remain in their expanded branch
+without moving the document away from its heading. The mobile drawer and command
 bar are overlays with bounded scrolling.
 
 ## Verification and budgets
@@ -93,7 +94,9 @@ Enter opens a new tab, modifier L copies its link, and Escape restores focus.
 
 The ambient shader uses the design system's framework-free export, in a separate
 idle chunk. Reduced motion loads no shader; visibility and theme changes dispose
-and remount its graphics resources. An opaque paper and footer protect body text.
+and remount its graphics resources. The footer stays opaque. Paper uses a 96% opaque fill and a slight backdrop blur
+only without reduced motion; reduced transparency and forced colours retain
+opaque paper.
 The static floor uses the marketing mesh palette and is present without scripts.
 
 Design-system candidates: Kbd size variants; CommandBarInput native input/ARIA
@@ -105,3 +108,20 @@ The page menu supports Markdown copy/view, Claude, ChatGPT and copying a link.
 Cursor, VS Code and MCP actions are omitted: docs.json lists their names but does
 not provide an install target or a supported page-handoff URL. Inventing those
 would produce a misleading action.
+
+## Release announcement
+
+The top strip shows one published update from the repository CHANGELOG.md, with
+version, date and its first feature or fix. One static line earns less attention
+than an automatically rotating ticker: it truncates on desktop and retains the
+version/date on phones, with no motion in either preference mode. Existing tiny
+controls remember dismissal by version, so another release is visible again.
+There is no fetch or rendering runtime for the strip. Missing or invalid notes
+omit it. The two newest releases are injected into the existing releases page
+and its Markdown output at build time, above the authored support policy.
+Guide sidebars and mobile navigation link contextually to the home agent setup
+card; the home page and API reference do not repeat that call to action.
+
+The reading surface uses compact linked rows instead of repeated raised cards. Coding-agent setup is a real CLI command selector in every sidebar, with direct setup links on its overview. The overview's existing product capture supplies visual context; it remains a screenshot, not an interactive demo. The wider contents rail highlights only the active heading. Overflowing tab strips show a scrolling hint, reveal keyboard-selected tabs horizontally, and preserve document scroll. The footer and document overscroll share opaque paper.
+
+Design-system ownership remains tokens, primitives, accessible menus/dialogs/tabs, brand assets, command bar and ambient rendering. Documentation owns its page grid, navigation tree, ToC, prose/MDX adapters, release strip, agent setup composition, copy controls and exports.

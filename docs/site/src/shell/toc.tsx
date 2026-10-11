@@ -43,12 +43,13 @@ function TocLinks({
           <Box as="li" key={entry.id} listStyleType="none">
             <chakra.a
               href={`#${entry.id}`}
+              data-depth={entry.depth}
               onClick={onChoose}
               aria-current={current ? "location" : undefined}
               display="block"
               paddingY="1"
-              fontSize="14px"
-              lineHeight="20px"
+              fontSize="13px"
+              lineHeight="21px"
               textDecoration="none"
               color={current ? "accent.fg" : "docs.contents"}
               fontWeight={current ? "600" : "400"}
@@ -68,11 +69,16 @@ function TocLinks({
 export function TocRail({ entries }: { entries: TocEntry[] }) {
   const active = useActiveId({ entries });
   return (
-    <Box as="nav" aria-label="On this page" data-docs-toc="">
+    <Box as="nav" className="docs-toc-rail" aria-label="On this page" data-docs-toc="">
       <Text margin="0" paddingBottom="2" fontSize="14px" lineHeight="20px" fontWeight="500">
         On this page
       </Text>
-      <TocLinks entries={entries} active={active} />
+      <Box className="docs-toc-track">
+        <svg className="docs-toc-progress" aria-hidden="true" focusable="false">
+          <path className="docs-toc-path" />
+        </svg>
+        <TocLinks entries={entries} active={active} />
+      </Box>
     </Box>
   );
 }

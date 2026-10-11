@@ -34,4 +34,3 @@ document.addEventListener("click", (event) => {
 });
 document.addEventListener("docs:search", openSearch);
 document.addEventListener("docs:leaving", closeSearch);
-openSearch();

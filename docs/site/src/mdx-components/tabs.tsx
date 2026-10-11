@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
-import { Tabs as ChakraTabs } from "@langwatch/design-system/primitives";
+import { Tabs as ChakraTabs, Text } from "@langwatch/design-system/primitives";
 import { Children, isValidElement, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -9,6 +9,9 @@ import { usePreference, writePreference } from "../lib/storage.ts";
 /** Docs reading treatment: neutral labels, a 2px accent underline, 44px triggers. */
 export const readingTabList = {
   overflowX: "auto",
+  minWidth: 0,
+  maxWidth: "100%",
+  paddingBottom: "2",
   flexWrap: "nowrap",
   scrollbarWidth: "thin",
 } satisfies SystemStyleObject;
@@ -55,15 +58,29 @@ export function Tabs({ children }: { children?: ReactNode }) {
       }
       variant="line"
       colorPalette="accent"
+      minWidth="0"
+      maxWidth="100%"
       marginY="6"
     >
-      <ChakraTabs.List css={readingTabList}>
+      <ChakraTabs.List
+        css={readingTabList}
+        aria-description="Scroll horizontally for more tabs. Use arrow keys to change the selected tab."
+      >
         {tabs.map((tab) => (
           <ChakraTabs.Trigger key={tab.label} value={tab.label} css={readingTabTrigger}>
             {tab.label}
           </ChakraTabs.Trigger>
         ))}
       </ChakraTabs.List>
+      <Text
+        className="docs-tab-hint"
+        aria-hidden="true"
+        fontSize="12px"
+        color="docs.lede"
+        margin="0"
+      >
+        Scroll for more →
+      </Text>
       {tabs.map((tab) => (
         <ChakraTabs.Content
           key={tab.label}

@@ -50,7 +50,10 @@ document.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
     event.preventDefault();
-    loadIsland({ name: "search" });
+    loadIsland({
+      name: "search",
+      trigger: document.querySelector<HTMLElement>("[data-docs-search]") ?? void 0,
+    });
     document.dispatchEvent(new Event("docs:search"));
   }
 });
@@ -75,8 +78,3 @@ for (const eventName of ["pointerover", "focusin"])
         : null;
     if (trigger) loadIsland({ name: "disclosures", trigger });
   });
-
-document.addEventListener("focusin", (event) => {
-  if (event.target instanceof Element && event.target.closest("[data-docs-search]"))
-    loadIsland({ name: "search" });
-});

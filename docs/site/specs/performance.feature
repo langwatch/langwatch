@@ -51,7 +51,9 @@ Feature: Static documentation with progressive interaction
     And tall desktop rails flow with the document without an inner scrollbar
     And short rails may stick beneath the header
     And the full-width footer follows the panel and never clips navigation
-    And Introduction and the section links start in view
+    And unrelated navigation groups start collapsed
+    And the active page remains in an expanded branch
+    And initial loading preserves the article heading and top gap
     And operation names occupy no more than two lines
 
   @e2e

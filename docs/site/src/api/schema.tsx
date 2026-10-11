@@ -111,6 +111,13 @@ function hasChildren({ schema }: { schema: Schema }): boolean {
 export function SchemaFields({ schema, depth = 0 }: { schema: Schema; depth?: number }) {
   const merged = mergeAllOf({ schema });
   const entries = Object.entries(merged.properties ?? {});
+  if (entries.length === 0 && hasChildren({ schema: merged }))
+    return (
+      <Box>
+        <SchemaNote schema={merged} />
+        <Children schema={merged} depth={depth} />
+      </Box>
+    );
   if (entries.length === 0) return <SchemaNote schema={merged} />;
   return (
     <Box>

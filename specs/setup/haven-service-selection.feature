@@ -207,6 +207,23 @@ Feature: haven service selection
       And "haven down" stops it and removes the route
       And a running stack refuses it, naming "haven up +docs"
 
+    Scenario: A stack refuses to start beside docs running alone
+      Given the docs run alone in this worktree and no stack is running
+      When the developer runs "haven up" or "haven up +docs"
+      Then startup refuses before registering any stack route or starting a service
+      And the message names "haven down" to stop the docs first
+
+    Scenario: Cancelling docs startup during stack registration starts nothing
+      Given this worktree's stack registration holds its startup lock
+      When "haven up --only docs" is cancelled while waiting for that lock
+      Then no docs service starts and no docs route is registered
+
+    Scenario: Solo docs keep their startup claim until their route is removed
+      Given the docs run alone in this worktree
+      When the docs stop
+      Then their route is removed before their live startup record
+      And a later stack startup cannot have its route removed by the solo runner
+
     # Haven hands the ui lane the routed URL of the built Storybook, so the
     # hostname and the application's /design-system reach the same Storybook.
     Scenario: The application frames the Storybook the stack routes to

@@ -149,15 +149,20 @@ const exampleRequestSchema = z.object({
 type ExampleRequest = z.infer<typeof exampleRequestSchema>;
 
 function curlExample({ url, method, auth, allHeaders, body, needsBody }: ExampleRequest) {
-  const parts = [`curl --request ${method} \\`, `  --url "${url}" \\`];
+  const parts = [`curl --request ${method} \\`, `  --url ${shellQuote(url)} \\`];
   if (auth)
     parts.push(`  --header "${auth.name}: ${auth.value.replace("$KEY", `$${KEY_ENV}`)}" \\`);
-  for (const [name, value] of allHeaders) parts.push(`  --header "${name}: ${value}" \\`);
+  for (const [name, value] of allHeaders)
+    parts.push(`  --header ${shellQuote(`${name}: ${value}`)} \\`);
   if (needsBody) parts.push("  --data @payload.json " + String.fromCharCode(92));
-  if (body !== void 0) parts.push(`  --data '${JSON.stringify(body)}' \\`);
+  if (body !== void 0) parts.push(`  --data ${shellQuote(JSON.stringify(body))} \\`);
   const last = parts.length - 1;
   parts[last] = parts[last].replace(/ \\$/, "");
   return parts.join("\n");
+}
+
+function shellQuote(value: string) {
+  return `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
 function pythonExample({ url, origin, method, auth, allHeaders, body, needsBody }: ExampleRequest) {
   const headerLines = [

@@ -26,7 +26,7 @@ type CardProps = {
 };
 
 const STRETCH = {
-  "&::after": { content: '""', position: "absolute", inset: "0", borderRadius: "xl" },
+  "&::after": { content: '""', position: "absolute", inset: "0", borderRadius: "sm" },
   "&:focus-visible": { outline: "none" },
   "&:focus-visible::after": {
     outline: "2px solid",
@@ -55,32 +55,39 @@ function CardHeading({
   );
 }
 
-/** An outlined card; with authored links inside, only the title navigates. */
-export function Card({ title, description, icon, href, horizontal, arrow, children }: CardProps) {
+/** A linked reading row; authored links inside keep their own targets. */
+export function Card({
+  title,
+  description,
+  icon,
+  href,
+  horizontal: _horizontal,
+  arrow,
+  children,
+}: CardProps) {
   const external = Boolean(href && /^https?:/.test(href));
   const stretch = Boolean(href) && !containsLink({ node: children });
-  const tileBackground = icon ? "accent.subtle" : "transparent";
   const compact = Boolean(icon && !description && !Children.toArray(children).length);
-  const showArrow = arrow === true || arrow === "true";
-  const alignment = horizontal ? "flex-start" : "stretch";
+  const showArrow = Boolean(href) && arrow !== false && arrow !== "false";
   const heading = (
     <CardHeading title={title} href={href} external={external} showArrow={showArrow} />
   );
   return (
     <Box
-      className="docs-card docs-raised"
+      className="docs-card"
       data-compact={compact}
       position="relative"
       display="flex"
-      flexDirection={horizontal || compact ? "row" : "column"}
-      alignItems={compact ? "center" : alignment}
+      flexDirection="row"
+      alignItems={compact ? "center" : "flex-start"}
       gap="4"
-      padding={compact ? "5" : "6"}
+      paddingY="4"
+      paddingX="2"
       minHeight={compact ? "64px" : void 0}
-      borderWidth="1px"
+      borderTopWidth="1px"
       borderColor="border"
-      borderRadius="xl"
-      bg="bg.panel"
+      borderRadius="sm"
+      bg="transparent"
       minWidth="0"
     >
       {icon ? (
@@ -91,7 +98,7 @@ export function Card({ title, description, icon, href, horizontal, arrow, childr
           width="2.25rem"
           height="2.25rem"
           borderRadius="lg"
-          bg={compact ? "transparent" : tileBackground}
+          bg="transparent"
           color="accent.fg"
         >
           <Icon icon={icon} size={compact ? 24 : 20} />
@@ -146,7 +153,8 @@ export function CardGroup({
         className="docs-card-grid"
         display="grid"
         alignItems="stretch"
-        gap="4"
+        columnGap="8"
+        rowGap="0"
         css={{
           gridTemplateColumns: "minmax(0, 1fr)",
           "@container (min-width: 480px)": {

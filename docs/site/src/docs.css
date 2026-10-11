@@ -309,7 +309,12 @@ body {
   font-size: 13px;
 }
 .docs-table-scroll {
-  border-block: 1px solid var(--chakra-colors-border);
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-lg);
+  overflow: auto;
+}
+.docs-table-scroll tr:last-child td {
+  border-bottom: 0;
 }
 .docs-prose th {
   color: var(--chakra-colors-fg);
@@ -352,7 +357,7 @@ body {
 }
 @media (min-width: 80rem) {
   .docs-layout[data-has-toc="true"] {
-    grid-template-columns: 280px minmax(0, 1fr) 160px;
+    grid-template-columns: 280px minmax(0, 1fr) 200px;
     grid-template-areas: "nav main toc";
     column-gap: 32px;
   }
@@ -539,14 +544,66 @@ body {
   font-size: 13px;
   color: var(--chakra-colors-fg-muted);
 }
-.docs-banner {
+.docs-release-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
   min-height: 36px;
+  padding-inline: max(24px, calc((100vw - 1280px) / 2));
+  background: var(--chakra-colors-docs-paper);
+  color: var(--chakra-colors-fg-muted);
+  border-bottom: 1px solid var(--chakra-colors-border-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+.docs-release-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.docs-release-link:hover {
+  color: var(--chakra-colors-fg);
+}
+.docs-release-label {
+  color: var(--chakra-colors-fg);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.docs-release-version {
+  color: var(--chakra-colors-accent-fg);
+  font-family: var(--chakra-fonts-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.docs-release-summary {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.docs-release-link time {
+  white-space: nowrap;
+  color: var(--chakra-colors-fg-muted);
+}
+.docs-release-link svg,
+.docs-agent-entry svg {
+  flex-shrink: 0;
 }
 @media (max-width: 767px) {
-  .docs-banner {
-    font-size: 12px;
-    line-height: 20px;
-    padding-inline: 16px 44px;
+  .docs-release-strip {
+    justify-content: space-between;
+    padding-inline: 16px 8px;
+    gap: 8px;
+  }
+  .docs-release-link {
+    gap: 10px;
+  }
+  .docs-release-summary {
+    display: none;
   }
 }
 
@@ -865,4 +922,120 @@ body {
 .docs-command-operation[data-method="DELETE"] [data-index] > p {
   background: var(--chakra-colors-red-subtle);
   color: var(--chakra-colors-red-fg);
+}
+
+.docs-toc-rail {
+  padding-inline-start: 0;
+}
+.docs-toc-track {
+  position: relative;
+  padding-inline-start: 16px;
+}
+.docs-toc-progress {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  width: 14px;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.docs-toc-path {
+  fill: none;
+  stroke: var(--chakra-colors-accent-fg);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .docs-toc-path {
+    transition: stroke-dashoffset 160ms ease;
+  }
+  .docs-layout {
+    background: color-mix(in srgb, var(--chakra-colors-docs-paper) 96%, transparent);
+    backdrop-filter: blur(12px);
+  }
+}
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  .docs-layout {
+    background: var(--chakra-colors-docs-paper);
+    backdrop-filter: none;
+  }
+}
+
+.docs-method-badge {
+  background: linear-gradient(
+    135deg,
+    var(--docs-method-tint, var(--chakra-colors-bg-subtle)),
+    var(--chakra-colors-bg-panel)
+  );
+  box-shadow: 0 2px 8px
+    color-mix(in srgb, var(--docs-method-tint, var(--chakra-colors-border)) 35%, transparent);
+}
+.docs-method-badge[data-method="GET"] {
+  --docs-method-tint: var(--chakra-colors-green-subtle);
+}
+.docs-method-badge[data-method="POST"] {
+  --docs-method-tint: var(--chakra-colors-blue-subtle);
+}
+.docs-method-badge[data-method="PUT"] {
+  --docs-method-tint: var(--chakra-colors-yellow-subtle);
+}
+.docs-method-badge[data-method="PATCH"] {
+  --docs-method-tint: var(--chakra-colors-yellow-subtle);
+}
+.docs-method-badge[data-method="DELETE"] {
+  --docs-method-tint: var(--chakra-colors-red-subtle);
+}
+
+/* The document's rubber-band area continues the footer's paper. */
+html,
+body {
+  background: var(--chakra-colors-docs-paper);
+}
+html,
+body {
+  overscroll-behavior-y: none;
+}
+.docs-site-footer {
+  min-height: 320px;
+}
+.docs-agent-launcher {
+  border-bottom: 1px solid var(--chakra-colors-border);
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+}
+.docs-agent-launcher select {
+  appearance: auto;
+  background: transparent;
+  color: var(--chakra-colors-accent-fg);
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  max-width: 100%;
+}
+.docs-agent-launcher option {
+  background: var(--chakra-colors-docs-paper);
+  color: var(--chakra-colors-fg);
+}
+.docs-agent-launcher code {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.docs-product-shot {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--chakra-colors-border);
+  border-radius: var(--chakra-radii-lg);
+  box-shadow: 0 8px 32px var(--chakra-colors-docs-shadow);
+}
+.docs-prose .lw-info-box {
+  color: var(--chakra-colors-docs-body);
+}
+
+.docs-tab-hint {
+  display: none;
+}
+[role="tablist"][data-overflow] + .docs-tab-hint {
+  display: block;
 }

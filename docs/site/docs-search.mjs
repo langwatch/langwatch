@@ -16,7 +16,10 @@ export function searchTrail({ nav, slug }) {
   return { section: "", trail: "" };
 }
 export function bodyText({ html }) {
-  const article = html.match(/<article[^>]*>([\s\S]*?)<\/article>/)?.[1] ?? "";
+  const article =
+    html.match(/<article[^>]*>([\s\S]*?)<\/article>/)?.[1] ??
+    html.match(/<main\b[^>]*\bid="content"[^>]*>([\s\S]*?)<\/main>/)?.[1] ??
+    "";
   return article
     .replace(/<style[\s\S]*?<\/style>/g, " ")
     .replace(/<[^>]+>/g, " ")

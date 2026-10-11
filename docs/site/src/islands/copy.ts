@@ -1,4 +1,6 @@
 async function copyText({ button }: { button: HTMLButtonElement }) {
+  const agent = button.closest(".docs-agent-launcher")?.querySelector<HTMLSelectElement>("select");
+  if (agent) return `npx langwatch ${agent.value}`;
   const slug = button.dataset.docsPageCopy;
   if (slug) {
     const response = await fetch(`/${slug}.md`, { credentials: "omit" });

@@ -2,7 +2,9 @@ import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { discoveryFiles, PAGE_EXPORT_EXTENSIONS } from "./docs-discovery.mjs";
 import { pageMarkdown } from "./docs-markdown.mjs";
+import { pageHead } from "./docs-metadata.mjs";
 import { buildNav } from "./docs-nav.mjs";
 import { llmsDirectory } from "./docs-output.mjs";
 import { readRedirects, resolveRedirect } from "./docs-routing.mjs";
@@ -16,7 +18,7 @@ export const STATIC_FILES = ["favicon.svg"];
 function devSearch({ docsRoot }) {
   const nav = buildNav({ docsRoot });
   return Object.entries(nav.pages).map(([slug, meta]) => {
-    const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
+    const source = pageMarkdown({ docsRoot, slug });
     return {
       slug,
       ...(meta.openapi ? { method: meta.openapi.split(/\s+/)[0].toUpperCase() } : {}),
@@ -30,7 +32,8 @@ function devSearch({ docsRoot }) {
 }
 
 function serveMarkdown({ docsRoot, pathname, response }) {
-  const slug = pathname.slice(1, -3);
+  const raw = pathname.slice(1).replace(/\.(md|claude|agent)$/, "");
+  const slug = raw === "index" ? "introduction" : raw;
   const { pages } = buildNav({ docsRoot });
   if (!Object.hasOwn(pages, slug)) {
     response.writeHead(404).end("Not found");
@@ -46,12 +49,23 @@ function serveSource({ docsRoot, pathname, response, next }) {
     response.end(llmsDirectory({ nav: buildNav({ docsRoot }) }));
     return;
   }
+  const discovery = discoveryFiles({ nav: buildNav({ docsRoot }) });
+  const discovered = discovery[pathname.slice(1)];
+  if (discovered) {
+    response.setHeader(
+      "Content-Type",
+      pathname.endsWith(".xml") ? "application/xml; charset=utf-8" : "text/plain; charset=utf-8",
+    );
+    response.end(discovered);
+    return;
+  }
   if (pathname === "/search-index.json") {
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     response.end(JSON.stringify(devSearch({ docsRoot })));
     return;
   }
-  if (pathname.endsWith(".md")) return serveMarkdown({ docsRoot, pathname, response });
+  if (PAGE_EXPORT_EXTENSIONS.some((extension) => pathname.endsWith(`.${extension}`)))
+    return serveMarkdown({ docsRoot, pathname, response });
   const [, top] = pathname.split("/");
   const allowed = STATIC_DIRS.includes(top) || STATIC_FILES.includes(top);
   const file = path.resolve(docsRoot, `.${pathname}`);
@@ -118,7 +132,7 @@ async function serveDocument({ request, response, next, server, docsRoot }) {
       .replace("<!--islands-->", themeScript + islandHead({ sources }))
       .replace(
         "<!--head-->",
-        `<title>${result.title.replaceAll("<", "&lt;")}</title><style data-docs-style>${styled.css}</style>`,
+        `${known ? pageHead({ slug, title: result.title, description: result.description }) : '<title>Not found</title><meta name="robots" content="noindex">'}<style data-docs-style>${styled.css}</style>`,
       )
       .replace("<!--app-->", styled.html)
       .replace("</body>", `${pageData({ slug, operation: result.operation })}</body>`);

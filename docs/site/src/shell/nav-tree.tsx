@@ -30,11 +30,13 @@ function NavMethod({ method }: { method: string }) {
   return (
     <Text
       as="span"
+      className="docs-method-badge"
+      data-method={method}
       flexShrink={0}
       minWidth="2.25rem"
       textAlign="center"
       paddingX="1"
-      borderRadius="xs"
+      borderRadius="sm"
       bg={`${palette}.subtle`}
       color={`${palette}.fg`}
       fontFamily="mono"
@@ -101,32 +103,8 @@ function GroupRow({
 }) {
   const active = ownsSlug({ items: item.children, slug: current });
   const [open, setOpen] = useState(active);
-  if (depth === 0) {
-    return (
-      <Box
-        as="li"
-        listStyleType="none"
-        marginTop="6"
-        css={{ "&:first-of-type": { marginTop: "0" } }}
-      >
-        <Text
-          as="p"
-          margin="0"
-          paddingX="3"
-          paddingBottom="2"
-          fontSize="14px"
-          lineHeight="20px"
-          fontWeight="600"
-          color="fg"
-        >
-          {item.title}
-        </Text>
-        <NavList items={item.children} current={current} depth={1} />
-      </Box>
-    );
-  }
   return (
-    <Box as="li" listStyleType="none">
+    <Box as="li" listStyleType="none" marginTop={depth === 0 ? "4" : "0"}>
       <chakra.button
         type="button"
         display="flex"
@@ -143,8 +121,8 @@ function GroupRow({
         borderRadius="sm"
         fontSize="14px"
         lineHeight="20px"
-        fontWeight="500"
-        color="nav.fg"
+        fontWeight={depth === 0 ? "600" : "500"}
+        color={depth === 0 ? "fg" : "nav.fg"}
         textAlign="start"
         cursor="pointer"
         _hover={{ bg: "bg.hover" }}

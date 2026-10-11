@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -30,11 +31,17 @@ type DocsOnlyRun struct {
 // docs.<slug>.langwatch.localhost at it (loopback without the proxy); the lane
 // is supervised and captured to docs.log, as in a stack, until ctx ends.
 func (o *Orchestrator) RunDocsSolo(ctx context.Context, p UpParams) error {
-	if err := o.DocsSoloRefusal(p); err != nil {
-		return err
-	}
 	slug, err := o.resolveSlug(p)
 	if err != nil {
+		return err
+	}
+	release, _, err := o.sem.Acquire(ctx, "up-"+slug, 1)
+	if err != nil {
+		return err
+	}
+	endRegistration := sync.OnceFunc(release)
+	defer endRegistration()
+	if err := o.DocsSoloRefusal(p); err != nil {
 		return err
 	}
 	ports, err := o.sys.FreePorts(1)
@@ -44,8 +51,11 @@ func (o *Orchestrator) RunDocsSolo(ctx context.Context, p UpParams) error {
 	port := ports[0]
 	logDir, _ := domain.StackLogPaths(p.WorktreeDir, slug)
 	docsURL, unroute := o.routeDocs(slug, port)
+	removeRecord := o.recordDocsOnly(DocsOnlyRun{PID: o.sys.Getpid(), URL: docsURL, LogDir: logDir})
+	// Keep the startup claim until route cleanup, so a new stack cannot lose its route.
+	defer removeRecord()
 	defer unroute()
-	defer o.recordDocsOnly(DocsOnlyRun{PID: o.sys.Getpid(), URL: docsURL, LogDir: logDir})()
+	endRegistration()
 	fmt.Printf("  docs  %s\n", docsURL)
 	o.sup.Supervise(ctx, []Child{{
 		Name: domain.DocsService, Dir: p.WorktreeDir, Color: palette[4],

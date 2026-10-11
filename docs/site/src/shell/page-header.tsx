@@ -24,6 +24,8 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
           height={{ base: "44px", xl: "34px" }}
           minHeight={{ base: "44px", xl: "34px" }}
           data-docs-page-copy={slug}
+          aria-keyshortcuts="Alt+Shift+C"
+          title="Copy page as Markdown (Alt+Shift+C)"
           disabled={!ready}
           borderEndRadius="0"
           onClick={() =>

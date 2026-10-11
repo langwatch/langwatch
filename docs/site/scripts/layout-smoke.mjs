@@ -62,11 +62,12 @@ async function reviewPage({ page, base, slug, width, mode }) {
   await page.goto(base + slug);
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => Boolean(document.querySelector('[data-island="toc"]')));
+  assert.equal(await page.evaluate(() => scrollY), 0);
   const desktop = width >= 1024;
   if (desktop) {
     await page.waitForFunction(() => {
       const active = document.querySelector('.docs-left-rail [aria-current="page"]');
-      return !active || active.getBoundingClientRect().bottom <= innerHeight;
+      return !active || active.getBoundingClientRect().height > 0;
     });
     assert.equal(
       await page

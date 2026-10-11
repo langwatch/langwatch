@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { buildNav } from "./docs-nav.mjs";
+import { changelogPath } from "./docs-releases.mjs";
 
 const ID = "virtual:docs-pages";
 
@@ -21,7 +22,7 @@ export function docsPagesPlugin({ docsRoot, onSourceChange }) {
       return `export default {${entries.join(",")}};`;
     },
     handleHotUpdate({ file, server }) {
-      if (!file.startsWith(docsRoot + path.sep)) return;
+      if (!file.startsWith(docsRoot + path.sep) && file !== changelogPath({ docsRoot })) return;
       if (file.includes(`${path.sep}site${path.sep}`)) return;
       onSourceChange();
       for (const [id, mod] of server.moduleGraph.idToModuleMap) {

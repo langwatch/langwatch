@@ -26,7 +26,8 @@ export async function runQuickAction({ id }: { id: string }) {
       /* Storage is optional. */
     }
   } else if (id === "copy") {
-    const slug = location.pathname.replace(/^\/+|\/+$/g, "") || "introduction";
+    const slug = document.querySelector<HTMLElement>("[data-docs-page-copy]")?.dataset.docsPageCopy;
+    if (!slug) throw new Error("Page export unavailable");
     const response = await fetch(`/${slug}.md`, { credentials: "omit" });
     if (!response.ok) throw new Error("Markdown unavailable");
     await navigator.clipboard.writeText(await response.text());

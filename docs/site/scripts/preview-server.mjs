@@ -31,6 +31,7 @@ export async function startPreview({ outDir, port }) {
               response.writeHead(301, { Location: redirect }).end();
               return;
             }
+            setExportContentType({ pathname, response });
             const target = path.resolve(outDir, `.${pathname}`, "index.html");
             const withinDist = target.startsWith(outDir + path.sep);
             const hasPage = withinDist && existsSync(target);
@@ -47,4 +48,9 @@ export async function startPreview({ outDir, port }) {
       },
     ],
   });
+}
+
+function setExportContentType({ pathname, response }) {
+  if (/\.(md|claude|agent)$/.test(pathname))
+    response.setHeader("Content-Type", "text/markdown; charset=utf-8");
 }

@@ -1,3 +1,13 @@
+function revealTab(button: HTMLElement) {
+  const list = button.closest<HTMLElement>('[role="tablist"]');
+  if (list) {
+    const item = button.getBoundingClientRect();
+    const bounds = list.getBoundingClientRect();
+    if (item.left < bounds.left) list.scrollLeft += item.left - bounds.left;
+    else if (item.right > bounds.right) list.scrollLeft += item.right - bounds.right;
+  }
+}
+
 function selectTab({ button }: { button: HTMLElement }) {
   const root = button.closest('[data-scope="tabs"][data-part="root"]');
   if (!root) return;
@@ -8,7 +18,12 @@ function selectTab({ button }: { button: HTMLElement }) {
     tab.toggleAttribute("data-selected", selected);
     tab.tabIndex = selected ? 0 : -1;
   });
-  const target = button.getAttribute("aria-controls");
+  revealTab(button);
+  measureTabLists();
+  const target = [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')].find(
+    (panel) => panel.getAttribute("aria-labelledby") === button.id,
+  )?.id;
+  if (target) button.setAttribute("aria-controls", target);
   root.querySelectorAll<HTMLElement>('[role="tabpanel"]').forEach((panel) => {
     if (panel.closest('[data-scope="tabs"][data-part="root"]') !== root) return;
     panel.hidden = panel.id !== target;
@@ -52,11 +67,21 @@ function onTabKey(event: KeyboardEvent) {
   else if (event.key === "End") index = buttons.length - 1;
   else return;
   event.preventDefault();
-  buttons[index]?.focus();
+  buttons[index]?.focus({ preventScroll: true });
   if (buttons[index]) selectTab({ button: buttons[index] });
 }
 
+function measureTabLists() {
+  document.querySelectorAll<HTMLElement>('[role="tablist"]').forEach((list) => {
+    list.toggleAttribute(
+      "data-overflow",
+      list.scrollWidth > list.clientWidth + list.scrollLeft + 2,
+    );
+  });
+}
+
 function restoreTabs() {
+  measureTabLists();
   document.querySelectorAll("[data-docs-preference]").forEach((root) => {
     let stored;
     try {
@@ -74,6 +99,9 @@ function restoreTabs() {
 export function installTabs() {
   restoreTabs();
   document.addEventListener("docs:navigated", restoreTabs);
+  window.addEventListener("resize", measureTabLists);
+  document.addEventListener("scroll", measureTabLists, { capture: true, passive: true });
+  void document.fonts.ready.then(measureTabLists);
   document.addEventListener("click", onTabClick);
   document.addEventListener("keydown", onTabKey);
 }

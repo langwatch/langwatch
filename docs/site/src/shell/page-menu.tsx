@@ -84,7 +84,7 @@ export function PageMenu({ slug, initialOpen = false }: { slug: string; initialO
           <MenuLabel
             icon={copied === "page" ? <Check size={16} /> : <Copy size={16} />}
             title={copied === "page" ? "Copied page" : "Copy page"}
-            description="Copy this page as Markdown for LLMs"
+            description="Copy this page as Markdown for LLMs · Alt+Shift+C"
           />
         </Menu.Item>
         <Menu.Item value="view" asChild>
@@ -96,6 +96,17 @@ export function PageMenu({ slug, initialOpen = false }: { slug: string; initialO
             />
           </a>
         </Menu.Item>
+        {["claude", "agent"].map((extension) => (
+          <Menu.Item key={extension} value={`source-${extension}`} asChild>
+            <a href={`/${slug}.${extension}`}>
+              <MenuLabel
+                icon={<FileText size={16} />}
+                title={`View .${extension}`}
+                description="Plain-text page for your agent"
+              />
+            </a>
+          </Menu.Item>
+        ))}
         {[
           {
             id: "claude",

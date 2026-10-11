@@ -1,4 +1,5 @@
 declare module "virtual:docs-nav" {
+  import type { Release } from "./lib/release.ts";
   export type NavItem =
     | { type: "page"; slug: string; title: string }
     | { type: "group"; title: string; children: NavItem[] };
@@ -12,7 +13,7 @@ declare module "virtual:docs-nav" {
   };
   export type SiteMeta = {
     name: string;
-    banner: { content: string; dismissible: boolean } | null;
+    releases: Release[];
     searchPrompt: string;
     signIn: string;
     github: string;

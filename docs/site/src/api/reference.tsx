@@ -58,7 +58,7 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
         wordBreak="break-word"
         css={{ userSelect: "all" }}
       >
-        {operation.path.split(/(\{[^}]+\})/).map((part, index) =>
+        {operation.path.split(/(\{[^}]+\}|\/)/).map((part, index) =>
           part.startsWith("{") ? (
             <Box
               as="span"
@@ -72,7 +72,13 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
               {part}
             </Box>
           ) : (
-            <span key={index}>{part}</span>
+            <Box
+              as="span"
+              key={index}
+              color={part === "/" || /^v\d+$/.test(part) ? "fg.muted" : "blue.fg"}
+            >
+              {part}
+            </Box>
           ),
         )}
       </Box>
@@ -117,9 +123,16 @@ export function Responses({ operation }: { operation: Operation }) {
               {response.description}
             </Text>
           </Flex>
-          {response.contents[0]?.schema?.properties ? (
-            <SchemaFields schema={response.contents[0].schema} />
-          ) : null}
+          {response.contents.map((content) =>
+            content.schema ? (
+              <Box key={content.type}>
+                <Text margin="0" paddingTop="3" fontSize="12px" color="fg.muted">
+                  {content.type}
+                </Text>
+                <SchemaFields schema={content.schema} />
+              </Box>
+            ) : null,
+          )}
         </Box>
       ))}
     </Section>

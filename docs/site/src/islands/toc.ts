@@ -16,7 +16,20 @@ function updateToc() {
       link.setAttribute("aria-current", "location");
     else link.removeAttribute("aria-current");
   }
+  document.querySelectorAll<HTMLElement>(".docs-toc-rail").forEach(updateProgress);
 }
+function updateProgress(rail: HTMLElement) {
+  const track = rail.querySelector<HTMLElement>(".docs-toc-track");
+  const svg = rail.querySelector<SVGSVGElement>(".docs-toc-progress");
+  const path = svg?.querySelector<SVGPathElement>("path");
+  const active = track?.querySelector<HTMLElement>('[aria-current="location"]');
+  if (!track || !svg || !path || !active) return;
+  const bounds = track.getBoundingClientRect();
+  const top = active.getBoundingClientRect().top - bounds.top + 4;
+  svg.setAttribute("viewBox", `0 0 14 ${bounds.height}`);
+  path.setAttribute("d", `M 4 ${top} L 4 ${top + active.offsetHeight - 8}`);
+}
+
 export function installToc() {
   document.addEventListener(
     "scroll",
@@ -29,6 +42,7 @@ export function installToc() {
     { passive: true },
   );
   document.addEventListener("docs:navigated", updateToc);
+  window.addEventListener("resize", updateToc);
   document.addEventListener("click", (event) => {
     const link = event.target instanceof Element ? event.target.closest("[data-docs-toc] a") : null;
     link?.closest("details")?.removeAttribute("open");

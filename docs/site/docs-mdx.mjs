@@ -10,6 +10,7 @@ import { remarkDocsContent } from "./docs-content.mjs";
 import { closeDiagrams } from "./docs-diagrams.mjs";
 import { remarkDocsLinks } from "./docs-links.mjs";
 import { rehypeDocsCode, rehypeDocsHeadings, rehypeDocsMedia } from "./docs-rehype.mjs";
+import { changelogPath, withReleaseNotes } from "./docs-releases.mjs";
 
 export function docsMdxPlugin({ docsRoot }) {
   const inner = mdx({
@@ -38,7 +39,12 @@ export function docsMdxPlugin({ docsRoot }) {
         if (!id.endsWith(".mdx")) return null;
         if (id.endsWith("/introduction.mdx"))
           this.addWatchFile(path.join(docsRoot, "skills/directory.mdx"));
-        return handler.call(this, code, id);
+        this.addWatchFile(changelogPath({ docsRoot }));
+        const slug = path
+          .relative(docsRoot, id)
+          .replace(/\\/g, "/")
+          .replace(/\.mdx$/, "");
+        return handler.call(this, withReleaseNotes({ source: code, slug, docsRoot }), id);
       },
     },
   };

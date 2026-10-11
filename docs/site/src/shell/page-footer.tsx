@@ -1,5 +1,5 @@
 import { Box, Flex, Link, Text } from "@langwatch/design-system/primitives";
-import { ArrowLeft, ArrowRight, PencilLine } from "lucide-react";
+import { ArrowLeft, ArrowRight, PencilLine, MessageSquareWarning } from "lucide-react";
 
 import { site } from "../lib/nav-model.ts";
 
@@ -49,6 +49,11 @@ export function PageFooter({
   previous: Neighbour;
   next: Neighbour;
 }) {
+  const issue = `${site.github}/issues/new?${new URLSearchParams({
+    title: `Docs: ${slug}`,
+    labels: "documentation",
+    body: `Page: https://docs.langwatch.ai/${slug}\n\nWhat is outdated or broken?\n\nExpected behavior or suggested correction:\n`,
+  })}`;
   return (
     <Box marginTop="14" borderTopWidth="1px" borderColor="border">
       <Box
@@ -73,10 +78,18 @@ export function PageFooter({
         <Text margin="0" color="docs.lede">
           Help make these docs better.
         </Text>
-        <Link href={`${site.github}/edit/main/docs/${slug}.mdx`} color="docs.body" gap="2">
-          <PencilLine size={14} aria-hidden="true" /> Edit this page
-        </Link>
+        <Flex gap="4" wrap="wrap">
+          <Link href={issue} color="docs.body" gap="2">
+            <MessageSquareWarning size={14} aria-hidden="true" /> Report outdated or broken docs
+          </Link>
+          <Link href={`${site.github}/edit/main/docs/${slug}.mdx`} color="docs.body" gap="2">
+            <PencilLine size={14} aria-hidden="true" /> Edit this page
+          </Link>
+        </Flex>
       </Flex>
+      <Text fontSize="12px" color="docs.body" marginTop="3">
+        Agents: include the page URL, what failed and a proposed correction in a docs issue.
+      </Text>
     </Box>
   );
 }

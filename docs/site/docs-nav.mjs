@@ -3,6 +3,8 @@ import path from "node:path";
 
 import { parse } from "yaml";
 
+import { changelogPath, readReleases } from "./docs-releases.mjs";
+
 const SPEC_FILES = ["api-reference/openapiLangWatch.json", "api-reference/openapi-evals.json"];
 const VERBS = ["get", "post", "put", "patch", "delete"];
 
@@ -152,13 +154,10 @@ export function buildNav({ docsRoot }) {
     href: String(anchor.href ?? ""),
   }));
 
-  const banner = config.banner?.content
-    ? { content: String(config.banner.content), dismissible: config.banner.dismissible !== false }
-    : null;
   const links = config.navbar?.links ?? [];
   const site = {
     name: String(config.name ?? "LangWatch"),
-    banner,
+    releases: readReleases({ docsRoot }),
     searchPrompt: String(config.search?.prompt ?? "Search the LangWatch docs"),
     signIn: String(
       links.find((link) => /sign ?in/i.test(link.label))?.href ?? "https://app.langwatch.ai",
@@ -227,6 +226,7 @@ export function docsNavPlugin({ docsRoot }) {
     async load(id) {
       if (id !== RESOLVED_ID) return null;
       this.addWatchFile(path.join(docsRoot, "docs.json"));
+      this.addWatchFile(changelogPath({ docsRoot }));
       const nav = buildNav({ docsRoot });
       for (const slug of Object.keys(nav.pages))
         this.addWatchFile(path.join(docsRoot, `${slug}.mdx`));

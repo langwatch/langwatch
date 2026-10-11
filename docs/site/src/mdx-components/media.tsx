@@ -22,7 +22,7 @@ export function DocsImage({ className, alt, src, width, ...rest }: ComponentProp
   }
   return (
     <img
-      className={`docs-img ${themeClass({ className })}`.trim()}
+      className={`docs-img ${themeClass({ className })} ${className ?? ""}`.trim()}
       src={src}
       alt={alt ?? ""}
       loading="lazy"

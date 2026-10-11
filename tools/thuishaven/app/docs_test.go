@@ -2,13 +2,16 @@ package app
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
@@ -31,6 +34,7 @@ func docsSoloOrchestrator(t *testing.T, store *fakeStore, sys *fakeSystem) (*Orc
 		sup:   sup,
 		proxy: proxy,
 		store: store,
+		sem:   &fakeSemaphore{},
 		log:   zap.NewNop(),
 	}, sup, proxy
 }
@@ -85,6 +89,88 @@ func TestRunDocsSoloRefusesASecondRun(t *testing.T) {
 	writeDocsOnly(t, p, "7")
 	if err := o.RunDocsSolo(t.Context(), p); err == nil || len(sup.lanes) != 0 {
 		t.Fatalf("err %v, ran %v; want a refusal naming the running docs", err, sup.lanes)
+	}
+}
+
+// @scenario "A stack refuses to start beside docs running alone"
+func TestUpRefusesBesideDocsOnly(t *testing.T) {
+	for _, withDocs := range []bool{false, true} {
+		name := "without docs"
+		if withDocs {
+			name = "with docs"
+		}
+		t.Run(name, func(t *testing.T) {
+			o, sup, proxy := docsSoloOrchestrator(t, &fakeStore{}, &fakeSystem{alive: map[int]bool{7: true}})
+			o.cfg.PortlessDisabled = true
+			p := UpParams{ExplicitSlug: "feat-x", WorktreeDir: t.TempDir()}
+			writeDocsOnly(t, p, "7")
+			err := o.Up(t.Context(), p, PlanOptions{Selection: domain.Selection{Docs: withDocs}})
+			if err == nil || !strings.Contains(err.Error(), "haven down") || !strings.Contains(err.Error(), "pid 7") {
+				t.Fatalf("Up = %v, want a refusal naming the live docs launcher and haven down", err)
+			}
+			if len(proxy.registered) != 0 || len(sup.lanes) != 0 || len(sup.shells) != 0 {
+				t.Fatalf("registered %v and ran %v/%v beside solo docs", proxy.registered, sup.lanes, sup.shells)
+			}
+			sem := o.sem.(*fakeSemaphore)
+			if sem.lastName != "up-feat-x" || sem.acquired != 1 || sem.released != 1 {
+				t.Fatalf("startup lock = %+v, want the same per-slug lock taken and released once", sem)
+			}
+		})
+	}
+}
+
+// @scenario "Cancelling docs startup during stack registration starts nothing"
+func TestRunDocsSoloWaitsForStackRegistration(t *testing.T) {
+	o, sup, proxy := docsSoloOrchestrator(t, &fakeStore{}, &fakeSystem{})
+	sem := semaphore.New(t.TempDir())
+	o.sem = sem
+	release, _, err := sem.Acquire(t.Context(), "up-feat-x", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	ctx, cancel := context.WithTimeout(t.Context(), 250*time.Millisecond)
+	defer cancel()
+	err = o.RunDocsSolo(ctx, UpParams{ExplicitSlug: "feat-x", WorktreeDir: t.TempDir()})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("RunDocsSolo = %v, want cancellation while the stack registration lock is held", err)
+	}
+	if len(proxy.registered) != 0 || len(sup.lanes) != 0 {
+		t.Fatalf("registered %v and ran %v before stack registration finished", proxy.registered, sup.lanes)
+	}
+}
+
+type docsCleanupProxy struct {
+	routingProxy
+	recordPath             string
+	recordPresentAtRemoval bool
+}
+
+func (p *docsCleanupProxy) Remove(service, slug string) {
+	_, err := os.Stat(p.recordPath)
+	p.recordPresentAtRemoval = err == nil
+	p.routingProxy.Remove(service, slug)
+}
+
+// @scenario "Solo docs keep their startup claim until their route is removed"
+func TestRunDocsSoloRemovesRouteBeforeStartupRecord(t *testing.T) {
+	o, _, _ := docsSoloOrchestrator(t, &fakeStore{}, &fakeSystem{alive: map[int]bool{1: true}})
+	p := UpParams{ExplicitSlug: "feat-x", WorktreeDir: t.TempDir()}
+	logDir, _ := domain.StackLogPaths(p.WorktreeDir, p.ExplicitSlug)
+	proxy := &docsCleanupProxy{recordPath: filepath.Join(logDir, docsOnlyFile)}
+	o.proxy = proxy
+	if err := o.RunDocsSolo(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	if !proxy.recordPresentAtRemoval || len(proxy.removed) != 1 {
+		t.Fatalf("removed %v with startup record present = %v, want the solo claim held through route cleanup", proxy.removed, proxy.recordPresentAtRemoval)
+	}
+	if _, ok := o.DocsOnly(p); ok {
+		t.Fatal("the startup record outlived solo route cleanup")
+	}
+	sem := o.sem.(*fakeSemaphore)
+	if sem.acquired != 1 || sem.released != 1 {
+		t.Fatalf("startup lock = %+v, want it released exactly once", sem)
 	}
 }
 

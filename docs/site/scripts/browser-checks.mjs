@@ -114,6 +114,7 @@ export async function checkClipboardReadiness({ browser, base }) {
       ["introduction", "Copy setup prompt"],
       ["integration/quick-start", "Copy page"],
       ["integration/quick-start", "Copy code"],
+      ["integration/quick-start", "Copy agent command"],
       ["skills/directory", "Copy full prompt"],
     ]) {
       await page.goto(`${base}${slug}`);

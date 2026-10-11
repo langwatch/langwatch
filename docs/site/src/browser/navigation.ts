@@ -88,7 +88,7 @@ async function installStyles({ next }: { next: Document }) {
 function updateHead({ next }: { next: Document }) {
   document.title = next.title;
   const selector =
-    'meta[name="description"], link[rel="canonical"], meta[property^="og:"], meta[name^="twitter:"]';
+    'meta[name="description"], link[rel="canonical"], meta[property^="og:"], meta[name^="twitter:"], link[rel="alternate"], link[rel="describedby"], script[data-docs-metadata]';
   document.head.querySelectorAll(selector).forEach((node) => node.remove());
   next.head
     .querySelectorAll(selector)

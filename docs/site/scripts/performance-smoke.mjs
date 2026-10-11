@@ -51,7 +51,7 @@ await it("swaps pages, preserves the header and restores history/focus", async (
         await page.locator("header").evaluate((node) => {
           node.dataset.navigationTest = "preserved";
         });
-        const link = page.locator('a[href="/integration/quick-start"]').first();
+        const link = page.locator('#content a[href="/integration/quick-start"]').first();
         await link.click();
         await page.waitForURL("**/integration/quick-start");
         assert.equal(

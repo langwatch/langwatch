@@ -17,6 +17,8 @@ async function updateGround() {
   try {
     const dispose = await mountAmbientShader({
       element: layer,
+      minPixelRatio: 0.5,
+      maxPixelCount: 360_000,
       mode: document.documentElement.classList.contains("dark") ? "dark" : "light",
     });
     if (version !== generation) dispose();

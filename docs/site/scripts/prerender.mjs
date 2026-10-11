@@ -5,7 +5,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { STATIC_DIRS, STATIC_FILES } from "../docs-dev.mjs";
+import { discoveryFiles, PAGE_EXPORT_EXTENSIONS } from "../docs-discovery.mjs";
 import { pageMarkdown } from "../docs-markdown.mjs";
+import { pageHead } from "../docs-metadata.mjs";
 import { buildNav } from "../docs-nav.mjs";
 import { llmsDirectory, pageTargets } from "../docs-output.mjs";
 import { readRedirects } from "../docs-routing.mjs";
@@ -18,9 +20,6 @@ import { extractStyles } from "./static-styles.mjs";
 const siteRoot = fileURLToPath(new URL("..", import.meta.url));
 const { outDir: dist } = readBuildOptions();
 const docsRoot = path.resolve(siteRoot, "..");
-function escapeHtml({ text }) {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-}
 const manifestText = await readFile(path.join(dist, ".vite/manifest.json"), "utf8");
 const manifest = JSON.parse(manifestText);
 const sources = Object.fromEntries(
@@ -38,11 +37,18 @@ const { pages } = nav;
 
 async function copyMarkdown({ slug }) {
   await mkdir(path.dirname(path.join(dist, slug)), { recursive: true });
-  await writeFile(path.join(dist, `${slug}.md`), pageMarkdown({ docsRoot, slug }));
+  const markdown = pageMarkdown({ docsRoot, slug });
+  for (const extension of PAGE_EXPORT_EXTENSIONS) {
+    await writeFile(path.join(dist, `${slug}.${extension}`), markdown);
+    if (slug === "introduction") await writeFile(path.join(dist, `index.${extension}`), markdown);
+  }
 }
 
 await writeFile(path.join(dist, "redirects.json"), JSON.stringify(readRedirects({ docsRoot })));
 await writeFile(path.join(dist, "llms.txt"), llmsDirectory({ nav }));
+for (const [name, contents] of Object.entries(discoveryFiles({ nav }))) {
+  await writeFile(path.join(dist, name), contents);
+}
 const searchIndex = [];
 const allStyles = new Set();
 const htmlTargets = [];
@@ -57,7 +63,11 @@ for (const slug of Object.keys(pages)) {
   try {
     const { html, title, description, operation, headings } = await render({ slug });
     const styled = staticPage({ html });
-    const head = `<title>${escapeHtml({ text: title })}</title>${description ? `<meta name="description" content="${escapeHtml({ text: description })}" />` : ""}`;
+    const imagePreload =
+      slug === "coding-agents/overview"
+        ? '<link rel="preload" as="image" href="/images/coding-agents/optimized/session-detail-1024.webp" imagesrcset="/images/coding-agents/optimized/session-detail-640.webp 640w, /images/coding-agents/optimized/session-detail-1024.webp 1024w, /images/coding-agents/optimized/session-detail-1560.webp 1560w" imagesizes="(min-width: 1280px) calc(100vw - 620px), (min-width: 1024px) calc(100vw - 380px), calc(100vw - 40px)">'
+        : "";
+    const head = imagePreload + pageHead({ slug, title, description });
     const page = template
       .replace(
         "<!--head-->",
@@ -86,7 +96,7 @@ const missingStyles = staticPage({ html: missing.html });
 const notFound = template
   .replace(
     "<!--head-->",
-    `<title>Not found</title><link data-docs-style rel="stylesheet" href="${missingStyles.href}">`,
+    `<title>Not found</title><meta name="robots" content="noindex"><link data-docs-style rel="stylesheet" href="${missingStyles.href}">`,
   )
   .replace("<!--app-->", missingStyles.html)
   .replace("</body>", `${pageData({ slug: "404", operation: null })}</body>`);
@@ -104,6 +114,11 @@ for (const target of htmlTargets) {
 for (const name of [...STATIC_DIRS, ...STATIC_FILES]) {
   if (existsSync(path.join(docsRoot, name)))
     await cp(path.join(docsRoot, name), path.join(dist, name), { recursive: true });
+}
+
+await mkdir(path.join(dist, "api-reference"), { recursive: true });
+for (const name of ["openapiLangWatch.json", "openapi-evals.json"]) {
+  await cp(path.join(docsRoot, "api-reference", name), path.join(dist, "api-reference", name));
 }
 
 const reasons = new Map();

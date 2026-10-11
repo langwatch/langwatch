@@ -572,6 +572,9 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		}
 	}
 	defer endRegistration()
+	if run, ok := o.DocsOnly(p); ok {
+		return fmt.Errorf("the docs already run alone here (pid %d) at %s; `haven down` first, then start the stack", run.PID, run.URL)
+	}
 	// Only services differ and the keeper replans: start and stop those lanes alone.
 	if err := o.applySelectionLive(ctx, p, opts); !errors.Is(err, errNotLive) {
 		return err

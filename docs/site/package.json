@@ -13,7 +13,9 @@
     "test:performance": "node scripts/performance-smoke.mjs",
     "size": "node scripts/performance-report.mjs",
     "test:layout": "node scripts/layout-smoke.mjs",
-    "test:polish": "node scripts/polish-smoke.mjs"
+    "test:polish": "node scripts/polish-smoke.mjs",
+    "test:news": "node scripts/news-smoke.mjs",
+    "test:refinement": "node scripts/refinement-smoke.mjs"
   },
   "dependencies": {
     "@langwatch/design-system": "workspace:*",

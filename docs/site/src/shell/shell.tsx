@@ -196,7 +196,7 @@ export function DocsShell({
         {showRail ? (
           <Box gridArea="toc" paddingTop="0" display={{ base: "none", xl: "block" }}>
             <Box
-              className="docs-toc-rail"
+              className="docs-toc-container"
               data-docs-rail=""
               paddingTop="10"
               maxHeight="calc(100vh - var(--docs-header-h) - 3rem)"

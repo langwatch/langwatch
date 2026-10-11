@@ -1,6 +1,34 @@
 Feature: Generate documentation data from authored sources
 
   @unit
+  Scenario: Export complete API operations for agents
+    Given a frontmatter-only API page points to an OpenAPI operation
+    When its Markdown export is generated
+    Then it contains its title, endpoint, authentication and parameters
+    And request and response schemas and explicit examples are retained
+    And an unresolved operation fails instead of producing an empty export
+
+  @unit
+  Scenario: Preserve guide metadata in Markdown exports
+    Given a guide has a title, description and authored MDX
+    When its Markdown export is generated
+    Then the title and description precede the readable authored source
+
+  @unit
+  Scenario: Index API reference content
+    Given an API page has a main content region without an article
+    When its search entry is generated
+    Then endpoint parameters and response fields are searchable
+    And surrounding navigation is excluded
+
+  @integration
+  Scenario: Render response arrays and composed schemas
+    Given a response contains array items and alternative object schemas
+    When the response reference is rendered
+    Then item fields and every alternative are visible
+    And all response media types retain their declared fields
+
+  @unit
   Scenario: Preserve authored navigation and API slugs
     Given nested navigation, title overrides and unlisted API files
     When navigation and the API inventory are generated

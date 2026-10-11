@@ -52,6 +52,20 @@ manual key. A blocked/closed popup, denial or timeout leaves the manual-key opti
 available. A full-page redirect variant is deferred; tokens must not be put in its
 URL if that variant is later approved.
 
+## Tab association and sandbox scope
+
+A random tab-flow identifier correlates consent and a grant; it does not make a
+bearer credential non-transferable. Memory-only storage and a five-minute ceiling
+limit exposure, but a copied credential can still be used until expiry or server
+revocation. Cryptographic tab binding would require a separately designed
+proof-of-possession protocol using a per-tab non-exportable key and API-side
+request-proof validation. The current proposal does not claim that guarantee.
+
+Sandbox access is a separate product decision. A sandbox must be an explicitly
+selected, isolated project with its own grants and lifecycle; the playground must
+not silently turn a production request into a sandbox request or widen a read
+preset into write access. No sandbox provisioning is included in this proposal.
+
 ## Ownership, CSRF and revocation
 
 Minting declares `.mintsCredential(...)`, project-scoped permissions and verified

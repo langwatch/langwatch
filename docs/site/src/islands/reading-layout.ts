@@ -5,14 +5,6 @@ function measureRails() {
     rail.toggleAttribute("data-fits-viewport", rail.offsetHeight <= innerHeight - header);
   });
 }
-function revealActivePage() {
-  if (location.hash || !matchMedia("(min-width: 64rem)").matches || scrollY > 0) return;
-  const active = document.querySelector<HTMLElement>('.docs-left-rail [aria-current="page"]');
-  if (!active) return;
-  const bounds = active.getBoundingClientRect();
-  if (bounds.bottom > innerHeight)
-    window.scrollBy({ top: bounds.bottom - innerHeight + 32, behavior: "instant" });
-}
 export function prepareReadingLayout() {
   observer?.disconnect();
   observer = new ResizeObserver(measureRails);
@@ -22,7 +14,6 @@ export function prepareReadingLayout() {
   measureRails();
   void document.fonts.ready.then(() => {
     measureRails();
-    revealActivePage();
   });
   const modifier = document.querySelector("[data-docs-modifier]");
   const icon = document.querySelector("[data-docs-command-icon] svg");
@@ -40,4 +31,46 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     event.target.click();
   }
+});
+
+let menusPrepared = false;
+function prepareContextMenus(event: Event) {
+  const target = event.target;
+  if (
+    menusPrepared ||
+    !(target instanceof Element) ||
+    !target.closest("[data-docs-theme], [data-docs-page-menu]")
+  ) {
+    return;
+  }
+
+  const source = document.querySelector<HTMLMetaElement>(
+    'meta[name="docs-island-context-menus"]',
+  )?.content;
+  if (!source) {
+    return;
+  }
+
+  const preload = document.createElement("link");
+  preload.rel = "modulepreload";
+  preload.href = source;
+  menusPrepared = true;
+  document.head.append(preload);
+}
+
+document.addEventListener("pointerover", prepareContextMenus);
+document.addEventListener("focusin", prepareContextMenus);
+
+document.addEventListener("keydown", (event) => {
+  if (!event.altKey || !event.shiftKey || event.code !== "KeyC") return;
+  if (event.ctrlKey || event.metaKey) return;
+  if (
+    event.target instanceof Element &&
+    event.target.closest("input, textarea, select, [contenteditable]")
+  )
+    return;
+  const button = document.querySelector<HTMLButtonElement>("[data-docs-page-copy]");
+  if (!button || button.disabled) return;
+  event.preventDefault();
+  button.click();
 });
