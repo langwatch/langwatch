@@ -96,6 +96,8 @@ drawers and dialogs on 2026-09-29 therefore did not keep them the same.
       `FrameAction`'s sibling `cancel` descriptor takes `data-testid` for the Cancel button.
     - `Dialog closeOnInteractOutside` (default true): `false` ignores an outside click only, so
       X and Escape keep their `dismissible` and `busy` rules. It is not `dismissible={false}`.
+    - `Dialog cancelLabel={null}` (DS-cap2): drops the default Cancel when one primary action
+      finishes the job; the X and Escape stay under `dismissible` and `busy`, default unchanged.
 
 ## Consequences
 

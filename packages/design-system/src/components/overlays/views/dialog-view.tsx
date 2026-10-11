@@ -170,8 +170,11 @@ export interface DialogProps {
   primaryAction?: FrameAction;
   /** Takes Cancel's place: "Keep links paused", "Later", "Stay here". */
   secondaryAction?: FrameAction;
-  /** Default "Cancel"; "Close" for a read-only dialog. */
-  cancelLabel?: string;
+  /**
+   * Default "Cancel"; "Close" for a read-only dialog. `null` drops the footer button when one
+   * primary action finishes the job; the X and Escape still close it under `dismissible`.
+   */
+  cancelLabel?: string | null;
   /** Footer left: the acknowledge checkbox, "Step 2 of 2". */
   note?: React.ReactNode;
   /** `false`: no X, no Cancel, no Escape, no outside click; only the actions close it. */
@@ -239,7 +242,9 @@ export function Dialog({
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
   const closable = dismissible && !busy;
   const cancel =
-    dismissible && !secondaryAction ? { label: cancelLabel, onClick: onClose } : undefined;
+    dismissible && !secondaryAction && cancelLabel !== null
+      ? { label: cancelLabel, onClick: onClose }
+      : undefined;
   const hasFooter = primaryAction ?? secondaryAction ?? cancel ?? note;
   const pickInitialFocus = () => {
     const usable = (selector: string) => firstFocusable(ownRef.current, selector);

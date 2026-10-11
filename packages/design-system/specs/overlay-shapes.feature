@@ -43,6 +43,13 @@ Feature: Drawer and dialog shapes
     Then the secondary action takes Cancel's place
 
   @integration
+  Scenario: A dialog finished by one action can drop Cancel and stay dismissible
+    Given a dialog with a primary action and no Cancel
+    Then the footer shows only the primary action
+    And the X requests one close and Escape requests one close
+    And a dialog with no primary action and no Cancel still has the X
+
+  @integration
   Scenario: A dialog that must be acknowledged cannot be dismissed
     Given a dialog that is not dismissible
     Then it has no close button and no Cancel

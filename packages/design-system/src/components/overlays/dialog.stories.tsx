@@ -80,6 +80,22 @@ export const SecretIgnoresOutsideClick: Story = {
   globals: { colorMode: "dark" },
 };
 
+/** One primary action finishes the job: no Cancel; the X and Escape still close it. */
+export const PrimaryOnly: Story = {
+  args: {
+    title: "Token created",
+    cancelLabel: null,
+    primaryAction: { label: "Done", onClick: noop },
+    children: <Text fontFamily="mono">lw-••••••••••••••••</Text>,
+  },
+  globals: { colorMode: "light" },
+};
+
+export const PrimaryOnlyDark: Story = {
+  ...PrimaryOnly,
+  globals: { colorMode: "dark" },
+};
+
 export const ReadOnly: Story = {
   args: {
     size: "lg",

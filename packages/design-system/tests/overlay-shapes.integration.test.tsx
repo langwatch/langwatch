@@ -637,6 +637,42 @@ describe("a drawer's icon", () => {
   });
 });
 
+describe("a dialog without a Cancel button", () => {
+  /** @scenario "A dialog finished by one action can drop Cancel and stay dismissible" */
+  it("shows only the primary action, and the X and Escape each request one close", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={onClose}
+        title="Token created"
+        cancelLabel={null}
+        primaryAction={{ label: "Done", onClick: vi.fn() }}
+      />,
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "Token created" });
+    expect(dialog.querySelector('[data-frame-action="cancel"]')).toBeNull();
+    expect(within(dialog).getByRole("button", { name: "Done" })).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Cancel" })).toBeNull();
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  /** @scenario "A dialog finished by one action can drop Cancel and stay dismissible" */
+  it("keeps the X on a dialog with neither a primary action nor a Cancel", async () => {
+    renderWithDesignSystem(<Dialog open onClose={vi.fn()} title="Notice" cancelLabel={null} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "Notice" });
+    expect(within(dialog).getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(dialog.querySelector("[data-frame-action]")).toBeNull();
+  });
+});
+
 describe("a dialog that ignores an outside click", () => {
   /** @scenario "A secret dialog ignores an outside click but closes by X or Escape" */
   it("stays open on an outside click, then closes once by the X and once by Escape", async () => {
