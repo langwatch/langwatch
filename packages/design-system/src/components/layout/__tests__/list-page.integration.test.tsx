@@ -23,7 +23,11 @@ function page(state: ListPageState, extra: Partial<ListPageProps> = {}) {
       state={state}
       search={search}
       filters={<button type="button">Active only</button>}
-      empty={{ size: "line", title: "No operators yet" }}
+      empty={{
+        size: "line",
+        title: "No operators yet",
+        next: { kind: "action", label: "Grant access", onClick: vi.fn() },
+      }}
       noResults={{ description: "No operators match.", onClear: vi.fn() }}
       error={{ title: "Could not load operators", onRetry: vi.fn() }}
       selection={{ label: "1 selected", onClear: vi.fn() }}
@@ -176,5 +180,21 @@ describe("ListPage", () => {
     expect(screen.getByText("No matching operators")).toBeTruthy();
     rerender(view({ error: <ListPageError title="Could not load operators" /> }));
     expect(screen.getByRole("alert").textContent).toContain("Could not load operators");
+  });
+
+  /** @scenario An empty list always points to a next step */
+  it("draws the configured empty step and no generic fallback", () => {
+    renderWithDesignSystem(
+      <ListPage
+        title="Operators"
+        state="empty"
+        // @ts-expect-error an empty config without a next step is refused
+        empty={{ size: "line", title: "No operators yet" }}
+      >
+        <div />
+      </ListPage>,
+    );
+    expect(screen.getByText("No operators yet")).toBeTruthy();
+    expect(screen.queryByText("Nothing here yet.")).toBeNull();
   });
 });

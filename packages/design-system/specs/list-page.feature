@@ -61,3 +61,9 @@ Feature: Shared list-page composition
   Scenario: Pages written before the states keep working
     Given a list page given loading, error, empty and toolbar nodes instead of a state
     Then it renders them as it always did
+
+  @integration
+  Scenario: An empty list always points to a next step
+    Given a list page in the empty state
+    Then its configuration must carry a next step
+    And no generic fallback line is drawn when a state's configuration is missing

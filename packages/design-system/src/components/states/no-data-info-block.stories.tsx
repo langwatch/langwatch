@@ -2,7 +2,11 @@ import { Box, Button, Link } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Database } from "lucide-react";
 
-import { NoDataInfoBlock, type NoDataInfoBlockBlockProps } from "./no-data-info-block.tsx";
+import {
+  NoDataInfoBlock,
+  type NoDataInfoBlockBlockProps,
+  type NoDataNext,
+} from "./no-data-info-block.tsx";
 
 /** The block sizes, so the stories' args stay typed; `Line` renders the line size itself. */
 function NoDataInfoBlockSized(props: NoDataInfoBlockBlockProps) {
@@ -97,4 +101,38 @@ export const Line: Story = {
       action={{ label: "Clear filters", onClick: () => undefined }}
     />
   ),
+};
+
+const settingNext: NoDataNext = {
+  kind: "setting",
+  label: "Open passkey settings",
+  href: "/settings/security",
+};
+const docsNext: NoDataNext = {
+  kind: "docs",
+  label: "Read about passkeys",
+  href: "https://langwatch.ai/docs",
+};
+const promptNext: NoDataNext = {
+  kind: "agent-prompt",
+  prompt: "Add passkey sign-in to this project.",
+};
+const actionNext: NoDataNext = { kind: "action", label: "Add a passkey", onClick: () => undefined };
+
+export const NextSetting: Story = { args: { next: settingNext } };
+export const NextDocs: Story = { args: { next: docsNext } };
+export const NextAgentPrompt: Story = { args: { next: promptNext } };
+export const NextAction: Story = { args: { next: actionNext } };
+
+export const LineNextSetting: Story = {
+  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={settingNext} />,
+};
+export const LineNextDocs: Story = {
+  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={docsNext} />,
+};
+export const LineNextAgentPrompt: Story = {
+  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={promptNext} />,
+};
+export const LineNextAction: Story = {
+  render: () => <NoDataInfoBlock size="line" title="No passkeys yet." next={actionNext} />,
 };

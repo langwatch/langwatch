@@ -3,7 +3,11 @@ import type { ReactNode } from "react";
 
 import { SearchInput } from "../forms/search-input.tsx";
 import { Banner, BannerAction } from "../states/banner.tsx";
-import { NoDataInfoBlock, type NoDataInfoBlockProps } from "../states/no-data-info-block.tsx";
+import {
+  NoDataInfoBlock,
+  type NoDataInfoBlockProps,
+  type NoDataNext,
+} from "../states/no-data-info-block.tsx";
 import { BackLink } from "./back-link.tsx";
 import { LoadMore, type LoadMoreProps } from "./load-more.tsx";
 import { PageLayout } from "./page-layout.tsx";
@@ -41,6 +45,16 @@ export interface ListPageNoResults {
   onClear?: () => void;
 }
 
+/** The empty state's block or line, with the next step it must carry. */
+export type ListPageEmptyConfig = NoDataInfoBlockProps & { next: NoDataNext };
+
+/** Each state's config is required with its state; the others are optional. */
+type ListPageStateConfig =
+  | { state: "loading" | "ready" }
+  | { state: "error"; error: ListPageErrorConfig }
+  | { state: "empty"; empty: ListPageEmptyConfig }
+  | { state: "no-results"; noResults: ListPageNoResults };
+
 /** Offset or cursor tables page; append feeds load more. Never both. */
 type ListPagePaging =
   | { pagination?: PaginationProps; loadMore?: never }
@@ -51,25 +65,25 @@ type ListPagePaging =
  * the toolbar so it can be cleared; only `ready` pages, loads more or selects. An `error`
  * with `ready` is an inline notice over the retained rows. Spec: specs/list-page.feature.
  */
-export type ListPageProps = ListPagePaging & {
-  title: string;
-  /** First body line, muted. */
-  description?: string;
-  back?: ListPageBack;
-  /** `PageLayout.HeaderButton`s only; one `primary`. */
-  actions?: ReactNode;
-  state: ListPageState;
-  search?: ListPageSearch;
-  /** FilterChips, a scope picker, a segmented control. */
-  filters?: ReactNode;
-  refreshing?: boolean;
-  error?: ListPageErrorConfig;
-  empty?: NoDataInfoBlockProps;
-  noResults?: ListPageNoResults;
-  selection?: SelectionActionBarProps;
-  /** A ListTable, or a CardGrid of ResourceTiles. */
-  children: ReactNode;
-};
+export type ListPageProps = ListPagePaging &
+  ListPageStateConfig & {
+    title: string;
+    /** First body line, muted. */
+    description?: string;
+    back?: ListPageBack;
+    /** `PageLayout.HeaderButton`s only; one `primary`. */
+    actions?: ReactNode;
+    search?: ListPageSearch;
+    /** FilterChips, a scope picker, a segmented control. */
+    filters?: ReactNode;
+    refreshing?: boolean;
+    error?: ListPageErrorConfig;
+    empty?: ListPageEmptyConfig;
+    noResults?: ListPageNoResults;
+    selection?: SelectionActionBarProps;
+    /** A ListTable, or a CardGrid of ResourceTiles. */
+    children: ReactNode;
+  };
 
 /** @deprecated Pass `state`, `description`, `search`, `filters`, `error` and `empty` configs. */
 export interface LegacyListPageProps {
@@ -84,10 +98,6 @@ export interface LegacyListPageProps {
   pagination?: PaginationProps;
   children: ReactNode;
 }
-
-const MISSING_EMPTY: NoDataInfoBlockProps = { size: "line", title: "Nothing here yet." };
-const MISSING_NO_RESULTS: ListPageNoResults = { description: "No results match." };
-const MISSING_ERROR: ListPageErrorConfig = { title: "This list could not be loaded." };
 
 /** A controlled resource list: the caller owns data, filtering, and the table's columns. */
 /** @deprecated Pass the `state` shape. Listed first so only a call without `state` lands here. */
@@ -127,7 +137,7 @@ function ListPageView({
         )}
         <PageLayout.Heading>{title}</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container maxWidth="full">
+      <PageLayout.Container width="fill">
         <Stack
           gap={4}
           minWidth={0}
@@ -162,11 +172,9 @@ function ListPageView({
           )}
           {ready && error && <ListPageErrorBanner {...error} />}
           {state === "loading" && <ListPageSkeleton />}
-          {state === "error" && <ListPageErrorBanner {...(error ?? MISSING_ERROR)} />}
-          {state === "empty" && <NoDataInfoBlock {...(empty ?? MISSING_EMPTY)} />}
-          {state === "no-results" && (
-            <ListPageNoResultsLine {...(noResults ?? MISSING_NO_RESULTS)} />
-          )}
+          {state === "error" && <ListPageErrorBanner {...error} />}
+          {state === "empty" && <NoDataInfoBlock {...empty} />}
+          {state === "no-results" && <ListPageNoResultsLine {...noResults} />}
           {ready && (
             <>
               <Box minWidth="0" overflowX="auto">
@@ -236,7 +244,7 @@ function LegacyListPage({
           {subtitle && <PageLayout.Subtitle>{subtitle}</PageLayout.Subtitle>}
         </Stack>
       </PageLayout.Header>
-      <PageLayout.Container maxWidth="full">
+      <PageLayout.Container width="fill">
         <Stack gap={4} minWidth={0}>
           {toolbar && <Box minWidth={0}>{toolbar}</Box>}
           {refreshing && !loading && (

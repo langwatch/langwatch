@@ -14,8 +14,18 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
+import { Check, Copy, ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { useCopyToClipboard } from "../../use-copy-to-clipboard.ts";
+
+/** Where an empty state sends the reader: never a dead end. */
+export type NoDataNext =
+  | { kind: "setting"; label: string; href: string }
+  | { kind: "docs"; label: string; href: string }
+  /** Copies `prompt` so the reader can paste it into their coding agent. */
+  | { kind: "agent-prompt"; prompt: string; label?: string }
+  | { kind: "action"; label: string; onClick: () => void };
 
 export type NoDataInfoBlockSize = "page" | "inline";
 
@@ -42,6 +52,8 @@ export interface NoDataInfoBlockBlockProps {
   children?: ReactNode;
   /** @deprecated ignored; the block has one colour. */
   color?: string;
+  /** The next step: a setting, a docs page, a prompt for a coding agent, or an action. */
+  next?: NoDataNext;
   testId?: string;
 }
 
@@ -50,6 +62,7 @@ export interface NoDataInfoBlockLineProps {
   size: "line";
   title: string;
   action?: { label: string; onClick: () => void };
+  next?: NoDataNext;
   testId?: string;
 }
 
@@ -68,7 +81,46 @@ const INLINE = {
 export const NoDataInfoBlock = (props: NoDataInfoBlockProps) =>
   props.size === "line" ? <NoDataLine {...props} /> : <NoDataBlock {...props} />;
 
-function NoDataLine({ title, action, testId }: NoDataInfoBlockLineProps) {
+function NoDataNextStep({ next }: { next: NoDataNext }) {
+  const { copied, copy } = useCopyToClipboard();
+  if (next.kind === "action") {
+    return (
+      <Button type="button" variant="plain" size="sm" color="fg" onClick={next.onClick}>
+        {next.label}
+      </Button>
+    );
+  }
+  if (next.kind === "agent-prompt") {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        data-next="agent-prompt"
+        onClick={() => copy(next.prompt)}
+      >
+        {copied ? <Check size={14} aria-hidden /> : <Copy size={14} aria-hidden />}
+        {copied ? "Copied" : (next.label ?? "Copy a prompt for your coding agent")}
+      </Button>
+    );
+  }
+  const docs = next.kind === "docs";
+  return (
+    <Link
+      href={next.href}
+      data-next={next.kind}
+      textStyle="sm"
+      color="fg.muted"
+      _hover={{ color: "fg" }}
+      {...(docs ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      {next.label}
+      {docs && <ExternalLink size={12} aria-hidden />}
+    </Link>
+  );
+}
+
+function NoDataLine({ title, action, next, testId }: NoDataInfoBlockLineProps) {
   return (
     <HStack gap={2} paddingY={2} data-testid={testId} data-size="line">
       <Text textStyle="sm" color="fg.muted">
@@ -79,6 +131,7 @@ function NoDataLine({ title, action, testId }: NoDataInfoBlockLineProps) {
           {action.label}
         </Button>
       )}
+      {next && <NoDataNextStep next={next} />}
     </HStack>
   );
 }
@@ -94,10 +147,11 @@ const NoDataBlock = ({
   bordered = true,
   docsInfo,
   children,
+  next,
   testId,
 }: NoDataInfoBlockBlockProps) => {
   const inline = size === "inline";
-  const actions = primaryAction ?? secondaryAction;
+  const actions = primaryAction ?? secondaryAction ?? next;
   const legacy = docsInfo ?? children;
   return (
     <Center
@@ -128,6 +182,7 @@ const NoDataBlock = ({
             <Box display="flex" gap={2} justifyContent="center" flexWrap="wrap" paddingTop={1}>
               {primaryAction}
               {secondaryAction}
+              {next && <NoDataNextStep next={next} />}
             </Box>
           )}
           {docsHref && (

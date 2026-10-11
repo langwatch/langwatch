@@ -81,9 +81,50 @@ export const Empty: Story = {
       icon: <Users />,
       title: "No operators yet",
       description: "Grant access to the first person who runs this installation.",
+      next: { kind: "action", label: "Grant access", onClick: () => void 0 },
     },
   },
 };
+/** Empty, pointing at the setting that turns it on. */
+export const EmptyWithSetting: Story = {
+  args: {
+    state: "empty",
+    empty: {
+      icon: <Users />,
+      title: "No operators yet",
+      description: "Grant access to the first person who runs this installation.",
+      next: { kind: "setting", label: "Open operator settings", href: "/settings/operators" },
+    },
+  },
+};
+/** Empty, pointing at the docs page that explains it. */
+export const EmptyWithDocs: Story = {
+  args: {
+    state: "empty",
+    empty: {
+      icon: <Users />,
+      title: "No operators yet",
+      description: "Grant access to the first person who runs this installation.",
+      next: { kind: "docs", label: "Read how operators work", href: "https://langwatch.ai/docs" },
+    },
+  },
+};
+/** Empty, offering a prompt to paste into a coding agent. */
+export const EmptyWithAgentPrompt: Story = {
+  args: {
+    state: "empty",
+    empty: {
+      icon: <Users />,
+      title: "No operators yet",
+      description: "Grant access to the first person who runs this installation.",
+      next: {
+        kind: "agent-prompt",
+        prompt: "Add LangWatch tracing to this project and grant me operator access.",
+      },
+    },
+  },
+};
+
 /** Records exist but the filters matched none; the toolbar stays so they can be cleared. */
 export const NoResults: Story = {
   args: {
