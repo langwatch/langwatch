@@ -68,6 +68,15 @@ Feature: The project.* browser namespace is served by the application the compos
     Then the name field says it is required, as on main
     And no organization update is sent
 
+  # The language and framework stay stored (onboarding picks snippets from them); settings
+  # stop showing and editing them.
+  @integration
+  Scenario: The project settings page asks nothing about the tech stack
+    Given somebody who manages a project with a stored language and framework
+    When the project settings page opens
+    Then it shows no tech stack field and no way to change it
+    And saving the page keeps the stored language and framework
+
   Scenario: A blank storage secret leaves the stored secret unchanged
     Given storage settings with a stored secret
     When the settings form is saved with an endpoint and a key id but a blank secret

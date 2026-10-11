@@ -75,6 +75,28 @@ describe("given an organization with a shared project", () => {
   });
 });
 
+describe("when the project settings page opens", () => {
+  /** @scenario The project settings page asks nothing about the tech stack */
+  it("shows no tech stack and saves the stored language and framework unchanged", async () => {
+    renderWithProjectHost(<ProjectGeneralScreen />);
+
+    expect(screen.queryByText("Tech stack")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Change" })).toBeNull();
+
+    fireEvent.change(screen.getByDisplayValue("Checkout assistant"), {
+      target: { value: "Renamed" },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Save changes" })[0]!);
+
+    await vi.waitFor(() => expect(calls.updateProject).toHaveBeenCalled());
+    expect(calls.updateProject.mock.calls[0]?.[0]).toMatchObject({
+      name: "Renamed",
+      language: "python",
+      framework: "openai",
+    });
+  });
+});
+
 describe("given the project in scope is somebody's personal workspace", () => {
   /**
    * The one the comment in the screen is emphatic about: a personal workspace

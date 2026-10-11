@@ -35,7 +35,6 @@ import {
   type UseFormRegister,
   useForm,
   useFormState,
-  useWatch,
 } from "react-hook-form";
 
 import { ProjectDepartmentField } from "../../../behavior/lent-peers.tsx";
@@ -46,8 +45,6 @@ import {
   type ProjectHostOrganization,
   type ProjectHostProject,
 } from "../../../model/project-host.ts";
-import { ProjectTechStackIcon } from "../../../ui/blocks/tech-stack.tsx";
-import { TechStackSelector } from "../../blocks/onboarding/tech-stack.tsx";
 import { SaveOnChangeSwitch, type SaveOutcome } from "../../blocks/save-on-change-switch.tsx";
 
 type OrganizationFormData = {
@@ -177,7 +174,7 @@ export default function ProjectSettingsScreen() {
   return <SettingsForm organization={organization} project={sharedProject} />;
 }
 
-/** Settings › Project › General: the project's own name, id, tech stack and switches. */
+/** Settings › Project › General: the project's own name, id and switches. */
 export function ProjectGeneralScreen() {
   const host = useProjectHost();
   const project = host.project();
@@ -578,8 +575,6 @@ function SettingsForm({
 
 type ProjectFormData = {
   name: string;
-  language: string;
-  framework: string;
   userLinkTemplate?: string;
   s3Endpoint?: string;
   s3AccessKeyId?: string;
@@ -597,8 +592,6 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
 
   const defaultValues = {
     name: project.name,
-    language: project.language,
-    framework: project.framework,
     userLinkTemplate: project.userLinkTemplate ?? "",
     s3Endpoint: project.s3Endpoint ?? "",
     s3AccessKeyId: project.s3AccessKeyId ?? "",
@@ -609,13 +602,9 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
   const form = useForm({
     defaultValues,
   });
-  const { register, handleSubmit, control, formState } = form;
-  // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
-  const language = useWatch({ control, name: "language" });
-  const framework = useWatch({ control, name: "framework" });
+  const { register, handleSubmit, formState } = form;
   const updateProject = projectApi.project.update.useMutation();
   const apiContext = projectApi.useUtils();
-  const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
   const [pendingSharingOff, setPendingSharingOff] = useState<{
     linkCount: number;
     outcome: SaveOutcome;
@@ -629,6 +618,9 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
       {
         projectId: project.id,
         ...data,
+        // No longer edited here; the update still carries the stored values.
+        language: project.language,
+        framework: project.framework,
         userLinkTemplate: data.userLinkTemplate ?? "",
         s3Endpoint: data.s3Endpoint ?? "",
         s3AccessKeyId: data.s3AccessKeyId ?? "",
@@ -755,33 +747,6 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
               projectId={project.id}
               governanceEnabled={governanceEnabled}
             />
-            <SettingsField
-              label="Tech stack"
-              hint="The project's language and framework."
-              error={
-                formState.errors.language || formState.errors.framework
-                  ? "Choose a language and framework"
-                  : undefined
-              }
-            >
-              {changeLanguageFramework ? (
-                <TechStackSelector form={form} language={language} framework={framework} />
-              ) : (
-                <HStack>
-                  <ProjectTechStackIcon project={project} />
-                  <Text textStyle="bodySm">
-                    {project.language} · {project.framework}
-                  </Text>
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    onClick={() => setChangeLanguageFramework(true)}
-                  >
-                    Change
-                  </Button>
-                </HStack>
-              )}
-            </SettingsField>
             <SettingsField
               label="Live presence"
               controlAlign="end"
