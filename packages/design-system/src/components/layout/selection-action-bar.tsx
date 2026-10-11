@@ -2,17 +2,7 @@ import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 
-/**
- * Floating selection action bar, pinned to the bottom-center of the
- * viewport: one shared shell so every bulk-selection surface looks the same.
- * UX contract: dev/docs/best_practices/selection-action-bar.md.
- */
-export function SelectionActionBar({
-  label,
-  onClear,
-  children,
-  testId,
-}: {
+export interface SelectionActionBarProps {
   /** Left-side content, usually the "N selected" count (string or node). */
   label: ReactNode;
   /** Clears the selection: the trailing X button. */
@@ -20,7 +10,14 @@ export function SelectionActionBar({
   /** Action buttons for the current selection, rendered after a divider. */
   children?: ReactNode;
   testId?: string;
-}) {
+}
+
+/**
+ * Floating selection action bar, pinned to the bottom-center of the
+ * viewport: one shared shell so every bulk-selection surface looks the same.
+ * UX contract: dev/docs/best_practices/selection-action-bar.md.
+ */
+export function SelectionActionBar({ label, onClear, children, testId }: SelectionActionBarProps) {
   return (
     <Box
       position="fixed"
