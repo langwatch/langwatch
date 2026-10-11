@@ -144,19 +144,3 @@ func TestRunSeedGivesEachRunItsOwnIDs(t *testing.T) {
 		t.Fatal("a later run, or the unsalted seed, replays the same ids")
 	}
 }
-
-func TestQueueLeftJudgesOnlyTheJobsPresentAtTheCut(t *testing.T) {
-	gq := "{event-sourcing/jobs}:gq:group:p1/fold/traceSummary/reactor/deferredOriginResolution/trace:a:jobs"
-	cut := map[string]struct{}{gq + " j1": {}, gq + " j2": {}, "q:wait #1x": {}}
-	now := map[string]struct{}{gq + " j2": {}, gq + " fresh": {}, "q:wait #1x": {}}
-	left := QueueLeft(cut, now)
-	if len(left) != 2 {
-		t.Fatalf("left = %v, want j2 and the list job; the fresh job is not the cut's", left)
-	}
-	if got := LeftByKind(left); got != "fold/traceSummary/reactor/deferredOriginResolution: 1; q:wait: 1" {
-		t.Errorf("by kind = %q", got)
-	}
-	if len(QueueLeft(cut, map[string]struct{}{gq + " fresh": {}})) != 0 {
-		t.Error("only fresh jobs wait, so the cut's jobs are drained")
-	}
-}

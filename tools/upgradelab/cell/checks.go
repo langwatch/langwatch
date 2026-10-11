@@ -43,7 +43,7 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Verdicts = append(cell.report.Verdicts,
 		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
-		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
+		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), queueVerdict(cell.report.Queue), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.ssoVerdicts(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.legacyVerdicts(ctx, final)...)
@@ -350,35 +350,69 @@ func lostVerdict(summaries []KindSummary) Verdict {
 
 func (cell *run) queueSummary(ctx context.Context) QueueSummary {
 	cell.queueMu.Lock()
-	samples := append([]QueueSample(nil), cell.queue...)
+	samples, reads := append([]QueueSample(nil), cell.queue...), cell.queueReads
 	cell.queueMu.Unlock()
-	summary := QueueSummary{Samples: samples, DrainedMs: -1, TopKeys: TopQueueKeys(ctx, cell.stores.RedisPort), ByKind: QueueByKind(ctx, cell.stores.RedisPort)}
-	cell.queueMu.Lock()
-	summary.CutJobs = len(cell.cutJobs)
-	cell.queueMu.Unlock()
-	if left, ok := cell.cutJobsStill(ctx); ok {
-		summary.Leftover = LeftByKind(left)
+	summary := summariseQueue(samples, cell.marks["fromWorkerPaused"], cell.marks["headWorkerStarted"])
+	summary.AtCut, summary.ReadErrors, summary.FirstError = cell.cutDepth, reads.failed, reads.first
+	summary.ByQueue = QueueBreakdown(ctx, cell.stores.RedisPort)
+	byKind, stop := context.WithTimeout(ctx, 2*time.Minute) // one SCAN of the group keys, bounded at a deep backlog
+	defer stop()
+	summary.ByKind = QueueByKind(byKind, cell.stores.RedisPort)
+	return summary
+}
+
+// queueReads counts failed depth reads and keeps the first, so a blind probe cannot read as an empty queue.
+type queueReads struct {
+	failed int
+	first  string
+}
+
+func (reads *queueReads) fail(err error) {
+	if reads.failed++; reads.first == "" {
+		reads.first = err.Error()
 	}
-	worker := cell.marks["headWorkerStarted"]
+}
+
+// queueSlack is the backlog live traffic keeps on top of the baseline; drainLimit is "around the baseline".
+const queueSlack = 100
+
+func drainLimit(baseline int) int { return baseline + max(queueSlack, baseline/4) }
+
+// queueBaseline is the deepest reading while main's worker still ran, before the cut paused it.
+func queueBaseline(samples []QueueSample, pausedAt int64) int {
+	baseline := 0
 	for _, sample := range samples {
-		if sample.AtMs < cell.marks["fromWorkerPaused"] {
-			summary.Baseline = max(summary.Baseline, sample.Depth)
+		if pausedAt > 0 && sample.AtMs < pausedAt {
+			baseline = max(baseline, sample.Depth)
 		}
+	}
+	return baseline
+}
+
+// summariseQueue finds the peak and the first reading after head's worker started that is back within the limit.
+func summariseQueue(samples []QueueSample, pausedAt, workerAt int64) QueueSummary {
+	summary := QueueSummary{Samples: samples, Baseline: queueBaseline(samples, pausedAt), DrainedMs: -1, Final: -1}
+	summary.Limit = drainLimit(summary.Baseline)
+	for _, sample := range samples {
 		if sample.Depth > summary.Peak {
 			summary.Peak, summary.PeakAtMs = sample.Depth, sample.AtMs
 		}
-		if summary.DrainedMs < 0 && sample.AtMs > worker && sample.Left == 0 {
-			summary.DrainedMs = sample.AtMs - worker
+		if summary.DrainedMs < 0 && workerAt > 0 && sample.AtMs >= workerAt && sample.Depth <= summary.Limit {
+			summary.DrainedMs = sample.AtMs - workerAt
 		}
+	}
+	if len(samples) > 0 {
+		summary.Final = samples[len(samples)-1].Depth
 	}
 	return summary
 }
 
-func (cell *run) queueVerdict() Verdict {
-	queue := cell.report.Queue
-	return verdict("N4", queue.DrainedMs >= 0,
-		fmt.Sprintf("%d jobs at the cut; all gone %d ms after the worker started (-1: never); baseline depth %d, peak %d at %d ms; left by kind: %q",
-			queue.CutJobs, queue.DrainedMs, queue.Baseline, queue.Peak, queue.PeakAtMs, queue.Leftover))
+// queueVerdict: the backlog fell back around the baseline after head's worker started, and stayed there at the end.
+func queueVerdict(queue QueueSummary) Verdict {
+	drained := queue.DrainedMs >= 0 && queue.Final >= 0 && queue.Final <= queue.Limit
+	return verdict("N4", drained,
+		fmt.Sprintf("group-queue jobs: baseline %d (limit %d), %d at the cut (-1: unread), peak %d at %d ms, within the limit %d ms after head's worker started (-1: never), %d at the end (-1: no reading); %d of %d reads failed%s",
+			queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.ReadErrors, queue.ReadErrors+len(queue.Samples), errSuffix(queue.FirstError)))
 }
 
 // opsVerdict: the Upgrades page answered a state, and after settle a finished one.

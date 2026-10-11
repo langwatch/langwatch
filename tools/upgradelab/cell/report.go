@@ -55,7 +55,8 @@ type KindSummary struct {
 	Failed     int    `json:"failed"`
 	Write      bool   `json:"write"`
 	Visible    int    `json:"visible"`
-	Lost       int    `json:"lost"` // answered 2xx, never visible
+	Lost       int    `json:"lost"`                // answered 2xx, never visible
+	Unchecked  bool   `json:"unchecked,omitempty"` // a stopped cell never asked the stores, so Visible and Lost mean nothing
 	MaxLatency int64  `json:"maxLatencyMs"`
 	FirstError string `json:"firstError,omitempty"`
 	// Upgrade-in-progress answers retried, the longest retry window, and every non-2xx seen on any attempt.
@@ -71,17 +72,20 @@ type PhaseStatuses struct {
 	Statuses map[string]int `json:"statuses"`
 }
 
-// QueueSummary is the waiting work: its peak and how long the jobs present at the cut took to drain once head's worker started.
+// QueueSummary is the group queues' waiting jobs over the run and when they fell back around the baseline.
 type QueueSummary struct {
-	Samples   []QueueSample `json:"samples"`
-	Baseline  int           `json:"baseline"`
-	Peak      int           `json:"peak"`
-	PeakAtMs  int64         `json:"peakAtMs"`
-	DrainedMs int64         `json:"drainedAfterWorkerMs"` // -1: never drained
-	TopKeys   string        `json:"topKeysAtEnd"`
-	CutJobs   int           `json:"jobsAtCut"`
-	Leftover  string        `json:"cutJobsLeftByKindAtEnd"`
-	ByKind    string        `json:"byKindAtEnd"` // waiting group-queue jobs per job kind, with when they are due
+	Samples    []QueueSample `json:"samples"`
+	Baseline   int           `json:"baseline"`   // deepest reading before the cut
+	Limit      int           `json:"drainLimit"` // "around the baseline": drainLimit(Baseline)
+	AtCut      int           `json:"depthAtCut"` // -1: unread
+	Peak       int           `json:"peak"`
+	PeakAtMs   int64         `json:"peakAtMs"`
+	DrainedMs  int64         `json:"drainedAfterWorkerMs"` // -1: never within the limit
+	Final      int           `json:"finalDepth"`           // -1: no reading
+	ReadErrors int           `json:"readErrors"`
+	FirstError string        `json:"firstReadError,omitempty"`
+	ByQueue    string        `json:"byQueueAtEnd"`
+	ByKind     string        `json:"byKindAtEnd"` // waiting group-queue jobs per job kind, with when they are due
 }
 
 // Shot is one screenshot and the Upgrades page state it showed.
@@ -175,7 +179,7 @@ func Summarize(calls []Call, timeline []PhaseChange, visible map[string]bool) ([
 	for _, call := range calls {
 		summary := kinds[call.Kind]
 		if summary == nil {
-			summary = &KindSummary{Kind: call.Kind, Write: call.Write}
+			summary = &KindSummary{Kind: call.Kind, Write: call.Write, Unchecked: visible == nil}
 			kinds[call.Kind] = summary
 		}
 		summary.add(call, visible)
@@ -213,7 +217,7 @@ func (summary *KindSummary) add(call Call, visible map[string]bool) {
 		return
 	}
 	summary.OK++
-	if !call.Write {
+	if !call.Write || visible == nil {
 		return
 	}
 	if visible[call.Kind+"/"+call.ID] {
@@ -256,11 +260,8 @@ func (report *Report) Markdown() string {
 			text.WriteString(peak.String() + "\n")
 		}
 	}
-	fmt.Fprintf(&text, "\nMarks (ms from start): %v\n\nQueue: baseline %d, peak %d at %d ms, drained %d ms after head's worker started\n\n",
-		report.Marks, report.Queue.Baseline, report.Queue.Peak, report.Queue.PeakAtMs, report.Queue.DrainedMs)
-	if report.Queue.ByKind != "" {
-		fmt.Fprintf(&text, "Waiting at the end, by job kind:\n\n```\n%s\n```\n\n", report.Queue.ByKind)
-	}
+	fmt.Fprintf(&text, "\nMarks (ms from start): %v\n\n", report.Marks)
+	report.Queue.write(&text)
 	for _, shot := range report.Shots {
 		fmt.Fprintf(&text, "- shot %s at %d ms: %s state %q %s\n", shot.Phase, shot.AtMs, shot.File, shot.State, shot.Error)
 	}
@@ -290,9 +291,58 @@ func (report *Report) writeTimeline(text *strings.Builder) {
 	}
 }
 
+// write renders the backlog: its figures, a sampled table over time and what waited at the end.
+func (queue QueueSummary) write(text *strings.Builder) {
+	fmt.Fprintf(text, "Queue (group-queue jobs): baseline %d, limit %d, at the cut %d, peak %d at %d ms, within the limit %d ms after head's worker started, %d at the end; %d failed reads\n\n",
+		queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.ReadErrors)
+	if rows := queueRows(queue.Samples, queueTableRows); len(rows) > 0 {
+		text.WriteString("| Ms from start | Waiting jobs |\n| --- | --- |\n")
+		for _, sample := range rows {
+			fmt.Fprintf(text, "| %d | %d |\n", sample.AtMs, sample.Depth)
+		}
+		text.WriteString("\n")
+	}
+	if queue.ByQueue != "" {
+		fmt.Fprintf(text, "Waiting at the end, by queue:\n\n```\n%s\n```\n\n", queue.ByQueue)
+	}
+	if queue.ByKind != "" {
+		fmt.Fprintf(text, "Waiting at the end, by job kind:\n\n```\n%s\n```\n\n", queue.ByKind)
+	}
+}
+
+const queueTableRows = 24
+
+// queueRows thins samples to about limit evenly spaced rows, always keeping the peak and the last.
+func queueRows(samples []QueueSample, limit int) []QueueSample {
+	if len(samples) <= limit {
+		return samples
+	}
+	peak := 0
+	for i, sample := range samples {
+		if sample.Depth > samples[peak].Depth {
+			peak = i
+		}
+	}
+	var rows []QueueSample
+	step := float64(len(samples)-1) / float64(limit-1)
+	for row, next := 0, 0; row < limit; row++ {
+		at := int(float64(row)*step + 0.5)
+		for ; next <= at; next++ {
+			if next == peak && next != at {
+				rows = append(rows, samples[next])
+			}
+		}
+		rows = append(rows, samples[at])
+	}
+	return rows
+}
+
 func writeCell(summary KindSummary, value int) string {
 	if !summary.Write {
 		return "-"
+	}
+	if summary.Unchecked {
+		return "unchecked"
 	}
 	return fmt.Sprint(value)
 }

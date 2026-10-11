@@ -71,7 +71,8 @@ type run struct {
 	poller             *Poller
 	queue              []QueueSample
 	queueMu            sync.Mutex
-	cutJobs            map[string]struct{} // jobs waiting when main's worker was paused (N4 judges these)
+	queueReads         queueReads // failed depth reads, so a blind probe shows in N4
+	cutDepth           int        // group-queue jobs waiting when main's worker was paused; -1 unread
 	marks              map[string]int64
 	shotsWG            sync.WaitGroup
 	atReady            []LedgerRow
@@ -145,7 +146,7 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	}
 	cell.runSteps(ctx, steps)
 	cell.finishTraffic()
-	cell.partialTraffic()
+	cell.partialChecks(ctx)
 	cell.noteLoad("end")
 	cell.reportLedger(ctx)
 	return cell.report, cell.write()
@@ -186,8 +187,9 @@ func (cell *run) announce(when string) {
 	fmt.Fprintf(cell.options.Stdout, "upgradelab: %s: open %s and sign in as %s for Ops > Upgrades\n", when, cell.url(), email)
 }
 
-// partialTraffic keeps what a stopped cell measured: calls and phases, writes unchecked.
-func (cell *run) partialTraffic() {
+// partialChecks keeps what a stopped cell measured: calls, phases, the backlog and the verdicts
+// that need no settled stores; writes stay unchecked.
+func (cell *run) partialChecks(ctx context.Context) {
 	if cell.report.Traffic != nil || cell.traffic == nil {
 		return
 	}
@@ -196,7 +198,21 @@ func (cell *run) partialTraffic() {
 		cell.report.Phases = cell.poller.Timeline()
 	}
 	cell.report.Traffic, cell.report.Timeline = Summarize(cell.allCalls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), nil)
-	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked, so Lost counts every 2xx write")
+	read, stop := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Minute) // a TERM cancelled ctx; the stores are still up
+	defer stop()
+	cell.report.Queue = cell.queueSummary(read)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.partialVerdicts()...)
+	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked (Visible and Lost read unchecked); only the verdicts that need no settled stores were judged")
+}
+
+// partialVerdicts are the checks a stopped cell can still judge from its traffic, phases and queue readings.
+func (cell *run) partialVerdicts() []Verdict {
+	verdicts := []Verdict{cell.holdingVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic),
+		ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), queueVerdict(cell.report.Queue)}
+	for index := range verdicts {
+		verdicts[index].Scenarios = scenarioIDs[verdicts[index].ID]
+	}
+	return verdicts
 }
 
 func prepare(options Options) (*run, error) {
@@ -225,7 +241,7 @@ func prepare(options Options) (*run, error) {
 		return nil, err
 	}
 	profile.NoAdminEmails = options.NoAdminEmails
-	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{})}
+	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{}), cutDepth: -1}
 	cell.report = &Report{Cell: options.Name(), Deployment: options.Deployment, Tier: options.Tier, Shape: options.Shape,
 		Release: options.Release, Head: options.HeadDir, HeadCommit: HeadCommit(options.HeadDir), Started: cell.origin.UTC().Format(time.RFC3339)}
 	return cell, nil
@@ -512,32 +528,26 @@ func sleep(ctx context.Context, span time.Duration) error {
 }
 
 func (cell *run) sampleQueueOnce(ctx context.Context) {
-	if depth, err := QueueDepth(ctx, cell.stores.RedisPort); err == nil {
-		left := cell.cutJobsLeft(ctx)
-		cell.queueMu.Lock()
-		cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth, Left: left})
-		cell.queueMu.Unlock()
-	}
-}
-
-// cutJobsLeft counts the jobs present at the cut that still wait; -1 on a read error, 0 before the cut.
-func (cell *run) cutJobsLeft(ctx context.Context) int {
-	left, ok := cell.cutJobsStill(ctx)
-	if !ok {
-		return -1
-	}
-	return len(left)
-}
-
-func (cell *run) cutJobsStill(ctx context.Context) ([]string, bool) {
+	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
 	cell.queueMu.Lock()
-	cut := cell.cutJobs
-	cell.queueMu.Unlock()
-	now, err := QueueJobs(ctx, cell.stores.RedisPort)
+	defer cell.queueMu.Unlock()
 	if err != nil {
-		return nil, false
+		cell.queueReads.fail(err)
+		return
 	}
-	return QueueLeft(cut, now), true
+	cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth})
+}
+
+// queueDrained reads the depth now and asks whether it is back around the pre-cut baseline.
+func (cell *run) queueDrained(ctx context.Context) bool {
+	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
+	if err != nil {
+		return false
+	}
+	cell.queueMu.Lock()
+	samples := append([]QueueSample(nil), cell.queue...)
+	cell.queueMu.Unlock()
+	return depth <= drainLimit(queueBaseline(samples, cell.marks["fromWorkerPaused"]))
 }
 
 func (cell *run) sampleQueue(ctx context.Context) {
@@ -556,12 +566,10 @@ func (cell *run) cut(ctx context.Context) error {
 	if err := sleep(ctx, cell.options.AtCut); err != nil {
 		return err
 	}
-	if jobs, err := QueueJobs(ctx, cell.stores.RedisPort); err == nil {
-		cell.queueMu.Lock()
-		cell.cutJobs = jobs
-		cell.queueMu.Unlock()
+	if depth, err := QueueDepth(ctx, cell.stores.RedisPort); err == nil {
+		cell.cutDepth = depth
 	} else {
-		cell.report.Notes = append(cell.report.Notes, "queue jobs at the cut: "+err.Error())
+		cell.report.Notes = append(cell.report.Notes, "queue depth at the cut: "+err.Error())
 	}
 	fingerprint, err := cell.fingerprint(ctx)
 	cell.before = fingerprint
@@ -795,21 +803,6 @@ func (cell *run) awaitReady(ctx context.Context) error {
 	return sleep(ctx, cell.options.AfterReady)
 }
 
-// grantOperator makes the seed account a platform operator on head: ADMIN_EMAILS grants nothing there.
-func (cell *run) grantOperator(ctx context.Context) {
-	defer close(cell.granted)
-	email, _ := generate.SeedAccount(cell.options.Seed)
-	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "src/main.ts", "grant-platform-operator", email) // #nosec G204 -- fixed argv.
-	command.Dir, command.Env = filepath.Join(cell.options.HeadDir, "apps", "tasks"), cell.envWith(nil)
-	out, err := command.CombinedOutput()
-	_ = os.WriteFile(cell.logPath("grant-operator"), out, 0o600)
-	if err != nil {
-		cell.report.Notes = append(cell.report.Notes, "grant-platform-operator: "+err.Error()+": "+tail(out))
-		return
-	}
-	_ = os.WriteFile(filepath.Join(cell.options.RunDir, "operator.granted"), nil, 0o600) // the walk signs in again
-}
-
 // assertOldWritersGone is the operator's act once the old release is stopped (rehearse.sh does the
 // same): from main, writers predate the serving roster, so needs-old-writers-gone steps otherwise
 // wait out the 30 min pre-roster grace, far past the settle window.
@@ -847,8 +840,7 @@ func (cell *run) settle(ctx context.Context) error {
 	cell.mark("trafficStopped")
 	err := waitFor(ctx, cell.options.SettleWithin, func() bool {
 		rows, err := Ledger(ctx, cell.stores)
-		left := cell.cutJobsLeft(ctx)
-		return err == nil && len(rows) > 0 && len(Outstanding(rows)) == 0 && left == 0
+		return err == nil && len(rows) > 0 && len(Outstanding(rows)) == 0 && cell.queueDrained(ctx)
 	})
 	cell.mark("settled")
 	if cell.stopSampler != nil {

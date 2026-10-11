@@ -140,42 +140,10 @@ func PhaseAt(timeline []PhaseChange, atMs int64) string {
 	return phase
 }
 
-// QueueSample is one reading of the waiting work.
+// QueueSample is one reading of the group queues' waiting jobs.
 type QueueSample struct {
 	AtMs  int64 `json:"atMs"`
 	Depth int   `json:"depth"`
-	Left  int   `json:"cutJobsLeft"` // jobs present at the cut still waiting; -1 unread
-}
-
-// QueueLeft is the jobs of cut still waiting in now.
-func QueueLeft(cut, now map[string]struct{}) []string {
-	var left []string
-	for job := range cut {
-		if _, ok := now[job]; ok {
-			left = append(left, job)
-		}
-	}
-	return left
-}
-
-// LeftByKind counts leftover jobs per job kind: the group key without tenant and aggregate, else the key.
-func LeftByKind(left []string) string {
-	counts := map[string]int{}
-	for _, job := range left {
-		key, _, _ := strings.Cut(job, " ")
-		if at := strings.Index(key, ":gq:group:"); at >= 0 {
-			if parts := strings.Split(strings.TrimSuffix(key[at+len(":gq:group:"):], ":jobs"), "/"); len(parts) >= 3 {
-				key = strings.Join(parts[1:len(parts)-1], "/")
-			}
-		}
-		counts[key]++
-	}
-	rows := make([]string, 0, len(counts))
-	for key, count := range counts {
-		rows = append(rows, fmt.Sprintf("%s: %d", key, count))
-	}
-	slices.Sort(rows)
-	return strings.Join(rows, "; ")
 }
 
 type queueKind struct {
