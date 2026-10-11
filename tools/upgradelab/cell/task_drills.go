@@ -454,7 +454,7 @@ func (cell *run) firstInstallFailDrill(ctx context.Context) (Verdict, error) {
 		Detail: fmt.Sprintf("while failed: %v; ready %t %s; after: %v", failed, ready, how, after)}, nil
 }
 
-// consoleFrontsAllButHealth: health answers without the console, every other probe shows it.
+// consoleFrontsAllButHealth: health answers without the console (/readyz its plain not-ready 503), every other probe shows it.
 func consoleFrontsAllButHealth(probes []string) bool {
 	if len(probes) == 0 {
 		return false
@@ -462,6 +462,9 @@ func consoleFrontsAllButHealth(probes []string) bool {
 	for _, probe := range probes {
 		health := strings.HasPrefix(probe, "/healthz ") || strings.HasPrefix(probe, "/readyz ")
 		if health == strings.Contains(probe, "console=true") {
+			return false
+		}
+		if strings.HasPrefix(probe, "/readyz ") && !strings.HasPrefix(probe, "/readyz 503 ") {
 			return false
 		}
 	}
