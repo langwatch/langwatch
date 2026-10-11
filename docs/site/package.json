@@ -12,7 +12,8 @@
     "test:session": "node scripts/session-smoke.mjs",
     "test:performance": "node scripts/performance-smoke.mjs",
     "size": "node scripts/performance-report.mjs",
-    "test:layout": "node scripts/layout-smoke.mjs"
+    "test:layout": "node scripts/layout-smoke.mjs",
+    "test:polish": "node scripts/polish-smoke.mjs"
   },
   "dependencies": {
     "@langwatch/design-system": "workspace:*",

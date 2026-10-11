@@ -62,6 +62,11 @@ async function measure({ directory }) {
         entryFiles({ name }),
       ),
     }),
+    ambientEnhancementGzip: await gzipFiles({ directory, files: entryFiles({ name: "ground" }) }),
+    contextMenusInteractionGzip: await gzipFiles({
+      directory,
+      files: entryFiles({ name: "context-menus" }),
+    }),
     searchInteractionGzip: await gzipFiles({ directory, files: entryFiles({ name: "search" }) }),
     playgroundInteractionGzip: await gzipFiles({
       directory,

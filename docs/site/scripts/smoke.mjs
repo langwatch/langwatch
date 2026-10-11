@@ -56,12 +56,11 @@ async function checkControls({ page, base }) {
   await page.locator("#docs-search-results a").first().waitFor();
   await page.keyboard.press("ArrowDown");
   assert.equal(
-    await page
-      .locator("#docs-search-results a")
-      .first()
-      .evaluate((element) => element === document.activeElement),
+    await page.getByRole("searchbox").evaluate((element) => element === document.activeElement),
     true,
   );
+  const activeResult = await page.getByRole("searchbox").getAttribute("aria-activedescendant");
+  assert.ok(await page.locator(`#${activeResult} a`).count());
   await page.keyboard.press("Escape");
   await page.goto(`${base}api-reference/traces/get-trace`);
   await page.getByRole("button", { name: "Try it", exact: true }).click();

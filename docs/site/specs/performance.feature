@@ -47,8 +47,10 @@ Feature: Static documentation with progressive interaction
   Scenario: Scroll a long API section naturally
     Given an API introduction is open at a desktop or phone width
     Then the document scrolls without an inner content panel
-    And the paper meets the header
-    And desktop navigation sticks beneath the header
+    And a gradient gap separates the header and rounded paper
+    And tall desktop rails flow with the document without an inner scrollbar
+    And short rails may stick beneath the header
+    And the full-width footer follows the panel and never clips navigation
     And Introduction and the section links start in view
     And operation names occupy no more than two lines
 
@@ -57,3 +59,30 @@ Feature: Static documentation with progressive interaction
     When a reader opens a guide with an accordion
     Then its content expands with keyboard activation
     And it collapses again without loading a page renderer
+
+  @e2e
+  Scenario: Use the shared command surface
+    When a reader opens search with the keyboard or search button
+    Then pages are grouped by section with matching headings and API methods
+    And arrow keys and Enter choose a result and Escape restores focus
+    And quick actions can change the theme and copy the page
+
+  @e2e
+  Scenario: Use clear contextual menus
+    When a reader opens the page or theme menu
+    Then page actions have readable titles and descriptions
+    And copying a page confirms success
+    And the theme menu marks the current choice
+
+  @e2e
+  Scenario: Start with a coding agent
+    When a reader chooses an agent and copies the setup prompt
+    Then the picker identifies the selected agent with its brand mark
+    And the complete authored prompt is copied with a success state
+    And reduced motion keeps the background static
+
+  @e2e
+  Scenario: Render brand marks during development
+    When a browser loads a brand SVG from the documentation dev server
+    Then the response declares its SVG image type
+    And the browser decodes the brand mark successfully

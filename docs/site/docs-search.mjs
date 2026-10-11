@@ -29,6 +29,7 @@ export function searchEntry({ nav, slug, html, headings }) {
   const meta = nav.pages[slug];
   return {
     slug,
+    ...(meta.openapi ? { method: meta.openapi.split(/\s+/)[0].toUpperCase() } : {}),
     title: meta.title,
     description: meta.description,
     ...searchTrail({ nav, slug }),

@@ -254,8 +254,9 @@ and self-hosted behaviour remain proposed scenarios, explicitly unimplemented.
 ## Static-first performance
 
 Pages are complete HTML with build-extracted, content-hashed design-system CSS.
-Chakra, Emotion, MDX and highlighting do not ship to readers. The bootstrap adds
-navigation and lazy controls; React loads only when search or Try it is opened.
+MDX and highlighting do not ship to readers. The bootstrap adds navigation and
+lazy controls. Search and contextual menus load the shared design-system runtime
+on interaction; reading and the API island do not need that runtime.
 See [Revision 4: performance](./DESIGN.md) for the boundaries and alternatives.
 
 Internal links prefetch on hover/focus, with a small viewport prefetch allowance.
@@ -285,3 +286,16 @@ checks static reading, navigation, prefetch, worker replacement, offline fallbac
 and credential isolation. `test:layout` checks 1280, 1440, 1670 and 390 pixel widths
 in light and dark. Run worker tests only against an isolated build: the update
 scenario temporarily changes that build’s `sw.js` and restores it afterwards.
+
+The page uses one document scroll: the floating content panel has a gradient gap
+above it, tall rails flow naturally, and the full-width footer sits outside it.
+Only a rail that fits the viewport becomes sticky. The ground shader is a separate
+idle enhancement; reduced motion keeps the static floor without loading it.
+
+```sh
+pnpm --filter @langwatch/docs-site test:polish --out-dir "$TMPDIR/docs-test-dist" --screenshots "$TMPDIR/docs-polish"
+```
+
+Pass `--before <previous-build>` to capture matching guide and agent-card baseline
+screenshots. The suite also exercises grouped command results, keyboard actions,
+contextual menus, theme selection and complete prompt copying.

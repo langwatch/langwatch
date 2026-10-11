@@ -42,16 +42,12 @@ function LeftRail({ children }: { children: ReactNode }) {
     >
       <Box
         className="docs-left-rail"
-        position="sticky"
-        top="var(--docs-header-h)"
-        height="calc(100vh - var(--docs-header-h))"
+        data-docs-rail=""
         display="flex"
         flexDirection="column"
-        overflowY="auto"
         paddingTop="6"
         paddingBottom="10"
         paddingX="4"
-        css={{ scrollbarWidth: "thin" }}
       >
         {children}
       </Box>
@@ -200,18 +196,17 @@ export function DocsShell({
         {showRail ? (
           <Box gridArea="toc" paddingTop="0" display={{ base: "none", xl: "block" }}>
             <Box
-              position="sticky"
-              top="var(--docs-header-h)"
+              className="docs-toc-rail"
+              data-docs-rail=""
               paddingTop="10"
               maxHeight="calc(100vh - var(--docs-header-h) - 3rem)"
-              overflowY="auto"
             >
               <TocRail entries={toc} />
             </Box>
           </Box>
         ) : null}
-        <SiteFooter />
       </Box>
+      <SiteFooter />
       <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} active={section} slug={slug} />
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </Box>

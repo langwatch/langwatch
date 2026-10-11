@@ -40,19 +40,6 @@
 .docs-menu :is(button, a):hover {
   background: var(--chakra-colors-bg-hover);
 }
-.docs-agent-start [aria-pressed] {
-  background: transparent;
-  color: var(--chakra-colors-fg);
-  border-color: var(--chakra-colors-border);
-}
-.docs-agent-start [aria-pressed="true"] {
-  background: var(--chakra-colors-fg);
-  color: var(--chakra-colors-bg-surface);
-  border-color: var(--chakra-colors-fg);
-}
-.docs-agent-start [aria-pressed="true"]:hover {
-  background: var(--chakra-colors-docs-body);
-}
 .docs-mobile-dialog {
   margin: 0;
   max-width: 100%;
@@ -80,85 +67,6 @@
   color: var(--chakra-colors-red-fg);
   font-size: 14px;
   margin-top: 12px;
-}
-.docs-search-dialog {
-  margin: 6rem auto auto;
-  width: min(640px, calc(100% - 32px));
-  max-height: min(640px, calc(100dvh - 128px));
-}
-.docs-search-input {
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
-  gap: 12px;
-  border-bottom: 1px solid var(--chakra-colors-border);
-}
-.docs-search-input input {
-  width: 100%;
-  min-width: 0;
-  height: 56px;
-  font-size: 16px;
-  background: transparent;
-  border: 0;
-  outline: none;
-}
-.docs-search-input button {
-  font-size: 13px;
-  min-height: 44px;
-}
-.docs-search-body {
-  overflow-y: auto;
-  max-height: 520px;
-  padding: 8px;
-}
-.docs-search-body p {
-  padding: 16px;
-  color: var(--chakra-colors-fg-muted);
-}
-#docs-search-results {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-#docs-search-results a {
-  display: block;
-  padding: 12px;
-  min-height: 64px;
-  border-radius: var(--chakra-radii-lg);
-  border-inline-start: 2px solid transparent;
-  text-decoration: none;
-}
-#docs-search-results a:focus,
-#docs-search-results a:hover {
-  background: var(--chakra-colors-accent-subtle);
-  border-color: var(--chakra-colors-accent-fg);
-  outline: none;
-}
-#docs-search-results strong {
-  display: block;
-  font-size: 14px;
-  line-height: 20px;
-}
-#docs-search-results span,
-#docs-search-results small {
-  display: block;
-  color: var(--chakra-colors-fg-muted);
-  font-size: 12px;
-  line-height: 20px;
-}
-.docs-search-description {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-@media (max-width: 48rem) {
-  .docs-search-dialog {
-    margin-top: 16px;
-    max-height: calc(100dvh - 32px);
-  }
-  .docs-search-body {
-    max-height: calc(100dvh - 100px);
-  }
 }
 .docs-request-error {
   color: var(--chakra-colors-red-fg);
@@ -233,8 +141,7 @@
   font-size: 13px;
 }
 .docs-response-content pre {
-  overflow: auto;
-  max-height: 33rem;
+  overflow-x: auto;
   padding: 16px;
   margin-top: 12px;
   background: var(--chakra-colors-bg-nested);

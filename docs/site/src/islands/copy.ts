@@ -27,8 +27,13 @@ async function copy({ button }: { button: HTMLButtonElement }) {
     await navigator.clipboard.writeText(await copyText({ button }));
     if (label) button.setAttribute("aria-label", "Copied");
     else button.textContent = button.hasAttribute("data-docs-prompt") ? "Prompt copied" : "Copied";
-    if (output) output.textContent = "Copied to clipboard";
+    button.dataset.copied = "true";
+    if (output)
+      output.textContent = button.hasAttribute("data-docs-prompt")
+        ? "Copied. Paste into your agent to start tracing."
+        : "Copied to clipboard";
     setTimeout(() => {
+      delete button.dataset.copied;
       button.innerHTML = original;
       if (label) button.setAttribute("aria-label", label);
     }, 2000);

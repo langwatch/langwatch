@@ -90,7 +90,7 @@ export function ResponseArea({
         </Text>
       </Flex>
       <CodeFrame>
-        <CodeBody source={source} expanded={false} />
+        <CodeBody source={source} />
       </CodeFrame>
     </Box>
   );

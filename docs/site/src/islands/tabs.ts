@@ -37,16 +37,6 @@ function onTabClick(event: MouseEvent) {
   if (!(event.target instanceof Element)) return;
   const tab = event.target.closest<HTMLElement>('[role="tab"]');
   if (tab) selectTab({ button: tab });
-  const expand = event.target.closest<HTMLElement>("[data-docs-expand]");
-  if (!expand) return;
-  const expanded = expand.getAttribute("aria-expanded") !== "true";
-  expand.setAttribute("aria-expanded", String(expanded));
-  expand.textContent = expanded ? "Collapse code" : "Expand code";
-  expand.parentElement?.parentElement
-    ?.querySelectorAll<HTMLElement>(".docs-code-region")
-    .forEach((region) => {
-      region.style.maxHeight = expanded ? "none" : "";
-    });
 }
 
 function onTabKey(event: KeyboardEvent) {

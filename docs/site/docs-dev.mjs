@@ -19,6 +19,7 @@ function devSearch({ docsRoot }) {
     const source = readFileSync(path.join(docsRoot, `${slug}.mdx`), "utf8");
     return {
       slug,
+      ...(meta.openapi ? { method: meta.openapi.split(/\s+/)[0].toUpperCase() } : {}),
       title: meta.title,
       description: meta.description,
       ...searchTrail({ nav, slug }),
@@ -57,6 +58,7 @@ function serveSource({ docsRoot, pathname, response, next }) {
   if (!file.startsWith(docsRoot + path.sep)) return next();
   if (!allowed || !existsSync(file)) return next();
   if (!statSync(file).isFile()) return next();
+  if (path.extname(file) === ".svg") response.setHeader("Content-Type", "image/svg+xml");
   createReadStream(file).pipe(response);
 }
 
@@ -109,7 +111,7 @@ async function serveDocument({ request, response, next, server, docsRoot }) {
     const sources = Object.fromEntries(
       ISLANDS.map((name) => [
         name,
-        `/src/islands/${name}.${["search", "playground"].includes(name) ? "tsx" : "ts"}`,
+        `/src/islands/${name}.${["search", "playground", "context-menus"].includes(name) ? "tsx" : "ts"}`,
       ]),
     );
     const html = template

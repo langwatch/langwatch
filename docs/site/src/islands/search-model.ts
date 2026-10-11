@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const searchEntrySchema = z.object({
   slug: z.string(),
+  method: z.string().default(""),
   title: z.string(),
   section: z.string(),
   description: z.string(),

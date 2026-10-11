@@ -1,5 +1,7 @@
 export const ISLANDS = [
   "controls",
+  "ground",
+  "context-menus",
   "copy",
   "tabs",
   "menus",

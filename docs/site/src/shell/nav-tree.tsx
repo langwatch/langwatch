@@ -77,7 +77,6 @@ function PageRow({
         textDecoration="none"
         color={active ? "accent.fg" : "nav.fg"}
         fontWeight={active ? "600" : "400"}
-        boxShadow={active ? "inset 2px 0 0 var(--chakra-colors-accent-fg)" : void 0}
         bg={active ? "accent.subtle" : undefined}
         _hover={{ bg: active ? "accent.subtle" : "bg.hover", textDecoration: "none" }}
       >

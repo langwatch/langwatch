@@ -1,8 +1,7 @@
 import { Box, Flex, Text } from "@langwatch/design-system/primitives";
-import { useState } from "react";
 import { z } from "zod";
 
-import { CodeBody, CopyAction, ExpandControl, sourceFromProps } from "./code-parts.tsx";
+import { CodeBody, CopyAction, sourceFromProps } from "./code-parts.tsx";
 import { languageName } from "./languages.ts";
 
 const TERMINAL_LANGUAGES = ["bash", "sh", "shell", "zsh", "console", "terminal", "shellscript"];
@@ -43,7 +42,6 @@ export function CodeBar({ children }: { children: React.ReactNode }) {
 /** A single fenced block: the pre-highlighted lines in a titled, copyable frame. */
 export function DocsCodeBlock(props: Record<string, unknown>) {
   const source = sourceFromProps(props);
-  const [expanded, setExpanded] = useState(false);
   if (source.lang === "mermaid") return <DocsMermaid {...props} />;
   const terminal = TERMINAL_LANGUAGES.includes(source.lang.toLowerCase());
   const title = source.title || (terminal ? "Terminal" : languageName({ lang: source.lang }));
@@ -69,12 +67,7 @@ export function DocsCodeBlock(props: Record<string, unknown>) {
           <CopyAction code={source.code} />
         </Box>
       )}
-      <CodeBody source={source} expanded={expanded} />
-      <ExpandControl
-        lines={source.lines.length}
-        expanded={expanded}
-        onToggle={() => setExpanded((value) => !value)}
-      />
+      <CodeBody source={source} />
     </CodeFrame>
   );
 }
@@ -116,7 +109,7 @@ function DocsMermaid(props: Record<string, unknown>) {
             </Text>
             <CopyAction code={source.code} />
           </CodeBar>
-          <CodeBody source={plain} expanded />
+          <CodeBody source={plain} />
         </CodeFrame>
       </details>
     </Box>

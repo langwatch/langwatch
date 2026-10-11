@@ -1,3 +1,5 @@
+import { prepareReadingLayout } from "./reading-layout.ts";
+
 let scheduled = false;
 function updateToc() {
   scheduled = false;
@@ -35,3 +37,5 @@ export function installToc() {
 }
 
 installToc();
+
+prepareReadingLayout();

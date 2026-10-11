@@ -1,22 +1,13 @@
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, Button, Flex, IconButton, Link, Text } from "@langwatch/design-system/primitives";
-import { ArrowUpRight, Menu as MenuIcon, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowUpRight, Command, Menu as MenuIcon, Search } from "lucide-react";
 
 import { site } from "../lib/nav-model.ts";
 import { GithubLink } from "./github-link.tsx";
 import { FRAME_MAX, GUTTER } from "./layout.ts";
 import type { PageKind } from "./layout.ts";
 import { ThemeMenu } from "./theme-menu.tsx";
-
-function useShortcutLabel() {
-  const [label, setLabel] = useState("⌘ K");
-  useEffect(() => {
-    if (!/Mac|iPhone|iPad/.test(navigator.platform)) setLabel("Ctrl K");
-  }, []);
-  return label;
-}
 
 export function Header({
   kind,
@@ -27,7 +18,6 @@ export function Header({
   onSearch: () => void;
   onMenu: () => void;
 }) {
-  const shortcut = useShortcutLabel();
   return (
     <Box
       as="header"
@@ -113,7 +103,15 @@ export function Header({
           <Text as="span" flex="1" textAlign="start" fontSize="14px">
             {site.searchPrompt}
           </Text>
-          <Kbd>{shortcut}</Kbd>
+          <span className="docs-shortcut" aria-hidden="true">
+            <Kbd>
+              <span data-docs-modifier="">Ctrl</span>
+            </Kbd>
+            <Kbd>K</Kbd>
+            <span data-docs-command-icon="" hidden>
+              <Command size={14} />
+            </span>
+          </span>
         </Button>
         <Flex
           alignItems="center"
@@ -153,7 +151,9 @@ export function Header({
           >
             Open app <ArrowUpRight size={15} aria-hidden="true" />
           </Link>
-          <ThemeMenu />
+          <Box data-docs-menu-root="theme">
+            <ThemeMenu />
+          </Box>
         </Flex>
       </Box>
     </Box>

@@ -77,7 +77,6 @@ export function SkillCard({
           <details>
             <summary>View prompt</summary>
             <CodeBody
-              expanded={false}
               source={{
                 lang: "text",
                 title: "Prompt",

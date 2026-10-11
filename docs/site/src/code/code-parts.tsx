@@ -15,7 +15,6 @@ export type CodeSource = {
 };
 
 const LINE_HEIGHT = "22px";
-const EXPAND_AFTER_LINES = 24;
 
 export function sourceFromProps(props: Record<string, unknown>): CodeSource {
   const lines = z
@@ -91,8 +90,7 @@ export function CopyAction({
 }
 
 /** The highlighted lines of one fence; both colour modes ride the same text via CSS variables. */
-export function CodeBody({ source, expanded }: { source: CodeSource; expanded: boolean }) {
-  const capped = source.lines.length > EXPAND_AFTER_LINES && !expanded;
+export function CodeBody({ source }: { source: CodeSource }) {
   return (
     <Box
       as="section"
@@ -106,8 +104,6 @@ export function CodeBody({ source, expanded }: { source: CodeSource; expanded: b
       minWidth="0"
       maxWidth="100%"
       overflowX="auto"
-      overflowY="auto"
-      maxHeight={capped ? { base: "22rem", md: "33rem" } : undefined}
       fontFamily="mono"
       fontSize="14px"
       lineHeight={LINE_HEIGHT}
@@ -128,34 +124,6 @@ export function CodeBody({ source, expanded }: { source: CodeSource; expanded: b
           ))}
         </code>
       </pre>
-    </Box>
-  );
-}
-
-export function ExpandControl({
-  lines,
-  expanded,
-  onToggle,
-}: {
-  lines: number;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  if (lines <= EXPAND_AFTER_LINES) return null;
-  return (
-    <Box borderTopWidth="1px" borderColor="border.nested" paddingX="3" paddingY="1">
-      <Button
-        type="button"
-        size="xs"
-        variant="ghost"
-        colorPalette="gray"
-        minHeight="40px"
-        data-docs-expand=""
-        onClick={onToggle}
-        aria-expanded={expanded}
-      >
-        {expanded ? "Collapse code" : "Expand code"}
-      </Button>
     </Box>
   );
 }

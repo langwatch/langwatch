@@ -79,7 +79,7 @@ export function createViteConfig({ sourceRoot = docsRoot, outDir = "dist" } = {}
               name,
               path.join(
                 siteRoot,
-                `src/islands/${name}.${["search", "playground"].includes(name) ? "tsx" : "ts"}`,
+                `src/islands/${name}.${["search", "playground", "context-menus"].includes(name) ? "tsx" : "ts"}`,
               ),
             ]),
           ),

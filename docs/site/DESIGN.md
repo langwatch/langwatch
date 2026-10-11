@@ -15,7 +15,7 @@ loader. Lightweight controls load on first interaction or after the page settles
 copy actions, themes, mobile navigation, code/status tabs, agent selection, media
 and contents tracking. They enhance the existing semantic HTML. Search and the
 API playground mount isolated React roots only on explicit interaction. Their
-native elements use extracted design-system variables; static control markup is
+API elements use extracted design-system variables; static control markup is
 not recreated in the browser. The API uses the existing request generator,
 validation and session-provider seam. No automatic request is sent on mount.
 Navigation disposes the API root, aborts pending work and clears credentials.
@@ -27,7 +27,8 @@ initial request. Whole-page hydration, Chakra in a lazy page bundle, runtime
 highlighting and a second client-side copy of MDX are rejected. Hydrating small
 static buttons with React would charge the renderer cost for no useful state, so
 those controls use browser event delegation instead. Module scripts give each
-island a separate entry without runtime CSS generation.
+island a separate entry. Reading needs no runtime CSS generation; the shared
+command and menu surfaces described below load their runtime on interaction.
 
 ## Navigation and deployment
 
@@ -60,12 +61,15 @@ See [MDN lifecycle guidance](https://developer.mozilla.org/en-US/docs/Web/API/Se
 
 ## Scroll layout
 
-The paper meets the header and extends through the document to its footer. Only
-side navigation and the contents rail have viewport-bounded sticky scrolling;
-main content and the API panel use document scrolling. The sidebar is 280 pixels
+The page has three document-flow regions: sticky header, a floating paper panel,
+and a full-width footer outside that panel. A 32-pixel desktop gap exposes the
+ambient ground above rounded paper corners. Tall navigation and contents rails
+flow with the document; only rails that fit the available viewport become sticky.
+Code, tables, prompts and API responses have no vertical scroll limit. The sidebar is 280 pixels
 wide with compact method badges. Operation labels occupy at most two lines, with
-full text retained for assistive technology and in the title. On navigation the
-sidebar starts at the top, scrolling only enough to reveal a deeper active page.
+full text retained for assistive technology and in the title. On arrival, the window scrolls only enough to reveal a deeper active page when
+there is no fragment or restored scroll position. The mobile drawer and command
+bar are overlays with bounded scrolling.
 
 ## Verification and budgets
 
@@ -75,3 +79,29 @@ reports raw and gzipped sizes and fails if bootstrap plus idle controls exceed
 client navigation, prefetch reuse, worker updates/offline fallback and a lazy API
 request. `test:layout` checks 1280/1440/1670/390 widths in both themes. Existing
 smoke and mock-session tests continue to cover the interactive surface.
+
+## Shared command surface and contextual controls
+
+Search uses the published CommandBarSurface, Input, Group, Item and Footer from
+the design system. The portal-based surface cannot be extracted as a closed
+static frame, so its React/Chakra runtime loads only when search is requested.
+The contextual Menu surfaces share that deferred runtime. No navigation-module
+browser code is imported. A docs-local result/action model leaves room for a
+future search mode without enabling Langy. Keyboard navigation keeps the caret
+in the search field and identifies its active result; Enter opens it, modifier
+Enter opens a new tab, modifier L copies its link, and Escape restores focus.
+
+The ambient shader uses the design system's framework-free export, in a separate
+idle chunk. Reduced motion loads no shader; visibility and theme changes dispose
+and remount its graphics resources. An opaque paper and footer protect body text.
+The static floor uses the marketing mesh palette and is present without scripts.
+
+Design-system candidates: Kbd size variants; CommandBarInput native input/ARIA
+props; semantic link/button command rows with a badge/secondary-line slot. The
+existing navigation catalogue, recent-item storage and Langy handoff remain owned
+by navigation and are not duplicated in docs.
+
+The page menu supports Markdown copy/view, Claude, ChatGPT and copying a link.
+Cursor, VS Code and MCP actions are omitted: docs.json lists their names but does
+not provide an install target or a supported page-handoff URL. Inventing those
+would produce a misleading action.

@@ -30,28 +30,6 @@ function openMobile() {
 
 function onMenuClick(event: MouseEvent) {
   const target = event.target instanceof Element ? event.target : null;
-  const trigger = target?.closest<HTMLElement>("[data-docs-theme], [data-docs-page-menu]");
-  if (trigger) {
-    const menu = trigger.nextElementSibling;
-    if (!(menu instanceof HTMLElement)) return;
-    const wasOpen = !menu.hidden;
-    closeMenus();
-    menu.hidden = wasOpen;
-    trigger.setAttribute("aria-expanded", String(!wasOpen));
-    if (!wasOpen) menu.querySelector<HTMLElement>("button,a")?.focus();
-    return;
-  }
-  const choice = target?.closest<HTMLElement>("[data-theme]");
-  if (choice?.dataset.theme) {
-    applyTheme({ choice: choice.dataset.theme });
-    choice
-      .closest(".docs-menu")
-      ?.querySelectorAll("[data-theme]")
-      .forEach((node) => node.setAttribute("aria-checked", String(node === choice)));
-    const trigger = choice.closest(".docs-menu")?.previousElementSibling;
-    if (trigger instanceof HTMLElement) trigger.focus();
-  }
-  closeMenus();
   if (target?.closest("[data-docs-mobile]")) openMobile();
   if (target?.closest("[data-docs-mobile-close]")) {
     const dialog = document.getElementById("docs-mobile-nav");

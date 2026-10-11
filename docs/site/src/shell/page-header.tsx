@@ -1,10 +1,9 @@
-import { Box, Button, Flex, Heading, IconButton, Text } from "@langwatch/design-system/primitives";
-import { Check, ChevronDown, Copy, ExternalLink, FileText, Link2 } from "lucide-react";
+import { Box, Button, Flex, Heading, Text } from "@langwatch/design-system/primitives";
+import { Check, Copy } from "lucide-react";
 
 import { useCopy } from "../lib/clipboard.ts";
 import type { PageKind } from "./layout.ts";
-
-const ORIGIN = "https://docs.langwatch.ai";
+import { PageMenu } from "./page-menu.tsx";
 
 async function readMarkdown({ slug }: { slug: string }): Promise<string> {
   const response = await fetch(`/${slug}.md`);
@@ -14,8 +13,6 @@ async function readMarkdown({ slug }: { slug: string }): Promise<string> {
 
 function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
   const { state, copy, ready } = useCopy();
-  const url = `${ORIGIN}/${slug}`;
-  const prompt = `Read ${url} and help me understand this page.`;
   return (
     <Flex alignItems="center" gap="2">
       <Flex>
@@ -45,48 +42,8 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
           )}
           {state === "copied" ? "Copied" : "Copy page"}
         </Button>
-        <Box position="relative">
-          <IconButton
-            data-docs-page-menu=""
-            type="button"
-            variant="outline"
-            colorPalette="gray"
-            size="sm"
-            height={{ base: "44px", xl: "34px" }}
-            minHeight={{ base: "44px", xl: "34px" }}
-            disabled={!ready}
-            aria-label="More page actions"
-            aria-haspopup="menu"
-            aria-expanded={false}
-            borderStartRadius="0"
-            marginInlineStart="-1px"
-          >
-            <ChevronDown size={16} />
-          </IconButton>
-          <div className="docs-menu" role="menu" aria-label="Page actions" hidden>
-            <a role="menuitem" href={`/${slug}.md`}>
-              <FileText size={16} /> View as Markdown
-            </a>
-            <a
-              role="menuitem"
-              href={`https://claude.ai/new?q=${encodeURIComponent(prompt)}`}
-              target="_blank"
-              rel="noopener"
-            >
-              <ExternalLink size={16} /> Open in Claude
-            </a>
-            <a
-              role="menuitem"
-              href={`https://chatgpt.com/?q=${encodeURIComponent(prompt)}`}
-              target="_blank"
-              rel="noopener"
-            >
-              <ExternalLink size={16} /> Open in ChatGPT
-            </a>
-            <button role="menuitem" type="button" data-docs-copy={url}>
-              <Link2 size={16} /> Copy page link
-            </button>
-          </div>
+        <Box data-docs-menu-root="page" data-slug={slug}>
+          <PageMenu slug={slug} />
         </Box>
       </Flex>
       {state === "failed" ? (

@@ -64,7 +64,7 @@ export function RequestExamples({ examples }: { examples: Record<string, CodeSou
             maxWidth="100%"
             overflow="hidden"
           >
-            <CodeBody source={examples[entry.id]} expanded />
+            <CodeBody source={examples[entry.id]} />
           </Tabs.Content>
         ))}
       </Tabs.Root>
@@ -157,7 +157,7 @@ function ResponseExampleBody({ response }: { response: Operation["responses"][nu
       </Box>
       {exampleCode ? (
         <Box marginTop="3" bg="bg.nested" borderTopWidth="1px" borderColor="border.nested">
-          <CodeBody source={plainSource({ code: exampleCode })} expanded={false} />
+          <CodeBody source={plainSource({ code: exampleCode })} />
         </Box>
       ) : (
         <Box height="3" />

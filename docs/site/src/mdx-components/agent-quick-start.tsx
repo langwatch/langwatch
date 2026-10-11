@@ -4,17 +4,36 @@ import { useState } from "react";
 
 import { useCopy } from "../lib/clipboard.ts";
 
-const AGENTS = ["Claude Code", "Codex", "Cursor"];
+const AGENTS = [
+  { name: "Claude Code", logo: "claude-code" },
+  { name: "Codex", logo: "codex" },
+  { name: "Cursor", logo: "cursor" },
+];
 
 function PromptPreview({ prompt }: { prompt: string }) {
   return (
     <Box borderWidth="1px" borderColor="border" borderRadius="lg" overflow="hidden" bg="bg.subtle">
-      <Box padding="4">
+      <Box padding="4" className="docs-prompt-terminal">
+        <Flex gap="2" alignItems="center" marginBottom="3" color="docs.lede" fontSize="12px">
+          <Terminal size={14} /> SETUP.md{" "}
+          <Text as="span" marginInlineStart="auto">
+            Ready for your agent
+          </Text>
+        </Flex>
         <Text as="div" fontSize="15px" lineHeight="26px" color="fg" fontWeight="500">
-          {prompt.split("\n")[0]}
+          <code>
+            <span className="docs-prompt-heading">{prompt.split("\n")[0]}</span>
+          </code>
         </Text>
         <Text as="div" fontSize="14px" lineHeight="24px" color="docs.lede" marginTop="1">
-          SDK setup, instrumentation and verification, ready for your coding agent.
+          <code>
+            <span className="docs-prompt-command">Instrument</span> this project with{" "}
+            <span className="docs-prompt-brand">LangWatch</span>.
+            <br />
+            <span className="docs-prompt-comment">
+              # Detect the SDK · add tracing · verify a trace
+            </span>
+          </code>
         </Text>
       </Box>
       <Box
@@ -44,8 +63,6 @@ function PromptPreview({ prompt }: { prompt: string }) {
           as="pre"
           tabIndex={0}
           aria-label="Full setup prompt"
-          maxHeight="240px"
-          overflowY="auto"
           whiteSpace="pre-wrap"
           overflowWrap="anywhere"
           padding="4"
@@ -70,7 +87,7 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
   const { state, copy, ready } = useCopy();
   return (
     <Box
-      className="docs-agent-start docs-raised"
+      className="docs-agent-start"
       borderWidth="1px"
       borderColor="border"
       borderRadius="xl"
@@ -89,7 +106,7 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
           instrument your code.
         </Text>
         <Flex as="fieldset" aria-label="Your coding agent" gap="2" wrap="wrap" marginBottom="5">
-          {AGENTS.map((name) => (
+          {AGENTS.map(({ name, logo }) => (
             <Button
               data-docs-agent={name}
               key={name}
@@ -106,7 +123,15 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
               borderColor={agent === name ? "fg" : "border"}
               _hover={{ bg: agent === name ? "docs.body" : "bg.hover" }}
             >
+              <img
+                src={`/images/logos/${logo}.svg`}
+                width={20}
+                height={20}
+                alt=""
+                className="docs-agent-logo"
+              />
               {name}
+              <Check size={14} className="docs-agent-check" aria-hidden="true" />
             </Button>
           ))}
         </Flex>
@@ -126,9 +151,9 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
           <Button
             width={{ base: "100%", md: "auto" }}
             minHeight="44px"
-            bg="fg"
-            color="bg.surface"
-            _hover={{ bg: "docs.body" }}
+            bg="docs.primary"
+            color="docs.primaryText"
+            _hover={{ bg: "docs.primaryHover" }}
             disabled={!ready}
             data-docs-prompt=""
             onClick={() => copy({ text: prompt })}

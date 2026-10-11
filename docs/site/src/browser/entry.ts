@@ -30,14 +30,15 @@ document.addEventListener("click", (event) => {
     ["[data-docs-search]", "search"],
     ["#try-it-button", "playground"],
     ["[data-docs-copy], [data-docs-page-copy], [data-docs-prompt]", "copy"],
-    ["[role=tab], [data-docs-expand]", "tabs"],
-    [
-      "[data-docs-theme], [data-docs-page-menu], [data-docs-mobile], [data-docs-mobile-close]",
-      "menus",
-    ],
+    ["[role=tab]", "tabs"],
+    ["[data-docs-theme], [data-docs-page-menu]", "context-menus"],
+    ["[data-docs-mobile], [data-docs-mobile-close]", "menus"],
     ["[data-docs-video]", "media"],
     ["[data-scope=accordion] button, [data-docs-tooltip]", "disclosures"],
-    ["button", "controls"],
+    [
+      '[data-docs-agent], [aria-label="Dismiss announcement"], nav[aria-label="Page navigation"] button[aria-expanded]',
+      "controls",
+    ],
   ];
   for (const [selector, name] of controls) {
     const trigger = event.target.closest<HTMLElement>(selector);
@@ -62,6 +63,7 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 const enhanceReading = () => {
   loadIsland({ name: "toc" });
   loadIsland({ name: "tabs" });
+  if (matchMedia("(prefers-reduced-motion: no-preference)").matches) loadIsland({ name: "ground" });
 };
 if ("requestIdleCallback" in window) window.requestIdleCallback(enhanceReading, { timeout: 1000 });
 else setTimeout(enhanceReading, 100);
@@ -73,3 +75,8 @@ for (const eventName of ["pointerover", "focusin"])
         : null;
     if (trigger) loadIsland({ name: "disclosures", trigger });
   });
+
+document.addEventListener("focusin", (event) => {
+  if (event.target instanceof Element && event.target.closest("[data-docs-search]"))
+    loadIsland({ name: "search" });
+});
