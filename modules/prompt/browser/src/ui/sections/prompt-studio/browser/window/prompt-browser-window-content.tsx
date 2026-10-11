@@ -251,7 +251,6 @@ function PromptBrowserWindowInner(props: {
               borderRight="1px solid"
               borderColor="border.muted"
               overflow="hidden"
-              boxShadow="md"
             >
               <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
                 <Box width="full" paddingX={3}>

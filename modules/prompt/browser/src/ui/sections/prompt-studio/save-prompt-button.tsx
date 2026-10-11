@@ -1,6 +1,7 @@
 import { Button } from "@langwatch/design-system/primitives";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useFormContext } from "react-hook-form";
+import { LuCheck } from "react-icons/lu";
 
 import { useLatestPromptVersion } from "../../../behavior/use-latest-prompt-version.ts";
 
@@ -55,6 +56,25 @@ export function SavePromptButton({
     if (nextVersion !== undefined) return `Update to v${nextVersion}`;
     return "Save";
   };
+
+  const isSaved = !hasUnsavedChanges && isAtLatestVersion;
+
+  if (isSaved && !isSaving) {
+    return (
+      <Button
+        variant="ghost"
+        size={size}
+        color="fg.muted"
+        disabled
+        title="Nothing to save"
+        _disabled={{ opacity: 1, cursor: "default" }}
+        data-testid="save-prompt-button"
+      >
+        <LuCheck />
+        Saved
+      </Button>
+    );
+  }
 
   return (
     <Button

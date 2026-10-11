@@ -101,10 +101,11 @@ export function PromptPlaygroundBrowser() {
                       onClick={() =>
                         tabbedWindow.activeTabId && handleSplit(tabbedWindow.activeTabId)
                       }
+                      size="sm"
                       disabled={!tabbedWindow.activeTabId}
                       title="Split tab to compare prompts side by side"
                     >
-                      <LuColumns2 size="18px" />
+                      <LuColumns2 size="16px" />
                       {!iconOnly && "Compare"}
                     </PageLayout.HeaderButton>
                   </Tooltip>

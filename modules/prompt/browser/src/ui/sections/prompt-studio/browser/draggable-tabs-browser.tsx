@@ -19,6 +19,7 @@ import {
   type TabsRootProps,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import React from "react";
 
 import { TabIdProvider } from "../studio-internals.ts";
@@ -210,6 +211,7 @@ function DraggableTabsWindow({
   onWindowClick,
   ...props
 }: DraggableTabsWindowProps) {
+  const accent = useProductAccent();
   const windowContextValue: TabWindowContextValue = {
     windowId,
     activeTabId,
@@ -226,7 +228,8 @@ function DraggableTabsWindow({
           height="full"
           display="flex"
           flexDirection="column"
-          variant="enclosed"
+          variant="line"
+          colorPalette={accent.colorPalette}
           lazyMount
           unmountOnExit
           {...props}
@@ -263,6 +266,7 @@ function DraggableTabsTabBar({ children, tabIds, ...props }: DraggableTabsTabBar
           gap={0}
           height="full"
           paddingY={0}
+          borderBottomWidth={0}
           background="none"
           // The strip, the switcher and the toolbar share one row. Without
           // this the switcher wraps onto a line of its own once the tabs fill

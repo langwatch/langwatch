@@ -287,11 +287,12 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
     <>
       <Tooltip content="Experiment" disabled={!iconOnly}>
         <PageLayout.HeaderButton
+          size="sm"
           onClick={() => setIsDialogOpen(true)}
           disabled={isDisabled}
           title={isDisabled ? "Open a prompt to create an experiment" : undefined}
         >
-          <FlaskConical size="18px" />
+          <FlaskConical size="16px" />
           {!iconOnly && "Experiment"}
         </PageLayout.HeaderButton>
       </Tooltip>

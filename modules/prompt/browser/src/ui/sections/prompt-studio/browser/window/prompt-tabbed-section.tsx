@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { type LlmConfigInputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -80,6 +81,7 @@ export function PromptTabbedSection({
   onDragEnd,
   onToggle,
 }: PromptTabbedSectionProps) {
+  const accent = useProductAccent();
   const form = useFormContext<PromptConfigFormValues>();
   const tabId = useTabId();
   const inputs = form.watch("version.configData.inputs") ?? [];
@@ -204,7 +206,8 @@ export function PromptTabbedSection({
       flexDirection="column"
       flex={1}
       width="full"
-      variant="subtle"
+      variant="line"
+      colorPalette={accent.colorPalette}
       size="sm"
       minHeight={0}
       paddingTop={1}
@@ -223,7 +226,7 @@ export function PromptTabbedSection({
         minHeight="32px"
         borderBottom={layoutMode === "horizontal" ? "1px solid" : undefined}
         borderColor={layoutMode === "horizontal" ? "border" : undefined}
-        paddingBottom={2}
+        paddingBottom={3}
       >
         <HStack
           width="full"
@@ -232,6 +235,7 @@ export function PromptTabbedSection({
           paddingX={3}
         >
           <Tabs.List
+            minWidth={0}
             display="flex"
             alignItems="center"
             gap={2}
@@ -272,7 +276,7 @@ export function PromptTabbedSection({
                     openDelay={0}
                   >
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
                       onClick={() => {
                         chatRef.current?.resetChat();
@@ -281,7 +285,6 @@ export function PromptTabbedSection({
                       aria-label="Reset chat"
                     >
                       <LuEraser />
-                      Reset chat
                     </Button>
                   </Tooltip>
                 )}
