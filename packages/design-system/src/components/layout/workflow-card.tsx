@@ -101,7 +101,10 @@ export type WorkflowCardDisplayProps = {
   children?: ReactNode;
 } & WorkflowCardBaseProps;
 
-/** A workflow as a card: icon, name or description, and when it last changed. */
+/**
+ * A workflow as a card: icon, name or description, and when it last changed.
+ * @deprecated Use `ResourceTile` from `@langwatch/design-system/resource-tile`. Goes in W-final.
+ */
 export function WorkflowCardDisplay({
   name,
   icon,

@@ -2,7 +2,12 @@ import { Box, Button, Link } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Database } from "lucide-react";
 
-import { NoDataInfoBlock } from "./no-data-info-block.tsx";
+import { NoDataInfoBlock, type NoDataInfoBlockBlockProps } from "./no-data-info-block.tsx";
+
+/** The block sizes, so the stories' args stay typed; `Line` renders the line size itself. */
+function NoDataInfoBlockSized(props: NoDataInfoBlockBlockProps) {
+  return <NoDataInfoBlock {...props} />;
+}
 
 const meta = {
   title: "Feedback/Empty state",
@@ -13,7 +18,7 @@ const meta = {
         "Wrapping it in Center or padding it; two solid buttons; children or docsInfo in new code. Still loading: Skeleton rows. A failure: Banner. A chart with no data: Chart empty state.",
     },
   },
-  component: NoDataInfoBlock,
+  component: NoDataInfoBlockSized,
   tags: ["autodocs"],
   args: {
     title: "No datasets yet",
@@ -28,7 +33,7 @@ const meta = {
     docsInfo: { control: false },
     children: { control: false },
   },
-} satisfies Meta<typeof NoDataInfoBlock>;
+} satisfies Meta<typeof NoDataInfoBlockSized>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -81,5 +86,15 @@ export const NarrowWidth: Story = {
     <Box maxWidth="260px" borderWidth="1px" borderColor="border.muted" borderRadius="md">
       <NoDataInfoBlock {...args} />
     </Box>
+  ),
+};
+
+export const Line: Story = {
+  render: () => (
+    <NoDataInfoBlock
+      size="line"
+      title="No replicas found."
+      action={{ label: "Clear filters", onClick: () => undefined }}
+    />
   ),
 };

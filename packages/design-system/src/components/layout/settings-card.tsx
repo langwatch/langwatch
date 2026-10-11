@@ -3,14 +3,22 @@
  * name and a chip in the header, the facts as name-left/value-right rows, and
  * the actions under them. Presentational only: no fetching, no module words.
  */
-import { Badge, Box, Card, chakra, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-export type SettingsTone = "ok" | "warning" | "bad" | "neutral";
+import { Card, type CardStatus } from "./card.tsx";
+
+export { StatusDot } from "./card.tsx";
+
+export type SettingsTone = CardStatus;
 
 /** A chip's tone, in the words the cards speak. */
 export type StatusChipTone = "neutral" | "good" | "warning" | "bad";
 
+/**
+ * @deprecated Use `Card` from `@langwatch/design-system/card`: `leading` is `icon`, `hint` is
+ * `description`, `tone` is `status`, `actions` is `footer`. Goes in W-final.
+ */
 export function SettingsCard({
   title,
   hint,
@@ -36,46 +44,21 @@ export function SettingsCard({
   "data-testid"?: string;
 }) {
   return (
-    <Card.Root
-      width="full"
-      height="full"
-      bg="bg.card"
-      borderColor="border.card"
+    <Card
+      title={title}
+      icon={leading}
+      description={hint}
+      status={tone}
+      badge={badge}
+      footer={actions}
       data-testid={testId}
     >
-      <Card.Body paddingX={4} paddingY={3.5}>
-        <VStack align="stretch" gap={2} height="full">
-          <VStack align="stretch" gap={0.5}>
-            <HStack width="full" gap={2} align="center">
-              {tone && <StatusDot tone={tone} />}
-              {leading && (
-                <Box color="fg.muted" display="flex" flexShrink={0}>
-                  {leading}
-                </Box>
-              )}
-              <Text as="h2" textStyle="cardTitle">
-                {title}
-              </Text>
-              <Spacer />
-              {badge}
-            </HStack>
-            {hint && (
-              <Text textStyle="caption" color="fg.muted">
-                {hint}
-              </Text>
-            )}
-          </VStack>
-
+      {children != null && (
+        <VStack align="stretch" gap={2}>
           {children}
-
-          {actions && (
-            <HStack gap={2} flexWrap="wrap" paddingTop={1.5}>
-              {actions}
-            </HStack>
-          )}
         </VStack>
-      </Card.Body>
-    </Card.Root>
+      )}
+    </Card>
   );
 }
 
@@ -163,42 +146,12 @@ export const SettingItem = chakra("div", {
   },
 });
 
-const DOT_COLOR: Record<SettingsTone, string> = {
-  ok: "green.solid",
-  warning: "orange.solid",
-  bad: "red.solid",
-  neutral: "fg.subtle",
-};
-
 const CHIP_PALETTE: Record<StatusChipTone, string> = {
   good: "green",
   warning: "orange",
   bad: "red",
   neutral: "gray",
 };
-
-/** A state before it is read; always beside a word saying the same thing. */
-export function StatusDot({
-  tone,
-  "data-testid": testId,
-}: {
-  tone: SettingsTone;
-  "data-testid"?: string;
-}) {
-  const background = DOT_COLOR[tone];
-
-  return (
-    <Box
-      width="6px"
-      height="6px"
-      borderRadius="full"
-      background={background}
-      flexShrink={0}
-      aria-hidden="true"
-      data-testid={testId}
-    />
-  );
-}
 
 /** A short state in words, washed in its tone. */
 export function StatusChip({

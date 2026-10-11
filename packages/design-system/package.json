@@ -271,6 +271,10 @@
       "types": "./dist/components/overlays/dialog.d.ts",
       "default": "./src/components/overlays/dialog.tsx"
     },
+    "./action-row": {
+      "types": "./dist/components/overlays/action-row.d.ts",
+      "default": "./src/components/overlays/action-row.tsx"
+    },
     "./display-formatters": {
       "types": "./dist/display-formatters.d.ts",
       "default": "./src/display-formatters.ts"
@@ -326,6 +330,10 @@
     "./pagination": {
       "types": "./dist/components/layout/pagination.d.ts",
       "default": "./src/components/layout/pagination.tsx"
+    },
+    "./load-more": {
+      "types": "./dist/components/layout/load-more.d.ts",
+      "default": "./src/components/layout/load-more.tsx"
     },
     "./popover": {
       "types": "./dist/components/overlays/popover.d.ts",
@@ -470,6 +478,14 @@
     "./settings-card": {
       "types": "./dist/components/layout/settings-card.d.ts",
       "default": "./src/components/layout/settings-card.tsx"
+    },
+    "./card": {
+      "types": "./dist/components/layout/card.d.ts",
+      "default": "./src/components/layout/card.tsx"
+    },
+    "./resource-tile": {
+      "types": "./dist/components/layout/resource-tile.d.ts",
+      "default": "./src/components/layout/resource-tile.tsx"
     },
     "./section-navigation-frame": {
       "types": "./dist/components/layout/section-navigation-frame.d.ts",

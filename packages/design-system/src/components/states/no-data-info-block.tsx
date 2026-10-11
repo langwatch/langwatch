@@ -1,15 +1,25 @@
 /**
- * The one empty state: icon, title, one sentence, at most one call to action. It owns its
- * height and centres itself, so a page never wraps it in a Center or pads it.
- * `page` fills a list page's body; `inline` sits in a settings band or under a table header.
+ * The one empty state: icon, title, one sentence, at most one call to action; it owns its height.
+ * `page` fills a list page's body; `inline` sits in a band or under a table header;
+ * `line` is one muted sentence where a list or a picker is empty.
  */
-import { Box, Center, EmptyState, Icon, Link, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Center,
+  EmptyState,
+  HStack,
+  Icon,
+  Link,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 
 export type NoDataInfoBlockSize = "page" | "inline";
 
-export interface NoDataInfoBlockProps {
+export interface NoDataInfoBlockBlockProps {
   title: string;
   description: string;
   icon: ReactNode;
@@ -35,6 +45,16 @@ export interface NoDataInfoBlockProps {
   testId?: string;
 }
 
+/** One muted sentence where a list or a picker is empty: "No replicas found." */
+export interface NoDataInfoBlockLineProps {
+  size: "line";
+  title: string;
+  action?: { label: string; onClick: () => void };
+  testId?: string;
+}
+
+export type NoDataInfoBlockProps = NoDataInfoBlockBlockProps | NoDataInfoBlockLineProps;
+
 const PAGE = { minHeight: "320px", flex: 1, alignSelf: "stretch", padding: 6 } as const;
 const INLINE = {
   minHeight: "160px",
@@ -45,7 +65,25 @@ const INLINE = {
   borderRadius: "md",
 } as const;
 
-export const NoDataInfoBlock = ({
+export const NoDataInfoBlock = (props: NoDataInfoBlockProps) =>
+  props.size === "line" ? <NoDataLine {...props} /> : <NoDataBlock {...props} />;
+
+function NoDataLine({ title, action, testId }: NoDataInfoBlockLineProps) {
+  return (
+    <HStack gap={2} paddingY={2} data-testid={testId} data-size="line">
+      <Text textStyle="sm" color="fg.muted">
+        {title}
+      </Text>
+      {action && (
+        <Button type="button" variant="plain" size="sm" color="fg" onClick={action.onClick}>
+          {action.label}
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+const NoDataBlock = ({
   title,
   description,
   icon,
@@ -57,7 +95,7 @@ export const NoDataInfoBlock = ({
   docsInfo,
   children,
   testId,
-}: NoDataInfoBlockProps) => {
+}: NoDataInfoBlockBlockProps) => {
   const inline = size === "inline";
   const actions = primaryAction ?? secondaryAction;
   const legacy = docsInfo ?? children;
