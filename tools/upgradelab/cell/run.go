@@ -370,13 +370,20 @@ func (cell *run) envWith(extra map[string]string) []string {
 	return Env(merged)
 }
 
+// fromEnvWith is envWith for main's processes, which read their log level from PINO_LOG_LEVEL.
+func (cell *run) fromEnvWith(extra map[string]string) []string {
+	merged := map[string]string{"PINO_LOG_LEVEL": "info"}
+	maps.Copy(merged, extra)
+	return cell.envWith(merged)
+}
+
 // fromSchema migrates the stores as the old release does before it serves (main: FromStartup).
 func (cell *run) fromSchema(ctx context.Context) error {
 	var log []byte
 	defer func() { _ = os.WriteFile(cell.logPath("from-schema"), log, 0o600) }()
 	for _, script := range FromStartup {
 		command := exec.CommandContext(ctx, "pnpm", append([]string{"-s", "run"}, script...)...) // #nosec G204 -- fixed argv.
-		command.Dir, command.Env = filepath.Join(cell.options.FromDir, "platform", "app"), cell.envWith(nil)
+		command.Dir, command.Env = filepath.Join(cell.options.FromDir, "platform", "app"), cell.fromEnvWith(nil)
 		out, err := command.CombinedOutput()
 		log = append(log, out...)
 		if err != nil {
@@ -391,8 +398,8 @@ func (cell *run) fromUp(ctx context.Context) error {
 	base := map[string]string{"PORT": itoa(cell.fromPort)}
 	worker := map[string]string{"PORT": itoa(cell.fromPort), "WORKER_METRICS_PORT": itoa(mustPort())}
 	for _, spec := range []ProcSpec{
-		{Name: "from-app", Args: FromAppArgs, Env: cell.envWith(base)},
-		{Name: "from-worker", Args: FromWorkerArgs, Env: cell.envWith(worker)},
+		{Name: "from-app", Args: FromAppArgs, Env: cell.fromEnvWith(base)},
+		{Name: "from-worker", Args: FromWorkerArgs, Env: cell.fromEnvWith(worker)},
 	} {
 		spec.Dir, spec.Log = dir, cell.logPath(spec.Name)
 		proc, err := Start(spec)

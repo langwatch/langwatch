@@ -385,7 +385,9 @@ func mainClientOutdated(record BrowserRecord, switched int64) bool {
 		strings.Contains(decoded, `"json":`)
 	socket := record.Kind == "http" && record.Status == http.StatusNotFound && strings.Contains(record.URL, "/api/trpc-ws")
 	refused := record.Kind == "console" && strings.Contains(record.Text, "status of 400")
-	return (enveloped || socket || refused) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+	told := record.Kind == "http" && record.Status == http.StatusBadRequest && strings.Contains(record.Text, "client_outdated")
+	logged := record.Kind == "console" && strings.HasPrefix(record.Text, "<< ") // main's tRPC logger echoing those refusals
+	return (enveloped || socket || refused || told || logged) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
 }
 
 // browserNoise is a console error or failed request the lab tolerates: every Match substring in the
@@ -418,6 +420,8 @@ func BrowserFindings(path string, switched, ready int64) (walks, expected int, t
 		case expectedWhileStepsRun(record, switched, ready):
 			expected++
 		case record.Kind == "walkerror":
+		case record.Kind == "navigated":
+			tolerated["the open tab navigated on its own between walks (told to reload)"]++
 		case mainTabAcrossSwitch(record, switched):
 			tolerated["/api/trpc-ws (main's tab, open across the switch, reconnecting)"]++
 		case mainPageAcrossSwitch(record, switched):

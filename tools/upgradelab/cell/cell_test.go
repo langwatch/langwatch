@@ -61,8 +61,8 @@ func TestEveryProfileRoutesToTheCellsOwnStores(t *testing.T) {
 		if !strings.Contains(env["ADMIN_EMAILS"], "seed+1@snapshot.test") {
 			t.Errorf("%s: the seed account is no platform operator: %q", name, env["ADMIN_EMAILS"])
 		}
-		if env["PINO_LOG_LEVEL"] != "info" {
-			t.Errorf("%s: releases log at %q, want info as cloud runs them", name, env["PINO_LOG_LEVEL"])
+		if env["LOG_LEVEL"] != "info" {
+			t.Errorf("%s: releases log at %q, want info as cloud runs them", name, env["LOG_LEVEL"])
 		}
 	}
 	hybrid, _ := BuildEnv(EnvInput{Profile: Profiles["hybrid"], Stores: stores, APIPort: 7100})

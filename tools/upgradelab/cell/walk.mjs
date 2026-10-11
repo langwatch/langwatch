@@ -37,7 +37,9 @@ const outsideAuth = (at) => !at.pathname.startsWith("/auth/");
 async function signIn(page) {
   await page.goto(`${url}/auth/signin`, { timeout: 30_000, waitUntil: "domcontentloaded" });
   const form = page
-    .locator('input[type="email"]:enabled, input[name="email"]:not([type="hidden"]):enabled')
+    .locator(
+      'input[type="email"]:enabled, input[name="email"]:not([type="hidden"]):enabled, input[autocomplete~="email"]:enabled, input[autocomplete~="username"]:enabled',
+    )
     .first();
   await Promise.race([
     form.waitFor({ timeout: 30_000 }),
@@ -73,6 +75,14 @@ async function openPage() {
       message.type() === "error" &&
       log({ kind: "console", step, url: page.url(), text: message.text().slice(0, 500) }),
   );
+  // A main-frame navigation while the walker naps is the app reloading itself (T1-F2).
+  page.on(
+    "framenavigated",
+    (frame) =>
+      frame === page.mainFrame() &&
+      step === "idle" &&
+      log({ kind: "navigated", step, url: frame.url(), text: "the page navigated on its own" }),
+  );
   page.on("pageerror", (error) =>
     log({ kind: "pageerror", step, url: page.url(), text: String(error).slice(0, 500) }),
   );
@@ -87,7 +97,9 @@ async function openPage() {
   page.on("response", async (response) => {
     if (response.status() < 400) return;
     const text =
-      response.status() === 503 ? (await response.text().catch(() => "")).slice(0, 300) : "";
+      response.status() === 503 || response.status() === 400
+        ? (await response.text().catch(() => "")).slice(0, 300)
+        : "";
     log({
       kind: "http",
       step,
@@ -110,6 +122,7 @@ try {
       if (!granted && existsSync(join(runDir, "operator.granted"))) {
         granted = true;
         project = "";
+        step = "regrant";
         // Off the signed-in page first, so nothing it still fetches goes out without the cookie.
         await page.goto("about:blank");
         await page.context().clearCookies();
@@ -196,6 +209,7 @@ try {
         await openPage().catch(() => undefined);
       }
     }
+    step = "idle";
     await nap(every);
   }
 } finally {

@@ -86,7 +86,7 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 			env[key] = value
 		}
 	}
-	env["PINO_LOG_LEVEL"] = "info" // as cloud runs both releases; unset, each logs at debug
+	env["LOG_LEVEL"] = "info" // as cloud runs head; main reads PINO_LOG_LEVEL (fromEnvWith), head warns on it
 	maps.Copy(env, operator)
 	maps.Copy(env, map[string]string{
 		"NODE_ENV": "production", "SKIP_ENV_VALIDATION": "true", // as the release image sets them
