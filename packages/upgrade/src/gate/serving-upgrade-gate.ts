@@ -15,6 +15,7 @@ import { upgradePlanSchema } from "../plan/plan-upgrade.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
+import { isPrivateTarget } from "../runner/schema-applier.ts";
 import { EXIT_CODES } from "../runner/upgrade-outcome.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
@@ -35,6 +36,7 @@ import {
   UPGRADE_RE_ASK_MS,
 } from "./serving-gate.ts";
 import { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
+import { startTargetCatchUp } from "./target-catch-up.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
@@ -196,6 +198,7 @@ export function upgradeGateOver({
             processId,
             release,
             warn,
+            catchUp: { upgrade: firstInstall, findLeaseHolder },
           }),
         }
       : {}),
@@ -500,6 +503,7 @@ function backgroundStepsOver({
   processId,
   release,
   warn,
+  catchUp,
 }: {
   postgres: UpgradePostgres;
   roster: Pick<ServingRoster, "oldWritersGoneFor">;
@@ -507,6 +511,8 @@ function backgroundStepsOver({
   processId: string;
   release: string | null;
   warn: ServingGateWarn;
+  /** Runs the upgrade again while a held private ClickHouse target is behind (T7-F1). */
+  catchUp: { upgrade: FirstInstallUpgrade; findLeaseHolder: UpgradeLeaseHolder };
 }) {
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
@@ -532,7 +538,24 @@ function backgroundStepsOver({
         identity: { owner: processId, image: release ?? "unreleased", host: hostname() },
         log,
       });
-      return startBackgroundSteps({ service, log });
+      const sweeping = startBackgroundSteps({ service, log });
+      const catchingUp = startTargetCatchUp({
+        findTargetsBehind: async () => {
+          if (!(await runner.ledgerExists())) return [];
+          const behind = (await ledger.findTargetsBehind()).map(({ target }) => target);
+          return [...new Set(behind.filter((target) => isPrivateTarget({ target })))];
+        },
+        findLeaseHolder: catchUp.findLeaseHolder,
+        upgrade: catchUp.upgrade,
+        warn: (message, fields) => warn(message, { processId, ...fields }),
+        maxMs: UPGRADE_RETRY_MAX_MS,
+      });
+      return {
+        stop: async () => {
+          await catchingUp.stop();
+          await sweeping.stop();
+        },
+      };
     },
   };
 }

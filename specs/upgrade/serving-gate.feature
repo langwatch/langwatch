@@ -176,3 +176,18 @@ Feature: Serving processes refuse to start when the installation is behind their
     Given the tasks process's installed modules booted over memory stores
     When `pnpm task upgrade steps --json` lists their migration steps
     Then the image's generated code step list, as the api and worker read it, names the same ids, kinds and modes in the same order
+
+  # A held private ClickHouse target catches up with no operator action (Alex, 2026-10-11, T7-F1).
+  @unit
+  Scenario: An admitted worker runs the upgrade again while a held private target is behind
+    Given an admitted worker and a private ClickHouse target the ledger records behind
+    And no upgrade run holds the lease
+    When the worker's catch-up pass comes round
+    Then it runs the upgrade once and its warning names the target
+    And while the target stays behind each later pass waits twice as long, up to five minutes
+
+  @unit
+  Scenario: An admitted worker with every ClickHouse target current runs no upgrade
+    Given an admitted worker and no ClickHouse target behind
+    When the worker's catch-up passes come round
+    Then it runs no upgrade

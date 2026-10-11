@@ -32,6 +32,8 @@ export {
 } from "./run-phases.ts";
 export {
   gooseAppliedStepIds,
+  isPrivateTarget,
+  PRIVATE_TARGET_PREFIX,
   type SchemaTargetReport,
   type UpgradeReconciler,
   type UpgradeRunnerLog,

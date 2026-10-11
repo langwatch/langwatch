@@ -36,6 +36,7 @@ import {
   createUpgradeRunner,
   formatPlan,
   gooseAppliedStepIds,
+  PRIVATE_TARGET_PREFIX,
   type SchemaTargetReport,
   redactSecrets,
   UPGRADE_NEXT_ACTION,
@@ -144,7 +145,8 @@ function clickhouseTargets({ environment }: TaskInput) {
   if (config.sharedUrl) targets.push({ name: "shared", url: config.sharedUrl });
   for (const endpoint of config.privateEndpoints) {
     if (targets.some((target) => target.url === endpoint.url)) continue;
-    targets.push({ name: `private:${endpoint.organizationId ?? "unknown"}`, url: endpoint.url });
+    const name = `${PRIVATE_TARGET_PREFIX}${endpoint.organizationId ?? "unknown"}`;
+    targets.push({ name, url: endpoint.url });
   }
   return { config, targets };
 }
@@ -253,15 +255,18 @@ async function migrateClickHouse({
   input,
   upTo,
   signal,
+  skipTargets,
 }: {
   input: TaskInput;
   upTo?: number;
   signal: AbortSignal;
+  /** Targets the runner holds back this run: a down private target is waited for once. */
+  skipTargets?: ReadonlySet<string>;
 }): Promise<SchemaTargetReport[]> {
   const { config, targets } = clickhouseTargets(input);
   const settings = config.settings;
   const reports: SchemaTargetReport[] = [];
-  for (const target of targets) {
+  for (const target of targets.filter(({ name }) => !skipTargets?.has(name))) {
     let error: string | null = null;
     try {
       await runMigrations(clickHouseRunOptions({ url: target.url, settings, upTo, signal }));
@@ -336,12 +341,12 @@ async function realignRewrittenChecksums({ input }: { input: TaskInput }): Promi
 function oneReleaseApplier({ input }: { input: TaskInput }): UpgradeSchemaApplier {
   let applied: readonly SchemaTargetReport[] | null = null;
   return {
-    async apply({ lockTimeoutMs, signal }) {
+    async apply({ lockTimeoutMs, signal, skipTargets }) {
       if (applied?.every((report) => report.ok)) return applied;
       await realignRewrittenChecksums({ input });
       applied = [
         await deployPrisma({ input, lockTimeoutMs, signal }),
-        ...(await migrateClickHouse({ input, signal })),
+        ...(await migrateClickHouse({ input, signal, skipTargets })),
       ];
       return applied;
     },
@@ -383,6 +388,7 @@ export type StepSchemaTo = (args: {
   gooseUpTo: number | null;
   lockTimeoutMs: number;
   signal: AbortSignal;
+  skipTargets?: ReadonlySet<string>;
 }) => Promise<SteppedSchema>;
 
 /** Said once, when the first schema to apply is older than the image's release. */
@@ -467,7 +473,7 @@ export function releaseSteppingApplier({
   return {
     ...onePass,
     async apply(args) {
-      const { release, lockTimeoutMs, signal } = args;
+      const { release, lockTimeoutMs, signal, skipTargets } = args;
       if (stepping === undefined) {
         stepping = release !== null && release !== imageRelease;
         if (stepping) say(steppingStartsLine({ imageRelease }));
@@ -475,7 +481,7 @@ export function releaseSteppingApplier({
       if (!stepping || release === null) return onePass.apply(args);
       const schema = releaseSchemaUpTo({ release, manifests });
       say(stepToLine({ release, ...schema }));
-      const stepped = await stepTo({ release, ...schema, lockTimeoutMs, signal });
+      const stepped = await stepTo({ release, ...schema, lockTimeoutMs, signal, skipTargets });
       say(steppedLine({ release, stepped }));
       return stepped.reports;
     },
@@ -534,10 +540,10 @@ async function stepPrisma({
 
 /** Postgres up to the release, then ClickHouse once a release up to it carries a goose version. */
 function stepSchemaTo({ input }: { input: TaskInput }): StepSchemaTo {
-  return async ({ release, prismaFolders, gooseUpTo, lockTimeoutMs, signal }) => {
+  return async ({ release, prismaFolders, gooseUpTo, lockTimeoutMs, signal, skipTargets }) => {
     const postgres = await stepPrisma({ input, release, prismaFolders, lockTimeoutMs, signal });
     if (!postgres.reports.every((report) => report.ok) || gooseUpTo === null) return postgres;
-    const clickhouse = await migrateClickHouse({ input, upTo: gooseUpTo, signal });
+    const clickhouse = await migrateClickHouse({ input, upTo: gooseUpTo, signal, skipTargets });
     return { ...postgres, reports: [...postgres.reports, ...clickhouse] };
   };
 }
@@ -547,6 +553,7 @@ function reconcilers({ input }: { input: TaskInput }): UpgradeReconciler[] {
   return [
     ...targets.map((target) => ({
       name: `clickhouse-ttl:${target.name}`,
+      target: target.name,
       run: () =>
         reconcileTTL({
           connectionUrl: target.url,

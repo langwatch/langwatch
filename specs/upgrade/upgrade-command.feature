@@ -47,15 +47,49 @@ Feature: The upgrade command
     And its message names "20261001000000_broken"
     And its message gives the command "prisma migrate resolve --rolled-back 20261001000000_broken"
 
+  # Each ClickHouse target upgrades on its own (Alex, 2026-10-11, T7-F1): a private target that
+  # fails holds only its organizations; the shared target and the release go on.
   @integration
-  Scenario: A failing private ClickHouse target fails the run and is recorded per target
-    Given a ClickHouse step the image declares and two targets, "shared" and "private:org_1"
-    And the applier applies it on "shared" and fails on "private:org_1"
+  Scenario: A failing private ClickHouse target is held while the release goes on
+    Given two ClickHouse steps the image declares and two targets, "shared" and "private:org_1"
+    And the applier applies them on "shared" and fails on "private:org_1"
+    When the upgrade runs with retries allowed
+    Then it exits with code 0
+    And the ledger records both steps on "shared" as done
+    And on "private:org_1" the first step failed with the error and the second pending
+    And both steps themselves are recorded done, so the serving gate admits the image
+    And "private:org_1" was asked once, never retried in the same run
+    And the installation reads "needs attention" with one failed target
+
+  @integration
+  Scenario: A held private ClickHouse target catches up on the next pass
+    Given an upgrade that held "private:org_1"
+    And "private:org_1" answers again
+    When the upgrade runs again with nothing else to apply
+    Then it applies the image's ClickHouse steps on "private:org_1"
+    And every step reads done on both targets and no target is behind
+    And the installation no longer counts a failed target
+
+  @integration
+  Scenario: A held private ClickHouse target still down stays held and the pass succeeds
+    Given an upgrade that held "private:org_1", still down
+    When the upgrade runs again with nothing else to apply
+    Then it asks the applier once for every shipped step and exits with code 0
+    And the private target's rows stay failed
+
+  @integration
+  Scenario: A failing shared ClickHouse target fails the run
+    Given a ClickHouse step and two targets, "shared" and "private:org_1"
+    And the applier fails on "shared"
     When the upgrade runs
     Then it exits with code 1
-    And the ledger records the step on "shared" as done and on "private:org_1" as failed with the error
-    And the step itself is recorded failed
-    And the run is recorded failed
+    And the step and the run are recorded failed
+
+  @unit
+  Scenario: Every ClickHouse target failing fails the run as before
+    Given only private ClickHouse targets, every one failing
+    When the runner decides which targets to hold
+    Then it holds none, so the failure fails the run
 
   @integration
   Scenario: An installation on any older release rolls through every step to the image

@@ -282,6 +282,15 @@ export class UpgradeLedgerRepository {
     return rows.map((row) => upgradeTargetSchema.parse(row));
   }
 
+  /** Every ClickHouse step a target has not applied yet: a held private target's backlog. */
+  async findTargetsBehind(): Promise<UpgradeTarget[]> {
+    const { rows } = await this.query<object>(
+      (t) => `SELECT ${TARGET_COLUMNS} FROM ${t.target}
+        WHERE "status" <> 'done' AND "step_id" LIKE 'clickhouse:%' ORDER BY "target", "step_id"`,
+    );
+    return rows.map((row) => upgradeTargetSchema.parse(row));
+  }
+
   /**
    * Takes the named lease when nobody holds it or the holder's has expired, in one statement, on
    * the database clock. Answers the lease, or null when a live holder keeps it.

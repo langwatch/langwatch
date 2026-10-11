@@ -117,6 +117,16 @@ A background step that fails does not fail a deploy, because it runs on the
 worker after the rollout. It surfaces through metrics and alerts, and the step
 stays `failed` in the ledger until a later build fixes it.
 
+A private ClickHouse target that fails or cannot be reached does not fail the run
+either (Alex, 2026-10-11). Each ClickHouse target upgrades on its own: the shared
+target and every healthy private target finish their steps and the release becomes
+ready. The run waits for the failing target once, then holds it: its target rows
+stay `failed` or `pending`, and Ops > Upgrades reads "Needs attention" with the
+target on the Dataplanes tab. Only that target's organizations wait. Once it
+answers, an admitted worker runs the upgrade again (every minute, slowing to every
+five while it stays down) and the target catches up with no operator action. A
+failing shared target still fails the run.
+
 ## Reading the console
 
 Every line `pnpm task upgrade` writes names its `phase`, what it is waiting on
@@ -213,7 +223,8 @@ branded page while an upgrade blocks, so the operator signals below are the only
 4. Pre-build the `AuditLog` and `GatewayRealtimeSession` indexes concurrently, as under "Long
    blocking steps". Pre-apply the hot-table `ALTER`s in a quiet window.
 5. Check that the database role can `CREATE` the `<schema>_upgrade_ledger` schema, that every
-   private ClickHouse target answers, and that the ClickHouse migration user's
+   private ClickHouse target answers (one that does not is held, so only its organizations
+   wait), and that the ClickHouse migration user's
    `mutations_sync` is 0, because migration 00103 runs a `MATERIALIZE INDEX` mutation.
 6. On the OLD image's Deployment, for the window, set the old image's own skip switches
    (`SKIP_PRISMA_MIGRATE`, `SKIP_CLICKHOUSE_MIGRATE`, `SKIP_LWQL_PROVISION`) so restarting old

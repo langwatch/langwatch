@@ -9,6 +9,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { assertCurrent } from "../../gate/serving-gate.ts";
 import { createLedgerTables } from "../../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../../ledger.repository.ts";
 import type { ManifestStep, ReleaseManifest } from "../../manifest/manifest.ts";
@@ -103,15 +104,17 @@ function fakeApplier({
   failOn?: string[];
   failOnce?: boolean;
   during?: () => Promise<void>;
-}): UpgradeSchemaApplier & { calls: (string | null)[]; order: string[] } {
+}): UpgradeSchemaApplier & { calls: (string | null)[]; order: string[]; asked: string[] } {
   const goose = new Map(targets.map((target) => [target, new Set<string>()]));
   let pendingFailure = failOnce;
   const order: string[] = [];
   const calls: (string | null)[] = [];
+  const asked: string[] = [];
   return {
     calls,
     order,
-    async apply({ release }) {
+    asked,
+    async apply({ release, skipTargets }) {
       calls.push(release);
       order.push("schema");
       await during?.();
@@ -131,6 +134,8 @@ function fakeApplier({
         { engine: "postgres", target: "postgres", ok: true, error: null },
       ];
       for (const [target, applied] of goose) {
+        if (skipTargets?.has(target)) continue;
+        asked.push(target);
         const failing = failOn.includes(target);
         if (!failing)
           for (const s of steps.filter((s) => s.id.startsWith("clickhouse:"))) applied.add(s.id);
@@ -318,28 +323,6 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
         },
       });
       expect(applier.calls).toEqual([]);
-    });
-  });
-
-  describe("when a private ClickHouse target fails", () => {
-    /** @scenario "A failing private ClickHouse target fails the run and is recorded per target" */
-    it("records each target, fails the step and the run", async () => {
-      const applier = fakeApplier({
-        release: "3.20.1",
-        targets: ["shared", "private:org_1"],
-        failOn: ["private:org_1"],
-      });
-      const outcome = await run(runnerFor({ release: "3.20.1", applier }));
-      expect(outcome).toMatchObject({ exitCode: 1, code: "schema_failed" });
-      const targets = await ledger().findTargets({ stepId: "clickhouse:00001" });
-      expect(
-        targets.map(({ target, status, lastError }) => ({ target, status, lastError })),
-      ).toEqual([
-        { target: "private:org_1", status: "failed", lastError: "Code: 210. Connection refused" },
-        { target: "shared", status: "done", lastError: null },
-      ]);
-      expect(await statusOf("clickhouse:00001")).toBe("failed");
-      expect((await ledger().findRuns()).at(-1)?.outcome).toBe("failed");
     });
   });
 
@@ -1025,6 +1008,109 @@ describe.skipIf(!DB_URL)("the upgrade runner on an unfinished or stale ledger", 
       expect(await statusOf("clickhouse:00001")).not.toBe("done");
       const upgrades = (await ledger().findRuns()).filter((r) => r.kind === "upgrade");
       expect(upgrades.map((r) => r.outcome)).toEqual(["failed"]);
+    });
+  });
+});
+
+describe.skipIf(!DB_URL)("the upgrade runner over a private ClickHouse target", () => {
+  describe("when a private ClickHouse target fails", () => {
+    const rowsOf = async (stepId: string) =>
+      (await ledger().findTargets({ stepId })).map(({ target, status, lastError }) => ({
+        target,
+        status,
+        lastError,
+      }));
+
+    /** @scenario "A failing private ClickHouse target is held while the release goes on" */
+    it("finishes the shared target and the release, and holds only the private target", async () => {
+      const applier = fakeApplier({
+        release: "3.21.0",
+        targets: ["shared", "private:org_1"],
+        failOn: ["private:org_1"],
+      });
+      const runner = runnerFor({
+        release: "3.21.0",
+        applier,
+        retry: { attempts: 3, backoffMs: 1 },
+      });
+      const outcome = await run(runner);
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      expect(await statusOf("clickhouse:00001")).toBe("done");
+      expect(await statusOf("clickhouse:00002")).toBe("done");
+      expect(await rowsOf("clickhouse:00001")).toEqual([
+        { target: "private:org_1", status: "failed", lastError: "Code: 210. Connection refused" },
+        { target: "shared", status: "done", lastError: null },
+      ]);
+      expect(await rowsOf("clickhouse:00002")).toEqual([
+        { target: "private:org_1", status: "pending", lastError: null },
+        { target: "shared", status: "done", lastError: null },
+      ]);
+      expect(applier.asked.filter((target) => target === "private:org_1")).toHaveLength(1);
+      const blockingSteps = shippedUpTo("3.21.0")
+        .filter((each) => each.mode === "blocking")
+        .map((each) => each.id);
+      const verdict = assertCurrent({
+        ledger: { steps: await ledger().findSteps() },
+        image: { release: "3.21.0", blockingSteps },
+      });
+      expect(verdict).toEqual({ admitted: true, outcome: "current" });
+      expect(await runner.status()).toMatchObject({
+        state: "needs-attention",
+        reason: "failed-target",
+        failedTargets: 1,
+      });
+    });
+
+    /** @scenario "A held private ClickHouse target catches up on the next pass" */
+    it("applies the private target's backlog once it answers, and the attention clears", async () => {
+      const failOn = ["private:org_1"];
+      const applier = fakeApplier({
+        release: "3.21.0",
+        targets: ["shared", "private:org_1"],
+        failOn,
+      });
+      await run(runnerFor({ release: "3.21.0", applier }));
+      failOn.length = 0;
+      const runner = runnerFor({ release: "3.21.0", applier });
+      const outcome = await run(runner);
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      for (const id of ["clickhouse:00001", "clickhouse:00002"]) {
+        expect(await rowsOf(id)).toEqual([
+          { target: "private:org_1", status: "done", lastError: null },
+          { target: "shared", status: "done", lastError: null },
+        ]);
+      }
+      expect(await ledger().findTargetsBehind()).toEqual([]);
+      expect((await runner.status()).failedTargets).toBe(0);
+    });
+
+    /** @scenario "A held private ClickHouse target still down stays held and the pass succeeds" */
+    it("leaves the rows held and the run succeeded", async () => {
+      const applier = fakeApplier({
+        release: "3.21.0",
+        targets: ["shared", "private:org_1"],
+        failOn: ["private:org_1"],
+      });
+      await run(runnerFor({ release: "3.21.0", applier }));
+      const outcome = await run(runnerFor({ release: "3.21.0", applier }));
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      expect(applier.calls).toEqual(["3.21.0", null]);
+      expect((await rowsOf("clickhouse:00001"))[0]).toMatchObject({ status: "failed" });
+    });
+  });
+
+  describe("when the shared ClickHouse target fails beside a private one", () => {
+    /** @scenario "A failing shared ClickHouse target fails the run" */
+    it("fails the step and the run, holding nothing", async () => {
+      const applier = fakeApplier({
+        release: "3.20.1",
+        targets: ["shared", "private:org_1"],
+        failOn: ["shared"],
+      });
+      const outcome = await run(runnerFor({ release: "3.20.1", applier }));
+      expect(outcome).toMatchObject({ exitCode: 1, code: "schema_failed" });
+      expect(await statusOf("clickhouse:00001")).toBe("failed");
+      expect((await ledger().findRuns()).at(-1)?.outcome).toBe("failed");
     });
   });
 });

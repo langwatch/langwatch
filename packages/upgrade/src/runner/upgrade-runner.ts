@@ -32,6 +32,7 @@ import {
   type ContractArchiveEntry,
   ContractArchiveService,
 } from "./contract-archive/contract-archive.service.ts";
+import { blocksRelease, type HeldTargets, newlyHeld, withHeldReports } from "./held-targets.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
 import { redactSecrets, resolveCommand, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
@@ -41,11 +42,12 @@ import {
   type RegisteredStep,
   UpgradeRunnerRepository,
 } from "./runner-ledger.repository.ts";
-import type {
-  SchemaTargetReport,
-  UpgradeReconciler,
-  UpgradeRunnerLog,
-  UpgradeSchemaApplier,
+import {
+  isPrivateTarget,
+  type SchemaTargetReport,
+  type UpgradeReconciler,
+  type UpgradeRunnerLog,
+  type UpgradeSchemaApplier,
 } from "./schema-applier.ts";
 import { type UpgradeOutcome, upgradeOutcome, UpgradeRunFailure } from "./upgrade-outcome.ts";
 
@@ -290,6 +292,7 @@ export class UpgradeRunnerService {
   private readonly archiver: ContractArchiveService;
   private resolved: { migration: string; attempt: number }[] = [];
   private permit: RerunPermit = { firstInstall: false, retried: new Set() };
+  private held: HeldTargets = new Map();
 
   private constructor(private readonly options: UpgradeRunnerOptions) {
     this.ledger = UpgradeLedgerRepository.create({ postgres: options.postgres });
@@ -558,6 +561,7 @@ export class UpgradeRunnerService {
   }): Promise<Record<string, unknown>> {
     await phases.start({ name: "preflight" });
     this.resolved = [];
+    this.held = new Map();
     const retried = [...this.permit.retried].map((name) => `prisma:${name}`);
     await this.runner.clearOperatorRetry({ ids: retried });
     await this.runner.registerSteps({ steps: this.shipped });
@@ -588,6 +592,7 @@ export class UpgradeRunnerService {
         applied.push(id);
       }
     }
+    await this.catchUpTargets({ signal });
     await phases.start({ name: "reconcile" });
     await this.runReconcilers({ signal });
     await phases.end({ name: "reconcile", outcome: "succeeded" });
@@ -598,6 +603,7 @@ export class UpgradeRunnerService {
       reopened,
       resolved: this.resolved,
       archived: kept,
+      ...(this.held.size > 0 ? { heldTargets: [...this.held.keys()] } : {}),
     };
   }
 
@@ -743,8 +749,9 @@ export class UpgradeRunnerService {
     const done = new Set([...prismaDone, ...gooseDone]);
     const unfinished = release.schema.filter((id) => !done.has(id));
     const failedPrisma = await this.failedPrismaMigrations();
+    const held = this.held;
     const failedOn = (engine: SchemaTargetReport["engine"]) =>
-      reports.some((report) => report.engine === engine && !report.ok);
+      reports.some((report) => report.engine === engine && blocksRelease({ report, held }));
     const postgresFailed =
       failedPrisma.length > 0 || failedOn("postgres") || unfinished.some(isPrisma);
     const clickhouseFailed = failedOn("clickhouse") || unfinished.some(isGoose);
@@ -762,7 +769,8 @@ export class UpgradeRunnerService {
       );
       throw rerunnableFailure({ names: failedPrisma, attempts, error: error ?? null, again });
     }
-    const failure = schemaFailure({ reports, unfinished });
+    const blocking = reports.filter((report) => report.ok || blocksRelease({ report, held }));
+    const failure = schemaFailure({ reports: blocking, unfinished });
     if (failure) throw failure;
   }
 
@@ -799,8 +807,17 @@ export class UpgradeRunnerService {
     const retry = this.options.retry ?? DEFAULT_RETRY;
     let resolvedLastAttempt: string[] = [];
     for (let attempt = 1; ; attempt++) {
-      const reports = await applier.apply({ release: release.release, lockTimeoutMs, signal });
-      if (reports.every((report) => report.ok)) {
+      const skipTargets = new Set(this.held.keys());
+      const applied = await applier.apply({
+        release: release.release,
+        lockTimeoutMs,
+        signal,
+        skipTargets,
+      });
+      this.hold({ reports: applied });
+      const held = this.held;
+      const reports = withHeldReports({ reports: applied, held });
+      if (reports.every((report) => !blocksRelease({ report, held }))) {
         if (resolvedLastAttempt.length > 0)
           log.appliedAfterResolve({ migrations: resolvedLastAttempt, attempt });
         return { reports, attempts: attempt };
@@ -867,7 +884,57 @@ export class UpgradeRunnerService {
     return done;
   }
 
-  /** D4: one target row per step and endpoint; the step is the aggregate, failed if any is. */
+  /** Holds each newly failed private target and says so once (T7-F1). */
+  private hold({ reports }: { reports: readonly SchemaTargetReport[] }): void {
+    for (const [target, error] of newlyHeld({ reports, held: this.held }))
+      this.holdTarget({ target, error });
+  }
+
+  private holdTarget({ target, error }: { target: string; error: string | null }): void {
+    this.held.set(target, error);
+    this.narrate.warn(
+      `ClickHouse target ${target} failed and is held: only its organizations wait, the rest of the release goes on`,
+      {
+        phase: "schema",
+        target,
+        error: redactSecrets(error ?? "no error given"),
+        waitingOn: "the target",
+        next: "nothing to do once the target answers: a later pass catches it up; otherwise fix what the error names",
+      },
+    );
+  }
+
+  /** One target row per open step; only the target's first missing step is blamed. */
+  private async writeTargetRows({
+    target,
+    open,
+  }: {
+    target: Extract<SchemaTargetReport, { engine: "clickhouse" }>;
+    open: readonly string[];
+  }): Promise<Map<string, TargetStatus>> {
+    const statuses = new Map<string, TargetStatus>();
+    let blamed = false;
+    for (const id of open.toSorted()) {
+      const status = targetStatus({ target, id, blamed });
+      blamed ||= status === "failed";
+      const lastError = status === "failed" ? target.error : null;
+      const version = id.slice("clickhouse:".length);
+      await this.ledger.upsertTarget({
+        stepId: id,
+        target: target.target,
+        status,
+        version,
+        lastError,
+      });
+      statuses.set(id, status);
+    }
+    return statuses;
+  }
+
+  /**
+   * D4: one target row per step and endpoint. The step is the aggregate of every target the run
+   * did not hold, failed if any is; a held private target keeps its own rows (T7-F1).
+   */
   private async recordClickHouse({
     open,
     reports,
@@ -881,24 +948,13 @@ export class UpgradeRunnerService {
     if (targets.length === 0 || open.length === 0) return [];
     const statuses = new Map<string, TargetStatus[]>();
     for (const target of targets) {
-      let blamed = false;
-      for (const id of open.toSorted()) {
-        const status = targetStatus({ target, id, blamed });
-        blamed ||= status === "failed";
-        const lastError = status === "failed" ? target.error : null;
-        const version = id.slice("clickhouse:".length);
-        const stepId = id;
-        await this.ledger.upsertTarget({
-          stepId,
-          target: target.target,
-          status,
-          version,
-          lastError,
-        });
-        statuses.set(id, [...(statuses.get(id) ?? []), status]);
-      }
+      const rows = await this.writeTargetRows({ target, open });
+      if (this.held.has(target.target)) continue;
+      for (const [id, status] of rows) statuses.set(id, [...(statuses.get(id) ?? []), status]);
     }
-    const failedOn = targets.filter((target) => !target.ok).map((target) => target.target);
+    const failedOn = targets
+      .filter((target) => !target.ok && !this.held.has(target.target))
+      .map((target) => target.target);
     const done: string[] = [];
     for (const [id, perTarget] of statuses) {
       if (perTarget.includes("failed")) {
@@ -1068,10 +1124,54 @@ export class UpgradeRunnerService {
     return this.runner.reopenDoneSteps({ ids: reopened, reason });
   }
 
+  /**
+   * A target an earlier run held catches up here, once the plan is applied: one apply of every
+   * step the image ships, recorded only on that target's rows. Still failing, it stays held and the
+   * run goes on (Alex, 2026-10-11, T7-F1); the worker asks for another pass later.
+   */
+  private async catchUpTargets({ signal }: { signal: AbortSignal }): Promise<void> {
+    const behind = (await this.ledger.findTargetsBehind()).filter(
+      ({ stepId, target }) =>
+        isPrivateTarget({ target }) && !this.held.has(target) && this.shippedIds.has(stepId),
+    );
+    if (behind.length === 0) return;
+    const lockTimeoutMs = this.options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
+    const skipTargets = new Set(this.held.keys());
+    const reports = await this.options.applier.apply({
+      release: null,
+      lockTimeoutMs,
+      signal,
+      skipTargets,
+    });
+    const targets = [...new Set(behind.map(({ target }) => target))];
+    const caughtUp: string[] = [];
+    for (const name of targets) {
+      const report = reports.find((each) => each.engine === "clickhouse" && each.target === name);
+      if (report?.engine !== "clickhouse") continue;
+      const open = behind.filter(({ target }) => target === name).map(({ stepId }) => stepId);
+      const rows = await this.writeTargetRows({ target: report, open });
+      if ([...rows.values()].every((status) => status === "done")) caughtUp.push(name);
+      else this.holdTarget({ target: name, error: report.error });
+    }
+    if (caughtUp.length > 0)
+      this.narrate.info(`ClickHouse target ${caughtUp.join(", ")} caught up`, {
+        phase: "schema",
+        targets: caughtUp,
+      });
+  }
+
   private async runReconcilers({ signal }: { signal: AbortSignal }): Promise<void> {
     const failed: string[] = [];
     for (const reconciler of this.options.reconcilers ?? []) {
       signal.throwIfAborted();
+      if (reconciler.target !== undefined && this.held.has(reconciler.target)) {
+        this.narrate.warn(`reconciler ${reconciler.name} skipped: its target is held`, {
+          phase: "reconcile",
+          reconciler: reconciler.name,
+          next: "nothing to do: it runs on the pass that catches the target up",
+        });
+        continue;
+      }
       try {
         await reconciler.run({ signal });
       } catch (error) {
