@@ -358,6 +358,11 @@ interface DrawerBaseProps {
   closeOnEscape?: boolean | (() => boolean);
   /** `true` locks the document scroll while open. Default false. */
   preventScroll?: boolean;
+  /**
+   * Beside a companion panel: `follow` eases the margin as the panel docks; `wait` also holds the
+   * entrance 450ms for a floating one. Omitted, the drawer moves as before.
+   */
+  companionMotion?: "follow" | "wait";
   /** `raised`: an opaque panel footer whose shadow shows while content waits beneath it. */
   footerAppearance?: "default" | "raised";
   /** The Back button's test id, when it is not `<data-testid>-back`. */
@@ -627,6 +632,15 @@ function DrawerFrame({
   );
 }
 
+const COMPANION_TRANSITION = "margin 240ms cubic-bezier(0.32, 0.72, 0, 1)";
+const COMPANION_MOTION = {
+  follow: { transition: COMPANION_TRANSITION },
+  wait: {
+    transition: COMPANION_TRANSITION,
+    _open: { animationDelay: "450ms", animationFillMode: "backwards" as const },
+  },
+};
+
 /** The drawer shape: props in, one look out. The part statics are deprecated. */
 export function Drawer({
   open = true,
@@ -665,6 +679,7 @@ export function Drawer({
   closeOnEscape = true,
   preventScroll = false,
   footerAppearance,
+  companionMotion,
   "data-testid": testId,
 }: DrawerProps) {
   const inset = useDrawerEndInset();
@@ -720,6 +735,7 @@ export function Drawer({
         ref={contentRef}
         bg={chrome === "content" ? "transparent" : DRAWER_GROUND}
         {...(chrome === "content" ? { overflow: "hidden" } : {})}
+        {...(companionMotion ? COMPANION_MOTION[companionMotion] : {})}
         {...(topInset === "studio-header"
           ? { marginTop: "14", height: `calc(100dvh - ${STUDIO_HEADER_TOP} - 0.5rem)` }
           : {})}

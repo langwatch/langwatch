@@ -450,6 +450,9 @@ function DialogFooterBand({
   );
 }
 
+const FOCUSABLE_CONTROLS =
+  'a[href], button, [role="tab"], [tabindex]:not([tabindex="-1"]), summary, [contenteditable="true"]';
+
 /** The dialog shape: props in, one look out. The part statics are deprecated. */
 export function Dialog({
   open,
@@ -517,8 +520,15 @@ export function Dialog({
   const pickInitialFocus = () => {
     const usable = (selector: string) => firstFocusable(ownRef.current, selector);
     const requested = initialFocus ? usable(`[data-frame-action="${initialFocus}"]`) : null;
-    return requested ?? usable("input, textarea, select") ?? usable('[data-frame-action="cancel"]');
+    return (
+      requested ??
+      usable("input, textarea, select") ??
+      usable('[data-frame-action="cancel"]') ??
+      usable(FOCUSABLE_CONTROLS) ??
+      ownRef.current
+    );
   };
+  const resolveInitialFocus = () => initialFocusEl?.() ?? pickInitialFocus();
   const resetKeys = [title, entityKey];
   const frame = (
     <>
@@ -566,7 +576,7 @@ export function Dialog({
       trapFocus={trapFocus}
       preventScroll={preventScroll}
       closeOnInteractOutside={closable && closeOnInteractOutside}
-      initialFocusEl={initialFocusEl ?? pickInitialFocus}
+      initialFocusEl={resolveInitialFocus}
       finalFocusEl={finalFocusEl}
       onExitComplete={onExitComplete}
       onOpenChange={(details) => {

@@ -430,10 +430,18 @@ export function SnippetPreview({
   const { colorMode } = useColorMode();
   const shikiAdapter = useShikiAdapter(colorMode);
   const lang = normalizeShikiLang(codeLanguage);
-  const [langReady, setLangReady] = useState(() => isShikiLangReady(lang));
+  const [, setLoadedTick] = useState(0);
+  const langReady = isShikiLangReady(lang);
   useEffect(() => {
-    if (!langReady) void ensureShikiLangLoaded(lang).then(() => setLangReady(true));
-  }, [lang, langReady]);
+    if (isShikiLangReady(lang)) return;
+    let current = true;
+    ensureShikiLangLoaded(lang)
+      .then(() => current && setLoadedTick((tick) => tick + 1))
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [lang]);
   const [internalIsVisible, setInternalIsVisible] = useState(false);
   const isVisible = controlledIsVisible ?? internalIsVisible;
   const masks = sensitiveValue !== undefined && !isVisible && code.includes(sensitiveValue);
@@ -452,7 +460,7 @@ export function SnippetPreview({
             colorPalette="orange"
             code={displayCode}
             data-testid={testId}
-            language={langReady ? codeLanguage : "text"}
+            language={langReady ? lang : "text"}
             meta={{ highlightLines, colorScheme: colorMode }}
             transition="all 0.3s ease"
             borderRadius="xl"

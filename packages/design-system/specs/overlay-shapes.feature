@@ -311,3 +311,22 @@ Feature: Drawer and dialog shapes
   Scenario: A drawer has a workspace width, an Escape guard and a raised footer
     Given a drawer of size workspace with an Escape guard answering false and a raised footer
     Then it is 87.5rem wide, Escape leaves it open until the guard answers true and the footer is opaque
+
+  @integration @browser
+  Scenario: A drawer can follow or wait for a companion panel
+    Given a drawer given companionMotion follow, another given wait, and one given neither
+    Then follow eases the end margin over 240ms
+    And wait also delays the entrance 450ms, and neither option leaves the drawer as before
+
+  @integration @browser
+  Scenario: A dialog with no field and no Cancel still takes and holds focus
+    Given a dialog with a link, tabs and a code preview but no input and no Cancel
+    When it opens without a click inside
+    Then focus is inside it and Tab and Shift+Tab never leave it
+    And an explicit initial target that is unavailable falls back the same way
+
+  @integration
+  Scenario: A snippet switching to a grammar not yet loaded shows readable code first
+    Given a snippet preview showing Python
+    When the same preview switches to Go before Go is loaded
+    Then the code reads as plain text at once and is highlighted once Go has loaded
