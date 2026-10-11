@@ -5,8 +5,9 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioFormDrawer } from "../../../scenarios/scenario-form-drawer.tsx";
@@ -18,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   mockGetById: vi.fn(),
   mockGetByIdRefetch: vi.fn(async () => ({})),
   mockListVersions: vi.fn(),
+  versionListeners: new Set<() => void>(),
+  versionTick: 0,
   mockListVersionsRefetch: vi.fn(),
   mockGetVersion: vi.fn(),
   mockRestoreVersion: vi.fn(),
@@ -96,7 +99,18 @@ vi.mock("@langwatch/scenario-client", () => ({
         }),
       },
       getById: { useQuery: mocks.mockGetById },
-      listVersions: { useQuery: mocks.mockListVersions },
+      listVersions: {
+        useQuery: (...args: unknown[]) => {
+          useSyncExternalStore(
+            (listener) => {
+              mocks.versionListeners.add(listener);
+              return () => void mocks.versionListeners.delete(listener);
+            },
+            () => mocks.versionTick,
+          );
+          return mocks.mockListVersions(...args);
+        },
+      },
       getVersion: { useQuery: mocks.mockGetVersion },
       restoreVersion: {
         useMutation: ({
@@ -468,7 +482,7 @@ describe("the History drawer", () => {
       isError: false,
       refetch: mocks.mockListVersionsRefetch,
     });
-    const view = renderHistory();
+    renderHistory();
 
     await user.click(screen.getByTestId("restore-2"));
     await user.click(screen.getByTestId("confirm-restore-2"));
@@ -497,7 +511,10 @@ describe("the History drawer", () => {
       isError: false,
       refetch: mocks.mockListVersionsRefetch,
     });
-    view.rerender(<ScenarioVersionHistoryDrawer open />);
+    act(() => {
+      mocks.versionTick += 1;
+      mocks.versionListeners.forEach((listener) => listener());
+    });
 
     const rows = screen.getAllByTestId(/^version-row-\d+$/);
     expect(rows[0]!.getAttribute("data-testid")).toBe("version-row-6");
