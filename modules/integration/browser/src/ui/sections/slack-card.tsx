@@ -8,6 +8,7 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { describeError } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Banner } from "@langwatch/design-system/banner";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { SettingItem, SettingList, SettingsCard } from "@langwatch/design-system/settings-card";
@@ -43,10 +44,23 @@ export function SlackCard() {
     }
     if (!list.data) return <Skeleton height="48px" data-testid="slack-connections-loading" />;
     if (list.data.connections.length === 0) {
+      if (!canAdd) {
+        return (
+          <NoDataInfoBlock
+            size="line"
+            title="No Slack connections yet. Ask an organization admin to add one."
+          />
+        );
+      }
       return (
-        <Text textStyle="body" color="fg.muted">
-          No Slack connections yet.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No Slack connections yet."
+          action={{
+            label: "Add Slack connection",
+            onClick: () => openDrawer("slackConnection", {}),
+          }}
+        />
       );
     }
     return (
