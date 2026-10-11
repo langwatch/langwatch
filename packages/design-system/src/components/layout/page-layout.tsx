@@ -28,6 +28,7 @@ import {
   type Ref,
 } from "react";
 
+import { useProductAccent } from "../scope/use-product-accent.ts";
 import { PageTabMenu, PageTabs } from "./page-header-tabs.tsx";
 
 export type { PageTab } from "./page-header-tabs.tsx";
@@ -248,7 +249,7 @@ function Content({ children, ...props }: PropsWithChildren<CardRootProps>) {
 
 /** What every header button takes: appearance is the header's, so no style props. */
 interface HeaderButtonBase {
-  /** The page's one main act: solid orange. */
+  /** The page's one main act: solid in the product's accent. */
   primary?: boolean;
   disabled?: boolean;
   loading?: boolean;
@@ -284,8 +285,6 @@ export type HeaderButtonProps = HeaderActionButtonProps | HeaderLinkButtonProps;
 /** @deprecated Open Chakra props; pass `HeaderButtonProps`. */
 export type LegacyHeaderButtonProps = ChakraButtonProps & { primary?: boolean };
 
-const PRIMARY_PROPS = { variant: "solid", colorPalette: "orange" } as const;
-
 function HeaderButton(props: HeaderButtonProps): ReactNode;
 /** @deprecated Style props; the header owns the button's look. */
 function HeaderButton(props: PropsWithChildren<LegacyHeaderButtonProps>): ReactNode;
@@ -295,12 +294,13 @@ function HeaderButton({
   ...props
 }: PropsWithChildren<LegacyHeaderButtonProps>): ReactNode {
   const size = useContext(HeaderSizeContext);
+  const accent = useProductAccent();
   return (
     <Button
       variant="outline"
       size={size === "lg" ? "md" : "xs"}
       flexShrink={0}
-      {...(primary ? PRIMARY_PROPS : {})}
+      {...(primary ? { variant: "solid", colorPalette: accent.colorPalette } : {})}
       {...props}
     >
       {children}

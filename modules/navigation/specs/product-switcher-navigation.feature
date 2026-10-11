@@ -172,3 +172,82 @@ Feature: Product switcher navigation
     When I navigate somewhere that makes my session or permissions read again
     Then the sidebar and top bar stay on screen
     And the page area is blank until the read settles, never the full loading splash
+
+  # Product accents: the design system holds one map from product to accent
+  # (packages/design-system/src/system/product-colours.ts). Navigation only
+  # declares which product the address in view belongs to; the shell mounts that
+  # declaration around the page, the open drawer and the footer together.
+
+  @unit
+  Scenario: Every registered product has an accent assignment and no other does
+    Given the product registry and the design system's product colour map
+    Then both name the same products
+
+  @integration
+  Scenario: The address in view names the product whose accent every surface reads
+    Given the host services read an address under Me, LLM Ops, Gateway or Governance
+    When a surface reads its product accent
+    Then it reads that product's accent
+
+  @integration
+  Scenario: Settings, ops and an unreadable address reset to the unscoped accent
+    Given the host services read a settings address, an ops address, the root, or no address
+    When a surface reads its product accent
+    Then it reads the unscoped accent and not the last product visited
+
+  @integration
+  Scenario: A page, the open drawer and a portalled menu read the same accent
+    Given I am on a Me page with a routed drawer open
+    When the page, the drawer and a menu portalled outside the page read their accent
+    Then all three read the Me accent
+
+  @integration
+  Scenario: Changing product keeps the page's draft input
+    Given I have typed into an input on a Me page
+    When I move to a Gateway page that keeps the input mounted
+    Then the accent changes to Gateway
+    And the input is the same element with the text I typed
+
+  @integration
+  Scenario: The composition's presentation provider wraps the page, the drawer and the footer
+    Given a composition that installs a presentation provider
+    When a page, an open drawer and the footer render
+    Then each of them reads what the provider supplies
+
+  @integration
+  Scenario: A composition with no presentation provider draws the page as before
+    Given a composition that installs no presentation provider
+    When a page renders
+    Then the page renders unchanged
+
+  @integration
+  Scenario: The installed shell gives the page and the open drawer the product of the address
+    Given the application shell with navigation's presentation provider
+    When a page and a routed drawer open on a Me address and on a settings address
+    Then both read the Me accent on the Me address
+    And both read the unscoped accent on the settings address
+
+  @integration
+  Scenario: The switcher, rail and sidebar stay neutral inside any product scope
+    Given the icon-rail shell inside a Me scope
+    Then the active tile keeps its neutral selected surface
+    And no navigation element is painted from a product colour
+
+  @integration
+  Scenario: A primary action draws the product's accent and nothing else changes
+    Given a footer with a primary, a secondary, a destructive action and Cancel
+    When it renders inside each product scope or none
+    Then only the primary action takes the product's accent
+    And Cancel, the secondary action and the destructive action keep their treatment
+
+  @integration
+  Scenario: A destructive primary stays red in every product
+    Given a footer whose primary action is destructive
+    When it renders inside a Me scope
+    Then the primary action is red
+
+  @integration
+  Scenario: A page header's primary button follows the product
+    Given a page header with a primary button and a plain button
+    When it renders inside each product scope or none
+    Then only the primary button takes the product's accent

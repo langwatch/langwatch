@@ -7,6 +7,7 @@ import { Box, Button, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { useProductAccent } from "../scope/use-product-accent.ts";
 import { Menu } from "./menu.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
@@ -59,7 +60,7 @@ export interface FrameMenuAction extends FrameActionLook {
 export type FrameAction = FrameButtonAction | FrameSubmitAction | FrameMenuAction;
 
 export interface ActionRowProps {
-  /** Solid orange (red with `danger`), rightmost. */
+  /** Solid in the product's accent (red with `danger`), rightmost. */
   primaryAction?: FrameAction;
   /** Outline, left of the primary. */
   secondaryAction?: FrameAction;
@@ -81,7 +82,7 @@ export type FrameActionKind = "primary" | "secondary" | "destructive" | "utility
 
 const LOOK: Record<FrameActionKind, { variant: "solid" | "outline" | "ghost"; palette?: string }> =
   {
-    primary: { variant: "solid", palette: "orange" },
+    primary: { variant: "solid" },
     secondary: { variant: "outline" },
     destructive: { variant: "ghost", palette: "red" },
     utility: { variant: "ghost" },
@@ -101,7 +102,9 @@ export function FrameActionButton({
   size?: "sm";
 }) {
   const look = LOOK[kind];
-  const palette = kind === "primary" && action.danger ? "red" : look.palette;
+  const accent = useProductAccent();
+  const primaryPalette = action.danger ? "red" : accent.colorPalette;
+  const palette = kind === "primary" ? primaryPalette : look.palette;
   const submits = action.type === "submit";
   const blocked = busy || action.loading === true;
   const button = (

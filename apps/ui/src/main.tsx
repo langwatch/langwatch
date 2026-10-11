@@ -198,6 +198,7 @@ class BrowserUiShell extends UiShell {
           session: browserUiHostServicesHook(rootHostServices),
           hostServices,
           footer: UiSaasFooter,
+          presentation: rootHostServices.navigationChrome.ProductAccentScope,
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,
