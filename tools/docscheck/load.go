@@ -36,6 +36,7 @@ var nonContentDirs = map[string]bool{
 	"logo":         true,
 	"media":        true,
 	"scripts":      true,
+	"site":         true,
 	"node_modules": true,
 }
 
