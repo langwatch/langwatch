@@ -186,11 +186,13 @@ type AutomationActionParamsParse =
   | Readonly<{ success: true; data: unknown }>
   | Readonly<{
       success: false;
-      error: Readonly<{ issues: readonly Readonly<{ message: string }>[] }>;
+      error: Readonly<{
+        issues: readonly Readonly<{ message: string; path: readonly PropertyKey[] }>[];
+      }>;
     }>;
 
 /** The per-action `actionParams` parser the process's provider registry owns. */
-interface AutomationActionParamsSchema {
+export interface AutomationActionParamsSchema {
   safeParse(value: unknown): AutomationActionParamsParse;
 }
 
