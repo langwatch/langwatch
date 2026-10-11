@@ -67,8 +67,15 @@ replaces the SCIM directory.
 `vendors.go` adds small OpenAI (`/openai/v1/organization/users|projects`), Anthropic
 (`/anthropic/v1/organizations/users|me`) and Microsoft (`/microsoft-login/<tenant>/oauth2/v2.0/token`,
 `/microsoft-graph/v1.0/users|subscribedSkus`) routes, same tenant words in the key or bearer.
-Dataverse bots and transcripts, the OpenAI cost report, the Anthropic usage/cost reports and the
-audit-log feeds are not served yet.
+The same file serves the paged reports and feeds: `GET /openai/v1/organization/costs` (daily
+buckets, one per page, `next_page`; a key holding `nokeys` refuses `group_by[]=api_key_id` so the
+puller falls back), `/anthropic/v1/organizations/usage_report/messages` and `/cost_report` (same
+paging), `/anthropic/v1/organizations/audit_log?cursor=<n>` (claude-compliance, 7 events, 3 a page),
+`/microsoft-graph/v1.0/auditLogs/directoryAudits` (absolute `@odata.nextLink`) and Dataverse at
+`/dataverse/api/data/v9.2/bots|conversationtranscripts` (7 conversations over 2 bots, 3 a page,
+reads the puller's `$filter` continuation and bot ids, Microsoft token as bearer). Extra words for
+the paged reports: `flaky` (503 on every page after the first), `cycle` (same next page forever).
+Fault target = the path, e.g. `--channel vendor --target /openai/v1/organization/costs --status 429`.
 
 ### Reaching it from the product
 
@@ -93,6 +100,14 @@ Tester recipes:
   "<member email>","active":true},{"id":"1002","userName":"<same email>","active":true}]'`, pull;
   People shows suggestions to confirm and a duplicate to refuse. OpenAI/Anthropic member lists
   (`sk-admin-good`) give three `@sim.vendor.test` people.
-- GOV-44: Copilot Studio Dataverse source with any tenant id and client secret: sign-in, seats
-  (`subscribedSkus`) and the directory (`/microsoft-graph/v1.0/users`) work. Dataverse bots and
-  transcripts need routes not built yet.
+- GOV-44: Copilot Studio Dataverse source with any tenant id and client secret (a tenant word in
+  the secret picks the failure: `revoked`, `noscope`). Sign-in, seats (`subscribedSkus`), the
+  directory (`users`) and `directoryAudits` work. Environment URL = `<outbound>/dataverse`: expect
+  2 agents and 7 conversations over 3 pages, then 0 on the next run (the cursor continues after
+  the last row). Caveat: the product only accepts an https `*.dynamics.com` environment URL
+  (`isEnvironmentOrigin`) and refuses next links off it; until the product admits the Dataverse
+  origin the transcript read cannot reach the sim, and the source reports the URL as invalid.
+- GOV-44 reports: OpenAI admin cost source (`sk-admin-good`): 3 daily buckets, 6 cost rows, one page
+  each; `sk-admin-nokeys` drops the key dimension, `sk-admin-flaky` fails after page one and resumes.
+  Anthropic usage and cost sources (`sk-ant-admin-good`) page the same. Claude compliance and the
+  Microsoft directory audits as custom pulls: 7 events, then 0.

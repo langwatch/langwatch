@@ -310,3 +310,28 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       When a pull source reads member lists, the account lookup, a Microsoft token, Graph users or subscribed SKUs
       Then outboundsim answers each from a seeded tenant
       And a key holding revoked, or no credential, is refused 401
+
+    @unit
+    Scenario: Outboundsim serves the OpenAI cost report, paged
+      When a pull source reads /openai/v1/organization/costs with start_time and group_by[]
+      Then outboundsim answers one daily bucket per page with has_more and next_page until the last
+      And a key holding nokeys refuses group_by[]=api_key_id with 400 naming start_time
+      And a key holding flaky is refused 503 after the first page and revoked is refused 401
+
+    @unit
+    Scenario: Outboundsim serves the Anthropic usage and cost reports, paged
+      When a pull source reads the usage_report/messages or cost_report routes with starting_at
+      Then outboundsim answers one bucket per page with has_more and next_page until the last
+      And a key holding cycle repeats the same next_page, and an unreadable starting_at is refused 400
+
+    @unit
+    Scenario: Outboundsim serves the Claude compliance audit log and the Microsoft directory audits, paged
+      When a custom pull source reads /anthropic/v1/organizations/audit_log or /microsoft-graph/v1.0/auditLogs/directoryAudits
+      Then outboundsim answers three events a page with a cursor, or an absolute @odata.nextLink on its own origin
+      And a drained cursor answers no events, noscope is refused 403 and down 503
+
+    @unit
+    Scenario: Outboundsim serves Dataverse bots and conversation transcripts behind the Microsoft token
+      When a Dataverse pull source reads /dataverse/api/data/v9.2/bots and conversationtranscripts
+      Then outboundsim answers the agents, and the transcripts ordered by createdon and id three a page through @odata.nextLink
+      And it honours the createdon cursor and bot ids in $filter, and refuses a revoked or missing token with 401
