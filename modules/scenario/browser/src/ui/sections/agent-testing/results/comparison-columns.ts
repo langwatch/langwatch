@@ -32,9 +32,9 @@ const CELL_PADDING = 28;
  * below its smallest width.
  */
 export function comparisonColumns(targets: readonly { label: string }[]): {
-  scenarioWidth: string;
-  targetWidth: string;
-  minWidth: string;
+  scenarioWidth: `${number}%`;
+  targetWidth: `${number}%`;
+  minWidth: `${number}px`;
 } {
   const width = targetColumnWidth(targets);
   const shares = SCENARIO_SHARE + targets.length;
@@ -43,8 +43,8 @@ export function comparisonColumns(targets: readonly { label: string }[]): {
     width + CELL_PADDING,
   );
   return {
-    scenarioWidth: `${((SCENARIO_SHARE / shares) * 100).toFixed(3)}%`,
-    targetWidth: `${((1 / shares) * 100).toFixed(3)}%`,
+    scenarioWidth: `${Number(((SCENARIO_SHARE / shares) * 100).toFixed(3))}%`,
+    targetWidth: `${Number(((1 / shares) * 100).toFixed(3))}%`,
     minWidth: `${Math.ceil(perShare * shares)}px`,
   };
 }

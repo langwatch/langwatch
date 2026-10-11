@@ -4,6 +4,7 @@
  * footer with count and select-all/clear buttons.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Box, Button, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
@@ -69,12 +70,7 @@ export function TargetPicker({
   onRemoveArchived,
 }: TargetPickerProps) {
   return (
-    <Box
-      border="1px solid"
-      borderColor={hasError ? "red.fg" : "border"}
-      borderRadius="md"
-      width="full"
-    >
+    <Card variant="frame" padding="none" invalid={hasError}>
       <HStack paddingX={3} paddingY={2} gap={2}>
         <Box flex={1}>
           <SearchInput
@@ -195,6 +191,6 @@ export function TargetPicker({
           </Button>
         </HStack>
       </HStack>
-    </Box>
+    </Card>
   );
 }

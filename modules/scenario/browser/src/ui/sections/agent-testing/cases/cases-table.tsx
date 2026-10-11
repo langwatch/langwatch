@@ -8,7 +8,7 @@
 import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Button, chakra, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import type { ScenarioLastResultSummary } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";
 
@@ -22,6 +22,8 @@ import { RecentRunsSubmenu } from "./recent-runs-menu.tsx";
 /** The last result of a scenario, as the aggregate answers it. */
 export type CaseLastResult = ScenarioLastResultSummary;
 
+type CaseColumn = { key: string; width?: `${number}px` };
+
 /**
  * The columns of the table: the scenario name takes the free width, the row actions what
  * they need on the right (a Run button only for someone who may run). Selection mode adds
@@ -33,11 +35,11 @@ function caseColumns({
 }: {
   isSelectionMode: boolean;
   canManage: boolean;
-}): { key: string; width?: string }[] {
+}): CaseColumn[] {
   return [
-    ...(isSelectionMode ? [{ key: "select", width: "52px" }] : []),
+    ...(isSelectionMode ? [{ key: "select", width: "52px" } satisfies CaseColumn] : []),
     { key: "scenario" },
-    { key: "actions", width: canManage ? "124px" : "52px" },
+    { key: "actions", width: canManage ? "124px" : "52px" } satisfies CaseColumn,
   ];
 }
 
@@ -50,17 +52,17 @@ function CasesListTable({
   testId,
   children,
 }: {
-  columns: { key: string; width?: string }[];
+  columns: CaseColumn[];
   testId: string;
   children: React.ReactNode;
 }) {
   return (
     <ListTable tableLayout="fixed" data-testid={testId}>
-      <Table.ColumnGroup>
+      <ListTable.ColumnGroup>
         {columns.map((column) => (
-          <Table.Column key={column.key} width={column.width} data-column={column.key} />
+          <ListTable.Column key={column.key} width={column.width} data-column={column.key} />
         ))}
-      </Table.ColumnGroup>
+      </ListTable.ColumnGroup>
       {children}
     </ListTable>
   );

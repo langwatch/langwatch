@@ -34,7 +34,9 @@ export function resultColumns({
     { key: "result", text: "Result", width: "148px" },
     { key: "scenario", text: "Scenario" },
     ...(hasEvaluators ? [{ key: "evaluators", text: "Evaluators" }] : []),
-    ...(hasCaller ? [{ key: "caller", text: "Caller", width: "114px" }] : []),
+    ...(hasCaller
+      ? [{ key: "caller", text: "Caller", width: "114px" } satisfies ResultsColumn]
+      : []),
     { key: "metrics", text: "Time · cost", width: "154px", align: "end" as const },
     { key: "menu", text: "", width: hasStoppable ? "116px" : "52px", action: true },
   ];

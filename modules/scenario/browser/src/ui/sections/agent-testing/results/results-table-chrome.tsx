@@ -6,7 +6,7 @@
 
 import { ListTable } from "@langwatch/design-system/list-table";
 import type { EmptyNext } from "@langwatch/design-system/no-data-info-block";
-import { Table, Text } from "@langwatch/design-system/primitives";
+import { Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 /**
@@ -18,7 +18,7 @@ export type ResultsColumn = {
   text: string;
   /** The hidden name of a column whose heading is empty. */
   label?: string;
-  width?: string;
+  width?: `${number}px`;
   align?: "end";
   action?: boolean;
 };
@@ -43,11 +43,11 @@ export function ResultsTable({
       containerProps={{ overflowX: "auto" }}
       data-testid={testId}
     >
-      <Table.ColumnGroup>
+      <ListTable.ColumnGroup>
         {columns.map((column) => (
-          <Table.Column key={column.key} width={column.width} data-column={column.key} />
+          <ListTable.Column key={column.key} width={column.width} data-column={column.key} />
         ))}
-      </Table.ColumnGroup>
+      </ListTable.ColumnGroup>
       {children}
     </ListTable>
   );

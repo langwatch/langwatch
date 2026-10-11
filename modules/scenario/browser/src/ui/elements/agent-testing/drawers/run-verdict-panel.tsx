@@ -4,6 +4,7 @@
  * criteria count or duration: the chip strip at the top of the drawer already reads all four.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -324,42 +325,40 @@ function EvaluationInputs({
         </Text>
       </Button>
       {open ? (
-        <VStack
-          align="stretch"
-          gap={1.5}
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          background="bg.subtle"
-          padding={2}
+        <Card
+          variant="nested"
+          padding="xs"
+          borderTone="muted"
           data-testid={`evaluation-inputs-${evaluatorId}`}
         >
-          {entries.map(([name, value]) => (
-            <Box key={name} minWidth={0}>
-              <Text
-                textStyle="micro"
-                fontWeight="semibold"
-                textTransform="uppercase"
-                letterSpacing="0.025em"
-                color="fg.muted"
-              >
-                {name}
-              </Text>
-              <Text
-                as="pre"
-                fontFamily="mono"
-                textStyle="micro"
-                lineHeight="short"
-                color="fg.muted"
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-                title={value}
-              >
-                {previewOf(value)}
-              </Text>
-            </Box>
-          ))}
-        </VStack>
+          <VStack align="stretch" gap={1.5}>
+            {entries.map(([name, value]) => (
+              <Box key={name} minWidth={0}>
+                <Text
+                  textStyle="micro"
+                  fontWeight="semibold"
+                  textTransform="uppercase"
+                  letterSpacing="0.025em"
+                  color="fg.muted"
+                >
+                  {name}
+                </Text>
+                <Text
+                  as="pre"
+                  fontFamily="mono"
+                  textStyle="micro"
+                  lineHeight="short"
+                  color="fg.muted"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                  title={value}
+                >
+                  {previewOf(value)}
+                </Text>
+              </Box>
+            ))}
+          </VStack>
+        </Card>
       ) : null}
     </VStack>
   );
@@ -608,27 +607,20 @@ function RunFailurePanel({ raw }: { raw: string }) {
             {detailOpen ? "Hide details" : "More info"}
           </Button>
           {detailOpen ? (
-            <Box
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="md"
-              background="bg.subtle"
-              padding={2}
-              maxHeight="260px"
-              overflow="auto"
-              data-testid="run-verdict-error-detail"
-            >
-              <Text
-                as="pre"
-                fontFamily="mono"
-                textStyle="micro"
-                lineHeight="short"
-                color="fg.muted"
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-              >
-                {detail}
-              </Text>
+            <Box maxHeight="260px" overflow="auto" data-testid="run-verdict-error-detail">
+              <Card variant="nested" padding="xs" borderTone="muted">
+                <Text
+                  as="pre"
+                  fontFamily="mono"
+                  textStyle="micro"
+                  lineHeight="short"
+                  color="fg.muted"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                >
+                  {detail}
+                </Text>
+              </Card>
             </Box>
           ) : null}
         </VStack>

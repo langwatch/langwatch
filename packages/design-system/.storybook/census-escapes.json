@@ -1669,22 +1669,6 @@
     "disposition": "reviewed"
   },
   {
-    "path": "modules/scenario/browser/src/ui/elements/agent-testing/drawers/run-verdict-panel.tsx",
-    "rule": "card-box",
-    "line": 327,
-    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
-    "owner": "scenario",
-    "disposition": "reviewed"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/elements/agent-testing/drawers/run-verdict-panel.tsx",
-    "rule": "card-box",
-    "line": 611,
-    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
-    "owner": "scenario",
-    "disposition": "reviewed"
-  },
-  {
     "path": "modules/scenario/browser/src/ui/elements/agent-testing/shared/evaluator-pill.tsx",
     "rule": "card-box",
     "line": 135,
@@ -1736,14 +1720,6 @@
     "path": "modules/scenario/browser/src/ui/elements/suite/dialogs/suite-context-menu.tsx",
     "rule": "card-box",
     "line": 40,
-    "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
-    "owner": "scenario",
-    "disposition": "reviewed"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/elements/suite/pickers/scenario-picker.tsx",
-    "rule": "card-box",
-    "line": 174,
     "reason": "Kept as today: a tight inset well, inline pill or chip, chart tile, error-bordered row or picker, floating bar, hero heading or popup menu, not a plain card (R8s1 review).",
     "owner": "scenario",
     "disposition": "reviewed"
@@ -2203,102 +2179,9 @@
     "owner": "workflow"
   },
   {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/component_execution/input-panel.tsx",
-    "rule": "card-box",
-    "line": 94,
-    "reason": "Workflow studio panel kept as today (R9w review).",
-    "owner": "workflow",
-    "disposition": "reviewed"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/component_execution/output-panel.tsx",
-    "rule": "card-box",
-    "line": 17,
-    "reason": "Workflow studio panel kept as today (R9w review).",
-    "owner": "workflow",
-    "disposition": "reviewed"
-  },
-  {
     "path": "modules/scenario/browser/src/ui/elements/scenario-table.tsx",
     "rule": "legacy-table-part",
     "line": 158,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/cases/cases-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 59,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/cases/cases-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 61,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 69,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 70,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 81,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 85,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 106,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 107,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/comparison-results-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 109,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/results-table-chrome.tsx",
-    "rule": "legacy-table-part",
-    "line": 46,
-    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/results/results-table-chrome.tsx",
-    "rule": "legacy-table-part",
-    "line": 48,
     "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
     "owner": "scenario"
   },
@@ -2973,14 +2856,6 @@
     "line": 19,
     "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
     "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/elements/suite/pickers/target-picker.tsx",
-    "rule": "card-box",
-    "line": 72,
-    "reason": "Not a plain card: an error-bordered picker, icon tile, table skeleton frame, selectable row or scrolling list (R8s2 review).",
-    "owner": "scenario",
-    "disposition": "reviewed"
   },
   {
     "path": "modules/scenario/browser/src/ui/elements/workflow/workflow-icons.tsx",

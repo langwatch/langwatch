@@ -5,7 +5,7 @@
  */
 
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Box, Table } from "@langwatch/design-system/primitives";
+import { Box } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot.tsx";
@@ -66,28 +66,18 @@ function MatrixHeader({
   scenarioRuns: ScenarioRunData[];
 }) {
   return (
-    <Table.Header>
-      <Table.Row
-        // A target header carries a summary and wraps its label, so it outgrows the band.
-        css={{
-          "&& > th": {
-            verticalAlign: "top",
-            height: "auto",
-            paddingY: "2.5",
-            whiteSpace: "normal",
-          },
-        }}
-      >
-        <Table.ColumnHeader>
+    <ListTable.Header>
+      <ListTable.Row>
+        <ListTable.ColumnHeader>
           <Box paddingTop="0.5">Scenario</Box>
-        </Table.ColumnHeader>
+        </ListTable.ColumnHeader>
         {targets.map((target) => (
-          <Table.ColumnHeader key={target.key}>
+          <ListTable.ColumnHeader key={target.key}>
             <TargetColumnHeader target={target} scenarioRuns={scenarioRuns} />
-          </Table.ColumnHeader>
+          </ListTable.ColumnHeader>
         ))}
-      </Table.Row>
-    </Table.Header>
+      </ListTable.Row>
+    </ListTable.Header>
   );
 }
 
@@ -99,16 +89,18 @@ export function ComparisonResultsTable(props: ComparisonResultsTableProps) {
   return (
     <ListTable
       tableLayout="fixed"
+      headerLayout="content"
       minWidth={minWidth}
-      containerProps={{ overflowX: "auto" }}
+      scroll="x"
+      scrollLabel="Comparison results"
       data-testid="comparison-results-table"
     >
-      <Table.ColumnGroup>
-        <Table.Column width={scenarioWidth} data-column="scenario" />
+      <ListTable.ColumnGroup>
+        <ListTable.Column width={scenarioWidth} data-column="scenario" />
         {targets.map((target) => (
-          <Table.Column key={target.key} width={targetWidth} data-column={target.key} />
+          <ListTable.Column key={target.key} width={targetWidth} data-column={target.key} />
         ))}
-      </Table.ColumnGroup>
+      </ListTable.ColumnGroup>
 
       <MatrixHeader targets={targets} scenarioRuns={scenarioRuns} />
 

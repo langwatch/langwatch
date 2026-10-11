@@ -4,6 +4,7 @@
  * and select-all/clear.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import {
   Badge,
@@ -171,12 +172,7 @@ export function ScenarioPicker({
     testSuites && testSuites.length > 0 ? groupScenariosByTestSuite(scenarios, testSuites) : null;
 
   return (
-    <Box
-      border="1px solid"
-      borderColor={hasError ? "red.fg" : "border"}
-      borderRadius="md"
-      width="full"
-    >
+    <Card variant="frame" padding="none" invalid={hasError}>
       <HStack paddingX={3} paddingY={2} gap={2}>
         <Box flex={1}>
           <SearchInput
@@ -317,6 +313,6 @@ export function ScenarioPicker({
           </Button>
         </HStack>
       </HStack>
-    </Box>
+    </Card>
   );
 }
