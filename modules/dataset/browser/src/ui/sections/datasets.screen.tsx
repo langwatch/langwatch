@@ -47,8 +47,7 @@ function listStateOf({
   shown: number | undefined;
 }): ListPageState {
   if (isAggregate) return "ready";
-  if (isError) return "error";
-  if (total === undefined) return "loading";
+  if (total === undefined) return isError ? "error" : "loading";
   if (total === 0) return "empty";
   return shown === 0 ? "no-results" : "ready";
 }
@@ -376,12 +375,16 @@ export default function DatasetsScreen() {
                 },
               }
         }
-        error={{
-          title: "Couldn't load the datasets",
-          description: "Try again, or read how datasets work.",
-          onRetry: () => void datasets.refetch(),
-          next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
-        }}
+        error={
+          listState === "error"
+            ? {
+                title: "Couldn't load the datasets",
+                description: "Try again, or read how datasets work.",
+                onRetry: () => void datasets.refetch(),
+                next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
+              }
+            : undefined
+        }
         empty={{
           title: "No datasets yet",
           description:
