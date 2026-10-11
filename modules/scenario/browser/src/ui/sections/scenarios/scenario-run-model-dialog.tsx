@@ -1,5 +1,5 @@
-import { Button, Text, VStack } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import { SimulationModelSelect } from "./simulation-model-select.tsx";
 
@@ -28,41 +28,31 @@ export function ScenarioRunModelDialog({
   isRunning: boolean;
 }) {
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)}>
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Choose models for this run</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} align="stretch">
-            <Text fontSize="sm" color="fg.muted">
-              Pick the model that role-plays the user and the model that judges the run. Both
-              default to your project&apos;s Default model.
-            </Text>
-            <SimulationModelSelect
-              label="User simulator"
-              featureKey="scenarios.user_simulator"
-              value={simulatorModel}
-              onChange={onSimulatorChange}
-            />
-            <SimulationModelSelect
-              label="Judge"
-              featureKey="scenarios.judge"
-              value={judgeModel}
-              onChange={onJudgeChange}
-            />
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Dialog.ActionTrigger asChild>
-            <Button variant="outline">Cancel</Button>
-          </Dialog.ActionTrigger>
-          <Button colorPalette="orange" loading={isRunning} onClick={onConfirm}>
-            Save and run
-          </Button>
-        </Dialog.Footer>
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      onClose={() => onOpenChange(false)}
+      title="Choose models for this run"
+      size="md"
+      primaryAction={{ label: "Save and run", loading: isRunning, onClick: onConfirm }}
+    >
+      <VStack gap={4} align="stretch">
+        <Text fontSize="sm" color="fg.muted">
+          Pick the model that role-plays the user and the model that judges the run. Both default to
+          your project&apos;s Default model.
+        </Text>
+        <SimulationModelSelect
+          label="User simulator"
+          featureKey="scenarios.user_simulator"
+          value={simulatorModel}
+          onChange={onSimulatorChange}
+        />
+        <SimulationModelSelect
+          label="Judge"
+          featureKey="scenarios.judge"
+          value={judgeModel}
+          onChange={onJudgeChange}
+        />
+      </VStack>
+    </Dialog>
   );
 }

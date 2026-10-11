@@ -2577,5 +2577,317 @@
     "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
     "owner": "prompt",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog-footer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 76,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 103,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 110,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 111,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 211,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 222,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 233,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 252,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 253,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 254,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 255,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 265,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 301,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 931,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 935,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 938,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 141,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 142,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 163,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 165,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 185,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 245,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 263,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 281,
+    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-name-field.tsx",
+    "rule": "card-box",
+    "line": 134,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-option-sections.tsx",
+    "rule": "card-box",
+    "line": 77,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-scope-section.tsx",
+    "rule": "empty-text",
+    "line": 86,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-scope-section.tsx",
+    "rule": "empty-text",
+    "line": 121,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-scope-section.tsx",
+    "rule": "empty-text",
+    "line": 181,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-scope-section.tsx",
+    "rule": "card-box",
+    "line": 188,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-scope-section.tsx",
+    "rule": "card-box",
+    "line": 295,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-target-picker.tsx",
+    "rule": "card-box",
+    "line": 148,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-target-picker.tsx",
+    "rule": "card-box",
+    "line": 211,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/media-part.tsx",
+    "rule": "card-box",
+    "line": 289,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenario-target-selector.tsx",
+    "rule": "card-box",
+    "line": 219,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-ai-generation.tsx",
+    "rule": "card-box",
+    "line": 192,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-ai-generation.tsx",
+    "rule": "card-box",
+    "line": 243,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-ai-generation.tsx",
+    "rule": "card-box",
+    "line": 408,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "card-box",
+    "line": 248,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "card-box",
+    "line": 471,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "card-box",
+    "line": 659,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
+    "rule": "card-box",
+    "line": 661,
+    "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
   }
 ]
