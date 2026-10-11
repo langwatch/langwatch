@@ -4,16 +4,33 @@
  * it, so the table's two reads (rollup, live status) are the wiring under test.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { queryImpls, permissionsRef } = vi.hoisted(() => ({
-  queryImpls: {} as Record<string, (input: unknown) => unknown>,
-  permissionsRef: { canManageOrganization: true },
-}));
+const { queryImpls, permissionsRef, queryStore } = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    queryImpls: {} as Record<string, (input: unknown) => unknown>,
+    permissionsRef: { canManageOrganization: true },
+    // The mocked reads subscribe here, so a re-pinned answer re-renders the
+    // component holding them for the live status read, whose parent the compiler memoises.
+    queryStore: {
+      version: 0,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      notify() {
+        this.version += 1;
+        for (const listener of listeners) listener();
+      },
+    },
+  };
+});
 
-vi.mock("../behavior/coding-agent-api.ts", () => {
+vi.mock("../behavior/coding-agent-api.ts", async () => {
+  const { useSyncExternalStore } = await import("react");
   const defaultQuery = () => ({
     data: undefined,
     isLoading: false,
@@ -21,7 +38,12 @@ vi.mock("../behavior/coding-agent-api.ts", () => {
     isFetched: true,
   });
   const hooksFor = (path: string): Map<string, unknown> => {
-    const useQuery = (input: unknown) => (queryImpls[path] ?? defaultQuery)(input);
+    const subscribe = () => useSyncExternalStore(queryStore.subscribe, () => queryStore.version);
+    const watchPinned = path === "github.pullRequestLiveStatus" ? subscribe : () => 0;
+    const useQuery = (input: unknown) => {
+      watchPinned();
+      return (queryImpls[path] ?? defaultQuery)(input);
+    };
     return new Map<string, unknown>([
       ["useQuery", useQuery],
       ["useInfiniteQuery", useQuery],
@@ -438,7 +460,7 @@ describe("the personal Pull Requests table", () => {
       });
       pinStatusesPending();
 
-      const { rerender } = renderTable();
+      renderTable();
 
       const stored = screen.getByText("Open");
       expect(stored).toHaveAttribute("data-status-source", "payload");
@@ -454,7 +476,7 @@ describe("the personal Pull Requests table", () => {
           mappedAt: null,
         },
       ]);
-      rerender(tableElement());
+      act(() => queryStore.notify());
 
       expect(screen.queryByText("Open")).not.toBeInTheDocument();
       const live = screen.getByText("Merged");
