@@ -7,4 +7,3 @@ export * from "./insight.errors.ts";
 export * from "./insight-inbox.ts";
 export * from "./insight.api.ts";
 export * from "./insight.trpc.ts";
-export * from "./insight.ui.ts";

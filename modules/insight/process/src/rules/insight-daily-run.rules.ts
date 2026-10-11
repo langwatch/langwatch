@@ -165,7 +165,7 @@ export function openInsightsOfBoard(input: BoardInsights): InsightEntry[] {
 }
 
 /** What a run does with one finding: files it as a new insight, or renews the one it repeats. */
-export type RunFindingAct<Finding> =
+type RunFindingAct<Finding> =
   | Readonly<{ kind: "file"; finding: Finding; position: number }>
   | Readonly<{ kind: "renew"; finding: Finding; insight: InsightEntry }>;
 

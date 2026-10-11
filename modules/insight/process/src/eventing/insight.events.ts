@@ -29,31 +29,31 @@ export const InsightRenewedEventSchema = z.object({
 });
 export type InsightRenewedEvent = z.infer<typeof InsightRenewedEventSchema>;
 
-export const InsightSeenEventSchema = z.object({
+const InsightSeenEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(INSIGHT_EVENT_TYPES.SEEN),
   version: z.literal(INSIGHT_EVENT_VERSIONS.SEEN),
   data: insightReaderEventDataSchema,
 });
-export type InsightSeenEvent = z.infer<typeof InsightSeenEventSchema>;
+type InsightSeenEvent = z.infer<typeof InsightSeenEventSchema>;
 
-export const InsightArchivedEventSchema = z.object({
+const InsightArchivedEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(INSIGHT_EVENT_TYPES.ARCHIVED),
   version: z.literal(INSIGHT_EVENT_VERSIONS.ARCHIVED),
   data: insightReaderEventDataSchema,
 });
-export type InsightArchivedEvent = z.infer<typeof InsightArchivedEventSchema>;
+type InsightArchivedEvent = z.infer<typeof InsightArchivedEventSchema>;
 
-export const InsightKeptEventSchema = z.object({
+const InsightKeptEventSchema = z.object({
   ...EventSchema.shape,
   type: z.literal(INSIGHT_EVENT_TYPES.KEPT),
   version: z.literal(INSIGHT_EVENT_VERSIONS.KEPT),
   data: insightReaderEventDataSchema,
 });
-export type InsightKeptEvent = z.infer<typeof InsightKeptEventSchema>;
+type InsightKeptEvent = z.infer<typeof InsightKeptEventSchema>;
 
-export type InsightReaderEvent = InsightSeenEvent | InsightArchivedEvent | InsightKeptEvent;
+type InsightReaderEvent = InsightSeenEvent | InsightArchivedEvent | InsightKeptEvent;
 
 export type InsightProcessingEvent = InsightFiledEvent | InsightRenewedEvent | InsightReaderEvent;
 

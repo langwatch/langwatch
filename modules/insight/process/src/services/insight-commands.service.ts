@@ -8,7 +8,7 @@ type CommandSender<Input> = { send(input: Input): Promise<unknown> };
 
 type Envelope = { tenantId: string; occurredAt: number };
 
-export type InsightCommandSenders = {
+type InsightCommandSenders = {
   fileInsight: CommandSender<InsightFiledEventData & Envelope>;
   renewInsight: CommandSender<InsightRenewedEventData & Envelope>;
   markInsightSeen: CommandSender<InsightReaderEventData & Envelope>;

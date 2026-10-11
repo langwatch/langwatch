@@ -1,4 +1,5 @@
-import { defineProcessModule } from "@langwatch/process";
+import type { InsightApi } from "@langwatch/insight-contract";
+import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { InsightModule } from "./app/insight.app.ts";
 import { insightDailyRunEventing } from "./eventing/insight-daily-run.pipeline.ts";
@@ -7,10 +8,11 @@ import { insightRepositories } from "./repositories/insight-repositories.registr
 import { InsightDailyRunRequestTask } from "./tasks/insight-daily-run-request.task.ts";
 import { insightTrpcTransport } from "./transport/insight.trpc.ts";
 
-export const insightProcessModule = defineProcessModule("insight")
-  .withRepositories(insightRepositories)
-  .withApi(InsightModule)
-  .withTransports(insightTrpcTransport)
-  .withEventing(insightEventing)
-  .withEventing(insightDailyRunEventing)
-  .withTasks(({ app }) => [InsightDailyRunRequestTask.create({ insights: app })]);
+export const insightProcessModule: PublishedProcessModule<"insight", InsightApi> =
+  defineProcessModule("insight")
+    .withRepositories(insightRepositories)
+    .withApi(InsightModule)
+    .withTransports(insightTrpcTransport)
+    .withEventing(insightEventing)
+    .withEventing(insightDailyRunEventing)
+    .withTasks(({ app }) => [InsightDailyRunRequestTask.create({ insights: app })]);

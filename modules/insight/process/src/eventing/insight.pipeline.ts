@@ -31,7 +31,7 @@ import {
 import { INSIGHT_EVENT_SCHEMAS } from "./insight.events.ts";
 import { createInsightProjection, type InsightState } from "./insight.projection.ts";
 
-export interface InsightPipelineDeps {
+interface InsightPipelineDeps {
   insightStore: StateProjectionStore<InsightState>;
   readerStore: StateProjectionStore<InsightReaderState>;
 }
