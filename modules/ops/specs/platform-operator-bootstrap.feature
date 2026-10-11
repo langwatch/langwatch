@@ -171,6 +171,20 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     When grant-platform-operator runs with an unknown address
     Then it fails with platform_operator_user_not_found
 
+  @unit @operator-recovery
+  Scenario: The recovery task waits for a grant that is still being applied
+    Given an active account holds the address
+    And the grant is accepted but authz has not confirmed it within its own window
+    When grant-platform-operator runs with that address
+    Then it keeps reading the operators with backoff, logging its progress
+    And it succeeds once the account is listed as an operator
+
+  @unit @operator-recovery
+  Scenario: The recovery task succeeds with a grant still being applied at its bound
+    Given the grant is accepted but still not readable when the task's wait ends
+    When grant-platform-operator runs with that address
+    Then it exits cleanly, saying the grant is recorded and still being applied
+
   # ============================================================================
   # The Operators page
   # ============================================================================
