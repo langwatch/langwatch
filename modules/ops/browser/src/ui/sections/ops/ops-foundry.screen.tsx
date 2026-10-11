@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { RotateCcw } from "lucide-react";
@@ -41,17 +42,11 @@ export default function OpsFoundryScreen() {
         padding="var(--page-inset)"
         w="full"
         overflow="hidden"
+        display="flex"
+        flexDirection="column"
         borderTopLeftRadius="inherit"
       >
-        <Box
-          height="full"
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="lg"
-          overflow="hidden"
-        >
-          {mounted ? <PlaygroundContent /> : <Skeleton height="full" />}
-        </Box>
+        <Card variant="frame-fill">{mounted ? <PlaygroundContent /> : <Skeleton flex={1} />}</Card>
       </Box>
     </FoundryTransport>
   );

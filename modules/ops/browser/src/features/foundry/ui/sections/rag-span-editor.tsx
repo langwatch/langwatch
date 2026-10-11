@@ -1,4 +1,5 @@
-import { Box, Button, Flex, Input, Text, Textarea } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Button, Flex, Input, Text, Textarea } from "@langwatch/design-system/primitives";
 import { Plus, Trash2 } from "lucide-react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
@@ -14,13 +15,13 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
   }
 
   return (
-    <Box rounded="lg" border="1px solid" borderColor="teal.muted" bg="teal.subtle" p={4}>
-      <Text fontSize="sm" fontWeight="semibold" color="teal.fg" mb={3}>
+    <Card variant="nested" tone="teal" padding="md">
+      <Text as="h3" fontSize="sm" fontWeight="semibold" color="teal.fg" mb={3}>
         RAG Contexts
       </Text>
       <Flex direction="column" gap={3}>
         {contexts.map((ctx, i) => (
-          <Box key={i} rounded="md" border="1px solid" borderColor="border" bg="bg.subtle" p={3}>
+          <Card key={i} variant="nested" tone="neutral" padding="sm">
             <Flex justify="space-between" mb={2}>
               <Text fontSize="xs" fontWeight="medium" color="fg.subtle">
                 Context {i + 1}
@@ -63,7 +64,7 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
               placeholder="Retrieved content..."
               rows={3}
             />
-          </Box>
+          </Card>
         ))}
         <Button
           size="sm"
@@ -79,6 +80,6 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
           <Plus size={12} /> Add Context
         </Button>
       </Flex>
-    </Box>
+    </Card>
   );
 }
