@@ -209,6 +209,12 @@ Feature: Instant Evals are metered on the gateway spend spine, reported to Strip
       Then its hold is released after the record and the next check reads the ledger again
 
     @unit
+    Scenario: A hold the worker released does not admit the api's next run against a stale spend
+      Given a free organization whose budget covers one run, and the api read its spend a moment ago
+      When that run is accepted, finishes on the worker, records its spend and releases its hold
+      Then the next two runs the api is asked to start are refused with instant_eval_free_budget_exhausted
+
+    @unit
     Scenario: A run that could not be queued holds nothing
       Given a free organization whose run was accepted but never queued
       When the queue refuses it
