@@ -13,6 +13,7 @@ import {
   RepositoryCell,
   ServiceCell,
   SessionContextSizeCell,
+  SessionIdCell,
   StartedCell,
   StatusCell,
   TokensCell,
@@ -22,6 +23,7 @@ import { TurnsCell } from "./turns-cell.tsx";
 export const conversationCells: Record<string, CellDef<ConversationGroup>> = {
   [ConversationSelectCell.id]: ConversationSelectCell,
   [ConversationCell.id]: ConversationCell,
+  [SessionIdCell.id]: SessionIdCell,
   [StartedCell.id]: StartedCell,
   [LastTurnCell.id]: LastTurnCell,
   [TurnsCell.id]: TurnsCell,

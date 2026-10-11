@@ -12,17 +12,12 @@ import { ChevronDown, Layers } from "lucide-react";
 import type React from "react";
 
 import { useViewStore } from "../../../../behavior/explorer.store.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { type GroupingMode } from "../../../../behavior/view.slice.ts";
+import { groupingLabels } from "../../../../model/grouping-labels.ts";
 
-const GROUPING_OPTIONS: Record<GroupingMode, string> = {
-  flat: "None",
-  "by-conversation": "Conversation",
-  "by-service": "Service",
-  "by-user": "User",
-  "by-model": "Model",
-};
-
-const isGroupingMode = (value: string): value is GroupingMode => value in GROUPING_OPTIONS;
+const isGroupingMode = (value: string): value is GroupingMode =>
+  Object.hasOwn(groupingLabels({ codingAgentScope: false }), value);
 
 /**
  * "Group by: <X>" picker. The trigger turns subtle while rows are grouped, so a grouped
@@ -31,14 +26,16 @@ const isGroupingMode = (value: string): value is GroupingMode => value in GROUPI
 export const GroupingSelect: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const grouping = useViewStore((s) => s.grouping);
   const setGrouping = useViewStore((s) => s.setGrouping);
-  const label = GROUPING_OPTIONS[grouping];
+  const { team } = useOrganizationTeamProject();
+  const options = groupingLabels({ codingAgentScope: !!team?.isPersonal });
+  const label = options[grouping];
 
   return (
     <MenuRoot positioning={{ placement: "bottom-start" }}>
       <Tooltip
         content={
           grouping === "flat"
-            ? "Group rows by conversation, service, user or model"
+            ? `Group rows by ${options["by-conversation"].toLowerCase()}, service, user or model`
             : `Rows grouped by ${label.toLowerCase()}`
         }
         positioning={{ placement: "bottom" }}
@@ -75,7 +72,7 @@ export const GroupingSelect: React.FC<{ compact?: boolean }> = ({ compact = fals
             if (isGroupingMode(e.value)) setGrouping(e.value);
           }}
         >
-          {Object.entries(GROUPING_OPTIONS).map(([value, optionLabel]) => (
+          {Object.entries(options).map(([value, optionLabel]) => (
             <MenuRadioItem key={value} value={value}>
               {optionLabel}
             </MenuRadioItem>

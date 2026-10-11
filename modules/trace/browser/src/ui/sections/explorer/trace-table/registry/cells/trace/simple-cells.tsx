@@ -78,6 +78,17 @@ export const ConversationIdCell = {
   ),
 } as const satisfies CellDef<TraceListItem>;
 
+/** A session is a conversation under its coding-agent name: the same id, the same field. */
+export const SessionIdCell = {
+  id: "sessionId",
+  label: "Session ID",
+  render: ({ row }) => (
+    <MonoCell color="fg.subtle" truncate title={row.conversationId ?? undefined} userSelect="all">
+      {row.conversationId || dash}
+    </MonoCell>
+  ),
+} as const satisfies CellDef<TraceListItem>;
+
 export const OriginCell = {
   id: "origin",
   label: "Origin",

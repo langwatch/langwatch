@@ -255,6 +255,13 @@ const traceColumnDefs = {
     minSize: 165,
     enableSorting: false,
   }),
+  sessionId: traceCol.accessor((row): unknown => row.conversationId ?? "", {
+    id: "sessionId",
+    header: "Session ID",
+    size: 180,
+    minSize: 130,
+    enableSorting: false,
+  }),
   origin: traceCol.accessor((row): unknown => row.origin, {
     id: "origin",
     header: "Origin",
@@ -294,6 +301,13 @@ const conversationColumnDefs: Record<string, ColumnDef<ConversationGroup, unknow
     size: 9999,
     minSize: 320,
     meta: flex,
+  }),
+  sessionId: convCol.accessor((row): unknown => row.conversationId, {
+    id: "sessionId",
+    header: "Session ID",
+    size: 180,
+    minSize: 130,
+    enableSorting: false,
   }),
   // Sizes here were carried over from an early draft where every
   // conversation header was abbreviated ("Dur", "Turns", etc.). Names

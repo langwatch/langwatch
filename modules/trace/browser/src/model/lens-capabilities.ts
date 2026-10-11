@@ -69,6 +69,7 @@ const TRACE_CAPABILITY: LensCapability = {
     { id: "ttft", label: "TTFT", section: "Standard" },
     { id: "userId", label: "User ID", section: "Standard" },
     { id: "conversationId", label: "Conversation ID", section: "Standard" },
+    { id: "sessionId", label: "Session ID", section: "Standard" },
     { id: "origin", label: "Origin", section: "Standard" },
     { id: "evaluations", label: "Evals", section: "Evaluations" },
     { id: "events", label: "Events", section: "Events" },
@@ -108,6 +109,7 @@ const CONVERSATION_CAPABILITY: LensCapability = {
   // missing a section, which reads as broken next to the dialog version.
   columns: [
     { id: "conversation", label: "Conversation", section: "Standard" },
+    { id: "sessionId", label: "Session ID", section: "Standard" },
     { id: "turns", label: "Traces", section: "Standard" },
     { id: "started", label: "Started", section: "Standard" },
     { id: "lastTurn", label: "Last Activity", section: "Standard" },

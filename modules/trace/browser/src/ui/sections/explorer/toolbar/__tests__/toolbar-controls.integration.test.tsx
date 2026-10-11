@@ -21,9 +21,11 @@ vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useTraceHost: () => ({ hasPermission: () => true }),
 }));
+const scope = vi.hoisted(() => ({ isPersonal: false }));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
+    team: { id: "team-1", isPersonal: scope.isPersonal },
   }),
 }));
 
@@ -32,6 +34,7 @@ vi.mock("../../../../../features/instant-eval/behavior/use-evaluator-options.ts"
 }));
 
 beforeEach(() => {
+  scope.isPersonal = false;
   useExplorerStore.getState().clearAll();
   useExplorerStore.getState().setGrouping("flat");
 });
@@ -62,6 +65,26 @@ describe("the grouping select", () => {
 
     const trigger = screen.getByRole("button", { name: "Group by: None" });
     expect(trigger).toHaveTextContent("Group by:None");
+  });
+});
+
+describe("the grouping select in a coding-agent scope", () => {
+  /** @scenario "A coding-agent scope labels the conversation grouping By session" */
+  it("reads Session for the conversation grouping, and Conversation elsewhere", async () => {
+    useExplorerStore.getState().setGrouping("by-conversation");
+    scope.isPersonal = true;
+    renderWithDesignSystem(<GroupingSelect />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Group by: Session" }));
+
+    const labels = (await screen.findAllByRole("menuitemradio")).map((item) => item.textContent);
+    expect(labels).toContain("Session");
+    expect(labels).not.toContain("Conversation");
+
+    cleanup();
+    scope.isPersonal = false;
+    renderWithDesignSystem(<GroupingSelect />);
+    expect(screen.getByRole("button", { name: "Group by: Conversation" })).toBeInTheDocument();
   });
 });
 
@@ -129,5 +152,16 @@ describe("the columns picker", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: /Service/ }));
 
     expect(useExplorerStore.getState().columnOrder).toContain("service");
+  });
+
+  /** @scenario "The session id column can be added and shows the id" */
+  it("offers Session ID and adds it to the view when its checkbox is checked", async () => {
+    const store = useExplorerStore.getState();
+    if (store.columnOrder.includes("sessionId")) store.toggleColumn("sessionId");
+    renderWithDesignSystem(<ColumnPickerContent />);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /Session ID/ }));
+
+    expect(useExplorerStore.getState().columnOrder).toContain("sessionId");
   });
 });

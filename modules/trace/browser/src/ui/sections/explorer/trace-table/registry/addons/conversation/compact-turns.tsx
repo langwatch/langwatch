@@ -240,6 +240,7 @@ function turnCellContent({
       );
     // Session-level coding-agent facts have no per-turn meaning: the
     // repository and the pull request belong to the whole session.
+    case "sessionId":
     case "modelCalls":
     case "compactions":
     case "repository":
