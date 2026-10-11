@@ -8,6 +8,7 @@ import { defineConfig, type Plugin, type UserConfig } from "vite";
 
 import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
 import { bootSplash } from "./vite/boot-splash";
+import { bundledRefresh } from "./vite/bundled-refresh";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
 import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
@@ -214,21 +215,6 @@ function logDevelopmentTlsState(
 
 const BUNDLED_ROLLDOWN = IS_BUNDLED ? { experimental: { devMode: { lazy: false } } } : {};
 
-/** Bundled dev runs plugin-react's preamble after the app's modules; stubs stop them throwing. */
-function bundledRefreshStub(): Plugin {
-  return {
-    name: "bundled-refresh-stub",
-    apply: "serve",
-    transformIndexHtml: () => [
-      {
-        tag: "script",
-        children: "window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;",
-        injectTo: "head-prepend",
-      },
-    ],
-  };
-}
-
 type RenderBuiltUrl = NonNullable<NonNullable<UserConfig["experimental"]>["renderBuiltUrl"]>;
 type RollupOnWarn = NonNullable<
   NonNullable<NonNullable<UserConfig["build"]>["rollupOptions"]>["onwarn"]
@@ -282,7 +268,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // The api renders the page's public config; the dev server lifts it from the api's shell.
       ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
-      ...(IS_BUNDLED ? [bundledRefreshStub()] : []),
+      ...(IS_BUNDLED ? [bundledRefresh()] : []),
       // Skipped when bundled: its /@fs script is not in the bundle, so it 404s.
       havenOrb({ slug: IS_BUNDLED ? undefined : process.env[HAVEN_SLUG_ENV] }),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
