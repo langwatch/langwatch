@@ -309,6 +309,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
     authorization: Authorization;
+    protections?: Protections;
   }): Promise<DiscoverResult>;
   /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
   renameTrace(
@@ -672,6 +673,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     timeRange: { from: number; to: number };
     /** The Instant Eval runs registered for the query's `eval` chips. */
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    /** The viewer's; under any content protection free text skips captured I/O. */
+    protections?: Protections;
   }): { sql: string; params: Record<string, unknown> } | null;
   /**
    * A legacy `filters` document compiled to parameterized ClickHouse conditions
@@ -693,6 +696,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     evalRuns?: readonly ResolvedInstantEvalRun[];
     originNamed?: boolean;
     dateField?: TraceDateField;
+    protections?: Protections;
   }): { sql: string; params: Record<string, unknown> };
   /**
    * The filter compiled against the LangWatchQL trace view, for a statement a
@@ -750,6 +754,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     query: string;
     evalRuns?: readonly ResolvedInstantEvalRun[];
     authorization: Authorization;
+    protections?: Protections;
   }): Promise<unknown>;
   readNewCount(params: unknown): Promise<number>;
   readSuggestions(params: unknown): Promise<string[]>;
