@@ -94,7 +94,8 @@ type run struct {
 	anchor             time.Time
 	sso                ssoSeed
 	retention          retentionState
-	odd                oddSeed // the tenant-oddities overlay
+	odd                oddSeed     // the tenant-oddities overlay
+	damage             damageState // the operator-damage overlay
 	legacy             legacySeed
 	legacyOrg          legacyOrgSeed
 	license            TestLicense
@@ -153,6 +154,9 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	}
 	if cell.overlay(OverlayTenantOddities) {
 		origin = append(origin, step{"oddities-plant", cell.plantOddities})
+	}
+	if cell.overlay(OverlayOperatorDamage) {
+		origin = append(origin, step{"damage-plant", cell.plantDamage})
 	}
 	steps := slices.Concat([]step{{"build", cell.buildBoth}}, origin, before, cut, []step{
 		{"switch", cell.switchToHead}, {"ready", cell.awaitReady},
@@ -223,6 +227,7 @@ func (cell *run) partialChecks(ctx context.Context) {
 	defer stop()
 	cell.report.Queue = cell.queueSummary(read)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.partialVerdicts()...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.damageVerdicts(read)...)
 	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked (Visible and Lost read unchecked); only the verdicts that need no settled stores were judged")
 }
 
@@ -735,6 +740,7 @@ func (cell *run) rollOver(ctx context.Context) error {
 	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
 		cell.reviveAPI()
 		cell.restartWorkerMidUpgrade(ctx)
+		cell.watchDamage(ctx)
 		status, _, err := get(ctx, httpClient, cell.headURL()+cell.options.SwitchOn)
 		return (err == nil && status/100 == 2) || cell.headDied()
 	})
@@ -826,6 +832,7 @@ func (cell *run) awaitReady(ctx context.Context) error {
 	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
 		cell.reviveAPI()
 		cell.restartWorkerMidUpgrade(ctx)
+		cell.watchDamage(ctx)
 		return FirstAt(cell.poller.Timeline(), "ready") >= 0 || cell.headDied()
 	})
 	if err != nil || cell.headDied() {
@@ -959,7 +966,7 @@ func (cell *run) shootPage(ctx context.Context, phase string, extra map[string]a
 	if phase == "down" {
 		return "", ""
 	}
-	if signIn {
+	if _, own := extra["url"]; signIn && !own { // a caller naming its own url manages its own sign-in
 		select { // a signed-in shot before the grant shows "Access Restricted"
 		case <-cell.granted:
 		case <-ctx.Done():

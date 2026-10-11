@@ -53,6 +53,7 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.scimVerdict(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.retentionVerdict(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.oddityVerdicts(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.damageVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.signupVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict(), cell.storedEventsVerdict(ctx))
@@ -273,6 +274,10 @@ func (cell *run) logVerdict() Verdict {
 			}
 			if each, ok := accepts(line, switched, ready, cell.origin); ok {
 				accepted[each.Signature+" ("+each.Reason+")"]++
+				continue
+			}
+			if cell.overlay(OverlayOperatorDamage) && refusalLine(line, ready, cell.origin) {
+				accepted["the upgrade refused on planted operator damage (judged by D1 to D3)"]++
 				continue
 			}
 			if inDownWindow(line, cell.down.downAtMs, cell.down.upAtMs, cell.origin) {

@@ -18,7 +18,7 @@ import (
 const OverlayRetention = "retention"
 
 // Overlays a cell accepts (-overlays), applied on top of its shape.
-var Overlays = []string{OverlayRetention, OverlayTenantOddities}
+var Overlays = []string{OverlayRetention, OverlayTenantOddities, OverlayOperatorDamage}
 
 // agedSlices are the ages in days the overlay writes rows at: each lands in an old weekly partition of its own.
 var agedSlices = []int{30, 61, 95, 400}

@@ -33,7 +33,11 @@ second head api with the private route missing, then malformed, after settle (H7
 plants aged rows on the private target under the private organization's own rule. `-overlays tenant-oddities`
 (SSO deployments; it also runs the cell's own object storage) plants a held organization (its legacy `ssoDomain` is a
 domain another organization's connection proved), plaintext provider keys, a Postgres-layout dataset and an organization
-with a prompt and no tags, and judges them as A1 to A4. Exit 0 all pass, 1 an invariant failed, 2 a
+with a prompt and no tags, and judges them as A1 to A4. `-overlays operator-damage` plants, by SQL on main, a
+`_prisma_migrations` row an interrupted deploy left failed (a folder below head's re-runnable marker) and a hand-built
+`AuditLog_idempotencyKey_key` on another column; on each refusal the cell records `/readyz`, `pnpm task upgrade status` and
+head's page, does the fix the refusal names as the operator (restarting head's worker when the upgrade does not run again
+within 2 min), and judges D1 to D3; pass `-ready-within 20m`. Exit 0 all pass, 1 an invariant failed, 2 a
 step stopped the cell (its databases are kept for inspection).
 
 Built code only, both sides: main runs `pnpm build` in `platform/app`, then `runtime:app` and
