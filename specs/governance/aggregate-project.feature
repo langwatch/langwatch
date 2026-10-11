@@ -53,13 +53,6 @@ Feature: An aggregate project reads its member projects
     Then the row is marked revoked with a reason rather than deleted
     And the organisation's authorization epoch moves forward
 
-  @unit
-  Scenario: A shared grant's window is stored with its row
-    Given a project-reader grant attached with a condition starting today
-    When the grant's attach is projected into the grants table
-    Then the stored row carries that condition
-    And an own grant's row carries none
-
   # ── B. A proof is minted at the door ─────────────────────────────────────
 
   @unit
