@@ -19,6 +19,7 @@ import { MemoryGatewayCacheRuleRepository } from "./memory.gateway-cache-rule.re
 import { MemoryGatewayChangeEventsRepository } from "./memory.gateway-change-event.repository.ts";
 import { MemoryGatewayConnectUpstreamRepository } from "./memory.gateway-connect-upstream.repository.ts";
 import { MemoryGatewayGuardrailRepository } from "./memory.gateway-guardrail.repository.ts";
+import { MemoryGatewayIdIndexFillRepository } from "./memory.gateway-id-index-fill.repository.ts";
 import { MemoryGatewayInternalStoreRepository } from "./memory.gateway-internal-store.repository.ts";
 import { MemoryGatewayKeyBudgetRepository } from "./memory.gateway-key-budget.repository.ts";
 import { MemoryGatewayOpenAdmissionsRepository } from "./memory.gateway-open-admissions.repository.ts";
@@ -85,6 +86,7 @@ export class MemoryGatewayRepositories {
       budgetSpend,
       principalSpend: MemoryGatewayPrincipalSpendRepository.create(),
       spendEvents,
+      idIndexFill: MemoryGatewayIdIndexFillRepository.create(),
       openAdmissions: MemoryGatewayOpenAdmissionsRepository.create(spendEvents),
       agentCache: MemoryGatewayAgentCacheEntryRepository.create(),
       spendFoldCache: MemoryGatewaySpendFoldCacheRepository.create(),

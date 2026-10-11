@@ -1,4 +1,10 @@
 import {
+  type IdIndexFlags,
+  type IdIndexReader,
+  indexedRead,
+  type WindowFragment,
+} from "@langwatch/clickhouse-client";
+import {
   type GatewaySpendDay,
   type GatewayUsageCount,
   type SpendUsage,
@@ -173,12 +179,50 @@ const utcDayStartMs = (day: string): number =>
   Temporal.Instant.from(`${day}T00:00:00.000Z`).epochMilliseconds;
 
 export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRepository {
-  static create(resolveClient: GatewayClickHouseResolver): ClickHouseGatewaySpendEventsRepository {
-    return new ClickHouseGatewaySpendEventsRepository(resolveClient);
+  static create(
+    resolveClient: GatewayClickHouseResolver,
+    options: { idIndexReader?: IdIndexReader | undefined } = {},
+  ): ClickHouseGatewaySpendEventsRepository {
+    return new ClickHouseGatewaySpendEventsRepository(resolveClient, options.idIndexReader);
   }
 
-  constructor(private readonly resolveClient: GatewayClickHouseResolver) {
+  constructor(
+    private readonly resolveClient: GatewayClickHouseResolver,
+    /** The routed client that answers an id index; absent, every lookup reads as before. */
+    private readonly idIndexReader?: IdIndexReader,
+  ) {
     super();
+  }
+
+  /**
+   * One request's rows, bounded by the id index when its flag is on for the tenant's target and
+   * unbounded as before otherwise. `run` splices the window it is given into its statement.
+   */
+  private readByRequestId<T>({
+    tenantId,
+    gatewayRequestId,
+    idIndex,
+    isEmpty,
+    run,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+    idIndex: IdIndexFlags | undefined;
+    isEmpty: (result: T) => boolean;
+    run: (window: WindowFragment | null) => Promise<T>;
+  }): Promise<T> {
+    if (this.idIndexReader === undefined) return run(null);
+    return indexedRead({
+      client: this.idIndexReader,
+      idIndex,
+      tenantId,
+      table: TABLE,
+      index: `${TABLE}_id_index`,
+      key: { GatewayRequestId: gatewayRequestId },
+      fallback: "unbounded",
+      isEmpty,
+      run,
+    });
   }
 
   /**
@@ -255,13 +299,21 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
   async findForFold({
     tenantId,
     gatewayRequestId,
+    idIndex,
   }: {
     tenantId: string;
     gatewayRequestId: string;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<GatewaySpendState | null> {
     const client = await this.resolveClient(tenantId);
-    const result = await client.query({
-      query: `
+    const raw = await this.readByRequestId<Record<string, unknown>[]>({
+      tenantId,
+      gatewayRequestId,
+      idIndex,
+      isEmpty: (rows) => rows.length === 0,
+      run: async (window) => {
+        const result = await client.query({
+          query: `
         SELECT ${SPEND_ROW_COLUMNS}, SettleReason, PodId, PodSeq,
                TokensCacheWrite1h, TokensInputAudio, TokensOutputAudio,
                CharsInput, AudioMS,
@@ -269,12 +321,15 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
           AND GatewayRequestId = {gatewayRequestId:String}
+          ${window?.sqlFor("OccurredAt") ?? ""}
         LIMIT 1
       `,
-      query_params: { tenantId, gatewayRequestId },
-      format: "JSONEachRow",
+          query_params: { tenantId, gatewayRequestId, ...window?.params },
+          format: "JSONEachRow",
+        });
+        return (await result.json()) as Record<string, unknown>[];
+      },
     });
-    const raw = (await result.json()) as Record<string, unknown>[];
     const r = raw[0];
     if (!r) return null;
     if (String(r.Version) !== GATEWAY_SPEND_PROJECTION_VERSION_LATEST) {
@@ -472,19 +527,32 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     tenantIds: string[];
     gatewayRequestId: string;
     statuses: string[];
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<SpendEventRow | null> {
     if (input.statuses.length === 0) return null;
     const perTenant = await Promise.all(
       input.tenantIds.map((tenantId) =>
-        this.readTenantSpendRows({
+        this.readByRequestId<SpendEventRow[]>({
           tenantId,
-          query: `SELECT ${SPEND_ROW_COLUMNS}
+          gatewayRequestId: input.gatewayRequestId,
+          idIndex: input.idIndex,
+          isEmpty: (rows) => rows.length === 0,
+          run: (window) =>
+            this.readTenantSpendRows({
+              tenantId,
+              query: `SELECT ${SPEND_ROW_COLUMNS}
         FROM ${TABLE} FINAL
         WHERE TenantId = {tenantId:String}
           AND GatewayRequestId = {gatewayRequestId:String}
           AND Status IN {statuses:Array(String)}
+          ${window?.sqlFor("OccurredAt") ?? ""}
         LIMIT 1`,
-          params: { gatewayRequestId: input.gatewayRequestId, statuses: input.statuses },
+              params: {
+                gatewayRequestId: input.gatewayRequestId,
+                statuses: input.statuses,
+                ...window?.params,
+              },
+            }),
         }),
       ),
     );

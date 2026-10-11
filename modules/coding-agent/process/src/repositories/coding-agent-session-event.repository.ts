@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type {
   CodingAgentSessionCursor,
   CodingAgentSessionEvent,
@@ -15,6 +16,8 @@ export abstract class CodingAgentSessionEventRepository {
     occurredAt?: { fromMs: number; toMs: number };
     cursor?: CodingAgentSessionCursor;
     limit: number;
+    /** Without `occurredAt`, the id index (when its flag is on) bounds the read. */
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<{
     events: CodingAgentSessionEvent[];
     nextCursor: CodingAgentSessionCursor | null;

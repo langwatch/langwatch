@@ -5,6 +5,7 @@ import {
 } from "@langwatch/api/rest";
 import type { CodingAgentApi, CodingAgentServerConfig } from "@langwatch/coding-agent-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { CodingAgentModule } from "./app/coding-agent.app.ts";
 import { codingAgentEventing } from "./eventing/coding-agent-processing.pipeline.ts";
@@ -50,4 +51,16 @@ export const codingAgentProcessModule: PublishedProcessModule<
         actorId: credential.userId ?? `apikey:${credential.apiKeyId}`,
       };
     },
-  });
+  })
+  .withMigrations(({ app }) => [
+    defineMigrationStep({
+      id: "coding-agent:fill-id-indexes",
+      kind: "data",
+      mode: "background",
+      description:
+        "Fills the id indexes of coding-agent sessions, events and trace mappings from older rows, then turns each ClickHouse target's index flag on.",
+      needsOldWritersGone: false,
+      // Level-triggered: a rerun merges the same ranges and resumes at the saved cursor.
+      run: ({ checkpoint, dryRun, signal }) => app.fillIdIndexes({ checkpoint, dryRun, signal }),
+    }),
+  ]);

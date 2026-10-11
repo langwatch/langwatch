@@ -2,6 +2,7 @@
  * The gateway budget ledger in ClickHouse.
  */
 
+import { type IdIndexBounds, type IdIndexReader, indexWindow } from "@langwatch/clickhouse-client";
 import {
   type GatewayBudgetLedgerStatus,
   type GatewayBudgetResource,
@@ -21,6 +22,7 @@ import { budgetSpendTargetsFor } from "../../rules/gateway-budget-spend-targets.
 import type {
   GatewayBudgetSpendRepository,
   GatewayBudgetSpendRecord,
+  IdIndexReadOptions,
 } from "../gateway-budget-spend.repository.ts";
 import type { GatewayClickHouseResolver } from "./clickhouse.gateway-session.store.ts";
 
@@ -215,18 +217,47 @@ type BucketQueryShape = {
 };
 
 export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepository {
-  static create(resolveClient: GatewayClickHouseResolver): GatewayBudgetClickHouseRepository {
-    return new GatewayBudgetClickHouseRepository(resolveClient);
+  static create(
+    resolveClient: GatewayClickHouseResolver,
+    options: { idIndexReader?: IdIndexReader | undefined } = {},
+  ): GatewayBudgetClickHouseRepository {
+    return new GatewayBudgetClickHouseRepository(resolveClient, options.idIndexReader);
   }
 
-  constructor(private readonly resolveClient: GatewayClickHouseResolver) {}
+  constructor(
+    private readonly resolveClient: GatewayClickHouseResolver,
+    /** The routed client that answers an id index; absent, every probe reads the ledger. */
+    private readonly idIndexReader?: IdIndexReader,
+  ) {}
+
+  /**
+   * What the ledger's id index holds for one request, or undefined while its flag is off for the
+   * tenant's target (or no reader was given). The ledger has no TTL, so the index is exact.
+   */
+  private async ledgerIndexBounds({
+    tenantId,
+    gatewayRequestId,
+    idIndex,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+  } & IdIndexReadOptions): Promise<IdIndexBounds | undefined> {
+    const reader = this.idIndexReader;
+    if (reader === undefined || idIndex === undefined) return undefined;
+    if (!idIndex.isOn({ target: await reader.targetOf({ tenantId }) })) return undefined;
+    return reader.indexBounds({
+      tenantId,
+      index: `${EVENTS_TABLE}_id_index`,
+      key: { GatewayRequestId: gatewayRequestId },
+    });
+  }
 
   /**
    * Idempotent at the ledger level (ReplacingMergeTree dedups on merge), but the
    * gateway_budget_scope_totals view aggregates at INSERT time and does not dedup — a replay
    * without a pre-insert guard multiplies the rollup total until the next merge.
    */
-  async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
+  async insertDebit(rows: BudgetDebitRow[], options: IdIndexReadOptions = {}): Promise<void> {
     if (rows.length === 0) return;
     const tenantId = rows[0]!.tenantId;
     const gatewayRequestId = rows[0]!.gatewayRequestId;
@@ -239,14 +270,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       );
     }
 
-    const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} LIMIT 1`,
-      query_params: { tenantId, gatewayRequestId },
-      format: "JSONEachRow",
-    });
-    const probeRows = (await probe.json()) as unknown[];
-    if (probeRows.length > 0) {
+    const bounds = await this.ledgerIndexBounds({ tenantId, gatewayRequestId, ...options });
+    const seen = bounds ? bounds.n > 0 : await this.requestInLedger({ tenantId, gatewayRequestId });
+    if (seen) {
       logger.debug(
         { tenantId, gatewayRequestId, batchSize: rows.length },
         "skipping replay — gateway_request_id already in ledger",
@@ -255,6 +281,23 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     }
 
     await this.insertRows(rows);
+  }
+
+  /** The unbounded probe the id index replaces while its flag is off. */
+  private async requestInLedger({
+    tenantId,
+    gatewayRequestId,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+  }): Promise<boolean> {
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} LIMIT 1`,
+      query_params: { tenantId, gatewayRequestId },
+      format: "JSONEachRow",
+    });
+    return ((await probe.json()) as unknown[]).length > 0;
   }
 
   /** Map + insert debit rows; shared by every probing insert path. */
@@ -499,12 +542,37 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     };
   }
 
+  /** The budgets already on one request; the index range (when known) bounds the scan. */
+  private async budgetsOnRequest({
+    tenantId,
+    gatewayRequestId,
+    budgetIds,
+    bounds,
+  }: {
+    tenantId: string;
+    gatewayRequestId: string;
+    budgetIds: string[];
+    bounds: IdIndexBounds | undefined;
+  }): Promise<{ BudgetId: string; ScopeId: string }[]> {
+    const client = await this.resolveClient(tenantId);
+    const window = bounds ? indexWindow(bounds) : null;
+    const probe = await client.query({
+      query: `SELECT DISTINCT BudgetId, ScopeId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)} ${window?.sqlFor("OccurredAt") ?? ""}`,
+      query_params: { tenantId, requestId: gatewayRequestId, budgetIds, ...window?.params },
+      format: "JSONEachRow",
+    });
+    return (await probe.json()) as { BudgetId: string; ScopeId: string }[];
+  }
+
   /**
    * One request resolves several budgets, each landing its own row, so the probe is per
    * (BudgetId, GatewayRequestId) rather than the whole-request one `insertDebit` takes — a
    * whole-request probe would silently skip every budget after the first it saw.
    */
-  async insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void> {
+  async insertDebitsForBudgets(
+    rows: BudgetDebitRow[],
+    options: IdIndexReadOptions = {},
+  ): Promise<void> {
     if (rows.length === 0) return;
     const tenantId = rows[0]!.tenantId;
     const gatewayRequestId = rows[0]!.gatewayRequestId;
@@ -519,18 +587,13 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       );
     }
     const budgetIds = [...new Set(rows.map((r) => r.budgetId))];
-    const client = await this.resolveClient(tenantId);
-    const probe = await client.query({
-      query: `SELECT DISTINCT BudgetId, ScopeId FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {requestId:String} AND BudgetId IN {budgetIds:Array(String)}`,
-      query_params: { tenantId, requestId: gatewayRequestId, budgetIds },
-      format: "JSONEachRow",
-    });
-    const existing = new Map(
-      ((await probe.json()) as { BudgetId: string; ScopeId: string }[]).map((r) => [
-        r.BudgetId,
-        r.ScopeId,
-      ]),
-    );
+    const bounds = await this.ledgerIndexBounds({ tenantId, gatewayRequestId, ...options });
+    // A request the index has never seen has no ledger row, so there is nothing to probe.
+    const probed =
+      bounds?.n === 0
+        ? []
+        : await this.budgetsOnRequest({ tenantId, gatewayRequestId, budgetIds, bounds });
+    const existing = new Map(probed.map((r) => [r.BudgetId, r.ScopeId]));
     // A budget already on this request suppresses the row (idempotent replay) — unless the
     // existing row names a DIFFERENT bucket, since the ledger key has no bucket in it. That
     // silently drops one side's spend from whichever bucket enforcement reads.

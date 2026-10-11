@@ -4,6 +4,8 @@ import type { Authorization } from "@langwatch/authorization";
 import {
   AuthorizedClickHouse,
   type ClickHouseQueryClient,
+  type IdIndexFlags,
+  indexedRead,
   type TenantScopedReader,
 } from "@langwatch/clickhouse-client";
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
@@ -34,6 +36,9 @@ import {
 } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_sessions" as const;
+
+/** A time predicate spliced into a statement, with the parameters it names. */
+type TimeBound = { sql: string; params: Record<string, number> };
 
 const asString = (value: unknown): string =>
   typeof value === "string" || typeof value === "number" || typeof value === "bigint"
@@ -471,27 +476,71 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /**
-   * Reads the latest raw session record without `FINAL`: late signals can move `StartedAt`,
-   * leaving superseded ReplacingMergeTree rows until TTL.
+   * Reads the latest raw session record without `FINAL`: late signals can move `StartedAt`.
+   * A caller's window bounds the outer scan only, since a newer version may sit outside it;
+   * with none, the id index (flag on) bounds both scans to the range all versions span.
    */
   private async findLatestRecord({
     tenantId,
     sessionId,
     window,
+    idIndex,
   }: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<Record<string, unknown> | null> {
     EventUtils.validateTenantId(
       { tenantId },
       "CodingAgentSessionClickHouseRepository.findBySessionId",
     );
-    const partitionFilter =
-      window !== undefined
-        ? "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})"
-        : "";
+    if (window !== undefined) {
+      return this.readLatestRecord({
+        tenantId,
+        sessionId,
+        outer: {
+          sql: "AND StartedAt BETWEEN fromUnixTimestamp64Milli({from:Int64}) AND fromUnixTimestamp64Milli({to:Int64})",
+          params: { from: window.fromMs, to: window.toMs },
+        },
+        inner: { sql: "", params: {} },
+      });
+    }
+    return indexedRead({
+      client: this.clickhouse,
+      idIndex,
+      tenantId,
+      table: TABLE_NAME,
+      index: `${TABLE_NAME}_id_index`,
+      key: { SessionId: sessionId },
+      fallback: "unbounded",
+      isEmpty: (record) => record === null,
+      run: (fragment) => {
+        const bound = {
+          sql: fragment?.sqlFor("StartedAt") ?? "",
+          params: fragment?.params ?? {},
+        };
+        return this.readLatestRecord({
+          tenantId,
+          sessionId,
+          outer: bound,
+          inner: bound,
+        });
+      },
+    });
+  }
 
+  private async readLatestRecord({
+    tenantId,
+    sessionId,
+    outer,
+    inner,
+  }: {
+    tenantId: string;
+    sessionId: string;
+    outer: TimeBound;
+    inner: TimeBound;
+  }): Promise<Record<string, unknown> | null> {
     const { rows } = await this.clickhouse.query<Record<string, unknown>>({
       tenantId,
       table: TABLE_NAME,
@@ -501,12 +550,13 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND SessionId = {sessionId:String}
-          ${partitionFilter}
+          ${outer.sql}
           AND (TenantId, SessionId, UpdatedAt) IN (
             SELECT TenantId, SessionId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND SessionId = {sessionId:String}
+              ${inner.sql}
             GROUP BY TenantId, SessionId
           )
         ORDER BY
@@ -517,11 +567,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
           StartedAt ASC
         LIMIT 1
       `,
-      params: {
-        tenantId,
-        sessionId,
-        ...(window !== undefined ? { from: window.fromMs, to: window.toMs } : {}),
-      },
+      params: { tenantId, sessionId, ...outer.params, ...inner.params },
     });
 
     return rows[0] ?? null;
@@ -532,6 +578,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<CodingAgentSessionRow | null> {
     const record = await this.findLatestRecord(params);
     return record ? fromRecord(record) : null;
@@ -546,6 +593,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<{
     row: CodingAgentSessionRow;
     appliedEventIds: string[];

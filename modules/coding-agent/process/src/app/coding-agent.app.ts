@@ -1,6 +1,7 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { Authorization } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type { FillIdIndexesOptions, IdIndexFillReport } from "@langwatch/clickhouse-client";
 import {
   type CodingAgentSessionLookupInput,
   CodingAgentApi as CodingAgentApiToken,
@@ -35,6 +36,7 @@ import {
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -66,6 +68,8 @@ import { SystemCodingAgentClockService } from "../services/coding-agent-clock.se
 import { CodingAgentCommandDispatcherService } from "../services/coding-agent-command-dispatcher.service.ts";
 import { GovernanceCodingAgentBillingService } from "../services/coding-agent-cost-attribution.service.ts";
 import { OtelCodingAgentCostMetricsService } from "../services/coding-agent-cost-metrics.service.ts";
+import { CodingAgentIdIndexFillService } from "../services/coding-agent-id-index-fill.service.ts";
+import { CodingAgentIdIndexFlagsService } from "../services/coding-agent-id-index-flags.service.ts";
 import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
 import { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
 import { CodingAgentScopeDirectoryService } from "../services/coding-agent-scope-directory.service.ts";
@@ -132,6 +136,7 @@ type CodingAgentDependencies = {
   users: typeof UserApi;
   auditLog: typeof AuditLogApi;
   governance: typeof GovernanceRestApi;
+  featureFlags: typeof FeatureFlagApi;
 };
 type CodingAgentSetup = FeatureSetup<
   CodingAgentDependencies,
@@ -159,6 +164,8 @@ export class CodingAgentModule implements CodingAgentApi {
     auditLog: AuditLogApi,
     /** Decides which coding-assistant sources a bundled plan covers. */
     governance: GovernanceRestApi,
+    /** Whether the id indexes are filled; a step turns it on once they are. */
+    featureFlags: FeatureFlagApi,
   };
 
   static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentModule {
@@ -171,6 +178,7 @@ export class CodingAgentModule implements CodingAgentApi {
       projects: dependencies.projects,
       billing: GovernanceCodingAgentBillingService.create({ governance: dependencies.governance }),
       clock: SystemCodingAgentClockService.create(),
+      idIndex: CodingAgentIdIndexFlagsService.create({ featureFlags: dependencies.featureFlags }),
     });
     const scopeService = CodingAgentCallerScopeService.create({
       directory: CodingAgentScopeDirectoryService.create({
@@ -226,6 +234,11 @@ export class CodingAgentModule implements CodingAgentApi {
       auditLog: dependencies.auditLog,
       processing,
       commands,
+      idIndexFill: CodingAgentIdIndexFillService.create({
+        fills: repositories.idIndexFill,
+        retention: dependencies.retention,
+        featureFlags: dependencies.featureFlags,
+      }),
     });
   }
 
@@ -238,6 +251,7 @@ export class CodingAgentModule implements CodingAgentApi {
   readonly #auditLog: Pick<AuditLogApi, "record">;
   readonly #processing: CodingAgentProcessingPipeline;
   readonly #commands: CodingAgentCommandDispatcherService;
+  readonly #idIndexFill: CodingAgentIdIndexFillService;
 
   private constructor({
     codingAgents,
@@ -249,6 +263,7 @@ export class CodingAgentModule implements CodingAgentApi {
     auditLog,
     processing,
     commands,
+    idIndexFill,
   }: {
     codingAgents: CodingAgentSessionService;
     github: GithubApi;
@@ -259,6 +274,7 @@ export class CodingAgentModule implements CodingAgentApi {
     auditLog: Pick<AuditLogApi, "record">;
     processing: CodingAgentProcessingPipeline;
     commands: CodingAgentCommandDispatcherService;
+    idIndexFill: CodingAgentIdIndexFillService;
   }) {
     this.#codingAgents = codingAgents;
     this.#github = github;
@@ -269,6 +285,14 @@ export class CodingAgentModule implements CodingAgentApi {
     this.#auditLog = auditLog;
     this.#processing = processing;
     this.#commands = commands;
+    this.#idIndexFill = idIndexFill;
+  }
+
+  /** The background step's fill of the id indexes (`coding-agent:fill-id-indexes`). */
+  fillIdIndexes(
+    run: Pick<FillIdIndexesOptions, "checkpoint" | "dryRun" | "signal">,
+  ): Promise<IdIndexFillReport> {
+    return this.#idIndexFill.fillIdIndexes(run);
   }
 
   /** The session pipeline this module registers, built once by {@link create}. */

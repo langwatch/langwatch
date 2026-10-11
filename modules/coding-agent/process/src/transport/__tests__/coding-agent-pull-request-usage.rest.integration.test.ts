@@ -3,6 +3,7 @@ import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-co
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -122,6 +123,7 @@ function mount({
       organizations: createApiFixture<OrganizationApi>({}),
       users: createApiFixture<UserApi>({}),
       governance: createApiFixture<GovernanceRestApi>({ isSourceBilled: async () => false }),
+      featureFlags: createApiFixture<FeatureFlagApi>({}),
       auditLog: createApiFixture<AuditLogApi>({
         record: async (command) => {
           audits.push(command);

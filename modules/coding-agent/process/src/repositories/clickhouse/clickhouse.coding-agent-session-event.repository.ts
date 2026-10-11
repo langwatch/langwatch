@@ -1,4 +1,8 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  type IdIndexFlags,
+  indexedRead,
+} from "@langwatch/clickhouse-client";
 import type {
   CodingAgentSessionEvent,
   CodingAgentSessionEventRecord,
@@ -11,6 +15,9 @@ import type { CodingAgentSessionEventRepository as SessionEventsRepository } fro
 import { clickHouseMomentOf, routingTenantOf, type ClickHouseMoment } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_session_events" as const;
+
+/** A time predicate spliced into a statement, with the parameters it names. */
+type TimeBound = { sql: string; params: Record<string, number> };
 
 const logger = createLogger("langwatch:app-layer:coding-agent:session-events-repository");
 
@@ -227,6 +234,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     occurredAt,
     cursor,
     limit,
+    idIndex,
   }: {
     tenantId: string;
     sessionId: string;
@@ -234,6 +242,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
     occurredAt?: { fromMs: number; toMs: number };
     cursor?: SessionEventsCursor;
     limit: number;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<{
     events: CodingAgentSessionEventRow[];
     nextCursor: SessionEventsCursor | null;
@@ -242,12 +251,57 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       { tenantId },
       "CodingAgentSessionEventsClickHouseRepository.findBySessionId",
     );
+    const read = (bound: TimeBound) =>
+      this.readSessionEvents({ tenantId, sessionId, kinds, bound, cursor, limit });
+    const rows =
+      occurredAt !== undefined
+        ? await read({
+            sql: "AND TimeUnixMs BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})",
+            params: { fromMs: occurredAt.fromMs, toMs: occurredAt.toMs },
+          })
+        : await indexedRead<ClickHouseReadRow[]>({
+            client: this.clickhouse,
+            idIndex,
+            tenantId,
+            table: TABLE_NAME,
+            index: `${TABLE_NAME}_id_index`,
+            key: { SessionId: sessionId },
+            fallback: "unbounded",
+            isEmpty: (found) => found.length === 0,
+            run: (fragment) =>
+              read({
+                sql: fragment?.sqlFor("TimeUnixMs") ?? "",
+                params: fragment?.params ?? {},
+              }),
+          });
+
+    const events = rows.map((row) => CodingAgentSessionEventsClickHouseRepository.mapRow(row));
+    const last = events[events.length - 1];
+    return {
+      events,
+      nextCursor:
+        events.length === limit && last
+          ? { timeUnixMs: last.timeUnixMs, recordId: last.recordId }
+          : null,
+    };
+  }
+
+  private async readSessionEvents({
+    tenantId,
+    sessionId,
+    kinds,
+    bound,
+    cursor,
+    limit,
+  }: {
+    tenantId: string;
+    sessionId: string;
+    kinds: string[] | undefined;
+    bound: TimeBound;
+    cursor: SessionEventsCursor | undefined;
+    limit: number;
+  }): Promise<ClickHouseReadRow[]> {
     const conditions = ["TenantId = {tenantId:String}", "SessionId = {sessionId:String}"];
-    if (occurredAt) {
-      conditions.push(
-        "TimeUnixMs BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})",
-      );
-    }
     if (kinds && kinds.length > 0) {
       conditions.push("EventKind IN {kinds:Array(String)}");
     }
@@ -267,7 +321,7 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       sql: `
         SELECT ${READ_COLUMNS}
         FROM ${TABLE_NAME}
-        WHERE ${conditions.join(" AND ")}
+        WHERE ${conditions.join(" AND ")} ${bound.sql}
         ORDER BY TimeUnixMs ASC, RecordId ASC, UpdatedAt DESC
         LIMIT 1 BY TimeUnixMs, RecordId
         LIMIT {limit:UInt32}
@@ -275,24 +329,14 @@ export class CodingAgentSessionEventsClickHouseRepository implements SessionEven
       params: {
         tenantId,
         sessionId,
-        fromMs: occurredAt?.fromMs,
-        toMs: occurredAt?.toMs,
+        ...bound.params,
         kinds,
         cursorTimeMs: cursor?.timeUnixMs,
         cursorRecordId: cursor?.recordId,
         limit,
       },
     });
-
-    const events = rows.map((row) => CodingAgentSessionEventsClickHouseRepository.mapRow(row));
-    const last = events[events.length - 1];
-    return {
-      events,
-      nextCursor:
-        events.length === limit && last
-          ? { timeUnixMs: last.timeUnixMs, recordId: last.recordId }
-          : null,
-    };
+    return rows;
   }
 
   async sumTokensByModelPerSession({

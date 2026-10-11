@@ -1,4 +1,8 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  type IdIndexFlags,
+  indexedRead,
+} from "@langwatch/clickhouse-client";
 import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-contract";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -12,6 +16,13 @@ import {
 } from "./clickhouse.mapper.ts";
 
 const TABLE_NAME = "coding_agent_trace_sessions" as const;
+
+/** The columns the by-trace read selects. */
+interface TraceSessionReadRow {
+  TraceId: string;
+  SessionId: string;
+  OccurredAt: string;
+}
 
 const logger = createLogger("langwatch:app-layer:coding-agent:trace-session-repository");
 
@@ -87,43 +98,58 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
 
   /**
    * The mapping row for one trace. IN-tuple dedup (max(UpdatedAt) per key), never FINAL.
-   * The closing `ORDER BY` is not decoration (ADR-071 sequencing step 4). A
+   * The closing `ORDER BY` is not decoration (ADR-071 sequencing step 4). With the id index
+   * on, both the scan and its dedup subquery read only the range the trace's rows span.
    */
   async findByTraceId({
     tenantId,
     traceId,
+    idIndex,
   }: {
     tenantId: string;
     traceId: string;
+    idIndex?: IdIndexFlags | undefined;
   }): Promise<CodingAgentTraceSessionRecord | null> {
     EventUtils.validateTenantId(
       { tenantId },
       "CodingAgentTraceSessionClickHouseRepository.findByTraceId",
     );
-    const { rows } = await this.clickhouse.query<{
-      TraceId: string;
-      SessionId: string;
-      OccurredAt: string;
-    }>({
+    const rows = await indexedRead<TraceSessionReadRow[]>({
+      client: this.clickhouse,
+      idIndex,
       tenantId,
       table: TABLE_NAME,
-      kind: "read",
-      sql: `
+      index: `${TABLE_NAME}_id_index`,
+      key: { TraceId: traceId },
+      fallback: "unbounded",
+      isEmpty: (found) => found.length === 0,
+      run: async (window) => {
+        const bound = window?.sqlFor("OccurredAt") ?? "";
+        const { rows: found } = await this.clickhouse.query<TraceSessionReadRow>({
+          tenantId,
+          table: TABLE_NAME,
+          kind: "read",
+          sql: `
         SELECT TraceId, SessionId, OccurredAt
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
+          ${bound}
           AND (TenantId, TraceId, UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM ${TABLE_NAME}
             WHERE TenantId = {tenantId:String}
               AND TraceId = {traceId:String}
+              ${bound}
             GROUP BY TenantId, TraceId
           )
         ORDER BY SessionId != TraceId DESC, OccurredAt DESC, SessionId ASC
         LIMIT 1
       `,
-      params: { tenantId, traceId },
+          params: { tenantId, traceId, ...window?.params },
+        });
+        return found;
+      },
     });
 
     const first = rows[0];

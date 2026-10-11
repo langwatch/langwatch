@@ -1,0 +1,12 @@
+/** Private persistence port for filling the id indexes from rows older than their views. */
+import type { FillIdIndexesOptions, IdIndexFillReport } from "@langwatch/clickhouse-client";
+
+export abstract class CodingAgentIdIndexFillRepository {
+  /** Fills every declared index on every target, then runs `beforeFlag` and `setFlag` on each. */
+  abstract fill(
+    input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
+  ): Promise<IdIndexFillReport>;
+
+  /** The declared indexes whose rows copy their source's retention, which data-retention raises. */
+  abstract indexesWithCopiedRetention(): string[];
+}

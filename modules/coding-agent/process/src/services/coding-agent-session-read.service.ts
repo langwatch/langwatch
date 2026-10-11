@@ -1,4 +1,5 @@
 import type { Authorization } from "@langwatch/authorization";
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   type CodingAgentRecentSessionsInput,
   type CodingAgentSession,
@@ -35,6 +36,8 @@ export class CodingAgentSessionReadService {
     metricSeries: SessionMetricSeriesRepository;
     sessionEvents: CodingAgentSessionEventRepository;
     clock: CodingAgentClock;
+    /** Whether the id indexes are filled; absent reads every lookup as before. */
+    idIndex?: IdIndexFlags | undefined;
   }): CodingAgentSessionReadService {
     return new CodingAgentSessionReadService(options);
   }
@@ -46,6 +49,7 @@ export class CodingAgentSessionReadService {
       metricSeries: SessionMetricSeriesRepository;
       sessionEvents: CodingAgentSessionEventRepository;
       clock: CodingAgentClock;
+      idIndex?: IdIndexFlags | undefined;
     },
   ) {}
 
@@ -75,6 +79,7 @@ export class CodingAgentSessionReadService {
       occurredAt: window,
       cursor: parsed.cursor,
       limit,
+      idIndex: this.dependencies.idIndex,
     });
     const derivedWindow = parsed.occurredAt === undefined ? window : undefined;
     if (page.events.length > 0 || parsed.cursor !== undefined || !derivedWindow) {
@@ -109,12 +114,14 @@ export class CodingAgentSessionReadService {
         tenantId: parsed.projectId,
         sessionId: parsed.sessionId,
         window,
+        idIndex: this.dependencies.idIndex,
       })) ??
       (window === undefined
         ? null
         : await this.dependencies.sessions.findBySessionId({
             tenantId: parsed.projectId,
             sessionId: parsed.sessionId,
+            idIndex: this.dependencies.idIndex,
           }));
     if (row === null) {
       return null;
@@ -133,6 +140,7 @@ export class CodingAgentSessionReadService {
     const mapping = await this.dependencies.traceSessions.findByTraceId({
       tenantId: parsed.projectId,
       traceId: parsed.traceId,
+      idIndex: this.dependencies.idIndex,
     });
     if (mapping === null) {
       return null;
@@ -230,6 +238,7 @@ export class CodingAgentSessionReadService {
     const row = await this.dependencies.sessions.findBySessionId({
       tenantId: input.projectId,
       sessionId: input.sessionId,
+      idIndex: this.dependencies.idIndex,
     });
 
     return row === null

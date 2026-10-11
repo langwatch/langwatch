@@ -7,6 +7,11 @@ import type { RestIdentity } from "@langwatch/api/hosting";
 import type { RestDeclaredResult } from "@langwatch/api/rest";
 import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
+import type {
+  FillIdIndexesOptions,
+  IdIndexFillReport,
+  IdIndexFlags,
+} from "@langwatch/clickhouse-client";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -260,6 +265,8 @@ import {
 } from "../services/gateway-governance-events.service.ts";
 import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
 import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
+import { GatewayIdIndexFillService } from "../services/gateway-id-index-fill.service.ts";
+import { GatewayIdIndexFlagsService } from "../services/gateway-id-index-flags.service.ts";
 import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
@@ -717,6 +724,8 @@ type GatewaySpendPipelineParts = Readonly<{
   foldCache: GatewaySpendFoldCacheRepository;
   /** Absent without the ClickHouse budget ledger, the only store a debit lands in. */
   debits: GatewaySpendDebitService | undefined;
+  /** Whether the spend ledger's id index bounds the fold's read-back. */
+  idIndex: IdIndexFlags;
 }>;
 
 type GatewaySpendDefinition = StaticPipelineDefinition<
@@ -778,6 +787,8 @@ type GatewayControlPlaneOptions = Readonly<{
   virtualKeyPepper: string | undefined;
   /** Where a virtual key's lifecycle is announced, where the deployment composed a ledger. */
   governanceSignals?: GatewayGovernanceSignals | undefined;
+  /** Whether the spend ledger's id index answers a lookup by request id. */
+  idIndex?: IdIndexFlags | undefined;
 }>;
 
 type GatewayControlPlane = GatewayAppDependencies &
@@ -824,7 +835,7 @@ function gatewayControlPlane(options: GatewayControlPlaneOptions): GatewayContro
   });
   const { budgetSpend, principalSpend, openAdmissions } = repositories;
   const spendLedger = repositories.spendEvents;
-  const spendEvents = GatewaySpendEventsService.create(spendLedger);
+  const spendEvents = GatewaySpendEventsService.create(spendLedger, { idIndex: options.idIndex });
   // The cache-rule and guardrail catalogues live on the one budget service, so
   // a rule written through one door is the rule every other door reads.
   const budgetDecisions = GatewayService.create({
@@ -1174,8 +1185,12 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       projects: setup.dependencies.projects,
     });
     const { repositories } = setup;
+    const idIndex = GatewayIdIndexFlagsService.create({
+      featureFlags: setup.dependencies.featureFlags,
+    });
     const controlPlane = gatewayControlPlane({
       repositories,
+      idIndex,
       peers: {
         authz: setup.dependencies.authz,
         projects: setup.dependencies.projects,
@@ -1307,6 +1322,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
               spend: controlPlane.budgetSpend,
               dedupe: GatewayBudgetChangeDedupeService.create(repositories.budgetChangeDedupe),
               changes: controlPlane.changeEvents,
+              idIndex,
               crossings: GatewayBudgetCrossingService.create({
                 budgets: controlPlane.budgetDecisions,
                 spend: controlPlane.budgetSpend,
@@ -1314,7 +1330,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
               }),
             })
           : void 0,
+        idIndex,
       },
+      idIndex,
+      idIndexFill: GatewayIdIndexFillService.create({
+        fills: repositories.idIndexFill,
+        featureFlags: setup.dependencies.featureFlags,
+      }),
       spend: {
         spendScope: repositories.spendScope,
         budgets: repositories.budgets,
@@ -1343,6 +1365,8 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
   #voice: GatewayVoiceServices;
   #spend: GatewaySpendCollaborators | undefined;
   #spendPipeline: GatewaySpendPipelineParts | undefined;
+  #idIndex: IdIndexFlags;
+  #idIndexFill: GatewayIdIndexFillService;
   #spendProcessing: EventingGatewaySpendAdapter | undefined;
   #spendScope: GatewaySpendScopeService | undefined;
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
@@ -1365,6 +1389,8 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     internalProtocol,
     internalDoor,
     spendPipeline,
+    idIndex,
+    idIndexFill,
     spend,
     budgetOverviewDeps,
     addresses = {
@@ -1381,6 +1407,8 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     internalProtocol: GatewayInternalProtocolService;
     internalDoor: RestIdentity;
     spendPipeline?: GatewaySpendPipelineParts;
+    idIndex: IdIndexFlags;
+    idIndexFill: GatewayIdIndexFillService;
     spend?: GatewaySpendCollaborators;
     budgetOverviewDeps?: GatewayBudgetOverviewDeps;
     addresses?: GatewayDeploymentAddresses;
@@ -1394,6 +1422,8 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     this.#connectUpstream = connectUpstream;
     this.#spend = spend;
     this.#spendPipeline = spendPipeline;
+    this.#idIndex = idIndex;
+    this.#idIndexFill = idIndexFill;
     this.#internalProtocol = internalProtocol;
     this.#internalAnswers = GatewayInternalDoorService.create({ protocol: internalProtocol });
     this.#spendAnswers = GatewaySpendReconciliationService.create({ collaborators: this });
@@ -1407,6 +1437,13 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       ? GatewayAgentCacheService.create({ store: infrastructure.agentCache })
       : void 0;
     this.#voice = voice;
+  }
+
+  /** The background step's fill of the id indexes (`gateway:fill-id-indexes`). */
+  fillIdIndexes(
+    run: Pick<FillIdIndexesOptions, "checkpoint" | "dryRun" | "signal">,
+  ): Promise<IdIndexFillReport> {
+    return this.#idIndexFill.fillIdIndexes(run);
   }
 
   /** gateway_spend as this role registers it: the worker folds the ledger, the api only sends. */
@@ -1426,6 +1463,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     const processing = EventingGatewaySpendAdapter.create({
       spendEvents: parts.ledger,
       cacheStore: (inner) => foldCache.cached(inner),
+      idIndex: parts.idIndex,
       gatewayDebits: debits
         ? {
             name: GATEWAY_DEBITS_PROCESS_NAME,
@@ -2558,6 +2596,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
     return (this.#budgetLedger ??= GatewayBudgetLedgerService.create({
       spend: this.#dependencies.budgetSpend,
       changes: this.#dependencies.changeEvents,
+      idIndex: this.#idIndex,
     }));
   }
 

@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import {
   defineEventingModule,
   type EventingSetup,
@@ -74,6 +75,8 @@ interface EventingGatewaySpendAdapterOptions {
    *  through `connectSettlement`, because the pipeline that owns the
    *  command is the one being built. */
   settlement?: Omit<SpendSettlementProcessDeps, "sendSettleSpend">;
+  /** Whether the spend ledger's id index bounds the fold's read-back; absent reads as before. */
+  idIndex?: IdIndexFlags | undefined;
 }
 
 /**
@@ -91,7 +94,9 @@ export class EventingGatewaySpendAdapter {
   private constructor(private readonly options: EventingGatewaySpendAdapterOptions) {}
 
   private foldStore(): FoldProjectionStore<GatewaySpendState> {
-    const inner = GatewaySpendStore.create(this.options.spendEvents);
+    const inner = GatewaySpendStore.create(this.options.spendEvents, {
+      idIndex: this.options.idIndex,
+    });
     return this.options.cacheStore ? this.options.cacheStore(inner) : inner;
   }
 
@@ -245,11 +250,17 @@ export class GatewaySpendProducerAdapter {
  * `refoldOnStoreMiss` reintroduced, or it overwrites partial state from init().
  */
 export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState> {
-  static create(repo: GatewaySpendEventsRepository): GatewaySpendStore {
-    return new GatewaySpendStore(repo);
+  static create(
+    repo: GatewaySpendEventsRepository,
+    options: { idIndex?: IdIndexFlags | undefined } = {},
+  ): GatewaySpendStore {
+    return new GatewaySpendStore(repo, options.idIndex);
   }
 
-  private constructor(private readonly repo: GatewaySpendEventsRepository) {}
+  private constructor(
+    private readonly repo: GatewaySpendEventsRepository,
+    private readonly idIndex: IdIndexFlags | undefined,
+  ) {}
 
   async get(
     aggregateId: string,
@@ -258,6 +269,7 @@ export class GatewaySpendStore implements FoldProjectionStore<GatewaySpendState>
     const folded = await this.repo.findForFold({
       tenantId: String(context.tenantId),
       gatewayRequestId: aggregateId,
+      idIndex: this.idIndex,
     });
     return folded === null ? { kind: "empty" } : { kind: "folded", state: folded };
   }

@@ -7,6 +7,7 @@ import type { GatewayCacheRuleRepository } from "./gateway-cache-rule.repository
 import type { GatewayChangeEventsRepository } from "./gateway-change-event.repository.ts";
 import type { GatewayConnectUpstreamRepository } from "./gateway-connect-upstream.repository.ts";
 import type { GatewayGuardrailRepository } from "./gateway-guardrail.repository.ts";
+import type { GatewayIdIndexFillRepository } from "./gateway-id-index-fill.repository.ts";
 import type { GatewayInternalStoreRepository } from "./gateway-internal-store.repository.ts";
 import type { GatewayKeyBudgetRepository } from "./gateway-key-budget.repository.ts";
 import type { GatewayOpenAdmissionsRepository } from "./gateway-open-admissions.repository.ts";
@@ -65,6 +66,8 @@ export interface GatewayRepositories {
   readonly principalSpend: GatewayPrincipalSpendRepository;
   /** The spend-event ledger gateway_spend folds into. */
   readonly spendEvents: GatewaySpendEventsRepository;
+  /** Fills the id indexes from rows older than their views. */
+  readonly idIndexFill: GatewayIdIndexFillRepository;
   /** The settlement sweep's read of every server's open admissions. */
   readonly openAdmissions: GatewayOpenAdmissionsRepository;
   readonly agentCache: GatewayAgentCacheEntryRepository;
