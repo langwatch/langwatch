@@ -926,25 +926,38 @@ export const RunDetails = React.memo(
           lazyMount
           unmountOnExit
         >
-          <Tabs.List position="relative" overflowX="auto" overflowY="hidden" whiteSpace="nowrap">
-            {size === "sm" && (
-              <Center
-                minHeight="31px"
-                marginBottom="-0.5"
-                paddingX={4}
-                fontWeight={500}
-                color="fg.muted"
-                background="bg.muted"
-              >
-                <Text>Step {dspyStepSummary.index}</Text>
-              </Center>
-            )}
+          <Box position="relative" display="flex" flexDirection="column">
+            <Tabs.List position="relative" overflowX="auto" overflowY="hidden" whiteSpace="nowrap">
+              {size === "sm" && (
+                <Center
+                  minHeight="31px"
+                  marginBottom="-0.5"
+                  paddingX={4}
+                  fontWeight={500}
+                  color="fg.muted"
+                  background="bg.muted"
+                >
+                  <Text>Step {dspyStepSummary.index}</Text>
+                </Center>
+              )}
+              <Tabs.Trigger value="0">
+                Predictors {dspyStep.data && `(${dspyStep.data.predictors.length})`}
+              </Tabs.Trigger>
+              <Tabs.Trigger value="1">
+                Evaluations {dspyStep.data && `(${dspyStep.data.examples.length})`}
+              </Tabs.Trigger>
+              <Tabs.Trigger value="2">
+                LLM Calls {dspyStep.data && `(${dspyStep.data.llm_calls.length})`}
+              </Tabs.Trigger>
+              {size === "sm" && <StepSummaryInline dspyStepSummary={dspyStepSummary} />}
+            </Tabs.List>
             {tabIndex === 0 && size !== "sm" && (
               <Box position="absolute" top={0} right={4}>
                 <HStack>
                   <Text>Raw</Text>
                   <Field.Root>
                     <Switch
+                      inputProps={{ "aria-label": "Raw" }}
                       checked={displayRawParams}
                       onCheckedChange={() => setDisplayRawParams(!displayRawParams)}
                     />
@@ -952,17 +965,7 @@ export const RunDetails = React.memo(
                 </HStack>
               </Box>
             )}
-            <Tabs.Trigger value="0">
-              Predictors {dspyStep.data && `(${dspyStep.data.predictors.length})`}
-            </Tabs.Trigger>
-            <Tabs.Trigger value="1">
-              Evaluations {dspyStep.data && `(${dspyStep.data.examples.length})`}
-            </Tabs.Trigger>
-            <Tabs.Trigger value="2">
-              LLM Calls {dspyStep.data && `(${dspyStep.data.llm_calls.length})`}
-            </Tabs.Trigger>
-            {size === "sm" && <StepSummaryInline dspyStepSummary={dspyStepSummary} />}
-          </Tabs.List>
+          </Box>
 
           <Tabs.Content
             value="0"
@@ -1072,7 +1075,11 @@ export const RunDetails = React.memo(
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  <QueryStatusRows view={examplesView} skeletonCells={3} colSpan={4} />
+                  <QueryStatusRows
+                    view={examplesView}
+                    skeletonCells={hasTrace ? 4 : 3}
+                    colSpan={hasTrace ? 5 : 4}
+                  />
                   {examplesView === "ready" &&
                     dspyStep.data &&
                     dspyStep.data.examples.map((example, index) => (
@@ -1127,7 +1134,7 @@ export const RunDetails = React.memo(
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                <QueryStatusRows view={llmCallsView} skeletonCells={4} colSpan={6} />
+                <QueryStatusRows view={llmCallsView} skeletonCells={4} colSpan={5} />
                 {llmCallsView === "ready" &&
                   dspyStep.data &&
                   dspyStep.data.llm_calls.map((llmCall, index) => (
