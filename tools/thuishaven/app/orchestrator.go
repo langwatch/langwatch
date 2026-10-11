@@ -247,6 +247,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		ModeOverriddenBy:     opts.ModeOverriddenBy,
 		EffectiveMode:        domain.EffectiveMode(opts.DeploymentMode.Name, opts.ModeOverriddenBy),
 		Refresh:              opts.Selection.Refresh,
+		AppOff:               opts.Selection.AppOff,
 		LangyImage:           opts.langyImageTag,
 		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
 		MockInstantEvalJudge: o.cfg.ShouldMockInstantEvalJudge,
@@ -390,11 +391,13 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 		case <-t.C:
 			// A record removed (down, a failed hand-over) or taken by another
 			// launcher is never written back: that resurrected a stack with no routes.
-			if cur, ok := o.stackBySlug(st.Slug); !ok || cur.LauncherPID != st.LauncherPID {
+			cur, ok := o.stackBySlug(st.Slug)
+			if !ok || cur.LauncherPID != st.LauncherPID {
 				return
 			}
-			st.UpdatedAt = o.sys.Now()
-			_ = o.store.SaveStack(st)
+			// The record as it is now: a live ±service rewrites its services.
+			cur.UpdatedAt = o.sys.Now()
+			_ = o.store.SaveStack(cur)
 		}
 	}
 }
@@ -566,6 +569,10 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		}
 	}
 	defer endRegistration()
+	// Only services differ and the keeper replans: start and stop those lanes alone.
+	if err := o.applySelectionLive(ctx, p, opts); !errors.Is(err, errNotLive) {
+		return err
+	}
 	proceed, err := o.reconcileRunningStack(p, opts)
 	if err != nil {
 		return err
@@ -607,7 +614,9 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		_ = o.store.SaveStack(st)
 	}
 	plan := o.keeperPlan(children, opts.IsForegroundClient)
-	plan.Seed = seed
+	if !opts.Selection.AppOff {
+		plan.Seed = seed // with the app off nothing would ever report ready to seed
+	}
 	sayPhase(p.StartedAt, "services starting")
 	if err := o.handOver(ctx, st, plan); err != nil {
 		return err

@@ -162,6 +162,8 @@ type fakeSystem struct {
 	starts          map[int]string
 	terminated      []int
 	reloaded        []int
+	replanned       []int
+	nextPort        int // FreePorts counts up from it; 0 hands out zeros
 	groupTerminated []int
 	groupKilled     []int
 	pidsByPort      map[int][]int
@@ -191,10 +193,19 @@ type spawnCall struct {
 	Dir  string
 }
 
-func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
-func (f *fakeSystem) PortInUse(port int) bool        { return f.portsInUse[port] }
-func (f *fakeSystem) ProcessAlive(pid int) bool      { return f.alive[pid] }
-func (f *fakeSystem) ProcessStart(pid int) string    { return f.starts[pid] }
+func (f *fakeSystem) FreePorts(n int) ([]int, error) {
+	ports := make([]int, n)
+	for i := range ports {
+		if f.nextPort != 0 {
+			f.nextPort++
+			ports[i] = f.nextPort
+		}
+	}
+	return ports, nil
+}
+func (f *fakeSystem) PortInUse(port int) bool     { return f.portsInUse[port] }
+func (f *fakeSystem) ProcessAlive(pid int) bool   { return f.alive[pid] }
+func (f *fakeSystem) ProcessStart(pid int) string { return f.starts[pid] }
 func (f *fakeSystem) Terminate(pid int) {
 	f.terminated = append(f.terminated, pid)
 	// A terminated launcher dies with its process group; reflect that so the
@@ -204,6 +215,7 @@ func (f *fakeSystem) Terminate(pid int) {
 	}
 }
 func (f *fakeSystem) Reload(pid int)         { f.reloaded = append(f.reloaded, pid) }
+func (f *fakeSystem) Replan(pid int)         { f.replanned = append(f.replanned, pid) }
 func (f *fakeSystem) TerminateGroup(pid int) { f.groupTerminated = append(f.groupTerminated, pid) }
 func (f *fakeSystem) KillGroup(pid int) {
 	f.groupKilled = append(f.groupKilled, pid)

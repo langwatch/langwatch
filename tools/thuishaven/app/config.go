@@ -57,6 +57,9 @@ type Config struct {
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.
 	UpArgv []string
+	// ServiceArgv is this Haven executable plus `service`, resolved like UpArgv:
+	// how the dashboard switches one service of a running stack.
+	ServiceArgv []string
 	// KeepArgv is this Haven executable plus `keep`: the stack's keeper.
 	KeepArgv                 []string
 	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)

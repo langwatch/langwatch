@@ -150,8 +150,12 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		NodeEnv: p.nodeEnv, LogPath: p.logPath, Port: p.port,
 	}
 	isBuiltUI := !st.Layout.IsMonolith() && opts.Selection.IsBuiltUI()
-	out := []Child{p.frontChild(mono, isBuiltUI)}
-	if isBuiltUI && opts.Selection.Refresh == domain.RefreshWatch && len(p.o.cfg.UIWatchArgv) > 0 {
+	isAppOn := !opts.Selection.AppOff
+	var out []Child
+	if isAppOn {
+		out = append(out, p.frontChild(mono, isBuiltUI))
+	}
+	if isAppOn && isBuiltUI && opts.Selection.Refresh == domain.RefreshWatch && len(p.o.cfg.UIWatchArgv) > 0 {
 		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui"), p.o.cfg.UIWatchArgv))
 	}
 	out = append(out, p.goLanes(mono)...)
@@ -169,7 +173,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		langy.LogPath = p.logPath("langyagent")
 		out = append(out, langy)
 	}
-	if st.Layout.IsMonolith() || isBuiltUI {
+	if st.Layout.IsMonolith() || isBuiltUI || !isAppOn {
 		return out
 	}
 	// --hmr: Vite runs as its own ui lane beside the backend (ADR-168, 2026-10-10).

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -97,6 +98,9 @@ type surfaceJSON struct {
 	Restart string `json:"restart"`
 	// Start is the `haven up +<x>` name a Not selected row may add.
 	Start string `json:"start"`
+	// Switch is the `haven service on|off <x>` name this row's switch flips, ""
+	// for none; the app row's switch is the ui, api and worker together.
+	Switch string `json:"switch"`
 }
 
 type laneErrorsJSON struct {
@@ -128,6 +132,8 @@ type stackActionsJSON struct {
 	StartDir   string `json:"startDir"`
 	// CanStartService offers Start on Not selected rows.
 	CanStartService bool `json:"canStartService"`
+	// CanStopService offers the off side of each row's switch.
+	CanStopService bool `json:"canStopService"`
 }
 
 // IdPTenant is one tenant of the IdP simulator a stack routes to.
@@ -258,6 +264,7 @@ func (s *Server) handleStackHome(w http.ResponseWriter, r *http.Request) {
 			StartDir:   st.WorktreeDir,
 
 			CanStartService: h.live && s.config.Actions.StartService != nil,
+			CanStopService:  h.live && s.config.Actions.StopService != nil,
 		},
 		Seed: s.seed(slug, h.live),
 	})
@@ -357,12 +364,13 @@ func (s *Server) routedSurface(h homeState, name, role string) surfaceJSON {
 			out.URL = svc.URL
 		}
 	}
-	isSelected := name == "app" || (has && (svc.Port != 0 || svc.IsFallback))
+	out.Switch = switchName(name)
+	isSelected := (name == "app" && !st.AppOff) || (name != "app" && has && (svc.Port != 0 || svc.IsFallback))
 	switch {
 	case !h.registered:
 		out.Status = statusDown
 	case !isSelected:
-		out.Status, out.Hint = statusNotSelected, "haven up +"+domain.CLIServiceNameForLayout(name, st.Layout)
+		out.Status, out.Hint = statusNotSelected, "haven up +"+out.Switch
 	case svc.IsFallback:
 		out.Status = statusDown
 		if s.portUp(svc.Port) {
@@ -383,21 +391,42 @@ func (s *Server) apiSurface(h homeState) surfaceJSON {
 	if svc, has := findService(st, domain.APIService); has && svc.URL != "" {
 		out.Hostname, out.URL = svc.Hostname, svc.URL
 	}
-	out.Status = statusDown
-	if h.registered {
-		out.Status = s.laneStatus(h.live, st.APIPort)
-	}
+	out.Status = appLaneStatus(s, h, st.APIPort)
 	return out
 }
 
 // workerSurface has no hostname: the worker serves no browser traffic, and
 // its metrics listener is what says it is up.
 func (s *Server) workerSurface(h homeState) surfaceJSON {
-	out := surfaceJSON{Name: "worker", Role: "Worker: queues, projections, subscribers", Port: h.stack.WorkerMetricsPort, Status: statusDown}
-	if h.registered {
-		out.Status = s.laneStatus(h.live, h.stack.WorkerMetricsPort)
+	return surfaceJSON{
+		Name: "worker", Role: "Worker: queues, projections, subscribers", Port: h.stack.WorkerMetricsPort,
+		Status: appLaneStatus(s, h, h.stack.WorkerMetricsPort),
 	}
-	return out
+}
+
+// appLaneStatus is the api's or worker's status: they stop with the app switch.
+func appLaneStatus(s *Server, h homeState, port int) string {
+	switch {
+	case !h.registered:
+		return statusDown
+	case h.stack.AppOff:
+		return statusNotSelected
+	default:
+		return s.laneStatus(h.live, port)
+	}
+}
+
+// switchName is the `haven service on|off` name of a routed surface, or ""
+// when it has no switch of its own.
+func switchName(surface string) string {
+	name := surface
+	if surface == "langyagent" {
+		name = "langy"
+	}
+	if slices.Contains(domain.SelectableServices, name) {
+		return name
+	}
+	return ""
 }
 
 // laneStatus is a selected surface of a registered stack: live once its port
@@ -518,8 +547,10 @@ func explain(h homeState, surfaces []surfaceJSON, tails map[string][]logLine) {
 		sf := &surfaces[i]
 		if sf.Status != statusNotSelected {
 			sf.Restart = restartName(sf.Name, h.stack.Layout)
-		} else {
-			sf.Start = domain.CLIServiceNameForLayout(sf.Name, h.stack.Layout)
+		} else if sf.Switch != "" {
+			sf.Start = sf.Switch
+		} else if h.stack.AppOff {
+			sf.Hint = "haven up +app"
 		}
 		reason, isWaiting := reasonFor(h, *sf)
 		sf.Reason = reason

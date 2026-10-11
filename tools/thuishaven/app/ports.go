@@ -237,6 +237,10 @@ type System interface {
 	// Reload sends pid SIGUSR2, the Node host's "reload on demand" signal
 	// (tools/dev-runtime); the process keeps running.
 	Reload(pid int)
+	// Replan sends a keeper SIGHUP: it rereads its plan and starts, stops or
+	// restarts only the lanes that changed. Only a keeper whose record says
+	// KeeperReplans may be sent it; an older one would die of it.
+	Replan(pid int)
 	// KillGroup SIGKILLs pid's whole process group — `down -f`'s hard stop for
 	// a stack that must die now (or won't die gracefully).
 	KillGroup(pid int)

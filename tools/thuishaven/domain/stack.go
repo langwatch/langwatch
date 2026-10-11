@@ -130,6 +130,11 @@ type Stack struct {
 	ModeEnv          []string `json:"modeEnv,omitempty"`
 	ModeOverriddenBy []string `json:"modeOverriddenBy,omitempty"`
 	EffectiveMode    string   `json:"effectiveMode,omitempty"`
+	// AppOff marks a stack whose ui, api and worker are stopped (`haven up -app`).
+	AppOff bool `json:"appOff,omitempty"`
+	// KeeperReplans marks a keeper that applies a rewritten plan on SIGHUP, so
+	// a ±service starts or stops only the lanes it changes (app/keeper_live.go).
+	KeeperReplans bool `json:"keeperReplans,omitempty"`
 	// Refresh is the mode this stack was brought up in: still, watch or hmr.
 	Refresh RefreshMode `json:"refresh,omitempty"`
 	// MockInstantEvalJudge injects INSTANT_EVAL_CLASSIFIER=memory, so Instant

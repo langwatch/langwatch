@@ -25,6 +25,8 @@ export const surfaceSchema = z.object({
   restart: z.string(),
   /** The `haven up +<name>` name that adds this not-selected row, "" when it has none. */
   start: z.string(),
+  /** The `haven service on|off <name>` this row's switch flips, "" when it has none. */
+  switch: z.string(),
 });
 export type Surface = z.infer<typeof surfaceSchema>;
 
@@ -84,6 +86,7 @@ export const stackHomeSchema = z.object({
     canStart: z.boolean(),
     startDir: z.string(),
     canStartService: z.boolean(),
+    canStopService: z.boolean(),
   }),
   /** The seed console: what `haven db seed` takes, its last status line and log tail. */
   seed: z.object({

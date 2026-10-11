@@ -105,6 +105,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)
 	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
 	mux.HandleFunc("/api/stacks/{slug}/start-service", s.handleStartService)
+	mux.HandleFunc("/api/stacks/{slug}/stop-service", s.handleStopService)
 	mux.HandleFunc("/api/stacks/{slug}/seed", s.handleSeed)
 	mux.HandleFunc("GET /api/stacks/{slug}/cli/{name}", s.handleCLIRead)
 	mux.HandleFunc("/api/stacks/{slug}/feedback/{id}/resolve", s.handleFeedbackResolve)

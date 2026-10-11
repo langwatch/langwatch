@@ -281,6 +281,7 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 		GoWatchArgv:             goWatchArgv(),
 		UIWatchArgv:             uiWatchArgv(),
 		UpArgv:                  selfArgv(worktree, "up"),
+		ServiceArgv:             selfArgv(worktree, "service"),
 		KeepArgv:                selfArgv(trustedRepoRoot(), "keep"),
 		IsAgent:                 isAgent,
 		PortlessDisabled:        devEnv("PORTLESS") == "0",
@@ -348,6 +349,7 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 				Destroy: orch.DestroyStack,
 				// Add one service to a live stack.
 				StartService: orch.StartStackService,
+				StopService:  orch.StopStackService,
 				Seed:         orch.SeedStack,
 				SeedReport:   orch.SeedReport,
 				// The up's hand-over: the daemon is the one place keepers start.

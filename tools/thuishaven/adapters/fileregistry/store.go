@@ -117,6 +117,8 @@ type selectionFile struct {
 // than keeping it: every one of those files says `"workers": false`, and a
 // field would read that as "run no background processing at all".
 type selectionFields struct {
+	// App is the LangWatch app (ui, api, worker), stated positively on disk.
+	App     *bool `json:"app"`
 	Gateway *bool `json:"gateway"`
 	NLP     *bool `json:"nlp"`
 	Langy   *bool `json:"langy"`
@@ -150,6 +152,9 @@ type selectionFields struct {
 
 // applyTo overlays the services this file actually states onto sel.
 func (f selectionFields) applyTo(sel *domain.Selection) {
+	if f.App != nil {
+		sel.AppOff = !*f.App
+	}
 	for _, field := range []struct{ stated, legacy, target *bool }{
 		{f.Gateway, nil, &sel.Gateway},
 		{f.NLP, nil, &sel.NLP},
@@ -210,7 +215,9 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // on the default-keeping behaviour above — that is there for files it did not
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
+	isAppOn := !sel.AppOff
 	b, err := json.MarshalIndent(selectionFile{Mode: sel.Mode, Services: &selectionFields{
+		App:          &isAppOn,
 		Gateway:      &sel.Gateway,
 		NLP:          &sel.NLP,
 		Langy:        &sel.Langy,

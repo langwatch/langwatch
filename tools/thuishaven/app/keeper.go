@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -165,6 +166,7 @@ func (o *Orchestrator) Keep(ctx context.Context, slug string, plan KeeperPlan) e
 	pid := o.sys.Getpid()
 	st.LauncherPID, st.LauncherStart = pid, o.sys.ProcessStart(pid)
 	st.OwnerPID, st.OwnerStart = plan.OwnerPID, plan.OwnerStart
+	st.KeeperReplans = true
 	st.UpdatedAt = o.sys.Now()
 	if err := o.store.SaveStack(st); err != nil {
 		return err
@@ -180,7 +182,10 @@ func (o *Orchestrator) Keep(ctx context.Context, slug string, plan KeeperPlan) e
 	if plan.Seed != nil {
 		go o.seedWhenReady(ctx, *plan.Seed)
 	}
-	o.sup.Supervise(ctx, plan.Children)
+	replans := make(chan os.Signal, 1)
+	signal.Notify(replans, syscall.SIGHUP)
+	defer signal.Stop(replans)
+	o.superviseLive(ctx, keeperRun{slug: slug, children: plan.Children, replans: replans})
 	cancel()
 	<-beat
 	o.dropKeptStack(st)

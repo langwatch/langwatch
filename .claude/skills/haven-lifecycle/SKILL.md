@@ -25,6 +25,7 @@ Check `haven status`, then the URL; `haven up` returning is not health.
 
 ```bash
 haven up +langy -mail             # add or drop a service; sticky
+haven service off mail             # switch one service in place, keeping the mode; app = ui+api+worker
 haven up +langevals               # evaluators (monitors, evaluations)
 haven up +llm                     # zero-cost model answers (llmsim)
 haven up +design-system +mail-room  # the Storybook and the mail studio

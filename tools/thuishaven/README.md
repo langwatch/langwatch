@@ -212,8 +212,12 @@ haven help       exhaustive, copy-pasteable reference
 
 **Service selection.** `haven up +langy` / `haven up -nlp` — sticky per
 worktree (`.haven.json`), shown by `status`, remembered across terminals and
-reboots. A running stack reconciles: matching selection is a no-op, a changed
-one replaces the stack in place. langy is off by default (it costs a container
+reboots. A running stack reconciles: matching selection is a no-op, and a
+change of services alone (same mode) starts and stops only the lanes it touches:
+the keeper rereads its plan on SIGHUP (`app/keeper_live.go`). `haven service
+on|off <name>` does the same and keeps the stack's mode; `app` is the ui, api
+and worker as one switch, and the stack home's surface table has a switch per
+row. A keeper older than this is not signalled; `haven up --force` once. langy is off by default (it costs a container
 image and a hard memory cap); the worktrees that need it say `+langy` once.
 langevals — the Python evaluator service monitors and evaluations call — is
 off by default too (its imports hold a few GiB). `haven up +langevals` runs
