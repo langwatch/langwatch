@@ -1,3 +1,4 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
@@ -309,10 +310,8 @@ function MenuOptions(props: MenuOptionsProps) {
   if (optionCount === 0) {
     return (
       <Box maxHeight="280px" overflowY="auto">
-        <Box padding={3}>
-          <Text fontSize="sm" color="fg.muted">
-            No matching fields found
-          </Text>
+        <Box paddingX={3} paddingY={1}>
+          <NoDataInfoBlock size="line" title="No matching fields found" />
           {onCreateVariable && !query && (
             <Text fontSize="xs" color="fg.subtle" marginTop={1}>
               Type a name to create a new variable
