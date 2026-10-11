@@ -32,8 +32,9 @@ drawers and dialogs on 2026-09-29 therefore did not keep them the same.
 3. **One width scale.** `sm` 28rem, `md` 32rem, `lg` 42rem, `xl` 56rem, `full` (drawers only),
    the same name meaning the same width in a drawer and a dialog. They are maxima, capped by the
    viewport and the docked panel's inset. Drawer `2xl` and the dialog `maxWidth`s retire.
-4. **Drawer footers never carry Cancel** (Q2); the X and Escape close. Dialogs keep Cancel, and
-   a `secondaryAction` takes its place. `dismissible={false}` drops the X, Cancel, Escape and
+4. **Drawer Cancel only when asked** (late ruling, 2026-10-11, supersedes Q2): a drawer footer
+   draws Cancel only when its descriptor carries `cancel`; existing Cancels stay. Dialogs keep
+   Cancel. Dialogs take `placement` "top" (default) or "center"; Card takes `padding="lg"` (20px). `dismissible={false}` drops the X, Cancel, Escape and
    outside click; `role` is separate.
 5. **Drawer ground** (Q3): the ruled ground is `bg.overlay`, but the shape keeps today's solid
    `bg` until Alex has seen light and dark screenshots. The switch is one constant,
