@@ -33,6 +33,7 @@ import {
 import { useSsoHost } from "../../model/sso-host.ts";
 import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
 import { IssuerRow } from "../elements/issuer-row.tsx";
+import { LegacyDomainToMoveNotice } from "../elements/legacy-domain-to-move-notice.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
 import {
   AvailabilityRefusalNotice,
@@ -313,6 +314,9 @@ function ConnectedJourney({
   return (
     <VStack align="stretch" gap={6} width="full" data-testid="sso-setup">
       {view.legacyRoute && <LegacyRouteNotice legacyRoute={view.legacyRoute} />}
+      {canManage && view.legacyDomainsToMove.length > 0 && (
+        <LegacyDomainToMoveNotice domains={view.legacyDomainsToMove} />
+      )}
 
       {/* Above the journey: while a pair stands, where sign-in goes is the
           fact that decides what every step below it means. */}

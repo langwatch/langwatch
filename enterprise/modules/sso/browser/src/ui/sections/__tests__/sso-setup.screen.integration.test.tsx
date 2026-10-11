@@ -192,6 +192,7 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
       activated: false,
     },
     legacyRoute: null,
+    legacyDomainsToMove: [],
     enterpriseRequired: false,
     migration: null,
     availability: { available: true, proof: "dns-txt" },
@@ -373,6 +374,22 @@ describe("the single sign-on setup page", () => {
 
       expect(screen.getByTestId("sso-legacy-route")).toBeInTheDocument();
       expect(screen.queryByTestId("sso-setup")).toBeNull();
+    });
+  });
+
+  describe("given an organization whose legacy domain still has to move onto its connection", () => {
+    /** @scenario "Administrators and LangWatch staff are told a legacy domain still has to move" */
+    it("tells a member who manages single sign-on, and nobody who may only view it", () => {
+      state.view = setupView({ legacyDomainsToMove: ["legacy.acme.com"] });
+
+      const { unmount } = renderWithSsoHost(<SsoSetupScreen />);
+      expect(screen.getByTestId("sso-legacy-domain-to-move")).toHaveTextContent(
+        /add legacy\.acme\.com to your own connection/,
+      );
+      unmount();
+
+      renderWithSsoHost(<SsoSetupScreen />, new FakeSsoHost({ canManage: false }));
+      expect(screen.queryByTestId("sso-legacy-domain-to-move")).toBeNull();
     });
   });
 

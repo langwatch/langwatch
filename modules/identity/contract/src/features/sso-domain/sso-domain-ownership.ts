@@ -1,3 +1,4 @@
+import { normalizeDomain } from "../../identifier.ts";
 import {
   isSsoPublishedProofChannel,
   type SsoConnectionLifecycleState,
@@ -40,6 +41,29 @@ export function isConfiguredLegacySsoRoute(state: {
   providerId: string;
 }): boolean {
   return state.source === "legacy-grandfathered" && state.providerId.length > 0;
+}
+
+/** A connection the legacy pin's domain may still move onto: neither discarded nor torn down. */
+const SSO_CONNECTION_GONE_STATES = new Set<string>(["DISCARDED", "TORN_DOWN"]);
+
+/**
+ * The legacy pin's domain still to move onto the organization's own connection (ADR-124 §7):
+ * the pin set, no grandfathered connection, and a live one of its own that has not verified it.
+ * Empty otherwise. Read off durable state, so it empties once the domain moves.
+ */
+export function legacySsoDomainsToMove({
+  legacySsoDomain,
+  connections,
+}: {
+  legacySsoDomain: string | undefined;
+  connections: readonly { source: string; state: string; verifiedDomains: readonly string[] }[];
+}): string[] {
+  if (!legacySsoDomain) return [];
+  if (connections.some((held) => held.source === "legacy-grandfathered")) return [];
+  const live = connections.filter((held) => !SSO_CONNECTION_GONE_STATES.has(held.state));
+  const domain = normalizeDomain(legacySsoDomain);
+  if (live.length === 0 || live.some((held) => held.verifiedDomains.includes(domain))) return [];
+  return [domain];
 }
 
 /** The domains whose evidence went missing and stayed missing (ADR-123). */

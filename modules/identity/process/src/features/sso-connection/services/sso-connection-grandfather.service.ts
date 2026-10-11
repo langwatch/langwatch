@@ -43,9 +43,8 @@ type SsoConnectionGrandfatherOutcome =
       };
     }
   | {
-      status: "migrated";
-      heldReason: "proof";
-      report: { kind: "competing_connection"; connectionId: string; domains: string[] };
+      status: "finalized";
+      report: { kind: "legacy_route_beside_connection"; domains: string[] };
     };
 
 interface SsoConnectionGrandfatherDeps {
@@ -97,14 +96,10 @@ export class SsoConnectionGrandfatherService {
 
     const domains = [normalizeDomain(legacy.ssoDomain)];
     const connectionId = grandfatheredSsoConnectionId({ organizationId });
-    // One connection per org (ADR-124 §7): another live one holds the org on the legacy door,
-    // as main does, until a later pass finds it alone.
+    // ADR-124 §7: beside its own live connection the pin stays on the legacy door, as on main.
+    // Not an upgrade issue: the org finishes, and the settings read shows the domain to move.
     if (await this.holdsCompetingConnection({ organizationId, connectionId })) {
-      return {
-        status: "migrated",
-        heldReason: "proof",
-        report: { kind: "competing_connection", connectionId, domains },
-      };
+      return { status: "finalized", report: { kind: "legacy_route_beside_connection", domains } };
     }
     const facts = await this.deps.connections.grandfatherConnection({
       tenantId: organizationId,

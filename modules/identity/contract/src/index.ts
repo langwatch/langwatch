@@ -242,6 +242,7 @@ export {
   isConfiguredLegacySsoRoute,
   isSsoConnectionInSetup,
   lapsedDomainsOf,
+  legacySsoDomainsToMove,
   looksLikeSsoConnectionId,
   type QualifiableConnection,
   qualifySsoDomainOwnership,

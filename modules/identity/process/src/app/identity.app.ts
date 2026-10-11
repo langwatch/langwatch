@@ -771,6 +771,7 @@ export class IdentityModule
       breakGlass: setup.repositories.ssoBreakGlass,
       activity: setup.repositories.ssoMigrationEvidence,
       migrations: ssoMigrationProgress,
+      legacy: setup.repositories.legacySsoOrganizations,
       entitled: async ({ organizationId }) =>
         isEnterpriseTier(
           (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,

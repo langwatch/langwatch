@@ -446,14 +446,31 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     When the sources are read for a legacy-configuration proof or a legacy-grandfathered source being written
     Then only the grandfather tenant step writes either, so no customer-facing route or Api operation on cloud can mint one
 
+  # Ruling 2026-10-11: an organization with the legacy settings beside its own connection is
+  # not an upgrade issue. It finishes; the domain still to move shows in its settings instead.
   @unit
-  Scenario: The grandfather step holds an organization that already has another live connection
+  Scenario: The grandfather step finishes an organization that already has another live connection
     Given an organization with legacy single sign-on settings
     And it already holds a connection that is not closed and is not its grandfathered connection
     When the grandfather step runs for it
-    Then the organization is held on its proof with a competing-connection report naming its legacy domains
-    And no grandfathered connection is written, so its people keep signing in through the legacy settings, as on main
-    And the next pass checks it again
+    Then the organization finishes with a report naming its legacy domains, and is not held
+    And no grandfathered connection is written and nothing is merged, so its people keep signing in through the legacy settings, as on main
+
+  @unit
+  Scenario: The legacy domain beside an organization's own connection is the one still to move
+    Given an organization with legacy single sign-on settings for "acme.com" and no grandfathered connection
+    And it holds its own live connection that has not verified "acme.com"
+    When its single sign-on setup is read
+    Then "acme.com" is named as the domain still to move onto its connection
+    And once its connection verifies "acme.com", or it holds no live connection, nothing is named
+
+  @integration
+  Scenario: Administrators and LangWatch staff are told a legacy domain still has to move
+    Given an organization's legacy domain is still to move onto its own connection
+    When a member who manages single sign-on opens its identity provider settings
+    Then a notice says the domain still signs in through the earlier setup and has to be added to their connection
+    And a member who may only view single sign-on sees no notice
+    And on LangWatch cloud, staff opening the organization in Ops see the same notice with a link to its connection
 
   @integration @regression
   Scenario: Migration routing waits for the replacement to be active

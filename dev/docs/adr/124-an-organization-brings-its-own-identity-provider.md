@@ -267,6 +267,17 @@ an unbounded register would make it five an hour per registration and turn
 registration into the enumeration rail. Read from the projection rather than a
 counter, so a discarded or torn-down connection correctly stops being one.
 
+**An organization with the legacy pin beside its own connection is not an
+upgrade issue** (ruling, 2026-10-11, cloud and self-hosted alike). The
+grandfather step finishes it rather than holding it: nothing is merged and no
+second connection is written, so the pin's domain keeps signing in through the
+legacy route and the connection's domains through the connection. The fact
+that the pin's domain still has to move is read off durable state
+(`legacySsoDomainsToMove`: the pin set, no grandfathered connection, a live
+connection that has not verified the domain) and shown to members who manage
+single sign-on in its settings, and on cloud to staff in Ops on the
+organization; never to ordinary members, never as an upgrade hold.
+
 ## Consequences
 
 **Good.**

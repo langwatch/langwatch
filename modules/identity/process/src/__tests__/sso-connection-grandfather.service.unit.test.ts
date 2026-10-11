@@ -244,8 +244,8 @@ describe("the sso connection grandfather migration", () => {
   });
 
   describe("given an organization that already holds another live connection", () => {
-    /** @scenario "The grandfather step holds an organization that already has another live connection" */
-    it("holds it on its proof, writes no grandfathered connection, and holds it again next pass", async () => {
+    /** @scenario "The grandfather step finishes an organization that already has another live connection" */
+    it("finishes it with a report naming the legacy domains, and writes no grandfathered connection", async () => {
       connections.seed({
         ...emptySsoConnection({ connectionId: "ssoc_direct" }),
         organizationId: ORG,
@@ -259,13 +259,8 @@ describe("the sso connection grandfather migration", () => {
 
       for (const outcome of [await run(), await run()]) {
         expect(outcome).toEqual({
-          status: "migrated",
-          heldReason: "proof",
-          report: {
-            kind: "competing_connection",
-            connectionId: "ssoc_gf_org_acme",
-            domains: ["acme.com"],
-          },
+          status: "finalized",
+          report: { kind: "legacy_route_beside_connection", domains: ["acme.com"] },
         });
       }
       await expect(
