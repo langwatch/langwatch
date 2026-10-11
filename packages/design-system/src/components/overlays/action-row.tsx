@@ -73,7 +73,7 @@ export interface ActionRowProps {
   /** A full-width block above the row: a totals breakdown. */
   summary?: ReactNode;
   /** Outline, left of the secondary. A dialog draws it by default; a drawer only when given. */
-  cancel?: { label?: string; onClick: () => void };
+  cancel?: { label?: string; onClick: () => void; "data-testid"?: string };
   /** Every action waits. */
   busy?: boolean;
 }
@@ -193,7 +193,11 @@ export function ActionRow({
       <Spacer />
       {cancel && (
         <FrameActionButton
-          action={{ label: cancel.label ?? "Cancel", onClick: cancel.onClick }}
+          action={{
+            label: cancel.label ?? "Cancel",
+            onClick: cancel.onClick,
+            "data-testid": cancel["data-testid"],
+          }}
           kind="cancel"
           busy={busy}
         />

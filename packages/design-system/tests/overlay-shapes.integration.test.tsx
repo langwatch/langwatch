@@ -487,7 +487,7 @@ describe("a drawer footer", () => {
     const onCancel = vi.fn();
     const shared: ActionRowProps = {
       primaryAction: { label: "Save", onClick: vi.fn() },
-      cancel: { label: "Discard", onClick: onCancel },
+      cancel: { label: "Discard", onClick: onCancel, "data-testid": "discard-button" },
     };
     renderWithDesignSystem(<Drawer onClose={vi.fn()} title="Edit key" footer={shared} />);
 
@@ -497,7 +497,9 @@ describe("a drawer footer", () => {
       .map((button) => button.textContent);
     expect(buttons.filter((name) => name === "Discard")).toHaveLength(1);
     expect(buttons.indexOf("Discard")).toBeLessThan(buttons.indexOf("Save"));
-    await userEvent.setup().click(within(drawer).getByRole("button", { name: "Discard" }));
+    const discard = within(drawer).getByRole("button", { name: "Discard" });
+    expect(discard.getAttribute("data-testid")).toBe("discard-button");
+    await userEvent.setup().click(discard);
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
