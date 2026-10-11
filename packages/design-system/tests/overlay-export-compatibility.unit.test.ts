@@ -26,6 +26,7 @@ describe("overlay public exports", () => {
         "setDrawerEndInset",
         "useDrawerEndInset",
         "useOverlayPortalTarget",
+        "useReserveDrawerFocus",
       ]);
     });
 
