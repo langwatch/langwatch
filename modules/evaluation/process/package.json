@@ -55,6 +55,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/upgrade": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
