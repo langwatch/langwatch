@@ -191,9 +191,10 @@ function ButtonReferences() {
       </Button>
       {/* Add source is not a bare button: it is this menu's trigger, and the
           trigger composition adds a class and its own emitted style, so the
-          references wear the same wrapper and the comparison stays about the button. */}
+          references wear the same wrapper and the comparison stays about the button.
+          The outline reference is the large header's house button: md, never shrinking. */}
       <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
-        <Button size="sm" variant="outline">
+        <Button size="md" variant="outline" flexShrink={0}>
           reference outline small trigger
         </Button>
       </AddIngestionSourceMenu>
