@@ -7,20 +7,16 @@
 
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, Input, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Input, Skeleton, VStack } from "@langwatch/design-system/primitives";
 
 import { useFocusOnMount } from "../../../../behavior/use-focus-on-mount.ts";
-import {
-  CASE_EDITOR_DRAWER_SIZE,
-  SUITE_EDITOR_DRAWER,
-} from "../../../../model/agent-testing/cases/drawer-keys.ts";
+import { SUITE_EDITOR_DRAWER } from "../../../../model/agent-testing/cases/drawer-keys.ts";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
   DIALOG_FIELD_STYLE,
   FieldError,
   FieldLabel,
 } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import { SuiteEvaluatorsSection } from "../../../elements/agent-testing/suite/suite-evaluators-section.tsx";
 import { SuiteFieldsSection } from "../../../elements/agent-testing/suite/suite-fields-section.tsx";
 import { type SuiteEditorModel, useSuiteEditor } from "../suite/use-suite-editor.ts";
@@ -33,18 +29,6 @@ export type SuiteEditorDrawerProps = {
 };
 
 const SUITE_EDITOR_SUBTITLE = "The fields its scenarios carry, and the checks every run in it gets";
-
-function SuiteEditorHeader({ storedName }: { storedName: string }) {
-  return (
-    <Drawer.Header>
-      <Drawer.Title>Edit test suite</Drawer.Title>
-      <Text textStyle="caption" color="fg.muted" marginTop={0.5}>
-        {storedName || SUITE_EDITOR_SUBTITLE}
-      </Text>
-      <Drawer.CloseTrigger />
-    </Drawer.Header>
-  );
-}
 
 /** Stands in for the form while the stored suite is being read. */
 function SuiteEditorSkeleton() {
@@ -122,27 +106,6 @@ function SuiteEditorFields({ model }: { model: SuiteEditorModel }) {
   );
 }
 
-function SuiteEditorFooter({ model }: { model: SuiteEditorModel }) {
-  return (
-    <Drawer.Actions
-      onCancel={model.close}
-      busy={model.isSaving}
-      primary={
-        <SmallButton
-          variant="solid"
-          colorPalette="orange"
-          loading={model.isSaving}
-          disabled={model.isLoading}
-          onClick={model.save}
-          data-testid="suite-editor-save"
-        >
-          Save
-        </SmallButton>
-      }
-    />
-  );
-}
-
 export function SuiteEditorDrawer(_props: SuiteEditorDrawerProps) {
   const { drawerOpen } = useDrawer();
   const params = useDrawerParams();
@@ -152,20 +115,27 @@ export function SuiteEditorDrawer(_props: SuiteEditorDrawerProps) {
   const model = useSuiteEditor({ testSuiteId, isOpen });
 
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open: nextOpen }) => !nextOpen && model.close()}
-      placement="end"
-      size={CASE_EDITOR_DRAWER_SIZE}
+      onClose={model.close}
+      size="lg"
+      title="Edit test suite"
+      subtitle={model.storedName || SUITE_EDITOR_SUBTITLE}
+      footer={{
+        cancel: { onClick: model.close },
+        busy: model.isSaving,
+        primaryAction: {
+          label: "Save",
+          loading: model.isSaving,
+          disabledReason: model.isLoading ? "The test suite is still loading." : void 0,
+          onClick: model.save,
+          "data-testid": "suite-editor-save",
+        },
+      }}
+      data-testid="suite-editor"
     >
-      <Drawer.Content data-testid="suite-editor">
-        <SuiteEditorHeader storedName={model.storedName} />
-        <Drawer.Body>
-          <SuiteEditorFields model={model} />
-        </Drawer.Body>
-        <SuiteEditorFooter model={model} />
-      </Drawer.Content>
-    </Drawer.Root>
+      <SuiteEditorFields model={model} />
+    </Drawer>
   );
 }
 

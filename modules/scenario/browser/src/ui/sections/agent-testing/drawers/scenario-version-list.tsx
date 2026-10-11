@@ -4,6 +4,7 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useState } from "react";
@@ -57,9 +58,18 @@ export function ScenarioVersionList({
 
   if (versions.length === 0) {
     return (
-      <Text color="fg.muted" textAlign="center" paddingY={8}>
-        No versions saved yet.
-      </Text>
+      <NoDataInfoBlock
+        size="line"
+        title="No versions saved yet."
+        next={[
+          {
+            kind: "docs",
+            label: "Read about versions",
+            href: "https://docs.langwatch.ai/agent-testing/scenarios",
+          },
+        ]}
+        testId="version-history-empty"
+      />
     );
   }
 
