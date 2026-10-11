@@ -54,31 +54,31 @@ function BudgetHeaderActions({
   onArchive: () => void;
 }) {
   return (
-    <HStack>
+    <>
       {/* Audit history remains reachable even after archive —
           the full lifecycle trail stays queryable so operators
           can reconstruct why a budget was archived. */}
-      <Link href={`/settings/audit-log?targetKind=budget&targetId=${budgetId}`}>
-        <Button variant="outline" size="sm">
+      <PageLayout.HeaderButton asChild>
+        <Link href={`/settings/audit-log?targetKind=budget&targetId=${budgetId}`}>
           <FileClock size={14} /> Audit history
-        </Button>
-      </Link>
+        </Link>
+      </PageLayout.HeaderButton>
       {!isArchived && canUpdate && (
-        <Button variant="outline" size="sm" onClick={onReset}>
+        <PageLayout.HeaderButton onClick={onReset}>
           <TimerReset size={14} /> Reset period
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {!isArchived && canUpdate && (
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <PageLayout.HeaderButton onClick={onEdit}>
           <Pencil size={14} /> Edit
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {!isArchived && canDelete && (
-        <Button colorPalette="red" variant="outline" size="sm" onClick={onArchive}>
+        <Button colorPalette="red" variant="outline" size="md" flexShrink={0} onClick={onArchive}>
           <Archive size={14} /> Archive
         </Button>
       )}
-    </HStack>
+    </>
   );
 }
 
@@ -210,27 +210,31 @@ function BudgetDetailPage() {
   return (
     <AiGatewayLayout>
       <>
-        <PageLayout.Header>
-          <PageLayout.Heading>
-            {budget?.name ?? "Budget"}
-            {isArchived && (
-              <Badge colorPalette="gray" ml={2}>
-                archived
-              </Badge>
-            )}
-          </PageLayout.Heading>
-          <Spacer />
-          {budget && (
-            <BudgetHeaderActions
-              budgetId={budget.id}
-              isArchived={isArchived}
-              canUpdate={canUpdate}
-              canDelete={canDelete}
-              onReset={() => setResetting(true)}
-              onEdit={() => setEditing(true)}
-              onArchive={() => setArchiving(true)}
-            />
-          )}
+        <PageLayout.Header
+          actions={
+            budget && (
+              <BudgetHeaderActions
+                budgetId={budget.id}
+                isArchived={isArchived}
+                canUpdate={canUpdate}
+                canDelete={canDelete}
+                onReset={() => setResetting(true)}
+                onEdit={() => setEditing(true)}
+                onArchive={() => setArchiving(true)}
+              />
+            )
+          }
+        >
+          <Box flex="1 1 12rem" minWidth={0}>
+            <PageLayout.Heading>
+              {budget?.name ?? "Budget"}
+              {isArchived && (
+                <Badge colorPalette="gray" ml={2}>
+                  archived
+                </Badge>
+              )}
+            </PageLayout.Heading>
+          </Box>
         </PageLayout.Header>
 
         <PageLayout.Container>

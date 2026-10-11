@@ -219,51 +219,51 @@ function VirtualKeyHeaderActions({
   onRevoke: () => void;
 }) {
   return (
-    <HStack>
+    <>
       {/* Audit history stays available even when revoked —
           operators forensically investigating a revoked VK
           still need its create/update/rotate/revoke trail. */}
-      <Link href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}>
-        <Button variant="outline" size="sm">
+      <PageLayout.HeaderButton asChild>
+        <Link href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}>
           <FileClock size={14} /> Audit history
-        </Button>
-      </Link>
+        </Link>
+      </PageLayout.HeaderButton>
       {/* Traces outlive the key, so this is offered whatever the
           key's status: investigating what a revoked key did is
           exactly when somebody needs it. */}
       {viewTracesHref && (
-        <Link href={viewTracesHref}>
-          <Button variant="outline" size="sm" data-testid="vk-header-view-traces">
+        <PageLayout.HeaderButton asChild data-testid="vk-header-view-traces">
+          <Link href={viewTracesHref}>
             <Bird size={14} /> View traces
-          </Button>
-        </Link>
+          </Link>
+        </PageLayout.HeaderButton>
       )}
       {vk.status === "active" && canUpdate && (
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <PageLayout.HeaderButton onClick={onEdit}>
           <Pencil size={14} /> Edit
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {vk.status === "active" && canRotate && (
-        <Button variant="outline" size="sm" onClick={onRotate}>
+        <PageLayout.HeaderButton onClick={onRotate}>
           <RotateCw size={14} /> Rotate
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {vk.status === "active" && canUpdate && (
-        <Button variant="outline" size="sm" onClick={onDisable}>
+        <PageLayout.HeaderButton onClick={onDisable}>
           <PauseCircle size={14} /> Disable
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {vk.status === "disabled" && canUpdate && (
-        <Button variant="outline" size="sm" loading={isEnabling} onClick={onEnable}>
+        <PageLayout.HeaderButton loading={isEnabling} onClick={onEnable}>
           <PlayCircle size={14} /> Enable
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {vk.status !== "revoked" && canUpdate && (
-        <Button colorPalette="red" variant="outline" size="sm" onClick={onRevoke}>
+        <Button colorPalette="red" variant="outline" size="md" flexShrink={0} onClick={onRevoke}>
           <Trash2 size={14} /> Revoke
         </Button>
       )}
-    </HStack>
+    </>
   );
 }
 
@@ -454,23 +454,27 @@ function VirtualKeyDetailPage() {
   return (
     <AiGatewayLayout>
       <>
-        <PageLayout.Header>
-          <PageLayout.Heading>{vk?.name ?? "Virtual key"}</PageLayout.Heading>
-          <Spacer />
-          {vk && (
-            <VirtualKeyHeaderActions
-              vk={vk}
-              viewTracesHref={viewTracesHref}
-              canUpdate={canUpdate}
-              canRotate={canRotate}
-              isEnabling={enableMutation.isPending}
-              onEdit={() => setEditing(true)}
-              onRotate={() => setRotating(true)}
-              onDisable={() => setDisabling(true)}
-              onEnable={() => void confirmEnable()}
-              onRevoke={() => setRevoking(true)}
-            />
-          )}
+        <PageLayout.Header
+          actions={
+            vk && (
+              <VirtualKeyHeaderActions
+                vk={vk}
+                viewTracesHref={viewTracesHref}
+                canUpdate={canUpdate}
+                canRotate={canRotate}
+                isEnabling={enableMutation.isPending}
+                onEdit={() => setEditing(true)}
+                onRotate={() => setRotating(true)}
+                onDisable={() => setDisabling(true)}
+                onEnable={() => void confirmEnable()}
+                onRevoke={() => setRevoking(true)}
+              />
+            )
+          }
+        >
+          <Box flex="1 1 12rem" minWidth={0}>
+            <PageLayout.Heading>{vk?.name ?? "Virtual key"}</PageLayout.Heading>
+          </Box>
         </PageLayout.Header>
 
         <PageLayout.Container>

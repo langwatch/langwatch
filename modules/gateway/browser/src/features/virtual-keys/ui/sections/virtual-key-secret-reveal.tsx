@@ -93,7 +93,7 @@ export function VirtualKeySecretReveal({
       open={open}
       onClose={close}
       title={kind === "rotate" ? "Save your rotated secret" : "Save your virtual key secret"}
-      size="lg"
+      size="md"
       role="alertdialog"
       dismissible={false}
       note={
