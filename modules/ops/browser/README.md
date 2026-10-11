@@ -140,7 +140,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 - Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/enterprise-billing-client`, `@langwatch/ops-client`, `@langwatch/prompt-client`.
 - Lends: `UpgradeActionNeededToken`.
 - Host APIs it requires: `OpsHostApi`, `CheckupHostApi`.
-- Capabilities: `impersonationBanner`.
+- Capabilities: `impersonationBanner`, `upgradeAttentionBanner`.
 - Config slices: `ops`, `rum`.
 
 <!-- readme:generated:end -->
