@@ -8,7 +8,6 @@
 import { Chip } from "@langwatch/design-system/chip";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import { Button, Heading, HStack, VStack, Icon } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SimulationRunStatus } from "@langwatch/scenario-contract";
 import { Square, Edit2, Play } from "lucide-react";
@@ -187,7 +186,6 @@ function HeaderActions({
         onOpenInTraces={isTraceReachable ? detail.handleOpenInTraces : null}
         dejaViewHref={detail.dejaView.href ?? null}
       />
-      <Drawer.CloseTrigger />
     </HStack>
   );
 }
