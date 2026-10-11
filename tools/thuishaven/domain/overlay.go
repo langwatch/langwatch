@@ -121,6 +121,12 @@ func (s Stack) OverlayEnv() []string {
 		// shipped preset loads data old enough to need it (see db.go).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
+	// The gateway spools unsent spend under os.TempDir() by default, which every stack's
+	// gateway on this machine shares: one stack would ship another's spend to its own
+	// control plane. Each stack spools beside its own run state instead.
+	if s.WorktreeDir != "" {
+		env = append(env, "LW_GATEWAY_SPEND_SPOOL_DIR="+GatewaySpendSpoolDir(s.WorktreeDir, s.Slug))
+	}
 	// The IdP simulator is an opt-in lane; only a worktree actually running (or
 	// falling back to) one gets the pointer, so nothing reads a dead URL.
 	if idp := s.svc("idp"); idp.Port != 0 && idp.URL != "" {

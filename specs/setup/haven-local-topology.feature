@@ -166,6 +166,13 @@ Feature: The local development topology
     Then the go lane hosts only the gateway
     And it carries no address for the service that was not selected
 
+  @unit
+  Scenario: Each stack's gateway spools its spend apart from every other stack's
+    Given two stacks running on one machine, each with its own gateway
+    When haven plans each stack's children
+    Then each gateway is handed a spend spool directory under its own stack's run state
+    And neither gateway can ship a spend record the other recorded to its own control plane
+
   # A checkout without cmd/service/combined_dev.go, or a monolith one, keeps
   # Haven's bundled simulator lanes (haven-bundled-simulators.feature).
   @unit

@@ -18,3 +18,9 @@ func StackLogPaths(worktreeDir, slug string) (dir, combined string) {
 	root := HavenLogsRoot(worktreeDir)
 	return filepath.Join(root, slug), filepath.Join(root, slug+".log")
 }
+
+// GatewaySpendSpoolDir is one stack's own gateway spend spool, in the owner-only run
+// dir beside the logs, so two stacks' gateways never drain each other's spend.
+func GatewaySpendSpoolDir(worktreeDir, slug string) string {
+	return filepath.Join(filepath.Dir(HavenLogsRoot(worktreeDir)), "run", slug, "gateway-spend-spool")
+}
