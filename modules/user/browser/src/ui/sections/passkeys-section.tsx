@@ -10,7 +10,6 @@ import {
   Box,
   Button,
   Field,
-  HStack,
   Input,
   Spacer,
   Text,
@@ -47,6 +46,7 @@ function RenamePasskeyDialog({
 }) {
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [nameMissing, setNameMissing] = useState(false);
 
   // Seeded from the passkey being renamed rather than held in sync with it: the
   // dialog opens once per passkey, and re-seeding on every render would fight
@@ -55,59 +55,58 @@ function RenamePasskeyDialog({
     if (passkey) setName(passkey.name ?? "");
   }, [passkey]);
 
+  const close = () => {
+    setNameMissing(false);
+    onClose();
+  };
+
   const save = async () => {
     if (!passkey) return;
     setIsSaving(true);
     try {
       await onRename({ id: passkey.id, name: name.trim() });
-      onClose();
+      close();
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={!!passkey}
-      onOpenChange={(details) => {
-        if (!details.open) onClose();
-      }}
+      onClose={close}
+      title="Rename passkey"
       placement="center"
+      busy={isSaving}
+      onSubmit={() => {
+        if (!name.trim()) {
+          setNameMissing(true);
+          return;
+        }
+        void save();
+      }}
+      primaryAction={{
+        label: "Save",
+        type: "submit",
+        loading: isSaving,
+        "data-testid": "save-passkey-name",
+      }}
     >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Rename passkey</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Field.Root>
-            <Field.Label>Name</Field.Label>
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Work laptop"
-              data-testid="passkey-name"
-            />
-          </Field.Root>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={3} justify="end" width="full">
-            <Button variant="outline" onClick={onClose} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              loading={isSaving}
-              disabled={!name.trim()}
-              onClick={() => void save()}
-              data-testid="save-passkey-name"
-            >
-              Save
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <Field.Root invalid={nameMissing}>
+        <Field.Label>Name</Field.Label>
+        <Input
+          value={name}
+          onChange={(event) => {
+            setName(event.target.value);
+            setNameMissing(false);
+          }}
+          aria-invalid={nameMissing || undefined}
+          placeholder="Work laptop"
+          data-testid="passkey-name"
+        />
+        <Field.ErrorText>Enter a name for this passkey.</Field.ErrorText>
+      </Field.Root>
+    </Dialog>
   );
 }
 
@@ -138,41 +137,25 @@ function RemovePasskeyDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={!!passkey}
-      onOpenChange={(details) => {
-        if (!details.open) onClose();
-      }}
+      onClose={onClose}
+      title={`Remove ${passkey ? passkeyLabel(passkey) : "passkey"}?`}
       placement="center"
+      busy={isRemoving}
+      primaryAction={{
+        label: "Remove",
+        danger: true,
+        loading: isRemoving,
+        onClick: () => void remove(),
+        "data-testid": "confirm-remove-passkey",
+      }}
     >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Remove {passkey ? passkeyLabel(passkey) : "passkey"}?</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Text fontSize="sm" color="fg.muted">
-            You will not be able to sign in with it again. The passkey stays on your device until
-            you delete it there too.
-          </Text>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={3} justify="end" width="full">
-            <Button variant="outline" onClick={onClose} disabled={isRemoving}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              loading={isRemoving}
-              onClick={() => void remove()}
-              data-testid="confirm-remove-passkey"
-            >
-              Remove
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <Text fontSize="sm" color="fg.muted">
+        You will not be able to sign in with it again. The passkey stays on your device until you
+        delete it there too.
+      </Text>
+    </Dialog>
   );
 }
 
@@ -412,18 +395,18 @@ export function PasskeysSection() {
         ) : null}
 
         {/* The waiting state sits over the list the ceremony was started from. */}
-        <Dialog.Root open={isCreating} placement="center">
-          <Dialog.Content data-testid="passkey-ceremony-dialog">
-            <Dialog.Header>
-              <Dialog.Title>Create your passkey</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body paddingBottom={6}>
-              <Text textStyle="body" color="fg.muted">
-                Follow your device&apos;s prompt to finish. Closing it keeps things as they were.
-              </Text>
-            </Dialog.Body>
-          </Dialog.Content>
-        </Dialog.Root>
+        <Dialog
+          open={isCreating}
+          onClose={() => {}}
+          title="Create your passkey"
+          placement="center"
+          dismissible={false}
+          data-testid="passkey-ceremony-dialog"
+        >
+          <Text textStyle="body" color="fg.muted">
+            Follow your device&apos;s prompt to finish. Closing it keeps things as they were.
+          </Text>
+        </Dialog>
 
         <RenamePasskeyDialog
           passkey={renaming}
