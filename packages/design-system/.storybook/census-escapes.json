@@ -1014,5 +1014,101 @@
     "line": 136,
     "reason": "Approved: the dashboard chart frame the owner liked fills its grid cell and clips; no Card variant draws it (R5a2 review).",
     "owner": "analytics"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "native-table",
+    "line": 1099,
+    "reason": "Approved: the protected editable dataset grid keeps its native virtualised rows (R4d review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 1100,
+    "reason": "Approved: the protected editable dataset grid keeps its native virtualised rows (R4d review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 1101,
+    "reason": "Approved: the protected editable dataset grid keeps its native virtualised rows (R4d review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 1103,
+    "reason": "Approved: the protected editable dataset grid keeps its native virtualised rows (R4d review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 1106,
+    "reason": "Approved: the protected editable dataset grid keeps its native virtualised rows (R4d review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 1108,
+    "reason": "Approved: the protected editable dataset grid keeps its native virtualised rows (R4d review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 1115,
+    "reason": "Approved: the protected editable dataset grid keeps its native virtualised rows (R4d review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 1280,
+    "reason": "Approved: the protected editable dataset grid keeps its native virtualised rows (R4d review).",
+    "owner": "dataset"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+    "rule": "card-box",
+    "line": 1079,
+    "reason": "The virtualisation scroll frame of the protected grid. (R4d review)",
+    "owner": "dataset",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/elements/floating-cell-editor.tsx",
+    "rule": "card-box",
+    "line": 143,
+    "reason": "The floating cell editor popup of the protected grid. (R4d review)",
+    "owner": "dataset",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/attachment-cell.tsx",
+    "rule": "card-box",
+    "line": 194,
+    "reason": "An inline file chip, not a card. (R4d review)",
+    "owner": "dataset",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/bulk-upload-drawer.tsx",
+    "rule": "card-box",
+    "line": 278,
+    "reason": "The drag-preview row, not a card. (R4d review)",
+    "owner": "dataset",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/dataset/browser/src/ui/sections/bulk-upload-drawer.tsx",
+    "rule": "card-box",
+    "line": 303,
+    "reason": "The drag-preview type pill, not a card. (R4d review)",
+    "owner": "dataset",
+    "disposition": "reviewed"
   }
 ]
