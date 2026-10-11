@@ -1899,48 +1899,6 @@
     "owner": "workflow"
   },
   {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 199,
-    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 208,
-    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 209,
-    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 211,
-    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 215,
-    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/drawers/studio-drawer-wrapper.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 377,
-    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
-    "owner": "workflow"
-  },
-  {
     "path": "modules/workflow/browser/src/ui/sections/optimization_studio/evaluate.tsx",
     "rule": "legacy-overlay-part",
     "line": 83,
@@ -2074,20 +2032,6 @@
     "owner": "workflow"
   },
   {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/properties/agent-properties-panel.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 954,
-    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/optimization_studio/properties/evaluator-properties-panel.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 275,
-    "reason": "Approved: workflow studio host kept as today (code editor host, dataset modal, registered footers, green-topped run forms, studio header) until the studio footer port and a one-sided panel card are designed (R9w review).",
-    "owner": "workflow"
-  },
-  {
     "path": "modules/workflow/browser/src/ui/sections/optimization_studio/publish.tsx",
     "rule": "legacy-overlay-part",
     "line": 156,
@@ -2194,62 +2138,6 @@
     "disposition": "reviewed"
   },
   {
-    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 136,
-    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 141,
-    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 416,
-    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 422,
-    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 423,
-    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 424,
-    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 446,
-    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 450,
-    "reason": "Approved: the prompt editor drawer keeps its custom footer (history, API snippet, unsaved-aware Save and Apply) until the drawer has a custom footer slot (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/chat/synced-chat-input.tsx",
     "rule": "card-box",
     "line": 174,
@@ -2304,174 +2192,6 @@
     "reason": "Not a plain card: chat composer, select-style popover anchor, dropdown list, tag row or the Outputs well (R9p2 review).",
     "owner": "prompt",
     "disposition": "reviewed"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog-footer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 76,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 103,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 110,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 111,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 211,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 222,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 233,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 252,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 253,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 254,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 255,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 265,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 301,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 931,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 935,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/scenarios/scenario-form-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 938,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 141,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 142,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 163,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 165,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 185,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 245,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 263,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 281,
-    "reason": "Approved: kept as today until the design system has Escape control on Dialog, a custom drawer footer node and a header slot for the Langy surface (R8s3 review).",
-    "owner": "scenario"
   },
   {
     "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-name-field.tsx",
@@ -2588,7 +2308,7 @@
   {
     "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
     "rule": "card-box",
-    "line": 248,
+    "line": 229,
     "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
     "owner": "scenario",
     "disposition": "reviewed"
@@ -2596,7 +2316,7 @@
   {
     "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
     "rule": "card-box",
-    "line": 471,
+    "line": 447,
     "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
     "owner": "scenario",
     "disposition": "reviewed"
@@ -2604,7 +2324,7 @@
   {
     "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
     "rule": "card-box",
-    "line": 659,
+    "line": 635,
     "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
     "owner": "scenario",
     "disposition": "reviewed"
@@ -2612,7 +2332,7 @@
   {
     "path": "modules/scenario/browser/src/ui/sections/shared/ai-create-modal.tsx",
     "rule": "card-box",
-    "line": 661,
+    "line": 637,
     "reason": "Not a plain card: dropdown, control well, inline hint, selectable tile, chip, icon tile or recap well (R8s3 review).",
     "owner": "scenario",
     "disposition": "reviewed"
@@ -2678,48 +2398,6 @@
     "rule": "legacy-table-part",
     "line": 225,
     "reason": "Approved: the protected dataset preview table with rich cells (R10w1 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/elements/workflow-create-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 164,
-    "reason": "Approved: the workflow create dialog keeps its emoji picker focus and scroll behaviour until Dialog can turn off its focus trap (R10w1 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/elements/workflow-create-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 171,
-    "reason": "Approved: the workflow create dialog keeps its emoji picker focus and scroll behaviour until Dialog can turn off its focus trap (R10w1 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/elements/workflow-create-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 174,
-    "reason": "Approved: the workflow create dialog keeps its emoji picker focus and scroll behaviour until Dialog can turn off its focus trap (R10w1 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/elements/workflow-create-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 190,
-    "reason": "Approved: the workflow create dialog keeps its emoji picker focus and scroll behaviour until Dialog can turn off its focus trap (R10w1 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/elements/workflow-create-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 193,
-    "reason": "Approved: the workflow create dialog keeps its emoji picker focus and scroll behaviour until Dialog can turn off its focus trap (R10w1 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/elements/workflow-create-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 195,
-    "reason": "Approved: the workflow create dialog keeps its emoji picker focus and scroll behaviour until Dialog can turn off its focus trap (R10w1 review).",
     "owner": "workflow"
   },
   {
@@ -2793,69 +2471,6 @@
     "reason": "Protected or not a plain card: canvas controls, result chip, chart tooltip, rich output viewport, editor frame, icon tile or cell editor (R10w1 review).",
     "owner": "workflow",
     "disposition": "reviewed"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 28,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 30,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 61,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 90,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 101,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/run-drawer-header-band.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 190,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/run-drawer-loading-body.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 52,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/run-drawer-loading-body.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 63,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
-  },
-  {
-    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog-call-body.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 19,
-    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
-    "owner": "scenario"
   },
   {
     "path": "modules/scenario/browser/src/ui/elements/workflow/workflow-icons.tsx",
@@ -3519,20 +3134,6 @@
     "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
     "rule": "legacy-overlay-part",
     "line": 76,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/workflow-create-dialog-host.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 144,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/workflow-create-dialog-host.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 178,
     "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
     "owner": "workflow"
   },

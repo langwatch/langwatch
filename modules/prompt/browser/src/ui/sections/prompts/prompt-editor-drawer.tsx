@@ -5,16 +5,16 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { Box, Button, Circle, HStack, VStack } from "@langwatch/design-system/primitives";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Box, Circle, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PromptEditorDrawerToken, type PromptEditorDrawerProps } from "@langwatch/prompt-client";
 import { hasNonEmptySystemMessage } from "@langwatch/prompt-contract";
 import { type AvailableSource, type FieldMapping } from "@langwatch/workflow-contract";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { FormProvider, useFieldArray, useWatch } from "react-hook-form";
-import { LuArrowLeft, LuPencil } from "react-icons/lu";
+import { LuPencil } from "react-icons/lu";
 
 import {
   useEditorInputMappings,
@@ -121,24 +121,25 @@ function useSetVariableMapping({
   );
 }
 
-/** The drawer's title: the prompt's handle (click to rename), its version and unsaved mark. */
+/** The visible title: the handle (click to rename), its version and the unsaved mark. */
 function EditorTitle({
   handle,
   onRename,
   versionBadge,
   hasUnsavedChanges,
 }: {
-  handle: string | undefined;
+  handle: string;
   onRename: () => void;
   versionBadge: ReactNode;
   hasUnsavedChanges: boolean;
 }) {
-  if (!handle) return <Drawer.Title>New prompt</Drawer.Title>;
   return (
-    <>
+    <HStack gap={2} flexWrap="wrap">
       <HStack asChild gap={1} cursor="pointer" _hover={{ "& .edit-icon": { display: "block" } }}>
         <button type="button" onClick={onRename}>
-          <Drawer.Title>{handle}</Drawer.Title>
+          <Text textStyle="md" fontWeight="semibold" overflowWrap="anywhere">
+            {handle}
+          </Text>
           <Box className="edit-icon" display="none" transition="opacity 0.2s" color="fg.muted">
             <LuPencil size={16} />
           </Box>
@@ -155,7 +156,7 @@ function EditorTitle({
           <Circle size="10px" bg="orange.solid" data-testid="unsaved-changes-indicator" />
         </Tooltip>
       )}
-    </>
+    </HStack>
   );
 }
 
@@ -412,43 +413,31 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     />
   );
 
-  return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && handleClose()}
-      size="sm"
-      modal={false}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <EditorTitle
-              handle={promptId ? (promptQuery.data?.handle ?? undefined) : undefined}
-              onRename={save.changeHandleDialog.openDialog}
-              versionBadge={versionBadge}
-              hasUnsavedChanges={hasUnsavedChanges}
-            />
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-          {loadingContent ?? formBodyContent}
-        </Drawer.Body>
+  const handle = promptId ? (promptQuery.data?.handle ?? undefined) : undefined;
 
-        <Drawer.Footer>{footerElement}</Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+  return (
+    <Drawer
+      open={isOpen}
+      onClose={handleClose}
+      onBack={canGoBack ? goBack : undefined}
+      backButtonTestId="back-button"
+      size="sm"
+      title={handle ?? "New prompt"}
+      titleContent={
+        handle ? (
+          <EditorTitle
+            handle={handle}
+            onRename={save.changeHandleDialog.openDialog}
+            versionBadge={versionBadge}
+            hasUnsavedChanges={hasUnsavedChanges}
+          />
+        ) : undefined
+      }
+      body="flush"
+      bodyScroll="content"
+      footerContent={footerElement}
+    >
+      {loadingContent ?? formBodyContent}
+    </Drawer>
   );
 }
