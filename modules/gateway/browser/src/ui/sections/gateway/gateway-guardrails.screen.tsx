@@ -8,7 +8,6 @@ import {
   Badge,
   Button,
   Field,
-  HStack,
   Input,
   NativeSelect,
   Spacer,
@@ -23,7 +22,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 import { Archive, MoreVertical, Pencil, Plus, Shield } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type FormEvent, type RefObject, useEffect, useId, useRef, useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
@@ -365,8 +364,13 @@ export function GuardrailDrawer({
   const [evaluatorId, setEvaluatorId] = useState("");
   const [direction, setDirection] = useState<GatewayGuardrailDirection>("PRE");
   const [failureMode, setFailureMode] = useState<GatewayGuardrailFailureMode>("FAIL_CLOSED");
+  const [attempted, setAttempted] = useState(false);
+  const formId = useId();
+  const nameRef = useRef<HTMLInputElement>(null);
+  const evaluatorRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
+    setAttempted(false);
     if (mode === "edit" && existing) {
       setName(existing.name);
       setDescription(existing.description ?? "");
@@ -407,9 +411,24 @@ export function GuardrailDrawer({
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
-  const submitDisabled = !name.trim() || !evaluatorId || isPending;
+  const nameMissing = !name.trim();
+  const evaluatorMissing = !evaluatorId;
+  const editingUnavailable = mode === "edit" && !existing;
 
-  const submit = () => {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isPending || editingUnavailable) return;
+    setAttempted(true);
+    const invalid = firstInvalidField({
+      nameMissing,
+      evaluatorMissing,
+      nameRef,
+      evaluatorRef,
+    });
+    if (invalid) {
+      invalid.focus();
+      return;
+    }
     if (mode === "create") {
       createMutation.mutate({
         projectId,
@@ -433,118 +452,151 @@ export function GuardrailDrawer({
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open
-      onOpenChange={({ open: next }) => {
-        if (!next) onClose();
-      }}
-      placement="end"
+      onClose={onClose}
       size="md"
+      title={mode === "create" ? "New guardrail" : "Edit guardrail"}
+      loading={mode === "edit" && listQuery.isLoading}
+      error={editError({ mode, listQuery, existing })}
+      footer={{
+        cancel: { onClick: onClose },
+        busy: isPending,
+        ...(editingUnavailable
+          ? {}
+          : {
+              primaryAction: {
+                label: mode === "create" ? "Create" : "Save changes",
+                type: "submit" as const,
+                form: formId,
+                loading: isPending,
+                "data-testid": "gateway-guardrail-submit",
+              },
+            }),
+      }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{mode === "create" ? "New guardrail" : "Edit guardrail"}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={5}>
-            <Field.Root required>
-              <Field.Label>Name</Field.Label>
-              <Input
-                data-testid="gateway-guardrail-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. block PII on requests"
-              />
-            </Field.Root>
+      <form id={formId} noValidate onSubmit={submit}>
+        <VStack align="stretch" gap={5}>
+          <Field.Root required invalid={attempted && nameMissing}>
+            <Field.Label>Name</Field.Label>
+            <Input
+              ref={nameRef}
+              data-testid="gateway-guardrail-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. block PII on requests"
+            />
+            <Field.ErrorText>Enter a name.</Field.ErrorText>
+          </Field.Root>
 
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                placeholder="Why this guardrail exists"
-              />
-            </Field.Root>
+          <Field.Root>
+            <Field.Label>Description</Field.Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Why this guardrail exists"
+            />
+          </Field.Root>
 
-            <Field.Root required>
-              <Field.Label>Evaluator</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  data-testid="gateway-guardrail-evaluator"
-                  value={evaluatorId}
-                  onChange={(e) => setEvaluatorId(e.target.value)}
-                >
-                  <option value="">Pick an evaluator…</option>
-                  {guardrailEvaluators.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name} ({e.slug})
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>
-                Only evaluators with executionMode AS_GUARDRAIL are listed. Flip an evaluator in
-                Evaluations to expose it here.
-              </Field.HelperText>
-            </Field.Root>
+          <Field.Root required invalid={attempted && evaluatorMissing}>
+            <Field.Label>Evaluator</Field.Label>
+            <NativeSelect.Root size="sm">
+              <NativeSelect.Field
+                ref={evaluatorRef}
+                data-testid="gateway-guardrail-evaluator"
+                value={evaluatorId}
+                onChange={(e) => setEvaluatorId(e.target.value)}
+              >
+                <option value="">Pick an evaluator…</option>
+                {guardrailEvaluators.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name} ({e.slug})
+                  </option>
+                ))}
+              </NativeSelect.Field>
+            </NativeSelect.Root>
+            <Field.HelperText>
+              Only evaluators with executionMode AS_GUARDRAIL are listed. Flip an evaluator in
+              Evaluations to expose it here.
+            </Field.HelperText>
+            <Field.ErrorText>Choose an evaluator.</Field.ErrorText>
+          </Field.Root>
 
-            <Field.Root required>
-              <Field.Label>Direction</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  data-testid="gateway-guardrail-direction"
-                  value={direction}
-                  onChange={(e) => setDirection(e.target.value as GatewayGuardrailDirection)}
-                >
-                  {(["PRE", "POST", "STREAM_CHUNK"] as const).map((d) => (
-                    <option key={d} value={d}>
-                      {DIRECTION_LABEL[d]}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>{DIRECTION_HELP[direction]}</Field.HelperText>
-            </Field.Root>
+          <Field.Root required>
+            <Field.Label>Direction</Field.Label>
+            <NativeSelect.Root size="sm">
+              <NativeSelect.Field
+                data-testid="gateway-guardrail-direction"
+                value={direction}
+                onChange={(e) => setDirection(e.target.value as GatewayGuardrailDirection)}
+              >
+                {(["PRE", "POST", "STREAM_CHUNK"] as const).map((d) => (
+                  <option key={d} value={d}>
+                    {DIRECTION_LABEL[d]}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+            </NativeSelect.Root>
+            <Field.HelperText>{DIRECTION_HELP[direction]}</Field.HelperText>
+          </Field.Root>
 
-            <Field.Root required>
-              <Field.Label>Failure mode</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={failureMode}
-                  onChange={(e) => setFailureMode(e.target.value as GatewayGuardrailFailureMode)}
-                >
-                  <option value="FAIL_CLOSED">{FAILURE_LABEL.FAIL_CLOSED}</option>
-                  <option value="FAIL_OPEN">{FAILURE_LABEL.FAIL_OPEN}</option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>
-                stream_chunk is always fail-open per contract regardless of this setting.
-              </Field.HelperText>
-            </Field.Root>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onClose} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              data-testid="gateway-guardrail-submit"
-              onClick={submit}
-              loading={isPending}
-              disabled={submitDisabled}
-            >
-              {mode === "create" ? "Create" : "Save changes"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          <Field.Root required>
+            <Field.Label>Failure mode</Field.Label>
+            <NativeSelect.Root size="sm">
+              <NativeSelect.Field
+                value={failureMode}
+                onChange={(e) => setFailureMode(e.target.value as GatewayGuardrailFailureMode)}
+              >
+                <option value="FAIL_CLOSED">{FAILURE_LABEL.FAIL_CLOSED}</option>
+                <option value="FAIL_OPEN">{FAILURE_LABEL.FAIL_OPEN}</option>
+              </NativeSelect.Field>
+            </NativeSelect.Root>
+            <Field.HelperText>
+              stream_chunk is always fail-open per contract regardless of this setting.
+            </Field.HelperText>
+          </Field.Root>
+        </VStack>
+      </form>
+    </Drawer>
   );
+}
+
+/** The first field a save attempt must fix, in the order the form shows them. */
+function firstInvalidField({
+  nameMissing,
+  evaluatorMissing,
+  nameRef,
+  evaluatorRef,
+}: {
+  nameMissing: boolean;
+  evaluatorMissing: boolean;
+  nameRef: RefObject<HTMLInputElement | null>;
+  evaluatorRef: RefObject<HTMLSelectElement | null>;
+}) {
+  if (nameMissing) return nameRef.current;
+  if (evaluatorMissing) return evaluatorRef.current;
+  return null;
+}
+
+/** Why an edit has nothing to edit yet: the list failed, or the row is gone. */
+function editError({
+  mode,
+  listQuery,
+  existing,
+}: {
+  mode: "create" | "edit";
+  listQuery: { isLoading: boolean; isError: boolean; refetch: () => unknown };
+  existing: unknown;
+}) {
+  if (mode !== "edit" || listQuery.isLoading || existing) return undefined;
+  if (listQuery.isError) {
+    return {
+      title: "Couldn't load this guardrail",
+      onRetry: () => void listQuery.refetch(),
+    };
+  }
+  return { title: "This guardrail is no longer available" };
 }
 
 export default GuardrailsPage;

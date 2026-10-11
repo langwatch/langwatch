@@ -3,6 +3,7 @@
  * URL-routed drawer; the guardrail editor rebuilds from the guardrail id in the address.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +12,7 @@ import { fakeGatewayHost, renderWithGatewayHost } from "../../../../testing.tsx"
 const state = vi.hoisted(() => ({
   guardrails: [] as unknown[],
   monitors: [] as unknown[],
+  mutate: vi.fn(),
 }));
 
 vi.mock("../../../../behavior/gateway-api.ts", () => {
@@ -35,7 +37,7 @@ vi.mock("../../../../behavior/gateway-api.ts", () => {
             });
           }
           if (property === "useMutation") {
-            return () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+            return () => ({ mutate: state.mutate, mutateAsync: vi.fn(), isPending: false });
           }
           if (property === "invalidate") return vi.fn();
           if (property === "useUtils") return () => node([]);
@@ -99,5 +101,40 @@ describe("given a shared link that carries a guardrail", () => {
 
     expect(await screen.findByText("New guardrail")).toBeInTheDocument();
     expect(screen.getByTestId("gateway-guardrail-name")).toHaveValue("");
+  });
+});
+
+describe("given the guardrail form is saved incomplete", () => {
+  beforeEach(() => {
+    state.mutate.mockClear();
+    state.guardrails = [];
+    state.monitors = [];
+  });
+  afterEach(cleanup);
+
+  it("explains the missing name and evaluator, focuses the first and sends nothing", async () => {
+    const user = userEvent.setup();
+    renderDrawer();
+
+    expect(screen.queryByText("Enter a name.")).not.toBeInTheDocument();
+    await user.click(await screen.findByTestId("gateway-guardrail-submit"));
+
+    expect(screen.getByText("Enter a name.")).toBeInTheDocument();
+    expect(screen.getByText("Choose an evaluator.")).toBeInTheDocument();
+    expect(screen.getByTestId("gateway-guardrail-name")).toHaveFocus();
+
+    await user.type(screen.getByTestId("gateway-guardrail-name"), "Block PII");
+    await user.click(screen.getByTestId("gateway-guardrail-submit"));
+    expect(screen.queryByText("Enter a name.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("gateway-guardrail-evaluator")).toHaveFocus();
+    expect(state.mutate).not.toHaveBeenCalled();
+  });
+
+  it("offers no save for an edit whose guardrail is not there", async () => {
+    renderDrawer("gr-missing");
+
+    expect(await screen.findByText("This guardrail is no longer available")).toBeInTheDocument();
+    expect(screen.queryByTestId("gateway-guardrail-submit")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
 });
