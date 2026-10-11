@@ -71,6 +71,10 @@ The contract spine (organization → … → analytics) stays: 3.8s in total.
 
 Worktree branch `feat/ts-compile-units` (a485d9f69c, codemod `dev/scripts/compile-unit-codemod.mjs`): trace, gateway, experiment, organization went from 30 programs to 12. Cold CPU +2% (693 → 706 CPU-s), root peak RSS 3.2 → 4.0 GB, export edit +8% CPU, leaf edit about 2.4x CPU (the unit rechecks all its tests). Contract and process cannot share a unit where other modules' contracts sit between them (trace, gateway, organization), and `pnpm sync:references` strips the unit wiring. Step 4 had already taken the duplicate-checking gain. Not worth rolling out.
 
+### Trial: Nx per-project cached typecheck (2026-10-11, not adopted as it stands)
+
+Branch `feat/nx-ts-typecheck` (113f29cc76, wrapper `dev/nx/ts-typecheck-plugin.mjs`). `@nx/js/typescript` needs a wrapper here: TS 6 for its compiler API, a real `tsc --build` for the 236 `noEmit` test configs, solution-only projects so `nx sync:check` stays clean, and `dist/`-only outputs (28 projects without `outDir` made it claim hand-written `.mjs` as outputs; a restore would overwrite source). Inputs hash dependants' `.tsbuildinfo`, so a body edit likely reruns every dependant. Cold run stopped at 104 of 276 tasks at load 35-177; only the warm cache-hit case looked good (22/22 hits). Revisit only on a quiet host, after deciding on `noEmit`, `outDir` everywhere and `.d.ts`-keyed inputs.
+
 Not doing: `isolatedDeclarations` (ruled out, `typescript-tidy-projects.md`
 §10.6); more `--builders` (§13 lever 5, no win on a chain).
 
