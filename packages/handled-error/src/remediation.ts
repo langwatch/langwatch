@@ -39,6 +39,13 @@ const registry = {
   },
 
   // ---- dataset storage ----
+  private_dataplane_unavailable: {
+    tips: [
+      "Set the variable this error names (CLICKHOUSE_URL__<label>__<orgId> or DATAPLANE_S3__<label>__<orgId>) and restart the api and worker",
+      "If it is set, check its value parses: a ClickHouse URL, or S3 JSON with endpoint, bucket, accessKeyId and secretAccessKey",
+    ],
+  },
+
   storage_not_writable: {
     tips: [
       "Set S3_BUCKET_NAME (with its credentials) so datasets are stored in object storage",

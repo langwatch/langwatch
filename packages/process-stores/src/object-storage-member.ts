@@ -4,8 +4,13 @@
  * the shared backend. An unplaceable project is refused, never defaulted.
  */
 import type { S3Client } from "@aws-sdk/client-s3";
-import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
+import {
+  PLATFORM_TENANT,
+  privateRouteVariableOf,
+  type PrivateRouteVariable,
+} from "@langwatch/clickhouse-client";
 
+import { DATAPLANE_S3_ENV_PREFIX } from "./config-owner.ts";
 import type { ObjectStorageConfig, ObjectStoragePrivateAccount } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
 import type {
@@ -27,6 +32,7 @@ import {
 } from "./object-storage-backend.ts";
 import { filesystemBackend } from "./object-storage-filesystem.ts";
 import { s3Backend, s3Client } from "./object-storage-s3.ts";
+import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
 import type { TenantDirectory } from "./tenant-directory.ts";
 
 /**
@@ -130,21 +136,44 @@ function privateBackends(options: {
   return backends;
 }
 
+/**
+ * A project's backend: its organization's own account, or the shared one. An organization whose
+ * `DATAPLANE_S3__` variable is malformed, or recorded as private and now missing, is refused.
+ */
 async function placeProject(options: {
   projectId: string;
   shared: ObjectBackend;
   accounts: ReadonlyMap<string, ObjectBackend>;
+  malformed: ReadonlyMap<string, string>;
   directory: TenantDirectory;
+  refusals: PrivateDataplaneRefusals;
 }): Promise<ObjectBackend> {
-  const { projectId, shared, accounts, directory } = options;
+  const { projectId, shared, accounts, malformed, directory, refusals } = options;
   if (projectId === "") throw new UnknownStorageProjectError(projectId);
-  if (accounts.size === 0) return shared;
   const organizationId = await directory.organizationForTenant(projectId);
   if (organizationId === null || organizationId === "") {
+    // With no private account configured, main placed every project on the shared backend.
+    if (accounts.size === 0 && malformed.size === 0) return shared;
     throw new UnknownStorageProjectError(projectId);
   }
   if (organizationId === PLATFORM_TENANT) return shared;
-  return accounts.get(organizationId) ?? shared;
+  const own = accounts.get(organizationId);
+  if (own) return own;
+
+  const broken = malformed.get(organizationId);
+  if (broken !== undefined) {
+    throw refusals.refuse({ organizationId, kind: "s3", variable: broken, problem: "malformed" });
+  }
+  const recorded = await directory.recordedPrivateDataplaneOf?.(organizationId);
+  if (recorded?.s3Label != null) {
+    const variable = privateRouteVariableOf({
+      prefix: DATAPLANE_S3_ENV_PREFIX,
+      label: recorded.s3Label,
+      organizationId,
+    });
+    throw refusals.refuse({ organizationId, kind: "s3", variable, problem: "missing" });
+  }
+  return shared;
 }
 
 export function buildObjectStorage(options: {
@@ -173,7 +202,24 @@ export function buildObjectStorage(options: {
     return backend;
   };
 
-  const place = (projectId: string) => placeProject({ projectId, shared, accounts, directory });
+  const malformed = new Map(
+    (config.malformedPrivateAccounts ?? []).map((entry) => [entry.organizationId, entry.variable]),
+  );
+  const refusals = PrivateDataplaneRefusals.create();
+  const variables: readonly PrivateRouteVariable[] = [
+    ...(config.privateAccounts ?? []).flatMap(({ organizationId, label, variable }) =>
+      variable === undefined
+        ? []
+        : [{ organizationId, label: label ?? "", variable, state: "present" as const }],
+    ),
+    ...(config.malformedPrivateAccounts ?? []).map((entry) => ({
+      ...entry,
+      state: "malformed" as const,
+    })),
+  ];
+
+  const place = (projectId: string) =>
+    placeProject({ projectId, shared, accounts, malformed, directory, refusals });
 
   /** A recorded location resolves only to the project's placed backend or the shared one. */
   const locate = async (at: StoredObjectAddress): Promise<ObjectBackend> => {
@@ -196,6 +242,7 @@ export function buildObjectStorage(options: {
     signDownload: async (at, facts) => (await locate(at)).signDownload(at, facts),
     destination: async (projectId) => (await place(projectId)).destination,
     probe: async (projectId) => (await place(projectId)).probe(),
+    privateAccountVariables: () => variables,
   };
 
   return {

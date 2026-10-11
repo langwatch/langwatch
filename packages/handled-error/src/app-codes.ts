@@ -585,6 +585,7 @@ export const APP_ERROR_CODES = [
   "platform_operator_self_grant",
   "platform_operator_user_not_found",
   "platform_permission_not_assignable",
+  "private_dataplane_unavailable",
   "project_cannot_archive_current",
   "project_creation_failed",
   "project_destination_team_not_found",

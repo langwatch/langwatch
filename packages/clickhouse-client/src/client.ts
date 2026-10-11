@@ -10,6 +10,7 @@ import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./qu
 import type { RetryPolicy } from "./retry.ts";
 import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
 import { extractQueryType, extractTableName } from "./statementShape.ts";
+import type { PrivateRouteVariable } from "./tenancy.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
 import type { QueryTracer } from "./tracing.ts";
 
@@ -28,6 +29,8 @@ export interface ClickHouseQueryClientOptions {
   reporter?: StatementReporter | undefined;
   /** The routing table's private routes, organization id to endpoint; none by default. */
   privateRoutes?: ReadonlyMap<string, string> | undefined;
+  /** Every private route variable this process parsed, usable or not; none by default. */
+  privateRouteVariables?: readonly PrivateRouteVariable[] | undefined;
 }
 
 const now = (): number => globalThis.performance.now();
@@ -40,6 +43,7 @@ export class ClickHouseQueryClient {
   private readonly retries: RetryPolicy | undefined;
   private readonly reporter: StatementReporter | undefined;
   private readonly routes: ReadonlyMap<string, string>;
+  private readonly routeVariables: readonly PrivateRouteVariable[];
   private readonly columnLists = new Map<string, ClickHouseColumns>();
 
   constructor({
@@ -50,6 +54,7 @@ export class ClickHouseQueryClient {
     retries,
     reporter,
     privateRoutes,
+    privateRouteVariables,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
@@ -58,6 +63,7 @@ export class ClickHouseQueryClient {
     this.retries = retries;
     this.reporter = reporter;
     this.routes = privateRoutes ?? new Map();
+    this.routeVariables = privateRouteVariables ?? [];
   }
 
   /**
@@ -66,6 +72,11 @@ export class ClickHouseQueryClient {
    */
   privateRoutes(): ReadonlyMap<string, string> {
     return this.routes;
+  }
+
+  /** Each private route variable by name and label, and whether it parsed; never its value. */
+  privateRouteVariables(): readonly PrivateRouteVariable[] {
+    return this.routeVariables;
   }
 
   /**

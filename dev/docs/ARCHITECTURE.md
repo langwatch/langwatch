@@ -1412,7 +1412,9 @@ per-target column list refreshed every 30 s, which answers the column's typed de
 column exists. A Postgres query the schema is not ready for (Prisma P2021/P2022, SQLSTATE
 42P01/42703) fails and says retry: `promoteStoreFailure` in `packages/api` maps it, once for every
 transport, to the handled `upgrade_in_progress` (503, Retry-After 10 s on REST, the same code over
-tRPC and SSE), and the browser's query client keeps retrying it with backoff. Ingestion is
+tRPC and SSE), and the browser's query client keeps retrying it with backoff. Each ClickHouse
+target upgrades on its own: a private target that is down holds only its own organisations, which
+answer upgrade_in_progress until it catches up (Alex, 2026-10-11). Ingestion is
 unaffected: it only enqueues for the worker, and a blocking step never touches a sign-in or ingest
 table. Cloud's rolling deploys keep the old pods serving through expand steps, since a new pod is
 not ready until the ledger is current. What a waiting browser sees splits by deployment (Alex,

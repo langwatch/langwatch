@@ -227,6 +227,17 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
     return !!this.memory.organizations.get(organizationId)?.instantEvalsEnabledAt;
   }
 
+  async recordPrivateDataplaneSeen(input: {
+    organizationId: string;
+    clickhouseLabel: string | null;
+    s3Label: string | null;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) return;
+    organization.privateClickHouseLabel ??= input.clickhouseLabel;
+    organization.privateS3Label ??= input.s3Label;
+  }
+
   async recordInstantEvalsOptIn(input: {
     organizationId: string;
     userId: string;

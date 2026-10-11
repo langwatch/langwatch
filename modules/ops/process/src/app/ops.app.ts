@@ -952,6 +952,7 @@ export class OpsModule implements OpsApi {
       checkup: setup.checkup,
       upgrades: OpsUpgradeService.create({
         ledger: repositories.upgradeLedger,
+        routes: repositories.clickhouseRoutes,
         // A process without the checkup cannot tell self-hosted apart, so it tells no member.
         isSaas: setup.checkup?.isSaas ?? true,
         ...(setup.checkup ? { cloudReleases: setup.checkup.usageReports } : {}),

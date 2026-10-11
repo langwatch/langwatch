@@ -40,7 +40,9 @@ describe("UpgradesTabs", () => {
   describe("given only the shared ClickHouse target", () => {
     /** @scenario "The dataplanes tab is hidden when no private target exists" */
     it("offers no Dataplanes tab", () => {
-      renderTabs([{ target: "shared", version: "00042", outstanding: 0, lastError: null }]);
+      renderTabs([
+        { target: "shared", version: "00042", outstanding: 0, lastError: null, route: "present" },
+      ]);
 
       expect(screen.queryByRole("tab", { name: "Dataplanes" })).toBeNull();
     });
@@ -49,8 +51,14 @@ describe("UpgradesTabs", () => {
   describe("given two private targets, one with a failed step", () => {
     it("lists each target's version, outstanding steps and the failed one's last error", async () => {
       renderTabs([
-        { target: "eu-1", version: "00042", outstanding: 0, lastError: null },
-        { target: "us-1", version: "00041", outstanding: 2, lastError: "Code 241: memory limit" },
+        { target: "eu-1", version: "00042", outstanding: 0, lastError: null, route: "present" },
+        {
+          target: "us-1",
+          version: "00041",
+          outstanding: 2,
+          lastError: "Code 241: memory limit",
+          route: "present",
+        },
       ]);
 
       fireEvent.click(screen.getByRole("tab", { name: "Dataplanes" }));
@@ -60,6 +68,36 @@ describe("UpgradesTabs", () => {
       expect(failed.textContent).toContain("2");
       expect(failed.textContent).toContain("Code 241: memory limit");
       expect(screen.getByTestId("upgrade-dataplane-eu-1").textContent).toContain("00042");
+    });
+  });
+
+  describe("given a private target whose route variable is missing", () => {
+    /** @scenario "The dataplanes tab marks a private target whose route is missing or malformed" */
+    it("marks that target's route as missing and the organization as refused", async () => {
+      renderTabs([
+        {
+          target: "private:org_1",
+          version: "00042",
+          outstanding: 0,
+          lastError: null,
+          route: "missing",
+        },
+        {
+          target: "private:org_2",
+          version: "00042",
+          outstanding: 0,
+          lastError: null,
+          route: "malformed",
+        },
+      ]);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Dataplanes" }));
+
+      const missing = await screen.findByTestId("upgrade-dataplane-route-private:org_1");
+      expect(missing.textContent).toContain("Missing");
+      expect(screen.getByTestId("upgrade-dataplane-route-private:org_2").textContent).toContain(
+        "Malformed",
+      );
     });
   });
 

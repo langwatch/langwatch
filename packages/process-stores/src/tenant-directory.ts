@@ -3,7 +3,11 @@
  * Postgres directly, never `ProjectApi` (cycles back via its ClickHouse
  * tier). A wrong route is a data-leak bug, not a slow query, so refuse.
  */
-import { PLATFORM_TENANT, type TenantDirectory } from "@langwatch/clickhouse-client";
+import {
+  PLATFORM_TENANT,
+  type RecordedPrivateDataplane,
+  type TenantDirectory,
+} from "@langwatch/clickhouse-client";
 import { SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
 
 export type { TenantDirectory };
@@ -21,9 +25,15 @@ export type TenantDirectoryRows = {
     { team: { select: { organizationId: true } } },
     { team: { organizationId: string } | null }
   >;
-  organization: RowById<{ id: true }, { id: string }>;
+  organization: RowById<{ id: true }, { id: string }> &
+    RowById<
+      { privateClickHouseLabel: true; privateS3Label: true },
+      { privateClickHouseLabel: string | null; privateS3Label: string | null }
+    >;
   user: RowById<{ id: true }, { id: string }>;
 };
+
+const NOTHING_RECORDED: RecordedPrivateDataplane = { clickhouseLabel: null, s3Label: null };
 
 /**
  * The three reads that place a tenant: a project by its team's organization,
@@ -58,6 +68,15 @@ export function prismaTenantDirectory(prisma: TenantDirectoryRows): TenantDirect
       if (user !== null) return PLATFORM_TENANT;
 
       return null;
+    },
+    /** The organization module's record of a private route once seen (it owns the row). */
+    async recordedPrivateDataplaneOf(organizationId: string): Promise<RecordedPrivateDataplane> {
+      const row = await prisma.organization.findUnique({
+        where: { id: organizationId },
+        select: { privateClickHouseLabel: true, privateS3Label: true },
+      });
+      if (row === null) return NOTHING_RECORDED;
+      return { clickhouseLabel: row.privateClickHouseLabel, s3Label: row.privateS3Label };
     },
   };
 }
@@ -115,6 +134,31 @@ export function privateTenantListing({
 const DEFAULT_MAX_CACHE_ENTRIES = 10_000;
 
 /**
+ * An organization's recorded private labels, remembered for the process: a record only appears
+ * while its route is present, so a kept answer holds. Bounded like the tenant cache.
+ */
+function cachedRecords({
+  read,
+  maxCacheEntries,
+}: {
+  read: (organizationId: string) => Promise<RecordedPrivateDataplane>;
+  maxCacheEntries: number;
+}): (organizationId: string) => Promise<RecordedPrivateDataplane> {
+  const recorded = new Map<string, RecordedPrivateDataplane>();
+  return async (organizationId) => {
+    const kept = recorded.get(organizationId);
+    if (kept !== undefined) return kept;
+    const answer = await read(organizationId);
+    if (recorded.size >= maxCacheEntries) {
+      const oldest = recorded.keys().next();
+      if (!oldest.done) recorded.delete(oldest.value);
+    }
+    recorded.set(organizationId, answer);
+    return answer;
+  };
+}
+
+/**
  * The same answers, remembered, so the two routed members share one lookup
  * instead of asking Postgres per statement. A NULL is deliberately not
  * cached, or a newly created tenant would stay unroutable until eviction.
@@ -128,8 +172,12 @@ export function cachedTenantDirectory(
   }
 
   const cache = new Map<string, string>();
+  const read = directory.recordedPrivateDataplaneOf?.bind(directory);
 
   return {
+    ...(read === undefined
+      ? {}
+      : { recordedPrivateDataplaneOf: cachedRecords({ read, maxCacheEntries }) }),
     async organizationForTenant(tenantId: string): Promise<string | null> {
       const remembered = cache.get(tenantId);
       if (remembered !== undefined) return remembered;

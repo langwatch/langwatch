@@ -42,6 +42,8 @@ import { OrganizationService } from "../organization.service.ts";
 import type { TeamIdentity } from "../team-identity.service.ts";
 
 class StubRepository extends OrganizationRepository {
+  async recordPrivateDataplaneSeen(): Promise<void> {}
+
   async findBySsoDomain(): Promise<null> {
     return null;
   }

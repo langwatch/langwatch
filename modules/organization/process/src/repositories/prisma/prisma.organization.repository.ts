@@ -274,6 +274,27 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     `;
   }
 
+  async recordPrivateDataplaneSeen(input: {
+    organizationId: string;
+    clickhouseLabel: string | null;
+    s3Label: string | null;
+  }): Promise<void> {
+    // Each label is kept as first seen; a row with both already set is left untouched.
+    await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // An organization is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "Organization"
+         SET "privateClickHouseLabel" = COALESCE("privateClickHouseLabel", ${input.clickhouseLabel}),
+             "privateS3Label" = COALESCE("privateS3Label", ${input.s3Label}),
+             "privateDataplaneSeenAt" = COALESCE("privateDataplaneSeenAt", now())
+       WHERE "id" = ${input.organizationId}
+         AND (("privateClickHouseLabel" IS NULL AND ${input.clickhouseLabel}::text IS NOT NULL)
+           OR ("privateS3Label" IS NULL AND ${input.s3Label}::text IS NOT NULL))
+    `;
+  }
+
   async saveJoinSetting({
     organizationId,
     setting,

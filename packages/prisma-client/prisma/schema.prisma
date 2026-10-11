@@ -1134,6 +1134,15 @@ model Organization {
   /// organization, in mebibytes. Null means the default. Set by an operator
   /// from the back office only; every other dataset size limit scales with it.
   datasetAttachmentMaxMb     Int?
+  /// The label of this organization's `CLICKHOUSE_URL__<label>__<id>` route, recorded by the
+  /// organization module the first time it is seen. Once set, a missing route refuses the
+  /// organization instead of serving it from the shared ClickHouse. Null: never private.
+  /// Spec: specs/private-dataplane/clickhouse-routing.feature.
+  privateClickHouseLabel     String?
+  /// The same for `DATAPLANE_S3__<label>__<id>`. Spec: specs/private-dataplane/s3-routing.feature.
+  privateS3Label             String?
+  /// When either label was first recorded.
+  privateDataplaneSeenAt     DateTime?
   /// Phase 8 - admin-configurable max lifetime for CLI device-flow
   /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
   /// gh-style flows). Companies that need finite session lifetime

@@ -313,12 +313,16 @@ export interface OpsUpgradeIdInputSchema extends Named<typeof opsUpgradeIdInputS
 export const opsUpgradeIdInputSchema: OpsUpgradeIdInputSchema = opsUpgradeIdInputSchemaDefinition;
 export type OpsUpgradeIdInput = z.infer<typeof opsUpgradeIdInputSchema>;
 
-/** One ClickHouse target: its latest done version, steps not done and latest failure. */
+/**
+ * One ClickHouse target: its latest done version, steps not done and latest failure, and whether
+ * this process can reach it: a private target whose variable is missing or malformed is refused.
+ */
 const opsUpgradeTargetSummarySchemaDefinition = z.object({
   target: z.string(),
   version: z.string().nullable(),
   outstanding: z.number().int(),
   lastError: z.string().nullable(),
+  route: z.enum(["present", "missing", "malformed"]),
 });
 export interface OpsUpgradeTargetSummarySchema extends Named<
   typeof opsUpgradeTargetSummarySchemaDefinition

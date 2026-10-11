@@ -88,13 +88,16 @@ function service({
   version,
   held,
   targets = [],
+  routes,
 }: {
   version?: UpgradeImageVersion;
   held?: CloudLatestRelease[];
   targets?: UpgradeTargetSummary[];
+  routes?: Parameters<typeof OpsUpgradeService.create>[0]["routes"];
 } = {}) {
   return OpsUpgradeService.create({
     isSaas: false,
+    ...(routes ? { routes } : {}),
     ...(held ? { cloudReleases: { findLatestRelease: async () => held } } : {}),
     ledger: MemoryUpgradeLedgerRepository.create({
       ...(version ? { version } : {}),
@@ -206,7 +209,53 @@ describe("OpsUpgradeService.listTargets", () => {
 
     const listed = await service({ targets }).listTargets();
 
-    expect(opsUpgradeTargetSummarySchema.array().parse(listed)).toEqual(targets);
+    expect(opsUpgradeTargetSummarySchema.array().parse(listed)).toEqual(
+      targets.map((target) => ({ ...target, route: "present" })),
+    );
+  });
+
+  /** @scenario "The dataplanes tab says whether this deployment reaches each private target" */
+  it("reads each private target's route as present, missing or malformed", async () => {
+    const target = (name: string) => ({
+      target: name,
+      version: "00041",
+      outstanding: 0,
+      lastError: null,
+    });
+    const upgrades = service({
+      targets: [
+        target("shared"),
+        target("private:org_up"),
+        target("private:org_gone"),
+        target("private:org_broken"),
+      ],
+      routes: {
+        findPrivateRoutes: () => new Map([["org_up", "http://ch-up:8123"]]),
+        findPrivateRouteVariables: () => [
+          {
+            organizationId: "org_up",
+            label: "up",
+            variable: "CLICKHOUSE_URL__up__org_up",
+            state: "present",
+          },
+          {
+            organizationId: "org_broken",
+            label: "broken",
+            variable: "CLICKHOUSE_URL__broken__org_broken",
+            state: "malformed",
+          },
+        ],
+      },
+    });
+
+    const routes = (await upgrades.listTargets()).map(({ target, route }) => [target, route]);
+
+    expect(routes).toEqual([
+      ["shared", "present"],
+      ["private:org_up", "present"],
+      ["private:org_gone", "missing"],
+      ["private:org_broken", "malformed"],
+    ]);
   });
 });
 

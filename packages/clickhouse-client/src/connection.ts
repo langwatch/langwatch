@@ -1,5 +1,10 @@
 import type { ClickHouseConfiguration } from "./config.ts";
-import { createTenantRouter, type TenantDirectory, type TenantRouter } from "./tenancy.ts";
+import {
+  createTenantRouter,
+  type PrivateRouteRefusalFactory,
+  type TenantDirectory,
+  type TenantRouter,
+} from "./tenancy.ts";
 import { TenantScopeError } from "./tenantGuard.ts";
 
 export interface ClickHouseCloseableClient {
@@ -35,6 +40,8 @@ export interface ClickHouseConnectionServiceOptions<Client extends ClickHouseClo
   directory: TenantDirectory;
   clientFactory: ClickHouseClientFactory<Client>;
   maxTenantCacheEntries?: number | undefined;
+  /** What a refused private route throws; the router's plain error by default. */
+  refusal?: PrivateRouteRefusalFactory | undefined;
 }
 
 export interface ClickHouseInstance<Client extends ClickHouseCloseableClient> {
@@ -116,7 +123,12 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
         tenantId,
       );
     }
-    return this.resolveOrganization(organizationId);
+    if (this.configuration.privateRoutes.has(organizationId)) {
+      return this.resolveOrganization(organizationId);
+    }
+    const route = await this.router.routeOrganization(organizationId);
+    this.assertOpen();
+    return route.kind === "shared" ? this.shared() : this.resolveOrganization(organizationId);
   }
 
   /** Resolves a known organisation without a directory lookup. */
@@ -241,20 +253,22 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
 
 /** Explicit, side-effect-free-until-called construction of one process connection graph. */
 export class ClickHouseConnectionService<Client extends ClickHouseCloseableClient> {
-  private constructor(
-    private readonly directory: TenantDirectory,
-    private readonly clientFactory: ClickHouseClientFactory<Client>,
-    private readonly maxTenantCacheEntries: number | undefined,
-  ) {}
+  private readonly directory: TenantDirectory;
+  private readonly clientFactory: ClickHouseClientFactory<Client>;
+  private readonly maxTenantCacheEntries: number | undefined;
+  private readonly refusal: PrivateRouteRefusalFactory | undefined;
+
+  private constructor(options: ClickHouseConnectionServiceOptions<Client>) {
+    this.directory = options.directory;
+    this.clientFactory = options.clientFactory;
+    this.maxTenantCacheEntries = options.maxTenantCacheEntries;
+    this.refusal = options.refusal;
+  }
 
   static create<Client extends ClickHouseCloseableClient>(
     options: ClickHouseConnectionServiceOptions<Client>,
   ): ClickHouseConnectionService<Client> {
-    return new ClickHouseConnectionService(
-      options.directory,
-      options.clientFactory,
-      options.maxTenantCacheEntries,
-    );
+    return new ClickHouseConnectionService(options);
   }
 
   connect(configuration: ClickHouseConfiguration): ClickHouseConnection<Client> {
@@ -263,8 +277,16 @@ export class ClickHouseConnectionService<Client extends ClickHouseCloseableClien
       routes.set(route.organizationId, route.url);
     }
     const router = createTenantRouter({
-      table: { routes, skipped: [], ambiguous: [] },
+      table: {
+        routes,
+        skipped: [],
+        ambiguous: [],
+        ...(configuration.malformedPrivateRoutes === undefined
+          ? {}
+          : { malformed: configuration.malformedPrivateRoutes }),
+      },
       directory: this.directory,
+      ...(this.refusal === undefined ? {} : { refusal: this.refusal }),
       ...(this.maxTenantCacheEntries === undefined
         ? {}
         : { maxCacheEntries: this.maxTenantCacheEntries }),

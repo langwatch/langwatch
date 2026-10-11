@@ -33,6 +33,13 @@ export function parseUpgradesTab({
   return "overview";
 }
 
+/** What the Route column says: a refused private target names why. */
+const ROUTE_TEXT: Record<UpgradeTargetSummaryView["route"], string> = {
+  present: "Present",
+  missing: "Missing: organization refused",
+  malformed: "Malformed: organization refused",
+};
+
 function TargetsTable({ targets }: { targets: readonly UpgradeTargetSummaryView[] }) {
   return (
     <ListTable
@@ -44,6 +51,7 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetSummaryView[
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Target</Table.ColumnHeader>
+          <Table.ColumnHeader>Route</Table.ColumnHeader>
           <Table.ColumnHeader>Version</Table.ColumnHeader>
           <Table.ColumnHeader textAlign="end">Outstanding</Table.ColumnHeader>
           <Table.ColumnHeader>Last error</Table.ColumnHeader>
@@ -53,6 +61,11 @@ function TargetsTable({ targets }: { targets: readonly UpgradeTargetSummaryView[
         {targets.map((target) => (
           <Table.Row key={target.target} data-testid={`upgrade-dataplane-${target.target}`}>
             <Table.Cell fontFamily="mono">{target.target}</Table.Cell>
+            <Table.Cell data-testid={`upgrade-dataplane-route-${target.target}`}>
+              <Text textStyle="sm" color={target.route === "present" ? "fg.muted" : "fg.error"}>
+                {ROUTE_TEXT[target.route]}
+              </Text>
+            </Table.Cell>
             <Table.Cell fontFamily="mono">{target.version ?? "None"}</Table.Cell>
             <Table.Cell textAlign="end">{target.outstanding}</Table.Cell>
             <Table.Cell maxWidth="420px">

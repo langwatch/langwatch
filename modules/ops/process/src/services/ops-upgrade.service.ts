@@ -34,6 +34,7 @@ import type {
 } from "@langwatch/upgrade/reader";
 import { orderReleases } from "@langwatch/upgrade/reader";
 
+import type { ClickHouseRoutesRepository } from "../repositories/clickhouse.routes.repository.ts";
 import type { CloudLatestRelease } from "../repositories/cloud-latest-release.repository.ts";
 import type { UpgradeLedgerRepository } from "../repositories/upgrade-ledger.repository.ts";
 import type { UsageReportService } from "./usage-report.service.ts";
@@ -155,9 +156,41 @@ function newerReleasesOf({
     .map(({ release }) => ({ release, notesUrl: releaseNotesUrl({ release }) }));
 }
 
-function targetSummaryOf(summary: UpgradeTargetSummary): OpsUpgradeTargetSummary {
+/** The ledger's prefix for a private ClickHouse target: `private:<organizationId>`. */
+const PRIVATE_TARGET_PREFIX = "private:";
+
+/** The routes this process holds, read to tell a reachable private target from a refused one. */
+type TargetRoutes = Pick<
+  ClickHouseRoutesRepository,
+  "findPrivateRoutes" | "findPrivateRouteVariables"
+>;
+
+/** Whether this process reaches a target: shared always; a private one by its variable. */
+function routeOf({
+  target,
+  routes,
+}: {
+  target: string;
+  routes: TargetRoutes | undefined;
+}): OpsUpgradeTargetSummary["route"] {
+  if (!target.startsWith(PRIVATE_TARGET_PREFIX)) return "present";
+  const organizationId = target.slice(PRIVATE_TARGET_PREFIX.length);
+  if (routes?.findPrivateRoutes().has(organizationId)) return "present";
+  const malformed = routes
+    ?.findPrivateRouteVariables()
+    .some((each) => each.organizationId === organizationId && each.state === "malformed");
+  return malformed ? "malformed" : "missing";
+}
+
+function targetSummaryOf({
+  summary,
+  routes,
+}: {
+  summary: UpgradeTargetSummary;
+  routes: TargetRoutes | undefined;
+}): OpsUpgradeTargetSummary {
   const { target, version, outstanding, lastError } = summary;
-  return { target, version, outstanding, lastError };
+  return { target, version, outstanding, lastError, route: routeOf({ target, routes }) };
 }
 
 /**
@@ -170,21 +203,35 @@ export class OpsUpgradeService {
     ledger,
     cloudReleases,
     isSaas,
+    routes,
   }: {
     ledger: UpgradeLedgerRepository;
+    /** The private routes this process holds; absent, every private target reads as missing. */
+    routes?: TargetRoutes;
     /** Cloud tells no member about its upgrades; only ops:view holders see them. */
     isSaas: boolean;
     /** The usage report's held reply; a process without one names no latest release. */
     cloudReleases?: Pick<UsageReportService, "findLatestRelease">;
   }): OpsUpgradeService {
-    return new OpsUpgradeService(ledger, cloudReleases, isSaas);
+    return new OpsUpgradeService({ ledger, cloudReleases, isSaas, routes });
   }
 
-  private constructor(
-    private readonly ledger: UpgradeLedgerRepository,
-    private readonly cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined,
-    private readonly isSaas: boolean,
-  ) {}
+  private readonly ledger: UpgradeLedgerRepository;
+  private readonly cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined;
+  private readonly isSaas: boolean;
+  private readonly routes: TargetRoutes | undefined;
+
+  private constructor(parts: {
+    ledger: UpgradeLedgerRepository;
+    cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined;
+    isSaas: boolean;
+    routes: TargetRoutes | undefined;
+  }) {
+    this.ledger = parts.ledger;
+    this.cloudReleases = parts.cloudReleases;
+    this.isSaas = parts.isSaas;
+    this.routes = parts.routes;
+  }
 
   /** A failed step, target or run on self-hosted; held organizations leave the state up to date. */
   async getAttentionNotice(): Promise<OpsUpgradeAttentionNotice> {
@@ -228,7 +275,9 @@ export class OpsUpgradeService {
   }
 
   async listTargets(): Promise<OpsUpgradeTargetSummary[]> {
-    return (await this.ledger.findTargets()).map(targetSummaryOf);
+    return (await this.ledger.findTargets()).map((summary) =>
+      targetSummaryOf({ summary, routes: this.routes }),
+    );
   }
 
   /** Reopens a failed step for the worker's next sweep, its checkpoint kept (D6). */

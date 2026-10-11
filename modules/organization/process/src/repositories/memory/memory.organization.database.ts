@@ -64,6 +64,9 @@ export interface MemoryOrganizationRow {
   /** The organization's own Instant Evals consent; absent reads as not given. */
   instantEvalsEnabledAt?: Instant | null;
   instantEvalsEnabledByUserId?: string | null;
+  /** The private route labels the organization was first seen with; absent reads as none. */
+  privateClickHouseLabel?: string | null;
+  privateS3Label?: string | null;
   createdAt: Instant;
   updatedAt: Instant;
 }

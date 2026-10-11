@@ -1,3 +1,4 @@
+import type { PrivateRouteVariable } from "@langwatch/clickhouse-client";
 import { type EventSourcing, type InMemoryProcessStore } from "@langwatch/eventing";
 import type { TenantSource } from "@langwatch/system-migrations";
 import {
@@ -119,6 +120,10 @@ class MemoryClickHouseRoutesRepository extends ClickHouseRoutesRepository {
 
   findPrivateRoutes(): ReadonlyMap<string, string> {
     return new Map();
+  }
+
+  findPrivateRouteVariables(): readonly PrivateRouteVariable[] {
+    return [];
   }
 }
 

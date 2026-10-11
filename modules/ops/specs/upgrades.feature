@@ -329,6 +329,21 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then each target shows its goose version and how many steps are outstanding
     And the failed target shows its last error
 
+  # A private organization recorded by the organization module whose route variable is missing or
+  # malformed is refused by the stores (specs/private-dataplane/clickhouse-routing.feature); the
+  # tab shows it so an operator sees why (Alex, 2026-10-11, T7-F2/T7-F3).
+  @unit
+  Scenario: The dataplanes tab says whether this deployment reaches each private target
+    Given private targets whose CLICKHOUSE_URL__ variables are present, missing and malformed
+    When an operator holding ops:view reads the targets
+    Then each target's route reads present, missing or malformed, and the shared target present
+
+  @integration
+  Scenario: The dataplanes tab marks a private target whose route is missing or malformed
+    Given a private target whose route is missing and one whose route is malformed
+    When an operator opens the Dataplanes tab
+    Then each of those targets is marked as refused, naming missing or malformed
+
   @integration
   Scenario: The dataplanes tab is hidden when no private target exists
     Given the ledger records no per-target rows, or only the shared ClickHouse target

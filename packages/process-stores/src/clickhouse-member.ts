@@ -31,6 +31,7 @@ import { counter, histogram, observableGauge } from "@langwatch/observability/me
 
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
+import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
 
 /** The vendor client, built once per physical endpoint this process reaches. */
 class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseClient> {
@@ -227,12 +228,14 @@ export function buildClickHouse(options: {
       // only name this process knows that is safe to print.
       cluster: route.organizationId,
     })),
+    malformedPrivateRoutes: config.malformedRoutes ?? [],
     ...(config.poolSizing === undefined ? {} : { poolSizing: config.poolSizing }),
   });
 
   const connection = ClickHouseConnectionService.create({
     directory: options.directory,
     clientFactory: new VendorClickHouseClientFactory(config),
+    refusal: PrivateDataplaneRefusals.create().forClickHouse(),
     ...(config.maxTenantCacheEntries === undefined
       ? {}
       : { maxTenantCacheEntries: config.maxTenantCacheEntries }),
@@ -281,6 +284,17 @@ export function buildClickHouse(options: {
     privateRoutes: new Map(
       (config.privateRoutes ?? []).map((route) => [route.organizationId, route.url]),
     ),
+    privateRouteVariables: [
+      ...(config.privateRoutes ?? []).flatMap(({ organizationId, label, variable }) =>
+        variable === undefined
+          ? []
+          : [{ organizationId, label: label ?? "", variable, state: "present" as const }],
+      ),
+      ...(config.malformedRoutes ?? []).map((route) => ({
+        ...route,
+        state: "malformed" as const,
+      })),
+    ],
   });
 
   return {

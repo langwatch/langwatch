@@ -3963,6 +3963,13 @@ const presentations = {
       return `${subject} no longer in this organization, so it cannot be put in a department. Reload and try again.`;
     },
   },
+  private_dataplane_unavailable: {
+    // fault: platform. The organization keeps its data on its own servers and this
+    // deployment cannot reach them; nothing is served from the shared ones instead.
+    title: "Your organization's data store can't be reached",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to restore the connection to your organization's own data store.",
+  },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
     // retrying changes nothing and there is no customer-side setting to fix.
