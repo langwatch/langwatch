@@ -33,6 +33,9 @@
       "path": "../secrets/tsconfig.build.json"
     },
     {
+      "path": "../redis-client/tsconfig.build.json"
+    },
+    {
       "path": "../process-stores/tsconfig.build.json"
     },
     {
