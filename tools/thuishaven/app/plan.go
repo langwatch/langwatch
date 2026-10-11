@@ -215,7 +215,7 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 // seed both take it: the seed writes the LLM base URLs into the provider rows.
 func simulatorsEnv(sel domain.Selection, st domain.Stack, repoDir string) []string {
 	var env []string
-	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.LLMService, domain.LambdaService} {
+	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.LLMService, domain.LambdaService, domain.GithubService} {
 		for _, svc := range st.Services {
 			if svc.Name == name {
 				env = append(env, simulatorBaseEnv(sel, svc, repoDir)...)
@@ -248,6 +248,8 @@ func simulatorBaseEnv(sel domain.Selection, svc domain.Service, repoDir string) 
 		return domain.LLMProviderEnv(resolvedDevEnv(repoDir), svc.Port)
 	case svc.Name == domain.LambdaService && sel.Lambda && svc.Port != 0:
 		return domain.LambdaFleetEnv(resolvedDevEnv(repoDir), svc.Port)
+	case svc.Name == domain.GithubService && sel.Github && svc.Port != 0:
+		return domain.GithubAppEnv(resolvedDevEnv(repoDir), svc.URL)
 	}
 	return nil
 }
@@ -430,7 +432,7 @@ func (p *childPlan) planSimulators() simulatorPlan {
 	return sp
 }
 
-// hostBundledSimulators places storage, voice, LLM, analytics, outbound, payment, telemetry and lambda, in that order.
+// hostBundledSimulators places storage, voice, LLM, analytics, outbound, payment, telemetry, lambda and github, in that order.
 func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	for _, sim := range []struct {
@@ -447,6 +449,7 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 		{sel.Payment, "paymentsim", func() []string { return paymentEnv(st, repoRoot) }, func() Child { return o.paymentChild(st, repoRoot, base) }},
 		{sel.Telemetry, "telemetrysim", func() []string { return telemetryEnv(st) }, func() Child { return o.telemetryChild(st, repoRoot, base) }},
 		{sel.Lambda, "lambdasim", func() []string { return lambdaEnv(st) }, func() Child { return o.lambdaChild(st, repoRoot, base) }},
+		{sel.Github, "githubsim", func() []string { return githubEnv(st) }, func() Child { return o.githubChild(st, repoRoot, base) }},
 	} {
 		if sim.isSelected {
 			sp.host(sim.binary, sim.env, sim.child)

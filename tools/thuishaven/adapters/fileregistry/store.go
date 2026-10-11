@@ -139,6 +139,7 @@ type selectionFields struct {
 	Payment   *bool `json:"paymentsim"`
 	Telemetry *bool `json:"telemetry"`
 	Lambda    *bool `json:"lambda"`
+	Github    *bool `json:"github"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
 	// when both are present; WriteSelection never writes it, so the next
@@ -166,6 +167,7 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Payment, nil, &sel.Payment},
 		{f.Telemetry, nil, &sel.Telemetry},
 		{f.Lambda, nil, &sel.Lambda},
+		{f.Github, nil, &sel.Github},
 	} {
 		switch {
 		case field.stated != nil:
@@ -225,6 +227,7 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Payment:      &sel.Payment,
 		Telemetry:    &sel.Telemetry,
 		Lambda:       &sel.Lambda,
+		Github:       &sel.Github,
 	}}, "", "  ")
 	if err != nil {
 		return err

@@ -1312,6 +1312,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Telemetry
 	case domain.LambdaService:
 		return opts.Selection.Lambda
+	case domain.GithubService:
+		return opts.Selection.Github
 	default:
 		return true
 	}

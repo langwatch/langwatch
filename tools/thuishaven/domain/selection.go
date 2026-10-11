@@ -84,6 +84,10 @@ type Selection struct {
 	// names a fleet, so studio runs take the per-project Lambda path through
 	// lambdasim to this stack's nlpgo. `haven up +lambda` once.
 	Lambda bool `json:"lambda"`
+	// Github is the GitHub stand-in (githubsim). Off by default: it names a
+	// GitHub App and points the github module's API and install page at the
+	// sim. `haven up +github` once.
+	Github bool `json:"github"`
 }
 
 // RefreshMode is the one stack mode switch: still (the zero value, `haven up`),
@@ -120,7 +124,7 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "github", "design-system", "mail-room", "langevals"}
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
@@ -224,6 +228,8 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.Telemetry = on
 	case LambdaService:
 		sel.Lambda = on
+	case GithubService:
+		sel.Github = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -269,6 +275,8 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Telemetry = local
 		case LambdaService:
 			sel.Lambda = local
+		case GithubService:
+			sel.Github = local
 		}
 	}
 	return sel
@@ -336,6 +344,7 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.Payment, PaymentService)
 	add(s.Telemetry, TelemetryService)
 	add(s.Lambda, LambdaService)
+	add(s.Github, GithubService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
 	add(s.Langevals, LangevalsService)

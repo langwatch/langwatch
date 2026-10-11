@@ -90,6 +90,11 @@ const TelemetryService = "telemetry"
 // per-project Lambda path, which a developer must never get by surprise.
 const LambdaService = "lambda"
 
+// GithubService is the GitHub stand-in (services/githubsim), routed at
+// github.<slug>.langwatch.localhost. Opt-in: it replaces the GitHub App the
+// stack talks to, so a developer must never get it by surprise.
+const GithubService = "github"
+
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the
 // same-origin app.<slug>.../api path (Vite's own proxy to Stack.APIPort)
