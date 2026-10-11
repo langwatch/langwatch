@@ -4,6 +4,7 @@ import {
   useMintPersonalToken,
 } from "@langwatch/api-key-client";
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Text, VStack } from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyNotice } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
@@ -11,10 +12,10 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 
+import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup.tsx";
-import { Drawer } from "../../drawer.tsx";
 import {
   type ActiveProjectContextValue,
   ActiveProjectProvider,
@@ -97,6 +98,8 @@ export function IntegrateDrawer({
     permissions: PROJECT_READ_PERMISSIONS,
   });
   const [segment, setSegment] = useState<Segment>("skill");
+  const floatingLangyOpen = useLangyStore((s) => s.isOpen && s.panelMode === "floating");
+  const [waitForFloatingLangy] = useState(() => floatingLangyOpen);
 
   if (!project || !organization) return null;
 
@@ -108,36 +111,30 @@ export function IntegrateDrawer({
   };
 
   return (
-    <Drawer.Root open={open} onOpenChange={(e) => onOpenChange(e.open)} size="xl" placement="end">
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <VStack align="stretch" gap={1}>
-            <Drawer.Title>Send your own traces</Drawer.Title>
-            <Text color="fg.muted" textStyle="sm">
-              Create a token, then pick how you want to integrate.
-            </Text>
-          </VStack>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {/* An aggregate (ADR-177) is never sent traces and owns no key,
-              so the drawer mints nothing on it. */}
-          {isAggregateProjectKind(project.kind) ? (
-            <AggregateReadOnlyNotice />
-          ) : (
-            <ActiveProjectProvider value={activeProjectContext}>
-              <IntegrationContent
-                projectId={project.id}
-                minting={minting}
-                segment={segment}
-                onSegmentChange={setSegment}
-                enabled={open}
-              />
-            </ActiveProjectProvider>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer
+      open={open}
+      onClose={() => onOpenChange(false)}
+      size="xl"
+      title="Send your own traces"
+      subtitle="Create a token, then pick how you want to integrate."
+      companionMotion={waitForFloatingLangy ? "wait" : "follow"}
+    >
+      {/* An aggregate (ADR-177) is never sent traces and owns no key,
+          so the drawer mints nothing on it. */}
+      {isAggregateProjectKind(project.kind) ? (
+        <AggregateReadOnlyNotice />
+      ) : (
+        <ActiveProjectProvider value={activeProjectContext}>
+          <IntegrationContent
+            projectId={project.id}
+            minting={minting}
+            segment={segment}
+            onSegmentChange={setSegment}
+            enabled={open}
+          />
+        </ActiveProjectProvider>
+      )}
+    </Drawer>
   );
 }
 
@@ -167,7 +164,7 @@ interface IntegrationContentProps {
   segment: Segment;
   onSegmentChange: (segment: Segment) => void;
   /**
-   * When false, the S/M/P/I keyboard shortcuts are suppressed. The drawer passes
+   * When false, the S/M/P/D keyboard shortcuts are suppressed. The drawer passes
    * `enabled={open}` so shortcuts only fire while the drawer is open.
    */
   enabled?: boolean;
@@ -180,7 +177,7 @@ function IntegrationContent({
   onSegmentChange,
   enabled = true,
 }: IntegrationContentProps): React.ReactElement {
-  // Tab letter shortcuts (S/M/P/I) fire whenever this component is
+  // Tab letter shortcuts (S/M/P/D) fire whenever this component is
   // active — always for IntegratePane, only while open for the drawer.
   // Suppressed when the user is typing in an input or contentEditable.
   useEffect(() => {

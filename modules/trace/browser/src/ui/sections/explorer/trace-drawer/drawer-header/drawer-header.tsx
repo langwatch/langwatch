@@ -6,7 +6,6 @@ import {
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
 import { IdText } from "@langwatch/design-system/id-text";
-import { Kbd } from "@langwatch/design-system/kbd";
 import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import {
   Box,
@@ -20,6 +19,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import type { TraceHeader } from "@langwatch/trace-contract";
@@ -36,6 +36,7 @@ import { useConversationContext } from "../../../../../features/conversation/beh
 import { usePinnedAttributes } from "../../../../../features/facet/behavior/use-pinned-attributes.ts";
 import { useSpanTree } from "../../../../../features/span/behavior/use-span-tree.ts";
 import { useFocusSectionStore } from "../../../../../features/trace-drawer/behavior/focus-section.store.ts";
+import { drawerShortcut } from "../../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
 import { useTraceDrawerNavigation } from "../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts";
 import {
   formatAbsoluteTime,
@@ -921,15 +922,11 @@ function BackNavigationMenu({
     <MenuRoot>
       <Tooltip
         content={
-          <HStack gap={1}>
-            <Text>
-              {backStackDepth > 1
-                ? `Back (${backStackDepth} traces). Right-click for full history`
-                : "Back to previous trace"}
-            </Text>
-            <Kbd>B</Kbd>
-          </HStack>
+          backStackDepth > 1
+            ? `Back (${backStackDepth} traces). Right-click for full history`
+            : "Back to previous trace"
         }
+        shortcut={drawerShortcut("back")}
         positioning={{ placement: "bottom" }}
       >
         <TriggerAnchor>
@@ -939,6 +936,7 @@ function BackNavigationMenu({
               variant="ghost"
               onClick={goBack}
               aria-label="Back to previous trace"
+              aria-keyshortcuts={shortcutAriaKeys(drawerShortcut("back"))}
               flexShrink={0}
             >
               <Icon as={LuArrowLeft} boxSize={3.5} />
@@ -1035,12 +1033,8 @@ function HeaderActions({
         </Tooltip>
       )}
       <Tooltip
-        content={
-          <HStack gap={1}>
-            <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
-            <Kbd>R</Kbd>
-          </HStack>
-        }
+        content={isRefreshing ? "Refreshing…" : "Refresh"}
+        shortcut={drawerShortcut("refresh")}
         positioning={{ placement: "bottom" }}
       >
         <Button
@@ -1049,6 +1043,7 @@ function HeaderActions({
           onClick={() => void onRefresh()}
           disabled={isRefreshing}
           aria-label="Refresh trace"
+          aria-keyshortcuts={shortcutAriaKeys(drawerShortcut("refresh"))}
           css={
             isRefreshing
               ? {
@@ -1067,12 +1062,8 @@ function HeaderActions({
         </Button>
       </Tooltip>
       <Tooltip
-        content={
-          <HStack gap={1}>
-            <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
-            <Kbd>M</Kbd>
-          </HStack>
-        }
+        content={isMaximized ? "Restore" : "Maximize"}
+        shortcut={drawerShortcut("maximize")}
         positioning={{ placement: "bottom" }}
       >
         <Button
@@ -1080,6 +1071,7 @@ function HeaderActions({
           variant="ghost"
           onClick={onMaximizeClick}
           aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
+          aria-keyshortcuts={shortcutAriaKeys(drawerShortcut("maximize"))}
         >
           <Icon as={isMaximized ? LuMinimize2 : LuMaximize2} boxSize={3.5} />
         </Button>
@@ -1099,12 +1091,8 @@ function HeaderActions({
       />
       <Box width="1px" height="16px" bg="border.muted" marginX={0.5} flexShrink={0} />
       <Tooltip
-        content={
-          <HStack gap={1}>
-            <Text>Close</Text>
-            <Kbd>Esc</Kbd>
-          </HStack>
-        }
+        content="Close. Escape clears a selected span first."
+        shortcut={drawerShortcut("close")}
         positioning={{ placement: "bottom" }}
       >
         {/* Plain ghost Button — the standard Chakra `CloseButton`
@@ -1119,6 +1107,7 @@ function HeaderActions({
           variant="ghost"
           onClick={onClose}
           aria-label="Close drawer"
+          aria-keyshortcuts={shortcutAriaKeys(drawerShortcut("close"))}
           paddingX={1.5}
           paddingY={1.5}
           height="auto"

@@ -5,6 +5,7 @@
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -60,6 +61,16 @@ describe("PageKeyboardShortcuts", () => {
       renderDialog();
       expect(screen.getByText(/ask langy about these traces/i)).toBeInTheDocument();
       expect(screen.queryByText(/ask ai to build a query/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given the reader searches the page list", () => {
+    /** @scenario "Search matches an action, a key and a scope" */
+    it("reads Cmd or Ctrl F as one chord and finds it by key name", async () => {
+      renderDialog();
+      await userEvent.setup().type(await screen.findByRole("searchbox"), "ctrl");
+      expect(screen.getByText("Find in loaded traces", { selector: "p" })).toBeInTheDocument();
+      expect(screen.queryByText("Toggle density")).not.toBeInTheDocument();
     });
   });
 });

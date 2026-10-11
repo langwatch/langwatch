@@ -7,6 +7,7 @@ import {
   MenuTrigger,
 } from "@langwatch/design-system/menu";
 import { IconButton } from "@langwatch/design-system/primitives";
+import { ShortcutHint, shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Keyboard, MoreHorizontal, Zap } from "lucide-react";
@@ -15,6 +16,7 @@ import type React from "react";
 import { getCurrentFilterText } from "../../../../behavior/explorer.store.ts";
 import { useTraceHost } from "../../../../behavior/trace-host.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
+import { PAGE_SHORTCUTS } from "../traces-page/page-keyboard-shortcuts.tsx";
 
 /**
  * The toolbar's less-used actions: turning the current filter into an automation
@@ -58,10 +60,16 @@ export const ToolbarMoreMenu: React.FC = () => {
             Create an automation from the current filter
           </MenuItem>
         )}
-        <MenuItem value="shortcuts" onClick={toggleShortcutsHelp}>
+        <MenuItem
+          value="shortcuts"
+          onClick={toggleShortcutsHelp}
+          aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.help)}
+        >
           <Keyboard size={14} />
           Keyboard shortcuts
-          <MenuItemCommand>?</MenuItemCommand>
+          <MenuItemCommand>
+            <ShortcutHint shortcut={PAGE_SHORTCUTS.help} decorative />
+          </MenuItemCommand>
         </MenuItem>
       </MenuContent>
     </MenuRoot>

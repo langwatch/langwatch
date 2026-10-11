@@ -1,11 +1,11 @@
-import { Kbd } from "@langwatch/design-system/kbd";
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
-import { Box, Button, HStack, Tabs, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Tabs, VisuallyHidden } from "@langwatch/design-system/primitives";
+import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ChevronDown, RotateCcw } from "lucide-react";
 import type React from "react";
-import { startTransition, useMemo, useRef, useState } from "react";
+import { startTransition, useId, useMemo, useRef, useState } from "react";
 
 import { useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
@@ -17,6 +17,7 @@ import {
 } from "../../../../behavior/view.slice.ts";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { useErrorCount } from "../hooks/use-error-count.ts";
+import { PAGE_SHORTCUTS } from "../traces-page/page-keyboard-shortcuts.tsx";
 import { CreateLensButton } from "./create-lens-button.tsx";
 import { LensNameDialog } from "./lens-name-dialog.tsx";
 import { LensTab } from "./lens-tab.tsx";
@@ -46,6 +47,7 @@ function resolveGroupLenses(ids: readonly string[], allLenses: LensConfig[]): Le
 }
 
 export const LensTabs: React.FC = () => {
+  const instructionsId = useId();
   const activeLensId = useViewStore((s) => s.activeLensId);
   const allLenses = useViewStore((s) => s.allLenses);
   const selectLens = useViewStore((s) => s.selectLens);
@@ -164,7 +166,11 @@ export const LensTabs: React.FC = () => {
         >
           <Box ref={scrollerRef} overflowX="hidden" flex="1" minWidth={0}>
             <HStack gap={0} flexWrap="nowrap" width="max-content" align="center">
-              <Tabs.List borderBottomWidth={0} flexWrap="nowrap">
+              <VisuallyHidden id={instructionsId}>
+                Left and Right arrows move between lenses. Home and End jump to the first and last.
+                Enter opens the focused lens.
+              </VisuallyHidden>
+              <Tabs.List borderBottomWidth={0} flexWrap="nowrap" aria-describedby={instructionsId}>
                 {flatLenses.map((lens) => (
                   <LensTab
                     key={lens.id}
@@ -201,12 +207,8 @@ export const LensTabs: React.FC = () => {
             dot, so it reads unmistakably as "revert this lens". */}
         {activeLensIsDraft && activeLensId !== "all-traces" && (
           <Tooltip
-            content={
-              <HStack gap={1.5}>
-                <Text>Reset to saved lens</Text>
-                <Kbd>R</Kbd>
-              </HStack>
-            }
+            content="Reset to saved lens"
+            shortcut={PAGE_SHORTCUTS.resetLens}
             positioning={{ placement: "bottom" }}
           >
             <Button
@@ -218,6 +220,7 @@ export const LensTabs: React.FC = () => {
               gap={1}
               onClick={() => revertLens(activeLensId)}
               aria-label="Reset to saved lens"
+              aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.resetLens)}
             >
               <RotateCcw size={12} />
               Reset

@@ -1,6 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { ShortcutHint, shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { toaster } from "@langwatch/design-system/toaster";
 import { MoreVertical } from "lucide-react";
 import { useCallback, useMemo } from "react";
@@ -29,8 +30,15 @@ import {
   useUnpinTrace,
 } from "../../../../../behavior/writes/use-trace-writes.ts";
 import { useConversationTurns } from "../../../../../features/conversation/behavior/use-conversation-turns.ts";
+import {
+  drawerShortcut,
+  RAW_JSON_SHORTCUT,
+} from "../../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
 import { isPreviewTraceId } from "../../../../../model/preview-trace-id.ts";
 import { showErrorToast } from "../../../errors/index.ts";
+
+const COPY_ID_SHORTCUT = drawerShortcut("copy-trace-id");
+const HELP_SHORTCUT = drawerShortcut("help");
 
 interface TraceOverflowMenuProps {
   traceId: string;
@@ -152,12 +160,18 @@ export function TraceOverflowMenu({
         </Button>
       </Menu.Trigger>
       <Menu.Content minWidth="240px">
-        <Menu.Item value="copy" onClick={onCopyTraceId}>
+        <Menu.Item
+          value="copy"
+          onClick={onCopyTraceId}
+          aria-keyshortcuts={shortcutAriaKeys(COPY_ID_SHORTCUT)}
+        >
           <HStack gap={2}>
             <Icon as={LuCopy} boxSize={3.5} />
             <Text>Copy trace ID</Text>
           </HStack>
-          <Menu.ItemCommand>Y</Menu.ItemCommand>
+          <Menu.ItemCommand>
+            <ShortcutHint shortcut={COPY_ID_SHORTCUT} decorative />
+          </Menu.ItemCommand>
         </Menu.Item>
 
         {onFindSimilar && (
@@ -212,12 +226,18 @@ export function TraceOverflowMenu({
 
         <Menu.Separator />
 
-        <Menu.Item value="raw-json" onClick={onOpenRawJson}>
+        <Menu.Item
+          value="raw-json"
+          onClick={onOpenRawJson}
+          aria-keyshortcuts={shortcutAriaKeys(RAW_JSON_SHORTCUT)}
+        >
           <HStack gap={2}>
             <Icon as={LuBraces} boxSize={3.5} />
             <Text>View raw JSON</Text>
           </HStack>
-          <Menu.ItemCommand>\</Menu.ItemCommand>
+          <Menu.ItemCommand>
+            <ShortcutHint shortcut={RAW_JSON_SHORTCUT} decorative />
+          </Menu.ItemCommand>
         </Menu.Item>
 
         {dejaViewHref && (
@@ -251,12 +271,18 @@ export function TraceOverflowMenu({
           </HStack>
         </Menu.Item>
 
-        <Menu.Item value="shortcuts" onClick={onShowShortcuts}>
+        <Menu.Item
+          value="shortcuts"
+          onClick={onShowShortcuts}
+          aria-keyshortcuts={shortcutAriaKeys(HELP_SHORTCUT)}
+        >
           <HStack gap={2}>
             <Icon as={LuKeyboard} boxSize={3.5} />
             <Text>Keyboard shortcuts</Text>
           </HStack>
-          <Menu.ItemCommand>?</Menu.ItemCommand>
+          <Menu.ItemCommand>
+            <ShortcutHint shortcut={HELP_SHORTCUT} decorative />
+          </Menu.ItemCommand>
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>

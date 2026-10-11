@@ -8,11 +8,12 @@ import {
   HStack,
   Icon,
   Text,
+  VisuallyHidden,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { type KeyboardEvent, memo, useMemo, useRef } from "react";
+import { type KeyboardEvent, memo, useId, useMemo, useRef } from "react";
 import {
   LuChevronDown,
   LuPanelBottomClose,
@@ -262,31 +263,40 @@ function SpanTabList({
   descriptors: TabDescriptor[];
   hiddenIds: ReadonlySet<string>;
 }) {
+  const instructionsId = useId();
   const visibleTabs = descriptors.filter((d) => !hiddenIds.has(d.id));
   // One tab stop: the open tab, else the first one on show.
   const tabStopId = (visibleTabs.find((d) => d.activeId) ?? visibleTabs[0])?.id;
   if (descriptors.length === 0) return null;
   return (
-    <HStack
-      role="tablist"
-      aria-label="Open spans"
-      gap="5px"
-      flexShrink={0}
-      flexWrap="nowrap"
-      align="stretch"
-      onKeyDown={(event) => handleTabKeys({ event, tabs: visibleTabs })}
-    >
-      {descriptors.map((descriptor) => (
-        <Flex
-          key={descriptor.id}
-          display={hiddenIds.has(descriptor.id) ? "none" : "flex"}
-          align="stretch"
-          flexShrink={0}
-        >
-          {descriptor.render({ tabbable: descriptor.id === tabStopId })}
-        </Flex>
-      ))}
-    </HStack>
+    <>
+      <VisuallyHidden id={instructionsId}>
+        Left and Right arrows move between span tabs. Home and End jump to the first and last. Enter
+        or Space opens the focused tab. Open bracket and close bracket select the previous and next
+        span.
+      </VisuallyHidden>
+      <HStack
+        role="tablist"
+        aria-label="Open spans"
+        aria-describedby={instructionsId}
+        gap="5px"
+        flexShrink={0}
+        flexWrap="nowrap"
+        align="stretch"
+        onKeyDown={(event) => handleTabKeys({ event, tabs: visibleTabs })}
+      >
+        {descriptors.map((descriptor) => (
+          <Flex
+            key={descriptor.id}
+            display={hiddenIds.has(descriptor.id) ? "none" : "flex"}
+            align="stretch"
+            flexShrink={0}
+          >
+            {descriptor.render({ tabbable: descriptor.id === tabStopId })}
+          </Flex>
+        ))}
+      </HStack>
+    </>
   );
 }
 

@@ -1,13 +1,5 @@
-import { Kbd } from "@langwatch/design-system/kbd";
-import {
-  Box,
-  Button,
-  Flex,
-  HStack,
-  Icon,
-  IconButton,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, Flex, HStack, Icon, IconButton } from "@langwatch/design-system/primitives";
+import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { Bookmark, Compass, Download, Map, PanelLeftOpen, Tent } from "lucide-react";
@@ -26,6 +18,7 @@ import { useIsNewAccount } from "../hooks/use-is-new-account.ts";
 import { useTraceExplorerTourPreference } from "../onboarding/hooks/use-trace-explorer-tour-preference.ts";
 import { useTourEntryPoints } from "../onboarding/index.ts";
 import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay.tsx";
+import { PAGE_SHORTCUTS } from "../traces-page/page-keyboard-shortcuts.tsx";
 import { ColumnsDropdown } from "./columns-dropdown.tsx";
 import { DensityToggle } from "./density-toggle.tsx";
 import { GroupingSelect } from "./grouping-select.tsx";
@@ -258,16 +251,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       <HStack gap={1} flexShrink={0}>
         {sidebarCollapsed && (
           <Tooltip
-            content={
-              <HStack gap={1.5}>
-                <Text>Show filters sidebar</Text>
-                <Kbd>{"["}</Kbd>
-              </HStack>
-            }
+            content="Show filters sidebar"
+            shortcut={PAGE_SHORTCUTS.sidebar}
             positioning={{ placement: "bottom" }}
           >
             <Button
               aria-label="Show filters sidebar"
+              aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.sidebar)}
               variant="outline"
               size="xs"
               fontWeight="medium"
