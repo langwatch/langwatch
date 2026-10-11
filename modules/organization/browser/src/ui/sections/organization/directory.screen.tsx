@@ -113,7 +113,7 @@ function DirectoryTabs({
           label: "People",
           count: counts.people,
           content: (
-            <Box paddingTop={4}>
+            <Box paddingTop={3}>
               <MembersScreen />
             </Box>
           ),
@@ -123,7 +123,7 @@ function DirectoryTabs({
           label: "Teams & projects",
           count: counts.teams,
           content: (
-            <Box paddingTop={4}>
+            <Box paddingTop={3}>
               <TeamsScreen />
             </Box>
           ),
@@ -133,7 +133,7 @@ function DirectoryTabs({
           label: "Groups",
           count: counts.groups,
           content: (
-            <Box paddingTop={4}>
+            <Box paddingTop={3}>
               <GroupsScreen />
             </Box>
           ),
@@ -146,7 +146,7 @@ function DirectoryTabs({
                 label: "Departments",
                 count: departmentCount,
                 content: (
-                  <Box paddingTop={4}>
+                  <Box paddingTop={3}>
                     <DepartmentsScreen organizationId={organizationId} />
                   </Box>
                 ),
