@@ -72,7 +72,13 @@ describe("the LangWatchQL catalog is opt-in", () => {
     /** @scenario "A ClickHouse table not listed in the catalog is not queryable" */
     it("has no view and is granted nothing", () => {
       // Real manifest tables the catalog deliberately does not list.
-      for (const table of ["instant_eval_runs", "goose_db_version", "automation_audit"]) {
+      const unlisted = [
+        "instant_eval_runs",
+        "goose_db_version",
+        "automation_audit",
+        "stored_spans_id_index",
+      ];
+      for (const table of unlisted) {
         expect(sourceTables.has(table)).toBe(false);
         expect(
           [...allowed].some((entry) => entry.endsWith(`.${table}`)),

@@ -18,7 +18,7 @@ Feature: A lookup by id reads only the partitions its id index names
     And it touches only the partitions inside that range
     And it is recorded as an index hit
 
-  @integration @unimplemented
+  @integration
   Scenario: inserting a record fills its index row in the same insert
     When a record is inserted into the source table
     Then its id index row exists without any application code writing it
@@ -36,7 +36,7 @@ Feature: A lookup by id reads only the partitions its id index names
     When its spans are looked up by trace id
     Then the read is bounded by the trace index and returns the spans
 
-  @unit @unimplemented
+  @unit
   Scenario: an id the index has never seen probes recent data once and stops
     Given the index's backfill has completed
     And no record exists for the id
@@ -57,14 +57,14 @@ Feature: A lookup by id reads only the partitions its id index names
     Then no id index table declares a PARTITION BY
     And each is ordered by tenant then id
 
-  @integration @unimplemented
+  @integration
   Scenario: the backfill fills existing records and can run twice
     Given records stored before the index existed
     When the background backfill step runs, is interrupted, resumes and runs again
     Then every existing id has an index row covering all of its rows
     And running it again changes no index range
 
-  @unit @unimplemented
+  @unit
   Scenario: until the backfill completes, a lookup keeps today's fallback
     Given the index's backfill step has not completed
     When a record is looked up by its id alone
@@ -83,13 +83,13 @@ Feature: A lookup by id reads only the partitions its id index names
     When its projection is replayed and its rows are inserted again
     Then the trace's index range still covers Monday to Thursday
 
-  @integration @unimplemented
+  @integration
   Scenario: a lengthened retention reaches the index
     Given a project whose traces are kept for 30 days
     When the project's trace retention is changed to 365 days
     Then the trace id index rows for that project carry 365 days as well
 
-  @integration @unimplemented
+  @integration
   Scenario: a shortened retention never shortens the index
     Given an aggregate with some events kept forever and others kept for 365 days
     When the project's trace retention is changed to 30 days
@@ -102,7 +102,7 @@ Feature: A lookup by id reads only the partitions its id index names
     When its events are read for replay
     Then the read takes the existing unbounded path and returns every event
 
-  @integration @unimplemented
+  @integration
   Scenario: an id kept forever is not expired by a finite-retention row
     Given an id whose earlier rows are kept forever
     When a later row for the same id arrives with a 30-day retention
@@ -127,14 +127,14 @@ Feature: A lookup by id reads only the partitions its id index names
     Then the first read finds nothing and the lookup falls back to the existing path
     And the fallback is recorded
 
-  @unit @unimplemented
+  @unit
   Scenario: readers trust the index only once its flag is on
     Given the owner's id index flag is on for this ClickHouse target and off for another
     When tenants on each target are looked up by id alone
     Then only the tenant on the flagged target reads through the index
     And no lookup waits on reading the flag
 
-  @unit @unimplemented
+  @unit
   Scenario: a failed batch backs off and resumes from its cursor
     Given a backfill whose next batch fails twice and then succeeds
     When the backfill step runs
@@ -153,7 +153,7 @@ Feature: A lookup by id reads only the partitions its id index names
     When the drawer loads
     Then every read starts at once, without waiting for a time to be found
 
-  @integration @unimplemented
+  @integration
   Scenario: a retention change during the backfill does not leave stale index rows
     Given a backfill in progress
     And a project's retention is lengthened from 30 to 365 days while it runs

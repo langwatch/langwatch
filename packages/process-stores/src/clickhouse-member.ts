@@ -82,7 +82,12 @@ export function vendorClickHouseClientOptions({
 export function vendorClickHouseSettings(
   settings: ClickHouseConfig["settings"],
 ): ClickHouseSettings {
-  return { date_time_input_format: "best_effort", ...settings };
+  // A retried replicated insert is deduplicated; this keeps the id-index views' blocks with it.
+  return {
+    date_time_input_format: "best_effort",
+    deduplicate_blocks_in_dependent_materialized_views: 1,
+    ...settings,
+  };
 }
 
 /** Per-statement latency and outcome counts, under the names main's dashboards read. */
@@ -345,6 +350,7 @@ export function buildClickHouse(options: {
         state: "malformed" as const,
       })),
     ],
+    organizationOf: (tenantId) => connection.organizationOf(tenantId),
   });
 
   return {

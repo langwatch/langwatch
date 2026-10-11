@@ -214,6 +214,36 @@ export type {
   WindowedReadMetrics,
   WindowedReadOutcome,
 } from "./windowedRead.ts";
+
+/** Id indexes (dev/docs/plans/id-index-2026-10-10.md): the flag seam, the bounded lookup by id,
+ * and the background fill each owner's step drives. */
+export type {
+  IdIndexBounds,
+  IdIndexFlags,
+  IdIndexKey,
+  IdIndexLookup,
+  IdIndexReader,
+  IdIndexTimeFormat,
+} from "./idIndexFlags.ts";
+export { SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
+export type { IndexedReadOptions } from "./indexedRead.ts";
+export { ID_INDEX_MISS_PROBE, ID_INDEX_WIDEN_MS, indexedRead, indexWindow } from "./indexedRead.ts";
+export type {
+  FillIdIndexesOptions,
+  IdIndexDeclaration,
+  IdIndexFillCheckpoint,
+  IdIndexFillCursor,
+  IdIndexFillReport,
+  IdIndexFillTarget,
+  IdIndexStatements,
+} from "./idIndexFill.ts";
+export {
+  DEFAULT_ID_INDEX_BATCH_ROWS,
+  fillIdIndexes,
+  fillStatement,
+  IdIndexFillIncompleteError,
+  idIndexFillTargets,
+} from "./idIndexFill.ts";
 export type {
   ClickHouseClientResolver,
   ReadResource,

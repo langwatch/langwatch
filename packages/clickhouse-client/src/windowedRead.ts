@@ -18,6 +18,8 @@ export const RESOLVER_RECENT_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
 export type WindowedReadOutcome =
   | "error"
   | "hit"
+  | "index_hit"
+  | "index_miss"
   | "unbounded_empty"
   | "unbounded_hit"
   | "unwindowed"
@@ -82,11 +84,13 @@ export function setWindowedReadMetrics(port: WindowedReadMetrics): void {
   windowedReadMetrics = port;
 }
 
-function incrementWindowedReadCount(table: string, outcome: WindowedReadOutcome): void {
+/** Counts one outcome on the process's sink; `indexedRead` shares it with `queryWindowed`. */
+export function incrementWindowedReadCount(table: string, outcome: WindowedReadOutcome): void {
   windowedReadMetrics?.record({ table, outcome });
 }
 
-function windowFragment(fromMs: number, toMs: number): WindowFragment {
+/** The inclusive `[fromMs, toMs]` time predicate one read attempt runs with. */
+export function windowFragment(fromMs: number, toMs: number): WindowFragment {
   return {
     fromMs,
     toMs,
@@ -102,7 +106,10 @@ function windowFragment(fromMs: number, toMs: number): WindowFragment {
  * for `{ lookbackMs }`. The frame's upper bound carries the same clock-skew headroom as the hinted
  * path, so a client clock running slightly fast cannot push a just-written row past the ceiling.
  */
-function fallbackFragment(fallback: WindowFallback, windowMs: number): WindowFragment | null {
+export function fallbackFragment(
+  fallback: WindowFallback,
+  windowMs: number,
+): WindowFragment | null {
   if (typeof fallback === "object") {
     const now = nowInstant().epochMilliseconds;
 

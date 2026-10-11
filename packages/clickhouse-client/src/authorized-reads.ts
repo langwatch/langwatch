@@ -20,6 +20,12 @@ import {
 import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseQueryClient } from "./client.ts";
+import {
+  type IdIndexBounds,
+  idIndexBoundsOf,
+  idIndexBoundsStatement,
+  type IdIndexLookup,
+} from "./idIndexFlags.ts";
 
 /** Resolves the routed client a project's reads are sent through. */
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
@@ -335,6 +341,36 @@ export class TenantScopedReader {
       ...(params.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
     });
     return { json: async () => result.rows };
+  }
+
+  /** The ClickHouse target this reader's statements land on, which keys an id-index flag. */
+  async targetOf(): Promise<string> {
+    return (await this.resolvedClient()).targetOf({ tenantId: this.deps.tenantId });
+  }
+
+  /**
+   * The fence-owned point read of an id index: binds the proof's tenant set itself and answers
+   * only `{ n, fromMs, toMs }`, never rows. The source read keeps its windowed marker, so a
+   * shared grant's window still filters what is returned (id-index plan, question 2).
+   */
+  async indexBounds(lookup: IdIndexLookup): Promise<IdIndexBounds> {
+    const fence = setExpression(this.deps.fence);
+    const statement = idIndexBoundsStatement({ ...lookup, tenantPredicate: fence.sql });
+    const client = await this.resolvedClient();
+    const result = await client.query<unknown>({
+      tenantId: this.deps.tenantId,
+      tenantIds: tenantsOf(this.deps.fence),
+      sql: statement.sql,
+      params: { ...statement.params, ...fence.params },
+      table: lookup.index,
+    });
+    return idIndexBoundsOf({ rows: result.rows });
+  }
+
+  private resolvedClient(): Promise<ClickHouseQueryClient> {
+    return this.deps.client().catch((cause: unknown) => {
+      throw new TenantReaderClientUnavailableError({ cause });
+    });
   }
 }
 

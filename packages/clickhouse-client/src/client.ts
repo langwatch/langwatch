@@ -4,6 +4,13 @@
  * sits outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
+import {
+  type IdIndexBounds,
+  idIndexBoundsOf,
+  idIndexBoundsStatement,
+  type IdIndexLookup,
+  SHARED_CLICKHOUSE_TARGET,
+} from "./idIndexFlags.ts";
 import type {
   ClickHouseOverloadErrorFactory,
   ClickHouseStatementAdmission,
@@ -35,6 +42,8 @@ export interface ClickHouseQueryClientOptions {
   privateRoutes?: ReadonlyMap<string, string> | undefined;
   /** Every private route variable this process parsed, usable or not; none by default. */
   privateRouteVariables?: readonly PrivateRouteVariable[] | undefined;
+  /** The organisation a tenant belongs to, from the router's cache; needed once a route exists. */
+  organizationOf?: ((tenantId: string) => Promise<string>) | undefined;
   /** Builds the handled refusal for a read whose server stopped answering; raw by default. */
   unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
   /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
@@ -71,6 +80,7 @@ export class ClickHouseQueryClient {
   private readonly reporter: StatementReporter | undefined;
   private readonly routes: ReadonlyMap<string, string>;
   private readonly routeVariables: readonly PrivateRouteVariable[];
+  private readonly organizationOf: ((tenantId: string) => Promise<string>) | undefined;
   private readonly columnLists = new Map<string, ClickHouseColumns>();
   private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
   private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
@@ -86,6 +96,7 @@ export class ClickHouseQueryClient {
     privateRouteVariables,
     unavailableErrorFactory,
     overloadErrorFactory,
+    organizationOf,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
@@ -97,6 +108,38 @@ export class ClickHouseQueryClient {
     this.routeVariables = privateRouteVariables ?? [];
     this.unavailable = unavailableErrorFactory;
     this.overloaded = overloadErrorFactory;
+    this.organizationOf = organizationOf;
+  }
+
+  /**
+   * The target a tenant's statements land on: `"shared"`, with no I/O while no private route
+   * exists, else its organisation when that has a route. Keys an owner's id-index flag.
+   */
+  async targetOf({ tenantId }: { tenantId: string }): Promise<string> {
+    if (this.routes.size === 0) return SHARED_CLICKHOUSE_TARGET;
+    if (this.organizationOf === undefined) {
+      throw new Error("A client with private routes cannot name a tenant's target without them.");
+    }
+    const organizationId = await this.organizationOf(tenantId);
+    return this.routes.has(organizationId) ? organizationId : SHARED_CLICKHOUSE_TARGET;
+  }
+
+  /** One point read of an id index for one tenant; the fenced twin is the reader's. */
+  async indexBounds({
+    tenantId,
+    ...lookup
+  }: IdIndexLookup & { tenantId: string }): Promise<IdIndexBounds> {
+    const statement = idIndexBoundsStatement({
+      ...lookup,
+      tenantPredicate: "TenantId = {tenantId:String}",
+    });
+    const result = await this.query<unknown>({
+      tenantId,
+      sql: statement.sql,
+      params: { ...statement.params, tenantId },
+      table: lookup.index,
+    });
+    return idIndexBoundsOf({ rows: result.rows });
   }
 
   /**

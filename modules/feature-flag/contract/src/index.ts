@@ -3,15 +3,19 @@ export type {
   FeatureFlagFamily,
   FeatureFlagKey,
   FeatureFlagScope,
+  IdIndexFlagKey,
   RegisteredFeatureFlagKey,
 } from "./feature-flag.ts";
 export {
   FEATURE_FLAG_FAMILIES,
   FEATURE_FLAGS,
+  ID_INDEX_FLAG_PREFIX,
+  idIndexFlagKey,
   listFeatureFlagFamilies,
   listFeatureFlags,
   pickFlagDefinition,
 } from "./feature-flag.ts";
+export { FEATURE_FLAG_LATCH_REFRESH_MS, FeatureFlagLatch } from "./feature-flag-latch.ts";
 export {
   deriveFeatureFlagEnvVarName,
   parseFeatureFlagEnvOverride,
