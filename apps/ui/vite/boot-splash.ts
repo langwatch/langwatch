@@ -29,6 +29,11 @@ const STYLE = `<style data-boot-splash>
     transition: opacity 700ms ease 120ms; }
   .lw-boot-shader[data-live] { opacity: 0.4; }
   .lw-boot svg { position: relative; z-index: 1; }
+  .lw-boot-note { position: absolute; z-index: 1; left: 0; right: 0; top: calc(50% + 12px);
+    margin: 0; text-align: center; font: 13px/18px Inter, system-ui, sans-serif; color: #475569;
+    opacity: 0; transition: opacity 400ms ease; }
+  .lw-boot-note[data-on] { opacity: 1; }
+  .dark .lw-boot-note { color: #9ca3af; }
   .lw-boot .face { fill: white; } .lw-boot .mark { fill: #213b41; }
   .lw-boot .word { fill: #1d293d; } .lw-boot .word-muted { fill: #314158; }
   .dark .lw-boot { background: #10101a; }
@@ -69,7 +74,7 @@ const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" width="186" height="45.6" 
 export const BOOT_SPLASH_HEAD = `${STYLE}\n${THEME_SCRIPT}`;
 
 /** The screen itself, fixed over the page. */
-export const BOOT_SPLASH_BODY = `<div id="lw-boot" class="lw-boot" data-testid="boot-splash" aria-busy="true"><div id="lw-boot-shader" class="lw-boot-shader" aria-hidden="true"></div>${LOGO}</div>`;
+export const BOOT_SPLASH_BODY = `<div id="lw-boot" class="lw-boot" data-testid="boot-splash" aria-busy="true"><div id="lw-boot-shader" class="lw-boot-shader" aria-hidden="true"></div>${LOGO}<p id="lw-boot-note" class="lw-boot-note" role="status"></p></div>`;
 
 // Fades the screen off once the app has drawn a real page into #root: it stays over the app's
 // own loading screen, so a slow session or API read shows one screen, not two. A page with no
@@ -91,6 +96,13 @@ const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
   function drawn() {
     return root.firstElementChild && !root.querySelector('[data-testid="loading-screen"]');
   }
+  // A slow first read (a busy dev machine, a cold server) says so rather than looking stuck.
+  setTimeout(function () {
+    var note = document.getElementById("lw-boot-note");
+    if (!note || !splash.isConnected) return;
+    note.textContent = "Waiting for the server…";
+    note.setAttribute("data-on", "");
+  }, 6000);
   var observer = new MutationObserver(function () { if (drawn()) leave(); });
   observer.observe(root, { childList: true, subtree: true });
 })();</script>`;
@@ -126,6 +138,12 @@ export async function bundleBootGround({ minify }: { minify: boolean }): Promise
 const groundTag = (code: string) =>
   `<script data-boot-splash>${code.replaceAll("</script", "<\\/script")}</script>`;
 
+// On Vite's bundling page the wait is the build, so the note says so after a moment.
+const BUILDING_NOTE = `<script data-boot-splash>setTimeout(function () {
+  var note = document.getElementById("lw-boot-note");
+  if (note) { note.textContent = "Building the app…"; note.setAttribute("data-on", ""); }
+}, 1500);</script>`;
+
 const FALLBACK_MARKER = "__vite_is_fallback_page__";
 
 /**
@@ -140,7 +158,7 @@ export function brandFallbackPage({
   ground?: string;
 }): string {
   if (!html.includes(FALLBACK_MARKER)) return html;
-  const body = `${BOOT_SPLASH_BODY}${ground ? groundTag(ground) : ""}`;
+  const body = `${BOOT_SPLASH_BODY}${BUILDING_NOTE}${ground ? groundTag(ground) : ""}`;
   return html
     .replace(/<style>[\s\S]*?<\/style>/, BOOT_SPLASH_HEAD)
     .replace(/<body>[\s\S]*<\/body>/, `<body style="margin:0">${body}</body>`);

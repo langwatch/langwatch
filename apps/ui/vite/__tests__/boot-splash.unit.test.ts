@@ -45,6 +45,7 @@ describe("the boot splash", () => {
     it("holds the screen while the app shows its own loading screen", async () => {
       const html = await transform('<html><head></head><body><div id="root"></div></body></html>');
       expect(html).toContain('[data-testid="loading-screen"]');
+      expect(html).toContain("Waiting for the server…");
     });
   });
 
@@ -56,6 +57,7 @@ describe("the boot splash", () => {
       expect(html).toContain("__vite_is_fallback_page__");
       expect(html).toContain("/* hmr client */");
       expect(html).toContain(GROUND);
+      expect(html).toContain("Building the app…");
     });
   });
 
