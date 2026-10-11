@@ -77,7 +77,6 @@ import { PullCadenceField } from "../../../features/ingestion-sources/ui/element
 import { SourceTypeIconGlyph } from "../../../features/ingestion-sources/ui/elements/source-type-icon-glyph.tsx";
 import { TraceDestinationField } from "../../../features/ingestion-sources/ui/elements/trace-destination-field.tsx";
 import { EnterpriseOttlEditor as OttlEditor } from "../../../features/ottl/ui/sections/ottl-editor.connected.tsx";
-import { useGovernanceHost } from "../../../model/governance-host.ts";
 import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
@@ -946,6 +945,7 @@ function InventoryTabs({
           value: "sources",
           label: "Sources",
           count: sourceCount,
+          description: "Connections that send usage data to this inventory.",
           content: (
             <VStack align="stretch" gap={4} width="full">
               {sources}
@@ -4760,7 +4760,6 @@ export function SecretModal({
   details: SecretDetails | null;
   onClose: () => void;
 }) {
-  const host = useGovernanceHost();
   const [copied, setCopied] = useState(false);
   const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
     secretModalTargets(details);
@@ -4794,10 +4793,7 @@ export function SecretModal({
       title={details.title}
       icon={<KeyRound size={16} />}
       closeOnInteractOutside={false}
-      secondaryAction={{
-        label: "View source page →",
-        onClick: () => host.navigate(`/governance/inventory/${details.sourceId}`),
-      }}
+      note={<Link href={`/governance/inventory/${details.sourceId}`}>View source page →</Link>}
       primaryAction={{ label: "I've saved it", onClick: onClose }}
     >
       <VStack align="stretch" gap={4}>

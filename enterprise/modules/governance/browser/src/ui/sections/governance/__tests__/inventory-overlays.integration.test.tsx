@@ -201,14 +201,32 @@ describe("given a source's secret is shown once", () => {
   });
 
   /** @scenario "The secret dialog leads to the source page" */
-  it("goes to the source's page from View source page", async () => {
+  it("offers View source page as a real link that navigates through the host on a plain click", async () => {
     const host = fakeGovernanceHost();
     renderWithGovernanceHost(<SecretModal details={details} onClose={vi.fn()} />, { host });
 
-    await userEvent
-      .setup()
-      .click(await screen.findByRole("button", { name: "View source page →" }));
+    const link = await screen.findByRole("link", { name: "View source page →" });
+    expect(link).toHaveAttribute("href", "/governance/inventory/src_otel");
+
+    await userEvent.setup().click(link);
 
     expect(host.recording.navigations).toEqual(["/governance/inventory/src_otel"]);
+  });
+
+  /** @scenario "The secret dialog leads to the source page" */
+  it("leaves a Cmd or Ctrl click on View source page to the browser, so it opens a new tab", async () => {
+    const host = fakeGovernanceHost();
+    renderWithGovernanceHost(<SecretModal details={details} onClose={vi.fn()} />, { host });
+    const link = await screen.findByRole("link", { name: "View source page →" });
+
+    // Runs after the handler: jsdom cannot open a tab, so it only swallows the default.
+    const swallow = (event: Event) => event.preventDefault();
+    document.addEventListener("click", swallow);
+
+    fireEvent.click(link, { metaKey: true });
+    fireEvent.click(link, { ctrlKey: true });
+    document.removeEventListener("click", swallow);
+
+    expect(host.recording.navigations).toEqual([]);
   });
 });
