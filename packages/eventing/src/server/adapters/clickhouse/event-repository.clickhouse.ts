@@ -308,6 +308,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
           ...(hasLowerBound ? { occurredAtFromMs } : {}),
         },
         format: "JSONEachRow",
+        // Unbounded, as in `getEventRecords`: a long-lived aggregate's history by its key.
+        ...(hasLowerBound ? {} : { SKIP_COLD_SCAN_CHECK: true as const }),
       });
 
       const rows = await result.json<EventLogRow>();
@@ -347,11 +349,13 @@ export class EventingClickHouseEventRepository implements EventRepository {
     const { tenantId, aggregateType, aggregateId } = request;
     try {
       const client = await this.getClient(tenantId);
-      const { query, query_params } = this.buildPagedQuery(request);
+      const { query, query_params, declaresFullScan } = this.buildPagedQuery(request);
       const result = await client.query({
         query,
         query_params,
         format: "JSONEachRow",
+        // Unbounded, as in `getEventRecords`: a long-lived aggregate's history by its key.
+        ...(declaresFullScan ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
       });
       const rows = await result.json<EventLogRow>();
       return mapEventLogRows({ rows, tenantId, aggregateType, aggregateId });
@@ -374,7 +378,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
     after: { timestamp: number; eventId: string } | undefined;
     limit: number;
     occurredAtFromMs?: number;
-  }): { query: string; query_params: Record<string, unknown> } {
+  }): { query: string; query_params: Record<string, unknown>; declaresFullScan: boolean } {
     const {
       tenantId,
       aggregateType,
@@ -430,6 +434,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
         ...(after ? { afterTimestamp: after.timestamp, afterEventId: after.eventId } : {}),
         limit,
       },
+      declaresFullScan: !hasLowerBound,
     };
   }
 

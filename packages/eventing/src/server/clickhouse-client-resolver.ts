@@ -7,6 +7,8 @@ export interface EventingClickHouseClient {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
+    /** Set when the read must walk every partition; see the member's cold-scan warning. */
+    SKIP_COLD_SCAN_CHECK?: true | undefined;
   }) => Promise<EventingClickHouseQueryResult>;
   insert(request: {
     table: string;

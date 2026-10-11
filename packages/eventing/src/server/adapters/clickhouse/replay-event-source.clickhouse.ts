@@ -240,6 +240,8 @@ export async function getAggregateOccurredAtBounds({
         AND AggregateId IN ({aggregateIds:Array(String)})
     `,
     params: { tenantId, aggregateTypes, aggregateIds },
+    // This read finds the bounds the batch's later reads prune by, so it must see all history.
+    SKIP_COLD_SCAN_CHECK: true,
   });
 
   const row = rows[0];
