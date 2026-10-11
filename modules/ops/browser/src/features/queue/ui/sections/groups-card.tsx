@@ -1,4 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -6,13 +8,11 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Center,
   HStack,
   Input,
   Spacer,
   Spinner,
-  Table,
   Text,
 } from "@langwatch/design-system/primitives";
 import {
@@ -22,7 +22,7 @@ import {
 } from "@langwatch/observability/grafana-links";
 import type { GroupInfo } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
-import { MoreVertical, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -66,13 +66,13 @@ function GroupsPlaceholder({ isLoading, anyGroups }: { isLoading: boolean; anyGr
 }
 
 /**
- * The tint answers "what is wrong RIGHT NOW" at a glance: red for groups an
- * operator must act on, orange for groups still failing on their own.
+ * The tone answers "what is wrong RIGHT NOW" at a glance: danger for groups an
+ * operator must act on, warning for groups still failing on their own.
  */
-function groupTint(classification: GroupClassification) {
+function groupTone(classification: GroupClassification) {
   const needsAnOperator = classification.state === "blocked" || classification.state === "stale";
-  if (needsAnOperator) return "red.subtle";
-  return classification.isFailing ? "orange.subtle" : undefined;
+  if (needsAnOperator) return "danger";
+  return classification.isFailing ? "warning" : void 0;
 }
 
 export function GroupsCard({ queueNames }: { queueNames: string[] }) {
@@ -170,132 +170,132 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   return (
     <>
-      <Card.Root borderColor="border.muted" boxShadow="none">
-        <Card.Body padding={0}>
-          {/* Paused-tenants banner: always visible when at least one tenant is paused so
+      <Card padding="none">
+        {/* Paused-tenants banner: always visible when at least one tenant is paused so
               operators don't accidentally assume a tenant's silence means it's healthy. */}
-          {hasAccess && primaryQueue && (
-            <PausedTenantsBanner
-              tenants={pausedTenantsQuery.data ?? []}
-              unpausingTenantId={
-                unpauseTenantMutation.isPending
-                  ? unpauseTenantMutation.variables?.tenantId
-                  : undefined
-              }
-              onUnpause={(tenantId) =>
-                unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId })
-              }
-            />
-          )}
-
-          <GroupsFilterBar
-            actions={hasAccess ? <ReapStrandedGroupsAction /> : undefined}
-            showFilters={allGroups.length > 0}
-            statusButtons={statusButtons}
-            statusFilter={statusFilter}
-            onStatusFilter={setStatusFilter}
-            search={search}
-            onSearch={setSearch}
+        {hasAccess && primaryQueue && (
+          <PausedTenantsBanner
+            tenants={pausedTenantsQuery.data ?? []}
+            unpausingTenantId={
+              unpauseTenantMutation.isPending
+                ? unpauseTenantMutation.variables?.tenantId
+                : undefined
+            }
+            onUnpause={(tenantId) =>
+              unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId })
+            }
           />
+        )}
 
-          {/* Tenant-scoped action bar: visible when the operator searches for an
+        <GroupsFilterBar
+          actions={hasAccess ? <ReapStrandedGroupsAction /> : undefined}
+          showFilters={allGroups.length > 0}
+          statusButtons={statusButtons}
+          statusFilter={statusFilter}
+          onStatusFilter={setStatusFilter}
+          search={search}
+          onSearch={setSearch}
+        />
+
+        {/* Tenant-scoped action bar: visible when the operator searches for an
               exact tenant id (e.g. project_W_7kPya...). Lets them pause/unpause
               ALL processing for that tenant or bulk-drain every group. Added
               post-2026-05-11 incident — clicking 500K Drain buttons by hand
               was the actual blocker that day. */}
-          {hasAccess && tenantScope && primaryQueue && (
-            <TenantActionBar
-              tenantId={tenantScope}
-              isPaused={isTenantPaused}
-              pausing={pauseTenantMutation.isPending}
-              unpausing={unpauseTenantMutation.isPending}
-              onPause={() => {
-                unpauseTenantMutation.reset();
-                pauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tenantScope });
-              }}
-              onUnpause={() => {
-                pauseTenantMutation.reset();
-                unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tenantScope });
-              }}
-              onDrain={() => setDrainTenantTarget(tenantScope)}
-            />
-          )}
+        {hasAccess && tenantScope && primaryQueue && (
+          <TenantActionBar
+            tenantId={tenantScope}
+            isPaused={isTenantPaused}
+            pausing={pauseTenantMutation.isPending}
+            unpausing={unpauseTenantMutation.isPending}
+            onPause={() => {
+              unpauseTenantMutation.reset();
+              pauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tenantScope });
+            }}
+            onUnpause={() => {
+              pauseTenantMutation.reset();
+              unpauseTenantMutation.mutate({ queueName: primaryQueue, tenantId: tenantScope });
+            }}
+            onDrain={() => setDrainTenantTarget(tenantScope)}
+          />
+        )}
 
-          {!hasGroupsToShow && (
-            <GroupsPlaceholder isLoading={isLoading} anyGroups={allGroups.length > 0} />
-          )}
-          {hasGroupsToShow && (
-            <Box
-              ref={scrollContainerRef}
-              maxHeight={`${GROUPS_VIEWPORT_HEIGHT}px`}
-              overflowY="auto"
+        {!hasGroupsToShow && (
+          <GroupsPlaceholder isLoading={isLoading} anyGroups={allGroups.length > 0} />
+        )}
+        {hasGroupsToShow && (
+          <Box
+            as="section"
+            ref={scrollContainerRef}
+            aria-label="Queue groups"
+            tabIndex={0}
+            maxHeight={`${GROUPS_VIEWPORT_HEIGHT}px`}
+            overflowY="auto"
+          >
+            <ListTable
+              density="compact"
+              variant="embedded"
+              scroll="external"
+              stickyHeader
+              rowHeight={GROUPS_ROW_HEIGHT}
+              aria-rowcount={filteredGroups.length + 1}
             >
-              <ListTable
-                density="compact"
-                columnRules={false}
-                containerProps={{ overflow: "visible" }}
-                size="sm"
-                variant="embedded"
-              >
-                <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
-                  <Table.Row>
-                    <Table.ColumnHeader>Group ID</Table.ColumnHeader>
-                    <Table.ColumnHeader width="140px">Pipeline</Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="end" width="60px">
-                      Pending
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="end" width="65px">
-                      Attempts
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader width="80px">Next run</Table.ColumnHeader>
-                    <Table.ColumnHeader width="85px">Oldest wait</Table.ColumnHeader>
-                    <Table.ColumnHeader width="70px">Status</Table.ColumnHeader>
-                    {hasAccess && (
-                      <Table.ColumnHeader width="44px">
-                        <Text srOnly>Actions</Text>
-                      </Table.ColumnHeader>
-                    )}
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  <VirtualizedTableRows
-                    count={filteredGroups.length}
-                    rowHeight={GROUPS_ROW_HEIGHT}
-                    columnCount={hasAccess ? 8 : 7}
-                    scrollContainerRef={scrollContainerRef}
-                    getItemKey={(i) => {
-                      const g = filteredGroups[i]!;
-                      return `${g.queueName}:${g.groupId}`;
-                    }}
-                    renderRow={(i) => (
-                      <GroupRow
-                        group={filteredGroups[i]!}
-                        now={now}
-                        hasAccess={hasAccess}
-                        grafana={grafana}
-                        onOpen={(group) => groupDetail.open(`${group.queueName}|${group.groupId}`)}
-                        onRetry={(group) =>
-                          unblockMutation.mutate({
-                            queueName: group.queueName,
-                            groupId: group.groupId,
-                          })
-                        }
-                        onCopy={(group) => copyGroupId(group.groupId)}
-                        onMoveToDlq={(group) =>
-                          setDlqTarget({ queueName: group.queueName, groupId: group.groupId })
-                        }
-                        onDrain={(group) =>
-                          setDrainTarget({ queueName: group.queueName, groupId: group.groupId })
-                        }
-                      />
-                    )}
-                  />
-                </Table.Body>
-              </ListTable>
-            </Box>
-          )}
-        </Card.Body>
-      </Card.Root>
+              <ListTable.Header>
+                <ListTable.Row aria-rowindex={1}>
+                  <ListTable.ColumnHeader>Group ID</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader width="140px">Pipeline</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader align="end" width="60px">
+                    Pending
+                  </ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader align="end" width="65px">
+                    Attempts
+                  </ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader width="80px">Next run</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader width="85px">Oldest wait</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader width="70px">Status</ListTable.ColumnHeader>
+                  {hasAccess && <ListTable.ActionHeader />}
+                </ListTable.Row>
+              </ListTable.Header>
+              <ListTable.Body>
+                <VirtualizedTableRows
+                  count={filteredGroups.length}
+                  rowHeight={GROUPS_ROW_HEIGHT}
+                  columnCount={hasAccess ? 8 : 7}
+                  scrollContainerRef={scrollContainerRef}
+                  getItemKey={(i) => {
+                    const g = filteredGroups[i]!;
+                    return `${g.queueName}:${g.groupId}`;
+                  }}
+                  renderRow={(i) => (
+                    <GroupRow
+                      group={filteredGroups[i]!}
+                      rowIndex={i + 2}
+                      now={now}
+                      hasAccess={hasAccess}
+                      grafana={grafana}
+                      onOpen={(group) => groupDetail.open(`${group.queueName}|${group.groupId}`)}
+                      onRetry={(group) =>
+                        unblockMutation.mutate({
+                          queueName: group.queueName,
+                          groupId: group.groupId,
+                        })
+                      }
+                      onCopy={(group) => copyGroupId(group.groupId)}
+                      onMoveToDlq={(group) =>
+                        setDlqTarget({ queueName: group.queueName, groupId: group.groupId })
+                      }
+                      onDrain={(group) =>
+                        setDrainTarget({ queueName: group.queueName, groupId: group.groupId })
+                      }
+                    />
+                  )}
+                />
+              </ListTable.Body>
+            </ListTable>
+          </Box>
+        )}
+        <GroupsCapNotice loaded={allGroups.length} total={groupsQuery.data?.total} />
+      </Card>
 
       <GroupConfirmDialogs actions={actions} primaryQueue={primaryQueue} />
 
@@ -310,6 +310,26 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
         />
       )}
     </>
+  );
+}
+
+/** The query loads one page of 200; say so when the queue holds more, never guess how many. */
+function GroupsCapNotice({ loaded, total }: { loaded: number; total: number | undefined }) {
+  if (total === void 0 || total <= loaded) return null;
+  return (
+    <Text
+      as="output"
+      display="block"
+      textStyle="xs"
+      color="fg.muted"
+      paddingX={4}
+      paddingY={2}
+      borderTop="1px solid"
+      borderTopColor="border"
+    >
+      Showing the first {loaded} of {total} groups. Search and the status filters cover these{" "}
+      {loaded} only.
+    </Text>
   );
 }
 
@@ -425,6 +445,7 @@ type QueuedGroup = GroupInfo & { queueName: string };
 /** One group's row: its load, retry state and, for an operator, its actions. */
 function GroupRow({
   group,
+  rowIndex,
   now,
   hasAccess,
   grafana,
@@ -435,6 +456,8 @@ function GroupRow({
   onDrain,
 }: {
   group: QueuedGroup;
+  /** Header-inclusive, 1-based position in the virtualised table. */
+  rowIndex: number;
   now: number;
   hasAccess: boolean;
   grafana: GrafanaDeepLinkConfig | null;
@@ -446,30 +469,31 @@ function GroupRow({
 }) {
   const c = classifyGroup(group, now);
   const overdue = !group.isBlocked && isOverdue(group.oldestJobMs);
-  const tint = groupTint(c);
+  const tone = groupTone(c);
 
   return (
-    <Table.Row
+    <ListTable.Row
       key={`${group.queueName}:${group.groupId}`}
-      cursor="pointer"
-      bg={tint}
-      _hover={{ bg: tint ?? "bg.subtle" }}
-      onClick={() => onOpen(group)}
+      aria-rowindex={rowIndex}
+      tone={tone}
+      onActivate={() => onOpen(group)}
     >
-      <Table.Cell height="49px">
-        <InlineCode variant="neutral">{group.groupId}</InlineCode>
-      </Table.Cell>
-      <Table.Cell height="49px">
+      <ListTable.Cell>
+        <ListTable.RowAction label={`Open group ${group.groupId}`} onActivate={() => onOpen(group)}>
+          <InlineCode variant="neutral">{group.groupId}</InlineCode>
+        </ListTable.RowAction>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color="fg.muted" truncate>
           {group.pipelineName ?? "—"}
         </Text>
-      </Table.Cell>
-      <Table.Cell height="49px" textAlign="end">
+      </ListTable.Cell>
+      <ListTable.Cell align="end">
         <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {group.pendingJobs}
         </Text>
-      </Table.Cell>
-      <Table.Cell height="49px" textAlign="end">
+      </ListTable.Cell>
+      <ListTable.Cell align="end">
         <Text
           textStyle="caption"
           fontVariantNumeric="tabular-nums"
@@ -477,13 +501,13 @@ function GroupRow({
         >
           {c.attempt > 0 ? c.attempt : "—"}
         </Text>
-      </Table.Cell>
-      <Table.Cell height="49px">
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color={c.state === "retrying" ? "orange.fg" : "fg.muted"}>
           {describeNextRun(c, now)}
         </Text>
-      </Table.Cell>
-      <Table.Cell height="49px">
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text
           textStyle="xs"
           color={overdue ? "orange.fg" : "fg.muted"}
@@ -492,16 +516,16 @@ function GroupRow({
           {formatTimeAgo(group.oldestJobMs)}
           {overdue ? " ⚠" : ""}
         </Text>
-      </Table.Cell>
-      <Table.Cell height="49px" title={c.isFailing ? (group.errorMessage ?? undefined) : undefined}>
+      </ListTable.Cell>
+      <ListTable.Cell title={c.isFailing ? (group.errorMessage ?? undefined) : undefined}>
         <GroupStateBadge c={c} />
-      </Table.Cell>
+      </ListTable.Cell>
       {hasAccess && (
-        <Table.Cell height="49px" onClick={(e) => e.stopPropagation()}>
+        <ListTable.ActionCell>
           <Menu.Root>
             <Menu.Trigger asChild>
               <Button size="sm" variant="ghost" aria-label={`Actions for ${group.groupId}`}>
-                <MoreVertical size={14} />
+                <MoreVerticalIcon size={14} />
               </Button>
             </Menu.Trigger>
             <Menu.Content>
@@ -570,9 +594,9 @@ function GroupRow({
               </Menu.Item>
             </Menu.Content>
           </Menu.Root>
-        </Table.Cell>
+        </ListTable.ActionCell>
       )}
-    </Table.Row>
+    </ListTable.Row>
   );
 }
 

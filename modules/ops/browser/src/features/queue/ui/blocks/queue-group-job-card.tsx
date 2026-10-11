@@ -1,14 +1,7 @@
+import { Card } from "@langwatch/design-system/card";
 import { IdText } from "@langwatch/design-system/id-text";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
 import { useState } from "react";
 
@@ -158,22 +151,20 @@ export function GroupJobCard({
     context?.traceId && traceUrlForTraceId ? traceUrlForTraceId(context.traceId) : null;
 
   return (
-    <Card.Root variant="outline">
-      <Card.Body padding={2.5} gap={2}>
-        <JobHeaderRow
-          job={job}
-          now={now}
-          showJson={showJson}
-          onToggleJson={() => setShowJson((v) => !v)}
-        />
-        <JobChipsRow job={job} />
-        {context && <JobContextRows context={context} traceHref={traceHref} />}
-        {showJson && job.data && (
-          <Box bg="bg.subtle" borderRadius="sm" padding={2} maxHeight="280px" overflow="auto">
-            <JsonViewer data={job.data} maxHeight="280px" />
-          </Box>
-        )}
-      </Card.Body>
-    </Card.Root>
+    <Card padding="sm" bodyLayout="spaced">
+      <JobHeaderRow
+        job={job}
+        now={now}
+        showJson={showJson}
+        onToggleJson={() => setShowJson((v) => !v)}
+      />
+      <JobChipsRow job={job} />
+      {context && <JobContextRows context={context} traceHref={traceHref} />}
+      {showJson && job.data && (
+        <Box bg="bg.subtle" borderRadius="sm" padding={2} maxHeight="280px" overflow="auto">
+          <JsonViewer data={job.data} maxHeight="280px" />
+        </Box>
+      )}
+    </Card>
   );
 }

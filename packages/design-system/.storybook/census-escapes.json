@@ -292,5 +292,21 @@
     "reason": "Show N more expands rows already in memory; it never loads a page (X3e2 review).",
     "owner": "scim",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/ui/elements/ops-virtualized-table-rows.tsx",
+    "rule": "restyle",
+    "line": 68,
+    "reason": "False positive: height is ListTable.PaddingRow's required virtual-scroll spacer prop, not a style override (X4q review).",
+    "owner": "ops",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/ui/elements/ops-virtualized-table-rows.tsx",
+    "rule": "restyle",
+    "line": 72,
+    "reason": "False positive: height is ListTable.PaddingRow's required virtual-scroll spacer prop, not a style override (X4q review).",
+    "owner": "ops",
+    "disposition": "reviewed"
   }
 ]

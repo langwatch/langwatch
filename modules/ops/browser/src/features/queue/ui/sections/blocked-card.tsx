@@ -1,15 +1,7 @@
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
-import {
-  Box,
-  Button,
-  Card,
-  HStack,
-  Input,
-  Spacer,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Input, Spacer, Text } from "@langwatch/design-system/primitives";
 import { useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -101,160 +93,166 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
 
   return (
     <>
-      <Card.Root borderColor="border.muted" boxShadow="none">
-        <Card.Body padding={0}>
-          <HStack
-            paddingX={4}
-            paddingY={2.5}
-            borderBottom="1px solid"
-            borderBottomColor="border"
-            gap={2}
-            flexWrap="wrap"
-          >
-            <Text textStyle="sm" fontWeight="medium" color="fg.error">
-              Blocked: {blocked.totalBlocked} groups, {clusters.length} error patterns
-            </Text>
-            <Spacer />
-            {hasAccess && (
-              <HStack gap={1.5} flexWrap="wrap">
-                {queuesWithBlocked.map((q) => (
-                  <Button
-                    key={q.name}
-                    variant="outline"
-                    size="sm"
-                    colorPalette="orange"
-                    onClick={() => setUnblockAllTarget(q.name)}
-                  >
-                    Unblock All ({q.blockedGroupCount})
-                  </Button>
-                ))}
-                {queuesWithBlocked.map((q) => (
-                  <Button
-                    key={`dlq-${q.name}`}
-                    variant="outline"
-                    size="sm"
-                    colorPalette="red"
-                    onClick={() => setMoveToDlqTarget(q.name)}
-                  >
-                    → DLQ
-                  </Button>
-                ))}
-                <HStack gap={1}>
-                  <Text textStyle="xs" color="fg.muted">
-                    Canary:
-                  </Text>
-                  <Input
-                    size="sm"
-                    type="number"
-                    value={canaryCount}
-                    onChange={(e) =>
-                      setCanaryCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 5)))
-                    }
-                    width="50px"
-                  />
-                  {queuesWithBlocked.map((q) => (
-                    <Button
-                      key={`c-${q.name}`}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setCanaryQueueTarget(q.name)}
-                    >
-                      Go
-                    </Button>
-                  ))}
-                </HStack>
-              </HStack>
-            )}
-          </HStack>
-
-          <Box ref={scrollContainerRef} maxHeight={`${BLOCKED_VIEWPORT_HEIGHT}px`} overflowY="auto">
-            <ListTable
-              density="compact"
-              columnRules={false}
-              containerProps={{ overflow: "visible" }}
-              size="sm"
-              variant="embedded"
-            >
-              <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
-                <Table.Row>
-                  <Table.ColumnHeader width="60px" textAlign="end">
-                    Count
-                  </Table.ColumnHeader>
-                  <Table.ColumnHeader>Error</Table.ColumnHeader>
-                  <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                  <Table.ColumnHeader>Sample groups</Table.ColumnHeader>
-                  <Table.ColumnHeader width="60px">Actions</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                <VirtualizedTableRows
-                  count={clusters.length}
-                  rowHeight={BLOCKED_ROW_HEIGHT}
-                  columnCount={5}
-                  scrollContainerRef={scrollContainerRef}
-                  getItemKey={(i) => {
-                    const c = clusters[i]!;
-                    return `${c.queueName}::${c.normalizedMessage}`;
-                  }}
-                  renderRow={(i) => {
-                    const cluster = clusters[i]!;
-                    const rowKey = `${cluster.queueName}::${cluster.normalizedMessage}`;
-                    return (
-                      <Table.Row key={rowKey}>
-                        <Table.Cell height="49px" textAlign="end">
-                          <Text color="fg.error" fontWeight="medium" textStyle="xs">
-                            {cluster.count}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell height="49px">
-                          <Text
-                            textStyle="xs"
-                            truncate
-                            maxWidth="300px"
-                            title={cluster.sampleMessage}
-                          >
-                            {cluster.sampleMessage}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell height="49px">
-                          <Text textStyle="xs" color="fg.muted">
-                            {cluster.pipelineName ?? "—"}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell height="49px">
-                          <Text textStyle="monoSm" truncate maxWidth="160px">
-                            {cluster.sampleGroupIds.slice(0, 2).join(", ")}
-                            {cluster.sampleGroupIds.length > 2
-                              ? ` +${cluster.sampleGroupIds.length - 2}`
-                              : ""}
-                          </Text>
-                        </Table.Cell>
-                        <Table.Cell height="49px">
-                          {cluster.sampleGroupIds[0] && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              colorPalette="red"
-                              onClick={() =>
-                                setDrainTarget({
-                                  queueName: cluster.queueName,
-                                  groupId: cluster.sampleGroupIds[0]!,
-                                })
-                              }
-                            >
-                              Drain
-                            </Button>
-                          )}
-                        </Table.Cell>
-                      </Table.Row>
-                    );
-                  }}
+      <Card padding="none">
+        <HStack
+          paddingX={4}
+          paddingY={2.5}
+          borderBottom="1px solid"
+          borderBottomColor="border"
+          gap={2}
+          flexWrap="wrap"
+        >
+          <Text textStyle="sm" fontWeight="medium" color="fg.error">
+            Blocked: {blocked.totalBlocked} groups, {clusters.length} error patterns
+          </Text>
+          <Spacer />
+          {hasAccess && (
+            <HStack gap={1.5} flexWrap="wrap">
+              {queuesWithBlocked.map((q) => (
+                <Button
+                  key={q.name}
+                  variant="outline"
+                  size="sm"
+                  colorPalette="orange"
+                  onClick={() => setUnblockAllTarget(q.name)}
+                >
+                  Unblock All ({q.blockedGroupCount})
+                </Button>
+              ))}
+              {queuesWithBlocked.map((q) => (
+                <Button
+                  key={`dlq-${q.name}`}
+                  variant="outline"
+                  size="sm"
+                  colorPalette="red"
+                  onClick={() => setMoveToDlqTarget(q.name)}
+                >
+                  → DLQ
+                </Button>
+              ))}
+              <HStack gap={1}>
+                <Text textStyle="xs" color="fg.muted">
+                  Canary:
+                </Text>
+                <Input
+                  size="sm"
+                  type="number"
+                  value={canaryCount}
+                  onChange={(e) =>
+                    setCanaryCount(Math.max(1, Math.min(100, parseInt(e.target.value) || 5)))
+                  }
+                  width="50px"
                 />
-              </Table.Body>
-            </ListTable>
-          </Box>
-        </Card.Body>
-      </Card.Root>
+                {queuesWithBlocked.map((q) => (
+                  <Button
+                    key={`c-${q.name}`}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCanaryQueueTarget(q.name)}
+                  >
+                    Go
+                  </Button>
+                ))}
+              </HStack>
+            </HStack>
+          )}
+        </HStack>
+
+        <Box
+          as="section"
+          ref={scrollContainerRef}
+          aria-label="Blocked error patterns"
+          tabIndex={0}
+          maxHeight={`${BLOCKED_VIEWPORT_HEIGHT}px`}
+          overflowY="auto"
+        >
+          <ListTable
+            density="compact"
+            variant="embedded"
+            scroll="external"
+            stickyHeader
+            rowHeight={BLOCKED_ROW_HEIGHT}
+            aria-rowcount={clusters.length + 1}
+          >
+            <ListTable.Header>
+              <ListTable.Row aria-rowindex={1}>
+                <ListTable.ColumnHeader width="60px" align="end">
+                  Count
+                </ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Error</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Pipeline</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Sample groups</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader width="60px">Actions</ListTable.ColumnHeader>
+              </ListTable.Row>
+            </ListTable.Header>
+            <ListTable.Body>
+              <VirtualizedTableRows
+                count={clusters.length}
+                rowHeight={BLOCKED_ROW_HEIGHT}
+                columnCount={5}
+                scrollContainerRef={scrollContainerRef}
+                getItemKey={(i) => {
+                  const c = clusters[i]!;
+                  return `${c.queueName}::${c.normalizedMessage}`;
+                }}
+                renderRow={(i) => {
+                  const cluster = clusters[i]!;
+                  const rowKey = `${cluster.queueName}::${cluster.normalizedMessage}`;
+                  return (
+                    <ListTable.Row key={rowKey} aria-rowindex={i + 2}>
+                      <ListTable.Cell align="end">
+                        <Text color="fg.error" fontWeight="medium" textStyle="xs">
+                          {cluster.count}
+                        </Text>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
+                        <Text
+                          textStyle="xs"
+                          truncate
+                          maxWidth="300px"
+                          title={cluster.sampleMessage}
+                        >
+                          {cluster.sampleMessage}
+                        </Text>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
+                        <Text textStyle="xs" color="fg.muted">
+                          {cluster.pipelineName ?? "—"}
+                        </Text>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
+                        <Text textStyle="monoSm" truncate maxWidth="160px">
+                          {cluster.sampleGroupIds.slice(0, 2).join(", ")}
+                          {cluster.sampleGroupIds.length > 2
+                            ? ` +${cluster.sampleGroupIds.length - 2}`
+                            : ""}
+                        </Text>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
+                        {cluster.sampleGroupIds[0] && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            colorPalette="red"
+                            onClick={() =>
+                              setDrainTarget({
+                                queueName: cluster.queueName,
+                                groupId: cluster.sampleGroupIds[0]!,
+                              })
+                            }
+                          >
+                            Drain
+                          </Button>
+                        )}
+                      </ListTable.Cell>
+                    </ListTable.Row>
+                  );
+                }}
+              />
+            </ListTable.Body>
+          </ListTable>
+        </Box>
+      </Card>
 
       <ConfirmDialog
         open={!!unblockAllTarget}

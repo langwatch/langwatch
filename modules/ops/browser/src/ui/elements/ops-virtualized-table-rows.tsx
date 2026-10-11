@@ -1,5 +1,5 @@
 /** VirtualizedTableRows via spacer rows; non-virtualized render for small tables. */
-import { Table } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Fragment, type ReactNode, type RefObject, useCallback } from "react";
 
@@ -65,25 +65,11 @@ export function VirtualizedTableRows({
 
   return (
     <>
-      {paddingTop > 0 && (
-        <Table.Row>
-          <Table.Cell
-            colSpan={columnCount}
-            style={{ height: `${paddingTop}px`, padding: 0, border: "none" }}
-          />
-        </Table.Row>
-      )}
+      {paddingTop > 0 && <ListTable.PaddingRow columns={columnCount} height={paddingTop} />}
       {virtualItems.map((vi) => (
         <Fragment key={vi.key}>{renderRow(vi.index)}</Fragment>
       ))}
-      {paddingBottom > 0 && (
-        <Table.Row>
-          <Table.Cell
-            colSpan={columnCount}
-            style={{ height: `${paddingBottom}px`, padding: 0, border: "none" }}
-          />
-        </Table.Row>
-      )}
+      {paddingBottom > 0 && <ListTable.PaddingRow columns={columnCount} height={paddingBottom} />}
     </>
   );
 }

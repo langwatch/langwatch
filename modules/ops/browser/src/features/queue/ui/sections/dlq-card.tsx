@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -6,11 +7,9 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   HStack,
   Input,
   Spacer,
-  Table,
   Text,
 } from "@langwatch/design-system/primitives";
 import { useRef, useState } from "react";
@@ -203,27 +202,30 @@ export function DlqRow({
   group,
   canManage,
   onAct,
+  rowIndex,
 }: {
   group: DlqRowGroup;
   canManage: boolean;
   onAct: (kind: "redrive" | "discard", group: DlqRowGroup) => void;
+  /** Header-inclusive, 1-based position in a virtualised table. */
+  rowIndex?: number;
 }) {
   return (
-    <Table.Row>
-      <Table.Cell height="49px">
+    <ListTable.Row aria-rowindex={rowIndex}>
+      <ListTable.Cell>
         <Badge size="xs" variant="subtle">
           {group.queueDisplayName}
         </Badge>
-      </Table.Cell>
-      <Table.Cell height="49px">
+      </ListTable.Cell>
+      <ListTable.Cell>
         <InlineCode variant="neutral">{group.groupId}</InlineCode>
-      </Table.Cell>
-      <Table.Cell height="49px">
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color="fg.muted">
           {group.pipelineName ?? "\u2014"}
         </Text>
-      </Table.Cell>
-      <Table.Cell height="49px">
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text
           textStyle="xs"
           color="fg.error"
@@ -233,12 +235,12 @@ export function DlqRow({
         >
           {group.error ?? ""}
         </Text>
-      </Table.Cell>
-      <Table.Cell height="49px" textAlign="end">
+      </ListTable.Cell>
+      <ListTable.Cell align="end">
         <Text textStyle="xs">{group.jobCount}</Text>
-      </Table.Cell>
+      </ListTable.Cell>
       {canManage && (
-        <Table.Cell height="49px">
+        <ListTable.Cell>
           <HStack gap={1}>
             <Button
               variant="outline"
@@ -257,9 +259,9 @@ export function DlqRow({
               Discard
             </Button>
           </HStack>
-        </Table.Cell>
+        </ListTable.Cell>
       )}
-    </Table.Row>
+    </ListTable.Row>
   );
 }
 
@@ -291,46 +293,44 @@ export function DlqCard({ queueNames: _queueNames }: { queueNames: string[] }) {
 
   return (
     <>
-      <Card.Root borderColor="border.muted" boxShadow="none">
-        <Card.Body padding={0}>
-          <DlqCardHeader
-            groupCount={groups.length}
-            shownCount={shownGroups.length}
-            filterText={filterText}
-            onFilterChange={setFilterText}
-            canManage={hasAccess}
-            shownGroups={shownGroups}
-            allGroups={groups}
-            canaryCount={canaryCount}
-            onCanaryCountChange={setCanaryCount}
-            onBulk={(kind, queueName) =>
-              actions.setPending(bulkActionFor({ kind, queueName, shownGroups }))
-            }
-            onCanary={actions.setCanaryTarget}
-          />
+      <Card padding="none">
+        <DlqCardHeader
+          groupCount={groups.length}
+          shownCount={shownGroups.length}
+          filterText={filterText}
+          onFilterChange={setFilterText}
+          canManage={hasAccess}
+          shownGroups={shownGroups}
+          allGroups={groups}
+          canaryCount={canaryCount}
+          onCanaryCountChange={setCanaryCount}
+          onBulk={(kind, queueName) =>
+            actions.setPending(bulkActionFor({ kind, queueName, shownGroups }))
+          }
+          onCanary={actions.setCanaryTarget}
+        />
 
-          <ProcessOutboxDeadRow
-            byProcess={processDead}
-            total={processDeadTotal}
-            hasQueueGroups={groups.length > 0}
-          />
+        <ProcessOutboxDeadRow
+          byProcess={processDead}
+          total={processDeadTotal}
+          hasQueueGroups={groups.length > 0}
+        />
 
-          <DlqTable
-            shownGroups={shownGroups}
-            hidden={groups.length === 0}
-            canManage={hasAccess}
-            scrollContainerRef={scrollContainerRef}
-            onAct={(kind, group) =>
-              actions.setPending({
-                kind,
-                queueName: group.queueName,
-                queueDisplayName: group.queueDisplayName,
-                groupIds: [group.groupId],
-              })
-            }
-          />
-        </Card.Body>
-      </Card.Root>
+        <DlqTable
+          shownGroups={shownGroups}
+          hidden={groups.length === 0}
+          canManage={hasAccess}
+          scrollContainerRef={scrollContainerRef}
+          onAct={(kind, group) =>
+            actions.setPending({
+              kind,
+              queueName: group.queueName,
+              queueDisplayName: group.queueDisplayName,
+              groupIds: [group.groupId],
+            })
+          }
+        />
+      </Card>
 
       <DlqConfirms actions={actions} canaryCount={canaryCount} />
     </>
@@ -426,31 +426,35 @@ function DlqTable({
 }) {
   return (
     <Box
+      as="section"
       ref={scrollContainerRef}
+      aria-label="Dead-letter queue groups"
+      tabIndex={0}
       maxHeight={`${DLQ_VIEWPORT_HEIGHT}px`}
       overflowY="auto"
       hidden={hidden}
     >
       <ListTable
         density="compact"
-        columnRules={false}
-        containerProps={{ overflow: "visible" }}
-        size="sm"
         variant="embedded"
+        scroll="external"
+        stickyHeader
+        rowHeight={DLQ_ROW_HEIGHT}
+        aria-rowcount={shownGroups.length + 1}
       >
-        <Table.Header position="sticky" top={0} zIndex={1} bg="bg.panel">
-          <Table.Row>
-            <Table.ColumnHeader>Queue</Table.ColumnHeader>
-            <Table.ColumnHeader>Group ID</Table.ColumnHeader>
-            <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-            <Table.ColumnHeader>Error</Table.ColumnHeader>
-            <Table.ColumnHeader textAlign="end" width="50px">
+        <ListTable.Header>
+          <ListTable.Row aria-rowindex={1}>
+            <ListTable.ColumnHeader>Queue</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Group ID</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Pipeline</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Error</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader align="end" width="50px">
               Jobs
-            </Table.ColumnHeader>
-            {canManage && <Table.ColumnHeader width="130px">Actions</Table.ColumnHeader>}
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+            </ListTable.ColumnHeader>
+            {canManage && <ListTable.ColumnHeader width="130px">Actions</ListTable.ColumnHeader>}
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           <VirtualizedTableRows
             count={shownGroups.length}
             rowHeight={DLQ_ROW_HEIGHT}
@@ -461,10 +465,15 @@ function DlqTable({
               return `${g.queueName}:${g.groupId}`;
             }}
             renderRow={(i) => (
-              <DlqRow group={shownGroups[i]!} canManage={canManage} onAct={onAct} />
+              <DlqRow
+                group={shownGroups[i]!}
+                canManage={canManage}
+                onAct={onAct}
+                rowIndex={i + 2}
+              />
             )}
           />
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     </Box>
   );
