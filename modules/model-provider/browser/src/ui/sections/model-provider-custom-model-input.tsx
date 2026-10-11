@@ -117,14 +117,14 @@ export const CustomModelInputSection = ({
   state,
   actions,
   provider,
-  dialogBackground,
+  ground,
   showRegistryLink = true,
 }: {
   state: UseModelProviderFormState;
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
-  /** Override DialogContent background (e.g. "bg.surface" for solid on onboarding). */
-  dialogBackground?: string;
+  /** `card` keeps the card ground the onboarding page gives its dialogs. */
+  ground?: "card";
   /** Whether to show the "See all models" link and registry modal. Defaults to true. */
   showRegistryLink?: boolean;
 }) => {
@@ -239,7 +239,7 @@ export const CustomModelInputSection = ({
         onClose={handleCloseModelDialog}
         onSubmit={handleAddModel}
         initialValues={editingChatModel}
-        dialogBackground={dialogBackground}
+        ground={ground}
       />
 
       <AddCustomEmbeddingsModelDialog
@@ -247,7 +247,7 @@ export const CustomModelInputSection = ({
         onClose={handleCloseEmbeddingsDialog}
         onSubmit={handleAddEmbeddingsModel}
         initialValues={editingEmbeddingsModel}
-        dialogBackground={dialogBackground}
+        ground={ground}
       />
 
       {showRegistryLink && (
@@ -255,7 +255,7 @@ export const CustomModelInputSection = ({
           open={registryModalOpen}
           onClose={() => setRegistryModalOpen(false)}
           provider={provider.provider}
-          dialogBackground={dialogBackground}
+          ground={ground}
         />
       )}
     </VStack>
