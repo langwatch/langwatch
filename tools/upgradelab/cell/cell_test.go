@@ -185,3 +185,16 @@ func TestRunSeedGivesEachRunItsOwnIDs(t *testing.T) {
 		t.Fatal("a later run, or the unsalted seed, replays the same ids")
 	}
 }
+
+func TestInDownWindowLeavesOnlyUnavailableLinesInsideTheWindowToH8(t *testing.T) {
+	origin := time.Date(2026, 10, 11, 18, 44, 32, 0, time.UTC)
+	inside := `{"level":"error","time":"2026-10-11T18:46:47.693Z","error":{"type":"ClickHouseUnavailableError"}}`
+	after := `{"level":"error","time":"2026-10-11T18:47:30.000Z","error":{"type":"ClickHouseUnavailableError"}}`
+	unknown := `{"level":"error","time":"2026-10-11T18:46:47.693Z","error":{"type":"UNKNOWN_TABLE"}}`
+	if !inDownWindow(inside, 95_000, 146_000, origin) {
+		t.Fatal("an unavailable line inside the window must go to H8")
+	}
+	if inDownWindow(after, 95_000, 146_000, origin) || inDownWindow(unknown, 95_000, 146_000, origin) || inDownWindow(inside, 0, 0, origin) {
+		t.Fatal("only unavailable lines inside a real window go to H8")
+	}
+}

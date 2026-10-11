@@ -208,7 +208,20 @@ var acceptedLogs = []acceptedLog{
 	{"UpgradeInProgressError", "expected 503 upgrade_in_progress while steps run", true},
 }
 
-var logTime = regexp.MustCompile(`"time":(\d{13})`)
+var logTime = regexp.MustCompile(`"time":"?(\d{13}|\d{4}-\d\d-\d\dT[0-9:.]+Z)"?`)
+
+// lineEpochMs is a log line's pino time (epoch ms or ISO), and whether it had one.
+func lineEpochMs(line string) (int64, bool) {
+	match := logTime.FindStringSubmatch(line)
+	if match == nil {
+		return 0, false
+	}
+	if epoch, err := strconv.ParseInt(match[1], 10, 64); err == nil {
+		return epoch, true
+	}
+	at, err := time.Parse(time.RFC3339Nano, match[1])
+	return at.UnixMilli(), err == nil
+}
 
 // accepts answers the accepted entry that covers line, if any; atMs bounds are ms from origin.
 func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog, bool) {
@@ -219,14 +232,22 @@ func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog,
 		if !each.Window {
 			return each, true
 		}
-		if match := logTime.FindStringSubmatch(line); match != nil && switched >= 0 && ready >= 0 {
-			epoch, _ := strconv.ParseInt(match[1], 10, 64)
+		if epoch, ok := lineEpochMs(line); ok && switched >= 0 && ready >= 0 {
 			if at := epoch - origin.UnixMilli(); at >= switched && at <= ready {
 				return each, true
 			}
 		}
 	}
 	return acceptedLog{}, false
+}
+
+// inDownWindow: a ClickHouse-unavailable error line logged while H8's gate held the private target closed (as N2 does).
+func inDownWindow(line string, downAt, upAt int64, origin time.Time) bool {
+	if upAt <= 0 || !(strings.Contains(line, "ClickHouseUnavailableError") || strings.Contains(line, "clickhouse_unavailable")) {
+		return false
+	}
+	epoch, ok := lineEpochMs(line)
+	return ok && epoch-origin.UnixMilli() >= downAt && epoch-origin.UnixMilli() <= upAt
 }
 
 // logVerdict counts error lines in head's logs: new ones fail I9, accepted ones are counted apart with their reason.
@@ -248,6 +269,10 @@ func (cell *run) logVerdict() Verdict {
 			}
 			if each, ok := accepts(line, switched, ready, cell.origin); ok {
 				accepted[each.Signature+" ("+each.Reason+")"]++
+				continue
+			}
+			if inDownWindow(line, cell.down.downAtMs, cell.down.upAtMs, cell.origin) {
+				accepted["ClickHouseUnavailableError (the private target H8 closed on purpose; judged by H8)"]++
 				continue
 			}
 			counts[name]++
