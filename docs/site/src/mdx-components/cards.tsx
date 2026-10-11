@@ -62,14 +62,14 @@ export function Card({ title, description, icon, href, horizontal, arrow, childr
   );
   return (
     <Box
-      className="docs-card"
+      className="docs-card docs-raised"
       data-compact={compact}
       position="relative"
       display="flex"
       flexDirection={horizontal || compact ? "row" : "column"}
       alignItems={compact ? "center" : alignment}
-      gap="3"
-      padding={compact ? "4" : "5"}
+      gap="4"
+      padding={compact ? "5" : "6"}
       minHeight={compact ? "64px" : void 0}
       borderWidth="1px"
       borderColor="border"
@@ -140,7 +140,7 @@ export function CardGroup({
       <Box
         className="docs-card-grid"
         display="grid"
-        alignItems="start"
+        alignItems="stretch"
         gap="4"
         css={{
           gridTemplateColumns: "minmax(0, 1fr)",

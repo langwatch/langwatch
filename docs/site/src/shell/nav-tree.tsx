@@ -22,7 +22,7 @@ function methodOf({ slug }: { slug: string }): string | null {
 }
 
 function indent({ depth }: { depth: number }) {
-  return `calc(1rem + ${Math.min(Math.max(depth - 1, 0), 3) * 0.75}rem)`;
+  return `calc(0.75rem + ${Math.min(Math.max(depth - 1, 0), 3) * 0.75}rem)`;
 }
 
 function NavMethod({ method }: { method: string }) {
@@ -67,16 +67,17 @@ function PageRow({
         display="flex"
         gap="2"
         alignItems="baseline"
-        minHeight={{ base: "44px", lg: "36px" }}
+        minHeight={{ base: "44px", lg: "38px" }}
         paddingY="2"
-        paddingX="4"
+        paddingX="3"
         paddingInlineStart={indent({ depth })}
-        borderRadius="full"
+        borderRadius="md"
         fontSize="14px"
         lineHeight="20px"
         textDecoration="none"
         color={active ? "accent.fg" : "nav.fg"}
         fontWeight={active ? "600" : "400"}
+        boxShadow={active ? "inset 2px 0 0 var(--chakra-colors-accent-fg)" : void 0}
         bg={active ? "accent.subtle" : undefined}
         _hover={{ bg: active ? "accent.subtle" : "bg.hover", textDecoration: "none" }}
       >
@@ -110,7 +111,7 @@ function GroupRow({
         <Text
           as="p"
           margin="0"
-          paddingX="4"
+          paddingX="3"
           paddingBottom="2"
           fontSize="14px"
           lineHeight="20px"
@@ -134,11 +135,11 @@ function GroupRow({
         alignItems="center"
         justifyContent="space-between"
         gap="2"
-        minHeight={{ base: "44px", lg: "36px" }}
+        minHeight={{ base: "44px", lg: "38px" }}
         paddingY="2"
-        paddingX="4"
+        paddingX="3"
         paddingInlineStart={indent({ depth })}
-        borderRadius="full"
+        borderRadius="md"
         fontSize="14px"
         lineHeight="20px"
         fontWeight="500"
@@ -154,7 +155,15 @@ function GroupRow({
           style={{ transform: open ? "rotate(90deg)" : undefined, flexShrink: 0 }}
         />
       </chakra.button>
-      <Box hidden={!open} data-docs-panel="">
+      <Box
+        hidden={!open}
+        data-docs-panel=""
+        borderInlineStartWidth="1px"
+        borderColor="border"
+        marginInlineStart="3"
+        marginTop="1"
+        marginBottom="2"
+      >
         <NavList items={item.children} current={current} depth={depth + 1} />
       </Box>
     </Box>

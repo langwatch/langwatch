@@ -24,3 +24,15 @@ export function bodyText({ html }) {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+export function searchEntry({ nav, slug, html, headings }) {
+  const meta = nav.pages[slug];
+  return {
+    slug,
+    title: meta.title,
+    description: meta.description,
+    ...searchTrail({ nav, slug }),
+    body: bodyText({ html }),
+    headings: headings.map(({ id, text }) => ({ id, text })),
+  };
+}

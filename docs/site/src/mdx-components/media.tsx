@@ -1,4 +1,5 @@
-import { Box, Link, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, Link, Text } from "@langwatch/design-system/primitives";
+import { Play } from "lucide-react";
 import { Children, isValidElement, useEffect, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 
@@ -40,6 +41,8 @@ export function DocsImage({ className, alt, src, width, ...rest }: ComponentProp
 
 export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video">) {
   const ref = useRef<HTMLVideoElement>(null);
+  const [started, setStarted] = useState(false);
+  const [failed, setFailed] = useState(false);
   const introduction = Children.toArray(children).some(
     (child) =>
       isValidElement<{ src?: string }>(child) &&
@@ -54,24 +57,70 @@ export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video
       ref.current?.play().catch(() => {});
     }
   }, [autoPlay, introduction]);
+  const playbackFailed = () => {
+    setStarted(false);
+    setFailed(true);
+  };
+  const start = async () => {
+    if (failed) ref.current?.load();
+    setFailed(false);
+    setStarted(true);
+    try {
+      await ref.current?.play();
+    } catch {
+      playbackFailed();
+    }
+  };
   return (
-    <Box as="figure" marginY="8" maxWidth="720px" marginX="auto">
-      <video
-        ref={ref}
-        playsInline
-        preload={introduction ? "none" : "metadata"}
-        poster={introduction ? "/posters/introduction.jpg" : rest.poster}
-        style={{
-          display: "block",
-          width: "100%",
-          height: "auto",
-          borderRadius: "var(--chakra-radii-showcase)",
-        }}
-        {...rest}
-        muted
-      >
-        {children}
-      </video>
+    <Box as="figure" marginY="8" maxWidth="none" marginX="auto">
+      <Box position="relative">
+        <video
+          ref={ref}
+          playsInline
+          preload={introduction ? "none" : "metadata"}
+          poster={introduction ? "/posters/introduction.jpg" : rest.poster}
+          style={{
+            display: "block",
+            width: "100%",
+            height: "auto",
+            borderRadius: "var(--chakra-radii-xl)",
+            boxShadow: "0 8px 24px var(--chakra-colors-docs-shadow-strong)",
+          }}
+          {...rest}
+          onErrorCapture={playbackFailed}
+          controls={introduction ? started : rest.controls}
+          muted
+        >
+          {children}
+        </video>
+        {introduction && !started ? (
+          <Box
+            position="absolute"
+            inset="0"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Button
+              onClick={start}
+              minHeight="48px"
+              borderRadius="full"
+              paddingX="6"
+              bg="docs.paper"
+              color="fg"
+              boxShadow="0 4px 24px var(--chakra-colors-docs-shadow-strong)"
+              _hover={{ bg: "bg.subtle" }}
+            >
+              <Play size={17} aria-hidden="true" /> Watch the product tour
+            </Button>
+          </Box>
+        ) : null}
+      </Box>
+      {failed ? (
+        <Text role="alert" color="red.fg" fontSize="14px" marginTop="3">
+          The video could not load. Try playing it again.
+        </Text>
+      ) : null}
       {introduction ? (
         <Text as="figcaption" marginTop="3" fontSize="13px" lineHeight="20px" color="fg.muted">
           Follow a request through its trace, inspect each span and see where time is spent.

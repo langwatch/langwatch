@@ -1,7 +1,7 @@
 Feature: Generate and run the documentation site
   The same docs.json, MDX and OpenAPI sources drive local development and the static build.
 
-  @unimplemented
+  @e2e
   Scenario: Build all configured documentation
     When the documentation build command succeeds
     Then every configured page has static HTML and Markdown
@@ -27,7 +27,7 @@ Feature: Generate and run the documentation site
     When docs.json or an OpenAPI document changes
     Then navigation and API pages reflect the changed source without restarting the server
 
-  @unimplemented
+  @e2e
   Scenario: Serve directory URLs consistently
     Given the static build is served by preview
     When a reader opens a page with or without a trailing slash

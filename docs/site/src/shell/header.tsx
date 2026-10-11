@@ -1,7 +1,7 @@
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, Button, Flex, IconButton, Link, Text } from "@langwatch/design-system/primitives";
-import { Menu as MenuIcon, Search } from "lucide-react";
+import { ArrowUpRight, Menu as MenuIcon, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { site } from "../lib/nav-model.ts";
@@ -28,11 +28,6 @@ export function Header({
   onMenu: () => void;
 }) {
   const shortcut = useShortcutLabel();
-  const quiet = {
-    color: "fg.muted",
-    textDecoration: "none",
-    _hover: { color: "fg", textDecoration: "none" },
-  };
   return (
     <Box
       as="header"
@@ -41,10 +36,10 @@ export function Header({
       zIndex="sticky"
       data-kind={kind}
       borderBottomWidth="1px"
-      borderColor="border.muted"
+      borderColor="border"
       css={{
-        backgroundColor: "color-mix(in srgb, var(--chakra-colors-bg-surface) 84%, transparent)",
-        backdropFilter: "blur(24px)",
+        backgroundColor: "var(--chakra-colors-docs-chrome)",
+        backdropFilter: "blur(32px) saturate(150%)",
         "@media (forced-colors: active), (prefers-reduced-transparency: reduce)": {
           backgroundColor: "var(--chakra-colors-bg-surface)",
           backdropFilter: "none",
@@ -58,8 +53,8 @@ export function Header({
         maxWidth={FRAME_MAX.endpoint}
         marginX="auto"
         paddingX={GUTTER}
-        height={{ base: "56px", lg: "64px" }}
-        gridTemplateColumns={{ lg: "1fr minmax(15rem, 27.5rem) 1fr" }}
+        height={{ base: "56px", lg: "72px" }}
+        gridTemplateColumns={{ lg: "1fr minmax(15rem, 28rem) 1fr" }}
       >
         <Flex alignItems="center" gap="1" paddingInlineStart={{ base: "0", lg: "4" }}>
           <IconButton
@@ -94,13 +89,13 @@ export function Header({
           alignItems="center"
           justifyContent="flex-start"
           gap="2"
-          height="38px"
+          height="42px"
           width="100%"
-          borderRadius="xl"
+          borderRadius="lg"
           paddingX="3"
           fontWeight="400"
           color="fg.muted"
-          bg="bg.surface"
+          bg="docs.raised"
         >
           <Search size={16} aria-hidden="true" />
           <Text as="span" flex="1" textAlign="start" fontSize="14px">
@@ -111,7 +106,7 @@ export function Header({
         <Flex
           alignItems="center"
           justifyContent="flex-end"
-          gap={{ base: "1", lg: "5" }}
+          gap={{ base: "1", lg: "4" }}
           marginInlineStart={{ base: "auto", lg: "0" }}
         >
           <IconButton
@@ -125,29 +120,26 @@ export function Header({
           >
             <Search size={20} aria-hidden="true" />
           </IconButton>
-          <Link
-            href={site.llms}
-            display={{ base: "none", lg: "inline-flex" }}
-            alignItems="center"
-            minHeight="44px"
-            fontSize="14px"
-            {...quiet}
-          >
-            llms.txt
-          </Link>
+          <Box display={{ base: "none", xl: "block" }}>
+            <GithubLink compact />
+          </Box>
           <Link
             href={site.signIn}
             display={{ base: "none", lg: "inline-flex" }}
             alignItems="center"
-            minHeight="44px"
+            gap="2"
+            minHeight="40px"
+            paddingX="4"
+            borderRadius="lg"
+            bg="fg"
+            color="bg.surface"
             fontSize="14px"
-            {...quiet}
+            fontWeight="600"
+            textDecoration="none"
+            _hover={{ bg: "docs.body", textDecoration: "none" }}
           >
-            Sign In
+            Open app <ArrowUpRight size={15} aria-hidden="true" />
           </Link>
-          <Box display={{ base: "none", lg: "block" }}>
-            <GithubLink compact />
-          </Box>
           <ThemeMenu />
         </Flex>
       </Box>

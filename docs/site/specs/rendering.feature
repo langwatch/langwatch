@@ -34,3 +34,31 @@ Feature: Read and navigate the generated documentation
     Then the API key field is visible and masked
     And no request is sent until the reader chooses Send request
     And missing required values prevent sending
+
+  @unimplemented
+  Scenario: Start with a coding agent
+    Given the reader opens the introduction
+    Then the product video appears before Quick Start
+    And the video waits for the reader to start playback
+    When the reader selects Claude Code, Codex or Cursor
+    Then the setup instructions name the selected agent
+    When the reader copies the setup prompt
+    Then the clipboard contains the full authored tracing prompt
+    And the setup panel reports success
+
+  @unimplemented
+  Scenario: Recover from unavailable browser capabilities
+    Given the introduction is open
+    When clipboard access fails
+    Then the setup panel links to the skills directory for manual copying
+    When product video playback fails
+    Then the poster and play control remain available
+    And the reader sees a playback error
+
+  @unimplemented
+  Scenario: Navigate on a small screen
+    Given the reader opens navigation on a small screen
+    Then the section list and page tree appear in a modal drawer
+    And the page tree can scroll to its final item
+    When the reader presses Escape
+    Then the drawer closes and focus returns to the navigation button

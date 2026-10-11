@@ -16,7 +16,7 @@ export function SideNav({
   return (
     <>
       <SectionAnchors active={active} />
-      <Box marginTop="6">
+      <Box marginTop="7" paddingTop="6" borderTopWidth="1px" borderColor="border">
         {active ? <NavTree items={active.children} current={slug} id={treeId} /> : null}
       </Box>
     </>

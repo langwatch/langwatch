@@ -15,7 +15,7 @@ import { lucideRoot } from "./ds-deps.mjs";
 const siteRoot = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 export const docsRoot = path.resolve(siteRoot, "..");
-export function createViteConfig({ sourceRoot = docsRoot } = {}) {
+export function createViteConfig({ sourceRoot = docsRoot, outDir = "dist" } = {}) {
   let operationSlugs;
   const openapiBySlug = () => (operationSlugs ??= openapiPages({ docsRoot: sourceRoot }));
   return {
@@ -24,7 +24,7 @@ export function createViteConfig({ sourceRoot = docsRoot } = {}) {
     plugins: [
       docsNavPlugin({ docsRoot: sourceRoot }),
       docsOpenapiPlugin({ docsRoot: sourceRoot, openapiBySlug }),
-      docsMdxPlugin(),
+      docsMdxPlugin({ docsRoot: sourceRoot }),
       react({ include: /\.(tsx|jsx|mdx)$/ }),
       docsDevPlugin({ docsRoot: sourceRoot }),
       docsPagesPlugin({
@@ -49,7 +49,7 @@ export function createViteConfig({ sourceRoot = docsRoot } = {}) {
       fs: { allow: [path.resolve(docsRoot, ".."), sourceRoot] },
       watch: { ignored: ["**/site/dist/**", "**/site/dist-ssr/**"] },
     },
-    build: { outDir: "dist", emptyOutDir: true },
+    build: { outDir, emptyOutDir: true },
   };
 }
 

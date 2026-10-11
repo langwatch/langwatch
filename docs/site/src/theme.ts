@@ -12,8 +12,16 @@ export const docsSystem = createDesignSystem(
       semanticTokens: {
         colors: {
           docs: {
-            paper: colour({ light: "#fffefc", dark: "#16181b" }),
-            canvas: { value: "{colors.docs.paper}" },
+            paper: colour({ light: "#fffefa", dark: "#181a1e" }),
+            canvas: colour({ light: "#efeee9", dark: "#0a0a0c" }),
+            sidebar: colour({ light: "#f7f6f2", dark: "#14161a" }),
+            raised: colour({ light: "#ffffff", dark: "#202328" }),
+            chrome: colour({ light: "#fffefae6", dark: "#14161ad9" }),
+            shadow: colour({ light: "#30251814", dark: "#00000055" }),
+            shadowStrong: colour({ light: "#30251821", dark: "#00000080" }),
+            meshBlue: colour({ light: "#cddcf9", dark: "#1e3a8a" }),
+            meshWarm: colour({ light: "#ffaf6e", dark: "#c97b3a" }),
+            meshRust: colour({ light: "#edc8be", dark: "#b85240" }),
             primary: colour({ light: "#e17100", dark: "#fe9a00" }),
             controlBorder: colour({ light: "#87817b", dark: "#77736f" }),
             body: colour({ light: "#3b3835", dark: "#d6d3d0" }),
@@ -22,8 +30,8 @@ export const docsSystem = createDesignSystem(
             tile: colour({ light: "#ecebe8", dark: "#24272b" }),
             action: colour({ light: "#26694d", dark: "#26694d" }),
             actionText: colour({ light: "#ffffff", dark: "#ffffff" }),
-            banner: colour({ light: "#e17100", dark: "#e17100" }),
-            bannerText: colour({ light: "#09090b", dark: "#09090b" }),
+            banner: colour({ light: "#232a32", dark: "#101216" }),
+            bannerText: colour({ light: "#f8f6f2", dark: "#efede9" }),
             rule: colour({
               light: "linear-gradient(90deg, #cddcf9, #ffaf6e, transparent)",
               dark: "linear-gradient(90deg, #3b5bdb, #c97b3a, transparent)",

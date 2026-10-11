@@ -6,12 +6,14 @@ import { promisify } from "node:util";
 import { build } from "vite";
 
 import { createViteConfig } from "../vite.config.mjs";
+import { readBuildOptions } from "./options.mjs";
 
+const { outDir } = readBuildOptions();
 const run = promisify(execFile);
 const ssrDir = fileURLToPath(new URL("../dist-ssr", import.meta.url));
 await rm(ssrDir, { recursive: true, force: true });
 try {
-  await build({ ...createViteConfig(), configFile: false, logLevel: "warn" });
+  await build({ ...createViteConfig({ outDir }), configFile: false, logLevel: "warn" });
   await build({
     ...createViteConfig(),
     configFile: false,
@@ -25,6 +27,8 @@ try {
   });
   const { stdout, stderr } = await run(process.execPath, [
     fileURLToPath(new URL("../dist-ssr/prerender.js", import.meta.url)),
+    "--out-dir",
+    outDir,
   ]);
   process.stdout.write(stdout);
   process.stderr.write(stderr);

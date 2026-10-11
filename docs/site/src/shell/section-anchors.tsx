@@ -1,39 +1,38 @@
-import { Box, Flex, Link, Text } from "@langwatch/design-system/primitives";
+import { Box, Link, Text } from "@langwatch/design-system/primitives";
+import {
+  Activity,
+  Blocks,
+  BookOpen,
+  Bot,
+  Braces,
+  LifeBuoy,
+  Route,
+  Server,
+  ShieldCheck,
+  SquareTerminal,
+} from "lucide-react";
 
-import { GenericIcon, ICONS } from "../lib/icon-registry.tsx";
+const SECTION_ICONS = {
+  Platform: BookOpen,
+  Observability: Activity,
+  "AI Gateway": Route,
+  "AI Governance": ShieldCheck,
+  "Coding Agents": SquareTerminal,
+  Langy: Bot,
+  "Self Hosting": Server,
+  "API Reference": Braces,
+  "Get Support": LifeBuoy,
+};
 import { firstSlug, sections, support } from "../lib/nav-model.ts";
 import type { Section } from "../lib/nav-model.ts";
 
-function Tile({ icon, selected }: { icon: string; selected: boolean }) {
-  const Glyph = ICONS[icon] ?? GenericIcon;
-  return (
-    <Flex
-      aria-hidden="true"
-      alignItems="center"
-      justifyContent="center"
-      flexShrink={0}
-      width="1.75rem"
-      height="1.75rem"
-      borderRadius="lg"
-      bg={selected ? "docs.primary" : "docs.tile"}
-      color={selected ? "accent.onSolid" : "fg"}
-    >
-      <Glyph size={16} />
-    </Flex>
-  );
+function SectionGlyph({ title }: { title: string }) {
+  const entry = Object.entries(SECTION_ICONS).find(([label]) => label === title);
+  const Glyph = entry?.[1] ?? Blocks;
+  return <Glyph size={19} strokeWidth={1.7} aria-hidden="true" />;
 }
 
-function AnchorLink({
-  href,
-  title,
-  icon,
-  selected,
-}: {
-  href: string;
-  title: string;
-  icon: string;
-  selected: boolean;
-}) {
+function AnchorLink({ href, title, selected }: { href: string; title: string; selected: boolean }) {
   return (
     <Link
       href={href}
@@ -41,17 +40,19 @@ function AnchorLink({
       display="flex"
       alignItems="center"
       gap="3"
-      minHeight={{ base: "44px", lg: "40px" }}
-      paddingX="4"
-      borderRadius="lg"
+      minHeight={{ base: "44px", lg: "39px" }}
+      paddingX="3"
+      borderRadius="md"
       fontSize="14px"
       lineHeight="20px"
       textDecoration="none"
       color={selected ? "accent.fg" : "nav.fg"}
-      fontWeight={selected ? "600" : "400"}
+      fontWeight={selected ? "600" : "450"}
+      bg={selected ? "accent.subtle" : "transparent"}
+      marginBottom="1"
       _hover={{ bg: "bg.hover", textDecoration: "none" }}
     >
-      <Tile icon={icon} selected={selected} />
+      <SectionGlyph title={title} />
       <Text as="span">{title}</Text>
     </Link>
   );
@@ -68,7 +69,6 @@ export function SectionAnchors({ active }: { active: Section | undefined }) {
               <AnchorLink
                 href={`/${firstSlug({ items: section.children })}`}
                 title={section.title}
-                icon={section.icon}
                 selected={section === active}
               />
             </Box>
@@ -79,7 +79,7 @@ export function SectionAnchors({ active }: { active: Section | undefined }) {
         <Box as="ul" margin="0" padding="0">
           {support.map((link) => (
             <Box as="li" key={link.title} listStyleType="none">
-              <AnchorLink href={link.href} title={link.title} icon={link.icon} selected={false} />
+              <AnchorLink href={link.href} title={link.title} selected={false} />
             </Box>
           ))}
         </Box>

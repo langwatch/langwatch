@@ -129,7 +129,7 @@ export function PageHeader({
   kind: PageKind;
 }) {
   return (
-    <Box paddingTop={{ base: "6", xl: "10" }} paddingBottom="0">
+    <Box paddingTop={{ base: "7", xl: "10" }} paddingBottom="0">
       <Box className="docs-page-header">
         <Flex
           alignItems="center"
@@ -162,7 +162,7 @@ export function PageHeader({
         </Heading>
         {description ? (
           <Text
-            marginTop="2"
+            marginTop="4"
             marginBottom="0"
             position="relative"
             fontSize="18px"

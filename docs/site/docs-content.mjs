@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 function classOf({ node }) {
   return node.attributes?.find((attribute) => attribute.name === "className")?.value ?? "";
 }
@@ -49,28 +52,37 @@ function skillCard({ node }) {
   };
 }
 
+function adaptSkillCards({ node }) {
+  if (!node.children) return;
+  node.children = node.children.map((child) => {
+    const classes = String(classOf({ node: child })).split(" ");
+    if (classes.includes("lw-accordion")) return skillCard({ node: child });
+    adaptSkillCards({ node: child });
+    return child;
+  });
+}
+
+function introduceSetup({ tree, file }) {
+  if (!file.path?.endsWith("/introduction.mdx")) return;
+  const group = tree.children.find((node) => node.name === "CardGroup");
+  if (!group) return;
+  const skills = readFileSync(path.join(path.dirname(file.path), "skills/directory.mdx"), "utf8");
+  const prompt = skills.match(/````text\n([\s\S]*?)\n````/)?.[1];
+  if (!prompt) return;
+  group.name = "AgentQuickStart";
+  group.attributes = [attribute({ name: "prompt", value: prompt })];
+  group.children = [];
+  const groupIndex = tree.children.indexOf(group);
+  const introduction = tree.children[groupIndex - 1];
+  if (introduction?.type === "paragraph") {
+    tree.children.splice(groupIndex - 1, 1);
+    tree.children.splice(groupIndex, 0, introduction);
+  }
+}
+
 export function remarkDocsContent() {
   return (tree, file) => {
-    const visit = (node) => {
-      if (!node.children) return;
-      node.children = node.children.map((child) => {
-        const classes = String(classOf({ node: child })).split(" ");
-        if (classes.includes("lw-accordion")) return skillCard({ node: child });
-        visit(child);
-        return child;
-      });
-    };
-    visit(tree);
-    if (!file.path?.endsWith("/introduction.mdx")) return;
-    const videoIndex = tree.children.findIndex((node) => node.name === "video");
-    if (videoIndex < 0) return;
-    const [video] = tree.children.splice(videoIndex, 1);
-    const groupIndex = tree.children.findIndex((node) => node.name === "CardGroup");
-    tree.children.splice(groupIndex + 1, 0, video);
-    const intro = tree.children[groupIndex - 1];
-    if (intro?.type === "paragraph") {
-      tree.children.splice(groupIndex - 1, 1);
-      tree.children.splice(groupIndex, 0, intro);
-    }
+    adaptSkillCards({ node: tree });
+    introduceSetup({ tree, file });
   };
 }

@@ -97,7 +97,11 @@ function operationTitle({ entry, fallback }) {
 
 function buildPage({ item, docsRoot, pages }) {
   const file = path.join(docsRoot, `${item}.mdx`);
-  if (!existsSync(file)) throw new Error(`Configured documentation page is missing: ${item}`);
+  if (!existsSync(file)) {
+    throw Object.assign(new Error(`Configured documentation page is missing: ${item}`), {
+      code: "docs_page_missing",
+    });
+  }
   const meta = readFrontmatter({ file });
   const entry = meta.openapi
     ? operationIndex({ docsRoot }).get(operationKey({ openapi: String(meta.openapi) }))

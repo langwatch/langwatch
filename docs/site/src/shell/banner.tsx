@@ -1,5 +1,5 @@
-import { Box, IconButton, Link } from "@langwatch/design-system/primitives";
-import { X } from "lucide-react";
+import { Box, Flex, IconButton, Link, Text } from "@langwatch/design-system/primitives";
+import { ArrowUpRight, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { site } from "../lib/nav-model.ts";
@@ -27,11 +27,11 @@ export function SiteBanner() {
       className="docs-banner"
       bg="docs.banner"
       color="docs.bannerText"
-      minHeight="40px"
-      paddingY="2"
+      minHeight="36px"
+      paddingY="1"
       paddingX="12"
       textAlign="center"
-      fontSize="14px"
+      fontSize="13px"
       lineHeight="24px"
     >
       {banner.dismissible ? (
@@ -42,8 +42,8 @@ export function SiteBanner() {
           position="absolute"
           right="2"
           top="0"
-          minWidth="40px"
-          height="40px"
+          minWidth="36px"
+          height="36px"
           onClick={() => {
             writePreference({ key, value: "dismissed" });
             setHidden(true);
@@ -53,20 +53,27 @@ export function SiteBanner() {
         </IconButton>
       ) : null}
       {match ? (
-        <>
+        <Flex alignItems="center" justifyContent="center" gap="3" minHeight="28px">
+          <Sparkles size={14} aria-hidden="true" />
           <Link
             href={match[2]}
-            fontWeight="600"
+            fontWeight="500"
             color="inherit"
-            textDecoration="underline"
-            textUnderlineOffset="2px"
+            textDecoration="none"
+            _hover={{ textDecoration: "underline" }}
+            display="inline-flex"
+            gap="2"
+            alignItems="center"
           >
-            {match[1]}:
-          </Link>{" "}
-          <Box as="span" display={{ base: "none", md: "inline" }}>
+            <Text as="span" truncate>
+              {match[1]}
+            </Text>
+            <ArrowUpRight size={13} aria-hidden="true" />
+          </Link>
+          <Box as="span" display={{ base: "none", xl: "inline" }} opacity="0.85">
             {match[3]}
           </Box>
-        </>
+        </Flex>
       ) : (
         banner.content
       )}

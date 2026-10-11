@@ -1,5 +1,6 @@
 import { DocsCodeBlock } from "../code/code-block.tsx";
 import { Accordion, AccordionGroup } from "./accordion.tsx";
+import { AgentQuickStart } from "./agent-quick-start.tsx";
 import { Check, Info, Note, Tip, Warning } from "./callouts.tsx";
 import { Card, CardGroup } from "./cards.tsx";
 import { CodeGroup, CodeGroupItem } from "./code-group.tsx";
@@ -16,6 +17,7 @@ import { Tab, Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
 
 export const mdxComponents = {
+  AgentQuickStart,
   SkillCard,
   LegacyContent,
   Accordion,

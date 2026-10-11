@@ -15,6 +15,7 @@ import { PageFooter } from "./page-footer.tsx";
 import { PageHeader } from "./page-header.tsx";
 import { SearchDialog, useSearchShortcut } from "./search.tsx";
 import { SideNav } from "./side-nav.tsx";
+import { SiteFooter } from "./site-footer.tsx";
 import { TocDisclosure, TocRail } from "./toc.tsx";
 import type { TocEntry } from "./toc.tsx";
 
@@ -32,7 +33,13 @@ type ShellProps = {
 
 function LeftRail({ children }: { children: ReactNode }) {
   return (
-    <Box gridArea="nav" display={{ base: "none", lg: "block" }} position="relative" zIndex="0">
+    <Box
+      className="docs-nav-plane"
+      gridArea="nav"
+      display={{ base: "none", lg: "block" }}
+      position="relative"
+      zIndex="0"
+    >
       <Box
         className="docs-left-rail"
         position="sticky"
@@ -41,9 +48,9 @@ function LeftRail({ children }: { children: ReactNode }) {
         display="flex"
         flexDirection="column"
         overflowY="auto"
-        paddingTop="6"
+        paddingTop="7"
         paddingBottom="10"
-        paddingInlineEnd="0"
+        paddingX="4"
         css={{ scrollbarWidth: "thin" }}
       >
         {children}
@@ -89,7 +96,7 @@ export function DocsShell({
     <Box
       className="docs-shell"
       minHeight="100vh"
-      bg={{ base: "docs.paper", lg: "docs.canvas" }}
+      bg="transparent"
       color="fg"
       position="relative"
       isolation="isolate"
@@ -102,9 +109,11 @@ export function DocsShell({
       <a className="docs-skip-link" href="#content">
         Skip to content
       </a>
-      <a className="docs-skip-link" href="#page-tree">
-        Skip to page list
-      </a>
+      {section ? (
+        <a className="docs-skip-link" href="#page-tree">
+          Skip to page list
+        </a>
+      ) : null}
       <PageGround home={kind === "home"} />
       <SiteBanner />
       <Header kind={kind} onSearch={openSearch} onMenu={() => setMenuOpen(true)} />
@@ -184,7 +193,7 @@ export function DocsShell({
               mode={typeMode}
               as="article"
               className="docs-prose"
-              marginTop={{ base: "8", xl: "12" }}
+              marginTop={{ base: "8", xl: "10" }}
             >
               {children}
             </TypeRegion>
@@ -205,6 +214,7 @@ export function DocsShell({
           </Box>
         ) : null}
       </Box>
+      <SiteFooter />
       <MobileNav open={menuOpen} onClose={() => setMenuOpen(false)} active={section} slug={slug} />
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
     </Box>

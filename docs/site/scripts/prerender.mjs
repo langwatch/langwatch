@@ -6,12 +6,14 @@ import { fileURLToPath } from "node:url";
 import { STATIC_DIRS, STATIC_FILES } from "../docs-dev.mjs";
 import { pageMarkdown } from "../docs-markdown.mjs";
 import { buildNav } from "../docs-nav.mjs";
+import { llmsDirectory, pageTargets } from "../docs-output.mjs";
 import { readRedirects } from "../docs-routing.mjs";
-import { bodyText, searchTrail } from "../docs-search.mjs";
+import { searchEntry } from "../docs-search.mjs";
+import { readBuildOptions } from "../scripts/options.mjs";
 import { render } from "../src/entry-server.tsx";
 
 const siteRoot = fileURLToPath(new URL("..", import.meta.url));
-const dist = path.join(siteRoot, "dist");
+const { outDir: dist } = readBuildOptions();
 const docsRoot = path.resolve(siteRoot, "..");
 function escapeHtml({ text }) {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -26,6 +28,7 @@ async function copyMarkdown({ slug }) {
 }
 
 await writeFile(path.join(dist, "redirects.json"), JSON.stringify(readRedirects({ docsRoot })));
+await writeFile(path.join(dist, "llms.txt"), llmsDirectory({ nav }));
 const searchIndex = [];
 let compiled = 0;
 const skipped = [];
@@ -40,17 +43,9 @@ for (const slug of Object.keys(pages)) {
         "</body>",
         `<script>window.__DOCS_SLUG__=${JSON.stringify(slug)}${examples ? `;window.__DOCS_EXAMPLES__=${JSON.stringify(examples)}` : ""}</script></body>`,
       );
-    searchIndex.push({
-      slug,
-      title: pages[slug].title,
-      description: pages[slug].description,
-      ...searchTrail({ nav, slug }),
-      body: bodyText({ html }),
-      headings: headings.map((heading) => ({ id: heading.id, text: heading.text })),
-    });
+    searchIndex.push(searchEntry({ nav, slug, html, headings }));
     await copyMarkdown({ slug });
-    const targets =
-      slug === "introduction" ? ["index.html", `${slug}/index.html`] : [`${slug}/index.html`];
+    const targets = pageTargets({ slug });
     for (const target of targets) {
       await mkdir(path.dirname(path.join(dist, target)), { recursive: true });
       await writeFile(path.join(dist, target), page);
@@ -87,7 +82,7 @@ for (const [reason, { count, example }] of [...reasons]
   .slice(0, 15)) {
   console.log(`  ${count}x ${reason} (e.g. ${example}.mdx)`);
 }
-await writeFile(path.join(siteRoot, "dist", "skipped.json"), JSON.stringify(skipped, null, 2));
+await writeFile(path.join(dist, "skipped.json"), JSON.stringify(skipped, null, 2));
 
 if (skipped.length > 0)
   throw new Error(`Documentation rendering failed for ${skipped.length} pages`);

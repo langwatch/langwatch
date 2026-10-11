@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "vite",
     "build": "node scripts/build.mjs",
-    "preview": "node scripts/preview.mjs"
+    "preview": "node scripts/preview.mjs",
+    "test": "vitest run",
+    "test:smoke": "node scripts/smoke.mjs",
+    "test:links": "node scripts/check-links.mjs"
   },
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
@@ -17,6 +20,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
     "@mdx-js/rollup": "^3.1.0",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
@@ -30,6 +34,7 @@
     "remark-mdx-frontmatter": "^5.0.0",
     "typescript": "catalog:",
     "vite": "catalog:",
+    "vitest": "catalog:",
     "yaml": "^2.6.0"
   }
 }

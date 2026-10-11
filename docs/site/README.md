@@ -44,9 +44,11 @@ This command compiles the client and renderer, then prerenders every configured
 page into `docs/site/dist`. It emits:
 
 - `/path/index.html` for each page, plus the introduction at `/index.html`.
+  Configured `section/index` pages also have a `/section` alias.
 - `/path.md` for each page's Markdown copy action.
 - Hashed JavaScript and CSS under `assets/`, fonts, posters and docs media.
 - `search-index.json` with article text, navigation trails and headings.
+- `llms.txt`, a directory of configured pages linking to their Markdown.
 - `redirects.json` generated from `docs.json`.
 - `404.html` with the documentation shell and recovery links.
 - `skipped.json`, empty after a successful build.
@@ -77,10 +79,60 @@ adapted during compilation. The current eight embedded product recordings have
 no audio streams; the video renderer explicitly mutes these silent demonstrations.
 Narrated media requires captions and a corresponding renderer before publication.
 
+The docs ground uses the marketing site's blue, apricot and rust palette. The
+centred paper, navigation rail and raised panels use separate semantic surfaces;
+gradients stay behind the page. The ground is static, including under reduced
+motion. The home recording starts only on request and has a local poster frame.
+Its agent setup panel copies the full tracing prompt from `skills/directory.mdx`;
+the picker changes the paste instructions, and the source remains in the MDX.
+The compiler watches that source so edits also refresh the home panel in dev.
+
+Potential design-system contributions are the layered documentation shell,
+agent setup panel and compact announcement strip. They remain docs-local until
+another surface needs the same behaviour.
+
 ```sh
 pnpm exec tsc --noEmit -p docs/site/tsconfig.json
 pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc docs/site
 ```
 
-Generator tests, browser smoke tests and a built-site link check are the next
-implementation phase. Behaviour scenarios live in `specs/`.
+Behaviour scenarios live in `specs/`; generator tests are colocated in
+`__tests__/`, and browser and link runners live in `scripts/`.
+
+## Test without disturbing a running preview
+
+The unit suite uses the repository's shared Vitest configuration. Run it through
+the package script, with the usual worker limit:
+
+```sh
+VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/docs-site test
+```
+
+Build an isolated artifact, then run the browser smoke and local link checks:
+
+```sh
+pnpm --filter @langwatch/docs-site build --out-dir "$TMPDIR/docs-test-dist"
+pnpm --filter @langwatch/docs-site test:smoke --out-dir "$TMPDIR/docs-test-dist" --screenshots "$TMPDIR/docs-test-shots"
+pnpm --filter @langwatch/docs-site test:links --out-dir "$TMPDIR/docs-test-dist"
+```
+
+The smoke runner starts its own preview on an available port, closes it and
+Chromium in cleanup, and captures the introduction, quick start and trace API
+page at 1440 and 390 pixels in light and dark. It checks clipboard copying,
+keyboard search, API authentication validation, the complete page inventory,
+redirects and 404 responses. API requests are intercepted; no real key is used.
+
+The link checker checks every built HTML page, local link and fragment, following
+configured redirects. It treats links to `docs.langwatch.ai` as local, skips
+external destinations, writes `link-report.json` in the chosen output directory,
+and exits non-zero for broken links. It has no exclusion list for content errors.
+
+For a separate manual preview:
+
+```sh
+pnpm --filter @langwatch/docs-site preview --out-dir "$TMPDIR/docs-test-dist" --port 4175
+```
+
+`--out-dir` is resolved from the package directory; absolute paths avoid
+ambiguity. Omitting it retains the normal `docs/site/dist` output. Preview still
+defaults to port 4173, and fails if its chosen port is occupied.

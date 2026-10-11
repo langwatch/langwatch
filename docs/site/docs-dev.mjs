@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { pageMarkdown } from "./docs-markdown.mjs";
 import { buildNav } from "./docs-nav.mjs";
+import { llmsDirectory } from "./docs-output.mjs";
 import { readRedirects, resolveRedirect } from "./docs-routing.mjs";
 import { bodyText, searchTrail } from "./docs-search.mjs";
 
@@ -36,6 +37,11 @@ function serveMarkdown({ docsRoot, pathname, response }) {
 }
 
 function serveSource({ docsRoot, pathname, response, next }) {
+  if (pathname === "/llms.txt") {
+    response.setHeader("Content-Type", "text/plain; charset=utf-8");
+    response.end(llmsDirectory({ nav: buildNav({ docsRoot }) }));
+    return;
+  }
   if (pathname === "/search-index.json") {
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     response.end(JSON.stringify(devSearch({ docsRoot })));
