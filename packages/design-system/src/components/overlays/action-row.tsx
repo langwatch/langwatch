@@ -3,10 +3,11 @@
  * Buttons are descriptors: the row picks variant, colour and size, so a footer cannot drift.
  * Spec: packages/design-system/adrs/002-overlay-and-card-shapes.md.
  */
-import { Box, Button, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { Button } from "../forms/button.tsx";
 import { useProductAccent } from "../scope/use-product-accent.ts";
 import { Menu } from "./menu.tsx";
 import { Tooltip } from "./tooltip.tsx";
