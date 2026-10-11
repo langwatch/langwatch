@@ -1,14 +1,7 @@
 import { IdText } from "@langwatch/design-system/id-text";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box, Button, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { RotateCcw, XCircle } from "lucide-react";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
@@ -46,8 +39,12 @@ export function DeadLetterRow({
       {/* The row opens on click; its first cell is a real button so the
           expanded region (the trace id, the only route to WHY the message
           died) is reachable by keyboard too. */}
-      <Table.Row cursor="pointer" onClick={onToggle} data-testid={`dead-row-${message.messageKey}`}>
-        <Table.Cell>
+      <ListTable.Row
+        expanded={isExpanded}
+        onActivate={onToggle}
+        data-testid={`dead-row-${message.messageKey}`}
+      >
+        <ListTable.Cell>
           <chakra.button
             type="button"
             aria-expanded={isExpanded}
@@ -61,27 +58,27 @@ export function DeadLetterRow({
               {message.processName}
             </Text>
           </chakra.button>
-        </Table.Cell>
-        <Table.Cell>
+        </ListTable.Cell>
+        <ListTable.Cell>
           <InlineCode variant="neutral">{message.intentType}</InlineCode>
-        </Table.Cell>
-        <Table.Cell>
+        </ListTable.Cell>
+        <ListTable.Cell>
           {/* Elided in the MIDDLE: both ends of a key carry information, and a
               right-truncated ksuid is indistinguishable from every other one
               sharing its prefix. */}
           <IdText value={message.processKey} label="ID" />
-        </Table.Cell>
-        <Table.Cell textAlign="end">
+        </ListTable.Cell>
+        <ListTable.Cell align="end">
           <Text textStyle="caption" fontVariantNumeric="tabular-nums">
             {message.attempts}
           </Text>
-        </Table.Cell>
-        <Table.Cell textAlign="end">
+        </ListTable.Cell>
+        <ListTable.Cell align="end">
           <Text textStyle="xs" color="fg.muted">
             {formatTimeAgo(message.updatedAt, now)}
           </Text>
-        </Table.Cell>
-        <Table.Cell textAlign="end">
+        </ListTable.Cell>
+        <ListTable.Cell align="end">
           {canManage && (
             <HStack gap={1} justify="end">
               <Button
@@ -113,12 +110,12 @@ export function DeadLetterRow({
               </Button>
             </HStack>
           )}
-        </Table.Cell>
-      </Table.Row>
+        </ListTable.Cell>
+      </ListTable.Row>
       {isExpanded && (
-        <Table.Row>
-          <Table.Cell colSpan={6} bg="bg.subtle">
-            <VStack align="stretch" gap={3} paddingY={2}>
+        <ListTable.SpanRow columns={6} band>
+          <Box paddingX={4} paddingY={3}>
+            <VStack align="stretch" gap={3}>
               <HStack gap={4} flexWrap="wrap">
                 <Labelled label="Message key" value={message.messageKey} />
                 <Labelled label="Project" value={message.projectId} />
@@ -132,8 +129,8 @@ export function DeadLetterRow({
                 <JsonViewer data={message.payload} />
               </Box>
             </VStack>
-          </Table.Cell>
-        </Table.Row>
+          </Box>
+        </ListTable.SpanRow>
       )}
     </>
   );
