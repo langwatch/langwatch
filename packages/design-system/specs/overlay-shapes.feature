@@ -274,3 +274,24 @@ Feature: Drawer and dialog shapes
   Scenario: A dialog can keep the card ground it had over a card-toned page
     Given a dialog with ground card and another without
     Then the first draws the card ground and the other keeps the overlay ground
+
+  @integration
+  Scenario: A primary action may be neutral or green, and a destroying one stays red
+    Given a dialog whose primary action carries the tone success, one with neutral and one with danger
+    Then the first is green, the second is the inverse button and the third is red
+
+  @integration
+  Scenario: A dialog or drawer footer may be one node that owns its controls
+    Given an overlay given footerContent
+    Then it draws that node in its one footer band with no extra Cancel
+    And a null footerContent draws no band
+
+  @integration
+  Scenario: A dialog's Escape and focus options default to the current behaviour
+    Given a dialog with closeOnEscape false and another busy dialog with closeOnEscape true
+    Then neither closes on Escape and the default dialog still does
+
+  @integration
+  Scenario: The detail and wide steps and the content frame are named
+    Given a drawer of size detail, one of size wide and one with the content chrome
+    Then they are 38.5rem, 59.375rem and a bounded frame with one X and a supplied header

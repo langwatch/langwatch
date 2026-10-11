@@ -351,3 +351,26 @@ export const Linked: Story = {
     </CardGrid>
   ),
 };
+
+export const InvalidFrame: Story = {
+  args: { variant: "frame", invalid: true, children: createElement(Text, null, "Pick a target") },
+};
+
+export const JoinedPanels: Story = {
+  render: () =>
+    createElement(
+      HStack,
+      { gap: 0, height: "200px", align: "stretch" },
+      createElement(Card, { variant: "joined-panel", edge: "start" }, "Inputs"),
+      createElement(Card, { variant: "joined-panel", edge: "end" }, "Outputs"),
+    ),
+};
+
+export const NestedMutedExtraSmall: Story = {
+  args: {
+    variant: "nested",
+    padding: "xs",
+    borderTone: "muted",
+    children: createElement(Text, null, "Error detail"),
+  },
+};

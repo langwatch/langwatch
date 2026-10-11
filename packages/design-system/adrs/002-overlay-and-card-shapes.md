@@ -118,3 +118,21 @@ The part statics (`Drawer.Root`, `Dialog.Content`, ...) stay, marked `@deprecate
 migrate wave by wave; W-final deletes them with the `studio-*` subpaths and the `SettingsCard`,
 `DetailDrawerHeader` and `WorkflowCard` aliases. Popups inside every drawer and dialog now portal
 into it rather than the body.
+
+## Amendment DS3 (2026-10-11): the remaining rollout surfaces
+
+Rulings: `.claude/tmp/ds-sweep/plan/RULINGS-DS3.md`. New options are opt-in; omitted props keep today's look.
+
+- **Primary tone.** `primaryAction.tone` is `accent` (default), `neutral` (the inverse button, `bg=fg`) or
+  `success` (green). `danger` wins over any tone. Secondary success stays outline.
+- **Footer node.** `Drawer.footerContent` and `Dialog.footerContent` replace the ActionRow's contents in the
+  same band; they exclude the descriptor footer, and a Dialog's `cancelLabel`, `note` and actions. The caller
+  owns the controls and passes its own busy flag, including to an already-open portalled menu.
+- **Dialog controls.** `closeOnEscape`, `trapFocus` and `preventScroll` default to true. The opt-outs exist for
+  the workflow create dialog, an integration whose emoji picker sits outside the frame; this is the one
+  documented exception to ADR-001's trapped modal default. `body="flush"`, `ground="panel"` and
+  `footerDivider` are finite options; `headerContent` and `surface="assistant"` serve the Langy create frame.
+- **Widths.** `detail` (38.5rem) on Drawer and Dialog, `wide` (59.375rem) on Drawer. `Drawer.chrome="content"`
+  with `headerContent` is a transparent bounded frame whose children own header and scrolling; the frame
+  draws the one X. `Drawer.topInset="studio-header"` keeps the studio's 56px top clearance.
+- **Card.** `invalid` (frame), `variant="joined-panel"` with `edge`, `padding="xs"`, `borderTone` (nested).

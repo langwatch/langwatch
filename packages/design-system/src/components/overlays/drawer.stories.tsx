@@ -291,3 +291,45 @@ function FocusReturnDemo() {
 
 /** A closing drawer hands focus back to the control that opened it, or to `finalFocusEl`. */
 export const ReturnsFocus: Story = { render: () => <FocusReturnDemo /> };
+
+export const PrimaryTones: Story = {
+  args: {
+    title: "Evaluator",
+    footer: {
+      secondaryAction: { label: "Save", onClick: noop, tone: "success" },
+      primaryAction: { label: "Apply", onClick: noop },
+    },
+  },
+};
+
+export const DetailWidth: Story = { args: { size: "detail", title: "Case" } };
+
+/** The node owns its controls; pass the same busy flag to them as to the drawer. */
+export const CustomFooter: Story = {
+  args: {
+    title: "Edit scenario",
+    footer: undefined,
+    footerContent: (
+      <Stack direction="row" gap={2} flexWrap="wrap" width="full" justify="flex-end">
+        <Button variant="outline" onClick={noop}>
+          History
+        </Button>
+        <Button onClick={noop}>Save and run</Button>
+      </Stack>
+    ),
+  },
+};
+
+export const WideContentDrawer: Story = {
+  args: {
+    title: "Run",
+    size: "wide",
+    chrome: "content",
+    headerContent: <Text padding={4}>Run header band</Text>,
+    children: <Text padding={4}>Transcript</Text>,
+  },
+};
+
+export const StudioHeaderInset: Story = {
+  args: { title: "Properties", topInset: "studio-header" },
+};

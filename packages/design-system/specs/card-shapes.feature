@@ -100,3 +100,13 @@ Feature: Card, resource tile, load more and the one-line empty state
   Scenario: A toned card is a surface and never an opener
     Given a toned nested card or an accent row given an opener
     Then the card is refused
+
+  @integration
+  Scenario: A frame card may be invalid and a joined panel names its edge
+    Given a frame card marked invalid and a joined panel with an edge
+    Then the invalid border is red with no fill and the panel's inner side is square
+
+  @integration
+  Scenario: A nested well takes the xs padding and a muted border
+    Given a nested card with padding xs and borderTone muted
+    Then it draws an 8px inset and the muted border

@@ -107,3 +107,8 @@ Feature: List table parts
   Scenario: A measured virtual table keeps selection and expansion across scrolling
     Given a measured virtual table
     Then rows select and expand around the rich cells
+
+  @integration
+  Scenario: A column may omit its width and a header may grow with its content
+    Given a column with no width and a table with headerLayout content
+    Then the column declares no width and the header grows with wrapped text

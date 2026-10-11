@@ -1,6 +1,6 @@
 import { Box, Button, Flex, Text } from "@chakra-ui/react";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 
 export interface SelectionActionBarProps {
   /** Left-side content, usually the "N selected" count (string or node); it wraps. */
@@ -32,10 +32,28 @@ const FLOATING = {
   "data-bottom-floating-bar": "",
 } as const;
 
-function focusSelectAll({ table }: { table: string | undefined }) {
+/**
+ * Resolved after the frame, because clearing rebuilds the header. Focus stays wherever the user
+ * moved meanwhile, and a missing or disabled select-all is left alone.
+ */
+function focusSelectAllNextFrame({
+  table,
+  clearButton,
+}: {
+  table: string | undefined;
+  clearButton: HTMLElement | null;
+}) {
   if (!table) return;
-  const box = document.getElementById(table)?.querySelector("[data-select-all]");
-  if (box instanceof HTMLElement) box.focus();
+  requestAnimationFrame(() => {
+    const active = document.activeElement;
+    const moved = active && active !== document.body && active !== clearButton;
+    if (moved) return;
+    const box = document.getElementById(table)?.querySelector("[data-select-all]");
+    if (!(box instanceof HTMLElement) || !box.isConnected) return;
+    if (box instanceof HTMLInputElement && box.disabled) return;
+    if (box.getAttribute("aria-disabled") === "true") return;
+    box.focus();
+  });
 }
 
 /**
@@ -52,6 +70,7 @@ export function SelectionActionBar({
   forTable,
 }: SelectionActionBarProps) {
   const floating = placement === "floating";
+  const clearRef = useRef<HTMLButtonElement>(null);
   return (
     <Box
       as="fieldset"
@@ -91,12 +110,13 @@ export function SelectionActionBar({
           </>
         )}
         <Button
+          ref={clearRef}
           size="xs"
           variant="ghost"
           marginStart="auto"
           onClick={() => {
             onClear();
-            focusSelectAll({ table: forTable });
+            focusSelectAllNextFrame({ table: forTable, clearButton: clearRef.current });
           }}
           aria-label="Clear selection"
         >

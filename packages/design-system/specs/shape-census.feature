@@ -142,3 +142,8 @@ Feature: The shape census measures how far screens are from the design system
     When the gate is judged
     Then it refuses with a reason
     And another owner's open rows are listed so a global gate can require them closed
+
+  @unit
+  Scenario: A padding row's height is its own prop, not a restyle
+    Given a ListTable.PaddingRow with a height and an ordinary row with a height
+    Then only the ordinary row reports a restyle

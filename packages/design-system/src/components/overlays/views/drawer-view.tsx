@@ -35,6 +35,8 @@ import { CloseButton } from "../close-button.tsx";
 export type {
   ActionRowProps,
   FrameAction,
+  FramePrimaryAction,
+  FramePrimaryTone,
   FrameSecondaryAction,
   FrameSecondaryTone,
 } from "../action-row.tsx";
@@ -241,16 +243,24 @@ export const DrawerRoot = function DrawerRoot({
   );
 };
 
-/** The shared overlay width scale, as maxima: sm 28rem, md 32rem, lg 42rem, xl 56rem, full. */
-export type DrawerSize = "sm" | "md" | "lg" | "xl" | "full";
+/**
+ * The shared overlay width scale, as maxima: sm 28rem, md 32rem, detail 38.5rem, lg 42rem,
+ * xl 56rem, wide 59.375rem, full. `detail` and `wide` are named steps, never arbitrary widths.
+ */
+export type DrawerSize = "sm" | "md" | "detail" | "lg" | "xl" | "wide" | "full";
 
 const DRAWER_WIDTH: Record<DrawerSize, string> = {
   sm: "28rem",
   md: "32rem",
+  detail: "38.5rem",
   lg: "42rem",
   xl: "56rem",
+  wide: "59.375rem",
   full: "100vw",
 };
+
+/** The studio header's 56px clearance (`marginTop="14"`), plus the 8px bottom gap. */
+const STUDIO_HEADER_TOP = "3.5rem";
 
 /**
  * The drawer ground. Ruling Q3 (ADR-002): the shape keeps today's solid ground until Alex has
@@ -268,7 +278,34 @@ const FOOTER_SAFE_AREA = "max(var(--chakra-spacing-4), env(safe-area-inset-botto
  */
 export type DrawerFooterProps = ActionRowProps;
 
-export interface DrawerProps {
+/** The descriptor footer, or one node that owns the whole footer row. */
+type DrawerFooterChoice =
+  | {
+      /** The one footer; omitted means no footer band. */
+      footer?: DrawerFooterProps;
+      footerContent?: never;
+    }
+  | {
+      footer?: never;
+      /**
+       * Replaces only the ActionRow's contents, inside the same measured band. `null`: no band.
+       * No Cancel is added. The caller passes `busy` to its own controls and guards their
+       * callbacks, including an already-open portalled menu.
+       */
+      footerContent: React.ReactNode;
+    };
+
+/** `standard` draws the generated header; `content` lets one header node own the top band. */
+type DrawerChromeChoice =
+  | { chrome?: "standard"; headerContent?: never }
+  | {
+      /** Transparent bounded frame, flush body; the children own the visible header and scroll. */
+      chrome: "content";
+      /** The visible header band. The frame draws the one X; this node draws none. */
+      headerContent: React.ReactNode;
+    };
+
+interface DrawerBaseProps {
   /** Default true: a routed drawer is mounted only while open. */
   open?: boolean;
   /** A request to close (the X, Escape): the drawer stays until `open` turns false. */
@@ -308,8 +345,8 @@ export interface DrawerProps {
   /** The id of the drawer-owned form, so a control elsewhere can name it. */
   formId?: string;
   children?: React.ReactNode;
-  /** The one footer; omitted means no footer band. */
-  footer?: DrawerFooterProps;
+  /** `studio-header` keeps the studio's 56px top clearance; the docked end inset is unaffected. */
+  topInset?: "default" | "studio-header";
   /** A save in flight: the X, back, Escape and every action wait. */
   busy?: boolean;
   /** The Back button's test id, when it is not `<data-testid>-back`. */
@@ -326,6 +363,8 @@ export interface DrawerProps {
   /** Prefixes the slot ids: `<id>-close`, `<id>-back`, `<id>-body`. */
   "data-testid"?: string;
 }
+
+export type DrawerProps = DrawerBaseProps & DrawerFooterChoice & DrawerChromeChoice;
 
 type DrawerFrameProps = Pick<
   DrawerProps,
@@ -346,6 +385,9 @@ type DrawerFrameProps = Pick<
   | "error"
   | "children"
   | "footer"
+  | "footerContent"
+  | "chrome"
+  | "headerContent"
   | "busy"
   | "errorScope"
   | "entityKey"
@@ -374,13 +416,18 @@ function DrawerFrame({
   error,
   children,
   footer,
+  footerContent,
+  chrome: chromeMode = "standard",
+  headerContent,
   busy = false,
   errorScope,
   entityKey,
   testId,
 }: DrawerFrameProps) {
-  const glass = useDrawerGlass({ framed: bodyScroll === "frame" });
-  const chrome = useDrawerChrome({ enabled: glass, hasFooter: footer != null });
+  const contentMode = chromeMode === "content";
+  const hasFooter = footer != null || (footerContent !== undefined && footerContent !== null);
+  const glass = useDrawerGlass({ framed: bodyScroll === "frame" && !contentMode });
+  const chrome = useDrawerChrome({ enabled: glass, hasFooter });
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
   const resetKeys = [title, entityKey];
   const titleLines = (
@@ -391,6 +438,27 @@ function DrawerFrame({
       {titleContent}
     </>
   );
+  if (contentMode) {
+    return (
+      <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
+        <ChakraDrawer.Title srOnly>{title}</ChakraDrawer.Title>
+        <Box flexShrink={0} paddingEnd={12} data-drawer-header-content="">
+          {headerContent}
+        </Box>
+        <ChakraDrawer.Body
+          {...BOUNDED_BODY}
+          padding={0}
+          flex={1}
+          data-body="flush"
+          data-testid={slot("body")}
+        >
+          <OverlayBodyState loading={loading} error={error}>
+            {children}
+          </OverlayBodyState>
+        </ChakraDrawer.Body>
+      </StudioIsolatedErrorBoundary>
+    );
+  }
   return (
     <>
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
@@ -484,7 +552,7 @@ function DrawerFrame({
           </OverlayBodyState>
         </ChakraDrawer.Body>
       </StudioIsolatedErrorBoundary>
-      {footer && (
+      {hasFooter && (
         <DrawerFooterBand
           glass={glass}
           edge={chrome.edges.bottom}
@@ -492,7 +560,7 @@ function DrawerFrame({
           paddingBottom={FOOTER_SAFE_AREA}
         >
           <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
-            <ActionRow {...footer} busy={busy || footer.busy} />
+            {footer ? <ActionRow {...footer} busy={busy || footer.busy} /> : footerContent}
           </StudioIsolatedErrorBoundary>
         </DrawerFooterBand>
       )}
@@ -523,6 +591,10 @@ export function Drawer({
   formId,
   children,
   footer,
+  footerContent,
+  chrome,
+  headerContent,
+  topInset = "default",
   busy = false,
   backButtonTestId,
   errorScope,
@@ -535,7 +607,9 @@ export function Drawer({
 }: DrawerProps) {
   const inset = useDrawerEndInset();
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
-  const glass = useDrawerGlass({ framed: bodyScroll !== "content" });
+  const glass = useDrawerGlass({ framed: bodyScroll !== "content" && chrome !== "content" });
+  const footerChoice = footerContent === undefined ? { footer } : { footerContent };
+  const chromeChoice = chrome === "content" ? { chrome, headerContent } : {};
   const frame = (
     <DrawerFrame
       onBack={onBack}
@@ -553,7 +627,8 @@ export function Drawer({
       bodyScroll={bodyScroll}
       loading={loading}
       error={error}
-      footer={footer}
+      {...footerChoice}
+      {...chromeChoice}
       busy={busy}
       errorScope={errorScope}
       entityKey={entityKey}
@@ -576,7 +651,11 @@ export function Drawer({
     >
       <DrawerContent
         ref={contentRef}
-        bg={DRAWER_GROUND}
+        bg={chrome === "content" ? "transparent" : DRAWER_GROUND}
+        {...(chrome === "content" ? { overflow: "hidden" } : {})}
+        {...(topInset === "studio-header"
+          ? { marginTop: "14", height: `calc(100dvh - ${STUDIO_HEADER_TOP} - 0.5rem)` }
+          : {})}
         maxWidth={`min(${DRAWER_WIDTH[size]}, calc(100vw - 1rem - ${inset}px))`}
         width="full"
         withErrorBoundary={false}

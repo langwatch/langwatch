@@ -16,10 +16,15 @@ import { BOUNDED_BODY, OverlayBodyState } from "../../../overlays/overlay-body.t
 import { OverlayPortalTargetProvider } from "../../../overlays/portal-target.ts";
 import { FieldLayoutProvider } from "../../forms/field-layout.ts";
 import { StudioIsolatedErrorBoundary } from "../../states/studio-error-boundary.tsx";
-import { ActionRow, type FrameAction, type FrameSecondaryAction } from "../action-row.tsx";
+import { ActionRow, type FramePrimaryAction, type FrameSecondaryAction } from "../action-row.tsx";
 import { CloseButton } from "../close-button.tsx";
 
-export type { ActionRowProps, FrameAction } from "../action-row.tsx";
+export type {
+  ActionRowProps,
+  FrameAction,
+  FramePrimaryAction,
+  FramePrimaryTone,
+} from "../action-row.tsx";
 
 export type DialogRootProps = Omit<ChakraDialog.RootProps, "size"> & {
   size?: "xs" | "sm" | "md" | "lg" | "xl" | "5xl" | "6xl" | "cover" | "full";
@@ -133,54 +138,57 @@ export const DialogCloseTrigger = React.forwardRef<
 });
 
 /** The shared overlay width scale, as maxima capped by the viewport. */
-export type DialogSize = "sm" | "md" | "lg" | "xl";
+export type DialogSize = "sm" | "md" | "detail" | "lg" | "xl";
 
 const DIALOG_WIDTH: Record<DialogSize, string> = {
   sm: "28rem",
   md: "32rem",
+  detail: "38.5rem",
   lg: "42rem",
   xl: "56rem",
 };
 
+const FOOTER_DIVIDER = {
+  borderTopWidth: "1px",
+  borderTopStyle: "solid",
+  borderColor: "border",
+} as const;
+
+const ASSISTANT_SURFACE = {
+  background: "bg.card",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "border.muted",
+  overflow: "hidden",
+  boxShadow: "0 28px 90px -32px color-mix(in srgb, {colors.bg.scrim} 62%, transparent)",
+} as const;
+
 /** The two places a dialog frame stands: near the top, or centred on the viewport. */
 export type DialogPlacement = "top" | "center";
 
-export interface DialogProps {
+interface DialogBaseProps {
   open: boolean;
   /** A request to close (X, Escape, outside, Cancel): the dialog stays until `open` is false. */
   onClose: () => void;
   /** Sentence case; names the thing and the act. Always the accessible name. */
   title: string;
-  /** Under the title, fg.muted; it describes the dialog (`aria-describedby`). */
-  description?: React.ReactNode;
-  /** 18px, before the title. */
-  icon?: React.ReactNode;
   /** Default "sm"; the body scrolls inside the frame. */
   size?: DialogSize;
   /** Where the frame sits. Omitted, it keeps the dialog recipe's own placement (top). */
   placement?: DialogPlacement;
-  /** Step two of a two-step dialog. */
-  onBack?: () => void;
   /** The dialog owns the form: a `type: "submit"` action submits it. Never wrap a child form. */
   onSubmit?: (event: React.FormEvent<HTMLFormElement>) => void;
   /** The id of the dialog-owned form, so a control elsewhere can name it. */
   formId?: string;
   children?: React.ReactNode;
-  /** `danger` for a destroying act. */
-  primaryAction?: FrameAction;
-  /** Takes Cancel's place: "Keep links paused", "Later", "Stay here". */
-  secondaryAction?: FrameSecondaryAction;
-  /** More outline actions after `secondaryAction`, in order, each with an optional tone. */
-  secondaryActions?: FrameSecondaryAction[];
-  /**
-   * Default "Cancel"; "Close" for a read-only dialog. `null` drops the footer button when one
-   * primary action finishes the job; the X and Escape still close it under `dismissible`.
-   */
-  cancelLabel?: string | null;
-  /** `card`: the card ground, for a dialog over a card-toned page (onboarding). */
-  ground?: "card";
-  /** Footer left: the acknowledge checkbox, "Step 2 of 2". */
-  note?: React.ReactNode;
+  /** `card`: the card ground, for a dialog over a card-toned page; `panel`: the panel ground. */
+  ground?: "card" | "panel";
+  /** `padded` (default) or `flush`: the body draws no padding, its children own the spacing. */
+  body?: "padded" | "flush";
+  /** `assistant`: the card ground, muted border and deep shadow of the Langy assistant frame. */
+  surface?: "default" | "assistant";
+  /** A rule above the footer. Default false. */
+  footerDivider?: boolean;
   /** `false`: no X, no Cancel, no Escape, no outside click; only the actions close it. */
   dismissible?: boolean;
   /**
@@ -188,6 +196,12 @@ export interface DialogProps {
    * under `dismissible` and `busy` as ever. Default true.
    */
   closeOnInteractOutside?: boolean;
+  /** `false`: Escape leaves it open (a child list owns Escape). Never enables Escape while busy. */
+  closeOnEscape?: boolean;
+  /** `false` only for an integration whose picker lives outside the frame. Default true. */
+  trapFocus?: boolean;
+  /** `false` leaves the document scrollable. Default true. */
+  preventScroll?: boolean;
   /** "alertdialog" for a must-acknowledge or destroying confirm. Default "dialog". */
   role?: "dialog" | "alertdialog";
   /** Shorthand for `initialFocusEl`; falls back to the first field, then Cancel. */
@@ -209,6 +223,143 @@ export interface DialogProps {
   "data-testid"?: string;
 }
 
+/** The descriptor footer, or one `footerContent` node that owns its controls (and its Cancel). */
+type DialogFooterChoice =
+  | {
+      footerContent?: never;
+      /** `danger` for a destroying act; `tone` paints it neutral or green. */
+      primaryAction?: FramePrimaryAction;
+      /** Takes Cancel's place: "Keep links paused", "Later", "Stay here". */
+      secondaryAction?: FrameSecondaryAction;
+      /** More outline actions after `secondaryAction`, in order, each with an optional tone. */
+      secondaryActions?: FrameSecondaryAction[];
+      /**
+       * Default "Cancel"; "Close" for a read-only dialog. `null` drops the footer button when one
+       * primary action finishes the job; the X and Escape still close it under `dismissible`.
+       */
+      cancelLabel?: string | null;
+      /** Footer left: the acknowledge checkbox, "Step 2 of 2". */
+      note?: React.ReactNode;
+    }
+  | {
+      /** Replaces the whole footer row. The caller passes `busy` to its own controls. */
+      footerContent: React.ReactNode;
+      primaryAction?: never;
+      secondaryAction?: never;
+      secondaryActions?: never;
+      cancelLabel?: never;
+      note?: never;
+    };
+
+/** The default heading row, or one `headerContent` node under a hidden semantic title. */
+type DialogHeaderChoice =
+  | {
+      headerContent?: never;
+      /** Under the title, fg.muted; it describes the dialog (`aria-describedby`). */
+      description?: React.ReactNode;
+      /** 18px, before the title. */
+      icon?: React.ReactNode;
+      /** Step two of a two-step dialog. */
+      onBack?: () => void;
+    }
+  | {
+      /** Replaces the visible heading; the X is still the frame's. No Dialog parts inside. */
+      headerContent: React.ReactNode;
+      description?: never;
+      icon?: never;
+      onBack?: never;
+    };
+
+export type DialogProps = DialogBaseProps & DialogFooterChoice & DialogHeaderChoice;
+
+/** The frame's ground, and the assistant treatment with its scope class. */
+function frameLook({ ground, assistant }: { ground?: "card" | "panel"; assistant: boolean }) {
+  if (assistant) return { ...ASSISTANT_SURFACE, className: "langy-root" };
+  if (ground === "card") return { background: "bg.card" };
+  return ground === "panel" ? { background: "bg.panel" } : {};
+}
+
+/** What decides whether the descriptor footer draws at all; null draws none. */
+function footerOf({
+  primaryAction,
+  secondaryAction,
+  secondaryActions,
+  cancel,
+  note,
+}: {
+  primaryAction?: FramePrimaryAction;
+  secondaryAction?: FrameSecondaryAction;
+  secondaryActions?: FrameSecondaryAction[];
+  cancel?: { label?: string; onClick: () => void };
+  note?: React.ReactNode;
+}) {
+  if (secondaryActions?.length) return true;
+  return primaryAction ?? secondaryAction ?? cancel ?? note;
+}
+
+/** The title row, or the supplied header node under a hidden title; the X stays the frame's. */
+function DialogHeading({
+  title,
+  icon,
+  description,
+  onBack,
+  headerContent,
+  assistant,
+  busy,
+  backTestId,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  description?: React.ReactNode;
+  onBack?: () => void;
+  headerContent?: React.ReactNode;
+  assistant: boolean;
+  busy: boolean;
+  backTestId?: string;
+}) {
+  const custom = headerContent !== undefined;
+  return (
+    <ChakraDialog.Header
+      flexDirection="column"
+      alignItems="stretch"
+      paddingEnd={12}
+      {...(assistant ? { paddingBottom: 3 } : {})}
+    >
+      {custom && <ChakraDialog.Title srOnly>{title}</ChakraDialog.Title>}
+      {custom && headerContent}
+      {!custom && (
+        <HStack gap={2} align="center" minWidth={0}>
+          {onBack && (
+            <IconButton
+              type="button"
+              aria-label="Back"
+              variant="ghost"
+              size="xs"
+              onClick={onBack}
+              disabled={busy}
+              marginStart={-1}
+              data-testid={backTestId}
+            >
+              <ArrowLeft aria-hidden />
+            </IconButton>
+          )}
+          {icon != null && (
+            <chakra.span display="inline-flex" color="fg.muted" aria-hidden>
+              {icon}
+            </chakra.span>
+          )}
+          <ChakraDialog.Title>{title}</ChakraDialog.Title>
+        </HStack>
+      )}
+      {description != null && (
+        <ChakraDialog.Description textStyle="sm" color="fg.muted">
+          {description}
+        </ChakraDialog.Description>
+      )}
+    </ChakraDialog.Header>
+  );
+}
+
 /** The dialog shape: props in, one look out. The part statics are deprecated. */
 export function Dialog({
   open,
@@ -219,6 +370,8 @@ export function Dialog({
   size = "sm",
   placement,
   onBack,
+  headerContent,
+  footerContent,
   onSubmit,
   formId,
   children,
@@ -227,9 +380,15 @@ export function Dialog({
   secondaryActions,
   cancelLabel = "Cancel",
   ground,
+  body = "padded",
+  surface = "default",
+  footerDivider = false,
   note,
   dismissible = true,
   closeOnInteractOutside = true,
+  closeOnEscape = true,
+  trapFocus = true,
+  preventScroll = true,
   role = "dialog",
   initialFocus,
   initialFocusEl,
@@ -252,7 +411,10 @@ export function Dialog({
       ? { label: cancelLabel, onClick: onClose }
       : undefined;
   const hasFooter =
-    primaryAction ?? secondaryAction ?? (secondaryActions?.length ? true : null) ?? cancel ?? note;
+    footerContent !== undefined
+      ? footerContent
+      : footerOf({ primaryAction, secondaryAction, secondaryActions, cancel, note });
+  const assistant = surface === "assistant";
   const pickInitialFocus = () => {
     const usable = (selector: string) => firstFocusable(ownRef.current, selector);
     const requested = initialFocus ? usable(`[data-frame-action="${initialFocus}"]`) : null;
@@ -262,37 +424,20 @@ export function Dialog({
   const frame = (
     <>
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
-        <ChakraDialog.Header flexDirection="column" alignItems="stretch" paddingEnd={12}>
-          <HStack gap={2} align="center" minWidth={0}>
-            {onBack && (
-              <IconButton
-                type="button"
-                aria-label="Back"
-                variant="ghost"
-                size="xs"
-                onClick={onBack}
-                disabled={busy}
-                marginStart={-1}
-                data-testid={slot("back")}
-              >
-                <ArrowLeft aria-hidden />
-              </IconButton>
-            )}
-            {icon != null && (
-              <chakra.span display="inline-flex" color="fg.muted" aria-hidden>
-                {icon}
-              </chakra.span>
-            )}
-            <ChakraDialog.Title>{title}</ChakraDialog.Title>
-          </HStack>
-          {description != null && (
-            <ChakraDialog.Description textStyle="sm" color="fg.muted">
-              {description}
-            </ChakraDialog.Description>
-          )}
-        </ChakraDialog.Header>
+        <DialogHeading
+          title={title}
+          icon={icon}
+          description={description}
+          onBack={onBack}
+          headerContent={headerContent}
+          assistant={assistant}
+          busy={busy}
+          backTestId={slot("back")}
+        />
         <ChakraDialog.Body
           {...(bodyScroll === "content" ? BOUNDED_BODY : { overflowY: "auto" as const })}
+          {...(body === "flush" ? { padding: 0 } : {})}
+          {...(assistant ? { paddingBottom: 4 } : {})}
           data-testid={slot("body")}
         >
           <OverlayBodyState loading={loading} error={error}>
@@ -301,16 +446,20 @@ export function Dialog({
         </ChakraDialog.Body>
       </StudioIsolatedErrorBoundary>
       {hasFooter != null && (
-        <ChakraDialog.Footer>
+        <ChakraDialog.Footer {...(footerDivider ? FOOTER_DIVIDER : {})}>
           <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
-            <ActionRow
-              primaryAction={primaryAction}
-              secondaryAction={secondaryAction}
-              secondaryActions={secondaryActions}
-              cancel={cancel}
-              note={note}
-              busy={busy}
-            />
+            {footerContent !== undefined ? (
+              footerContent
+            ) : (
+              <ActionRow
+                primaryAction={primaryAction}
+                secondaryAction={secondaryAction}
+                secondaryActions={secondaryActions}
+                cancel={cancel}
+                note={note}
+                busy={busy}
+              />
+            )}
           </StudioIsolatedErrorBoundary>
         </ChakraDialog.Footer>
       )}
@@ -321,7 +470,9 @@ export function Dialog({
       open={open}
       placement={placement}
       role={role}
-      closeOnEscape={closable}
+      closeOnEscape={closable && closeOnEscape}
+      trapFocus={trapFocus}
+      preventScroll={preventScroll}
       closeOnInteractOutside={closable && closeOnInteractOutside}
       initialFocusEl={initialFocusEl ?? pickInitialFocus}
       finalFocusEl={finalFocusEl}
@@ -337,7 +488,7 @@ export function Dialog({
         maxHeight="calc(100dvh - 4rem)"
         withErrorBoundary={false}
         aria-label={title}
-        {...(ground === "card" ? { background: "bg.card" } : {})}
+        {...frameLook({ ground, assistant })}
         data-size={size}
         data-testid={testId}
       >

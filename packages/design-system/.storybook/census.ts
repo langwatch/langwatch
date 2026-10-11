@@ -237,7 +237,7 @@ const TARGET: Record<string, TargetEntry> = {
   Drawer: { family: "drawers", subpath: "drawer", allowed: ["size"] },
   Dialog: { family: "dialogs", subpath: "dialog", allowed: ["size"] },
   ActionRow: { family: "drawers", subpath: "action-row", allowed: [] },
-  Card: { family: "cards", subpath: "card", allowed: ["padding", "variant"] },
+  Card: { family: "cards", subpath: "card", allowed: ["padding", "variant", "borderTone"] },
   CardGrid: { family: "cards", subpath: "card", allowed: [] },
   ResourceTile: { family: "cards", subpath: "resource-tile", allowed: [] },
   LoadMore: { family: "pagination", subpath: "load-more", allowed: [] },
@@ -973,6 +973,7 @@ function overridesOf({ visit, info, sizing }: { visit: Visit; info: ShapeInfo; s
   const choices: Record<string, string> = {};
   for (const [prop, node] of visit.props) {
     if (info.allowed.includes(prop)) choices[prop] = valueOf({ scan: visit.scan, node });
+    else if (prop === "height" && visit.ref === "ListTable.PaddingRow") continue;
     else if (CONDITION.test(prop)) {
       conditionEntries({ scan: visit.scan, prop, node, sink });
     } else if (isOverride({ prop, sizing })) {

@@ -793,4 +793,23 @@ describe("shape census classifier", () => {
     expect(openOwners({ result: open })).toEqual(["upgrade"]);
     expect(openOwners({ result: evaluateCheck({ sites: [], escapes: [] }) })).toEqual([]);
   });
+
+  describe("given a ListTable.PaddingRow height", () => {
+    const rows = (row: string) => `
+      import { ListTable as Table } from "@langwatch/design-system/list-table";
+      export const Rows = () => (
+        <Table>
+          ${row}
+        </Table>
+      );
+    `;
+
+    /** @scenario "A padding row's height is its own prop, not a restyle" */
+    it("is not a restyle, while the same height on an ordinary row is", () => {
+      const spacer = sitesOf(rows("<Table.PaddingRow columns={3} height={120} />"));
+      const ordinary = sitesOf(rows("<Table.Row height={120} />"));
+      expect(where(spacer, "restyle")).toEqual([]);
+      expect(where(ordinary, "restyle").length).toBeGreaterThan(0);
+    });
+  });
 });

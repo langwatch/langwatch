@@ -195,3 +195,58 @@ export const OpenedFromMenu: Story = { render: () => <MenuFocusDemo /> };
 export const Narrow: Story = { parameters: { viewport: { defaultViewport: "mobile1" } } };
 
 export const Closed: Story = { args: { open: false } };
+
+/** Neutral confirmation and green persistence are the two primary tones besides the accent. */
+export const PrimaryTones: Story = {
+  args: {
+    title: "Skip the tour?",
+    description: "You can restart the guide from the help menu.",
+    cancelLabel: null,
+    secondaryAction: { label: "Skip", onClick: noop },
+    primaryAction: { label: "Keep guide", onClick: noop, tone: "neutral" },
+  },
+};
+
+export const SuccessPrimary: Story = {
+  args: {
+    title: "Save version",
+    primaryAction: { label: "Save to v4", onClick: noop, tone: "success" },
+  },
+};
+
+export const SuccessPrimaryLoading: Story = {
+  args: {
+    title: "Save version",
+    primaryAction: { label: "Save to v4", onClick: noop, tone: "success", loading: true },
+  },
+};
+
+export const DetailWidth: Story = { args: { size: "detail", title: "Run scenario" } };
+
+/** The caller owns every control in the footer, its Cancel included. */
+export const CustomFooter: Story = {
+  args: {
+    title: "Run scenario",
+    primaryAction: undefined,
+    footerContent: (
+      <>
+        <Button variant="outline" onClick={noop}>
+          Cancel
+        </Button>
+        <Button onClick={noop}>Run</Button>
+      </>
+    ),
+  },
+};
+
+export const AssistantSurface: Story = {
+  args: {
+    title: "Create a scenario",
+    size: "detail",
+    surface: "assistant",
+    description: undefined,
+    headerContent: <Text fontWeight="semibold">Create a scenario with Langy</Text>,
+    primaryAction: undefined,
+    footerContent: <Button onClick={noop}>Generate</Button>,
+  },
+};

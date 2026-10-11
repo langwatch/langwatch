@@ -10,6 +10,12 @@ export interface LoadMoreProps {
   total?: number;
   /** Plural noun: "runs". */
   unitLabel?: string;
+  /** The button's visible text. Default "Load more". */
+  label?: string;
+  /** Defaults to the visible label. */
+  "aria-label"?: string;
+  /** `compact`: a full-width xs ghost button in fg.muted; the parent keeps the inset. */
+  appearance?: "default" | "compact";
   "data-testid"?: string;
 }
 
@@ -20,20 +26,40 @@ export function LoadMore({
   shown,
   total,
   unitLabel,
+  label = "Load more",
+  "aria-label": ariaLabel,
+  appearance = "default",
   "data-testid": testId,
 }: LoadMoreProps) {
   const count = describeCount({ shown, total, unitLabel });
   if (!hasMore && count === undefined) return null;
+  const compact = appearance === "compact";
   return (
-    <VStack gap={2} paddingY={3} data-testid={testId}>
+    <VStack
+      gap={2}
+      paddingY={compact ? 2 : 3}
+      align={compact ? "stretch" : undefined}
+      data-testid={testId}
+    >
       {count && (
         <Text as="output" textStyle="xs" color="fg.muted">
           {count}
         </Text>
       )}
       {hasMore && (
-        <Button type="button" variant="outline" size="sm" loading={loading} onClick={onLoadMore}>
-          Load more
+        <Button
+          type="button"
+          variant={compact ? "ghost" : "outline"}
+          size={compact ? "xs" : "sm"}
+          width={compact ? "full" : undefined}
+          color={compact ? "fg.muted" : undefined}
+          aria-label={ariaLabel ?? label}
+          loading={loading}
+          onClick={() => {
+            if (!loading) onLoadMore();
+          }}
+        >
+          {label}
         </Button>
       )}
     </VStack>

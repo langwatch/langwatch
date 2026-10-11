@@ -21,7 +21,8 @@ export type CardVariant =
   | "elevated"
   | "showcase"
   | "emphasized"
-  | "accent-row";
+  | "accent-row"
+  | "joined-panel";
 
 /** The palette roles a nested card or an accent row may carry; omitted, nothing is coloured. */
 export type CardTone = "neutral" | "teal" | "blue" | "yellow" | "red" | "purple" | "green";
@@ -30,9 +31,22 @@ export type CardTone = "neutral" | "teal" | "blue" | "yellow" | "red" | "purple"
  * Tone belongs to `nested` (a tinted well: border, fill and heading) and `accent-row` (only the
  * left edge); any other variant takes none.
  */
+type NoExtras = { invalid?: never; edge?: never; borderTone?: never };
+
+/**
+ * `invalid` belongs to `frame` (the whole border turns red). `joined-panel` needs its `edge`.
+ * `borderTone` belongs to a neutral `nested` well; a tone already colours its border.
+ */
 type ToneProps =
-  | { variant: "nested" | "accent-row"; tone?: CardTone }
-  | { variant?: CardVariant; tone?: never };
+  | (NoExtras & { variant: "nested" | "accent-row"; tone?: CardTone })
+  | (NoExtras & { variant?: Exclude<CardVariant, "joined-panel">; tone?: never })
+  | (Omit<NoExtras, "invalid"> & { variant: "frame"; tone?: never; invalid?: boolean })
+  | (Omit<NoExtras, "borderTone"> & {
+      variant: "nested";
+      tone?: "neutral";
+      borderTone: "default" | "muted";
+    })
+  | (Omit<NoExtras, "edge"> & { variant: "joined-panel"; tone?: never; edge: "start" | "end" });
 
 /** Where the card's subject stands: the dot before the title, always beside `badge` words. */
 export type CardStatus = "ok" | "warning" | "bad" | "neutral";
@@ -50,11 +64,11 @@ interface CardBaseProps {
   /** A StatusChip, a count. */
   badge?: ReactNode;
   /**
-   * md 16px, sm 12px; none: an embedded ListTable, a code block or an editor fills it. lg 20px
-   * is the old Chakra card's own space, kept for a surface whose screenshots show it. xl 24px all
-   * round; inline-lg 24px across, 20px down. Default md; frame-fill has none; accent-row 8px.
+   * md 16px, sm 12px, xs 8px; none: a ListTable, code block or editor fills it. lg 20px is the old
+   * Chakra card's space. xl 24px all round; inline-lg 24px across, 20px down. Default md;
+   * frame-fill none; accent-row 8px.
    */
-  padding?: "xl" | "inline-lg" | "lg" | "md" | "sm" | "none";
+  padding?: "xl" | "inline-lg" | "lg" | "md" | "sm" | "xs" | "none";
   /**
    * How the content slot lays its children out. flow (default): block flow. stack: a stretching
    * column with no gap. spaced: the same column with 12px between children.
@@ -110,6 +124,7 @@ const RECIPE_VARIANT = {
   showcase: "outline",
   emphasized: "outline",
   "accent-row": "subtle",
+  "joined-panel": "outline",
 } as const;
 
 /** frame keeps the panel's border and drops its fill, shadow and blur. */
@@ -147,6 +162,25 @@ const ACCENT_ROW = {
   boxShadow: "none",
   backdropFilter: "none",
 } as const;
+
+/** One half of a pair: studio paint, 8px outer corners, no border on the joining side. */
+function joinedPaint({ edge }: { edge: "start" | "end" }) {
+  return {
+    background: "bg",
+    borderColor: "border.emphasized",
+    boxShadow: "sm",
+    backdropFilter: "none",
+    ...(edge === "start"
+      ? { borderRadius: 0, borderStartRadius: "lg", borderEndWidth: 0 }
+      : { borderRadius: 0, borderEndRadius: "lg", borderStartWidth: 0 }),
+    display: "flex",
+    flexDirection: "column",
+    height: "full",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
+  } as const;
+}
 
 const OVERRIDES: Partial<
   Record<
@@ -214,6 +248,7 @@ const INSET = {
   lg: { x: 5, y: 5 },
   md: { x: 4, y: 4 },
   sm: { x: 3, y: 3 },
+  xs: { x: 2, y: 2 },
   none: { x: 0, y: 0 },
 } as const;
 
@@ -356,23 +391,43 @@ function surfacePaint({
   tone,
   opener,
   accent,
+  edge,
+  invalid,
+  borderTone,
 }: {
   variant: CardVariant;
   tone: CardTone | undefined;
   opener: boolean;
   accent: ProductAccent;
+  edge?: "start" | "end";
+  invalid?: boolean;
+  borderTone?: "default" | "muted";
 }) {
   return {
     ...OVERRIDES[variant],
+    ...(variant === "joined-panel" && edge ? joinedPaint({ edge }) : {}),
+    ...(variant === "frame" && invalid ? { borderColor: "border.error" } : {}),
     ...(variant === "nested" && tone !== undefined ? wellPaint({ tone }) : {}),
+    ...(variant === "nested" && borderTone === "muted" && (tone === undefined || tone === "neutral")
+      ? { borderColor: "border.muted" }
+      : {}),
     ...(variant === "accent-row" ? edgePaint({ tone: tone ?? "neutral" }) : {}),
     ...(opener ? openerPaint({ accent }) : {}),
   };
 }
 
+/** A joined panel has 24px, a frame-fill none (its content fills it), the rest 16px. */
+function defaultPadding({ joined, fills }: { joined: boolean; fills: boolean }) {
+  if (joined) return "xl";
+  return fills ? "none" : "md";
+}
+
 export function Card({
   variant = "panel",
   tone,
+  invalid,
+  edge,
+  borderTone,
   title,
   titleLevel = 2,
   description,
@@ -390,10 +445,11 @@ export function Card({
   "data-tour": tourId,
 }: CardProps) {
   const accent = useProductAccent();
-  const fills = variant === "frame-fill";
+  const joined = variant === "joined-panel";
+  const fills = variant === "frame-fill" || joined;
   const fit = fills ? FILLS : NO_FILLS;
   const rowDefault = variant === "accent-row" && paddingProp === undefined;
-  const padding = paddingProp ?? (fills ? "none" : "md");
+  const padding = paddingProp ?? defaultPadding({ joined, fills });
   if (opener && (variant === "accent-row" || tone !== undefined)) {
     throw new Error("Card: an accent row or a toned card is a surface, not an opener");
   }
@@ -411,11 +467,22 @@ export function Card({
     <ChakraCard.Root
       variant={RECIPE_VARIANT[variant]}
       width="full"
-      {...surfacePaint({ variant, tone, opener: opener !== undefined, accent })}
+      {...surfacePaint({
+        variant,
+        tone,
+        opener: opener !== undefined,
+        accent,
+        edge,
+        invalid,
+        borderTone,
+      })}
       borderStyle={placeholder ? "dashed" : undefined}
       data-card-variant={variant}
       data-card-padding={rowDefault ? "row" : padding}
       data-card-tone={tone}
+      data-card-invalid={invalid ? "" : undefined}
+      data-card-edge={edge}
+      data-card-border-tone={borderTone}
       data-testid={testId}
       data-tour={tourId}
     >
@@ -438,6 +505,7 @@ export function Card({
             flex={1}
             minWidth={0}
             {...fit.content}
+            {...(joined ? { overflowY: "auto" } : {})}
             {...(layout === "flow"
               ? {}
               : {

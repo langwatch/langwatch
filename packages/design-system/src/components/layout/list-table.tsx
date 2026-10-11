@@ -62,6 +62,13 @@ const HEADER = {
   whiteSpace: "nowrap",
 } as const;
 const HEADER_HEIGHT = { default: "40px", compact: "32px" } as const;
+/** `headerLayout="content"`: the header grows with wrapped content, top-aligned, 10px inset. */
+const CONTENT_HEADER = {
+  height: "auto",
+  verticalAlign: "top",
+  whiteSpace: "normal",
+  paddingY: "10px",
+} as const;
 /** Zero-specificity defaults, so a row's or a cell's own padding wins. */
 const COMPACT_CELLS = { "& :where(tbody td)": { paddingY: "1.5", paddingX: "3" } } as const;
 
@@ -103,6 +110,8 @@ interface ListTableBaseProps {
   variant?: "card" | "embedded";
   /** Opt in to column dividers; ordinary lists use row rules only. */
   columnRules?: boolean;
+  /** `content`: header cells grow with wrapped content. Default `single-line`, a fixed height. */
+  headerLayout?: "single-line" | "content";
   /** `fixed` makes the `width` set on column headers authoritative. */
   tableLayout?: "auto" | "fixed";
   /** The width below which a wide table stops shrinking and scrolls (with `scroll="x"`). */
@@ -136,7 +145,7 @@ export type ListTableProps = ListTableBaseProps & ListTableScroll;
 
 /** @deprecated Open Table.Root and container props; pass `ListTableProps`. */
 export type LegacyListTableProps = Omit<ComponentProps<typeof Table.Root>, "variant"> &
-  Omit<ListTableBaseProps, "children" | "tableLayout" | "minWidth"> & {
+  Omit<ListTableBaseProps, "children" | "tableLayout" | "minWidth" | "headerLayout"> & {
     /** @deprecated Use `scroll`. */
     containerProps?: BoxProps;
     /** @deprecated Use `scroll="external"`, which alone can stick the header. */
@@ -162,12 +171,14 @@ function ListTableRoot({
   variant = "card",
   stickyHeader = false,
   rowHeight,
+  headerLayout = "single-line",
   loading = false,
   loadingLabel = "Loading rows",
   scroll,
   scrollLabel,
   ...props
 }: LegacyListTableProps & {
+  headerLayout?: "single-line" | "content";
   scroll?: "x" | "external";
   scrollLabel?: string;
   rowHeight?: number;
@@ -197,6 +208,7 @@ function ListTableRoot({
           "& thead th": {
             ...HEADER,
             height: HEADER_HEIGHT[density],
+            ...(headerLayout === "content" ? CONTENT_HEADER : {}),
             ...(stickyHeader ? STICKY_HEADER : {}),
           },
           ...(density === "compact" ? COMPACT_CELLS : {}),

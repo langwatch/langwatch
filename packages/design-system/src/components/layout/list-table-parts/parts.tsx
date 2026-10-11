@@ -287,7 +287,8 @@ export function ColumnGroup({ children }: ListTableColumnGroupProps) {
 }
 
 export interface ListTableColumnProps {
-  width: ColumnWidth;
+  /** Omitted, no width is declared and the column sizes automatically. */
+  width?: ColumnWidth;
   minWidth?: ColumnWidth;
   maxWidth?: ColumnWidth;
   "data-column"?: string;

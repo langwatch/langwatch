@@ -102,9 +102,15 @@ export type FrameSecondaryTone = "neutral" | "danger" | "success" | "info";
 /** A secondary descriptor: a `FrameAction` that may carry a tone. */
 export type FrameSecondaryAction = FrameAction & { tone?: FrameSecondaryTone };
 
+/** The primary action's colour meaning; omitted is the accent. `danger` wins over it. */
+export type FramePrimaryTone = "accent" | "neutral" | "success";
+
+/** A primary descriptor: a `FrameAction` that may carry a tone. */
+export type FramePrimaryAction = FrameAction & { tone?: FramePrimaryTone };
+
 export interface ActionRowProps {
-  /** Solid in the product's accent (red with `danger`), rightmost. */
-  primaryAction?: FrameAction;
+  /** Solid in the product's accent (red with `danger`, green or inverse with `tone`), rightmost. */
+  primaryAction?: FramePrimaryAction;
   /** Outline, left of the primary; its `tone` is danger (red), success (green) or info (blue). */
   secondaryAction?: FrameSecondaryAction;
   /** More outline actions after the singular one, in order; a footer needs no primary for them. */
@@ -149,6 +155,25 @@ function toneStyle(tone: FrameSecondaryTone | undefined) {
   } as const;
 }
 
+/** Neutral confirmation: the inverse button, near-black in light mode and light in dark mode. */
+const NEUTRAL_PRIMARY = { bg: "fg", color: "bg.panel", _hover: { opacity: 0.9 } } as const;
+
+/** The primary's palette and paint: danger wins, then the tone, then the product accent. */
+function primaryLook({
+  action,
+  primaryTone,
+  accent,
+}: {
+  action: FrameAction;
+  primaryTone: FramePrimaryTone | undefined;
+  accent: { colorPalette: string };
+}) {
+  if (action.danger) return { palette: "red", toned: undefined };
+  if (primaryTone === "success") return { palette: "green", toned: undefined };
+  const toned = primaryTone === "neutral" ? NEUTRAL_PRIMARY : undefined;
+  return { palette: accent.colorPalette, toned };
+}
+
 function relFor({ rel, target }: { rel?: string; target?: string }) {
   if (target !== "_blank") return rel;
   const tokens = (rel ?? "").split(/\s+/).filter(Boolean);
@@ -165,7 +190,7 @@ function isPlainActivation({ event, target }: { event: ReactMouseEvent; target?:
 interface LinkStyle {
   palette: string | undefined;
   size: "sm" | undefined;
-  toned: ReturnType<typeof toneStyle>;
+  toned: ReturnType<typeof toneStyle> | typeof NEUTRAL_PRIMARY;
 }
 
 /** A link action drawn as an anchor in the button look; unavailable, it loses its href. */
@@ -226,18 +251,20 @@ export function FrameActionButton({
   busy = false,
   size,
   tone,
+  primaryTone,
 }: {
   action: FrameAction;
   kind: FrameActionKind;
   busy?: boolean;
   size?: "sm";
   tone?: FrameSecondaryTone;
+  primaryTone?: FramePrimaryTone;
 }) {
   const look = LOOK[kind];
   const accent = useProductAccent();
-  const primaryPalette = action.danger ? "red" : accent.colorPalette;
-  const palette = kind === "primary" ? primaryPalette : look.palette;
-  const toned = kind === "secondary" ? toneStyle(tone) : undefined;
+  const primary = kind === "primary" ? primaryLook({ action, primaryTone, accent }) : undefined;
+  const palette = primary ? primary.palette : look.palette;
+  const toned = kind === "secondary" ? toneStyle(tone) : primary?.toned;
   const submits = action.type === "submit";
   const blocked = busy || action.loading === true;
   const unavailable = blocked || action.disabledReason !== undefined;
@@ -364,7 +391,14 @@ export function ActionRow({
           tone={action.tone}
         />
       ))}
-      {primaryAction && <FrameActionButton action={primaryAction} kind="primary" busy={busy} />}
+      {primaryAction && (
+        <FrameActionButton
+          action={primaryAction}
+          kind="primary"
+          busy={busy}
+          primaryTone={primaryAction.tone}
+        />
+      )}
     </HStack>
   );
   if (summary == null) return row;

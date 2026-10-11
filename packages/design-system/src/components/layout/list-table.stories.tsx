@@ -346,3 +346,39 @@ export const ExternalScroll: Story = {
 export const NarrowScroll: Story = {
   render: () => <Box maxWidth="320px">{wideX}</Box>,
 };
+
+/** Columns with no width size to their content; mix px, percentage and unsized. */
+export const AutomaticColumns: Story = {
+  render: () => (
+    <ListTable aria-label="Mixed widths">
+      <ListTable.ColumnGroup>
+        <ListTable.Column />
+        <ListTable.Column width="30%" />
+        <ListTable.Column width={120} />
+      </ListTable.ColumnGroup>
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Share</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Count</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+    </ListTable>
+  ),
+};
+
+/** A tall header grows with wrapped summaries instead of clipping them. */
+export const ContentHeader: Story = {
+  render: () => (
+    <ListTable aria-label="Wrapped headers" headerLayout="content">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>
+            A long column summary that wraps onto a second and third line when the column is narrow
+          </ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Pass rate</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+    </ListTable>
+  ),
+};

@@ -29,3 +29,12 @@ export const Default: Story = {};
 export const Loading: Story = { args: { loading: true } };
 export const WithoutTotal: Story = { args: { total: undefined } };
 export const AtTheEnd: Story = { args: { hasMore: false, shown: 212 } };
+
+export const CustomLabel: Story = { args: { label: "Load older chats" } };
+export const CompactLongLabel: Story = {
+  args: {
+    label: "Load older chats",
+    "aria-label": "Load older conversations",
+    appearance: "compact",
+  },
+};

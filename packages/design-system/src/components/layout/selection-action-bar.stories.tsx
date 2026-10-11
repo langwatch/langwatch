@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import { SelectionActionBar } from "./selection-action-bar.tsx";
 
@@ -111,3 +112,31 @@ export const Narrow: Story = {
     </Box>
   ),
 };
+
+function ClearRebuildsHeaderDemo() {
+  const [selected, setSelected] = useState(2);
+  return (
+    <>
+      <table id="rows" aria-label="rows">
+        <thead>
+          <tr>
+            <th key={selected}>
+              <input type="checkbox" data-select-all="" aria-label="Select all" />
+            </th>
+          </tr>
+        </thead>
+      </table>
+      {selected > 0 && (
+        <SelectionActionBar
+          label={`${selected} selected`}
+          placement="inline"
+          forTable="rows"
+          onClear={() => setSelected(0)}
+        />
+      )}
+    </>
+  );
+}
+
+/** Clearing replaces the header and unmounts the bar; focus lands on the new select-all. */
+export const ClearRebuildsHeader: Story = { render: () => <ClearRebuildsHeaderDemo /> };

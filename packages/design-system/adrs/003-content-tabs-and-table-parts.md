@@ -49,3 +49,11 @@ not a rebrand. Three of the four products already draw the accent orange; only M
   surface outside a product, draws exactly what it drew before.
 - Feature lanes replace product-colour literals with the hook's result; they add no map.
 - Brand, status, chart and vendor colours never read this map.
+
+## Amendment DS3 (2026-10-11): widths, tall headers, padding rows
+
+`ListTable.Column` `width` is optional (omitted, no width is declared). `headerLayout="content"` lets header
+cells grow with wrapped content (auto height, top aligned, 10px inset). `ListTable.PaddingRow` already takes
+`{ columns, height }`; the census no longer reads that `height` as a restyle. `LoadMore` takes `label`,
+`aria-label` and `appearance="compact"`. `SelectionActionBar` Clear restores select-all focus on the next
+animation frame, after the header has been rebuilt.
