@@ -20,7 +20,6 @@ Rule: Grouping selector dropdown
     Given the user is authenticated with "traces:view" permission
     And the project has traces with varied models, services, users, and sessions
 
-  @integration
   Scenario: Grouping selector appears in the toolbar
     When the Observe page loads
     Then a "Group by: None" select (Layers icon, label, chevron) is visible in the toolbar

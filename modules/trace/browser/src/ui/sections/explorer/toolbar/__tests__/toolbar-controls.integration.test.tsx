@@ -57,7 +57,6 @@ describe("the grouping select", () => {
     }
   });
 
-  /** @scenario "Grouping selector appears in the toolbar" */
   it("names the active grouping on the trigger", () => {
     renderWithDesignSystem(<GroupingSelect />);
 
