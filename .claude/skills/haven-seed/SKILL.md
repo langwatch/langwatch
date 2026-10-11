@@ -29,7 +29,7 @@ haven db seed --live                # a gentle live load into the last seed's or
 ```
 
 Flags: `--size tiny|small|medium|large`, `--spans <n>` (1 to 2000000), `--days <d>`,
-`--persona startup,enterprise,gateway,agent-eval|all`, `--private <n>`, `--seed <s>`,
+`--persona startup,enterprise,gateway,agent-eval|all`, `--private <n>` (default 0 on every tier: nothing binds a private org yet, so ask for them), `--seed <s>`,
 `--anchor <rfc3339>`, `--age <n>d` (history ends n days ago, to test retention),
 `--conversations <n>`, `--turns <n>`, `--shape saas|sh-licensed|sh-free`,
 `--org name=..,plan=free|licence,users=N[,persona=..][,owner=EMAIL][,admin=no]` (repeatable),

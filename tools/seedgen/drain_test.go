@@ -156,3 +156,78 @@ func TestARerunSendsNoTelemetryToAProjectAnEarlierRunMade(t *testing.T) {
 		}
 	}
 }
+
+// grantBehindExecutor answers member.add with grant_exceeds_caller_permissions until it has been
+// sent landsAfter times (0 never lands); any other refusal code stays final.
+type grantBehindExecutor struct {
+	fakeExecutor
+	code       string
+	landsAfter int
+}
+
+func (g *grantBehindExecutor) Send(ctx context.Context, action Action) (Reply, error) {
+	reply, err := g.fakeExecutor.Send(ctx, action)
+	if action.Kind != KindMemberAdd {
+		if action.Kind == KindOrgCreate {
+			reply.Refs["$team:"+strings.TrimPrefix(action.Ref, "$org:")+"/main"] = "id-team"
+		}
+		return reply, err
+	}
+	g.mu.Lock()
+	n := g.sent[action.ID]
+	g.mu.Unlock()
+	if g.landsAfter > 0 && n >= g.landsAfter {
+		return reply, err
+	}
+	return Reply{ID: action.ID, Code: g.code}, nil
+}
+
+func memberAddSends(plan *Plan, executor *fakeExecutor) (most int) {
+	for step := range plan.Steps() {
+		if a := step.Action; a != nil && a.Kind == KindMemberAdd {
+			most = max(most, executor.sent[a.ID])
+		}
+	}
+	return most
+}
+
+func TestMemberAddWaitsForTheOwnersGrantToLand(t *testing.T) {
+	plan := drainPlan(t)
+	executor := &grantBehindExecutor{fakeExecutor: fakeExecutor{sent: map[string]int{}},
+		code: "grant_exceeds_caller_permissions", landsAfter: 8}
+	result, err := Run(context.Background(), RunConfig{Plan: plan, Executor: executor,
+		Checkpoint: NewCheckpoint(plan.Run, nil), Tick: time.Millisecond, Backoff: time.Microsecond,
+		GrantWait: time.Minute})
+	if err != nil || result.IdentityRefused != 0 {
+		t.Fatalf("err %v, %d identity refusals; the grant landed after 8 tries", err, result.IdentityRefused)
+	}
+	if most := memberAddSends(plan, &executor.fakeExecutor); most < 8 {
+		t.Errorf("member.add was sent %d times, want at least 8 (more than the %d plain retries)", most, retries)
+	}
+}
+
+func TestMemberAddGivesUpWhenTheGrantNeverLands(t *testing.T) {
+	plan := drainPlan(t)
+	executor := &grantBehindExecutor{fakeExecutor: fakeExecutor{sent: map[string]int{}},
+		code: "grant_exceeds_caller_permissions"}
+	result, err := Run(context.Background(), RunConfig{Plan: plan, Executor: executor,
+		Checkpoint: NewCheckpoint(plan.Run, nil), Tick: time.Millisecond, Backoff: time.Millisecond,
+		GrantWait: 20 * time.Millisecond})
+	if err != nil || result.IdentityRefused == 0 {
+		t.Fatalf("err %v, %d identity refusals; a grant that never lands must end refused", err, result.IdentityRefused)
+	}
+}
+
+func TestOtherMemberAddRefusalsStayFinal(t *testing.T) {
+	plan := drainPlan(t)
+	executor := &grantBehindExecutor{fakeExecutor: fakeExecutor{sent: map[string]int{}}, code: "resource_limit_exceeded"}
+	result, err := Run(context.Background(), RunConfig{Plan: plan, Executor: executor,
+		Checkpoint: NewCheckpoint(plan.Run, nil), Tick: time.Millisecond, Backoff: time.Microsecond,
+		GrantWait: time.Minute})
+	if err != nil || result.IdentityRefused == 0 {
+		t.Fatalf("err %v, %d identity refusals; want a final refusal", err, result.IdentityRefused)
+	}
+	if most := memberAddSends(plan, &executor.fakeExecutor); most != 1 {
+		t.Errorf("a final refusal was sent %d times, want 1", most)
+	}
+}

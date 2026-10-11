@@ -19,7 +19,7 @@ func seedSpec() commandSpec {
 		{long: "--spans", takesValue: true, value: "<n>", summary: "exact span count, 1 to 2000000"},
 		{long: "--days", takesValue: true, value: "<d>", summary: "days of history before the anchor (default 30)"},
 		{long: "--persona", takesValue: true, value: "<list>", summary: "startup,enterprise,gateway,agent-eval or all"},
-		{long: "--private", takesValue: true, value: "<n>", summary: "organizations on private stores"},
+		{long: "--private", takesValue: true, value: "<n>", summary: "organizations on private stores (default 0)"},
 		{long: "--seed", takesValue: true, value: "<s>", summary: "the seed: the same seed gives the same content"},
 		{long: "--anchor", takesValue: true, value: "<rfc3339>", summary: "the moment history ends at"},
 		{long: "--age", takesValue: true, value: "<n>d", summary: "history ends n days ago, so retention can be tested (default 0d)"},

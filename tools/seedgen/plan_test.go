@@ -120,6 +120,17 @@ func TestRetentionComesBeforeEveryCellAndTimesStayInTheWindow(t *testing.T) {
 	}
 }
 
+func TestNoTierPlansPrivateOrgsUnlessAsked(t *testing.T) {
+	for _, tier := range Tiers {
+		if got := mustPlan(t, "--size", tier.Name).Flags.Private; got != 0 {
+			t.Errorf("%s plans %d private orgs by default, want 0", tier.Name, got)
+		}
+	}
+	if got := mustPlan(t, "--size", "small", "--private", "2").Flags.Private; got != 2 {
+		t.Errorf("--private 2 planned %d", got)
+	}
+}
+
 func TestPrivateOrgsAreNeverCreated(t *testing.T) {
 	plan := mustPlan(t, "--size", "small", "--private", "1")
 	for step := range plan.Steps() {
