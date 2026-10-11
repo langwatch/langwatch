@@ -4663,5 +4663,145 @@
     "line": 807,
     "reason": "Approved: the protected batch comparison grid keeps its own cells, widths and group heading (astra review batch-comparison-table.md).",
     "owner": "workflow"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/explorer/trace-table/virtual-spacer.tsx",
+    "rule": "legacy-table-part",
+    "line": 18,
+    "reason": "Approved: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/explorer/trace-table/virtual-spacer.tsx",
+    "rule": "legacy-table-part",
+    "line": 19,
+    "reason": "Approved: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/toolbar/lens-tab.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 73,
+    "reason": "Approved: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/toolbar/lens-tab.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 126,
+    "reason": "Approved: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/search-bar/floating-ai-bar.tsx",
+    "rule": "card-box",
+    "line": 145,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/search-bar/floating-langy-bar.tsx",
+    "rule": "card-box",
+    "line": 115,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/search-bar/token-value-picker.tsx",
+    "rule": "card-box",
+    "line": 179,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/search-bar/token-value-picker.tsx",
+    "rule": "card-box",
+    "line": 202,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/toolbar/column-picker-content.tsx",
+    "rule": "card-box",
+    "line": 218,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/conversation-lens-body.tsx",
+    "rule": "empty-text",
+    "line": 189,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/registry/addons/conversation/chat-turns.tsx",
+    "rule": "hand-append",
+    "line": 67,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/registry/addons/conversation/compact-turns.tsx",
+    "rule": "hand-append",
+    "line": 360,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/registry/addons/trace/expanded-peek-addon.tsx",
+    "rule": "card-box",
+    "line": 276,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/registry/shared-chips.tsx",
+    "rule": "card-box",
+    "line": 92,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/registry/shared-chips.tsx",
+    "rule": "card-box",
+    "line": 142,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/registry/shared-chips.tsx",
+    "rule": "card-box",
+    "line": 273,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/trace-find-bar.tsx",
+    "rule": "card-box",
+    "line": 73,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/trace-find-bar.tsx",
+    "rule": "card-box",
+    "line": 138,
+    "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
+    "owner": "trace",
+    "disposition": "reviewed"
   }
 ]
