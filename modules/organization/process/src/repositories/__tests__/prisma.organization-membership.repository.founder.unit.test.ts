@@ -61,7 +61,10 @@ describe("PrismaOrganizationMembershipRepository.createAndAssign", () => {
 
       const created = await repository.createAndAssign(FOUNDER);
 
-      expect(created.organization.id).toBe(FOUNDER.orgId);
+      expect(created).toMatchObject({
+        organization: { id: FOUNDER.orgId },
+        grantsConfirmed: false,
+      });
       expect(enabled).toEqual([{ disabledAt: null }]);
       expect(deleted).not.toHaveBeenCalled();
     });

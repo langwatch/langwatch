@@ -208,6 +208,15 @@ guards refuse a new `DROP TABLE` or `DROP COLUMN` in a Prisma folder or goose fi
 `langwatch@v*` tag; released history keeps its drops. Specs: `packages/upgrade/specs/contract-order.feature`,
 `specs/ops/migration-safety.feature`.
 
+### 9. Amendment 2026-10-11: jobs start once the blocking part is done
+
+2026-10-11 (Alex, T0-F11): the worker takes jobs as soon as the schema and the blocking steps are
+done; LangWatchQL setup and the system-migrations pass request finish alongside in the same run,
+under its lease, and a failure among them is logged and recorded on the run without holding jobs.
+`pnpm task upgrade` still waits for the whole run and exits by its outcome. The pass request waits
+on its queue jobs ahead of any backlog, which the now-consuming worker runs. Spec:
+`specs/upgrade/in-app-upgrade.feature`.
+
 ## Alternatives considered
 
 - **Number cloud builds** (a build counter beside the `git-<sha>`). Ordering builds

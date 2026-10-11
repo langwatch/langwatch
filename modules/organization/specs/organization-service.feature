@@ -372,6 +372,12 @@ Feature: Shared organization service
     # T0-F11: deleting it here dropped the grants and stranded the founder on onboarding.
 
   @unit
+  Scenario: The sign-up answer says whether the founder's grants are confirmed
+    Given a sign-up whose founder grants were appended
+    When the organization is initialized
+    Then the answer carries grantsConfirmed true when they landed in time and false while they still land
+
+  @unit
   Scenario: A founder organization whose grants are refused is removed
     Given a sign-up whose founder grants are refused
     When the organization is created

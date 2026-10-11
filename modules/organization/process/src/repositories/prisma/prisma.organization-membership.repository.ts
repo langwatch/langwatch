@@ -84,6 +84,7 @@ import type {
   AuditLogFilters,
   CreateAndAssignInput,
   CreateAndAssignResult,
+  FounderOrganizationCreated,
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
@@ -1010,13 +1011,14 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return organization;
   }
 
-  async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
+  async createAndAssign(input: CreateAndAssignInput): Promise<FounderOrganizationCreated> {
     const created = await this.createFounderBootstrap(input);
+    let landed: boolean;
 
     try {
       // The membership stays disabled while the founder's two grants make
       // their round trip, so committing the organization first exposes no access.
-      const landed = await landedInTime(() =>
+      landed = await landedInTime(() =>
         this.writer.attachBindings({
           organizationId: created.organization.id,
           bindings: [
@@ -1072,7 +1074,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       throw error;
     }
 
-    return { organization: created.organization, team: created.team };
+    return { organization: created.organization, team: created.team, grantsConfirmed: landed };
   }
 
   /** The organization, its first team and the founder's membership, held disabled. */

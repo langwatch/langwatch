@@ -1398,7 +1398,9 @@ process (Alex, 2026-10-11: the runner composed once in `packages/upgrade`, `runI
 Prisma and goose still run as their own programs), waits while another runner holds the lease,
 takes no job until the ledger is current, and after a failed run waits for a Retry that returns
 the step to `pending` (Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker
-never does"). `pnpm task upgrade` is a run-once worker (Alex, 2026-10-11): it starts the worker,
+never does"). The worker takes jobs once the blocking part is done (the schema and the blocking
+steps), while LangWatchQL setup and the system-migrations pass request finish alongside, their
+outcome recorded on the run (Alex, 2026-10-11, T0-F11). `pnpm task upgrade` is a run-once worker (Alex, 2026-10-11): it starts the worker,
 which runs the same upgrade once under the same lease and exits 0, 1 or 3; `status`, `plan` and
 `steps` stay reads in the tasks app (apps/api `start:prepare:db`: upgrade alone; no
 system-migrations pass); the root `prisma:migrate` and
