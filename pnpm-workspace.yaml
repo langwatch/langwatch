@@ -14,6 +14,7 @@ packages:
   - dev/tests/agentic-e2e
   - dev/tests/e2e-stack
   - dev/scripts
+  - docs/site
 
 catalog:
   '@ai-sdk/anthropic': ^3.0.44
