@@ -378,6 +378,15 @@ Feature: Running system migrations across organizations
     When a pass runs
     Then "org_acme" is held with reason "pending"
 
+  # A first hold is usually a projection still folding under the upgrade's
+  # drain; the next pass re-proves it. Only a hold that persists is a warn.
+  @unit
+  Scenario: A first hold is logged at info and a hold that persists at warn
+    Given a migration whose own proof disagrees for "org_acme"
+    When a pass holds it for the first time
+    Then the hold is logged at info
+    And when a later pass still holds it, the hold is logged at warn
+
   @unit
   Scenario: A tenant that leaves held drops its reason
     Given "org_acme" is held

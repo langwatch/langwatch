@@ -19,6 +19,7 @@ type StoredObjectsClickHouseClient = Readonly<{
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
     SKIP_TENANT_CHECK?: true;
+    SKIP_COLD_SCAN_CHECK?: true;
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
 }>;
 
@@ -47,6 +48,7 @@ export class RoutedStoredObjectsClickHouse implements StoredObjectsClickHouse {
           sql: input.query,
           params: input.query_params,
           SKIP_TENANT_CHECK: input.SKIP_TENANT_CHECK,
+          SKIP_COLD_SCAN_CHECK: input.SKIP_COLD_SCAN_CHECK,
         });
         return { json: async <Result>() => result.rows as Result[] };
       },

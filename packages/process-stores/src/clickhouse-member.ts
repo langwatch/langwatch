@@ -1,6 +1,11 @@
 /** One ClickHouse client that routes itself. Modules never resolve endpoints
  * because every statement carries tenantId filtering, enforced by this driver. */
-import { createClient, type ClickHouseClient, type ClickHouseSettings } from "@clickhouse/client";
+import {
+  createClient,
+  type ClickHouseClient,
+  type ClickHouseClientConfigOptions,
+  type ClickHouseSettings,
+} from "@clickhouse/client";
 import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
@@ -16,7 +21,9 @@ import {
   setWindowedReadMetrics,
   StatementReporter,
   TenantGuard,
+  vendorLoggerClassFor,
   type StatementMetrics,
+  type VendorLogSink,
   type WindowedReadMetrics,
   type ClickHouseClientCreationInput,
   type ClickHouseLaneStats,
@@ -35,20 +42,39 @@ import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
 
 /** The vendor client, built once per physical endpoint this process reaches. */
 class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseClient> {
+  private readonly logSink = createLogger("langwatch:clickhouse:driver");
+
   constructor(private readonly config: ClickHouseConfig) {
     super();
   }
 
   create(input: ClickHouseClientCreationInput): ClickHouseClient {
-    return createClient({
-      url: input.url,
-      max_open_connections: input.maxOpenConnections,
-      ...(this.config.requestTimeoutMs === undefined
-        ? {}
-        : { request_timeout: this.config.requestTimeoutMs }),
-      clickhouse_settings: vendorClickHouseSettings(this.config.settings),
-    });
+    return createClient(
+      vendorClickHouseClientOptions({ config: this.config, input, logSink: this.logSink }),
+    );
   }
+}
+
+/**
+ * The driver logs through the process's logger, whose policy drops the driver's own error: the
+ * retry wrapper warns per attempt, and only the final failure reaches the caller.
+ */
+export function vendorClickHouseClientOptions({
+  config,
+  input,
+  logSink,
+}: {
+  config: ClickHouseConfig;
+  input: Pick<ClickHouseClientCreationInput, "url" | "maxOpenConnections">;
+  logSink: VendorLogSink;
+}): ClickHouseClientConfigOptions {
+  return {
+    url: input.url,
+    max_open_connections: input.maxOpenConnections,
+    ...(config.requestTimeoutMs === undefined ? {} : { request_timeout: config.requestTimeoutMs }),
+    clickhouse_settings: vendorClickHouseSettings(config.settings),
+    log: { LoggerClass: vendorLoggerClassFor(logSink) },
+  };
 }
 
 /** JS Dates travel as ISO strings, which ClickHouse parses only best-effort, as main always set. */

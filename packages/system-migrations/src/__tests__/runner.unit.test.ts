@@ -2,7 +2,7 @@ import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MigrationLeaseRepository } from "../lease.repository.ts";
-import { SystemMigrationRunnerService } from "../runner.service.ts";
+import { heldNoticeLevel, SystemMigrationRunnerService } from "../runner.service.ts";
 import {
   SystemMigrationRecordNotFoundError,
   type SystemMigrationStateRepository,
@@ -783,6 +783,27 @@ describe("SystemMigrationRunnerService held tenants", () => {
       })).runPass();
 
       expect(await acme()).toMatchObject({ status: "migrated", heldReason: "pending" });
+    });
+  });
+
+  describe("when the hold is logged", () => {
+    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
+    it("logs a first hold at info, since the next pass re-proves it", () => {
+      expect(heldNoticeLevel({ existing: undefined })).toBe("info");
+    });
+
+    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
+    it("logs a tenant still held from an earlier pass at warn", () => {
+      const held: TenantMigrationRecord = {
+        migrationName: "m1",
+        tenantId: "org_acme",
+        status: "migrated",
+        report: null,
+        heldReason: "proof",
+        heldSince: nowInstant(),
+      };
+
+      expect(heldNoticeLevel({ existing: held })).toBe("warn");
     });
   });
 

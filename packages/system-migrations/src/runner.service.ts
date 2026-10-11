@@ -321,7 +321,7 @@ export class SystemMigrationRunnerService {
       const { heldReason } = record;
       const fields = { migration: migration.name, tenantId, status: outcome.status };
       if (heldReason) {
-        logger.warn(
+        logger[heldNoticeLevel({ existing })](
           { ...fields, heldReason },
           "tenant migration held; it stays on its legacy path and nothing waits on it",
         );
@@ -338,6 +338,18 @@ export class SystemMigrationRunnerService {
       );
     }
   }
+}
+
+/**
+ * A first hold is usually a projection still folding, and the next pass re-proves it, so it is
+ * info; a tenant still held from an earlier pass is a warn.
+ */
+export function heldNoticeLevel({
+  existing,
+}: {
+  existing: TenantMigrationRecord | undefined;
+}): "info" | "warn" {
+  return existing?.status === "migrated" ? "warn" : "info";
 }
 
 /** Held carries why and since when (the first moment, while still held); else neither. */

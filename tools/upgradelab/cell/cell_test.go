@@ -61,6 +61,9 @@ func TestEveryProfileRoutesToTheCellsOwnStores(t *testing.T) {
 		if !strings.Contains(env["ADMIN_EMAILS"], "seed+1@snapshot.test") {
 			t.Errorf("%s: the seed account is no platform operator: %q", name, env["ADMIN_EMAILS"])
 		}
+		if env["PINO_LOG_LEVEL"] != "info" {
+			t.Errorf("%s: releases log at %q, want info as cloud runs them", name, env["PINO_LOG_LEVEL"])
+		}
 	}
 	hybrid, _ := BuildEnv(EnvInput{Profile: Profiles["hybrid"], Stores: stores, APIPort: 7100})
 	if got := hybrid["CLICKHOUSE_URL__snap__snap_hybrid_org_4"]; got != "http://d:p@127.0.0.1:8123/upgradelab_x_p_snap" {

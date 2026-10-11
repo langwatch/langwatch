@@ -66,6 +66,8 @@ export class ClickHouseStoredObjectLegacySourceRepository extends StoredObjectLe
       // Read-only legacy index under ADR-158: stored_objects has no TenantId column, so the
       // statement is filtered by project_id.
       SKIP_TENANT_CHECK: true,
+      // The import copies a project's whole legacy index, so every created_at partition is read.
+      SKIP_COLD_SCAN_CHECK: true,
     });
     const rows = await result.json<unknown>();
     return rows.map((raw) => {
