@@ -34,7 +34,10 @@ import { CopyDatasetDialog } from "./copy-dataset-dialog.tsx";
 
 const DATASETS_DOCS = "https://docs.langwatch.ai/datasets/overview";
 
-/** What the list shows, from the read. An aggregate project only ever shows its notice. */
+/**
+ * What the list shows, from the read. An aggregate project only ever shows its notice; a
+ * failed refresh keeps the rows, and ListPage shows the error inline over them.
+ */
 function listStateOf({
   isAggregate,
   isError,
@@ -375,16 +378,12 @@ export default function DatasetsScreen() {
                 },
               }
         }
-        error={
-          listState === "error"
-            ? {
-                title: "Couldn't load the datasets",
-                description: "Try again, or read how datasets work.",
-                onRetry: () => void datasets.refetch(),
-                next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
-              }
-            : undefined
-        }
+        error={{
+          title: "Couldn't load the datasets",
+          description: "Try again, or read how datasets work.",
+          onRetry: () => void datasets.refetch(),
+          next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
+        }}
         empty={{
           title: "No datasets yet",
           description:

@@ -83,7 +83,7 @@ Feature: Datasets list page
     Given my datasets have loaded
     When a later refresh of the list fails
     Then I still see my datasets
-    And I am not told the datasets could not be loaded
+    And I am told the refresh failed, above them
 
   # ============================================================================
   # Creating

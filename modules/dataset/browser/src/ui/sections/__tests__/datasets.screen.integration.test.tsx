@@ -204,7 +204,7 @@ describe("Datasets list screen", () => {
 
   describe("given a refresh fails after the datasets loaded", () => {
     /** @scenario A failed refresh keeps the datasets I already see */
-    it("keeps the rows and shows no error title", () => {
+    it("keeps the rows with the error as a notice over them", () => {
       datasetsQuery.current = {
         data: [makeDataset("ds-1", "offline evals", 12)],
         isLoading: false,
@@ -214,7 +214,7 @@ describe("Datasets list screen", () => {
       renderWithDatasetHost(<DatasetsScreen />);
 
       expect(screen.getByText("offline evals")).toBeInTheDocument();
-      expect(screen.queryByText("Couldn't load the datasets")).not.toBeInTheDocument();
+      expect(screen.getByText("Couldn't load the datasets")).toBeInTheDocument();
     });
   });
 
