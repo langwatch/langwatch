@@ -403,7 +403,8 @@ describe("UsageService over the trace count", () => {
         projectId,
         month,
         seeded: { traces: seeded, cutAt: 0 },
-        liveByHour: { "3600000": count - seeded },
+        live: count - seeded,
+        liveByMinute: {},
         LastEventOccurredAt: 0,
       };
       await meter.save({ organizationId: "org-1", state, traces: count, appliedEventIds: [] });

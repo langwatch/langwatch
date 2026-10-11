@@ -6,9 +6,9 @@ Feature: Trace records each trace's first sighting for entitlement's count
   Ruling (Alex, 2026-10-11): entitlement's trace meter is a count per project and month, fed by
   facts. First seen means the trace summary's first write (`trace_summaries.CreatedAt`), so a trace
   that started before the 1st but first reached us this month counts this month, and one first seen
-  last month does not count again. Cut: traces first seen before it are in the upgrade's count, from
-  it on each arrives as its own fact. The cut falls on a whole hour, so entitlement can drop the
-  hours before it whichever fact arrives first.
+  last month does not count again. Cut (Alex, 2026-10-11): the moment the old writers are gone,
+  kept exactly. The upgrade counts up to the first whole UTC minute at or after it; entitlement keeps
+  sightings by minute until the seed lands, so it drops the ones the seed counted.
 
   @unit
   Scenario: Each trace is recorded as first seen once, at its summary's first write
@@ -43,10 +43,11 @@ Feature: Trace records each trace's first sighting for entitlement's count
     And a project with none gets no fact
 
   @unit
-  Scenario: The count's cut falls on the next whole hour, once the old writers are gone
+  Scenario: The count's cut is the moment the old writers are gone, kept exactly
     Given the step needs the old writers gone, so every worker records first sightings
-    When it starts at 14:20
-    Then its cut is 15:00 and it counts only once the clock has passed the cut
+    When it starts at 14:20:30
+    Then its cut is 14:20:30, it counts traces first seen before 14:21
+    And it waits only until that minute has settled, about a minute
 
   @unit
   Scenario: The upgrade pages projects and saves its cut and each page it completes

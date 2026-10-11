@@ -103,7 +103,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
         mode: "background",
         description:
           "Records each project's traces seen so far this month, so plan trace limits count from a complete month.",
-        // An old worker records no first sighting, so the cut falls after the last one is gone.
+        // An old worker records no first sighting: the cut is the moment the last one is gone.
         needsOldWritersGone: true,
         run: ({ checkpoint, dryRun, signal }) => {
           const resumed = traceCountSeedReportSchema.safeParse(checkpoint.resumeFrom);

@@ -1,6 +1,6 @@
 import { Temporal } from "@langwatch/time";
 
-const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
 
 /**
  * How far a span's append may sit after its summary's first write and still be the trace's first
@@ -24,9 +24,12 @@ export function monthStartOf(month: string): number {
     .toZonedDateTime({ timeZone: "UTC" }).epochMilliseconds;
 }
 
-/** The count's cut: the next whole UTC hour at or after an instant, so it falls on an hour. */
-export function countCutAfter(epochMs: number): number {
-  return Math.ceil(epochMs / HOUR_MS) * HOUR_MS;
+/**
+ * Where the upgrade's count stops for a cut: the first whole UTC minute at or after it. Entitlement
+ * counts sightings by minute, so the minute holding the cut belongs to the count.
+ */
+export function countedUntilOf(cutAt: number): number {
+  return Math.ceil(cutAt / MINUTE_MS) * MINUTE_MS;
 }
 
 /**

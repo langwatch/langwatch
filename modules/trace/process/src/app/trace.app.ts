@@ -384,7 +384,6 @@ import type { TraceProcessingCommands } from "../services/trace-processing-comma
 import { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 import { TraceRetentionFloorService } from "../services/trace-retention-floor.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
-import { TraceUsageCountService } from "../services/trace-usage-count.service.ts";
 import {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,
@@ -963,10 +962,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
     });
     app.#processingCommands = commands;
-    app.#usageCounts = TraceUsageCountService.create({
-      projects: setup.dependencies.projects,
-      usageCount: setup.repositories.usageCount,
-    });
     app.#modelSpend = setup.repositories.modelSpend;
     app.#attributeSpend = setup.repositories.attributeSpend;
     app.#attributedRollup = setup.repositories.attributedRollup;
@@ -1286,7 +1281,6 @@ export class TraceModule implements TraceApi, CollectorApp {
   #retention: RetentionPolicyResolver | null = null;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
-  #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
   #attributeSpend: TraceAttributeSpendRepository | null = null;
   #attributedRollup: TraceAttributedRollupRepository | null = null;
@@ -1300,16 +1294,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw new TraceCapabilityUnavailableError("this process", "the precondition sample");
     }
     return this.#preconditionSamples.readSample(input);
-  }
-
-  async countTracesByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[]> {
-    if (!this.#usageCounts) {
-      throw new TraceCapabilityUnavailableError("this process", "the trace usage count");
-    }
-    return this.#usageCounts.countByProjects(input);
   }
 
   /** trace_processing for this process's role: producers send, consumers fold and react. */

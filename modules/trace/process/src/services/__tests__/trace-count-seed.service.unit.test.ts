@@ -4,10 +4,11 @@ import { describe, expect, it } from "vitest";
 import { MemoryTraceUsageCountRepository } from "../../repositories/memory/memory.trace-usage-count.repository.ts";
 import { TraceCountSeedService, type TraceCountSeedReport } from "../trace-count-seed.service.ts";
 
-const HOUR = 3_600_000;
-/** The step starts at 14:20 on 8 October; its cut is 15:00. */
-const STARTED_AT = Date.UTC(2026, 9, 8, 14, 20);
-const CUT = Date.UTC(2026, 9, 8, 15);
+/** The step starts once the old writers are gone, 14:20:30 on 8 October: that is its cut. */
+const STARTED_AT = Date.UTC(2026, 9, 8, 14, 20, 30);
+const CUT = STARTED_AT;
+/** The count runs to the first whole minute at or after the cut. */
+const COUNTED_UNTIL = Date.UTC(2026, 9, 8, 14, 21);
 
 type Recorded = Parameters<
   Parameters<typeof TraceCountSeedService.create>[0]["milestones"]["recordTracesCountedBeforeCut"]
@@ -20,11 +21,11 @@ function compose({ pageSize = 2 }: { pageSize?: number } = {}) {
     usageCount.record({ tenantId, traceId, createdAt, occurredAtMs: STARTED_AT });
   trace("a", "a1", "2026-10-01 00:00:00.000");
   trace("a", "a1", "2026-10-02 00:00:00.000");
-  trace("a", "a2", "2026-10-08 14:59:59.999");
+  trace("a", "a2", "2026-10-08 14:20:45.000");
   trace("c", "c1", "2026-10-05 10:00:00.000");
   trace("d", "d1", "2026-09-30 23:00:00.000");
   trace("d", "d1", "2026-10-03 00:00:00.000");
-  trace("e", "e1", "2026-10-08 15:00:00.000");
+  trace("e", "e1", "2026-10-08 14:21:00.000");
   const ids = ["a", "b", "c", "d", "e"];
   const pagesAsked: (string | undefined)[] = [];
   const recorded: Recorded[] = [];
@@ -78,17 +79,17 @@ describe("TraceCountSeedService", () => {
         { tenantId: "c", projectId: "c", month: "2026-10", cutAt: CUT, traces: 1 },
       ]);
       expect(report).toMatchObject({ cutAt: CUT, month: "2026-10", projects: 2, traces: 3 });
-      expect(now()).toBeGreaterThanOrEqual(CUT);
+      expect(now()).toBeGreaterThanOrEqual(COUNTED_UNTIL);
     });
 
-    /** @scenario "The count's cut falls on the next whole hour, once the old writers are gone" */
-    it("cuts on the next whole hour and counts only after the clock has passed it", async () => {
-      const { run, recorded } = compose();
+    /** @scenario "The count's cut is the moment the old writers are gone, kept exactly" */
+    it("cuts at its start, counts its minute, and waits only until that minute has settled", async () => {
+      const { run, recorded, now } = compose();
 
       await run();
 
-      expect(CUT - STARTED_AT).toBeLessThan(HOUR);
       expect(recorded.every((fact) => fact.cutAt === CUT)).toBe(true);
+      expect(now() - CUT).toBeLessThanOrEqual(2 * 60_000);
     });
 
     /** @scenario "The upgrade pages projects and saves its cut and each page it completes" */
@@ -129,7 +130,7 @@ describe("TraceCountSeedService", () => {
       expect(recorded).toEqual([]);
       expect(saved).toEqual([]);
       expect(now()).toBe(STARTED_AT);
-      // Counted up to now, 14:20: a2, first seen at 14:59, is not yet in.
+      // Counted up to now, 14:20:30: a2, first seen at 14:20:45, is not yet in.
       expect(report).toMatchObject({ cutAt: CUT, projects: 2, traces: 2 });
     });
 

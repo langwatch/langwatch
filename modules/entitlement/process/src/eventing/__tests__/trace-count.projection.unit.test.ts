@@ -16,6 +16,7 @@ const ORGANIZATION = "org_1";
 const PROJECT = "project_a";
 const MONTH = "2026-10";
 const HOUR = 3_600_000;
+const MINUTE = 60_000;
 const CUT = Date.UTC(2026, 9, 8, 14);
 
 let sequence = 0;
@@ -103,6 +104,14 @@ const untouchedStore = TraceCountStoreService.create({
   projects: { getProjectPlacement: async () => ({ kind: "unplaced" as const }) },
 });
 
+/** The pure fold over facts, from a given state or from init. */
+function foldAll(events: readonly Event[], from?: TraceCountState): TraceCountState {
+  const { fold } = traceCountPeerFold(untouchedStore);
+  let state = from ?? fold.init();
+  for (const event of events) state = fold.apply(state, event as Parameters<typeof fold.apply>[1]);
+  return state;
+}
+
 /** A replay: every fact from init, deduplicated by idempotency key, in the order given. */
 function replay(events: readonly Event[]): number {
   const { fold } = traceCountPeerFold(untouchedStore);
@@ -163,14 +172,43 @@ describe("the trace count fold", () => {
       await expect(lane.total()).resolves.toBe(42);
     });
 
-    /** @scenario "A later seed's cut wins whatever order the seeds arrive in" */
-    it("keeps the latest cut when an earlier one arrives after it", async () => {
+    /** @scenario "A seed's cut inside a minute leaves that minute to the seed" */
+    it("drops sightings in the cut's own minute, which trace's seed counted", async () => {
+      const cutAt = CUT + 30_000;
       const lane = liveLane();
-      await lane.deliver(firstSeen({ traceId: "between", firstSeenAt: CUT + 30 * 60_000 }));
-      await lane.deliver(seed({ traces: 41, cutAt: CUT + HOUR }));
-      await lane.deliver(seed({ traces: 40, cutAt: CUT }));
+      await lane.deliver(firstSeen({ traceId: "same-minute", firstSeenAt: CUT + 45_000 }));
+      await lane.deliver(seed({ traces: 40, cutAt }));
+      await lane.deliver(firstSeen({ traceId: "same-minute-late", firstSeenAt: CUT + 50_000 }));
+      await lane.deliver(firstSeen({ traceId: "next-minute", firstSeenAt: CUT + MINUTE }));
 
       await expect(lane.total()).resolves.toBe(41);
+    });
+
+    /** @scenario "Once seeded, the month keeps one running total and no minutes" */
+    it("empties the minutes when the seed lands and counts later sightings in one number", async () => {
+      const state = foldAll([
+        firstSeen({ traceId: "early", firstSeenAt: CUT - MINUTE }),
+        firstSeen({ traceId: "late", firstSeenAt: CUT + MINUTE }),
+      ]);
+      expect(Object.keys(state.liveByMinute)).toHaveLength(2);
+
+      const seededState = foldAll(
+        [seed({ traces: 40 }), firstSeen({ traceId: "after", firstSeenAt: CUT + 2 * MINUTE })],
+        state,
+      );
+
+      expect(seededState.liveByMinute).toEqual({});
+      expect(seededState.live).toBe(2);
+      expect(traceCountOf(seededState)).toBe(42);
+    });
+
+    /** @scenario "The first seed of a month sets its base; a later one changes nothing" */
+    it("keeps the first seed applied, as a replay keeps the first fact of one key", async () => {
+      const lane = liveLane();
+      await lane.deliver(seed({ traces: 40, cutAt: CUT }));
+      await lane.deliver(seed({ traces: 41, cutAt: CUT + MINUTE, id: "evt_second_run" }));
+
+      await expect(lane.total()).resolves.toBe(40);
     });
   });
 

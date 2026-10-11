@@ -1,19 +1,22 @@
 import { z } from "zod";
 
 /** The count's version; a stored row of another version reads as undecodable. */
-export const TRACE_COUNT_PROJECTION_VERSION = "2026-10-11" as const;
+export const TRACE_COUNT_PROJECTION_VERSION = "2026-10-12" as const;
 
 /**
  * One project's traces in one UTC month, folded from trace's facts: the seeded base counted up to
- * the upgrade's cut, and every trace first seen since, by the hour it was first seen in.
+ * the upgrade's cut, and a running total of first sightings. Until the seed lands, sightings are
+ * also kept per UTC minute, so the seed can drop the ones it counted; then the minutes are emptied.
  */
 export const traceCountStateSchema = z.object({
   projectId: z.string(),
   /** `YYYY-MM`. */
   month: z.string(),
   seeded: z.object({ traces: z.number(), cutAt: z.number() }).nullable(),
-  /** First sightings per UTC hour, keyed by the hour's first instant in epoch ms. */
-  liveByHour: z.record(z.string(), z.number()),
+  /** Sightings counted on top of the seed: every one before it lands, from its cut after. */
+  live: z.number().default(0),
+  /** Unseeded only: first sightings per UTC minute, keyed by the minute's first instant in ms. */
+  liveByMinute: z.record(z.string(), z.number()).default({}),
   LastEventOccurredAt: z.number(),
 });
 export type TraceCountState = z.infer<typeof traceCountStateSchema>;

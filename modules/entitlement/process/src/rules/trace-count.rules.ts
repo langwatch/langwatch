@@ -1,20 +1,20 @@
 import type { TraceCountState } from "../repositories/trace-count.repository.ts";
 
-const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
 
-/** The month's traces: the seeded base plus every first sighting at or after its cut. */
+/** The first instant of the UTC minute an instant falls in. */
+function minuteOf(epochMs: number): number {
+  return Math.floor(epochMs / MINUTE_MS) * MINUTE_MS;
+}
+
+/** The month's traces: the seeded base plus the running total of first sightings. */
 export function traceCountOf(state: TraceCountState): number {
-  const cutAt = state.seeded?.cutAt ?? Number.NEGATIVE_INFINITY;
-  let live = 0;
-  for (const [hour, count] of Object.entries(state.liveByHour)) {
-    if (Number(hour) >= cutAt) live += count;
-  }
-  return (state.seeded?.traces ?? 0) + live;
+  return (state.seeded?.traces ?? 0) + state.live;
 }
 
 /**
- * One trace first seen: counted in its hour, unless the seed already counted it. Facts are
- * idempotency-keyed by trace and month, and the executor drops redelivered event ids.
+ * One trace first seen. After the seed it counts only from the cut's next whole minute on, since
+ * trace's seed counted up to that minute; before the seed it is also kept by minute.
  */
 export function countFirstSighting({
   state,
@@ -23,17 +23,21 @@ export function countFirstSighting({
   state: TraceCountState;
   firstSeenAt: number;
 }): TraceCountState {
-  if (state.seeded && firstSeenAt < state.seeded.cutAt) return state;
-  const hour = String(Math.floor(firstSeenAt / HOUR_MS) * HOUR_MS);
+  const minute = minuteOf(firstSeenAt);
+  if (state.seeded) {
+    return minute >= state.seeded.cutAt ? { ...state, live: state.live + 1 } : state;
+  }
+  const key = String(minute);
   return {
     ...state,
-    liveByHour: { ...state.liveByHour, [hour]: (state.liveByHour[hour] ?? 0) + 1 },
+    live: state.live + 1,
+    liveByMinute: { ...state.liveByMinute, [key]: (state.liveByMinute[key] ?? 0) + 1 },
   };
 }
 
 /**
- * Sets the seeded base. The latest cut wins whatever the arrival order, and hours before it are
- * dropped: the seed counted them. Trace cuts on a whole hour, so no hour straddles the cut.
+ * Sets the seeded base once: the minutes before its cut are dropped, since the seed counted them,
+ * and the rest become the running total. A later seed of the same month changes nothing.
  */
 export function setSeededBase({
   state,
@@ -44,9 +48,10 @@ export function setSeededBase({
   traces: number;
   cutAt: number;
 }): TraceCountState {
-  if (state.seeded && cutAt < state.seeded.cutAt) return state;
-  const liveByHour = Object.fromEntries(
-    Object.entries(state.liveByHour).filter(([hour]) => Number(hour) >= cutAt),
-  );
-  return { ...state, seeded: { traces, cutAt }, liveByHour };
+  if (state.seeded) return state;
+  let live = 0;
+  for (const [minute, count] of Object.entries(state.liveByMinute)) {
+    if (Number(minute) >= cutAt) live += count;
+  }
+  return { ...state, seeded: { traces, cutAt }, live, liveByMinute: {} };
 }

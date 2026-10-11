@@ -10,7 +10,7 @@ const FIRST_SEEN_LOOKBACK_MS = 31 * 24 * 60 * 60 * 1_000;
 
 type AttributeCountRow = { value: string; count: string | number };
 
-/** Main's `queryTraceSummariesTotalUniq` for one project: HyperLogLog `uniq`, about 1% error. */
+/** ClickHouse reads of per-project trace counts over `trace_summaries`. */
 export class TraceUsageCountClickHouseRepository extends TraceUsageCountRepository {
   readonly #clickhouse: ClickHouseQueryClient;
 
@@ -21,30 +21,6 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
 
   static create(clickhouse: ClickHouseQueryClient): TraceUsageCountClickHouseRepository {
     return new TraceUsageCountClickHouseRepository(clickhouse);
-  }
-
-  async countDistinctTraces(input: {
-    tenantId: string;
-    startDate: string;
-    endDate: string;
-  }): Promise<number> {
-    const result = await this.#clickhouse.query<TotalRow>({
-      tenantId: input.tenantId,
-      sql: `
-        SELECT uniq(TraceId) as total
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND CreatedAt >= {startDate:DateTime64(3)}
-          AND CreatedAt < {endDate:DateTime64(3)}
-      `,
-      params: {
-        tenantId: input.tenantId,
-        startDate: input.startDate,
-        endDate: input.endDate,
-      },
-    });
-
-    return Number(result.rows[0]?.total ?? 0);
   }
 
   /**

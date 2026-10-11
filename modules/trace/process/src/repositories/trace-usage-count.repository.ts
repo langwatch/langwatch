@@ -1,14 +1,7 @@
 import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
-/** One project's distinct traces over a UTC window, read from the trace_summaries projection. */
+/** Per-project trace counts read from the trace_summaries projection. */
 export abstract class TraceUsageCountRepository {
-  abstract countDistinctTraces(input: {
-    tenantId: string;
-    /** UTC ClickHouse DateTime64(3): `YYYY-MM-DD HH:mm:ss.SSS`, inclusive. */
-    startDate: string;
-    /** UTC ClickHouse DateTime64(3): `YYYY-MM-DD HH:mm:ss.SSS`, exclusive. */
-    endDate: string;
-  }): Promise<number>;
   /**
    * Distinct traces whose summary was first written in `[fromMs, toMs)`: a trace first seen
    * before `fromMs` is not counted again. Exact, for entitlement's seeded trace count.

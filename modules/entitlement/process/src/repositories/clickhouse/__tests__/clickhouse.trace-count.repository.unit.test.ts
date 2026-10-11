@@ -46,7 +46,8 @@ const STATE: TraceCountState = {
   projectId: "project_1",
   month: "2026-10",
   seeded: { traces: 40, cutAt: 1 },
-  liveByHour: { "3600000": 2 },
+  live: 2,
+  liveByMinute: {},
   LastEventOccurredAt: 5,
 };
 

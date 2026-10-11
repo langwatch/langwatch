@@ -67,9 +67,12 @@ export type TraceFirstSeenEventData = z.infer<typeof traceFirstSeenEventDataSche
 const tracesCountedBeforeCutEventDataSchemaDefinition = z.object({
   tenantId: z.string().min(1),
   projectId: z.string().min(1),
-  /** `YYYY-MM`, the UTC month counted from its first instant up to `cutAt`. */
+  /** `YYYY-MM`, the UTC month counted from its first instant. */
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
-  /** Epoch ms; traces first seen from here on arrive as {@link TRACE_FIRST_SEEN_EVENT_TYPE}. */
+  /**
+   * Epoch ms, the moment the old writers were gone. `traces` counts up to the first whole UTC
+   * minute at or after it; later minutes arrive as {@link TRACE_FIRST_SEEN_EVENT_TYPE} facts.
+   */
   cutAt: z.number().int().nonnegative(),
   traces: z.number().int().nonnegative(),
 });

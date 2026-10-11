@@ -5,13 +5,13 @@ import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
-import { countCutAfter, monthStartOf, usageMonthOf } from "../rules/trace-first-seen.rules.ts";
+import { countedUntilOf, monthStartOf, usageMonthOf } from "../rules/trace-first-seen.rules.ts";
 import type { TraceProjectMilestonesService } from "./trace-project-milestones.service.ts";
 
 const PROJECT_PAGE_SIZE = 500;
-/** A summary written just before the cut is read only after its insert has landed. */
-const SETTLE_MS = 2 * 60_000;
-const POLL_MS = 30_000;
+/** A summary written just before the counted minute ends is read only after its insert landed. */
+const SETTLE_MS = 60_000;
+const POLL_MS = 15_000;
 
 /** What the step saves after each page of projects and returns at the end. */
 export const traceCountSeedReportSchema = z.object({
@@ -41,8 +41,8 @@ type TraceCountSeedDependencies = Readonly<{
 }>;
 
 /**
- * Records, once per project, its traces first seen this month before an hour-aligned cut, so
- * entitlement's count starts complete; from the cut on, each trace arrives as its own fact.
+ * Records, once per project, its traces first seen this month before the cut, the moment the old
+ * writers were gone, so entitlement's count starts complete; after it each trace is its own fact.
  * Design and the cut's arithmetic: modules/trace/specs/trace-first-seen.feature.
  */
 export class TraceCountSeedService {
@@ -67,20 +67,24 @@ export class TraceCountSeedService {
     signal,
     onPage,
   }: TraceCountSeedInput): Promise<TraceCountSeedReport> {
-    const cutAt = resumeFrom?.cutAt ?? countCutAfter(this.now());
+    // The step runs once the old writers are gone, so its first start is the cut, kept exactly.
+    const cutAt = resumeFrom?.cutAt ?? this.now();
+    const countedUntil = countedUntilOf(cutAt);
     let report: TraceCountSeedReport = resumeFrom ?? {
       cutAt,
-      month: usageMonthOf(cutAt - 1),
+      month: usageMonthOf(countedUntil - 1),
       afterProjectId: null,
       projects: 0,
       traces: 0,
     };
     // The cut is saved before any wait, so a resumed run counts against the same instant.
     if (!dryRun && !resumeFrom) await onPage(report);
-    if (!dryRun && !(await this.waitPast({ instant: cutAt + SETTLE_MS, signal }))) return report;
+    if (!dryRun && !(await this.waitPast({ instant: countedUntil + SETTLE_MS, signal }))) {
+      return report;
+    }
     const window = {
       fromMs: monthStartOf(report.month),
-      toMs: dryRun ? Math.min(cutAt, this.now()) : cutAt,
+      toMs: dryRun ? Math.min(countedUntil, this.now()) : countedUntil,
     };
     let after = report.afterProjectId ?? undefined;
     do {

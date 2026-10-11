@@ -13,7 +13,8 @@ Feature: Entitlement's meters, decisions and who learns them
 
   # --- The trace count ---------------------------------------------------------
   # Ruling (Alex, 2026-10-11): a count per project and month, folded from trace's facts. Trace
-  # records each trace once when first seen; its upgrade records each project's month up to a cut.
+  # records each trace once when first seen; its upgrade records each project's month up to a cut,
+  # the moment its old writers were gone, counted to the next whole minute.
   # Entitlement never asks trace: a peer fold over the two facts, replayable from trace's log.
 
   @unit @usage
@@ -41,10 +42,23 @@ Feature: Entitlement's meters, decisions and who learns them
     Then sightings before the cut add nothing and sightings from the cut on add one each
 
   @unit @usage
-  Scenario: A later seed's cut wins whatever order the seeds arrive in
-    Given two seeds of one month with different cuts
-    When the later cut is folded before the earlier one
-    Then the month counts from the later cut
+  Scenario: A seed's cut inside a minute leaves that minute to the seed
+    Given trace's seed counted up to the first whole minute after its cut
+    When sightings arrive in the cut's own minute and in the next one
+    Then only the next minute's sightings add to the month
+
+  # Bounded row (2026-10-11): minutes are kept only until the seed lands.
+  @unit @usage
+  Scenario: Once seeded, the month keeps one running total and no minutes
+    Given first sightings kept by minute before the seed
+    When the seed lands and more traces are first seen
+    Then the minutes are emptied and later sightings add to one running total
+
+  @unit @usage
+  Scenario: The first seed of a month sets its base; a later one changes nothing
+    Given a month already seeded
+    When a second seed of the same month arrives with a later cut
+    Then the month keeps the first seed, as a replay keeps the first fact of one key
 
   @unit @usage
   Scenario: A replay of trace's facts reaches the live count, in any order

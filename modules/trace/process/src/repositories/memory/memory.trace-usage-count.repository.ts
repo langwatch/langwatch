@@ -13,7 +13,7 @@ type CountedTrace = {
   attributes?: Readonly<Record<string, string>>;
 };
 
-/** Exact where ClickHouse's `uniq` is approximate, so small test data stays deterministic. */
+/** In-memory twin of the trace count reads, exact over the rows a test records. */
 export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
   readonly #traces: CountedTrace[] = [];
 
@@ -28,23 +28,6 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
   /** Seeds one trace summary row; `createdAt` uses the window's own DateTime64(3) spelling. */
   record(trace: CountedTrace): void {
     this.#traces.push(trace);
-  }
-
-  async countDistinctTraces(input: {
-    tenantId: string;
-    startDate: string;
-    endDate: string;
-  }): Promise<number> {
-    const traceIds = this.#traces
-      .filter(
-        (trace) =>
-          trace.tenantId === input.tenantId &&
-          trace.createdAt >= input.startDate &&
-          trace.createdAt < input.endDate,
-      )
-      .map((trace) => trace.traceId);
-
-    return new Set(traceIds).size;
   }
 
   async countTracesFirstSeen(input: {

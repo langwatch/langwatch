@@ -947,11 +947,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): boolean;
   readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
-  /** This UTC billing month's distinct traces per project; refuses a foreign project. */
-  countTracesByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[]>;
   /** The project's distinct traces over the last 24 hours. */
   countTracesInLastDay(input: { projectId: string }): Promise<number>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */
