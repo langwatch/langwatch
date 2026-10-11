@@ -196,6 +196,18 @@ export const limitsSchema = z.object({
 });
 export type Limits = z.infer<typeof limitsSchema>;
 
+export const machineSettingSchema = z.object({
+  name: z.string(),
+  kind: z.enum(["switch", "minutes"]),
+  value: z.string(),
+  default: z.string(),
+  summary: z.string(),
+});
+export type MachineSetting = z.infer<typeof machineSettingSchema>;
+
+export const machineSettingsSchema = z.object({ settings: z.array(machineSettingSchema) });
+export type MachineSettings = z.infer<typeof machineSettingsSchema>;
+
 export const actionAnswerSchema = z.union([
   z.object({ message: z.string() }),
   z.object({ error: z.string() }),

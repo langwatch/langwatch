@@ -94,6 +94,9 @@ type Orchestrator struct {
 	// the TUI and the web dashboard read concurrently.
 	idleMu       sync.Mutex
 	idleReadings map[string]idleReading
+	// runtimeIdleSince is when the VM was first seen unused with auto-stop on;
+	// zero while something uses it. Daemon tick only.
+	runtimeIdleSince time.Time
 }
 
 // Deps is the injected object graph. A struct rather than a positional

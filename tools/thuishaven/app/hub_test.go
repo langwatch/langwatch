@@ -35,6 +35,13 @@ type fakeStore struct {
 	appendHistoryErr   error
 	prereqSkips        map[string]bool
 	containerPosture   string
+	machineSettings    domain.MachineSettings
+}
+
+func (f *fakeStore) ReadMachineSettings() domain.MachineSettings { return f.machineSettings }
+func (f *fakeStore) WriteMachineSettings(s domain.MachineSettings) error {
+	f.machineSettings = s
+	return nil
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }

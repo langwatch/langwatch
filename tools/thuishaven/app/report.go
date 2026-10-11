@@ -103,7 +103,12 @@ func (o *Orchestrator) serverHealth(ctx context.Context) map[string]health {
 		isManaged bool
 		probe     func() (bool, string)
 	}{
-		{"observability", o.obs != nil, func() (bool, string) { return o.obs.Health(ctx) }},
+		{"observability", o.obs != nil, func() (bool, string) {
+			if o.isObservabilityOff() {
+				return true, "off (haven machine settings set " + domain.SettingObservability + " on)"
+			}
+			return o.obs.Health(ctx)
+		}},
 		{"clickhouse", o.ch != nil && o.cfg.ShouldManageClickHouse, func() (bool, string) { return o.ch.Health(ctx) }},
 		{"postgres", o.pg != nil && o.cfg.ShouldManagePostgres, func() (bool, string) { return o.pg.Health(ctx) }},
 		{"redis", o.rds != nil && o.cfg.ShouldManageRedis, func() (bool, string) { return o.rds.Health(ctx) }},
@@ -146,7 +151,7 @@ func (o *Orchestrator) containerNeedInputs() domain.ContainerNeedInputs {
 	if o.cfg.ShouldManageClickHouse {
 		in.ClickHouse = o.cfg.ClickHouseRuntime
 	}
-	if o.cfg.ShouldStartObservability {
+	if o.cfg.ShouldStartObservability && !o.isObservabilityOff() {
 		in.Observability = o.cfg.ObservabilityTier
 	}
 	return in

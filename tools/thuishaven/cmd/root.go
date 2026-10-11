@@ -348,9 +348,10 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 				// The up's hand-over: the daemon is the one place keepers start.
 				StartKeeper: orch.StartKeeper,
 			},
-			Limits:   dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
-			CLIReads: dashboardCLIReads(orch),
-			Browser:  dashboardBrowser(),
+			Limits:          dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
+			MachineSettings: dashboard.MachineSettings{Report: orch.MachineSettingsView, Set: orch.SetMachineSetting},
+			CLIReads:        dashboardCLIReads(orch),
+			Browser:         dashboardBrowser(),
 		}),
 		params:   app.UpParams{WorktreeDir: worktree, Branch: gitBranch(worktree), ExplicitSlug: explicitSlug(target), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),

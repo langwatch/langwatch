@@ -120,6 +120,11 @@ export const LIMITS_PATH = "/api/limits";
 export const limitPath = ({ name }: { name: string }) =>
   `${LIMITS_PATH}/${encodeURIComponent(name)}`;
 
+export const MACHINE_SETTINGS_PATH = "/api/machine-settings";
+
+export const machineSettingPath = ({ name }: { name: string }) =>
+  `${MACHINE_SETTINGS_PATH}/${encodeURIComponent(name)}`;
+
 export const START_PATH = "/api/worktrees/start";
 
 /** One `haven <name> --json` read for a stack, as the daemon answers it. */

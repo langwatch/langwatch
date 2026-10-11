@@ -570,6 +570,10 @@ func (o *Orchestrator) refreshObservability(ctx context.Context) {
 	if o.obs == nil {
 		return
 	}
+	if o.isObservabilityOff() {
+		o.stopObservabilitySwitchedOff(ctx)
+		return
+	}
 	if o.obs.IsRunning(ctx) {
 		o.routeObservability()
 		return

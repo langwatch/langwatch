@@ -71,6 +71,10 @@ type Store interface {
 	// which is what makes haven fall back to looking.
 	ReadContainerPosture() string
 	WriteContainerPosture(string) error
+	// The machine settings (observability on/off, VM auto-stop), saved in
+	// haven's home. Absent or corrupt reads as the defaults.
+	ReadMachineSettings() domain.MachineSettings
+	WriteMachineSettings(domain.MachineSettings) error
 	// TouchDBActivity records "slug's databases were in use now" — the clock the
 	// daemon's idle-database pruning reads. Touched on every `up` and refreshed
 	// by the daemon while a stack stays registered.
