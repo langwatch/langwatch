@@ -584,34 +584,24 @@ function InviteLinkDialog({
   onClose: () => void;
 }) {
   return (
-    <Dialog.Root open={open} onOpenChange={({ open }) => (open ? undefined : onClose())}>
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Invite Link</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body paddingBottom={6}>
-          <VStack align="start" gap={4}>
-            <Text>
-              Send the link below to the users you want to invite to join the organization.
-            </Text>
+    <Dialog open={open} onClose={onClose} title="Invite Link" cancelLabel="Close">
+      <VStack align="start" gap={4}>
+        <Text>Send the link below to the users you want to invite to join the organization.</Text>
 
-            <VStack align="start" gap={4} width="full">
-              {invites.map((invite) => (
-                <VStack key={invite.inviteCode} align="start" gap={6} width="full">
-                  <Text fontWeight="600">{invite.email}</Text>
-                  <CopyInput
-                    value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
-                    label="Invite Link"
-                    marginTop={0}
-                  />
-                </VStack>
-              ))}
+        <VStack align="start" gap={4} width="full">
+          {invites.map((invite) => (
+            <VStack key={invite.inviteCode} align="start" gap={6} width="full">
+              <Text fontWeight="600">{invite.email}</Text>
+              <CopyInput
+                value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
+                label="Invite Link"
+                marginTop={0}
+              />
             </VStack>
-          </VStack>
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+          ))}
+        </VStack>
+      </VStack>
+    </Dialog>
   );
 }
 
