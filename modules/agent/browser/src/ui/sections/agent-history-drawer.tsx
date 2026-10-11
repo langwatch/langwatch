@@ -1,8 +1,19 @@
 import type { AgentHistoryEntry } from "@langwatch/agent-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
-import { ArrowUp, Bot, Copy, Edit, type LucideIcon, RefreshCw, Trash2, X } from "lucide-react";
+import {
+  ArrowUp,
+  Bot,
+  Copy,
+  Edit,
+  History,
+  type LucideIcon,
+  RefreshCw,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { AgentClient } from "../../model/agent-client.ts";
@@ -17,6 +28,8 @@ const ACTION_META = {
   "agents.pushToCopies": { label: "Pushed to replicas", icon: ArrowUp },
   "agents.syncFromSource": { label: "Synced from source", icon: RefreshCw },
 } as const satisfies Record<string, { label: string; icon: LucideIcon }>;
+
+const AGENTS_DOCS_HREF = "https://langwatch.ai/docs/agent-testing/targets";
 
 export type AgentHistoryDrawerProps = {
   agentId: string;
@@ -58,9 +71,14 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
         </Text>
       )}
       {!isLoading && !isError && entries.length === 0 && (
-        <Text color="fg.muted" textAlign="center" paddingY={8}>
-          No history recorded yet.
-        </Text>
+        <NoDataInfoBlock
+          size="inline"
+          bordered={false}
+          icon={<History size={20} />}
+          title="No history recorded yet"
+          description="Edits, replicas and syncs of this agent are listed here as they happen."
+          next={[{ kind: "docs", label: "How agents are used", href: AGENTS_DOCS_HREF }]}
+        />
       )}
       {!isLoading && !isError && entries.length > 0 && (
         <VStack gap={0} align="stretch">

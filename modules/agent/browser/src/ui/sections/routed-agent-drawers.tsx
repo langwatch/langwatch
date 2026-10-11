@@ -229,7 +229,7 @@ export function RoutedAgentWorkflowTargetEditorDrawer({ agentId }: { agentId?: s
       icon={linked.icon}
       updatedAtLabel={formatTimeAgo(toEpochMs(linked.updatedAt))}
       width="300px"
-      {...(workflow.editorHref ? { action: <ExternalLink size={16} /> } : {})}
+      action={workflow.editorHref ? <ExternalLink size={16} /> : void 0}
     />
   );
   return (

@@ -504,5 +504,27 @@
     "reason": "False positive: a settings page with a header, explanatory text and one card, not a filterable list page (R2s2 review).",
     "owner": "notification",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/agent/browser/src/ui/sections/routed-agent-drawers.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 147,
+    "reason": "Approved raw dialog: the full-viewport code editor takeover with its own tabs, status bar and Cmd+S, no Escape close; the Dialog shape stops at xl (R3a2 review).",
+    "owner": "agent"
+  },
+  {
+    "path": "modules/agent/browser/src/ui/sections/routed-agent-drawers.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 152,
+    "reason": "Approved raw dialog: the full-viewport code editor takeover with its own tabs, status bar and Cmd+S, no Escape close; the Dialog shape stops at xl (R3a2 review).",
+    "owner": "agent"
+  },
+  {
+    "path": "modules/agent/browser/src/ui/sections/agent-list-drawer.tsx",
+    "rule": "card-box",
+    "line": 149,
+    "reason": "A picker row with a trailing menu; a Card opener cannot hold controls and ResourceTile would triple the list height (R3a2 review).",
+    "owner": "agent",
+    "disposition": "reviewed"
   }
 ]

@@ -169,21 +169,21 @@ describe("AgentTypeSelectorDrawer", () => {
 
     it("navigates to the HTTP editor when HTTP Agent is chosen", () => {
       openedByAddress();
-      fireEvent.click(screen.getByText("HTTP Agent"));
+      fireEvent.click(screen.getByRole("button", { name: "HTTP Agent" }));
 
       expect(drawer.openDrawer).toHaveBeenCalledWith("agentHttpEditor");
     });
 
     it("navigates to the code editor when Code Agent is chosen", () => {
       openedByAddress();
-      fireEvent.click(screen.getByText("Code Agent"));
+      fireEvent.click(screen.getByRole("button", { name: "Code Agent" }));
 
       expect(drawer.openDrawer).toHaveBeenCalledWith("agentCodeEditor");
     });
 
     it("navigates to the workflow selector when Workflow Agent is chosen", () => {
       openedByAddress();
-      fireEvent.click(screen.getByText("Workflow Agent"));
+      fireEvent.click(screen.getByRole("button", { name: "Workflow Agent" }));
 
       expect(drawer.openDrawer).toHaveBeenCalledWith("workflowSelector");
     });
