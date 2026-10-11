@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.gateway_spend_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, GatewayRequestId)
-TTL toDateTime(ToAt) + INTERVAL 13 MONTH + INTERVAL 7 DAY DELETE
+TTL toDateTime(ToAt) + INTERVAL 13 MONTH + INTERVAL 7 DAY DELETE;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -34,7 +34,7 @@ SELECT TenantId, GatewayRequestId,
   min(OccurredAt) AS FromAt, max(OccurredAt) AS ToAt,
   max(toUInt16(65535)) AS _retention_days
 FROM ${CLICKHOUSE_DATABASE}.gateway_spend
-GROUP BY TenantId, GatewayRequestId
+GROUP BY TenantId, GatewayRequestId;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_ledger_events_i
   _retention_days SimpleAggregateFunction(max, UInt16)
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
-ORDER BY (TenantId, GatewayRequestId)
+ORDER BY (TenantId, GatewayRequestId);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -57,7 +57,7 @@ SELECT TenantId, GatewayRequestId,
   min(OccurredAt) AS FromAt, max(OccurredAt) AS ToAt,
   max(toUInt16(65535)) AS _retention_days
 FROM ${CLICKHOUSE_DATABASE}.gateway_budget_ledger_events
-GROUP BY TenantId, GatewayRequestId
+GROUP BY TenantId, GatewayRequestId;
 -- +goose StatementEnd
 
 -- +goose Down

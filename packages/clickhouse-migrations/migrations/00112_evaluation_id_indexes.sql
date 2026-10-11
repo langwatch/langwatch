@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_runs_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, EvaluationId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(RetainAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(RetainAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -45,7 +45,7 @@ SELECT TenantId, EvaluationId,
   max(UpdatedAt) AS RetainAt,
   max(if(_retention_days = 0, 65535, _retention_days)) AS _retention_days
 FROM ${CLICKHOUSE_DATABASE}.evaluation_runs
-GROUP BY TenantId, EvaluationId
+GROUP BY TenantId, EvaluationId;
 -- +goose StatementEnd
 
 -- +goose Down

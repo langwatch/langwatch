@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_sessions_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, SessionId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -31,7 +31,7 @@ SELECT TenantId, SessionId,
   min(StartedAt) AS FromAt, max(StartedAt) AS ToAt,
   max(if(_retention_days = 0, 65535, _retention_days)) AS _retention_days
 FROM ${CLICKHOUSE_DATABASE}.coding_agent_sessions
-GROUP BY TenantId, SessionId
+GROUP BY TenantId, SessionId;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_session_events_id
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, SessionId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -55,7 +55,7 @@ SELECT TenantId, SessionId,
   min(TimeUnixMs) AS FromAt, max(TimeUnixMs) AS ToAt,
   max(if(_retention_days = 0, 65535, _retention_days)) AS _retention_days
 FROM ${CLICKHOUSE_DATABASE}.coding_agent_session_events
-GROUP BY TenantId, SessionId
+GROUP BY TenantId, SessionId;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_trace_sessions_id
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, TraceId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -79,7 +79,7 @@ SELECT TenantId, TraceId,
   min(OccurredAt) AS FromAt, max(OccurredAt) AS ToAt,
   max(if(_retention_days = 0, 65535, _retention_days)) AS _retention_days
 FROM ${CLICKHOUSE_DATABASE}.coding_agent_trace_sessions
-GROUP BY TenantId, TraceId
+GROUP BY TenantId, TraceId;
 -- +goose StatementEnd
 
 -- +goose Down
