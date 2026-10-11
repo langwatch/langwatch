@@ -1,5 +1,4 @@
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { HStack, useBreakpointValue } from "@langwatch/design-system/primitives";
+import { HStack, IconButton, useBreakpointValue } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LuColumns2 } from "react-icons/lu";
 
@@ -21,7 +20,6 @@ export function PromptPlaygroundBrowser() {
   const activeWindowId = useDraggableTabsBrowserStore((state) => state.activeWindowId);
   const setActiveWindow = useDraggableTabsBrowserStore((state) => state.setActiveWindow);
 
-  const iconOnly = windows.length > 1 || isCompact;
   // Panes share the room beside the sidebar; with the sidebar in a drawer each takes the screen.
   let windowMaxWidth = "auto";
   if (windows.length > 1) {
@@ -64,7 +62,7 @@ export function PromptPlaygroundBrowser() {
             tabIds={tabbedWindow.tabs.map((tab) => tab.id)}
             height="48px"
             flexShrink={0}
-            paddingRight={6}
+            paddingRight={2}
           >
             {/* The switcher lives inside the strip, not in the toolbar below,
                 because the toolbar only renders for the active pane - and a
@@ -95,21 +93,22 @@ export function PromptPlaygroundBrowser() {
                     pointerEvents: "none",
                   }}
                 >
-                  <ExperimentFromPlaygroundButton iconOnly={iconOnly} />
-                  <Tooltip content="Compare" disabled={!iconOnly}>
-                    <PageLayout.HeaderButton
+                  <ExperimentFromPlaygroundButton />
+                  <Tooltip content="Compare">
+                    <IconButton
+                      aria-label="Compare"
                       onClick={() =>
                         tabbedWindow.activeTabId && handleSplit(tabbedWindow.activeTabId)
                       }
                       size="sm"
+                      variant="outline"
                       disabled={!tabbedWindow.activeTabId}
                       title="Split tab to compare prompts side by side"
                     >
                       <LuColumns2 size="16px" />
-                      {!iconOnly && "Compare"}
-                    </PageLayout.HeaderButton>
+                    </IconButton>
                   </Tooltip>
-                  <AddPromptButton iconOnly={iconOnly} />
+                  <AddPromptButton iconOnly />
                 </HStack>
               </>
             )}

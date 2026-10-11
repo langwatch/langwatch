@@ -36,8 +36,6 @@ export function PromptStudioScreen() {
             width={{ base: "full", md: "250px" }}
             height={{ base: "auto", md: "full" }}
             flexShrink={0}
-            borderRightWidth={{ base: 0, md: "1px" }}
-            borderColor="border"
             display={{ base: hasNoTabs ? "flex" : "none", md: "flex" }}
           >
             <PageLayout.Header withBorder={false}>

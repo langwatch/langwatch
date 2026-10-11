@@ -5912,98 +5912,98 @@
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
     "rule": "legacy-tabs-part",
-    "line": 223,
+    "line": 221,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
     "rule": "legacy-tabs-part",
-    "line": 264,
+    "line": 261,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
     "rule": "legacy-tabs-part",
-    "line": 318,
+    "line": 315,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 200,
+    "line": 198,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 237,
+    "line": 234,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 249,
+    "line": 246,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 257,
+    "line": 254,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 262,
+    "line": 259,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 264,
+    "line": 261,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 268,
+    "line": 265,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 308,
+    "line": 305,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 331,
+    "line": 328,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 353,
+    "line": 350,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
     "rule": "legacy-tabs-part",
-    "line": 364,
+    "line": 361,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },

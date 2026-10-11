@@ -1,6 +1,5 @@
 import { Box, Button, HStack, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { type LlmConfigInputType, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -81,7 +80,6 @@ export function PromptTabbedSection({
   onDragEnd,
   onToggle,
 }: PromptTabbedSectionProps) {
-  const accent = useProductAccent();
   const form = useFormContext<PromptConfigFormValues>();
   const tabId = useTabId();
   const inputs = form.watch("version.configData.inputs") ?? [];
@@ -206,8 +204,7 @@ export function PromptTabbedSection({
       flexDirection="column"
       flex={1}
       width="full"
-      variant="line"
-      colorPalette={accent.colorPalette}
+      variant="subtle"
       size="sm"
       minHeight={0}
       paddingTop={1}
@@ -282,9 +279,9 @@ export function PromptTabbedSection({
                         chatRef.current?.resetChat();
                         chatRef.current?.focusInput();
                       }}
-                      aria-label="Reset chat"
                     >
                       <LuEraser />
+                      Reset chat
                     </Button>
                   </Tooltip>
                 )}

@@ -1,6 +1,5 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Text } from "@langwatch/design-system/primitives";
+import { IconButton, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type LocalPromptConfig,
@@ -171,15 +170,11 @@ const convertTabToTarget = ({
   };
 };
 
-interface ExperimentFromPlaygroundButtonProps {
-  iconOnly?: boolean;
-}
-
 /**
  * Button to create an experiment from the current prompt playground tabs. Opens a
  * confirmation dialog and creates the experiment with all open prompts as targets.
  */
-export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlaygroundButtonProps) {
+export function ExperimentFromPlaygroundButton() {
   const { project, hasPermission } = usePromptProject();
   const host = usePromptHost();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -285,16 +280,17 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
 
   return (
     <>
-      <Tooltip content="Experiment" disabled={!iconOnly}>
-        <PageLayout.HeaderButton
+      <Tooltip content="Experiment">
+        <IconButton
+          aria-label="Experiment"
           size="sm"
+          variant="outline"
           onClick={() => setIsDialogOpen(true)}
           disabled={isDisabled}
           title={isDisabled ? "Open a prompt to create an experiment" : undefined}
         >
           <FlaskConical size="16px" />
-          {!iconOnly && "Experiment"}
-        </PageLayout.HeaderButton>
+        </IconButton>
       </Tooltip>
 
       <Dialog

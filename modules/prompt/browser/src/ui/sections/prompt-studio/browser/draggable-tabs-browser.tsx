@@ -19,7 +19,6 @@ import {
   type TabsRootProps,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import React from "react";
 
 import { TabIdProvider } from "../studio-internals.ts";
@@ -211,7 +210,6 @@ function DraggableTabsWindow({
   onWindowClick,
   ...props
 }: DraggableTabsWindowProps) {
-  const accent = useProductAccent();
   const windowContextValue: TabWindowContextValue = {
     windowId,
     activeTabId,
@@ -228,8 +226,7 @@ function DraggableTabsWindow({
           height="full"
           display="flex"
           flexDirection="column"
-          variant="line"
-          colorPalette={accent.colorPalette}
+          variant="plain"
           lazyMount
           unmountOnExit
           {...props}
@@ -324,6 +321,14 @@ function DraggableBrowserTabTrigger({
       overflow="hidden"
       cursor="pointer"
       transition="all 0.15s ease-in-out"
+      height="32px"
+      paddingX={3}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="lg"
+      background="transparent"
+      color="fg.muted"
+      _selected={{ background: "bg.panel", borderColor: "border.emphasized", color: "fg" }}
     >
       {children}
     </Tabs.Trigger>
@@ -366,7 +371,7 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       // TAB_MAX_WIDTH down to TAB_MIN_WIDTH, and only then does the strip
       // scroll. They are never hidden - a hidden element has a zero-size rect,
       // which would corrupt @dnd-kit's drop-index math for these sortables.
-      flex="1 1 0"
+      flex={`0 1 ${TAB_MAX_WIDTH}`}
       minWidth={TAB_MIN_WIDTH}
       maxWidth={TAB_MAX_WIDTH}
       alignItems="stretch"

@@ -1,4 +1,5 @@
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { LuPlus } from "react-icons/lu";
@@ -36,15 +37,27 @@ export function AddPromptButton({ iconOnly }: AddPromptButtonProps) {
 
   return (
     <Tooltip content="New prompt" disabled={!iconOnly}>
-      <PageLayout.HeaderButton
-        primary
-        size="sm"
-        onClick={handleClick}
-        data-testid="prompt-new-button"
-      >
-        <LuPlus size={16} />
-        {!iconOnly && "New prompt"}
-      </PageLayout.HeaderButton>
+      {iconOnly ? (
+        <IconButton
+          aria-label="New prompt"
+          size="sm"
+          variant="outline"
+          onClick={handleClick}
+          data-testid="prompt-new-button"
+        >
+          <LuPlus size={16} />
+        </IconButton>
+      ) : (
+        <PageLayout.HeaderButton
+          primary
+          size="sm"
+          onClick={handleClick}
+          data-testid="prompt-new-button"
+        >
+          <LuPlus size={16} />
+          New prompt
+        </PageLayout.HeaderButton>
+      )}
     </Tooltip>
   );
 }
