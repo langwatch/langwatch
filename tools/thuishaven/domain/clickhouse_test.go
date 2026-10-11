@@ -217,12 +217,13 @@ func TestClickHouseUsersConfigMatchesProductionAsyncInserts(t *testing.T) {
 	for _, want := range []string{
 		"<async_insert>1</async_insert>",
 		"<wait_for_async_insert>1</wait_for_async_insert>",
-		"<async_insert_max_data_size>10485760</async_insert_max_data_size>",
-		"<async_insert_busy_timeout_ms>1000</async_insert_busy_timeout_ms>",
 		"<max_threads>2</max_threads>",
 	} {
 		if !strings.Contains(ClickHouseUsersConfig, want) {
 			t.Errorf("default profile is missing %q", want)
 		}
+	}
+	if strings.Contains(ClickHouseUsersConfig, "async_insert_busy_timeout") {
+		t.Error("local keeps ClickHouse's adaptive flush timeout; production's 1 s stalls a sequential seed")
 	}
 }
