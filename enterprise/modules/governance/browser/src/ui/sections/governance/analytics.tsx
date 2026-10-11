@@ -1,4 +1,5 @@
 import { Card } from "@langwatch/design-system/card";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -9,7 +10,6 @@ import {
   Field,
   HStack,
   Spacer,
-  Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -42,12 +42,22 @@ import {
 } from "../../../ui/sections/governance-section-gate.tsx";
 import GovernanceLayout from "../governance-layout.tsx";
 
+type AnalyticsView = "explore" | "dashboards";
+
+const ANALYTICS_TABS_ID = "governance-analytics-views";
+
 // Explore surface before engine: real controls, unreal chart body. Preview badge, no inert.
 function AnalyticsPage() {
   const { organization } = useGovernanceScope();
   const orgName = organization?.name ?? "your organization";
   const [timeWindow, setTimeWindow] = useState<ExploreWindow>(DEFAULT_EXPLORE_WINDOW);
   const [selection, setSelection] = useState<ExploreSelection>(DEFAULT_EXPLORE_SELECTION);
+  const [view, setView] = useState<AnalyticsView>("explore");
+  const openExplore = () => {
+    setView("explore");
+    // The pressed button leaves with its panel; the Explore tab keeps focus where the reader was.
+    document.getElementById(`${ANALYTICS_TABS_ID}-tab-explore`)?.focus();
+  };
 
   return (
     <GovernanceLayout pageTitle="Analytics · AI Governance · LangWatch">
@@ -75,39 +85,44 @@ function AnalyticsPage() {
             query; running it is coming.
           </Text>
 
-          <Tabs.Root
-            defaultValue="explore"
-            variant="line"
-            colorPalette="accent"
-            size="sm"
-            lazyMount
-            unmountOnExit
-          >
-            <Tabs.List>
-              <Tabs.Trigger value="explore">Explore</Tabs.Trigger>
-              <Tabs.Trigger value="dashboards">
-                Dashboards
-                <Badge size="xs" variant="subtle" colorPalette="gray">
-                  0
-                </Badge>
-              </Tabs.Trigger>
-            </Tabs.List>
-            <Tabs.Content value="explore" paddingTop={4}>
-              <ExploreTab
-                orgName={orgName}
-                timeWindow={timeWindow}
-                selection={selection}
-                onSelectionChange={setSelection}
-              />
-            </Tabs.Content>
-            <Tabs.Content value="dashboards" paddingTop={4}>
-              <NoDataInfoBlock
-                icon={<LayoutDashboard />}
-                title="Dashboards are not available yet."
-                description="Saved dashboards will appear here once this preview is connected to your data."
-              />
-            </Tabs.Content>
-          </Tabs.Root>
+          <ContentTabs
+            label="Analytics views"
+            id={ANALYTICS_TABS_ID}
+            value={view}
+            onValueChange={({ value }) => setView(value)}
+            mount="active"
+            items={[
+              {
+                value: "explore",
+                label: "Explore",
+                content: (
+                  <ExploreTab
+                    orgName={orgName}
+                    timeWindow={timeWindow}
+                    selection={selection}
+                    onSelectionChange={setSelection}
+                  />
+                ),
+              },
+              {
+                value: "dashboards",
+                label: "Dashboards",
+                count: 0,
+                content: (
+                  <NoDataInfoBlock
+                    icon={<LayoutDashboard />}
+                    title="Dashboards are not available yet."
+                    description="Saved dashboards will appear here once this preview is connected to your data."
+                    primaryAction={
+                      <Button size="sm" onClick={openExplore}>
+                        Build a query in Explore
+                      </Button>
+                    }
+                  />
+                ),
+              },
+            ]}
+          />
         </VStack>
       </PageLayout.Container>
     </GovernanceLayout>

@@ -467,6 +467,20 @@ describe("given sam, a delegated viewer, opens the People page", () => {
       expect(chip("Department")).toHaveTextContent("Finance");
       expect(chip("Sort")).toHaveTextContent("Requests");
     });
+
+    /** @scenario "A department nobody belongs to offers a way back to every department" */
+    it("clears only the department from the address and lists everybody again", async () => {
+      const { host } = renderPage({ query: { department: "Legal", sort: "requests" } });
+
+      expect(screen.queryByRole("row", { name: /Ada Lovelace/ })).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "Show every department" }));
+
+      const written = host.recording.queries.at(-1)?.next;
+      expect(written).not.toHaveProperty("department");
+      expect(written).toMatchObject({ sort: "requests" });
+      expect(rowOf(/Ada Lovelace/)).toBeInTheDocument();
+      expect(rowOf(/Bo Kim/)).toBeInTheDocument();
+    });
   });
 
   describe("when the organization's plan lacks the activity monitor", () => {

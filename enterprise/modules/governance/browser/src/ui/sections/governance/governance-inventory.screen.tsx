@@ -3,6 +3,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Banner } from "@langwatch/design-system/banner";
 import { CodePreview } from "@langwatch/design-system/code-preview";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -23,7 +24,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Tabs,
   Text,
   Textarea,
   VStack,
@@ -89,7 +89,6 @@ import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-stat
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
-import { GovernanceTabLabel } from "../../../ui/elements/governance-tab-label.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
@@ -937,38 +936,31 @@ function InventoryTabs({
   sources: ReactNode;
 }) {
   return (
-    <Tabs.Root
+    <ContentTabs
+      label="Inventory"
       value={inventoryTab}
       onValueChange={({ value }) => selectInventoryTab(value)}
-      variant="line"
-      colorPalette="accent"
-      size="sm"
-      lazyMount
-      unmountOnExit
-    >
-      <Tabs.List>
-        <Tabs.Trigger value="catalog">
-          <GovernanceTabLabel label="Catalog" count={catalogCount} />
-        </Tabs.Trigger>
-        <Tabs.Trigger value="environments">
-          <GovernanceTabLabel label="Environments" count={environmentCount} />
-        </Tabs.Trigger>
-        <Tabs.Trigger value="sources">
-          <GovernanceTabLabel label="Sources" count={sourceCount} />
-        </Tabs.Trigger>
-      </Tabs.List>
-      <Tabs.Content value="catalog" paddingTop={4}>
-        {catalog}
-      </Tabs.Content>
-      <Tabs.Content value="environments" paddingTop={4}>
-        {environments}
-      </Tabs.Content>
-      <Tabs.Content value="sources" paddingTop={4}>
-        <VStack align="stretch" gap={4} width="full">
-          {sources}
-        </VStack>
-      </Tabs.Content>
-    </Tabs.Root>
+      mount="active"
+      items={[
+        { value: "catalog", label: "Catalog", count: catalogCount, content: catalog },
+        {
+          value: "environments",
+          label: "Environments",
+          count: environmentCount,
+          content: environments,
+        },
+        {
+          value: "sources",
+          label: "Sources",
+          count: sourceCount,
+          content: (
+            <VStack align="stretch" gap={4} width="full">
+              {sources}
+            </VStack>
+          ),
+        },
+      ]}
+    />
   );
 }
 
