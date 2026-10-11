@@ -483,19 +483,19 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then it answers do not show
 
   @integration
-  Scenario: The shell's upgrade notice tells a member to contact their operator
+  Scenario: Home's upgrade notice tells a member to contact their operator
     Given the upgrade attention notice answers show
-    When a signed-in member without ops:view opens any page
-    Then the shell shows a warning banner reading "LangWatch's last update needs attention. Contact your LangWatch operator."
+    When a signed-in member without ops:view opens Home
+    Then the "Action needed for updates" card reads "LangWatch's last update needs attention. Contact your LangWatch operator."
     And it offers no link
 
   @integration
-  Scenario: An operator's upgrade notice links to Ops › Upgrades
+  Scenario: An operator's upgrade notice on Home links to Ops › Upgrades
     Given the upgrade attention notice answers show
-    When a signed-in operator holding ops:view opens any page
-    Then the banner links to /ops/upgrades
+    When a signed-in operator holding ops:view opens Home
+    Then one "Action needed for updates" card shows and links to /ops/upgrades
 
   @integration
   Scenario: The upgrade notice shows nothing while it loads
     Given the upgrade attention notice has not answered yet
-    Then the shell shows no banner and no error
+    Then Home shows no card and no error
