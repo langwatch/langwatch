@@ -168,7 +168,7 @@
   {
     "path": "modules/gateway/browser/src/ui/sections/gateway/gateway-budget.screen.tsx",
     "rule": "empty-text",
-    "line": 266,
+    "line": 270,
     "reason": "False positive: a tooltip sentence, not an empty state. (X2g2 review)",
     "owner": "gateway",
     "disposition": "reviewed"
@@ -208,7 +208,7 @@
   {
     "path": "modules/gateway/browser/src/ui/sections/gateway/gateway-virtual-key.screen.tsx",
     "rule": "card-box",
-    "line": 790,
+    "line": 798,
     "reason": "A chart frame; charts stay as they are. (X2g2 review)",
     "owner": "gateway",
     "disposition": "reviewed"
@@ -352,28 +352,14 @@
   {
     "path": "modules/organization/browser/src/features/join-offer/ui/sections/join-your-team-takeover.tsx",
     "rule": "legacy-overlay-part",
-    "line": 140,
+    "line": 142,
     "reason": "Approved raw dialog: a full-screen join-your-team takeover with no X, Escape or outside dismiss; the Dialog shape has no cover size (R1a1 review).",
     "owner": "organization"
   },
   {
     "path": "modules/organization/browser/src/features/join-offer/ui/sections/join-your-team-takeover.tsx",
     "rule": "legacy-overlay-part",
-    "line": 148,
-    "reason": "Approved raw dialog: a full-screen join-your-team takeover with no X, Escape or outside dismiss; the Dialog shape has no cover size (R1a1 review).",
-    "owner": "organization"
-  },
-  {
-    "path": "modules/organization/browser/src/features/join-offer/ui/sections/join-your-team-takeover.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 149,
-    "reason": "Approved raw dialog: a full-screen join-your-team takeover with no X, Escape or outside dismiss; the Dialog shape has no cover size (R1a1 review).",
-    "owner": "organization"
-  },
-  {
-    "path": "modules/organization/browser/src/features/join-offer/ui/sections/join-your-team-takeover.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 152,
+    "line": 150,
     "reason": "Approved raw dialog: a full-screen join-your-team takeover with no X, Escape or outside dismiss; the Dialog shape has no cover size (R1a1 review).",
     "owner": "organization"
   },
@@ -428,7 +414,7 @@
   {
     "path": "modules/api-key/browser/src/ui/sections/cli-auth-screen.tsx",
     "rule": "card-box",
-    "line": 582,
+    "line": 584,
     "reason": "The device user-code display, not a card. (R2m1 review)",
     "owner": "api-key",
     "disposition": "reviewed"
@@ -436,7 +422,7 @@
   {
     "path": "modules/api-key/browser/src/ui/sections/cli-auth-screen.tsx",
     "rule": "empty-text",
-    "line": 709,
+    "line": 711,
     "reason": "A helper note under a picker, not an empty state. (R2m1 review)",
     "owner": "api-key",
     "disposition": "reviewed"
@@ -980,7 +966,7 @@
   {
     "path": "modules/analytics/browser/src/ui/sections/custom-graph.tsx",
     "rule": "card-box",
-    "line": 1455,
+    "line": 1457,
     "reason": "The summary chart glow frame; charts stay as they are. (rollout review)",
     "owner": "analytics",
     "disposition": "reviewed"
@@ -2125,7 +2111,7 @@
   {
     "path": "modules/scenario/browser/src/ui/elements/scenario-table.tsx",
     "rule": "legacy-table-part",
-    "line": 158,
+    "line": 168,
     "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
     "owner": "scenario"
   },
@@ -4029,7 +4015,7 @@
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/registry/addons/conversation/compact-turns.tsx",
     "rule": "hand-append",
-    "line": 360,
+    "line": 361,
     "reason": "Kept as today: protected trace search, lens, table or instant evaluation (R12t review).",
     "owner": "trace",
     "disposition": "reviewed"
@@ -4405,70 +4391,63 @@
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "native-table",
-    "line": 199,
+    "line": 202,
     "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "legacy-table-part",
-    "line": 200,
+    "line": 211,
     "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "legacy-table-part",
-    "line": 201,
+    "line": 217,
     "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "legacy-table-part",
-    "line": 207,
+    "line": 220,
     "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "legacy-table-part",
-    "line": 210,
+    "line": 222,
     "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "legacy-table-part",
-    "line": 212,
+    "line": 224,
     "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "legacy-table-part",
-    "line": 214,
+    "line": 233,
     "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "legacy-table-part",
-    "line": 223,
-    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
-    "rule": "legacy-table-part",
-    "line": 225,
+    "line": 235,
     "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace"
   },
   {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "card-box",
-    "line": 171,
+    "line": 173,
     "reason": "Kept as today: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
     "owner": "trace",
     "disposition": "reviewed"
@@ -4708,7 +4687,7 @@
   {
     "path": "modules/automation/browser/src/features/authoring/ui/sections/subject-section.tsx",
     "rule": "card-box",
-    "line": 743,
+    "line": 737,
     "reason": "Not a plain card: an input-shaped placeholder, a lockable option button, a segmented toggle or the delivery picker whose border turns green when set up (R4w1 review).",
     "owner": "automation",
     "disposition": "reviewed"
@@ -5828,42 +5807,28 @@
   {
     "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
     "rule": "legacy-tabs-part",
-    "line": 174,
+    "line": 219,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "gateway"
   },
   {
     "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
     "rule": "legacy-tabs-part",
-    "line": 199,
+    "line": 221,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "gateway"
   },
   {
     "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
     "rule": "legacy-tabs-part",
-    "line": 218,
+    "line": 250,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "gateway"
   },
   {
     "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
     "rule": "legacy-tabs-part",
-    "line": 220,
-    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
-    "owner": "gateway"
-  },
-  {
-    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
-    "rule": "legacy-tabs-part",
-    "line": 247,
-    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
-    "owner": "gateway"
-  },
-  {
-    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
-    "rule": "legacy-tabs-part",
-    "line": 249,
+    "line": 252,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "gateway"
   },
@@ -5912,21 +5877,21 @@
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
     "rule": "legacy-tabs-part",
-    "line": 221,
+    "line": 231,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
     "rule": "legacy-tabs-part",
-    "line": 261,
+    "line": 271,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
     "rule": "legacy-tabs-part",
-    "line": 315,
+    "line": 325,
     "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
     "owner": "prompt"
   },
@@ -6252,5 +6217,61 @@
     "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
     "owner": "user",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/scenario-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 170,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/scenario-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 172,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/scenario-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 189,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/scenario-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 192,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/scenario-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 199,
+    "reason": "Approved: free-width columns, the comparison matrix tall header and the Langy-style row keep today's look until ListTable has optional widths and a tall header (R7t review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 174,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "gateway"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 199,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "gateway"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
+    "rule": "legacy-table-part",
+    "line": 210,
+    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
+    "owner": "trace"
   }
 ]

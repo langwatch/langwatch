@@ -229,7 +229,9 @@ function useEditorPosition({
 
   useLayoutEffect(() => {
     const intended = intendedPositionRef.current;
-    if (!isEditing || !intended || offsetCorrectedRef.current) {
+    // Measure only once the placed style is on the editor; the render that
+    // opens it still holds the empty style and would read a bogus miss.
+    if (!isEditing || !intended || offsetCorrectedRef.current || style.position !== "fixed") {
       return;
     }
 
