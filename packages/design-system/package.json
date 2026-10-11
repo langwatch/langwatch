@@ -471,6 +471,10 @@
       "types": "./dist/components/layout/settings-section.d.ts",
       "default": "./src/components/layout/settings-section.tsx"
     },
+    "./field-editor": {
+      "types": "./dist/components/forms/field-editor.d.ts",
+      "default": "./src/components/forms/field-editor.tsx"
+    },
     "./settings-field": {
       "types": "./dist/components/forms/settings-field.d.ts",
       "default": "./src/components/forms/settings-field.tsx"
