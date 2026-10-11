@@ -641,4 +641,77 @@ describe("shape census classifier", () => {
     expect(registry).toMatchObject({ source: "@langwatch/design-system/card", family: "cards" });
     expect(typeof registry?.planned).toBe("boolean");
   });
+
+  /** @scenario "The new tabs and table shapes count as adopted; raw parts are violations" */
+  it("adopts the new tabs, toolbar and ListTable parts and flags raw Tabs and Table parts", () => {
+    const sites = sitesOf(`
+      import { ContentTabs } from "@langwatch/design-system/content-tabs";
+      import { CodeTabs } from "@langwatch/design-system/code-tabs";
+      import { MetricTabs } from "@langwatch/design-system/metric-tabs";
+      import { TableToolbar } from "@langwatch/design-system/table-toolbar";
+      import { ColumnPicker } from "@langwatch/design-system/column-picker";
+      import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
+      import { ListTable } from "@langwatch/design-system/list-table";
+      export const A = () => (
+        <>
+          <ContentTabs density="compact" mount="all" />
+          <CodeTabs />
+          <MetricTabs />
+          <TableToolbar />
+          <ColumnPicker />
+          <SelectionActionBar placement="inline" />
+          <ListTable>
+            <ListTable.Row>
+              <ListTable.Cell align="end">x</ListTable.Cell>
+              <ListTable.RowAction>x</ListTable.RowAction>
+            </ListTable.Row>
+          </ListTable>
+        </>
+      );
+    `);
+    expect(sites.filter((site) => site.site).every((site) => site.disposition === "adopted")).toBe(
+      true,
+    );
+    expect(sites.filter((site) => site.site).map((site) => site.what)).toEqual([
+      "ContentTabs",
+      "CodeTabs",
+      "MetricTabs",
+      "TableToolbar",
+      "ColumnPicker",
+      "SelectionActionBar",
+      "ListTable",
+    ]);
+    expect(sites.find((site) => site.what === "ContentTabs")?.choices).toEqual({
+      density: "compact",
+      mount: "all",
+    });
+    expect(sites.filter((site) => site.what.startsWith("ListTable."))).toHaveLength(3);
+    const { families } = summariseCensus({ sites, literals: [] });
+    expect(families.tabs).toMatchObject({ adoptedRoots: 3, parts: 0 });
+    expect(families.tables).toMatchObject({ adoptedRoots: 4, parts: 0 });
+
+    const raw = sitesOf(`
+      ${imports.primitives("Tabs, Table")}
+      export const T = () => (
+        <Tabs.Root>
+          <Tabs.List><Tabs.Trigger /></Tabs.List>
+          <Tabs.Content />
+        </Tabs.Root>
+      );
+      export const R = () => <Tabs.RootProvider><Tabs.List /></Tabs.RootProvider>;
+      export const H = () => (
+        <Table.Root>
+          <Table.Header><Table.Row><Table.ColumnHeader /></Table.Row></Table.Header>
+          <Table.Body><Table.Row><Table.Cell /></Table.Row></Table.Body>
+        </Table.Root>
+      );
+    `);
+    expect(raw.every((site) => site.disposition === "violation")).toBe(true);
+    expect(where(raw, "legacy-tabs-part")).toHaveLength(6);
+    expect(where(raw, "legacy-table-part")).toHaveLength(6);
+    expect(where(raw, "hand-table")).toHaveLength(1);
+    const summary = summariseCensus({ sites: raw, literals: [] });
+    expect(summary.families.tabs).toMatchObject({ roots: 2, affectedRoots: 2 });
+    expect(summary.families.tables).toMatchObject({ roots: 1, affectedRoots: 1 });
+  });
 });

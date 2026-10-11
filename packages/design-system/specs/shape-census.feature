@@ -114,3 +114,9 @@ Feature: The shape census measures how far screens are from the design system
     And an unclassified candidate or unknown fails with exit code 2
     And a candidate with a not-a-card destination is classified
     And an escape without a reason is refused
+
+  @unit
+  Scenario: The new tabs and table shapes count as adopted; raw parts are violations
+    Given source using ContentTabs, CodeTabs, MetricTabs, TableToolbar, ColumnPicker, SelectionActionBar and ListTable parts
+    Then each root counts as adopted and ListTable parts are adopted parts
+    And raw Tabs and Table parts count as violations sharing their owning root

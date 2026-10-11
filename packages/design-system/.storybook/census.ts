@@ -244,6 +244,24 @@ const TARGET: Record<string, TargetEntry> = {
   ListPage: { family: "listPages", subpath: "list-page", allowed: [] },
   Pagination: { family: "pagination", allowed: [] },
   ListTable: { family: "tables", allowed: [] },
+  TableToolbar: { family: "tables", subpath: "table-toolbar", allowed: [] },
+  ColumnPicker: { family: "tables", subpath: "column-picker", allowed: [] },
+  SelectionActionBar: {
+    family: "tables",
+    subpath: "selection-action-bar",
+    allowed: ["placement"],
+  },
+  ContentTabs: {
+    family: "tabs",
+    subpath: "content-tabs",
+    allowed: ["density", "body", "inset", "scroll", "mount", "activationMode"],
+  },
+  CodeTabs: { family: "tabs", subpath: "code-tabs", allowed: [] },
+  MetricTabs: {
+    family: "tabs",
+    subpath: "metric-tabs",
+    allowed: ["mount", "activationMode"],
+  },
   ConfirmDialog: { family: "dialogs", allowed: [] },
   DeleteConfirmationDialog: { family: "dialogs", allowed: [] },
   NoDataInfoBlock: { family: "emptyStates", allowed: [] },
@@ -272,6 +290,8 @@ const LEGACY: Record<string, { family: Family; rule: string }> = {
   Dialog: { family: "dialogs", rule: "legacy-overlay-part" },
   EmptyState: { family: "emptyStates", rule: "legacy-empty-state" },
   Card: { family: "cards", rule: "legacy-card-part" },
+  Tabs: { family: "tabs", rule: "legacy-tabs-part" },
+  Table: { family: "tables", rule: "legacy-table-part" },
 };
 const OVERLAY_PARTS = new Set([
   "Root",
@@ -292,8 +312,11 @@ const RAW_EXPORTS: Record<string, Family> = {
   RawDrawer: "drawers",
   RawDialog: "dialogs",
   RawPagination: "pagination",
+  RawTabs: "tabs",
+  RawTable: "tables",
 };
-const TABS_ROOT = "Tabs";
+/** Roots of a legacy family: `Tabs.RootProvider` opens tabs as `Tabs.Root` does. */
+const LEGACY_ROOTS = new Set(["Root", "RootProvider"]);
 
 const sourceMatches = ({ source, subpath }: { source: string; subpath?: string }) =>
   subpath === undefined ||
@@ -341,9 +364,9 @@ function legacyShape({
   if (old && member) {
     return shapeInfo({
       family: old.family,
-      site: member === "Root",
+      site: LEGACY_ROOTS.has(member),
       role: "legacy",
-      rule: old.rule,
+      rule: old.family === "tables" && member === "Root" ? "hand-table" : old.rule,
     });
   }
   const flat = ds && !member ? /^(Drawer|Dialog)(\w+)$/.exec(head) : undefined;
@@ -366,10 +389,10 @@ function plainShape({
   member?: string;
   ds: boolean;
 }): ShapeInfo | undefined {
-  if (head === TABS_ROOT && member) {
-    return shapeInfo({ family: "tabs", site: member === "Root", role: "ds", rule: "clean" });
-  }
   if (!ds) return undefined;
+  if (head === "ListTable" && member) {
+    return shapeInfo({ family: "tables", site: false, role: "adopted", rule: "adopted" });
+  }
   const named = NAMED_SITES[head];
   if (named)
     return shapeInfo({ family: named, site: member === undefined, role: "ds", rule: "clean" });
@@ -965,7 +988,7 @@ function recordCopies({ visit }: { visit: Visit }) {
 
 function recordRoles({ visit }: { visit: Visit }) {
   const { ref, scan, chakra } = visit;
-  if (chakra && ref === "Table.Root" && !nearest({ scan, pattern: /^ListTable$/ })) {
+  if (chakra && ref === "Table.Root" && !visit.info) {
     stateOf({ scan }).table = true;
     record({
       visit,
