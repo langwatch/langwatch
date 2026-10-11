@@ -611,7 +611,7 @@ describe("the product-switcher top bar", () => {
     });
   });
 
-  describe("when the organization holds more than eight projects", () => {
+  describe("when I open the project menu", () => {
     const crowdedReadings: Partial<StubNavigationReadings> = {
       organizations: [crowdedOrg],
       organization: crowdedOrg,
@@ -672,7 +672,7 @@ describe("the product-switcher top bar", () => {
       });
     });
 
-    /** @scenario A large project list opens with a focused search field */
+    /** @scenario Typing filters the projects by name across every team */
     it("opens with a focused search field that filters by project and team name", async () => {
       renderShell({ readings: crowdedReadings });
       await openProjectPicker();
@@ -698,6 +698,46 @@ describe("the product-switcher top bar", () => {
       expect(screen.queryByText("Core App 1")).not.toBeInTheDocument();
     });
 
+    /** @scenario The project menu opens with a focused search field */
+    it("focuses the search field even for a short project list", async () => {
+      renderShell();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "Switch project" }));
+      await waitFor(() => {
+        expect(screen.getByRole("combobox", { name: "Search projects" })).toHaveFocus();
+      });
+    });
+
+    /** @scenario No project matches what I typed */
+    it("shows one quiet line naming the text when nothing matches", async () => {
+      renderShell({ readings: crowdedReadings });
+      await openProjectPicker();
+
+      searchFor("zzz");
+      await waitFor(() => {
+        expect(screen.getByText('No projects match "zzz"')).toBeInTheDocument();
+      });
+      expect(screen.queryByText("New Project")).not.toBeInTheDocument();
+    });
+
+    /** @scenario Escape clears the search before it closes the menu */
+    it("clears the typed text on the first Escape and closes on the second", async () => {
+      renderShell({ readings: crowdedReadings });
+      await openProjectPicker();
+      const field = screen.getByPlaceholderText("Search projects");
+
+      searchFor("billing");
+      await waitFor(() => expect(field).toHaveValue("billing"));
+      fireEvent.keyDown(field, { key: "Escape", code: "Escape" });
+      await waitFor(() => expect(field).toHaveValue(""));
+      expect(screen.getByPlaceholderText("Search projects")).toBeInTheDocument();
+
+      fireEvent.keyDown(field, { key: "Escape", code: "Escape" });
+      await waitFor(() => {
+        expect(screen.queryByPlaceholderText("Search projects")).not.toBeVisible();
+      });
+    });
+
     /** @scenario The project search answers the keyboard */
     it("moves with the arrow keys and opens the highlighted project on Enter", async () => {
       renderShell({ readings: crowdedReadings });
@@ -712,20 +752,6 @@ describe("the product-switcher top bar", () => {
       await waitFor(() => {
         expect(navigateMock).toHaveBeenCalledWith(expect.stringContaining("billing-sync"));
       });
-    });
-  });
-
-  describe("when the organization holds eight projects or fewer", () => {
-    /** @scenario A short project list stays a plain menu */
-    it("lists the projects with no search field", async () => {
-      renderShell();
-
-      const user = userEvent.setup();
-      await user.click(screen.getByRole("button", { name: "Switch project" }));
-      await waitFor(() => {
-        expect(screen.getByText("Support Bot")).toBeInTheDocument();
-      });
-      expect(screen.queryByPlaceholderText("Search projects")).not.toBeInTheDocument();
     });
   });
 

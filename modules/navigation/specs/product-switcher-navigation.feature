@@ -132,37 +132,51 @@ Feature: Product switcher navigation
     And it does not render as the personal or the settings surface
 
   @integration
-  Scenario: A large project list opens with a focused search field
-    Given my organization holds more than eight projects
+  Scenario: The project menu opens with a focused search field
     When I open the project menu
     Then a search field sits at the top of the menu and holds the focus
-    And typing narrows the list to projects whose name or team matches
+    And this holds however many projects the organization has
 
   @integration
-  Scenario: A short project list stays a plain menu
-    Given my organization holds eight projects or fewer
-    When I open the project menu
-    Then the menu lists the projects with no search field
+  Scenario: Typing filters the projects by name across every team
+    Given the project menu is open
+    When I type part of a project's name or its team's name
+    Then the menu lists only the matching projects, in their team groups
+    And a team group with no matching project is hidden
+    And "New Project" is hidden while I have text in the field
+
+  @integration
+  Scenario: No project matches what I typed
+    Given the project menu is open
+    When I type text that matches no project
+    Then the menu shows one line: No projects match the text I typed
 
   @integration
   Scenario: The project search answers the keyboard
-    Given my organization holds more than eight projects
-    And the project menu is open
+    Given the project menu is open
     When I move down the list with the arrow keys and press Enter
     Then the highlighted project opens
 
   @integration
   Scenario: Typing highlights the top result
-    Given my organization holds more than eight projects
-    And the project menu is open
+    Given the project menu is open
     When I type enough of a project's name to narrow the list
     Then the first result is already highlighted, with no arrow key pressed
     When I press Enter
     Then that project opens
 
   @integration
+  Scenario: Escape clears the search before it closes the menu
+    Given the project menu is open
+    And I have typed text in the search field
+    When I press Escape
+    Then the field is empty and the menu is still open
+    When I press Escape again
+    Then the menu closes
+
+  @integration
   Scenario: Creating a project stays available while the list is unfiltered
-    Given my organization holds more than eight projects
+    Given I may create projects in a team
     When I open the project menu without typing
     Then each team I can create a project in offers "New Project"
 

@@ -4,19 +4,14 @@
  * modules/navigation/specs/product-switcher-navigation.feature
  */
 
-import { Menu } from "@langwatch/design-system/menu";
-import { Badge, Box, Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
+import { Badge, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
 
 import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import type { ProductId } from "../../model/products.ts";
-import type { ProjectPickGroup } from "../../model/project-pick-items.ts";
 import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
-import { NavigationLink } from "../elements/navigation-link.tsx";
-import { AggregateProjectAvatar, ProjectAvatar } from "../elements/project-avatar.tsx";
 
 function ScopeDivider() {
   return (
@@ -47,14 +42,8 @@ function MeScopeChip() {
 }
 
 /**
- * Above this many projects the plain menu turns into a searchable
- * combobox: the list no longer fits a screen, so finding beats reading.
- */
-const PROJECT_SEARCH_THRESHOLD = 8;
-
-/**
- * The LLM Ops scope: the current project as a chip, opening a menu of the
- * organization's projects (plus a per-team create entry). Organization
+ * The LLM Ops scope: the current project as a chip, opening a searchable list
+ * of the organization's projects (plus a per-team create entry). Organization
  * choice lives in its own control, so this menu stays within the current one.
  */
 function ProjectScopeMenu() {
@@ -72,123 +61,21 @@ function ProjectScopeMenu() {
       organizationId: orgId,
     });
 
-  const projectCount = groups.reduce((count, group) => count + group.projects.length, 0);
   const showTeamHeaders = groups.length > 1;
   const currentProjectIsAggregate = isAggregateProjectKind(project.kind);
 
   return (
     <>
       <ScopeDivider />
-      {projectCount > PROJECT_SEARCH_THRESHOLD ? (
-        <ProjectSwitcherCombobox
-          groups={groups}
-          currentProjectId={project.id}
-          currentProjectName={project.name}
-          currentProjectIsAggregate={currentProjectIsAggregate}
-          showTeamHeaders={showTeamHeaders}
-          onCreateProjectForTeam={onCreateProjectForTeam}
-        />
-      ) : (
-        <ProjectMenu
-          groups={groups}
-          currentProjectId={project.id}
-          currentProjectName={project.name}
-          currentProjectIsAggregate={currentProjectIsAggregate}
-          showTeamHeaders={showTeamHeaders}
-          onCreateProjectForTeam={onCreateProjectForTeam}
-        />
-      )}
+      <ProjectSwitcherCombobox
+        groups={groups}
+        currentProjectId={project.id}
+        currentProjectName={project.name}
+        currentProjectIsAggregate={currentProjectIsAggregate}
+        showTeamHeaders={showTeamHeaders}
+        onCreateProjectForTeam={onCreateProjectForTeam}
+      />
     </>
-  );
-}
-
-/** The plain project menu, for a list short enough to read whole. */
-function ProjectMenu({
-  groups,
-  currentProjectId,
-  currentProjectName,
-  currentProjectIsAggregate,
-  showTeamHeaders,
-  onCreateProjectForTeam,
-}: {
-  groups: ProjectPickGroup[];
-  currentProjectId: string;
-  currentProjectName: string;
-  currentProjectIsAggregate: boolean;
-  showTeamHeaders: boolean;
-  onCreateProjectForTeam: ({ teamId, orgId }: { teamId: string; orgId: string }) => void;
-}) {
-  return (
-    <Menu.Root>
-      <Menu.Trigger asChild>
-        <Button
-          variant="ghost"
-          aria-label="Switch project"
-          data-testid="navigation-project-switcher"
-          data-tour="project-switcher"
-          textStyle="bodySm"
-          fontWeight="normal"
-          paddingX={2}
-          height="32px"
-          color="fg"
-          gap={2}
-          minWidth={0}
-          maxWidth="280px"
-          title={currentProjectName}
-          _hover={{ backgroundColor: "bg.muted" }}
-        >
-          {currentProjectIsAggregate ? (
-            <AggregateProjectAvatar name={currentProjectName} />
-          ) : (
-            <ProjectAvatar name={currentProjectName} />
-          )}
-          <Text truncate>{currentProjectName}</Text>
-          <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
-        </Button>
-      </Menu.Trigger>
-      <Portal>
-        <Menu.Content minWidth="240px" maxWidth="min(360px, 90vw)">
-          {groups.map(({ team, projects: teamProjects }) => (
-            <Menu.ItemGroup key={team.teamId} title={showTeamHeaders ? team.label : "Projects"}>
-              {teamProjects.map((candidate) => (
-                <Menu.Item
-                  key={candidate.projectId}
-                  value={candidate.projectId}
-                  textStyle="bodySm"
-                  asChild
-                >
-                  <NavigationLink href={candidate.href} _hover={{ textDecoration: "none" }}>
-                    <HStack gap={2} width="full">
-                      {candidate.isAggregate ? (
-                        <AggregateProjectAvatar name={candidate.label} />
-                      ) : (
-                        <ProjectAvatar name={candidate.label} />
-                      )}
-                      <Text flex={1} minWidth={0} truncate title={candidate.label}>
-                        {candidate.label}
-                      </Text>
-                      {candidate.projectId === currentProjectId && (
-                        <Check size={13} aria-label="Current project" />
-                      )}
-                    </HStack>
-                  </NavigationLink>
-                </Menu.Item>
-              ))}
-              {team.canCreateProject && (
-                <Menu.Item
-                  value={`new-project-${team.teamId}`}
-                  data-testid="navigation-project-new"
-                  textStyle="bodySm"
-                  onClick={() => onCreateProjectForTeam({ teamId: team.teamId, orgId: team.orgId })}
-                >
-                  <Plus size={13} /> New Project
-                </Menu.Item>
-              )}
-            </Menu.ItemGroup>
-          ))}
-        </Menu.Content>
-      </Portal>
-    </Menu.Root>
   );
 }
 
