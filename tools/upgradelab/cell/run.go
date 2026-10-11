@@ -94,6 +94,7 @@ type run struct {
 	anchor             time.Time
 	sso                ssoSeed
 	retention          retentionState
+	odd                oddSeed // the tenant-oddities overlay
 	legacy             legacySeed
 	legacyOrg          legacyOrgSeed
 	license            TestLicense
@@ -149,6 +150,9 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 		origin = append(origin, step{"retention-rules", cell.retentionRules})
 		before = append(before, step{"retention-age", cell.retentionAge})
 		cut = append(cut, step{"retention-cut", cell.retentionAtCut})
+	}
+	if cell.overlay(OverlayTenantOddities) {
+		origin = append(origin, step{"oddities-plant", cell.plantOddities})
 	}
 	steps := slices.Concat([]step{{"build", cell.buildBoth}}, origin, before, cut, []step{
 		{"switch", cell.switchToHead}, {"ready", cell.awaitReady},
@@ -248,6 +252,9 @@ func prepare(options Options) (*run, error) {
 		if !contains(Overlays, overlay) {
 			return nil, fmt.Errorf("unknown overlay %q: want one of %v", overlay, Overlays)
 		}
+		if overlay == OverlayTenantOddities && !profile.SSO {
+			return nil, errors.New("the tenant-oddities overlay needs an SSO deployment (cloud-sso or cloud-legacy-sso)")
+		}
 	}
 	for _, dir := range []string{options.FromDir, options.HeadDir} {
 		if err := CheckSourceDir(dir); err != nil {
@@ -258,6 +265,9 @@ func prepare(options Options) (*run, error) {
 		return nil, err
 	}
 	profile.NoAdminEmails = options.NoAdminEmails
+	if contains(options.Overlays, OverlayTenantOddities) {
+		profile.Objects = true // datasets move to object storage, which a cloud install has
+	}
 	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{}), cutDepth: -1}
 	cell.report = &Report{Cell: options.Name(), Deployment: options.Deployment, Tier: options.Tier, Shape: options.Shape,
 		Release: options.Release, Head: options.HeadDir, HeadCommit: HeadCommit(options.HeadDir), Started: cell.origin.UTC().Format(time.RFC3339)}

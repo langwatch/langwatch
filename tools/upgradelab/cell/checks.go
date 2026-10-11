@@ -52,6 +52,7 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.licensedSSOVerdicts(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.scimVerdict(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.retentionVerdict(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.oddityVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.signupVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict(), cell.storedEventsVerdict(ctx))
@@ -477,6 +478,8 @@ func (cell *run) opsVerdict(final []LedgerRow) Verdict {
 	want := "Up to date"
 	if len(Outstanding(final)) > 0 {
 		want = "Finishing in background"
+	} else if cell.overlay(OverlayTenantOddities) && cell.odd.err == nil {
+		want = "Needs attention" // the planted held organization (A1)
 	}
 	return verdict("O1", states["settled"] == want, fmt.Sprintf("want %q settled; state by phase: %v", want, states))
 }

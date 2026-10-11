@@ -52,7 +52,7 @@ func parse(args []string) (Options, error) {
 	flags.StringVar(&options.FromSnapshot, "from-snapshot", "", "a produce entry directory or cache key: restore it instead of seeding")
 	ledger := flags.String("ledger", "", "comma-separated #8553 rows (UP-04, UD-7, ...) to claim at start and report at the end")
 	drills := flags.String("drills", "", "comma-separated drills on top of the profile: api-early (switch on /healthz), worker-restart, retry, private-down, route-broken (hybrid)")
-	overlays := flags.String("overlays", "", "comma-separated overlays planted on main: retention (aged telemetry under three retention rules)")
+	overlays := flags.String("overlays", "", "comma-separated overlays planted on main: retention (aged telemetry under three retention rules), tenant-oddities (held organization, plaintext keys, Postgres dataset rows, untagged prompts; SSO deployments)")
 	if err := flags.Parse(args); err != nil {
 		return options, err
 	}
