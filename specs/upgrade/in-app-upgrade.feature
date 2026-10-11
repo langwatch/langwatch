@@ -117,6 +117,13 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     And a raw query failing for any other reason still answers 500
 
   @unit
+  Scenario: A ClickHouse read the schema is not ready for answers upgrade_in_progress
+    Given the worker is running the upgrade and a ClickHouse migration of the api's image is pending
+    When a repository's query names a table or column that migration has not created
+    Then REST answers 503 upgrade_in_progress with Retry-After
+    And a ClickHouse query failing for any other reason still answers 500
+
+  @unit
   Scenario: The browser retries a read answered upgrade_in_progress
     Given the api answers a read upgrade_in_progress
     When the browser's query client decides whether to try again

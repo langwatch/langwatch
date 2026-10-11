@@ -239,3 +239,49 @@ describe("a raw SQL read the schema is not ready for", () => {
     });
   });
 });
+
+/** Shaped as `@clickhouse/client` raises it, or as the routing driver fails an in-band error. */
+const clickHouseFailed = ({ code, type }: { code: string; type?: string }) =>
+  Object.assign(new Error("Unknown table expression identifier 'usage_trace_meter'"), {
+    code,
+    type,
+  });
+
+describe("a ClickHouse read the schema is not ready for", () => {
+  afterEach(() => setLedgerCurrent({ current: false }));
+
+  describe("when the query names a table or column a pending migration adds", () => {
+    /** @scenario "A ClickHouse read the schema is not ready for answers upgrade_in_progress" */
+    it.each([
+      { code: "60", type: "UNKNOWN_TABLE" },
+      { code: "16", type: "NO_SUCH_COLUMN_IN_TABLE" },
+      { code: "60" },
+    ])("answers $code $type as 503 upgrade_in_progress with Retry-After", async (failure) => {
+      const response = await restAnswerFor(clickHouseFailed(failure));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Retry-After")).toBe("10");
+      expect(await response.json()).toMatchObject({ code: "upgrade_in_progress" });
+    });
+  });
+
+  describe("when the query failed for another reason", () => {
+    /** @scenario "A ClickHouse read the schema is not ready for answers upgrade_in_progress" */
+    it("answers a syntax error as an unhandled 500", async () => {
+      const response = await restAnswerFor(clickHouseFailed({ code: "62", type: "SYNTAX_ERROR" }));
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe("when the gate already admitted the process", () => {
+    /** @scenario "A missing table on a ledger that says current is not reported as upgrading" */
+    it("answers a missing ClickHouse table as an unhandled 500", async () => {
+      setLedgerCurrent({ current: true });
+
+      const response = await restAnswerFor(clickHouseFailed({ code: "60", type: "UNKNOWN_TABLE" }));
+
+      expect(response.status).toBe(500);
+    });
+  });
+});

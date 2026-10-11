@@ -445,6 +445,13 @@ const SCHEMA_BEHIND_CODES: readonly unknown[] = ["P2021", "P2022", "42P01", "427
 /** The driver adapter's kinds for 42P01 and 42703 (`@prisma/adapter-pg`). */
 const SCHEMA_BEHIND_KINDS: readonly unknown[] = ["TableDoesNotExist", "ColumnNotFound"];
 
+/** ClickHouse's UNKNOWN_TABLE (60) and NO_SUCH_COLUMN_IN_TABLE (16): its tables migrate too. */
+const CLICKHOUSE_SCHEMA_BEHIND_TYPES: readonly unknown[] = [
+  "UNKNOWN_TABLE",
+  "NO_SUCH_COLUMN_IN_TABLE",
+];
+const CLICKHOUSE_SCHEMA_BEHIND_CODES: readonly unknown[] = ["60", "16"];
+
 /** How many wrappers deep a schema-behind failure is still recognised; also stops a cycle. */
 const CAUSE_DEPTH = 6;
 
@@ -467,6 +474,8 @@ export function isSchemaBehind(error: unknown): boolean {
 function namesMissingSchema(node: object): boolean {
   if ("code" in node && SCHEMA_BEHIND_CODES.includes(node.code)) return true;
   if ("originalCode" in node && SCHEMA_BEHIND_CODES.includes(node.originalCode)) return true;
+  if ("type" in node && CLICKHOUSE_SCHEMA_BEHIND_TYPES.includes(node.type)) return true;
+  if ("code" in node && CLICKHOUSE_SCHEMA_BEHIND_CODES.includes(node.code)) return true;
   return "kind" in node && SCHEMA_BEHIND_KINDS.includes(node.kind);
 }
 
