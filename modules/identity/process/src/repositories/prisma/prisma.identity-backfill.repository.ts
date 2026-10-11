@@ -30,6 +30,7 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
         createdAt: true,
         userHashKey: true,
         lastLoginAt: true,
+        passkeySignupClaimHash: true,
       },
     });
     if (!user) throw new UserNotFoundError(userId);
@@ -40,7 +41,12 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
       createdAtMs: user.createdAt.getTime(),
       userHashKey: user.userHashKey,
       lastLoginAtMs: user.lastLoginAt?.getTime() ?? null,
+      passkeySignupPending: user.passkeySignupClaimHash !== null,
     };
+  }
+
+  async countPasskeys({ userId }: { userId: string }): Promise<number> {
+    return this.prisma.passkey.count({ where: { userId } });
   }
 
   async findAccountRows({ userId }: { userId: string }): Promise<BackfillAccountRow[]> {

@@ -235,11 +235,16 @@ export class MemoryIdentityBackfillRepository implements IdentityBackfillReposit
       createdAtMs: row.createdAtMs,
       userHashKey: row.userHashKey,
       lastLoginAtMs: row.lastLoginAtMs ?? null,
+      passkeySignupPending: row.passkeySignupPending ?? false,
     };
   }
 
   async findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]> {
     return this.store.accounts.get(args.userId) ?? [];
+  }
+
+  async countPasskeys(args: { userId: string }): Promise<number> {
+    return this.store.passkeyCounts.get(args.userId) ?? 0;
   }
 
   async findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]> {

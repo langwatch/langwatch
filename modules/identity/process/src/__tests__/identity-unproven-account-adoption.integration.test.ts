@@ -34,7 +34,7 @@ const identifierIdentity = CryptoIdentifierIdentityService.create();
 
 describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => {
   const namespace = `unproven-${nanoid(8)}`;
-  const ids = { sam: "", kim: "", lee: "" };
+  const ids = { sam: "", kim: "", lee: "", ana: "" };
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
     logger: createLogger("langwatch:identity:test:unproven-account"),
@@ -106,6 +106,15 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
     });
     ids.lee = lee.id;
     await seedState(lee.id, "rolled_back");
+
+    // Unproven, carrying only her address: today's pass finalizes her unverified.
+    const ana = await prisma.user.create({
+      data: { name: "ana", email: `ana-${namespace}@example.com`, emailVerified: false },
+    });
+    ids.ana = ana.id;
+    const anaPass = await backfill.migrateUser({ userId: ana.id });
+    if (anaPass.status !== "finalized") throw new Error(`setup: ana was ${anaPass.status}`);
+    await repositories.latch.recordFinalized({ userId: ana.id, report: anaPass.report });
   });
 
   afterAll(async () => {
@@ -140,6 +149,7 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
     expect(reopened?.status).toBe("migrated");
     expect((await stateOf(ids.kim))?.status).toBe("finalized");
     expect((await stateOf(ids.lee))?.status).toBe("rolled_back");
+    expect((await stateOf(ids.ana))?.status).toBe("finalized");
 
     expect(await repositories.migration.reopenUnprovenAccounts({ dryRun: false })).toBe(0);
     expect((await stateOf(ids.sam))?.updatedAt).toEqual(reopened?.updatedAt);
@@ -176,6 +186,33 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
     });
     expect(signIn?.methods.hasPassword).toBe(false);
     expect(outcome.status).toBe("finalized");
+  });
+
+  /** @scenario "An unproven account finalized with only its address is confirmed with nothing to wipe" */
+  it("confirms the address-only account and leaves no pre-proof credential behind", async () => {
+    expect((await stateOf(ids.ana))?.status).toBe("finalized");
+
+    // The confirmation link's adoption, as user's repository writes it (adoptUnconfirmed).
+    await prisma.$transaction([
+      prisma.account.deleteMany({ where: { userId: ids.ana } }),
+      prisma.passkey.deleteMany({ where: { userId: ids.ana } }),
+      prisma.user.update({
+        where: { id: ids.ana },
+        data: {
+          emailVerified: true,
+          signupConfirmationPending: false,
+          passkeySignupClaimHash: null,
+        },
+      }),
+    ]);
+
+    expect(await prisma.accountCredential.findMany({ where: { userId: ids.ana } })).toEqual([]);
+    const live = await prisma.identifier.findMany({
+      where: { userId: ids.ana, state: { not: "DETACHED" } },
+      select: { provider: true, accountId: true },
+    });
+    expect(live).toEqual([{ provider: "email", accountId: null }]);
+    expect((await stateOf(ids.ana))?.status).toBe("finalized");
   });
 });
 

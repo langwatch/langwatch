@@ -39,6 +39,7 @@ function samUser(overrides?: Partial<BackfillUserRow>): BackfillUserRow {
     createdAtMs: USER_CREATED_AT,
     userHashKey: "a-hash-key",
     lastLoginAtMs: null,
+    passkeySignupPending: false,
     ...overrides,
   };
 }
@@ -63,6 +64,7 @@ function googleAccount(): BackfillAccountRow {
 function harness(options?: {
   user?: BackfillUserRow | null;
   accounts?: BackfillAccountRow[];
+  passkeys?: number;
   applyCeremonies?: boolean;
   presetRows?: BackfillIdentifierRow[];
   secretCarry?: IdentitySecretCarryRepository;
@@ -127,6 +129,7 @@ function harness(options?: {
         return user;
       },
       findAccountRows: async () => accounts,
+      countPasskeys: async () => options?.passkeys ?? 0,
       findIdentifierRows: async () => [...rows.values()],
     },
     users: {
@@ -270,7 +273,7 @@ describe("the identifier backfill pass", () => {
   });
 
   describe("when nobody has proven the account (never confirmed, never signed into)", () => {
-    /** @scenario "The backfill never finalizes an account nobody has proven" */
+    /** @scenario "The backfill holds an unproven account carrying a sign-in method set before the proof" */
     it("holds the user at migrated and writes nothing", async () => {
       const { service, attachIdentifier, verifyIdentifier, minted, carried } = harness({
         user: samUser({ emailVerified: false, userHashKey: null }),
@@ -285,7 +288,25 @@ describe("the identifier backfill pass", () => {
       expect(carried).toEqual([]);
     });
 
-    /** @scenario "The backfill never finalizes an account nobody has proven" */
+    /** @scenario "The backfill holds an unproven account carrying a sign-in method set before the proof" */
+    it("holds one carrying only a passkey, or a passkey sign-up in flight", async () => {
+      const withPasskey = harness({
+        user: samUser({ emailVerified: false }),
+        accounts: [],
+        passkeys: 1,
+      });
+      const midSignUp = harness({
+        user: samUser({ emailVerified: false, passkeySignupPending: true }),
+        accounts: [],
+      });
+
+      expect((await withPasskey.service.migrateUser({ userId: USER })).status).toBe("migrated");
+      expect((await midSignUp.service.migrateUser({ userId: USER })).status).toBe("migrated");
+      expect(withPasskey.attachIdentifier).not.toHaveBeenCalled();
+      expect(midSignUp.attachIdentifier).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The backfill holds an unproven account carrying a sign-in method set before the proof" */
     it("finalizes as before on a later pass once the address is confirmed", async () => {
       const user = samUser({ emailVerified: false });
       const { service } = harness({ user });
@@ -295,6 +316,26 @@ describe("the identifier backfill pass", () => {
       const later = await service.migrateUser({ userId: USER });
 
       expect(later.status).toBe("finalized");
+    });
+
+    /** @scenario "The backfill finalizes an unproven account carrying only its address, unverified" */
+    it("finalizes one carrying only its address, with the address left unverified", async () => {
+      const { service, attachIdentifier, verifyIdentifier, rows, carried } = harness({
+        user: samUser({ emailVerified: false }),
+        accounts: [],
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(outcome).toEqual({ status: "finalized", report: { kind: "adopted", identifiers: 1 } });
+      expect(attachIdentifier).toHaveBeenCalledTimes(1);
+      expect(attachIdentifier.mock.calls[0]?.[0]).toMatchObject({ provider: "email" });
+      expect(verifyIdentifier).not.toHaveBeenCalled();
+      expect([...rows.values()].map((row) => [row.provider, row.state])).toEqual([
+        ["email", "ATTACHED"],
+      ]);
+      // Nothing set before the proof, so the latch has no secret to carry.
+      expect(carried).toEqual(["looked"]);
     });
 
     it("still backfills an account that was signed into without confirming", async () => {

@@ -29,6 +29,8 @@ interface MemoryUserRow {
   userHashKey: string | null;
   /** `User.lastLoginAt`; absent reads as never signed into. */
   lastLoginAtMs?: number | null;
+  /** `User.passkeySignupClaimHash` is set; absent reads as none. */
+  passkeySignupPending?: boolean;
   payload: Record<string, unknown>;
 }
 
@@ -47,6 +49,8 @@ export class MemoryIdentityStore {
   readonly users = new Map<string, MemoryUserRow>();
   readonly identifiers = new Map<string, IdentifierFact>();
   readonly accounts = new Map<string, BackfillAccountRow[]>();
+  /** Legacy `Passkey` rows, counted per user. */
+  readonly passkeyCounts = new Map<string, number>();
   readonly backfillIdentifiers = new Map<string, BackfillIdentifierRow[]>();
   readonly reservations = new Map<string, IdentifierReservationHolder>();
   readonly verifications = new Map<string, IdentityVerificationRecord>();

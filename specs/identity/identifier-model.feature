@@ -353,13 +353,23 @@ Feature: The identifier model - identity as an event-sourced pipeline
   # An account nobody has proven (never confirmed, never signed into) may hold a
   # password somebody else chose. A confirmation link adopts it and drops that
   # password from the legacy rows, so it stays on the legacy branch until then
-  # (Alex, 2026-10-06, "Adopt gap"; ADR-116 §2).
+  # (Alex, 2026-10-06, "Adopt gap"; ADR-116 §2). With nothing to drop it is
+  # pulled through, unverified (Alex, 2026-10-11).
   @unit
-  Scenario: The backfill never finalizes an account nobody has proven
+  Scenario: The backfill holds an unproven account carrying a sign-in method set before the proof
     Given "sam"'s account was never confirmed and never signed into
+    And it carries a password, a social link, a passkey or a passkey sign-up in flight
     When the identity backfill migrates "sam"
     Then "sam" is held at migrated and nothing is written for "sam"
     And once "sam"'s address is confirmed, a later pass finalizes "sam" as before
+
+  @unit
+  Scenario: The backfill finalizes an unproven account carrying only its address, unverified
+    Given "ana"'s account was never confirmed and never signed into
+    And it carries no password, social link, passkey or passkey sign-up
+    When the identity backfill migrates "ana"
+    Then "ana" is finalized with her address attached and not verified
+    And no secret is carried for "ana"
 
   @unit
   Scenario: The backfill drops the stored credential of an account row that is gone
@@ -371,12 +381,13 @@ Feature: The identifier model - identity as an event-sourced pipeline
 
   @integration
   Scenario: A blocking sweep reopens every unproven account an earlier pass finalized
-    Given an earlier pass finalized "sam", whose account was never confirmed and never signed into
+    Given an earlier pass finalized "sam", whose account was never confirmed and never signed into and carries a password
     And it finalized "kim", whose address is confirmed, and an operator pinned "lee" as rolled back
+    And it finalized "ana", unproven but carrying only her address
     When the reopen sweep runs as a dry run
     Then it reports "sam" and changes nothing
     When the reopen sweep runs
-    Then "sam" is held at migrated, "kim" stays finalized and "lee" stays rolled back
+    Then "sam" is held at migrated, "kim" and "ana" stay finalized and "lee" stays rolled back
     And a second run changes nothing
 
   @integration
@@ -388,6 +399,13 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then no credential row and no live identifier for that password remains in identity's tables
     And the sign-in screen no longer offers "sam" a password
     And "sam" is finalized again
+
+  @integration
+  Scenario: An unproven account finalized with only its address is confirmed with nothing to wipe
+    Given an earlier pass finalized "ana", unproven and carrying only her address
+    When a confirmation link adopts "ana"'s account
+    Then no credential row and no account-backed identifier exists for "ana" in identity's tables
+    And "ana" stays finalized with only her address identifier
 
   # D09: the Auth0 broker's subject is a compound — `google-oauth2|<sub>`
   # states the person's identity AT GOOGLE, wrapped in the broker's

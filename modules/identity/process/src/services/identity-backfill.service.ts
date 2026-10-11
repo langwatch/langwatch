@@ -9,6 +9,7 @@ import {
 
 import type {
   BackfillAccountRow,
+  BackfillUserRow,
   IdentityBackfillRepository,
 } from "../repositories/identity-backfill.repository.ts";
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
@@ -17,7 +18,7 @@ import {
   establishUserEmailCommandId,
 } from "../rules/identity-command-id.rules.ts";
 import type { IdentityAdoptionWrites } from "../rules/identity-writes.rules.ts";
-import { isUnprovenAccount } from "../rules/unproven-account.rules.ts";
+import { carriesPreProofSignInMethod, isUnprovenAccount } from "../rules/unproven-account.rules.ts";
 import { mintUserHashKey } from "../rules/user-hash-key.rules.ts";
 import {
   type IdentityBackfillPlanService,
@@ -116,9 +117,11 @@ export class IdentityBackfillService {
       return { status: "finalized", report: { kind: "no_email" } };
     }
 
-    if (isUnprovenAccount(user)) {
+    const accounts = await this.reads.findAccountRows({ userId });
+    if (isUnprovenAccount(user) && (await this.carriesPreProofMethod({ user, accounts }))) {
       // Held on the legacy branch, where a confirmation link's adoption drops every pre-proof
       // credential; the pass writes nothing until the address is proven (Alex, 2026-10-06).
+      // One carrying only its address has nothing to drop, so it finalizes unverified.
       return { status: "migrated", report: { kind: "unproven_account" } };
     }
 
@@ -129,7 +132,6 @@ export class IdentityBackfillService {
       });
     }
 
-    const accounts = await this.reads.findAccountRows({ userId });
     const planned = this.plan.planIdentifiers({
       user: { ...user, email: user.email },
       accounts,
@@ -152,6 +154,20 @@ export class IdentityBackfillService {
     }
 
     return outcome;
+  }
+
+  private async carriesPreProofMethod({
+    user,
+    accounts,
+  }: {
+    user: BackfillUserRow;
+    accounts: BackfillAccountRow[];
+  }): Promise<boolean> {
+    return carriesPreProofSignInMethod({
+      accounts: accounts.length,
+      passkeys: await this.reads.countPasskeys({ userId: user.id }),
+      passkeySignupPending: user.passkeySignupPending,
+    });
   }
 
   private async adoptPlanned({
