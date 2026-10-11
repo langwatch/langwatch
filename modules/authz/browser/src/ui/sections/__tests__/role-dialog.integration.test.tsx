@@ -4,7 +4,7 @@
  * Writing a role, with the answer on screen while you write it (main's RoleDialog suite).
  * Spec: specs/identity/org-access-cluster.feature
  */
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -130,11 +130,35 @@ describe("given somebody writing a new role", () => {
     });
 
     /** @scenario The preview describes the role as it is built */
-    it("refuses to save a role that grants nothing, and says why", () => {
+    it("names every missing field when saving an empty role, and focuses the name", async () => {
       renderDialog();
 
-      expect(screen.getByRole("button", { name: "Create role" })).toBeDisabled();
+      const create = screen.getByRole("button", { name: "Create role" });
+      expect(create).toBeEnabled();
+      await userEvent.click(create);
+
+      expect(await screen.findByText("Give this role a name")).toBeInTheDocument();
       expect(screen.getByText("Choose at least one permission before saving.")).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("textbox", { name: /Name/ })).toHaveFocus());
+      expect(state.created).toEqual([]);
+    });
+
+    /** @scenario The preview describes the role as it is built */
+    it("focuses the permission search when only the permissions are missing", async () => {
+      renderDialog();
+
+      await userEvent.type(screen.getByRole("textbox", { name: /Name/ }), "Support analyst");
+      await userEvent.click(screen.getByRole("button", { name: "Create role" }));
+
+      expect(screen.getByText("Choose at least one permission before saving.")).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Search permissions" })).toHaveFocus();
+      expect(state.created).toEqual([]);
+
+      await setLevel({ resource: "traces", area: "Data and analysis", level: "Read" });
+
+      expect(
+        screen.queryByText("Choose at least one permission before saving."),
+      ).not.toBeInTheDocument();
     });
   });
 
