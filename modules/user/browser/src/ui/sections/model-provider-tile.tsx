@@ -37,6 +37,25 @@ function sanitizeDefaultLabel(raw: string | undefined): string {
     .replace(/^[^a-z0-9]+/, "");
 }
 
+/** Whether the clipboard took the text; a missing or refusing clipboard is `false`. */
+async function writeToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function CopyFailedNotice({ failed }: { failed: boolean }) {
+  if (!failed) return null;
+  return (
+    <Banner status="error">
+      Couldn't copy to the clipboard. Reveal the secret and copy it by hand, or try again.
+    </Banner>
+  );
+}
+
 const VOWEL_SOUNDS = ["a", "e", "i", "o", "u"];
 function articleFor(word: string): "a" | "an" {
   const first = word.trim().charAt(0).toLowerCase();
@@ -96,6 +115,7 @@ export function ModelProviderTile({
   const [issued, setIssued] = useState<IssuedKey | null>(null);
   const [secretRevealed, setSecretRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const workspaceWait = usePersonalWorkspaceWait({ organizationId });
@@ -126,10 +146,11 @@ export function ModelProviderTile({
 
   const issuing = issueMutation.isPending;
 
-  const onCopySecret = () => {
+  const onCopySecret = async () => {
     if (!issued) return;
-    void navigator.clipboard.writeText(issued.secret);
-    setCopied(true);
+    const written = await writeToClipboard(issued.secret);
+    setCopyFailed(!written);
+    setCopied(written);
     setTimeout(() => setCopied(false), 1500);
   };
 
@@ -137,6 +158,7 @@ export function ModelProviderTile({
     setIssued(null);
     setLabel(sanitizeDefaultLabel(config.defaultLabel));
     setSecretRevealed(false);
+    setCopyFailed(false);
     setErrorMessage(null);
   };
 
@@ -282,11 +304,12 @@ export function ModelProviderTile({
                 size="xs"
                 variant="ghost"
                 aria-label={copied ? "Copied" : "Copy secret"}
-                onClick={onCopySecret}
+                onClick={() => void onCopySecret()}
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
               </IconButton>
             </HStack>
+            <CopyFailedNotice failed={copyFailed} />
           </VStack>
           <VStack align="stretch" gap={1}>
             <Text fontSize="xs" color="fg.muted">

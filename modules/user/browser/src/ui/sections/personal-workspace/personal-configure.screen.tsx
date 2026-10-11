@@ -1,3 +1,4 @@
+import { Banner } from "@langwatch/design-system/banner";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { InlineCode } from "@langwatch/design-system/inline-code";
@@ -12,9 +13,10 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SettingsField } from "@langwatch/design-system/settings-field";
 import { toEpochMs } from "@langwatch/time";
 import { Copy, Laptop, Monitor, Server } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { api } from "../../../behavior/personal-workspace-api.ts";
 import {
@@ -32,7 +34,8 @@ import {
   usePersonalWorkspaceWait,
 } from "../../../behavior/use-personal-workspace-wait.ts";
 import { formatRelativeTime } from "../../../model/relative-time.ts";
-import { AvatarUploadControl } from "../avatar-upload-control.tsx";
+import { CredentialCard, RevokeConfirmation } from "../../blocks/credential-cards.tsx";
+import { Link } from "../../elements/personal-link.tsx";
 import { BudgetOverviewList } from "../budget-overview/index.ts";
 import { DevicesPanel } from "../devices-panel.tsx";
 import { HomePagePicker } from "../home-page-picker.tsx";
@@ -53,8 +56,16 @@ export function PersonalConfigureScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Settings</PageLayout.Heading>
+      <PageLayout.Header
+        actions={
+          <PageLayout.HeaderButton asChild>
+            <Link unstyled href="/settings/profile">
+              Edit profile
+            </Link>
+          </PageLayout.HeaderButton>
+        }
+      >
+        <PageLayout.Heading>Personal configuration</PageLayout.Heading>
       </PageLayout.Header>
       <PersonalWorkspaceLayout>
         <VStack align="stretch" gap={6} width="full">
@@ -64,13 +75,8 @@ export function PersonalConfigureScreen() {
 
           <SectionCard title="Profile">
             <VStack align="stretch" gap={4}>
-              {ctx.organizationId && <AvatarUploadControl organizationId={ctx.organizationId} />}
               <Field label="Name" value={ctx.fullName} />
-              <Field
-                label="Email"
-                value={ctx.email}
-                hint={`Managed by ${ctx.organizationName} IT`}
-              />
+              <Field label="Email" value={ctx.email} />
               <Field label="Joined" value={ctx.joinedOn} />
               {ctx.routingPolicyName && (
                 <Field
@@ -102,7 +108,7 @@ export function PersonalConfigureScreen() {
           {personalProjectId && ctx.organizationId ? (
             <SectionCard
               title="Personal OTLP Endpoint"
-              description="Send raw OTLP traces directly to your personal workspace. For tool-specific auto-shape (Claude Code, Cursor, etc.), use the Trace Ingest tile catalog on /me when available."
+              description="Send raw OTLP traces directly to your personal workspace."
             >
               <PersonalOtlpEndpointPanel
                 organizationId={ctx.organizationId}
@@ -132,6 +138,8 @@ function PersonalCredentialsSection({
   const toaster = usePersonalToaster();
   const showErrorToast = useShowErrorToast();
   const [newKeyLabel, setNewKeyLabel] = useState("");
+  const [labelError, setLabelError] = useState<string | null>(null);
+  const labelInput = useRef<HTMLInputElement>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [revealedSecret, setRevealedSecret] = useState<{
     label: string;
@@ -159,6 +167,7 @@ function PersonalCredentialsSection({
         baseUrl: issued.baseUrl,
       });
       setNewKeyLabel("");
+      setLabelError(null);
       setShowAddForm(false);
       void utils.personalVirtualKeys.list.invalidate();
       toaster.create({
@@ -186,7 +195,12 @@ function PersonalCredentialsSection({
   });
 
   const onIssue = () => {
-    if (!newKeyLabel.trim() || !organizationId) return;
+    if (!newKeyLabel.trim()) {
+      setLabelError("Give the key a name.");
+      labelInput.current?.focus();
+      return;
+    }
+    if (!organizationId) return;
     issueMutation.mutate({
       organizationId: organizationId,
       label: newKeyLabel.trim(),
@@ -239,16 +253,23 @@ function PersonalCredentialsSection({
                       <Text fontSize="sm" fontWeight="medium">
                         New personal key
                       </Text>
-                      <Input
-                        placeholder="e.g. jane-laptop-2"
-                        size="sm"
-                        value={newKeyLabel}
-                        onChange={(e) => setNewKeyLabel(e.target.value)}
-                      />
-                      <Text fontSize="xs" color="fg.muted">
-                        Lowercase letters, numbers, dash, underscore. The secret is shown once on
-                        creation.
-                      </Text>
+                      <SettingsField
+                        layout="stacked"
+                        label="Name"
+                        hint="Lowercase letters, numbers, dash, underscore. The secret is shown once on creation."
+                        error={labelError}
+                      >
+                        <Input
+                          ref={labelInput}
+                          placeholder="e.g. jane-laptop-2"
+                          size="sm"
+                          value={newKeyLabel}
+                          onChange={(e) => {
+                            setNewKeyLabel(e.target.value);
+                            setLabelError(null);
+                          }}
+                        />
+                      </SettingsField>
                       {workspaceWait.waiting && (
                         <Text fontSize="xs" color="fg.muted" as="output" display="block">
                           {PERSONAL_WORKSPACE_WAIT_HINT}
@@ -259,7 +280,7 @@ function PersonalCredentialsSection({
                           size="sm"
                           onClick={onIssue}
                           loading={issueMutation.isPending}
-                          disabled={!newKeyLabel.trim() || workspaceWait.waiting}
+                          disabled={workspaceWait.waiting}
                         >
                           Create key
                         </Button>
@@ -269,6 +290,7 @@ function PersonalCredentialsSection({
                           onClick={() => {
                             setShowAddForm(false);
                             setNewKeyLabel("");
+                            setLabelError(null);
                           }}
                         >
                           Cancel
@@ -280,8 +302,8 @@ function PersonalCredentialsSection({
 
                 {apiKeys.length === 0 ? (
                   <Text fontSize="sm" color="fg.muted">
-                    No personal keys yet. Run <InlineCode>langwatch login</InlineCode> in your
-                    terminal to issue your first one.
+                    No virtual keys yet. Add a key for a tool, or run{" "}
+                    <InlineCode>langwatch login</InlineCode> in your terminal to connect a device.
                   </Text>
                 ) : (
                   <VStack align="stretch" gap={2}>
@@ -486,49 +508,34 @@ function ApiKeyRow({
   const Icon = osIcon(apiKey.os);
 
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      borderWidth="1px"
-      borderColor={isPendingRevoke ? "red.emphasized" : "border.muted"}
-      borderRadius="sm"
-      padding={3}
-    >
-      <HStack gap={3}>
-        <Box>
-          <Icon size={20} />
-        </Box>
-        <VStack align="start" gap={0} flex={1}>
-          <Text fontSize="sm" fontWeight="medium">
-            {apiKey.label}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            {apiKey.deviceHint} · Last used {fmtRelative(apiKey.lastUsedAt)}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            Created {fmtRelative(apiKey.createdAt)}
-          </Text>
-        </VStack>
-        {!isPendingRevoke && (
+    <CredentialCard
+      icon={<Icon size={20} />}
+      title={apiKey.label}
+      subline={`${apiKey.deviceHint} · Last used ${fmtRelative(apiKey.lastUsedAt)}`}
+      meta={
+        <Text fontSize="xs" color="fg.muted">
+          Created {fmtRelative(apiKey.createdAt)}
+        </Text>
+      }
+      isPendingRevoke={isPendingRevoke}
+      action={
+        isPendingRevoke ? null : (
           <Button size="sm" variant="outline" colorPalette="red" onClick={onRequestRevoke}>
             Revoke
           </Button>
-        )}
-      </HStack>
-      {isPendingRevoke && (
-        <HStack gap={2} paddingY={2} paddingX={3} backgroundColor="red.subtle" borderRadius="sm">
-          <Text fontSize="xs" color="red.fg" flex={1}>
-            Revoke this key? Any tool using it will start failing immediately.
-          </Text>
-          <Button size="xs" variant="ghost" onClick={onCancelRevoke} disabled={isRevoking}>
-            Cancel
-          </Button>
-          <Button size="xs" colorPalette="red" onClick={onConfirmRevoke} loading={isRevoking}>
-            Confirm revoke
-          </Button>
-        </HStack>
-      )}
-    </VStack>
+        )
+      }
+      confirmation={
+        isPendingRevoke ? (
+          <RevokeConfirmation
+            question="Revoke this key? Any tool using it will start failing immediately."
+            isRevoking={isRevoking}
+            onCancel={onCancelRevoke}
+            onConfirm={onConfirmRevoke}
+          />
+        ) : null
+      }
+    />
   );
 }
 
@@ -540,6 +547,18 @@ function RevealedSecretBanner({
   onDismiss: () => void;
 }) {
   const toaster = usePersonalToaster();
+  const [copyFailed, setCopyFailed] = useState(false);
+
+  const copySecret = async () => {
+    try {
+      await navigator.clipboard.writeText(secret.secret);
+    } catch {
+      setCopyFailed(true);
+      return;
+    }
+    setCopyFailed(false);
+    toaster.create({ title: "Secret copied to clipboard", type: "success" });
+  };
 
   return (
     <Box
@@ -574,20 +593,16 @@ function RevealedSecretBanner({
           <Text fontSize="xs" fontFamily="mono" flex={1} wordBreak="break-all">
             {secret.secret}
           </Text>
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={() => {
-              void navigator.clipboard.writeText(secret.secret);
-              toaster.create({
-                title: "Secret copied to clipboard",
-                type: "success",
-              });
-            }}
-          >
-            <Copy size={14} /> Copy
+          <Button size="xs" variant="ghost" onClick={() => void copySecret()}>
+            <Copy size={14} /> {copyFailed ? "Try again" : "Copy"}
           </Button>
         </HStack>
+        {copyFailed && (
+          <Banner status="error">
+            Couldn't copy to the clipboard. Select the secret above and copy it by hand, or try
+            again. It won't be shown again once you dismiss this.
+          </Banner>
+        )}
         <Text fontSize="xs" color="green.fg">
           Gateway base URL: <InlineCode>{secret.baseUrl}</InlineCode>
         </Text>
