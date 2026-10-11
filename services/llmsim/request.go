@@ -296,6 +296,8 @@ func (s *Server) answer(h http.Header, req request) reply {
 		rep.Mode = "scripted"
 	} else if object, ok := scriptedJSON(req); ok {
 		rep = reply{Mode: "scripted", Text: object, Finish: "stop"}
+	} else if object, ok := s.takeNextJSON(req); ok {
+		rep = reply{Mode: "scripted", Text: object, Finish: "stop"}
 	} else {
 		rep = s.markovReply(req, r, toolsMode(h, req.model))
 	}

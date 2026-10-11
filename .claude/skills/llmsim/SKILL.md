@@ -41,6 +41,8 @@ gets the same answer, at no cost. Code: `services/llmsim`, console `apps/llmsim-
   `/tool <name> <json args>` line of the last user message is a call with exactly those
   arguments, in order; `/next` starts the turn after the tool results; other lines are text.
   Type it into Langy's chat to make Langy call one of its tools (`bash`, `read`, …) your way.
+- A `/json <object>` line in the last user message is the exact answer to a JSON request;
+  settings `nextJson` queues one exact answer for the next JSON request (PUT replaces all settings).
 - Agentic runs: `tools` in the model name (`markov-tools`) or `X-Llmsim-Tools: auto` makes
   an auto tool choice always call a tool (the one the last user message names, else a
   seeded pick, schema-valid args); after a tool result it answers text. Chat, responses
@@ -52,7 +54,7 @@ gets the same answer, at no cost. Code: `services/llmsim`, console `apps/llmsim-
 GET    /_sim/api/calls          newest first (model, mode, tokens, status)
 GET    /_sim/api/calls/{id}     request and reply
 DELETE /_sim/api/calls          reset
-GET|PUT /_sim/api/settings      {"forcedError": 0|4xx|5xx, "seed": ""|"random"|"<v>"}
+GET|PUT /_sim/api/settings      {"forcedError": 0|4xx|5xx, "seed": ""|"random"|"<v>", "nextJson": {...}}
 ```
 
 ## Seed, tests and load

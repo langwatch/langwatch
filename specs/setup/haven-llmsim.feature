@@ -126,6 +126,14 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the answer is exactly that object
     And a text request with the same message keeps the model's usual answer
 
+  # Bound by services/llmsim/llmsim_test.go. Steers a JSON call whose prompt the
+  # person cannot write, such as the trace search router behind the search bar.
+  Scenario: A queued JSON answer is the next JSON request's answer, once
+    Given the console settings hold a "nextJson" object
+    When the next request asks for a JSON object or a JSON schema
+    Then the answer is exactly that object
+    And the request after it gets the model's usual answer, and a text request never takes it
+
   Scenario: Langy mode echoes a tool result back
     Given the script's tool calls have been answered with tool results
     When the script has a "/next" step left
