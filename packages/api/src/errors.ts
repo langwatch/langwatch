@@ -534,15 +534,40 @@ export function setLedgerCurrent({ current }: { current: boolean }): void {
   ledgerCurrent = current;
 }
 
+/** Private ClickHouse targets still applying their migrations, by organisation (T7-F18). */
+let organizationsCatchingUp: ReadonlySet<string> = new Set();
+
+/** The worker's shared list, read from Redis by the upgrade gate; empty when it cannot be read. */
+export function setOrganizationsCatchingUp({
+  organizationIds,
+}: {
+  organizationIds: Iterable<string>;
+}): void {
+  organizationsCatchingUp = new Set(organizationIds);
+}
+
+/** Whether the failure came from a private target that is still catching up its migrations. */
+function isFromTargetCatchingUp(error: unknown): boolean {
+  let node: unknown = error;
+  for (let depth = 0; depth < CAUSE_DEPTH; depth++) {
+    if (typeof node !== "object" || node === null) return false;
+    if ("privateTarget" in node && typeof node.privateTarget === "string") {
+      return organizationsCatchingUp.has(node.privateTarget);
+    }
+    node = causeOf(node);
+  }
+  return false;
+}
+
 /**
  * The one mapping of a store failure every boundary answers: busy pool, schema behind. Schema
- * behind is `upgrade_in_progress` only before the gate admits; after, the ledger and the schema
- * disagree, an unhandled 500 whose log names the table or column (STUCK-STATES).
+ * behind is `upgrade_in_progress` before the gate admits, or from a private ClickHouse target still
+ * catching up; otherwise the ledger and the schema disagree, a 500 naming the table (STUCK-STATES).
  */
 export function promoteStoreFailure<T>(raised: T): T | Error {
   if (isDatabaseBusy(raised)) return new DatabaseBusyError();
   if (!isSchemaBehind(raised)) return raised;
-  if (!ledgerCurrent) return new UpgradeInProgressError();
+  if (!ledgerCurrent || isFromTargetCatchingUp(raised)) return new UpgradeInProgressError();
   const detail = raised instanceof Error ? raised.message : String(raised);
   return new Error(`schema and ledger disagree: ${detail}`, { cause: raised });
 }

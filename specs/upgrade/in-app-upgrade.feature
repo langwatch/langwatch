@@ -123,6 +123,33 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Then REST answers 503 upgrade_in_progress with Retry-After
     And a ClickHouse query failing for any other reason still answers 500
 
+  # Each private ClickHouse target catches up on its own; the worker shares which ones through Redis (Alex, 2026-10-11, T7-F18).
+  @unit
+  Scenario: A ClickHouse read from a private target still catching up answers upgrade_in_progress after admission
+    Given the gate admitted the api and the worker shares that a private ClickHouse target is catching up
+    When a read routed to that target names a table its migrations have not created yet
+    Then REST answers 503 upgrade_in_progress with Retry-After
+    And the failure is logged as a warning, not an error
+
+  @unit
+  Scenario: A ClickHouse read the schema is not ready for on a current target stays a 500 after admission
+    Given the gate admitted the api and no private ClickHouse target is catching up
+    When a read names a table the schema lacks
+    Then it answers an unhandled 500 that says the schema and ledger disagree
+
+  @unit
+  Scenario: A process that cannot read the catching-up targets from Redis answers as before
+    Given the gate admitted the api and Redis does not answer
+    When a read routed to a private target names a table the schema lacks
+    Then it answers an unhandled 500, and no request fails because of the check
+
+  @unit
+  Scenario: The worker shares which private targets are catching up with every instance
+    Given an admitted worker and a private ClickHouse target the ledger records behind
+    When its catch-up pass comes round
+    Then it writes that target's organisation to Redis with a short expiry
+    And once the target is current it clears the list
+
   @unit
   Scenario: The browser retries a read answered upgrade_in_progress
     Given the api answers a read upgrade_in_progress

@@ -10,7 +10,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { Authorize } from "../access/access.ts";
-import { promoteStoreFailure, setLedgerCurrent } from "../errors.ts";
+import {
+  isUpgradeInProgress,
+  promoteStoreFailure,
+  setLedgerCurrent,
+  setOrganizationsCatchingUp,
+} from "../errors.ts";
 import { SessionReader } from "../hosting/session-reader.ts";
 import { canonicalErrorResponse, withRetryAfter } from "../rest/response.ts";
 import { composeTrpcRouters } from "../trpc/compose.ts";
@@ -280,6 +285,82 @@ describe("a ClickHouse read the schema is not ready for", () => {
       setLedgerCurrent({ current: true });
 
       const response = await restAnswerFor(clickHouseFailed({ code: "60", type: "UNKNOWN_TABLE" }));
+
+      expect(response.status).toBe(500);
+    });
+  });
+});
+
+/** A ClickHouse UNKNOWN_TABLE as the routing driver tags it with the private target it reached. */
+const unknownTableFrom = (privateTarget: string) =>
+  Object.assign(
+    new Error("Table langwatch.new_thing does not exist", {
+      cause: Object.assign(new Error("Table langwatch.new_thing does not exist"), {
+        code: "60",
+        type: "UNKNOWN_TABLE",
+      }),
+    }),
+    { privateTarget, code: "60", type: "UNKNOWN_TABLE" },
+  );
+
+describe("a ClickHouse read from a private target once the gate admitted", () => {
+  afterEach(() => {
+    setLedgerCurrent({ current: false });
+    setOrganizationsCatchingUp({ organizationIds: [] });
+  });
+
+  describe("when the worker shares that the target is still catching up", () => {
+    /** @scenario "A ClickHouse read from a private target still catching up answers upgrade_in_progress after admission" */
+    it("answers 503 upgrade_in_progress with Retry-After and logs below error", async () => {
+      setLedgerCurrent({ current: true });
+      setOrganizationsCatchingUp({ organizationIds: ["org_private"] });
+
+      const response = await restAnswerFor(unknownTableFrom("org_private"));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Retry-After")).toBe("10");
+      expect(await response.json()).toMatchObject({ code: "upgrade_in_progress" });
+      expect(isUpgradeInProgress(unknownTableFrom("org_private"))).toBe(true);
+    });
+  });
+
+  describe("when the failing target is not the one catching up", () => {
+    /** @scenario "A ClickHouse read the schema is not ready for on a current target stays a 500 after admission" */
+    it("answers an unhandled 500 that says the schema and ledger disagree", async () => {
+      setLedgerCurrent({ current: true });
+      setOrganizationsCatchingUp({ organizationIds: ["org_other"] });
+
+      const response = await restAnswerFor(unknownTableFrom("org_private"));
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
+      expect(isUpgradeInProgress(unknownTableFrom("org_private"))).toBe(false);
+    });
+
+    /** @scenario "A ClickHouse read the schema is not ready for on a current target stays a 500 after admission" */
+    it("answers an untagged UNKNOWN_TABLE as a 500 even while a target catches up", async () => {
+      setLedgerCurrent({ current: true });
+      setOrganizationsCatchingUp({ organizationIds: ["org_private"] });
+      const untagged = Object.assign(new Error("Table langwatch.new_thing does not exist"), {
+        code: "60",
+        type: "UNKNOWN_TABLE",
+      });
+
+      const promoted = promoteStoreFailure(untagged);
+
+      expect(promoted instanceof Error ? promoted.message : "").toBe(
+        "schema and ledger disagree: Table langwatch.new_thing does not exist",
+      );
+    });
+  });
+
+  describe("when Redis could not be read, so the shared list is empty", () => {
+    /** @scenario "A process that cannot read the catching-up targets from Redis answers as before" */
+    it("answers the tagged failure as an unhandled 500, as before", async () => {
+      setLedgerCurrent({ current: true });
+      setOrganizationsCatchingUp({ organizationIds: [] });
+
+      const response = await restAnswerFor(unknownTableFrom("org_private"));
 
       expect(response.status).toBe(500);
     });

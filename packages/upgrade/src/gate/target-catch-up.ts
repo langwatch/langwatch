@@ -16,6 +16,7 @@ export function startTargetCatchUp({
   findLeaseHolder,
   upgrade,
   warn,
+  shareTargetsBehind,
   everyMs = TARGET_CATCH_UP_EVERY_MS,
   maxMs,
 }: {
@@ -23,6 +24,8 @@ export function startTargetCatchUp({
   findLeaseHolder: () => Promise<unknown>;
   upgrade: FirstInstallUpgrade;
   warn: CatchUpWarn;
+  /** Tells every instance which targets are behind, so their reads answer upgrade_in_progress. */
+  shareTargetsBehind?: (targets: readonly string[]) => Promise<void>;
   everyMs?: number;
   maxMs: number;
 }): { stop: () => Promise<void> } {
@@ -34,30 +37,25 @@ export function startTargetCatchUp({
     timer = setTimeout(() => void once(), waitMs);
     timer.unref?.();
   };
+  const share = (targets: readonly string[]) => shareSafely({ shareTargetsBehind, warn, targets });
   const once = async () => {
     try {
-      const behind = await findTargetsBehind();
-      if (behind.length === 0) waitMs = everyMs;
-      else if ((await findLeaseHolder()) === null && !stopped) {
-        warn(
-          `ClickHouse target ${behind.join(", ")} is behind; this worker runs the upgrade to catch it up`,
-          {
-            phase: "catch-up",
-            targets: behind,
-            waitingOn: `\`${UPGRADE_COMMAND}\``,
-            next: "nothing to do: the target catches up once it answers",
-          },
-        );
-        await upgrade();
-        const still = await findTargetsBehind();
-        waitMs = still.length === 0 ? everyMs : Math.min(waitMs * 2, maxMs);
-      }
+      waitMs = await catchUpPass({
+        findTargetsBehind,
+        findLeaseHolder,
+        upgrade,
+        warn,
+        share,
+        stopped: () => stopped,
+        waits: { waitMs, everyMs, maxMs },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       warn("ClickHouse target catch-up pass failed", { phase: "catch-up", error: message });
     }
     schedule();
   };
+  if (shareTargetsBehind) void findTargetsBehind().then(share, () => undefined);
   schedule();
   return {
     // A running upgrade holds its own lease and finishes on its own; a stop does not wait for it.
@@ -66,4 +64,62 @@ export function startTargetCatchUp({
       clearTimeout(timer);
     },
   };
+}
+
+/** A failed share only warns: the targets still catch up, and readers fall back to the 500. */
+async function shareSafely({
+  shareTargetsBehind,
+  warn,
+  targets,
+}: {
+  shareTargetsBehind: ((targets: readonly string[]) => Promise<void>) | undefined;
+  warn: CatchUpWarn;
+  targets: readonly string[];
+}): Promise<void> {
+  try {
+    await shareTargetsBehind?.(targets);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    warn("could not share the ClickHouse targets catching up", {
+      phase: "catch-up",
+      error: message,
+    });
+  }
+}
+
+/** One pass: shares the targets behind and upgrades if no run holds the lease; the next wait. */
+async function catchUpPass({
+  findTargetsBehind,
+  findLeaseHolder,
+  upgrade,
+  warn,
+  share,
+  stopped,
+  waits: { waitMs, everyMs, maxMs },
+}: {
+  findTargetsBehind: () => Promise<readonly string[]>;
+  findLeaseHolder: () => Promise<unknown>;
+  upgrade: FirstInstallUpgrade;
+  warn: CatchUpWarn;
+  share: (targets: readonly string[]) => Promise<void>;
+  stopped: () => boolean;
+  waits: { waitMs: number; everyMs: number; maxMs: number };
+}): Promise<number> {
+  const behind = await findTargetsBehind();
+  await share(behind);
+  if (behind.length === 0) return everyMs;
+  if ((await findLeaseHolder()) !== null || stopped()) return waitMs;
+  warn(
+    `ClickHouse target ${behind.join(", ")} is behind; this worker runs the upgrade to catch it up`,
+    {
+      phase: "catch-up",
+      targets: behind,
+      waitingOn: `\`${UPGRADE_COMMAND}\``,
+      next: "nothing to do: the target catches up once it answers",
+    },
+  );
+  await upgrade();
+  const still = await findTargetsBehind();
+  await share(still);
+  return still.length === 0 ? everyMs : Math.min(waitMs * 2, maxMs);
 }

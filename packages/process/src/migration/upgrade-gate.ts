@@ -7,7 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { setLedgerCurrent } from "@langwatch/api";
+import { setLedgerCurrent, setOrganizationsCatchingUp } from "@langwatch/api";
 import type { ListedWork } from "@langwatch/eventing";
 
 import type { ServerRole } from "../feature-installer.ts";
@@ -58,6 +58,10 @@ export type UpgradeGate = Readonly<{
   retryFailedSteps?: () => Promise<void>;
   /** Runs the upgrade once in this process and answers its exit code: `pnpm task upgrade`. */
   runOnce?: () => Promise<number>;
+  /** Hands on the private ClickHouse targets still catching up, read every few seconds (T7-F18). */
+  watchTargetsCatchingUp?: (
+    onChange: (organizationIds: readonly string[]) => void,
+  ) => Readonly<{ stop: () => Promise<void> }>;
 }>;
 
 /**
@@ -154,6 +158,7 @@ export function upgradeGateComponent({
   let admitted = false;
   /** Set while an upgrading api serves and asks on until current. */
   let upgrading: Readonly<{ stop: AbortController; asking: Promise<void> }> | undefined;
+  let catchingUp: Readonly<{ stop: () => Promise<void> }> | undefined;
   /** D1, D2: a fresh token per failed run, printed on one log line; only its hash is kept. */
   const issueConsoleToken = (): Pick<UpgradeConsole, "tokenSha256" | "tokenTtlMs"> => {
     const token = randomBytes(32).toString("base64url");
@@ -220,6 +225,9 @@ export function upgradeGateComponent({
       const serving = () => {
         admitted = true;
         setLedgerCurrent({ current: true });
+        catchingUp = gate.watchTargetsCatchingUp?.((organizationIds) =>
+          setOrganizationsCatchingUp({ organizationIds }),
+        );
         const elapsedMs = Math.round(performance.now() - startedAt);
         logger.info(
           {
@@ -263,6 +271,7 @@ export function upgradeGateComponent({
     stop: async () => {
       upgrading?.stop.abort();
       await upgrading?.asking;
+      await catchingUp?.stop();
       setLedgerCurrent({ current: false });
       if (admitted) await gate.release();
     },

@@ -19,7 +19,7 @@ import type { UpgradePostgres } from "../ports.ts";
 import { writeUpgradeLine } from "../runner/image-upgrade.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
-import { isPrivateTarget } from "../runner/schema-applier.ts";
+import { isPrivateTarget, PRIVATE_TARGET_PREFIX } from "../runner/schema-applier.ts";
 import { EXIT_CODES, type UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
@@ -46,6 +46,11 @@ import {
 } from "./serving-gate.ts";
 import { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
 import { startTargetCatchUp } from "./target-catch-up.ts";
+import {
+  redisTargetsCatchingUp,
+  type TargetsCatchingUpStore,
+  watchTargetsCatchingUp,
+} from "./targets-catching-up.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
@@ -98,6 +103,7 @@ export function upgradeGateOver({
   processId,
   firstInstall,
   credentialKeys,
+  targetsCatchingUp = null,
   warn = emitWarning,
   wait = (ms) => sleep(ms),
 }: {
@@ -110,6 +116,8 @@ export function upgradeGateOver({
   processId: string;
   firstInstall: FirstInstallUpgrade;
   credentialKeys?: readonly string[];
+  /** The shared list of private ClickHouse targets catching up (T7-F18); null without Redis. */
+  targetsCatchingUp?: TargetsCatchingUpStore | null;
   warn?: ServingGateWarn;
   /** The worker's pause between asks; tests pass their own. */
   wait?: (ms: number) => Promise<unknown>;
@@ -194,9 +202,16 @@ export function upgradeGateOver({
         await gate.release();
       } finally {
         await connection.close();
+        await targetsCatchingUp?.close();
       }
     },
     serving: () => gate.serving(),
+    ...(targetsCatchingUp === null
+      ? {}
+      : {
+          watchTargetsCatchingUp: (onChange: (organizationIds: readonly string[]) => void) =>
+            watchTargetsCatchingUp({ store: targetsCatchingUp, onChange }),
+        }),
     ...consoleRetryFor({ role, findFailures: findBlockingFailures, runner }),
     ...(role === "worker"
       ? {
@@ -207,7 +222,7 @@ export function upgradeGateOver({
             processId,
             release,
             warn,
-            catchUp: { upgrade: firstInstall, findLeaseHolder },
+            catchUp: { upgrade: firstInstall, findLeaseHolder, targetsCatchingUp },
           }),
         }
       : {}),
@@ -524,7 +539,11 @@ function backgroundStepsOver({
   release: string | null;
   warn: ServingGateWarn;
   /** Runs the upgrade again while a held private ClickHouse target is behind (T7-F1). */
-  catchUp: { upgrade: FirstInstallUpgrade; findLeaseHolder: UpgradeLeaseHolder };
+  catchUp: {
+    upgrade: FirstInstallUpgrade;
+    findLeaseHolder: UpgradeLeaseHolder;
+    targetsCatchingUp: TargetsCatchingUpStore | null;
+  };
 }) {
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
@@ -560,6 +579,9 @@ function backgroundStepsOver({
         },
         findLeaseHolder: catchUp.findLeaseHolder,
         upgrade: catchUp.upgrade,
+        ...(catchUp.targetsCatchingUp === null
+          ? {}
+          : { shareTargetsBehind: shareOver({ store: catchUp.targetsCatchingUp }) }),
         warn: (message, fields) => warn(message, { processId, ...fields }),
         maxMs: UPGRADE_RETRY_MAX_MS,
       });
@@ -571,6 +593,14 @@ function backgroundStepsOver({
       };
     },
   };
+}
+
+/** The ledger names a private target `private:<organizationId>`; the list holds organisations. */
+function shareOver({ store }: { store: TargetsCatchingUpStore }) {
+  return (targets: readonly string[]) =>
+    store.write({
+      organizationIds: targets.map((target) => target.slice(PRIVATE_TARGET_PREFIX.length)),
+    });
 }
 
 /** The gate's statements give up rather than hold its one connection (gate review, 2026-10-10). */
@@ -666,6 +696,10 @@ export async function servingUpgradeGate({
             processId: `${hostname()}:${process.pid}:${role}`,
             firstInstall: upgrade,
             credentialKeys,
+            targetsCatchingUp: redisTargetsCatchingUp({
+              url: redis?.trim() || undefined,
+              environment,
+            }),
             warn,
           });
           return { ...gate, runOnce };

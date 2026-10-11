@@ -88,7 +88,7 @@ export type {
   ClickHouseVendorClientOptions,
 } from "./managed-client.ts";
 export type { RoutableStatementClient } from "./routingDriver.ts";
-export { routingDriver } from "./routingDriver.ts";
+export { PrivateTargetSchemaError, routingDriver } from "./routingDriver.ts";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool.ts";
 export {
   DEFAULT_CLIENTS_PER_PROCESS,
