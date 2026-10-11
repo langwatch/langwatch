@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import type { UpgradeOutcomeCode } from "../../runner/upgrade-outcome.ts";
 import { assertCurrent, firstInstallVerdict, type ServingVerdict } from "../serving-gate.ts";
 import { admitAfterFirstInstall } from "../serving-upgrade-gate.ts";
 
@@ -23,7 +24,7 @@ describe("admitAfterFirstInstall", () => {
         gate: { admit: async () => answers.shift() ?? firstInstallVerdict() },
         firstInstall: async () => {
           said.push({ message: "upgrade ran" });
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
         warn: (message, fields) => void said.push({ message, fields }),
       });
@@ -52,7 +53,7 @@ describe("admitAfterFirstInstall", () => {
         gate: { admit: async () => answers.shift() ?? { admitted: true, outcome: "current" } },
         firstInstall: async () => {
           said.push({ message: "upgrade ran" });
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
         warn: (message, fields) => void said.push({ message, fields }),
       });
@@ -80,7 +81,7 @@ describe("admitAfterFirstInstall", () => {
         gate: { admit: async () => answers.shift() ?? { admitted: true, outcome: "current" } },
         firstInstall: async () => {
           said.push("upgrade ran");
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
         warn: (message) => void said.push(message),
       });
@@ -95,7 +96,7 @@ describe("admitAfterFirstInstall", () => {
       const said: string[] = [];
       await admitAfterFirstInstall({
         gate: { admit: async () => ({ admitted: true, outcome: "current" }) },
-        firstInstall: async () => ({ exitCode: 0, logTail: [] }),
+        firstInstall: async () => ({ code: "done", logTail: [] }),
         warn: (message) => void said.push(message),
       });
 
@@ -104,10 +105,10 @@ describe("admitAfterFirstInstall", () => {
   });
 
   describe("given a worker that lost the lease to a peer's run", () => {
-    describe("when its upgrade exits 3 after waiting for the lease", () => {
+    describe("when its upgrade ends lease_not_acquired after waiting for the lease", () => {
       it("never counts it as a failed run and runs again once the lease is free", async () => {
         const said: string[] = [];
-        const exits = [3, 0];
+        const exits: UpgradeOutcomeCode[] = ["lease_not_acquired", "done"];
         const answers: ServingVerdict[] = [
           assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
           assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
@@ -115,7 +116,7 @@ describe("admitAfterFirstInstall", () => {
         ];
         const verdict = await admitAfterFirstInstall({
           gate: { admit: async () => answers.shift() ?? { admitted: true, outcome: "current" } },
-          firstInstall: async () => ({ exitCode: exits.shift() ?? 0, logTail: [] }),
+          firstInstall: async () => ({ code: exits.shift() ?? "done", logTail: [] }),
           warn: (message) => void said.push(message),
           findFailedSteps: async () => [],
           wait: async () => undefined,
@@ -143,7 +144,7 @@ describe("admitAfterFirstInstall", () => {
         gate: { admit: async () => answers.shift() ?? current },
         firstInstall: async () => {
           runs += 1;
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
         warn: (message) => void said.push(message),
         findLeaseHolder: async () => holders[0] ?? null,
@@ -165,11 +166,11 @@ describe("admitAfterFirstInstall", () => {
     it("runs nothing while the step is failed and runs again once a Retry returns it to pending", async () => {
       let failed = [{ id: "clickhouse:00042", error: "boom" }];
       const answers = [behind(), behind(), behind(), current];
-      const exitCodes = [2, 0];
+      const codes: UpgradeOutcomeCode[] = ["failed", "done"];
       let runs = 0;
       const verdict = await admitAfterFirstInstall({
         gate: { admit: async () => answers.shift() ?? current },
-        firstInstall: async () => ({ exitCode: exitCodes[runs++] ?? 0, logTail: [] }),
+        firstInstall: async () => ({ code: codes[runs++] ?? "done", logTail: [] }),
         warn: () => undefined,
         findFailedSteps: async () => failed,
         wait: async () => {
@@ -190,7 +191,7 @@ describe("admitAfterFirstInstall", () => {
         gate: { admit: async () => answers.shift() ?? current },
         firstInstall: async () => {
           runs += 1;
-          return { exitCode: 1, logTail: [] };
+          return { code: "failed", logTail: [] };
         },
         warn: () => undefined,
         findFailedSteps: async () => [{ id: "clickhouse:00042", error: "boom" }],
@@ -208,12 +209,12 @@ describe("admitAfterFirstInstall", () => {
     it("retries on a doubling wait, saying it retries and the run's last line, never a Retry", async () => {
       const said: string[] = [];
       const waits: number[] = [];
-      const exits = [1, 1, 1, 0];
+      const exits: UpgradeOutcomeCode[] = ["failed", "failed", "failed", "done"];
       const answers = [behind(), behind(), behind(), behind(), current];
       const verdict = await admitAfterFirstInstall({
         gate: { admit: async () => answers.shift() ?? current },
         firstInstall: async () => ({
-          exitCode: exits.shift() ?? 0,
+          code: exits.shift() ?? "done",
           logTail: ["preflight refused: a failed Prisma migration"],
         }),
         warn: (message) => void said.push(message),
@@ -236,7 +237,7 @@ describe("admitAfterFirstInstall", () => {
         gate: { admit: async () => (runs < 8 ? behind() : current) },
         firstInstall: async () => {
           runs += 1;
-          return { exitCode: 1, logTail: [] };
+          return { code: "failed", logTail: [] };
         },
         warn: () => undefined,
         wait: async (ms) => void waits.push(ms),

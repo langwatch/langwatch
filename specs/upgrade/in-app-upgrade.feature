@@ -65,6 +65,13 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     And once a Retry returns the step to pending the worker runs the upgrade again
 
   @unit
+  Scenario: The worker waits on the run's outcome, never on a process exit code
+    Given the worker's gate runs the upgrade
+    When the run ends done, lease_not_acquired or any failure
+    Then the gate admits, waits for the lease holder, or waits for a Retry or the backoff
+    And a run in a child process maps its exit code 0, 3 and anything else to done, lease_not_acquired and failed
+
+  @unit
   Scenario: A restarted worker runs a failed upgrade once more
     Given the worker's upgrade run failed on a blocking step
     When the operator restarts the worker

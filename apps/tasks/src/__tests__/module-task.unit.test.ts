@@ -18,7 +18,21 @@ class RecordingTask extends Task {
   }
 }
 
-const booted = vi.hoisted(() => ({ ran: new Array<string>(), app: { tasks: vi.fn() } }));
+const booted = vi.hoisted(() => ({
+  ran: new Array<string>(),
+  listed: new Array<{ name: string; timeoutMs: number }>(),
+  app: {
+    tasks: vi.fn(),
+    runListedWork: async <Result>(input: {
+      name: string;
+      timeoutMs: number;
+      work: () => Promise<Result>;
+    }): Promise<Result> => {
+      booted.listed.push({ name: input.name, timeoutMs: input.timeoutMs });
+      return input.work();
+    },
+  },
+}));
 
 vi.mock("../process-modules.generated.ts", () => ({ processModules: [] }));
 vi.mock("@langwatch/process", async (importOriginal) => {
@@ -41,6 +55,7 @@ vi.mock("@langwatch/process", async (importOriginal) => {
 
 beforeEach(() => {
   booted.ran.length = 0;
+  booted.listed.length = 0;
   booted.app.tasks.mockReturnValue([new RecordingTask("installed", booted.ran)]);
 });
 
@@ -102,5 +117,20 @@ describe("given a module task run", () => {
       expect(importModule).not.toHaveBeenCalled();
       expect(booted.ran).toEqual(["installed"]);
     });
+  });
+});
+
+describe("given a module task run ahead of the backlog", () => {
+  /** @scenario "The pass a finished upgrade requests runs ahead of any queue backlog" */
+  it("runs the task inside the queue's listed work, with its wait", async () => {
+    await runModuleTask({
+      name: "installed",
+      args: [],
+      signal: new AbortController().signal,
+      listed: { timeoutMs: 60_000 },
+    });
+
+    expect(booted.listed).toEqual([{ name: "task:installed", timeoutMs: 60_000 }]);
+    expect(booted.ran).toEqual(["installed"]);
   });
 });

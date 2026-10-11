@@ -2,16 +2,24 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { UPGRADE_LOG_TAIL_LINES } from "../runner/run-log.ts";
+import type { UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
 
 /** The image's tasks app, where `pnpm task upgrade` runs (rethink 6.9). */
 export const TASKS_APP_DIRECTORY = fileURLToPath(
   new URL("../../../../apps/tasks/", import.meta.url),
 );
 
-/** Runs one `upgrade`: its exit code (a launch failure answers 1) and its last lines of output. */
-export type FirstInstallUpgrade = () => Promise<
-  Readonly<{ exitCode: number; logTail: readonly string[] }>
->;
+/** One upgrade run as the worker's gate sees it: the runner's outcome and its last lines. */
+export type UpgradeRunResult = Readonly<{ code: UpgradeOutcomeCode; logTail: readonly string[] }>;
+
+/** Runs one `upgrade`, in a child process or in this one. */
+export type FirstInstallUpgrade = () => Promise<UpgradeRunResult>;
+
+/** A child's exit code as the runner's outcome: 0 done, 3 lease not acquired, else failed. */
+export function outcomeOfExitCode(exitCode: number): UpgradeOutcomeCode {
+  if (exitCode === 0) return "done";
+  return exitCode === 3 ? "lease_not_acquired" : "failed";
+}
 
 /**
  * Q10: on a Helm first install the api's first boot runs `upgrade` once, as the pre-roll Job would,
@@ -40,7 +48,7 @@ export function spawnFirstInstallUpgrade({
       const child = spawn(command, [...args], { cwd, stdio: ["inherit", "pipe", "pipe"] });
       child.stdout.on("data", tee(process.stdout));
       child.stderr.on("data", tee(process.stderr));
-      child.once("error", () => resolve({ exitCode: 1, logTail }));
-      child.once("close", (code) => resolve({ exitCode: code ?? 1, logTail }));
+      child.once("error", () => resolve({ code: "failed", logTail }));
+      child.once("close", (code) => resolve({ code: outcomeOfExitCode(code ?? 1), logTail }));
     });
 }

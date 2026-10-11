@@ -60,10 +60,13 @@ export async function runModuleTask({
   args,
   signal,
   plugins,
+  listed,
 }: {
   name: string;
   args: readonly string[];
   signal: AbortSignal;
+  /** Runs the task's queue jobs ahead of any backlog and waits up to `timeoutMs` for them. */
+  listed?: { timeoutMs: number };
   /** Absent loads no plugin module, as a run that names only an installed module's task. */
   plugins?: TaskModulePlugins;
 }): Promise<void> {
@@ -80,7 +83,9 @@ export async function runModuleTask({
       signal.throwIfAborted();
       const startedAt = performance.now();
       logger.info({ task: name }, "task starting");
-      await catalogue.get({ name }).run({ args, signal });
+      const task = catalogue.get({ name });
+      const work = () => task.run({ args, signal });
+      await (listed ? app.runListedWork({ name: `task:${name}`, ...listed, work }) : work());
       const elapsedMs = Math.round(performance.now() - startedAt);
       logger.info({ task: name, elapsedMs }, "task finished");
     },

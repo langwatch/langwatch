@@ -15,12 +15,11 @@ import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
-import { upgradePlanSchema } from "../plan/plan-upgrade.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 import { isPrivateTarget } from "../runner/schema-applier.ts";
-import { EXIT_CODES } from "../runner/upgrade-outcome.ts";
+import type { UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
 import { PreRosterRepository } from "../serving-roster/pre-roster.repository.ts";
@@ -423,8 +422,8 @@ export async function admitAfterFirstInstall({
     // An exit 0 that left the ledger behind runs again only after the re-ask interval.
     if (ranClean) await wait(reAskMs);
     sayRun({ verdict, warn });
-    const { exitCode, logTail } = await firstInstall();
-    ranClean = exitCode === 0;
+    const { code, logTail } = await firstInstall();
+    ranClean = code === "done";
     if (ranClean) {
       retries = 0;
       continue;
@@ -432,7 +431,7 @@ export async function admitAfterFirstInstall({
     // After any run a failed step waits for a Retry; a lease loser's exit is not a failure.
     mayRunPastFailure = false;
     retries = await waitAfterFailedRun({
-      run: { verdict, exitCode, logTail },
+      run: { verdict, code, logTail },
       retries,
       findFailedSteps,
       warn,
@@ -447,31 +446,31 @@ export const UPGRADE_RETRY_MAX_MS = 5 * 60_000;
 
 /** Waits after a failed run; answers the count of back-to-back failures with no failed step. */
 async function waitAfterFailedRun({
-  run: { verdict, exitCode, logTail },
+  run: { verdict, code, logTail },
   retries,
   findFailedSteps,
   warn,
   wait,
   reAskMs,
 }: {
-  run: { verdict: ServingVerdict; exitCode: number; logTail: readonly string[] };
+  run: { verdict: ServingVerdict; code: UpgradeOutcomeCode; logTail: readonly string[] };
   retries: number;
   findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
   warn: ServingGateWarn;
   wait: (ms: number) => Promise<unknown>;
   reAskMs: number;
 }): Promise<number> {
-  const failed =
-    exitCode === EXIT_CODES.lease_not_acquired ? [] : await findFailedSteps().catch(() => []);
-  if (exitCode === EXIT_CODES.lease_not_acquired || failed.length > 0) {
-    if (failed.length > 0) warnFailedRun({ verdict, exitCode, warn });
+  const lost = code === "lease_not_acquired";
+  const failed = lost ? [] : await findFailedSteps().catch(() => []);
+  if (lost || failed.length > 0) {
+    if (failed.length > 0) warnFailedRun({ verdict, code, warn });
     await wait(reAskMs);
     return 0;
   }
   const retryInMs = Math.min(reAskMs * 2 ** retries, UPGRADE_RETRY_MAX_MS);
   const cause = logTail.at(-1) ?? "it printed nothing";
   warn(
-    `\`${UPGRADE_COMMAND}\` exited ${exitCode} with no failed step to retry (last line: ${cause}); this worker retries it in ${retryInMs / 1000} s`,
+    `\`${UPGRADE_COMMAND}\` ended ${code} with no failed step to retry (last line: ${cause}); this worker retries it in ${retryInMs / 1000} s`,
     {
       phase: verdict.outcome,
       waitingOn: "the retry backoff",
@@ -485,14 +484,14 @@ async function waitAfterFailedRun({
 
 function warnFailedRun({
   verdict,
-  exitCode,
+  code,
   warn,
 }: {
   verdict: ServingVerdict;
-  exitCode: number;
+  code: UpgradeOutcomeCode;
   warn: ServingGateWarn;
 }): void {
-  warn(`\`${UPGRADE_COMMAND}\` exited ${exitCode}; this worker waits for a Retry`, {
+  warn(`\`${UPGRADE_COMMAND}\` ended ${code}; this worker waits for a Retry`, {
     phase: verdict.outcome,
     waitingOn: "a Retry",
     next: "retry the failed step from Ops > Upgrades or the upgrade console",

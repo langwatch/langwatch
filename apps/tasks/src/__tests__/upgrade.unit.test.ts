@@ -4,7 +4,7 @@
 import { type ClickHouseClient, ClickHouseError } from "@clickhouse/client";
 import { SecretsChain } from "@langwatch/secrets";
 import type { UpgradePostgres } from "@langwatch/upgrade";
-import { upgradeOutcome } from "@langwatch/upgrade/runner";
+import { upgradeOutcome, withLockTimeout } from "@langwatch/upgrade/runner";
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 import { describe, expect, it } from "vitest";
 
@@ -17,7 +17,6 @@ import {
   runUpgradeCommand,
   sqlReader,
   upcastStepsOf,
-  withLockTimeout,
 } from "../upgrade.ts";
 
 /** No module declares a step: the command never boots the tasks process. */

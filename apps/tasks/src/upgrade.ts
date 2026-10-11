@@ -24,13 +24,7 @@ import {
   type UpgradePostgres,
 } from "@langwatch/upgrade";
 import { IMAGE_MIGRATION_DIRECTORIES, imageRelease, readImageTree } from "@langwatch/upgrade/gate";
-import {
-  compareReleases,
-  loadReleases,
-  type ManifestStep,
-  type ReleaseManifest,
-  releaseVersionSchema,
-} from "@langwatch/upgrade/manifest";
+import { loadReleases, type ManifestStep, releaseVersionSchema } from "@langwatch/upgrade/manifest";
 import { formatStatus, preflightFrom, previewUpgradeTo } from "@langwatch/upgrade/reader";
 import {
   createUpgradeRunner,
@@ -39,6 +33,9 @@ import {
   PRIVATE_TARGET_PREFIX,
   type SchemaTargetReport,
   redactSecrets,
+  releaseSteppingApplier,
+  type SteppedSchema,
+  type StepSchemaTo,
   UPGRADE_NEXT_ACTION,
   UPGRADE_STATUS_COMMAND,
   type UpgradeOutcome,
@@ -47,6 +44,8 @@ import {
   type UpgradeRunnerLog,
   type UpgradeSchemaApplier,
   upgradeReadHintMessage,
+  type UpgradeTaskLine,
+  withLockTimeout,
 } from "@langwatch/upgrade/runner";
 import { assertOldWritersGone, recordPreRosterRollback } from "@langwatch/upgrade/serving-roster";
 import {
@@ -103,21 +102,6 @@ export function parseUpgradeArgs({ args }: { args: readonly string[] }): Upgrade
   const json = flags.includes("--json");
   if (first === "status") return { command: first, json };
   return to === undefined ? { command: first, json } : { command: first, json, to };
-}
-
-/** The migration session's URL with `lock_timeout` added to any session options already there. */
-export function withLockTimeout({
-  url,
-  lockTimeoutMs,
-}: {
-  url: string;
-  lockTimeoutMs: number;
-}): string {
-  const parsed = new URL(url);
-  const option = `-c lock_timeout=${lockTimeoutMs}`;
-  const existing = parsed.searchParams.get("options");
-  parsed.searchParams.set("options", existing ? `${existing} ${option}` : option);
-  return parsed.toString();
 }
 
 /** Rows as JSON; a database goose has not created yet holds none (upgrade-command.feature). */
@@ -355,139 +339,6 @@ function oneReleaseApplier({ input }: { input: TaskInput }): UpgradeSchemaApplie
   };
 }
 
-/** What stepping to a release applies: every Prisma folder and the last goose version up to it. */
-export function releaseSchemaUpTo({
-  release,
-  manifests,
-}: {
-  release: string;
-  manifests: readonly ReleaseManifest[];
-}): { prismaFolders: string[]; gooseUpTo: number | null } {
-  const ids = manifests
-    .filter((manifest) => compareReleases({ left: manifest.release, right: release }) <= 0)
-    .flatMap((manifest) => manifest.steps.map((step) => step.id));
-  const named = (prefix: string) =>
-    ids.filter((id) => id.startsWith(prefix)).map((id) => id.slice(prefix.length));
-  const versions = named("clickhouse:").map(Number);
-  return {
-    prismaFolders: named("prisma:"),
-    gooseUpTo: versions.length > 0 ? Math.max(...versions) : null,
-  };
-}
-
-/** What one stepped release did: its target reports and the Prisma folders it applied. */
-export type SteppedSchema = Readonly<{
-  reports: readonly SchemaTargetReport[];
-  applied: readonly string[];
-}>;
-
-/** Applies the schema up to one release; the stepping applier calls it once per release. */
-export type StepSchemaTo = (args: {
-  release: string;
-  prismaFolders: readonly string[];
-  gooseUpTo: number | null;
-  lockTimeoutMs: number;
-  signal: AbortSignal;
-  skipTargets?: ReadonlySet<string>;
-}) => Promise<SteppedSchema>;
-
-/** Said once, when the first schema to apply is older than the image's release. */
-export function steppingStartsLine({
-  imageRelease,
-}: {
-  imageRelease: string | null;
-}): UpgradeTaskLine {
-  return {
-    level: "info",
-    message: `the upgrade crosses several releases: the schema steps one release at a time up to ${imageRelease ?? "this image"}, each release's blocking steps after its schema`,
-    fields: { phase: "schema", waitingOn: "nothing", next: "nothing to do: wait for the run" },
-  };
-}
-
-/** Said before one release's schema is applied. */
-export function stepToLine({
-  release,
-  prismaFolders,
-  gooseUpTo,
-}: {
-  release: string;
-  prismaFolders: readonly string[];
-  gooseUpTo: number | null;
-}): UpgradeTaskLine {
-  const clickhouse =
-    gooseUpTo === null ? "no ClickHouse version up to it" : `ClickHouse up to version ${gooseUpTo}`;
-  return {
-    level: "info",
-    message: `stepping the schema to ${release}: ${prismaFolders.length} Prisma folder(s) up to it, ${clickhouse}`,
-    fields: {
-      phase: "schema",
-      release,
-      waitingOn: "prisma migrate deploy, then goose",
-      next: "nothing to do: wait for the run",
-    },
-  };
-}
-
-/** Said after one release's schema: what it applied, or which targets failed. */
-export function steppedLine({
-  release,
-  stepped,
-}: {
-  release: string;
-  stepped: SteppedSchema;
-}): UpgradeTaskLine {
-  const failed = stepped.reports.filter((report) => !report.ok).map((report) => report.target);
-  const fields = { phase: "schema", release, applied: stepped.applied };
-  if (failed.length === 0)
-    return {
-      level: "info",
-      message: `schema stepped to ${release}: ${stepped.applied.length} Prisma migration(s) applied; its blocking steps run next`,
-      fields: { ...fields, waitingOn: "nothing" },
-    };
-  return {
-    level: "warn",
-    message: `schema step to ${release} failed on ${failed.join(", ")}`,
-    fields: { ...fields, failed, waitingOn: "the runner's retry or its failure report" },
-  };
-}
-
-/**
- * One release, a fresh install or only the unreleased tail: the one-pass applier, unchanged. A
- * first schema older than the image steps each release in turn, the unreleased tail in one pass
- * (specs/upgrade/stepping.feature).
- */
-export function releaseSteppingApplier({
-  imageRelease,
-  manifests,
-  onePass,
-  stepTo,
-  say,
-}: {
-  imageRelease: string | null;
-  manifests: readonly ReleaseManifest[];
-  onePass: UpgradeSchemaApplier;
-  stepTo: StepSchemaTo;
-  say: (line: UpgradeTaskLine) => void;
-}): UpgradeSchemaApplier {
-  let stepping: boolean | undefined;
-  return {
-    ...onePass,
-    async apply(args) {
-      const { release, lockTimeoutMs, signal, skipTargets } = args;
-      if (stepping === undefined) {
-        stepping = release !== null && release !== imageRelease;
-        if (stepping) say(steppingStartsLine({ imageRelease }));
-      }
-      if (!stepping || release === null) return onePass.apply(args);
-      const schema = releaseSchemaUpTo({ release, manifests });
-      say(stepToLine({ release, ...schema }));
-      const stepped = await stepTo({ release, ...schema, lockTimeoutMs, signal, skipTargets });
-      say(steppedLine({ release, stepped }));
-      return stepped.reports;
-    },
-  };
-}
-
 /** One release's Postgres schema through the stepping applier's release directory. */
 async function stepPrisma({
   input,
@@ -564,12 +415,37 @@ function reconcilers({ input }: { input: TaskInput }): UpgradeReconciler[] {
         }),
     })),
     { name: "langwatchql", run: () => lwqlProvision({ ...input, failOnError: true }) },
-    {
-      name: "system-migrations-pass-request",
-      run: () =>
-        runModuleTask({ name: "request-system-migrations-pass", args: [], signal: input.signal }),
-    },
+    { name: "system-migrations-pass-request", run: () => requestSystemMigrationsPass({ input }) },
   ];
+}
+
+/** How long the run waits for the pass request's queue jobs, which run ahead of any backlog. */
+const PASS_REQUEST_WAIT_MS = 60_000;
+
+/**
+ * Asks a worker for one system-migrations pass, its queue jobs ahead of any backlog (T6: the
+ * request sat behind 800k jobs). One that does not settle in time is a warning: the hourly
+ * re-drive still reaches every tenant step. Spec: modules/ops/specs/ops-system-migrations.feature.
+ */
+async function requestSystemMigrationsPass({ input }: { input: TaskInput }): Promise<void> {
+  try {
+    await runModuleTask({
+      name: "request-system-migrations-pass",
+      args: [],
+      signal: input.signal,
+      listed: { timeoutMs: PASS_REQUEST_WAIT_MS },
+    });
+  } catch (error) {
+    input.signal.throwIfAborted();
+    runnerLog().warn(
+      "the system-migrations pass request did not settle; the hourly re-drive runs it",
+      {
+        phase: "reconcile",
+        error: error instanceof Error ? error.message : String(error),
+        next: "nothing to do: tenant steps settle at the next re-drive",
+      },
+    );
+  }
 }
 
 /** The run's read hints on the framework's channel, for the api to relay (round 8, U2-LIVE). */
@@ -590,13 +466,6 @@ function runnerLog(): UpgradeRunnerLog {
     warn: (message, fields) => logger.warn(fields ?? {}, message),
   };
 }
-
-/** A log line the task writes, kept pure so its wording is tested without a logger. */
-export type UpgradeTaskLine = Readonly<{
-  level: "info" | "warn" | "error";
-  message: string;
-  fields: Record<string, unknown>;
-}>;
 
 /** Said before a run with no ClickHouse target: the gate refuses to serve without one. */
 export function noClickHouseLine(): UpgradeTaskLine {

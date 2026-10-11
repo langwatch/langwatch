@@ -226,8 +226,16 @@ Feature: Migration safety
 
   @unit
   Scenario: Dropping a ClickHouse index, projection or view, or a table the file creates, is accepted
+    # A view here is a plain view or a materialised view writing TO a table.
     When a goose file drops something that holds no data of its own
     Then the scanner reports nothing
+
+  @unit
+  Scenario: Dropping a ClickHouse materialised view that owns an inner table is refused by name
+    Given a materialised view the tree created without TO, so its rows live in its inner table
+    When a goose file above the newest release tag drops that view
+    Then the scanner names the migration and the view
+    And dropping a materialised view that writes TO a table, or a plain view, is accepted
 
   @unit
   Scenario: A commented ClickHouse rollback note that drops is accepted

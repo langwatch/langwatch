@@ -40,6 +40,17 @@ export {
   type UpgradeSchemaApplier,
 } from "./schema-applier.ts";
 export {
+  releaseSchemaUpTo,
+  releaseSteppingApplier,
+  type SteppedSchema,
+  type StepSchemaTo,
+  steppedLine,
+  steppingStartsLine,
+  stepToLine,
+  type UpgradeTaskLine,
+  withLockTimeout,
+} from "./release-stepping-applier.ts";
+export {
   formatPlan,
   type UpgradeExitCode,
   type UpgradeOutcome,

@@ -15,7 +15,9 @@ export type {
 } from "./upgrade-gate.service.ts";
 export {
   type FirstInstallUpgrade,
+  outcomeOfExitCode,
   spawnFirstInstallUpgrade,
+  type UpgradeRunResult,
   TASKS_APP_DIRECTORY,
 } from "./first-install-upgrade.ts";
 export {

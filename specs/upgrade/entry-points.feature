@@ -104,8 +104,8 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
   @unimplemented
   Scenario: A first install whose upgrade failed leaves the worker waiting for a Retry
     Given an empty ledger on an empty schema
-    When the worker's gate runs the upgrade and the upgrade exits non-zero
-    Then the worker names the command and the exit code and waits for a Retry
+    When the worker's gate runs the upgrade and the run does not end done
+    Then the worker names the command and the run's outcome and waits for a Retry
     And the api holds and offers the token console
 
   @integration

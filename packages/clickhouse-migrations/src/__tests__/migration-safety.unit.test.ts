@@ -10,6 +10,7 @@ import {
   type MigrationSource,
   NOTHING_DELETED_RULES,
   formatFindings,
+  innerTableViews,
   parseBaseline,
   parseRelease,
   scanClickHouseMigration,
@@ -80,11 +81,14 @@ const migrations: MigrationSource[] = readdirSync(MIGRATIONS_DIR)
   .toSorted()
   .map((name) => ({ name, sql: readFileSync(resolve(MIGRATIONS_DIR, name), "utf8") }));
 
+/** Every materialised view the tree creates without `TO`, which owns an inner table. */
+const INNER_VIEWS = innerTableViews(migrations);
+
 const unshipped = migrations.filter((migration) => !baseline.includes(migration.name));
 
 /** What the tree scan reports for one file, with the graceful rules only above the marker. */
 function scanTree(migration: MigrationSource) {
-  return scanClickHouseMigration({ ...migration, steps: STEPS }).filter(
+  return scanClickHouseMigration({ ...migration, steps: STEPS, innerViews: INNER_VIEWS }).filter(
     (finding) =>
       migration.name > RELEASED_THROUGH ||
       (!GRACEFUL_RULES.has(finding.rule) && !NOTHING_DELETED_RULES.has(finding.rule)),
@@ -310,6 +314,28 @@ describe("ClickHouse migration safety", () => {
       ).toEqual([]);
     });
 
+    /** @scenario "Dropping a ClickHouse materialised view that owns an inner table is refused by name" */
+    it("refuses dropping a view created without TO, and accepts one writing TO a table", () => {
+      const tree = [
+        {
+          name: "00001_views.sql",
+          sql:
+            "-- +goose Up\nCREATE MATERIALIZED VIEW IF NOT EXISTS inner_mv ENGINE = MergeTree ORDER BY a AS SELECT 1 AS a;\n" +
+            "CREATE MATERIALIZED VIEW IF NOT EXISTS to_mv TO t AS SELECT 1 AS a;\n",
+        },
+      ];
+      const innerViews = innerTableViews(tree);
+      expect([...innerViews]).toEqual(["inner_mv"]);
+      const dropOf = (view: string) =>
+        scanClickHouseMigration({
+          name: "00999_fixture.sql",
+          sql: `-- +goose Up\n-- contract: retired in 1.0.0\nDROP VIEW IF EXISTS \${D}.${view};\n`,
+          innerViews,
+        }).map((finding) => finding.rule);
+      expect(dropOf("inner_mv")).toEqual(["drop-table-or-column"]);
+      expect(dropOf("to_mv")).toEqual([]);
+    });
+
     /** @scenario "A commented ClickHouse rollback note that drops is accepted" */
     it("reads no drop in a comment or the commented down half", () => {
       expect(
@@ -395,8 +421,8 @@ describe("ClickHouse migration safety", () => {
     it("skips the no-drop rule up to the newest release tag's newest file", () => {
       const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
       const drops = history.flatMap((migration) =>
-        scanClickHouseMigration({ ...migration, steps: STEPS }).filter((finding) =>
-          NOTHING_DELETED_RULES.has(finding.rule),
+        scanClickHouseMigration({ ...migration, steps: STEPS, innerViews: INNER_VIEWS }).filter(
+          (finding) => NOTHING_DELETED_RULES.has(finding.rule),
         ),
       );
       expect(drops.length).toBeGreaterThan(0);
@@ -410,8 +436,8 @@ describe("ClickHouse migration safety", () => {
       expect(migrations.map((migration) => migration.name)).toContain(RELEASED_THROUGH);
       const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
       const graceful = history.flatMap((migration) =>
-        scanClickHouseMigration({ ...migration, steps: STEPS }).filter((finding) =>
-          GRACEFUL_RULES.has(finding.rule),
+        scanClickHouseMigration({ ...migration, steps: STEPS, innerViews: INNER_VIEWS }).filter(
+          (finding) => GRACEFUL_RULES.has(finding.rule),
         ),
       );
       expect(graceful.length).toBeGreaterThan(0);
