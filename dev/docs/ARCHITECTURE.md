@@ -3014,6 +3014,8 @@ accepts it. A class declaring `fault: "customer"` at a 5xx keeps its body, in `p
 Transient 503 refusals keep their code: `clickhouse_overloaded` and `service_unavailable` go on the wire
 unmasked, so a caller can tell a retryable refusal from a fault (Alex, 2026-10-06, round 9, CH-1,
 amending the masking ruling).
+`clickhouse_unavailable` (a ClickHouse connection that dropped or was refused) joins them: the code shows,
+and the raw connection error stays a logged reason, never in the body (Alex, 2026-10-11).
 A relayed herr error with no fault and no status stays `customer`: `presumed_platform` applies only when a
 status of 500 or more is known (coordinator, citing the ruling's "at a 5xx status", 2026-10-05).
 `LangWatchQLFilterRefusal` is a trace contract error (coordinator, citing Alex's ingestion-key approval,

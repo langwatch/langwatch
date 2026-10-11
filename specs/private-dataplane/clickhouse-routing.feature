@@ -297,3 +297,10 @@ Feature: Private ClickHouse Routing
     Then the read fails with the handled 503 "clickhouse_unavailable"
     And the dropped connection is kept as its reason
     But a ClickHouse server error is passed through unchanged
+
+  @unit
+  Scenario: A ClickHouse that comes back answers again with no restart
+    Given a read refused as clickhouse_unavailable because its ClickHouse refused or dropped the connection
+    When the ClickHouse answers again
+    Then the next read on the same process succeeds on the same vendor client
+    And no client, socket or route is kept in a failed state

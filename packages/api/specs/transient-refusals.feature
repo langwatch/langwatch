@@ -25,6 +25,14 @@ Feature: Transient refusals keep their body, and JSON text is parsed at the door
       When the tRPC error formatter renders it
       Then the message is the code and the serialized error carries its code, status and retryable flag
 
+    @integration
+    Scenario: A dropped ClickHouse connection answers 503 clickhouse_unavailable over REST without its raw reason
+      Given a read refused as clickhouse_unavailable whose reason is "read ECONNRESET" from a ClickHouse host and URL
+      When the REST boundary renders it
+      Then the answer is 503 with code clickhouse_unavailable and its own message
+      And the body names no ECONNRESET, no host and no URL
+      And the failure is logged under the code clickhouse_unavailable, with the raw reason
+
   Rule: Every other undeclared 5xx stays masked
 
     @integration
@@ -37,7 +45,7 @@ Feature: Transient refusals keep their body, and JSON text is parsed at the door
     Scenario: The transient allowlist is declared once
       Given the handled-error package
       When a boundary asks whether a handled error is a transient refusal
-      Then only clickhouse_overloaded, connect_credential_pending, service_unavailable and upgrade_in_progress at 503 answer yes
+      Then only clickhouse_overloaded, clickhouse_unavailable, connect_credential_pending, private_dataplane_unavailable, service_unavailable and upgrade_in_progress at 503 answer yes
 
   Rule: A JSON-text field parses at the door
 
