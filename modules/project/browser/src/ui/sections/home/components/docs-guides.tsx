@@ -11,11 +11,8 @@ import {
 } from "react-icons/lu";
 
 import { HomeCard } from "./home-card.tsx";
-import {
-  HOME_SECTION_GAP,
-  HOME_SECTION_PADDING,
-  HomeSectionHeader,
-} from "./home-section-header.tsx";
+import { HomeSectionHeader } from "./home-section-header.tsx";
+import { HOME_SECTION_GAP, HOME_SECTION_PADDING } from "./home-section-layout.ts";
 
 /**
  * Docs & guides, said out loud: four first-class guide links, each naming a

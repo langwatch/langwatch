@@ -1,7 +1,6 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Box, Button, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
-import type { IconType } from "react-icons";
 import {
   LuCheck,
   LuDatabase,
@@ -17,42 +16,14 @@ import {
 import { homeApi } from "../../../../behavior/home-api.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { HomeCard } from "./home-card.tsx";
+import { HomeSectionHeader } from "./home-section-header.tsx";
+import { HOME_SECTION_GAP, HOME_SECTION_PADDING } from "./home-section-layout.ts";
 import {
-  HOME_SECTION_GAP,
-  HOME_SECTION_PADDING,
-  HomeSectionHeader,
-} from "./home-section-header.tsx";
-
-export type OnboardingStepKey =
-  | "createProject"
-  | "syncFirstMessage"
-  | "inviteTeamMembers"
-  | "setupModelProviders"
-  | "createPrompt"
-  | "createSimulation"
-  | "setupEvaluation"
-  | "createWorkflow"
-  | "createDataset";
-
-/** The icon for each step, shared with the receded setup hairline. */
-export const STEP_ICON: Record<OnboardingStepKey, IconType> = {
-  createProject: LuCheck,
-  syncFirstMessage: LuMessageSquare,
-  inviteTeamMembers: LuUsers,
-  setupModelProviders: LuKey,
-  createPrompt: LuScroll,
-  createSimulation: LuPlay,
-  setupEvaluation: LuGauge,
-  createWorkflow: LuWorkflow,
-  createDataset: LuDatabase,
-};
-
-type OnboardingStep = {
-  key: OnboardingStepKey;
-  title: string;
-  href: string;
-  complete: boolean;
-};
+  buildOnboardingSteps,
+  calculateCompletionPercentage,
+  type OnboardingStep,
+  type OnboardingStepKey,
+} from "./onboarding-progress.model.ts";
 
 /**
  * Get icon for onboarding step
@@ -80,88 +51,6 @@ const getIconForStep = (key: OnboardingStepKey) => {
     default:
       return <LuCheck size={12} />;
   }
-};
-
-/**
- * Build onboarding steps from API response
- */
-export const buildOnboardingSteps = (
-  data: {
-    workflows: number;
-    datasets: number;
-    onlineEvaluations: number;
-    simulations: number;
-    modelProviders: number;
-    prompts: number;
-    teamMembers: number;
-    firstMessage: boolean;
-  },
-  projectSlug: string,
-): OnboardingStep[] => {
-  return [
-    {
-      key: "createProject",
-      title: "Create your new project",
-      href: "/settings/teams",
-      complete: true,
-    },
-    {
-      key: "syncFirstMessage",
-      title: "Sync your first message",
-      href: `/${projectSlug}/traces`,
-      complete: data.firstMessage,
-    },
-    {
-      key: "inviteTeamMembers",
-      title: "Invite team members",
-      href: `/settings/members`,
-      complete: (data.teamMembers ?? 0) > 1,
-    },
-    {
-      key: "setupModelProviders",
-      title: "Set up your model providers",
-      href: `/settings/model-providers`,
-      complete: (data.modelProviders ?? 0) > 0,
-    },
-    {
-      key: "createPrompt",
-      title: "Create your first versioned prompt",
-      href: `/${projectSlug}/prompts`,
-      complete: (data.prompts ?? 0) > 0,
-    },
-    {
-      key: "createSimulation",
-      title: "Create your first agent simulation",
-      href: `/${projectSlug}/simulations`,
-      complete: (data.simulations ?? 0) > 0,
-    },
-    {
-      key: "setupEvaluation",
-      title: "Set up your first online evaluation",
-      href: `/${projectSlug}/online-evaluations`,
-      complete: (data.onlineEvaluations ?? 0) > 0,
-    },
-    {
-      key: "createWorkflow",
-      title: "Create your first workflow",
-      href: `/${projectSlug}/workflows`,
-      complete: (data.workflows ?? 0) > 0,
-    },
-    {
-      key: "createDataset",
-      title: "Create a dataset from the messages",
-      href: `/${projectSlug}/datasets`,
-      complete: (data.datasets ?? 0) > 0,
-    },
-  ];
-};
-
-/**
- * Calculate completion percentage
- */
-export const calculateCompletionPercentage = (steps: OnboardingStep[]): number => {
-  const completedCount = steps.filter((s) => s.complete).length;
-  return Math.round((completedCount / steps.length) * 100);
 };
 
 type StepItemProps = {

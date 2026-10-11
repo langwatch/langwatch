@@ -18,7 +18,8 @@ import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { Link } from "../../../../ui/elements/app-link.tsx";
 import { usePeriodSelector } from "../../../elements/analytics/period-selector.tsx";
 import { HomeCard } from "./home-card.tsx";
-import { HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header.tsx";
+import { HomeSectionHeader } from "./home-section-header.tsx";
+import { HOME_SECTION_PADDING } from "./home-section-layout.ts";
 
 const QUICK_STARTS = [
   {

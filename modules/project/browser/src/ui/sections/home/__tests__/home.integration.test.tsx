@@ -57,7 +57,6 @@ vi.mock("../components/traces-overview.tsx", () => ({
 }));
 vi.mock("../components/welcome-header.tsx", () => ({
   WelcomeHeader: () => null,
-  useTimeOfDay: () => "morning",
 }));
 
 import {
