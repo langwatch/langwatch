@@ -38,6 +38,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 			"selection":     r.selection,
 			"overlay":       o.worktreeOverlay(worktreeDir, reveal),
 			"nxDaemons":     r.nxDaemons,
+			"duplicates":    o.InfraDuplicates(context.Background()),
 			"slots":         r.slots,
 		})
 	}
@@ -206,6 +207,9 @@ func (o *Orchestrator) printShared(r statusReport) {
 	}
 	for _, d := range r.nxDaemons {
 		fmt.Printf("ok   nx daemon pid %d (%s, ~%s)\n", d.PID, d.Worktree, domain.HumanBytes(d.RSS))
+	}
+	for _, g := range o.InfraDuplicates(context.Background()) {
+		fmt.Printf("dup  %s\n", g.Describe())
 	}
 }
 

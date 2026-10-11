@@ -270,6 +270,7 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 		Browser:                 browserLimits(),
 		BrowserOwnerRoots:       browserOwnerRoots(trustedRepoRoot()),
 		Orphans:                 orphanLimits(),
+		Duplicates:              app.DuplicateLimitsFromEnv(devEnv),
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),

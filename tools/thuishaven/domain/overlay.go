@@ -242,8 +242,9 @@ func (s Stack) OverlayEnv() []string {
 	// database on it. The app connects straight to loopback (HTTP, no proxy) at
 	// the per-slug database, so migration counts are always this worktree's own.
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
+		user, password := s.ClickHouseLogin()
 		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://%s:%s@127.0.0.1:%d/%s",
-			ClickHouseUser, ClickHousePassword, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+			user, password, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
 		// Backup-status gauges query system.backup_log, which only exists once
 		// backups are configured, a production concern. The app collects them by
 		// default (unset must not disarm the production alerts that read them), so
@@ -664,4 +665,13 @@ func LaneDatabaseEnv(env []string, lane string) []string {
 		out[i] = "DATABASE_URL=" + u.String()
 	}
 	return out
+}
+
+// ClickHouseLogin is the login the stack's app connects as: its own once haven
+// provisioned one, the shared admin login before that.
+func (s Stack) ClickHouseLogin() (user, password string) {
+	if s.ClickHouseUser != "" && s.ClickHousePassword != "" {
+		return s.ClickHouseUser, s.ClickHousePassword
+	}
+	return ClickHouseUser, ClickHousePassword
 }

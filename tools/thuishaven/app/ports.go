@@ -288,7 +288,13 @@ type ClickHouse interface {
 	// EnsureDatabase creates a stack's database if it does not exist.
 	EnsureDatabase(ctx context.Context, database string) error
 	// DropDatabase removes a stack's database — the "give me a fresh DB" affordance.
+	// Its login and workload go with it.
 	DropDatabase(ctx context.Context, database string) error
+	// EnsureStackAccess gives a stack its own workload and login (password as
+	// given), so its queries are CPU-scheduled and memory-capped per stack.
+	EnsureStackAccess(ctx context.Context, database, password string) error
+	// SetStackWeight sets a provisioned stack's workload weight.
+	SetStackWeight(ctx context.Context, database string, weight int) error
 	// HTTPPort returns the managed server's HTTP port if known, without starting it
 	// (0 when it has never been provisioned).
 	HTTPPort() int

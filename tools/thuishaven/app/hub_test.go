@@ -265,6 +265,38 @@ type fakeDBServer struct {
 	mu        sync.Mutex // guards dropped: the bulk delete drops concurrently
 	dropped   []string
 	dropErr   error // when set, DropDatabase records the attempt then fails
+	// access and weights record EnsureStackAccess and SetStackWeight; accessErr
+	// and weightErr fail them.
+	access    map[string]string
+	weights   map[string]int
+	accessErr error
+	weightErr error
+}
+
+func (f *fakeDBServer) EnsureStackAccess(_ context.Context, db, password string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.accessErr != nil {
+		return f.accessErr
+	}
+	if f.access == nil {
+		f.access = map[string]string{}
+	}
+	f.access[db] = password
+	return nil
+}
+
+func (f *fakeDBServer) SetStackWeight(_ context.Context, db string, weight int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.weightErr != nil {
+		return f.weightErr
+	}
+	if f.weights == nil {
+		f.weights = map[string]int{}
+	}
+	f.weights[db] = weight
+	return nil
 }
 
 func (f *fakeDBServer) Ensure(context.Context) (int, error)               { return 1, nil }

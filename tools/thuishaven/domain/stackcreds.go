@@ -32,23 +32,31 @@ var StackCredentials = []StackCredential{
 	{Key: "HAVEN_SEED_SCIM_TOKEN"},
 }
 
+// HavenOnlyCredentials are generated and stored like StackCredentials but never
+// injected as their own variables: haven embeds them where they are used.
+var HavenOnlyCredentials = []string{ClickHouseStackPasswordKey}
+
 // FillStackCredentials adds a fresh random value for every credential stored
 // lacks, and reports whether it added any (so the caller persists only then).
 func FillStackCredentials(stored map[string]string) (map[string]string, bool, error) {
-	out := make(map[string]string, len(StackCredentials))
+	out := make(map[string]string, len(StackCredentials)+len(HavenOnlyCredentials))
 	for key, value := range stored {
 		out[key] = value
 	}
-	added := false
+	keys := make([]string, 0, len(StackCredentials)+len(HavenOnlyCredentials))
 	for _, credential := range StackCredentials {
-		if out[credential.Key] != "" {
+		keys = append(keys, credential.Key)
+	}
+	added := false
+	for _, key := range append(keys, HavenOnlyCredentials...) {
+		if out[key] != "" {
 			continue
 		}
 		raw := make([]byte, 32)
 		if _, err := rand.Read(raw); err != nil {
 			return nil, false, err
 		}
-		out[credential.Key] = hex.EncodeToString(raw)
+		out[key] = hex.EncodeToString(raw)
 		added = true
 	}
 	return out, added, nil

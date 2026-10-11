@@ -209,9 +209,11 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			}
 			o.reapDeadStacks()
 			o.governPressure()
+			o.weightFocusedWorkload(ctx)
 			o.governProcesses()
 			o.reapOrphanNxDaemons()
 			o.sweepRepoOrphans()
+			o.sweepDuplicates(ctx)
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 			o.stopColimaIfIdle(ctx)

@@ -43,6 +43,8 @@ type Config struct {
 	// Orphans bounds the daemon's sweep of unowned dev tooling under the
 	// BrowserOwnerRoots and every stack's worktree; a zero field disables a rule.
 	Orphans domain.OrphanLimits
+	// Duplicates is the sweep of infra running twice (HAVEN_DEDUPE); zero is off.
+	Duplicates domain.DuplicateLimits
 	// BrowserOwnerRoots are the checkout roots whose scripts' headless shells
 	// the browser governor may reap; worktrees sit beneath the main root.
 	BrowserOwnerRoots []string

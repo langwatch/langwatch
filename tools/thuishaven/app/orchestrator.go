@@ -74,6 +74,9 @@ type Orchestrator struct {
 	// know that half has finished.
 	isGoverning atomic.Bool
 	governance  sync.WaitGroup
+	// clickHouseFocus is the slug whose workload last got the focused weight.
+	// Daemon tick only.
+	clickHouseFocus string
 
 	// procActivity is the process watch's cross-tick idle clock (ADR-095),
 	// touched only from the daemon's monitor loop. procTel ships the watch's
@@ -1076,6 +1079,7 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	st.ClickHouseHTTPPort = port
 	st.ClickHouseDatabase = db
 	st.ClickHousePostgresHost = o.cfg.ClickHousePostgresHost
+	o.ensureClickHouseStackAccess(ctx, st)
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	scheme, epPort := o.serviceEndpoint(proxyScheme, proxyPort, port)
 	st.Services = append(st.Services, domain.Service{
