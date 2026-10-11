@@ -151,85 +151,65 @@ export function FeatureFlagRulesDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(details: { open: boolean }) => onOpenChange(details.open)}
+      onClose={() => onOpenChange(false)}
       size="lg"
+      title="Targeting rules"
+      description="Rules are evaluated top-to-bottom; the first match wins, and you can drag a rule by its handle to change that order. When no rule matches, the row toggle decides."
+      primaryAction={{ label: "Save rules", onClick: () => void save(), loading: saving }}
+      busy={saving}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Targeting rules</Dialog.Title>
-          <Dialog.Description>
-            Rules are evaluated top-to-bottom; the first match wins, and you can drag a rule by its
-            handle to change that order. When no rule matches, the row toggle decides.
-          </Dialog.Description>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={3}>
-            <Text fontFamily="mono" fontSize="xs" color="fg.muted">
-              {flagKey}
-            </Text>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(event: DragEndEvent) => {
-                const { active, over } = event;
-                if (!over || active.id === over.id) return;
-                setDraft((current) =>
-                  withRuleMoved(current, { fromId: String(active.id), toId: String(over.id) }),
-                );
-              }}
-            >
-              <SortableContext
-                items={draft.map((rule) => rule.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <VStack align="stretch" gap={2}>
-                  {draft.map((rule) => (
-                    <RuleEditorRow
-                      key={rule.id}
-                      rule={rule}
-                      onChange={(patch) =>
-                        setDraft((current) =>
-                          current.map((candidate) =>
-                            candidate.id === rule.id ? { ...candidate, ...patch } : candidate,
-                          ),
-                        )
-                      }
-                      onRemove={() =>
-                        setDraft((current) =>
-                          current.filter((candidate) => candidate.id !== rule.id),
-                        )
-                      }
-                    />
-                  ))}
-                </VStack>
-              </SortableContext>
-            </DndContext>
-            {validationError && <Text color="fg.error">{validationError}</Text>}
-            <Button
-              variant="ghost"
-              size="sm"
-              alignSelf="flex-start"
-              onClick={() => setDraft((current) => withRuleAdded(current, newRule()))}
-            >
-              <Plus size={14} /> Add rule
-            </Button>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Dialog.ActionTrigger asChild>
-            <Button variant="outline" disabled={saving}>
-              Cancel
-            </Button>
-          </Dialog.ActionTrigger>
-          <Button colorPalette="orange" loading={saving} onClick={() => void save()}>
-            Save rules
-          </Button>
-        </Dialog.Footer>
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack align="stretch" gap={3}>
+        <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+          {flagKey}
+        </Text>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(event: DragEndEvent) => {
+            const { active, over } = event;
+            if (!over || active.id === over.id) return;
+            setDraft((current) =>
+              withRuleMoved(current, { fromId: String(active.id), toId: String(over.id) }),
+            );
+          }}
+        >
+          <SortableContext
+            items={draft.map((rule) => rule.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <VStack align="stretch" gap={2}>
+              {draft.map((rule) => (
+                <RuleEditorRow
+                  key={rule.id}
+                  rule={rule}
+                  onChange={(patch) =>
+                    setDraft((current) =>
+                      current.map((candidate) =>
+                        candidate.id === rule.id ? { ...candidate, ...patch } : candidate,
+                      ),
+                    )
+                  }
+                  onRemove={() =>
+                    setDraft((current) => current.filter((candidate) => candidate.id !== rule.id))
+                  }
+                />
+              ))}
+            </VStack>
+          </SortableContext>
+        </DndContext>
+        {validationError && <Text color="fg.error">{validationError}</Text>}
+        <Button
+          variant="ghost"
+          size="sm"
+          alignSelf="flex-start"
+          onClick={() => setDraft((current) => withRuleAdded(current, newRule()))}
+        >
+          <Plus size={14} /> Add rule
+        </Button>
+      </VStack>
+    </Dialog>
   );
 }
 

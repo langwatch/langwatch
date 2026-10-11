@@ -294,40 +294,26 @@ function TokenDialogs({ tokens }: { tokens: ScimTokens }) {
         </Dialog.Content>
       </Dialog.Root>
 
-      <Dialog.Root
+      <Dialog
         open={!!tokens.tokenToRevoke}
-        onOpenChange={({ open }) => {
-          if (!open) tokens.setTokenToRevoke(null);
+        onClose={() => tokens.setTokenToRevoke(null)}
+        size="md"
+        title="Revoke this token?"
+        primaryAction={{
+          label: "Revoke",
+          onClick: () => tokens.tokenToRevoke && tokens.handleRevoke(tokens.tokenToRevoke),
+          loading: tokens.revokeMutation.isPending,
+          danger: true,
+          "data-testid": "scim-token-revoke-confirm",
         }}
       >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Revoke this token?</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body>
-            <VStack gap={4} align="start">
-              <Text>
-                The identity provider using it stops being able to provision anyone through this
-                connection, immediately.
-              </Text>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="outline" onClick={() => tokens.setTokenToRevoke(null)}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              onClick={() => tokens.tokenToRevoke && tokens.handleRevoke(tokens.tokenToRevoke)}
-              loading={tokens.revokeMutation.isPending}
-              data-testid="scim-token-revoke-confirm"
-            >
-              Revoke
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+        <VStack gap={4} align="start">
+          <Text>
+            The identity provider using it stops being able to provision anyone through this
+            connection, immediately.
+          </Text>
+        </VStack>
+      </Dialog>
     </>
   );
 }
