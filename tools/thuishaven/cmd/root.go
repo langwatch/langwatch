@@ -223,16 +223,18 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 	// Docker Desktop): its ceiling is explicit and per-profile, so neither
 	// container can quietly take the machine. Both containers are sized against this machine's RAM/CPU.
 	ram, cpus := sys.TotalMemory(), runtime.NumCPU()
-	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), colimaLimits(ram, cpus), sup).WithHome(havenHome())
-	chRuntime, ch := managedClickHouse(rt)
+	settings := store.ReadMachineSettings()
+	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), colimaLimits(ram, cpus), sup).WithHome(havenHome()).
+		WithRefusal(func() error { return store.ReadMachineSettings().RefuseVM("") })
+	chRuntime, ch := managedClickHouse(rt, settings)
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
 	rds := redisbrew.New(
 		envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula),
 		envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort),
 		envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB),
 	)
-	obs := observabilityStack(rt, ram, cpus)
-	obsTier, _, _ := selectedObservabilityTier()
+	obs := observabilityStack(rt, observabilityLimits(ram, cpus), settings)
+	obsTier, _, _ := selectedObservabilityTier(settings)
 
 	// The console floor haven imposes while the observability stack is up: default
 	// warn, because the full info/debug stream is in Grafana and the terminal only
@@ -439,10 +441,14 @@ func observabilityEndpoints() domain.ObservabilityEndpoints {
 
 // managedClickHouse picks the shared server's runtime (HAVEN_CH_RUNTIME, else
 // native where a binary is pinned): a bad statement is reported, then the
-// container is used, the way a bad LANGWATCH_HAVEN_REDIS_DB is ignored.
-func managedClickHouse(rt *colima.Runtime) (domain.ClickHouseRuntime, app.ClickHouse) {
-	chRuntime, err := domain.ResolveClickHouseRuntime(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
-	if err != nil {
+// container is used, the way a bad LANGWATCH_HAVEN_REDIS_DB is ignored. With
+// the vm setting off it is native, or the install line and a refused VM.
+func managedClickHouse(rt *colima.Runtime, settings domain.MachineSettings) (domain.ClickHouseRuntime, app.ClickHouse) {
+	chRuntime, err := settings.ClickHouseRuntimeFor(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
+	switch {
+	case err != nil && settings.VMOff:
+		fmt.Fprintf(os.Stderr, "haven: %v\n", err)
+	case err != nil:
 		fmt.Fprintf(os.Stderr, "haven: %v; using the ClickHouse container\n", err)
 	}
 	if artifact, ok := domain.ClickHouseNativeArtifactFor(runtime.GOOS, runtime.GOARCH); ok && chRuntime == domain.ClickHouseRuntimeNative {

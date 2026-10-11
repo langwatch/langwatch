@@ -156,8 +156,11 @@ func (o *Orchestrator) serverHealth(ctx context.Context) map[string]health {
 // selected feature runs in a container. Probing never starts the VM.
 func (o *Orchestrator) colimaHealth(ctx context.Context) health {
 	needs := domain.ContainerNeeds(o.containerNeedInputs())
-	if len(needs) == 0 {
+	if o.machineSettings().VMOff || len(needs) == 0 {
 		detail := "not needed (ClickHouse and observability run natively)"
+		if o.machineSettings().VMOff {
+			detail = "off (machine setting vm): never started; ClickHouse and observability run natively"
+		}
 		if rt, ok := o.container.(idleStoppable); ok && rt.StoppedByHaven() {
 			detail += "; stopped by haven"
 		}

@@ -12,6 +12,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/atomicfile"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/system"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -68,7 +69,8 @@ func limitsReport() domain.LimitsReport {
 		func(key string) (string, string, bool) {
 			return resolveKnobSource(key, processKnobs())
 		})
-	chRuntime, _ := domain.ResolveClickHouseRuntime(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
+	settings := fileregistry.New(havenHome()).ReadMachineSettings()
+	chRuntime, _ := settings.ClickHouseRuntimeFor(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
 	_, pinned := domain.ClickHouseNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
 	report.NativeClickHouse = pinned && chRuntime == domain.ClickHouseRuntimeNative
 	return report

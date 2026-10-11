@@ -31,6 +31,7 @@ type Runtime struct {
 	limits  domain.ColimaLimits
 	lanes   Lanes
 	home    string // haven's home; where the started-by-haven record lives
+	refuse  func() error
 }
 
 // New builds a Runtime for a profile. limits are only applied when haven has to
@@ -48,6 +49,13 @@ func New(profile string, limits domain.ColimaLimits, lanes Lanes) *Runtime {
 // the user) started the VM, so only such a VM is ever stopped again.
 func (r *Runtime) WithHome(home string) *Runtime {
 	r.home = home
+	return r
+}
+
+// WithRefusal sets the check Ensure asks before starting anything; a non-nil
+// answer (the vm machine setting off) refuses every start, from any caller.
+func (r *Runtime) WithRefusal(refuse func() error) *Runtime {
+	r.refuse = refuse
 	return r
 }
 
@@ -77,6 +85,11 @@ type profileStatus struct {
 // daemon. A profile that does not exist yet is created with haven's limits; one
 // that exists is started as its owner configured it, never resized.
 func (r *Runtime) Ensure(ctx context.Context) (dockerHost string, err error) {
+	if r.refuse != nil {
+		if err := r.refuse(); err != nil {
+			return "", err
+		}
+	}
 	if _, err := exec.LookPath("colima"); err != nil {
 		return "", fmt.Errorf("colima is not installed — `brew install colima docker` (haven runs the observability stack on colima, not Docker Desktop)")
 	}

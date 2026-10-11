@@ -631,6 +631,12 @@ func (o *Orchestrator) resolveLangyTier(ctx context.Context, opts *PlanOptions) 
 	req.ContainerRuntimeAvailable = o.container != nil && o.container.Available(ctx)
 	tier, notice := domain.ResolveLangyTier(req)
 	opts.LangyTier = tier
+	if refusal := o.machineSettings().RefuseVM("sandboxed Langy"); refusal != nil && tier.RunsInContainer() && opts.Selection.Langy {
+		// Refused, never dropped to the unsandboxed host tier.
+		fmt.Printf("  langyagent: %v\n", refusal)
+		opts.Selection.Langy = false
+		return
+	}
 	// Said only when this stack actually runs langy: a worktree that opted out
 	// has no isolation posture to be surprised by.
 	if notice == "" || !opts.Selection.Langy {
