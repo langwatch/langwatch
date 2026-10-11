@@ -279,3 +279,16 @@ Feature: The local development topology
     When haven assembles the application's environment
     Then each key the operator exported keeps their value
     And haven fills only the RUM keys they left unset
+
+  @unit
+  Scenario: Taking one stack down leaves the shared proxy running
+    Given two stacks are registered and share the machine-wide portless proxy
+    When haven down takes one of them down, with or without --force
+    Then the proxy is never stopped; only haven down --all stops it
+    And a proxy that died with the stack's process group is started again while another stack remains
+
+  @unit
+  Scenario: Bringing a stack up starts a missing proxy
+    Given the portless proxy is not running
+    When haven up bootstraps the stack
+    Then the proxy is started before the stack is reported ready

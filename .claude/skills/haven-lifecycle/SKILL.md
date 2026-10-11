@@ -12,7 +12,7 @@ Run from the workspace root. `make haven <sub>` forwards to the CLI (`dev/haven.
 ```bash
 haven up --agent -d               # start; bare `haven up` without a TTY never returns and dies with your shell
 haven status --agent              # every stack, service health, shared servers, RAM (--json, --reveal)
-haven down                        # stop this stack, keep databases
+haven down                        # stop this stack, keep databases; never stops the shared portless proxy (only --all does); up starts a missing one
 haven down --all                  # every stack, shared servers, daemon and proxy; --force kills hard
 haven restart sims                # bounce one lane; nothing else restarts (--rebuild for an image)
 haven reload                      # apply changes to a held stack; waits for "reload finished"

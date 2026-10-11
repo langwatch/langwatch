@@ -1054,8 +1054,28 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	}
 	removeKeeperPlan(p.WorktreeDir, slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
+	o.keepProxyForOtherStacks()
 	o.stopColimaIfIdle(ctx)
 	return nil
+}
+
+// keepProxyForOtherStacks restarts the machine-wide portless proxy if it is
+// down while another stack is still registered. Down never stops the proxy
+// (only `down --all` does); this is the net for a proxy that went away with
+// the downed stack's process group.
+func (o *Orchestrator) keepProxyForOtherStacks() {
+	if o.cfg.PortlessDisabled || o.proxy.Running() {
+		return
+	}
+	for _, st := range o.store.Stacks() {
+		if st.PortlessDisabled {
+			continue
+		}
+		if err := o.proxy.EnsureReady(); err != nil {
+			o.log.Warn("down: could not restart the shared portless proxy", zap.Error(err))
+		}
+		return
+	}
 }
 
 // ensureClickHouse starts the shared managed clickhouse-server (if not already
