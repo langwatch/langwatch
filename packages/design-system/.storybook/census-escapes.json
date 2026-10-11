@@ -316,5 +316,45 @@
     "reason": "The throughput chart hover tooltip, not a card; charts stay as they are (X4s1 review).",
     "owner": "ops",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/features/foundry/ui/sections/connection-settings.tsx",
+    "rule": "empty-text",
+    "line": 41,
+    "reason": "A No projects found note inside a Select list, not an empty state. (X5o1 review)",
+    "owner": "ops",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/features/foundry/ui/sections/graph-view.tsx",
+    "rule": "card-box",
+    "line": 53,
+    "reason": "A React Flow node with selection and error tint; a protected specialised shape. (X5o1 review)",
+    "owner": "ops",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/features/foundry/ui/sections/llm-span-editor.tsx",
+    "rule": "card-box",
+    "line": 39,
+    "reason": "A tinted span panel or role-edged message row; a Card would flatten its colour meaning. (X5o1 review)",
+    "owner": "ops",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/features/foundry/ui/sections/llm-span-editor.tsx",
+    "rule": "card-box",
+    "line": 85,
+    "reason": "A tinted span panel or role-edged message row; a Card would flatten its colour meaning. (X5o1 review)",
+    "owner": "ops",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/ops/browser/src/features/foundry/ui/sections/prompt-span-editor.tsx",
+    "rule": "card-box",
+    "line": 19,
+    "reason": "A tinted span panel; a Card would flatten its colour meaning. (X5o1 review)",
+    "owner": "ops",
+    "disposition": "reviewed"
   }
 ]
