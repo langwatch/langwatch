@@ -5,10 +5,13 @@
  */
 
 import type { GrantScopeTier, GrantStatus } from "@langwatch/authz-contract";
+import { Card } from "@langwatch/design-system/card";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Pagination } from "@langwatch/design-system/pagination";
 import {
+  Box,
   Button,
-  Card,
   HStack,
   SkeletonText,
   Spacer,
@@ -16,6 +19,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
+import { Users } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { authzApi } from "../../behavior/authz-api.ts";
@@ -86,6 +90,12 @@ export function AccessPanel({
   const pageCount = Math.max(1, Math.ceil(holders.length / HOLDER_PAGE_SIZE));
   const shown = holders.slice(page * HOLDER_PAGE_SIZE, (page + 1) * HOLDER_PAGE_SIZE);
 
+  const clearFilters = () => {
+    setScopeFilter("ALL");
+    setStatusFilter("ANY");
+    setPage(0);
+  };
+
   if (assignments.isError) {
     return <SectionErrorNotice title="Couldn't load your role assignments" />;
   }
@@ -121,52 +131,62 @@ export function AccessPanel({
         <GrantRoleButton canManage={canManage} onClick={() => setDialog({ kind: "grant" })} />
       </HStack>
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-          {assignments.isLoading ? (
-            <SkeletonText noOfLines={5} gap={4} padding={4} />
-          ) : (
-            <VStack gap={0} width="full" align="stretch" data-testid="role-assignments-list">
-              {shown.length === 0 ? (
-                <Text padding={6} textAlign="center" color="fg.muted">
-                  Nobody has been assigned a role yet.
-                </Text>
-              ) : (
-                shown.map((holder) => (
-                  <HolderRow
-                    key={holder.key}
-                    holder={holder}
-                    nowMs={nowMs}
-                    canManage={canManage}
-                    onChangeRole={(grant) => setDialog({ kind: "change", grant })}
-                    onRevoke={setGrantToRevoke}
-                  />
-                ))
-              )}
-            </VStack>
-          )}
-        </Card.Body>
-      </Card.Root>
+      <Card padding="none">
+        {assignments.isLoading ? (
+          <SkeletonText noOfLines={5} gap={4} padding={4} />
+        ) : (
+          <VStack gap={0} width="full" align="stretch" data-testid="role-assignments-list">
+            {shown.length === 0 ? (
+              <NoDataInfoBlock
+                size="inline"
+                bordered={false}
+                icon={<Users />}
+                title={
+                  rows.length === 0
+                    ? "Nobody has been assigned a role yet"
+                    : "No role assignments match these filters"
+                }
+                description={
+                  rows.length === 0
+                    ? "Use Grant role above to give a member or a group a role on the organization, a team or a project."
+                    : "Widen the scope or status filter, or clear both."
+                }
+                primaryAction={
+                  rows.length === 0 ? (
+                    void 0
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={clearFilters}>
+                      Clear filters
+                    </Button>
+                  )
+                }
+              />
+            ) : (
+              shown.map((holder) => (
+                <HolderRow
+                  key={holder.key}
+                  holder={holder}
+                  nowMs={nowMs}
+                  canManage={canManage}
+                  onChangeRole={(grant) => setDialog({ kind: "change", grant })}
+                  onRevoke={setGrantToRevoke}
+                />
+              ))
+            )}
+          </VStack>
+        )}
+      </Card>
 
       {pageCount > 1 && (
-        <HStack width="full" justify="end">
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page === 0}
-            onClick={() => setPage(page - 1)}
-          >
-            Previous
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={page + 1 >= pageCount}
-            onClick={() => setPage(page + 1)}
-          >
-            Next
-          </Button>
-        </HStack>
+        <Box width="full">
+          <Pagination
+            page={page + 1}
+            pageSize={HOLDER_PAGE_SIZE}
+            totalCount={holders.length}
+            unitLabel="members and groups"
+            onPageChange={(next) => setPage(next - 1)}
+          />
+        </Box>
       )}
 
       {dialog.kind !== "none" && (
