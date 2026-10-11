@@ -1,5 +1,6 @@
 import { Box, Button, Text, VisuallyHidden } from "@langwatch/design-system/primitives";
 import { Check, Copy } from "lucide-react";
+import { z } from "zod";
 
 import { useCopy } from "../lib/clipboard.ts";
 
@@ -16,19 +17,22 @@ const LINE_HEIGHT = "22px";
 const EXPAND_AFTER_LINES = 24;
 
 export function sourceFromProps(props: Record<string, unknown>): CodeSource {
-  const lines = JSON.parse(String(props["data-lines"] ?? "[]")) as string[];
+  const lines = z
+    .array(z.string())
+    .parse(JSON.parse(z.string().default("[]").parse(props["data-lines"])));
   return {
-    lang: String(props["data-lang"] ?? ""),
-    title: String(props["data-title"] ?? ""),
-    code: String(props["data-code"] ?? ""),
+    lang: z.string().default("").parse(props["data-lang"]),
+    title: z.string().default("").parse(props["data-title"]),
+    code: z.string().default("").parse(props["data-code"]),
     lines,
-    highlight: String(props["data-highlight"] ?? "")
+    highlight: z
+      .string()
+      .default("")
+      .parse(props["data-highlight"])
       .split(",")
       .filter(Boolean)
       .map(Number),
-    numbered: String(props["data-flags"] ?? "")
-      .split(",")
-      .includes("lines"),
+    numbered: z.string().default("").parse(props["data-flags"]).split(",").includes("lines"),
   };
 }
 
@@ -56,7 +60,7 @@ export function CopyAction({ code, label = "Copy code" }: { code: string; label?
           {state === "copied" ? "Copied" : "Copy"}
         </Text>
       </Button>
-      <VisuallyHidden role="status" aria-live="polite">
+      <VisuallyHidden as="output" aria-live="polite">
         {state === "copied"
           ? "Copied to clipboard"
           : state === "failed"

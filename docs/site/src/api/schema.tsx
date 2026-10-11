@@ -1,4 +1,5 @@
 import { Badge, Box, Flex, Text } from "@langwatch/design-system/primitives";
+
 import { DocsField, Expandable } from "../mdx-components/fields.tsx";
 import type { Parameter, Schema } from "./operation.ts";
 
@@ -9,7 +10,9 @@ export function typeLabel({ schema }: { schema: Schema }): string {
   const options = schema.oneOf ?? schema.anyOf;
   if (options) return options.map((option) => typeLabel({ schema: option })).join(" | ");
   if (schema.allOf) return "object";
-  const base = Array.isArray(schema.type) ? schema.type.join(" | ") : (schema.type ?? (schema.properties ? "object" : "any"));
+  const base = Array.isArray(schema.type)
+    ? schema.type.join(" | ")
+    : (schema.type ?? (schema.properties ? "object" : "any"));
   if (base === "array" && schema.items) return `${typeLabel({ schema: schema.items })}[]`;
   return schema.format ? `${base} (${schema.format})` : base;
 }
@@ -27,9 +30,9 @@ function mergeAllOf({ schema }: { schema: Schema }): Schema {
 
 function constraints({ schema }: { schema: Schema }): string[] {
   const out: string[] = [];
-  if (schema.enum) out.push(`One of: ${schema.enum.map((value) => JSON.stringify(value)).join(", ")}`);
-  if (schema.minLength !== undefined) out.push(`Minimum length ${schema.minLength}`);
-  if (schema.maxLength !== undefined) out.push(`Maximum length ${schema.maxLength}`);
+
+  if (schema.minLength !== undefined) out.push(`Schema minimum length: ${schema.minLength}`);
+  if (schema.maxLength !== undefined) out.push(`Schema maximum length: ${schema.maxLength}`);
   if (schema.minimum !== undefined) out.push(`Minimum ${schema.minimum}`);
   if (schema.maximum !== undefined) out.push(`Maximum ${schema.maximum}`);
   if (schema.pattern) out.push(`Pattern ${schema.pattern}`);
@@ -37,7 +40,10 @@ function constraints({ schema }: { schema: Schema }): string[] {
 }
 
 function opensObject({ schema }: { schema: Schema }): boolean {
-  return schema.additionalProperties === true || (typeof schema.additionalProperties === "object" && schema.additionalProperties !== null);
+  return (
+    schema.additionalProperties === true ||
+    (typeof schema.additionalProperties === "object" && schema.additionalProperties !== null)
+  );
 }
 
 export function SchemaNote({ schema }: { schema: Schema }) {
@@ -66,7 +72,12 @@ function Children({ schema, depth }: { schema: Schema; depth: number }) {
   if (depth >= MAX_DEPTH) return null;
   const target = schema.type === "array" && schema.items ? schema.items : schema;
   const merged = mergeAllOf({ schema: target });
-  if (merged.$recursive) return <Text margin="0" fontSize="13px" color="fg.muted">Recursive: see {merged.$recursive}</Text>;
+  if (merged.$recursive)
+    return (
+      <Text margin="0" fontSize="13px" color="fg.muted">
+        Recursive: see {merged.$recursive}
+      </Text>
+    );
   const options = merged.oneOf ?? merged.anyOf;
   if (options) {
     return (
@@ -89,24 +100,50 @@ function Children({ schema, depth }: { schema: Schema; depth: number }) {
 function hasChildren({ schema }: { schema: Schema }): boolean {
   const target = schema.type === "array" && schema.items ? schema.items : schema;
   const merged = mergeAllOf({ schema: target });
-  return Boolean(merged.oneOf || merged.anyOf || (merged.properties && Object.keys(merged.properties).length > 0) || merged.$recursive);
+  return Boolean(
+    merged.oneOf ||
+    merged.anyOf ||
+    (merged.properties && Object.keys(merged.properties).length > 0) ||
+    merged.$recursive,
+  );
 }
 
 export function SchemaFields({ schema, depth = 0 }: { schema: Schema; depth?: number }) {
   const merged = mergeAllOf({ schema });
   const entries = Object.entries(merged.properties ?? {});
+  if (entries.length === 0) return <SchemaNote schema={merged} />;
   return (
     <Box>
       {entries.map(([name, child]) => (
-        <DocsField key={name} name={name} type={typeLabel({ schema: child })} kind="param" location="" required={merged.required?.includes(name)} deprecated={child.deprecated}>
+        <DocsField
+          key={name}
+          name={name}
+          type={typeLabel({ schema: child })}
+          kind="param"
+          location=""
+          required={merged.required?.includes(name)}
+          deprecated={child.deprecated}
+        >
           {child.description ? <p>{child.description}</p> : null}
+          {child.enum ? (
+            <Flex gap="1.5" wrap="wrap" fontSize="12px" alignItems="baseline">
+              <span>One of</span>
+              {child.enum.map((value, index) => (
+                <Box key={index} as="code" bg="bg.subtle" borderRadius="sm" paddingX="1.5">
+                  {JSON.stringify(value)}
+                </Box>
+              ))}
+            </Flex>
+          ) : null}
           {constraints({ schema: child }).map((line) => (
             <Box key={line} as="p" color="fg.muted">
               {line}
             </Box>
           ))}
           {hasChildren({ schema: child }) ? (
-            <Expandable>
+            <Expandable
+              title={`${Object.keys(child.properties ?? child.items?.properties ?? {}).length || "nested"} child attributes`}
+            >
               <Children schema={child} depth={depth} />
             </Expandable>
           ) : null}
@@ -120,7 +157,15 @@ export function ParameterFields({ parameters }: { parameters: Parameter[] }) {
   return (
     <Box>
       {parameters.map((param) => (
-        <DocsField key={`${param.in}:${param.name}`} name={param.name} type={typeLabel({ schema: param.schema })} kind="param" location="" required={param.required} deprecated={param.deprecated}>
+        <DocsField
+          key={`${param.in}:${param.name}`}
+          name={param.name}
+          type={typeLabel({ schema: param.schema })}
+          kind="param"
+          location=""
+          required={param.required}
+          deprecated={param.deprecated}
+        >
           {param.description ? <p>{param.description}</p> : null}
           {constraints({ schema: param.schema }).map((line) => (
             <Box key={line} as="p" color="fg.muted">

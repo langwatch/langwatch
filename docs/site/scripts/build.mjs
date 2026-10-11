@@ -36,10 +36,31 @@ const { render } = await import(pathToFileURL(path.join(ssrDir, "entry-server.js
 const nav = buildNav({ docsRoot });
 const { pages } = nav;
 
-function sectionOf({ nav, slug }) {
-  const owns = (items) =>
-    items.some((item) => (item.type === "page" ? item.slug === slug : owns(item.children)));
-  return nav.anchors.find((anchor) => owns(anchor.children))?.title ?? "";
+function trailOf({ items, slug }) {
+  for (const item of items) {
+    if (item.type === "page" && item.slug === slug) return [];
+    if (item.type === "group") {
+      const trail = trailOf({ items: item.children, slug });
+      if (trail) return [item.title, ...trail];
+    }
+  }
+  return null;
+}
+function searchTrail({ nav, slug }) {
+  for (const anchor of nav.anchors) {
+    const trail = trailOf({ items: anchor.children, slug });
+    if (trail) return { section: anchor.title, trail: [anchor.title, ...trail].join(" › ") };
+  }
+  return { section: "", trail: "" };
+}
+function bodyText({ html }) {
+  const article = html.match(/<article[^>]*>([\s\S]*?)<\/article>/)?.[1] ?? "";
+  return article
+    .replace(/<style[\s\S]*?<\/style>/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&[^;]+;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function copyMarkdown({ slug }) {
@@ -74,7 +95,8 @@ for (const slug of Object.keys(pages)) {
       slug,
       title: pages[slug].title,
       description: pages[slug].description,
-      section: sectionOf({ nav, slug }),
+      ...searchTrail({ nav, slug }),
+      body: bodyText({ html }),
       headings: headings.map((heading) => ({ id: heading.id, text: heading.text })),
     });
     await copyMarkdown({ slug });
@@ -92,9 +114,11 @@ for (const slug of Object.keys(pages)) {
 
 await writeFile(path.join(dist, "search-index.json"), JSON.stringify(searchIndex));
 
+const missing = await render({ slug: "404" });
 const notFound = template
   .replace("<!--head-->", "<title>Not found</title>")
-  .replace("<!--app-->", "");
+  .replace("<!--app-->", missing.html)
+  .replace("</body>", `<script>window.__DOCS_SLUG__="404"</script></body>`);
 await writeFile(path.join(dist, "404.html"), notFound);
 
 for (const name of [...STATIC_DIRS, ...STATIC_FILES]) {
@@ -111,7 +135,7 @@ for (const { slug, reason } of skipped) {
 }
 console.log(`\n[docs-site] compiled: ${compiled}, skipped: ${skipped.length}`);
 for (const [reason, { count, example }] of [...reasons]
-  .sort((a, b) => b[1].count - a[1].count)
+  .toSorted((a, b) => b[1].count - a[1].count)
   .slice(0, 15)) {
   console.log(`  ${count}x ${reason} (e.g. ${example}.mdx)`);
 }

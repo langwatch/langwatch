@@ -50,7 +50,7 @@ function TocLinks({
               fontSize="14px"
               lineHeight="20px"
               textDecoration="none"
-              color={current ? "accent.fg" : "fg.muted"}
+              color={current ? "accent.fg" : "docs.contents"}
               fontWeight={current ? "600" : "400"}
               _hover={{ color: "fg", textDecoration: "none" }}
               paddingInlineStart={entry.depth > 2 ? "3" : "0"}

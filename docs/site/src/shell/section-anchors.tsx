@@ -12,15 +12,13 @@ function Tile({ icon, selected }: { icon: string; selected: boolean }) {
       alignItems="center"
       justifyContent="center"
       flexShrink={0}
-      width="1.5rem"
-      height="1.5rem"
+      width="1.75rem"
+      height="1.75rem"
       borderRadius="lg"
-      bg={selected ? "docs.primary" : "bg.subtle"}
-      borderWidth="1px"
-      borderColor={selected ? "accent.fg" : "border"}
-      color={selected ? "accent.onSolid" : "fg.muted"}
+      bg={selected ? "docs.primary" : "docs.tile"}
+      color={selected ? "accent.onSolid" : "fg"}
     >
-      <Glyph size={14} />
+      <Glyph size={16} />
     </Flex>
   );
 }

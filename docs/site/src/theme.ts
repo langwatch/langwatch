@@ -13,13 +13,25 @@ export const docsSystem = createDesignSystem(
         colors: {
           docs: {
             paper: colour({ light: "#fffefc", dark: "#16181b" }),
-            canvas: colour({ light: "#f4f4f1", dark: "#0d0f12" }),
+            canvas: { value: "{colors.docs.paper}" },
             primary: colour({ light: "#e17100", dark: "#fe9a00" }),
             controlBorder: colour({ light: "#87817b", dark: "#77736f" }),
+            body: colour({ light: "#3b3835", dark: "#d6d3d0" }),
+            lede: colour({ light: "#5f5a55", dark: "#a8a4a0" }),
+            contents: colour({ light: "#6f6a65", dark: "#9a9692" }),
+            tile: colour({ light: "#ecebe8", dark: "#24272b" }),
+            action: colour({ light: "#26694d", dark: "#26694d" }),
+            actionText: colour({ light: "#ffffff", dark: "#ffffff" }),
+            banner: colour({ light: "#e17100", dark: "#e17100" }),
+            bannerText: colour({ light: "#09090b", dark: "#09090b" }),
+            rule: colour({
+              light: "linear-gradient(90deg, #cddcf9, #ffaf6e, transparent)",
+              dark: "linear-gradient(90deg, #3b5bdb, #c97b3a, transparent)",
+            }),
             ground: colour({
               light:
                 "radial-gradient(ellipse at 15% 0%, #cddcf9 0%, transparent 65%), radial-gradient(ellipse at 85% 10%, #ffaf6e 0%, transparent 65%), {colors.docs.canvas}",
-              dark: "radial-gradient(ellipse at 15% 0%, #1e3a8a 0%, transparent 65%), radial-gradient(ellipse at 85% 10%, #c97b3a 0%, transparent 65%), {colors.docs.canvas}",
+              dark: "radial-gradient(ellipse at 15% 0%, #1d2a44 0%, transparent 65%), radial-gradient(ellipse at 85% 10%, #7a4a22 0%, transparent 65%), {colors.docs.canvas}",
             }),
           },
           bg: {
@@ -37,7 +49,7 @@ export const docsSystem = createDesignSystem(
             muted: colour({ light: "#625d58", dark: "#aaa6a3" }),
             subtle: { value: "{colors.fg.muted}" },
           },
-          nav: { fg: colour({ light: "#57534e", dark: "#aaa6a3" }) },
+          nav: { fg: colour({ light: "#4d4945", dark: "#b4b0ac" }) },
           border: {
             DEFAULT: colour({ light: "#e5e2df", dark: "#34373b" }),
             muted: colour({ light: "#efedeb", dark: "#2b2e32" }),

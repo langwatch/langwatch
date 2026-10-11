@@ -6,7 +6,11 @@ import { TypeRegion } from "../lib/type-mode.tsx";
 
 /** A heading with a hover and focus anchor; a body H1 is presented as H2 and keeps its id. */
 export function makeHeading({ level }: { level: 1 | 2 | 3 | 4 | 5 | 6 }) {
-  const tag = `h${Math.max(level, 2)}` as "h2";
+  const tags = { 1: "h2", 2: "h2", 3: "h3", 4: "h4", 5: "h5", 6: "h6" } satisfies Record<
+    number,
+    "h2" | "h3" | "h4" | "h5" | "h6"
+  >;
+  const tag = tags[level];
   return function DocsHeading({ id, children }: { id?: string; children?: ReactNode }) {
     return (
       <Box as={tag} id={id} className="docs-heading" data-level={Math.max(level, 2)}>
@@ -46,7 +50,7 @@ export function DocsTable(props: ComponentProps<"table">) {
     <TypeRegion
       mode="productive"
       className="docs-table-scroll"
-      role="region"
+      as="section"
       tabIndex={0}
       aria-label="Table"
       overflowX="auto"

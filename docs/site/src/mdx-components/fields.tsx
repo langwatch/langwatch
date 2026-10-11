@@ -25,22 +25,18 @@ export function DocsField({
   ...props
 }: FieldProps & { kind?: "param" | "response" }) {
   const name = props.name ?? props.path ?? props.query ?? props.body ?? props.header ?? "";
-  const location =
-    props.location ??
-    (props.path
-      ? "path"
-      : props.query
-        ? "query"
-        : props.header
-          ? "header"
-          : props.body
-            ? "body"
-            : "");
+  const inferred = [
+    ["path", props.path],
+    ["query", props.query],
+    ["header", props.header],
+    ["body", props.body],
+  ].find(([, value]) => Boolean(value));
+  const location = props.location ?? inferred?.[0] ?? "";
   const required = flag(props.required);
   return (
     <TypeRegion
       mode="productive"
-      paddingY="4"
+      paddingY="3"
       borderBottomWidth="1px"
       borderColor="border.muted"
       className="docs-field"
@@ -50,26 +46,17 @@ export function DocsField({
         <Box
           as="code"
           fontFamily="mono"
-          fontSize="14px"
+          fontSize="13px"
           lineHeight="24px"
-          fontWeight="500"
-          color="accent.fg"
+          fontWeight="600"
+          color="fg"
           wordBreak="break-word"
           overflowWrap="anywhere"
         >
           {name}
         </Box>
         {props.type ? (
-          <Box
-            as="span"
-            fontFamily="mono"
-            fontSize="12px"
-            lineHeight="20px"
-            color="fg.muted"
-            bg="bg.subtle"
-            paddingX="1.5"
-            borderRadius="sm"
-          >
+          <Box as="span" fontFamily="mono" fontSize="12px" lineHeight="20px" color="fg.muted">
             {props.type}
           </Box>
         ) : null}
@@ -79,9 +66,9 @@ export function DocsField({
           </Badge>
         ) : null}
         {required ? (
-          <Badge size="sm" variant="subtle" colorPalette="red">
-            Required
-          </Badge>
+          <Box as="span" fontSize="12px" color="accent.fg">
+            required
+          </Box>
         ) : null}
         {flag(props.deprecated) ? (
           <Badge size="sm" variant="subtle" colorPalette="yellow">
@@ -91,7 +78,7 @@ export function DocsField({
       </Flex>
       {children ? (
         <Box
-          marginTop="2"
+          marginTop="1.5"
           fontSize="14px"
           lineHeight="22px"
           color="fg"
@@ -137,7 +124,11 @@ export function Expandable({
       <Accordion.Item value="item">
         <Accordion.ItemTrigger
           minHeight="44px"
-          paddingX="0"
+          paddingX="3"
+          width="fit-content"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="lg"
           gap="2"
           cursor="pointer"
           color="fg.muted"
@@ -149,8 +140,10 @@ export function Expandable({
         <Accordion.ItemContent data-docs-panel="">
           <Accordion.ItemBody
             paddingStart="4"
-            paddingY="0"
-            borderStartWidth="1px"
+            padding="3"
+            borderWidth="1px"
+            borderRadius="lg"
+            marginTop="2"
             borderColor="border.muted"
             marginBottom="2"
           >

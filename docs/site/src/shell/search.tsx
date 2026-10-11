@@ -1,19 +1,47 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Box, Button, Flex, Input, Link, Spinner, Text } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Button,
+  Flex,
+  chakra,
+  Link,
+  Spinner,
+  Text,
+} from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { z } from "zod";
 
-export type SearchEntry = {
-  slug: string;
-  title: string;
-  section: string;
-  description: string;
-  headings: { id: string; text: string }[];
-};
+const searchEntrySchema = z.object({
+  slug: z.string(),
+  title: z.string(),
+  section: z.string(),
+  description: z.string(),
+  trail: z.string().default(""),
+  body: z.string().default(""),
+  headings: z.array(z.object({ id: z.string(), text: z.string() })),
+});
+export type SearchEntry = z.infer<typeof searchEntrySchema>;
 
 type Result = { entry: SearchEntry; heading?: { id: string; text: string }; score: number };
 
 const MAX_RESULTS = 20;
+
+function similarWord({ word, term }: { word: string; term: string }) {
+  if (term.length < 5 || Math.abs(word.length - term.length) > 1) return false;
+  let left = 0;
+  while (left < term.length && word[left] === term[left]) left += 1;
+  if (word.length === term.length) {
+    const replacement = word.slice(left + 1) === term.slice(left + 1);
+    const transpose =
+      word[left] === term[left + 1] &&
+      word[left + 1] === term[left] &&
+      word.slice(left + 2) === term.slice(left + 2);
+    return replacement || transpose;
+  }
+  if (word.length > term.length) return word.slice(left + 1) === term.slice(left);
+  return word.slice(left) === term.slice(left + 1);
+}
 
 function scoreEntry({ entry, terms }: { entry: SearchEntry; terms: string[] }): Result | null {
   const title = entry.title.toLowerCase();
@@ -32,6 +60,11 @@ function scoreEntry({ entry, terms }: { entry: SearchEntry; terms: string[] }): 
     }
     if (description.includes(term) && best < 10) best = 10;
     if (entry.slug.includes(term) && best < 8) best = 8;
+    if (entry.body.toLowerCase().includes(term) && best < 5) best = 5;
+    if (best === 0) {
+      const words = `${title} ${description} ${entry.trail}`.toLowerCase().split(/[^a-z0-9_]+/);
+      if (words.some((word) => similarWord({ word, term }))) best = 3;
+    }
     if (best === 0) return null;
     score += best;
   }
@@ -39,18 +72,24 @@ function scoreEntry({ entry, terms }: { entry: SearchEntry; terms: string[] }): 
 }
 
 export function searchIndex({ index, query }: { index: SearchEntry[]; query: string }): Result[] {
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const terms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((term) => term && !["how", "do", "i", "a", "the", "to", "is"].includes(term));
   if (terms.length === 0) return [];
   return index
     .map((entry) => scoreEntry({ entry, terms }))
     .filter((result): result is Result => result !== null)
-    .sort((a, b) => b.score - a.score)
+    .toSorted((a, b) => b.score - a.score)
     .slice(0, MAX_RESULTS);
 }
 
 function Highlighted({ text, terms }: { text: string; terms: string[] }) {
   if (terms.length === 0) return <>{text}</>;
-  const pattern = new RegExp(`(${terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "gi");
+  const pattern = new RegExp(
+    `(${terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`,
+    "gi",
+  );
   return (
     <>
       {text.split(pattern).map((part, position) =>
@@ -77,16 +116,25 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
     setLoad({ state: "loading" });
     fetch("/search-index.json")
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error("bad status"))))
-      .then((index: SearchEntry[]) => setLoad({ state: "ready", index }))
+      .then((data: unknown) =>
+        setLoad({ state: "ready", index: z.array(searchEntrySchema).parse(data) }),
+      )
       .catch(() => setLoad({ state: "failed" }));
   };
   useEffect(() => {
     if (open && load.state === "idle") start();
   }, [open, load.state]);
-  const results = useMemo(() => (load.state === "ready" ? searchIndex({ index: load.index, query }) : []), [load, query]);
+  const results = useMemo(
+    () => (load.state === "ready" ? searchIndex({ index: load.index, query }) : []),
+    [load, query],
+  );
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   useEffect(() => setSelected(0), [query]);
-  const hrefOf = ({ result }: { result: Result }) => `/${result.entry.slug}${result.heading ? `#${result.heading.id}` : ""}`;
+  useEffect(() => {
+    document.getElementById(`docs-search-result-${selected}`)?.scrollIntoView({ block: "nearest" });
+  }, [selected]);
+  const hrefOf = ({ result }: { result: Result }) =>
+    `/${result.entry.slug}${result.heading ? `#${result.heading.id}` : ""}`;
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "ArrowDown") {
       event.preventDefault();
@@ -99,25 +147,61 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
     }
   };
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: next }) => (next ? undefined : onClose())} placement="top" initialFocusEl={() => input.current} lazyMount unmountOnExit>
-      <Dialog.Content maxWidth="640px" width="calc(100% - 2rem)" marginTop={{ base: "0", md: "24" }} maxHeight={{ base: "100dvh", md: "min(640px, calc(100vh - 8rem))" }} display="flex" flexDirection="column" bg="bg.overlay">
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open: next }) => (next ? undefined : onClose())}
+      placement="top"
+      initialFocusEl={() => input.current}
+      lazyMount
+      unmountOnExit
+    >
+      <Dialog.Content
+        maxWidth="640px"
+        width="calc(100% - 2rem)"
+        marginTop={{ base: "0", md: "24" }}
+        maxHeight={{ base: "100dvh", md: "min(640px, calc(100vh - 8rem))" }}
+        display="flex"
+        flexDirection="column"
+        bg="bg.overlay"
+      >
         <Dialog.Title className="docs-sr-only">Search the LangWatch docs</Dialog.Title>
-        <Flex alignItems="center" gap="3" paddingX="4" borderBottomWidth="1px" borderColor="border.muted" minHeight="56px">
+        <Flex
+          alignItems="center"
+          gap="3"
+          paddingX="4"
+          borderBottomWidth="1px"
+          borderColor="border.muted"
+          minHeight="56px"
+        >
           <Search size={18} aria-hidden="true" />
-          <Input
+          <chakra.input
             ref={input}
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls="docs-search-results"
+            aria-activedescendant={results[selected] ? `docs-search-result-${selected}` : void 0}
+            aria-autocomplete="list"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder="Search the LangWatch docs"
             aria-label="Search the LangWatch docs"
-            variant="flushed"
+            flex="1"
+            minWidth="0"
+            bg="transparent"
             border="none"
             fontSize="16px"
             height="56px"
             outline="none"
           />
-          <Button type="button" size="xs" variant="ghost" colorPalette="gray" onClick={onClose} display={{ md: "none" }}>
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            colorPalette="gray"
+            onClick={onClose}
+            display={{ md: "none" }}
+          >
             Close
           </Button>
         </Flex>
@@ -130,7 +214,13 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
             <Flex direction="column" gap="2" padding="4">
               <Text margin="0">Search could not load.</Text>
               <Flex gap="3">
-                <Button type="button" size="sm" variant="outline" colorPalette="gray" onClick={start}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  colorPalette="gray"
+                  onClick={start}
+                >
                   Retry
                 </Button>
                 <Link href="/introduction" color="blue.fg" alignSelf="center">
@@ -160,33 +250,79 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
               No results for “{query}”. Try a broader term.
             </Text>
           ) : (
-            <Box as="ul" margin="0" padding="0" role="listbox" aria-label={`${results.length} results`}>
+            <Box
+              as="ul"
+              id="docs-search-results"
+              margin="0"
+              padding="0"
+              role="listbox"
+              aria-label={`${results.length} results`}
+            >
               {results.map((result, position) => (
-                <Box as="li" key={`${result.entry.slug}-${result.heading?.id ?? ""}`} listStyleType="none" role="option" aria-selected={position === selected}>
+                <Box
+                  as="li"
+                  id={`docs-search-result-${position}`}
+                  key={`${result.entry.slug}-${result.heading?.id ?? ""}`}
+                  listStyleType="none"
+                  role="option"
+                  aria-selected={position === selected}
+                >
                   <Link
                     href={hrefOf({ result })}
                     display="block"
                     minHeight="64px"
                     padding="3"
                     borderRadius="lg"
-                    bg={position === selected ? "nav.bgActive" : undefined}
+                    bg={position === selected ? "accent.subtle" : void 0}
+                    borderInlineStartWidth="2px"
+                    borderColor={position === selected ? "accent.fg" : "transparent"}
                     textDecoration="none"
                     _hover={{ bg: "nav.bgHover", textDecoration: "none" }}
                     onMouseMove={() => setSelected(position)}
                   >
-                    <Text as="span" display="block" fontSize="14px" lineHeight="20px" fontWeight="600" color="fg.muted">
+                    <Text
+                      as="span"
+                      display="block"
+                      fontSize="14px"
+                      lineHeight="20px"
+                      fontWeight="600"
+                      color="fg"
+                    >
                       <Highlighted text={result.entry.title} terms={terms} />
                     </Text>
                     {result.heading ? (
-                      <Text as="span" display="block" fontSize="13px" lineHeight="20px" color="fg.muted">
+                      <Text
+                        as="span"
+                        display="block"
+                        fontSize="13px"
+                        lineHeight="20px"
+                        color="fg.muted"
+                      >
                         {result.heading.text}
                       </Text>
                     ) : null}
-                    <Text as="span" display="block" fontSize="12px" lineHeight="20px" color="fg.muted">
-                      {result.entry.section}
+                    <Text
+                      as="span"
+                      display="block"
+                      fontSize="12px"
+                      lineHeight="20px"
+                      color="fg.muted"
+                    >
+                      {result.entry.trail || result.entry.section}
                     </Text>
                     {result.entry.description ? (
-                      <Text as="span" display="-webkit-box" fontSize="12px" lineHeight="20px" color="fg.muted" css={{ WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      <Text
+                        as="span"
+                        display="-webkit-box"
+                        fontSize="12px"
+                        lineHeight="20px"
+                        color="fg.muted"
+                        css={{
+                          WebkitLineClamp: 1,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
                         {result.entry.description}
                       </Text>
                     ) : null}
@@ -213,4 +349,3 @@ export function useSearchShortcut({ onOpen }: { onOpen: () => void }) {
     return () => window.removeEventListener("keydown", handler);
   }, [onOpen]);
 }
-

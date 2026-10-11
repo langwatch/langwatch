@@ -83,7 +83,7 @@ export function DocsShell({
   );
   const contents =
     toc.length >= 2 ? <TocDisclosure entries={toc} always={kind === "endpoint"} /> : null;
-  const footer = <PageFooter slug={slug} previous={previous} next={next} />;
+  const footer = slug === "404" ? null : <PageFooter slug={slug} previous={previous} next={next} />;
 
   return (
     <Box
@@ -114,7 +114,7 @@ export function DocsShell({
         data-wide={wide || kind === "home" || !showRail ? "true" : "false"}
       >
         <LeftRail>
-          <SideNav active={section} slug={slug} treeId="page-tree" scrollTree />
+          <SideNav active={section} slug={slug} treeId="page-tree" />
         </LeftRail>
         {endpoint ? (
           <>
@@ -179,7 +179,7 @@ export function DocsShell({
             paddingBottom="12"
           >
             {header}
-            {kind === "guide" && !wide ? <Box>{contents}</Box> : null}
+            {kind === "guide" ? <Box marginTop="4">{contents}</Box> : null}
             <TypeRegion
               mode={typeMode}
               as="article"

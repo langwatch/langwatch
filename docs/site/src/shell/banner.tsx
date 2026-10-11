@@ -24,8 +24,9 @@ export function SiteBanner() {
   return (
     <Box
       position="relative"
-      bg="docs.primary"
-      color="accent.onSolid"
+      className="docs-banner"
+      bg="docs.banner"
+      color="docs.bannerText"
       minHeight="40px"
       paddingY="2"
       paddingX="12"
@@ -60,9 +61,11 @@ export function SiteBanner() {
             textDecoration="underline"
             textUnderlineOffset="2px"
           >
-            {match[1]}
+            {match[1]}:
           </Link>{" "}
-          {match[3]}
+          <Box as="span" display={{ base: "none", md: "inline" }}>
+            {match[3]}
+          </Box>
         </>
       ) : (
         banner.content

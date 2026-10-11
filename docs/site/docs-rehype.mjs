@@ -1,3 +1,4 @@
+import { renderDiagram } from "./docs-diagrams.mjs";
 import { highlightLines } from "./docs-highlight.mjs";
 
 function textOf({ node }) {
@@ -35,7 +36,9 @@ export function rehypeDocsCode() {
     const jobs = [];
     const visit = (node) => {
       if (node.type === "element" && node.tagName === "pre") {
-        const code = node.children?.find((child) => child.type === "element" && child.tagName === "code");
+        const code = node.children?.find(
+          (child) => child.type === "element" && child.tagName === "code",
+        );
         if (code) jobs.push({ pre: node, code });
         return;
       }
@@ -44,10 +47,15 @@ export function rehypeDocsCode() {
     visit(tree);
     for (const { pre, code } of jobs) {
       const className = [code.properties?.className ?? []].flat();
-      const lang = className.find((name) => String(name).startsWith("language-"))?.slice("language-".length) ?? "";
+      const lang =
+        className.find((name) => String(name).startsWith("language-"))?.slice("language-".length) ??
+        "";
       const source = textOf({ node: code }).replace(/\n$/, "");
       const meta = parseFenceMeta({ meta: code.data?.meta });
-      const lines = lang === "mermaid" ? source.split("\n").map(() => "") : await highlightLines({ code: source, lang });
+      const lines =
+        lang === "mermaid"
+          ? source.split("\n").map(() => "")
+          : await highlightLines({ code: source, lang });
       pre.properties = {
         dataLang: lang,
         dataTitle: meta.title,
@@ -56,6 +64,11 @@ export function rehypeDocsCode() {
         dataHighlight: meta.highlight.join(","),
         dataFlags: meta.flags.join(","),
       };
+      if (lang === "mermaid") {
+        const diagram = await renderDiagram({ source });
+        pre.properties.dataDiagramLight = diagram.light;
+        pre.properties.dataDiagramDark = diagram.dark;
+      }
       pre.children = [];
     }
   };
@@ -72,7 +85,8 @@ function slugOf({ text, used }) {
 }
 
 function estreeOf({ value }) {
-  if (Array.isArray(value)) return { type: "ArrayExpression", elements: value.map((item) => estreeOf({ value: item })) };
+  if (Array.isArray(value))
+    return { type: "ArrayExpression", elements: value.map((item) => estreeOf({ value: item })) };
   if (value && typeof value === "object") {
     return {
       type: "ObjectExpression",
@@ -109,8 +123,13 @@ export function rehypeDocsHeadings() {
         if (depth === 2) sawH2 = true;
         headings.push({ depth, text: textOf({ node }).trim(), id: String(node.properties.id) });
       }
-      if ((node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") && node.name === "Step") {
-        const title = node.attributes?.find((attr) => attr.name === "title" && typeof attr.value === "string");
+      if (
+        (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
+        node.name === "Step"
+      ) {
+        const title = node.attributes?.find(
+          (attr) => attr.name === "title" && typeof attr.value === "string",
+        );
         if (title) {
           let id = node.attributes.find((attr) => attr.name === "id")?.value;
           if (!id) {
@@ -138,7 +157,11 @@ export function rehypeDocsHeadings() {
                 type: "VariableDeclaration",
                 kind: "const",
                 declarations: [
-                  { type: "VariableDeclarator", id: { type: "Identifier", name: "headings" }, init: estreeOf({ value: headings }) },
+                  {
+                    type: "VariableDeclarator",
+                    id: { type: "Identifier", name: "headings" },
+                    init: estreeOf({ value: headings }),
+                  },
                 ],
               },
             },
@@ -155,7 +178,15 @@ const MEDIA = { img: "DocsImg", video: "DocsVideo", iframe: "DocsIframe" };
 export function rehypeDocsMedia() {
   return (tree) => {
     const visit = (node) => {
-      if ((node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") && MEDIA[node.name]) node.name = MEDIA[node.name];
+      if (
+        (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
+        MEDIA[node.name]
+      )
+        node.name = MEDIA[node.name];
+      const legacy = node.attributes?.some(
+        (attribute) => attribute.name === "className" && String(attribute.value).includes("lw-"),
+      );
+      if (node.name === "div" && legacy) node.name = "LegacyContent";
       for (const child of node.children ?? []) visit(child);
     };
     visit(tree);

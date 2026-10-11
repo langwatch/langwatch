@@ -1,10 +1,11 @@
-import { Box, chakra, Flex, Text } from "@langwatch/design-system/primitives";
+import { Box, chakra, Text } from "@langwatch/design-system/primitives";
 import { ChevronRight } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import nav from "virtual:docs-nav";
 
 import { ownsSlug } from "../lib/nav-model.ts";
 import type { NavItem } from "../lib/nav-model.ts";
+import { Icon } from "../mdx-components/icon.tsx";
 
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 const METHOD_PALETTE: Record<string, string> = {
@@ -57,6 +58,7 @@ function PageRow({
 }) {
   const active = item.slug === current;
   const method = methodOf({ slug: item.slug });
+  const icon = nav.pages[item.slug]?.icon;
   return (
     <Box as="li" listStyleType="none">
       <chakra.a
@@ -79,6 +81,7 @@ function PageRow({
         _hover={{ bg: active ? "accent.subtle" : "bg.hover", textDecoration: "none" }}
       >
         {method ? <NavMethod method={method} /> : null}
+        {!method && icon ? <Icon icon={icon} size={16} /> : null}
         <span>{item.title}</span>
       </chakra.a>
     </Box>
@@ -105,7 +108,7 @@ function GroupRow({
         css={{ "&:first-of-type": { marginTop: "0" } }}
       >
         <Text
-          as="h2"
+          as="p"
           margin="0"
           paddingX="4"
           paddingBottom="2"
@@ -182,17 +185,8 @@ export function NavTree({
   current: string;
   id?: string;
 }) {
-  const ref = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const scroller = ref.current?.closest<HTMLElement>("[data-docs-scroll]");
-    const row = ref.current?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (!scroller || !row) return;
-    const offset = row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-    if (offset > scroller.clientHeight - 80 || offset < 0)
-      scroller.scrollTop += offset - scroller.clientHeight / 3;
-  }, []);
   return (
-    <Box as="nav" id={id} tabIndex={id ? -1 : undefined} aria-label="Page navigation" ref={ref}>
+    <Box as="nav" id={id} tabIndex={id ? -1 : undefined} aria-label="Page navigation">
       <NavList items={items} current={current} depth={0} />
     </Box>
   );

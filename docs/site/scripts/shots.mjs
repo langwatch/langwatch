@@ -1,14 +1,12 @@
 import { mkdirSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { chromium } from "playwright";
+
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../../..");
-const require = createRequire(import.meta.url);
-const { chromium } = require(
-  path.join(root, "node_modules/.pnpm/playwright-core@1.63.0/node_modules/playwright-core"),
-);
+
 const out = process.env.DOCS_SHOTS_DIR ?? path.join(root, ".claude/tmp/docs-site/shots");
 const showBanner = process.env.DOCS_SHOW_BANNER === "1";
 mkdirSync(out, { recursive: true });

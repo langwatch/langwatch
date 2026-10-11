@@ -1,16 +1,16 @@
-import { Box, Button, Flex, Tabs, Text } from "@langwatch/design-system/primitives";
+import { Box, Button, Flex, Text } from "@langwatch/design-system/primitives";
 import { Play } from "lucide-react";
 
 import { TypeRegion } from "../lib/type-mode.tsx";
-import { readingTabList, readingTabTrigger } from "../mdx-components/tabs.tsx";
+import { DocsField } from "../mdx-components/fields.tsx";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { MethodBadge } from "./method-badge.tsx";
 import type { Operation } from "./operation.ts";
-import { ParameterFields, SchemaFields, SchemaNote } from "./schema.tsx";
+import { ParameterFields, SchemaFields } from "./schema.tsx";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Box as="section" marginTop="9">
+    <Box as="section" id={title.toLowerCase().replaceAll(" ", "-")} marginTop="8">
       <Text
         as="h2"
         margin="0"
@@ -58,7 +58,23 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
         wordBreak="break-word"
         css={{ userSelect: "all" }}
       >
-        {operation.path}
+        {operation.path.split(/(\{[^}]+\})/).map((part, index) =>
+          part.startsWith("{") ? (
+            <Box
+              as="span"
+              key={index}
+              bg="green.subtle"
+              color="green.fg"
+              borderRadius="sm"
+              paddingX="1"
+              paddingY="0.5"
+            >
+              {part}
+            </Box>
+          ) : (
+            <span key={index}>{part}</span>
+          ),
+        )}
       </Box>
       <Button
         id="try-it-button"
@@ -69,11 +85,11 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
         height="40px"
         paddingX="4"
         borderRadius="lg"
-        bg="green.fg"
-        color="bg.surface"
+        bg="docs.action"
+        color="docs.actionText"
         fontWeight="500"
         fontSize="13px"
-        _hover={{ bg: "green.fg", opacity: 0.9 }}
+        _hover={{ bg: "docs.action", opacity: 0.9 }}
         width={{ base: "100%", md: "auto" }}
       >
         Try it <Play size={12} aria-hidden="true" />
@@ -83,54 +99,29 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
 }
 
 export function Responses({ operation }: { operation: Operation }) {
-  const statuses = operation.responses.map((response) => response.status);
-  const { status: active, setStatus: setActive } = useEndpointState();
-  if (statuses.length === 0) return null;
+  if (operation.responses.length === 0) return null;
   return (
     <Section title="Responses">
-      <Tabs.Root
-        value={active}
-        onValueChange={({ value }) => setActive(value)}
-        variant="line"
-        colorPalette="accent"
-        marginTop="2"
-      >
-        <Tabs.List css={readingTabList} aria-label="Response status">
-          {statuses.map((status) => (
-            <Tabs.Trigger key={status} value={status} css={readingTabTrigger}>
-              {status}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-        {operation.responses.map((response) => {
-          const content = response.contents[0];
-          return (
-            <Tabs.Content
-              key={response.status}
-              value={response.status}
-              paddingX="0"
-              paddingTop="4"
-              data-docs-panel=""
+      {operation.responses.map((response) => (
+        <Box key={response.status} paddingY="3" borderBottomWidth="1px" borderColor="border.muted">
+          <Flex gap="3" alignItems="baseline">
+            <Box
+              as="code"
+              fontFamily="mono"
+              fontSize="13px"
+              color={response.status.startsWith("2") ? "green.fg" : "fg.muted"}
             >
-              <Text margin="0" fontSize="16px" lineHeight="28px">
-                {response.description}
-              </Text>
-              {content ? (
-                <Text margin="0" fontSize="12px" color="fg.muted">
-                  {content.type}
-                </Text>
-              ) : null}
-              {content?.schema ? (
-                Object.keys(content.schema.properties ?? {}).length > 0 ? (
-                  <SchemaFields schema={content.schema} />
-                ) : (
-                  <SchemaNote schema={content.schema} />
-                )
-              ) : null}
-            </Tabs.Content>
-          );
-        })}
-      </Tabs.Root>
+              {response.status}
+            </Box>
+            <Text margin="0" fontSize="14px" lineHeight="22px" color="docs.body">
+              {response.description}
+            </Text>
+          </Flex>
+          {response.contents[0]?.schema?.properties ? (
+            <SchemaFields schema={response.contents[0].schema} />
+          ) : null}
+        </Box>
+      ))}
     </Section>
   );
 }
@@ -159,19 +150,15 @@ export function EndpointReference({
       {operation.schemes.length > 0 ? (
         <Section title="Authorisation">
           {operation.schemes.map((scheme) => (
-            <Box key={scheme.id} paddingY="4" fontSize="14px" lineHeight="24px">
-              <Box as="code" fontFamily="mono" fontWeight="500" color="accent.fg">
-                {scheme.type === "apiKey" ? scheme.name : "Authorization: Bearer"}
-              </Box>{" "}
-              <Text as="span" color="fg.muted">
-                from {scheme.id}
-              </Text>
-              {scheme.description ? (
-                <Text margin="0" color="fg.muted">
-                  {scheme.description}
-                </Text>
-              ) : null}
-            </Box>
+            <DocsField
+              key={scheme.id}
+              name={scheme.type === "apiKey" ? scheme.name : "Authorization"}
+              type="string"
+              location={scheme.in ?? "header"}
+              required
+            >
+              {scheme.description ? <p>{scheme.description}</p> : null}
+            </DocsField>
           ))}
         </Section>
       ) : null}
@@ -186,11 +173,7 @@ export function EndpointReference({
             {bodyContent.type}
             {operation.body.required ? " · Required" : ""}
           </Text>
-          {Object.keys(bodyContent.schema.properties ?? {}).length > 0 ? (
-            <SchemaFields schema={bodyContent.schema} />
-          ) : (
-            <SchemaNote schema={bodyContent.schema} />
-          )}
+          <SchemaFields schema={bodyContent.schema} />
         </Section>
       ) : null}
       <Responses operation={operation} />

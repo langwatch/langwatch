@@ -1,6 +1,7 @@
 import { Box, Flex, Tabs } from "@langwatch/design-system/primitives";
 import { Children, isValidElement, useState } from "react";
 import type { ReactNode } from "react";
+
 import { CodeBar, CodeFrame } from "../code/code-block.tsx";
 import { CodeBody, CopyAction, ExpandControl, sourceFromProps } from "../code/code-parts.tsx";
 import type { CodeSource } from "../code/code-parts.tsx";
@@ -12,9 +13,10 @@ type Item = { label: string; source?: CodeSource; content?: ReactNode };
 
 function itemsOf({ children }: { children: ReactNode }): Item[] {
   return Children.toArray(children).flatMap((child): Item[] => {
-    if (!isValidElement<Record<string, unknown>>(child)) return [];
+    if (!isValidElement<{ title?: string; children?: ReactNode } & Record<string, unknown>>(child))
+      return [];
     if (child.type === CodeGroupItem) {
-      return [{ label: String(child.props.title ?? "Example"), content: child.props.children as ReactNode }];
+      return [{ label: String(child.props.title ?? "Example"), content: child.props.children }];
     }
     const source = sourceFromProps(child.props);
     if (!source.code && !source.lines.length) return [];
@@ -31,9 +33,7 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   const labels = items.map((item) => item.label);
   const wanted = group ? stored : local;
-  const active = wanted && labels.some((label) => label.toLowerCase() === wanted.toLowerCase())
-    ? labels.find((label) => label.toLowerCase() === wanted.toLowerCase())!
-    : labels[0];
+  const active = labels.find((label) => label.toLowerCase() === wanted?.toLowerCase()) ?? labels[0];
   const current = items.find((item) => item.label === active) ?? items[0];
   if (!current) return null;
   const currentLines = current.source?.lines.length ?? 0;
@@ -50,9 +50,21 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
         size="md"
       >
         <CodeBar>
-          <Tabs.List css={{ ...readingTabList, flex: 1, minWidth: 0, borderBottomWidth: 0, boxShadow: "none" }}>
+          <Tabs.List
+            css={{
+              ...readingTabList,
+              flex: 1,
+              minWidth: 0,
+              borderBottomWidth: 0,
+              boxShadow: "none",
+            }}
+          >
             {items.map((item) => (
-              <Tabs.Trigger key={item.label} value={item.label} css={{ ...readingTabTrigger, minHeight: "44px" }}>
+              <Tabs.Trigger
+                key={item.label}
+                value={item.label}
+                css={{ ...readingTabTrigger, minHeight: "44px" }}
+              >
                 {item.label}
               </Tabs.Trigger>
             ))}
@@ -70,7 +82,11 @@ export function CodeGroup({ children }: { children?: ReactNode }) {
             )}
           </Tabs.Content>
         ))}
-        <ExpandControl lines={currentLines} expanded={expanded} onToggle={() => setExpanded((value) => !value)} />
+        <ExpandControl
+          lines={currentLines}
+          expanded={expanded}
+          onToggle={() => setExpanded((value) => !value)}
+        />
       </Tabs.Root>
     </CodeFrame>
   );

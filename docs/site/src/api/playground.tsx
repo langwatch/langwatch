@@ -29,8 +29,9 @@ import {
 } from "./codegen.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { EXAMPLE_LANGUAGES } from "./operation.ts";
-import type { ExampleLanguage, HighlightedExamples, Operation, Parameter } from "./operation.ts";
+import type { HighlightedExamples, Operation, Parameter } from "./operation.ts";
 import { Panel } from "./panel.tsx";
+import { ResponsiveExamples } from "./responsive-examples.tsx";
 
 type Outcome =
   | { kind: "idle" }
@@ -233,6 +234,8 @@ export function Playground({
         nextErrors[paramKey({ location: param.in, name: param.name })] =
           `${param.name} is required.`;
     }
+    if (scheme && !key.trim()) nextErrors.auth = "Enter an API key.";
+    if (operation.body?.required && !body.trim()) nextErrors.body = "Enter a request body.";
     if (body.trim()) {
       try {
         JSON.parse(body);
@@ -244,7 +247,13 @@ export function Playground({
     if (Object.keys(nextErrors).length > 0) {
       const first = Object.keys(nextErrors)[0];
       document
-        .getElementById(first === "body" ? "pg-body" : `pg-${first.replace(":", "-")}`)
+        .getElementById(
+          first === "auth"
+            ? "pg-auth"
+            : first === "body"
+              ? "pg-body"
+              : `pg-${first.replace(":", "-")}`,
+        )
         ?.focus();
       return;
     }
@@ -272,7 +281,7 @@ export function Playground({
         body: text,
         headers: [...response.headers.entries()],
       });
-    } catch (error) {
+    } catch {
       if (abort.signal.aborted) {
         setOutcome({
           kind: "error",
@@ -314,7 +323,9 @@ export function Playground({
     declared ??
     (chosenContent?.schema ? exampleFromSchema({ schema: chosenContent.schema }) : undefined);
   const exampleCode =
-    example === undefined || example === null ? "" : JSON.stringify(example, null, 2);
+    example === undefined || example === null || JSON.stringify(example) === "{}"
+      ? ""
+      : JSON.stringify(example, null, 2);
 
   return (
     <Flex direction="column" gap="6" minWidth="0" data-type-mode="productive">
@@ -343,11 +354,11 @@ export function Playground({
             </Text>
             {scheme ? (
               <chakra.details
-                open={required.length === 0 || undefined}
+                open
                 css={{
                   "& > summary": {
                     cursor: "pointer",
-                    minHeight: "32px",
+                    minHeight: "44px",
                     display: "flex",
                     alignItems: "center",
                     fontSize: "13px",
@@ -356,10 +367,12 @@ export function Playground({
                 }}
               >
                 <summary>
-                  Authorisation: {scheme.type === "apiKey" ? scheme.name : "Authorization"}
+                  API key · {scheme.type === "apiKey" ? scheme.name : "Authorization"}
                 </summary>
                 <Flex gap="2" marginTop="1">
                   <Input
+                    id="pg-auth"
+                    aria-invalid={Boolean(errors.auth)}
                     size="sm"
                     type={reveal ? "text" : "password"}
                     value={key}
@@ -393,6 +406,11 @@ export function Playground({
                     Clear
                   </Button>
                 </Flex>
+                {errors.auth ? (
+                  <Text color="red.fg" fontSize="12px">
+                    {errors.auth}
+                  </Text>
+                ) : null}
                 <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
                   Kept in this tab. Cleared when you reload.
                 </Text>
@@ -414,7 +432,7 @@ export function Playground({
                 css={{
                   "& > summary": {
                     cursor: "pointer",
-                    minHeight: "32px",
+                    minHeight: "44px",
                     display: "flex",
                     alignItems: "center",
                     fontSize: "13px",
@@ -422,7 +440,7 @@ export function Playground({
                   },
                 }}
               >
-                <summary>Optional fields (deprecated)</summary>
+                <summary>▸ Optional fields (deprecated)</summary>
                 <Flex direction="column" gap="3" marginTop="2">
                   {deprecated.map(renderParam)}
                 </Flex>
@@ -517,112 +535,114 @@ export function Playground({
         </Panel>
       ) : null}
 
-      <Panel showHeader={false} title="Request example">
-        <Tabs.Root
-          value={languageLabel}
-          onValueChange={({ value }) => writePreference({ key: "api-language", value })}
-          variant="line"
-          colorPalette="accent"
-          minWidth="0"
-          maxWidth="100%"
-        >
-          <Flex
-            alignItems="center"
-            borderBottomWidth="1px"
-            borderColor="border.nested"
-            paddingX="2"
-            bg="bg.subtle"
+      <ResponsiveExamples>
+        <Panel showHeader={false} title="Request example">
+          <Tabs.Root
+            value={languageLabel}
+            onValueChange={({ value }) => writePreference({ key: "api-language", value })}
+            variant="line"
+            colorPalette="accent"
+            minWidth="0"
+            maxWidth="100%"
           >
-            <Tabs.List
-              css={{
-                ...readingTabList,
-                flex: 1,
-                minWidth: 0,
-                borderBottomWidth: 0,
-                boxShadow: "none",
-              }}
-            >
-              {EXAMPLE_LANGUAGES.map((entry) => (
-                <Tabs.Trigger key={entry.id} value={entry.label} css={readingTabTrigger}>
-                  {entry.label}
-                </Tabs.Trigger>
-              ))}
-            </Tabs.List>
-            <CopyAction code={examples[language].code} />
-          </Flex>
-          {EXAMPLE_LANGUAGES.map((entry) => (
-            <Tabs.Content
-              key={entry.id}
-              value={entry.label}
-              padding="0"
-              data-docs-panel=""
-              bg="bg.nested"
-              minWidth="0"
-              maxWidth="100%"
-              overflow="hidden"
-            >
-              <CodeBody source={examples[entry.id]} expanded />
-            </Tabs.Content>
-          ))}
-        </Tabs.Root>
-      </Panel>
-
-      {statuses.length > 0 ? (
-        <Panel showHeader={false} title="Documented response">
-          <Flex
-            alignItems="center"
-            bg="bg.subtle"
-            borderBottomWidth="1px"
-            borderColor="border"
-            paddingInlineEnd="2"
-          >
-            <Tabs.Root
-              value={status}
-              onValueChange={({ value }) => setStatus(value)}
-              variant="line"
-              colorPalette="accent"
-              minWidth="0"
-              flex="1"
+            <Flex
+              alignItems="center"
+              borderBottomWidth="1px"
+              borderColor="border.nested"
+              paddingX="2"
+              bg="bg.subtle"
             >
               <Tabs.List
-                aria-label="Response status"
-                css={{ ...readingTabList, paddingInline: "8px", borderBottomWidth: "0" }}
+                css={{
+                  ...readingTabList,
+                  flex: 1,
+                  minWidth: 0,
+                  borderBottomWidth: 0,
+                  boxShadow: "none",
+                }}
               >
-                {statuses.map((entry) => (
-                  <Tabs.Trigger key={entry} value={entry} css={readingTabTrigger}>
-                    {entry}
+                {EXAMPLE_LANGUAGES.map((entry) => (
+                  <Tabs.Trigger key={entry.id} value={entry.label} css={readingTabTrigger}>
+                    {entry.label}
                   </Tabs.Trigger>
                 ))}
               </Tabs.List>
-            </Tabs.Root>
-            {exampleCode ? <CopyAction code={exampleCode} label="Copy example" /> : null}
-          </Flex>
-          <Box paddingX="4" paddingTop="3" fontSize="12px" lineHeight="18px" color="fg.muted">
-            <Text margin="0">{chosen?.description}</Text>
-            {chosenContent ? (
-              <Text margin="0">
-                {exampleCode
-                  ? declared !== undefined
-                    ? "Declared example"
-                    : "Example from schema"
-                  : "No example supplied"}{" "}
-                · {chosenContent.type}
-              </Text>
-            ) : null}
-          </Box>
-          {exampleCode ? (
-            <Box marginTop="3" bg="bg.nested" borderTopWidth="1px" borderColor="border.nested">
-              <CodeBody source={plainSource({ code: exampleCode })} expanded={false} />
-            </Box>
-          ) : (
-            <Box height="3" />
-          )}
+              <CopyAction code={examples[language].code} />
+            </Flex>
+            {EXAMPLE_LANGUAGES.map((entry) => (
+              <Tabs.Content
+                key={entry.id}
+                value={entry.label}
+                padding="0"
+                data-docs-panel=""
+                bg="bg.nested"
+                minWidth="0"
+                maxWidth="100%"
+                overflow="hidden"
+              >
+                <CodeBody source={examples[entry.id]} expanded />
+              </Tabs.Content>
+            ))}
+          </Tabs.Root>
         </Panel>
-      ) : null}
-      <Text margin="0" fontSize="12px" lineHeight="18px" color="fg.muted">
-        Examples are generated from the schema. These are not live responses.
-      </Text>
 
+        {statuses.length > 0 ? (
+          <Panel showHeader={false} title="Documented response">
+            <Flex
+              alignItems="center"
+              bg="bg.subtle"
+              borderBottomWidth="1px"
+              borderColor="border"
+              paddingInlineEnd="2"
+            >
+              <Tabs.Root
+                value={status}
+                onValueChange={({ value }) => setStatus(value)}
+                variant="line"
+                colorPalette="accent"
+                minWidth="0"
+                flex="1"
+              >
+                <Tabs.List
+                  aria-label="Response status"
+                  css={{ ...readingTabList, paddingInline: "8px", borderBottomWidth: "0" }}
+                >
+                  {statuses.map((entry) => (
+                    <Tabs.Trigger
+                      key={entry}
+                      value={entry}
+                      css={{ ...readingTabTrigger, paddingX: "2", fontSize: "12px" }}
+                    >
+                      {entry}
+                    </Tabs.Trigger>
+                  ))}
+                </Tabs.List>
+              </Tabs.Root>
+              {exampleCode ? <CopyAction code={exampleCode} label="Copy example" /> : null}
+            </Flex>
+            <Box paddingX="4" paddingTop="3" fontSize="12px" lineHeight="18px" color="fg.muted">
+              <Text margin="0">{chosen?.description}</Text>
+              {chosenContent ? (
+                <Text margin="0">
+                  {exampleCode
+                    ? declared !== undefined
+                      ? "Declared example"
+                      : "Example from schema"
+                    : "Response fields are not specified"}{" "}
+                  · {chosenContent.type}
+                </Text>
+              ) : null}
+            </Box>
+            {exampleCode ? (
+              <Box marginTop="3" bg="bg.nested" borderTopWidth="1px" borderColor="border.nested">
+                <CodeBody source={plainSource({ code: exampleCode })} expanded={false} />
+              </Box>
+            ) : (
+              <Box height="3" />
+            )}
+          </Panel>
+        ) : null}
+      </ResponsiveExamples>
       {outcome.kind !== "idle" ? (
         <Panel title="Live response">
           <Box padding="4" aria-live="polite">

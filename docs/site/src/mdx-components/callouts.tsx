@@ -41,6 +41,12 @@ function Callout({ kind, children }: { kind: keyof typeof KINDS; children?: Reac
       borderRadius="xl"
       bg={`${palette}.subtle`}
       color={rule}
+      css={{
+        _dark: {
+          background: `color-mix(in srgb, var(--chakra-colors-${palette}-solid) 10%, var(--chakra-colors-docs-paper))`,
+          borderColor: `color-mix(in srgb, var(--chakra-colors-${palette}-solid) 25%, var(--chakra-colors-docs-paper))`,
+        },
+      }}
     >
       <Box
         as="span"

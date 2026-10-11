@@ -2421,6 +2421,9 @@ importers:
       shiki:
         specifier: 'catalog:'
         version: 4.3.0
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
     devDependencies:
       '@mdx-js/rollup':
         specifier: ^3.1.0
@@ -2437,6 +2440,12 @@ importers:
       '@vitejs/plugin-react':
         specifier: 'catalog:'
         version: 6.1.1(babel-plugin-react-compiler@1.0.0)(oxc-transform-react@0.145.0)(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+      mermaid:
+        specifier: 11.16.1
+        version: 11.16.1
+      playwright:
+        specifier: 'catalog:'
+        version: 1.63.0
       rehype-slug:
         specifier: ^6.0.0
         version: 6.0.0

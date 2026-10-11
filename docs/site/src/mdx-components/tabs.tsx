@@ -1,6 +1,8 @@
+import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 import { Tabs as ChakraTabs } from "@langwatch/design-system/primitives";
 import { Children, isValidElement, useState } from "react";
 import type { ReactNode } from "react";
+
 import { preferenceGroupFor } from "../code/languages.ts";
 import { usePreference, writePreference } from "../lib/storage.ts";
 
@@ -8,9 +10,8 @@ import { usePreference, writePreference } from "../lib/storage.ts";
 export const readingTabList = {
   overflowX: "auto",
   flexWrap: "nowrap",
-  scrollbarWidth: "none",
-  "&::-webkit-scrollbar": { display: "none" },
-} as const;
+  scrollbarWidth: "thin",
+} satisfies SystemStyleObject;
 
 export const readingTabTrigger = {
   color: "fg.muted",
@@ -23,7 +24,7 @@ export const readingTabTrigger = {
   lineHeight: "20px",
   _hover: { color: "fg", bg: "bg.hover" },
   "&[data-selected]": { color: "fg", fontWeight: "600" },
-} as const;
+} satisfies SystemStyleObject;
 
 type TabProps = { title?: string; children?: ReactNode };
 
@@ -34,7 +35,9 @@ export function Tab({ children }: TabProps) {
 
 export function Tabs({ children }: { children?: ReactNode }) {
   const tabs = Children.toArray(children).flatMap((child, index) =>
-    isValidElement<TabProps>(child) ? [{ label: child.props.title ?? `Tab ${index + 1}`, content: child.props.children }] : [],
+    isValidElement<TabProps>(child)
+      ? [{ label: child.props.title ?? `Tab ${index + 1}`, content: child.props.children }]
+      : [],
   );
   const labels = tabs.map((tab) => tab.label);
   const group = preferenceGroupFor({ labels });
@@ -46,7 +49,9 @@ export function Tabs({ children }: { children?: ReactNode }) {
   return (
     <ChakraTabs.Root
       value={active}
-      onValueChange={({ value }) => (group ? writePreference({ key: group, value }) : setLocal(value))}
+      onValueChange={({ value }) =>
+        group ? writePreference({ key: group, value }) : setLocal(value)
+      }
       variant="line"
       colorPalette="accent"
       marginY="6"
@@ -59,7 +64,14 @@ export function Tabs({ children }: { children?: ReactNode }) {
         ))}
       </ChakraTabs.List>
       {tabs.map((tab) => (
-        <ChakraTabs.Content key={tab.label} value={tab.label} paddingX="0" paddingTop="4" paddingBottom="0" data-docs-panel="">
+        <ChakraTabs.Content
+          key={tab.label}
+          value={tab.label}
+          paddingX="0"
+          paddingTop="4"
+          paddingBottom="0"
+          data-docs-panel=""
+        >
           {tab.content}
         </ChakraTabs.Content>
       ))}

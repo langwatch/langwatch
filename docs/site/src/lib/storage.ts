@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { z } from "zod";
 
 const PREFIX = "lw-docs:";
 const EVENT = "lw-docs-pref";
@@ -27,8 +28,9 @@ export function usePreference({ key }: { key: string | null }): string | null {
     if (!key) return;
     setValue(readPreference({ key }));
     const onChange = (event: Event) => {
-      const detail = (event as CustomEvent<{ key: string; value: string }>).detail;
-      if (detail.key === key) setValue(detail.value);
+      if (!(event instanceof CustomEvent)) return;
+      const result = z.object({ key: z.string(), value: z.string() }).safeParse(event.detail);
+      if (result.success && result.data.key === key) setValue(result.data.value);
     };
     window.addEventListener(EVENT, onChange);
     return () => window.removeEventListener(EVENT, onChange);

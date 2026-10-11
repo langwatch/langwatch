@@ -29,8 +29,8 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
           variant="outline"
           colorPalette="gray"
           size="sm"
-          height="34px"
-          minHeight="34px"
+          height={{ base: "44px", xl: "34px" }}
+          minHeight={{ base: "44px", xl: "34px" }}
           borderEndRadius="0"
           onClick={() =>
             copy({
@@ -55,8 +55,8 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
               variant="outline"
               colorPalette="gray"
               size="sm"
-              height="34px"
-              minHeight="34px"
+              height={{ base: "44px", xl: "34px" }}
+              minHeight={{ base: "44px", xl: "34px" }}
               aria-label="More page actions"
               borderStartRadius="0"
               marginInlineStart="-1px"
@@ -89,13 +89,13 @@ function CopyPageMenu({ slug, title }: { slug: string; title: string }) {
         </Menu.Root>
       </Flex>
       {state === "failed" ? (
-        <Text as="span" fontSize="13px" color="red.fg" role="status">
+        <Text as="output" fontSize="13px" color="red.fg">
           Could not copy. Select the Markdown instead.
         </Text>
       ) : null}
-      <span className="docs-sr-only" role="status" aria-live="polite">
+      <output className="docs-sr-only" aria-live="polite">
         {state === "copied" ? `Copied ${title}` : ""}
-      </span>
+      </output>
     </Flex>
   );
 }
@@ -140,9 +140,11 @@ export function PageHeader({
           position="relative"
         >
           <Breadcrumb trail={breadcrumb} />
-          <Box className="docs-page-actions" display={{ base: "none", xl: "block" }}>
-            <CopyPageMenu slug={slug} title={title} />
-          </Box>
+          {slug !== "404" ? (
+            <Box className="docs-page-actions">
+              <CopyPageMenu slug={slug} title={title} />
+            </Box>
+          ) : null}
         </Flex>
         <Heading
           as="h1"
@@ -153,7 +155,7 @@ export function PageHeader({
           fontSize={{ base: "30px", md: "36px" }}
           lineHeight={{ base: "38px", md: "44px" }}
           letterSpacing="-0.025em"
-          paddingInlineEnd={{ base: "0", xl: "10rem" }}
+          paddingInlineEnd={{ base: "0", xl: slug === "404" ? "0" : "10rem" }}
           textWrap="pretty"
         >
           {title}
@@ -165,15 +167,12 @@ export function PageHeader({
             position="relative"
             fontSize="18px"
             lineHeight="28px"
-            color="fg.muted"
+            color="docs.lede"
             maxWidth="60ch"
           >
             {description}
           </Text>
         ) : null}
-        <Box display={{ base: "block", xl: "none" }} marginTop="6" position="relative">
-          <CopyPageMenu slug={slug} title={title} />
-        </Box>
       </Box>
     </Box>
   );

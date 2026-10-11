@@ -76,7 +76,7 @@ export function Step({
           alignItems="center"
           gap="2"
           margin="0"
-          marginBottom="6"
+          marginBottom="3"
           paddingTop="0"
           fontSize="16px"
           lineHeight="28px"
