@@ -68,7 +68,10 @@ type Stack struct {
 	WorkerMetricsPort int `json:"workerMetricsPort"`
 	// VoiceSocketPort is the worker's raw voice socket (VOICE_WS_PORT); each
 	// stack needs its own or two stacks collide on the default 3300.
-	VoiceSocketPort    int    `json:"voiceSocketPort"`
+	VoiceSocketPort int `json:"voiceSocketPort"`
+	// OutboundTLSPort is outboundsim's https listener on 127.0.0.1, under a certificate the
+	// portless CA signs: the push-service stand-in the product reaches over https by IP.
+	OutboundTLSPort    int    `json:"outboundTlsPort,omitempty"`
 	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
 	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
 	// ClickHousePostgresHost is how that server reaches host Postgres for

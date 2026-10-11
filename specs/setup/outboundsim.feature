@@ -385,3 +385,11 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       Then outboundsim answers 201 and /_sim/api/push counts the send against that device
       And a bad signature or another aud is refused 403, a missing TTL 400
       And a device named gone, or told to by PUT /_sim/api/push/<device>, answers 410 (or 404, 429)
+
+    @unit
+    Scenario: haven gives outboundsim an https listener on 127.0.0.1 for the push stand-in
+      Given the portless Local CA exists and the stack selects outbound
+      When haven plans the stack
+      Then it issues a 127.0.0.1 certificate from that CA and outboundsim serves its routes over https on a second port
+      And the overlay sets WEB_PUSH_SERVICE_BASE to https://127.0.0.1:<that port>/push unless .env names one
+      And without the CA there is no https listener and no push base

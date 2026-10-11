@@ -34,6 +34,10 @@ type Config struct {
 	MaxBodyBytes int
 	// Seed loads sample records at start (OUTBOUNDSIM_SEED=1).
 	Seed bool
+	// TLSAddr is a second, https listener (OUTBOUNDSIM_TLS_ADDR) serving the same routes
+	// under TLSCert and TLSKey (OUTBOUNDSIM_TLS_CERT, OUTBOUNDSIM_TLS_KEY, PEM files):
+	// a stand-in the product must reach over https on an IP address, such as a push service.
+	TLSAddr, TLSCert, TLSKey string
 }
 
 // LoadConfig reads outboundsim's configuration from the environment.
@@ -43,6 +47,8 @@ func LoadConfig() Config {
 		MaxRecords:   envInt("OUTBOUNDSIM_MAX_RECORDS", 5000),
 		MaxBodyBytes: envInt("OUTBOUNDSIM_MAX_BODY_BYTES", 256<<10),
 		Seed:         os.Getenv("OUTBOUNDSIM_SEED") == "1",
+		TLSAddr:      os.Getenv("OUTBOUNDSIM_TLS_ADDR"), TLSCert: os.Getenv("OUTBOUNDSIM_TLS_CERT"),
+		TLSKey: os.Getenv("OUTBOUNDSIM_TLS_KEY"),
 	}
 	if cfg.Addr == "" {
 		cfg.Addr = ":5597"
@@ -188,16 +194,43 @@ func (s *Server) Serve(ctx context.Context) error {
 		return fmt.Errorf("binding %s: %w", s.cfg.Addr, err)
 	}
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	servers := []*http.Server{srv}
+	failed, stop := make(chan error, 1), make(chan struct{})
+	if s.cfg.TLSAddr != "" {
+		tlsLn, err := lc.Listen(ctx, "tcp", s.cfg.TLSAddr)
+		if err != nil {
+			_ = ln.Close()
+			return fmt.Errorf("binding %s: %w", s.cfg.TLSAddr, err)
+		}
+		tlsSrv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
+		servers = append(servers, tlsSrv)
+		go func() {
+			if err := tlsSrv.ServeTLS(tlsLn, s.cfg.TLSCert, s.cfg.TLSKey); !errors.Is(err, http.ErrServerClosed) {
+				failed <- fmt.Errorf("https listener %s: %w", s.cfg.TLSAddr, err)
+				close(stop)
+			}
+		}()
+	}
 	go func() {
-		<-ctx.Done()
+		select {
+		case <-ctx.Done():
+		case <-stop:
+		}
 		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
+		for _, server := range servers {
+			_ = server.Shutdown(shutdownCtx)
+		}
 	}()
 	if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
-	return nil
+	select {
+	case err := <-failed:
+		return err
+	default:
+		return nil
+	}
 }
 
 // writeError answers {"error": message}, the shape the console's fetch reads.

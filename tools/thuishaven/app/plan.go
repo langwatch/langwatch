@@ -205,6 +205,9 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 	// computed before `base` feeds the ui/backend lanes (and mono's own copy)
 	// below, so a monolith checkout's one lane gets them too.
 	p.base = append(p.base, simulatorsEnv(opts.Selection, st, repoDir)...)
+	if opts.Selection.Outbound && o.proxy.CACertPath() != "" {
+		p.base = append(p.base, domain.WebPushProviderEnv(resolvedDevEnv(repoDir), st.OutboundTLSPort)...)
+	}
 	if os.Getenv(domain.NoMailKnob) == "1" {
 		p.base = append(p.base, domain.NoMailEnv()...) // after mailsim's SMTP lines, so these win
 	}
@@ -449,7 +452,7 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 		{sel.Voice, "voicesim", func() []string { return voiceEnv(st) }, func() Child { return o.voiceChild(st, repoRoot, base) }},
 		{sel.LLM, "llmsim", func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, repoRoot, base) }},
 		{sel.Analytics, "analyticssim", func() []string { return analyticsEnv(st) }, func() Child { return o.analyticsChild(st, repoRoot, base) }},
-		{sel.Outbound, "outboundsim", func() []string { return outboundEnv(st) }, func() Child { return o.outboundChild(st, repoRoot, base) }},
+		{sel.Outbound, "outboundsim", func() []string { return outboundEnv(st, o.proxy.CACertPath()) }, func() Child { return o.outboundChild(st, repoRoot, base) }},
 		{sel.Payment, "paymentsim", func() []string { return paymentEnv(st, repoRoot) }, func() Child { return o.paymentChild(st, repoRoot, base) }},
 		{sel.Telemetry, "telemetrysim", func() []string { return telemetryEnv(st) }, func() Child { return o.telemetryChild(st, repoRoot, base) }},
 		{sel.Lambda, "lambdasim", func() []string { return lambdaEnv(st) }, func() Child { return o.lambdaChild(st, repoRoot, base) }},

@@ -148,7 +148,9 @@ Fault channels `aws`, `azure`, `push`. `haven up +outbound` sets, unless .env na
 `MANAGED_BEDROCK_STS_BASE=<direct>/sts` (managed-provider module: both role hops),
 `AZURE_BLOB_ENDPOINT=<outbound>/azure-blob/<AZURE_BLOB_ACCOUNT_NAME or simaccount>` and
 `AZURE_BLOB_AUTHORITY_HOST=<outbound>/azure-login` (object storage; inert unless
-`STORED_OBJECTS_BACKEND=azure`). `WEB_PUSH_SERVICE_BASE` (notification module) is not set: see NOTIF-09.
+`STORED_OBJECTS_BACKEND=azure`), and `WEB_PUSH_SERVICE_BASE=https://127.0.0.1:<tls port>/push`
+(notification module): haven issues outboundsim a 127.0.0.1 certificate from the portless CA and
+it serves the same routes over https on a second port (`outboundTlsPort` in `haven status --json`).
 
 - `sts.go`: `POST /sts/` AssumeRole (SigV4 header required, never verified) answers fresh session
   credentials; a role ARN holding `denied` is 403 AccessDenied.
@@ -175,5 +177,7 @@ Tester recipes:
   IDENTITY_ENDPOINT=<direct>/azure-msi/token IDENTITY_HEADER=sim` (token mode, refresh). Upload a
   dataset, open it, delete it; `GET /_sim/api/azure` shows the blob come and go. Wrong account: the
   `otheraccount` key against `simaccount` (or a name outboundsim does not hold) is denied.
-- NOTIF-09: needs an https push origin the API trusts on an IP literal (blocked, see the fl-cloud
-  handoff). Until then: `POST /push/<device>` with web-push's own request proves the stand-in side.
+- NOTIF-09: subscribe through the product API with endpoint `<WEB_PUSH_SERVICE_BASE>/<device>`
+  and any p256dh/auth keys (one row per device; an `http://` or unknown host is refused). Trigger a
+  push (a Langy turn finishing): `GET /_sim/api/push` shows one send per device. A device named
+  `...gone...` answers 410 and its subscription is deleted.
