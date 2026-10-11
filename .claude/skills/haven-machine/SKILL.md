@@ -24,6 +24,18 @@ forwarded. Knobs: `CHECK_SLOTS`, `CHECK_PRESSURE`, `HAVEN_TYPECHECK_SLOTS`,
 `HAVEN_TYPECHECK_MAX_RSS_MB` (kills a run over 6 GiB or 10 minutes), `HAVEN_TEST_WORKERS`,
 `HAVEN_SLOT_HELD` (set inside a run: already admitted). See `haven-env`.
 
+## Machine settings
+
+```bash
+haven machine settings                                   # list: observability, runtime-auto-stop, runtime-idle-grace-minutes
+haven machine settings set observability off             # stop the o11y stack now; the daemon keeps it down, stacks get no OTLP env
+haven machine settings set runtime-auto-stop on          # stop the colima VM (whoever started it) once unused for the grace
+haven machine settings set runtime-idle-grace-minutes 15 # 1..1440, default 10; `unset <name>` restores a default
+```
+
+Saved in haven's home (`machine-settings.json`); the hub's Settings page has the same toggles.
+Auto-stop never stops the VM while any container runs on it. Docker Desktop is not stopped.
+
 ## The gate
 
 `haven gate` answers a coding-agent PreToolUse hook on stdin (`--client claude`, the default, or

@@ -53,6 +53,6 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 
 ```
 haven sim mail address | status | list [--to] [--subject] | get <id> [--html] | links <id>
-haven sim mail fault --error <0|4xx|5xx>         # SMTP sends refused with that reply code (4xx retry, 5xx permanent); 0 clears it
+haven sim mail fault <4xx|5xx|off>               # SMTP sends refused with that reply code (4xx retry, 5xx permanent); off clears it
 haven sim mail wait [--to] [--subject] [--after <id>] [--timeout 30s] | delete <id> | clear
 ```

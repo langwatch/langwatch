@@ -177,6 +177,23 @@ describe("the migration pass under its cohort rules", () => {
     });
   });
 
+  describe("given a self-hosted installation that enrolled no organization", () => {
+    /** @scenario "Enrollment does not apply to self-hosted installations" */
+    it("processes every organization without consulting enrollment", async () => {
+      const migration = migrationOf({ name: "selfhosted", runsAutomaticallyOnSelfHosted: true });
+
+      await passOn({
+        isSaaS: false,
+        tenants: ["acme", "globex"],
+        enrolled: new Map(),
+        migrations: [migration],
+        state: new InMemoryStateRepository(),
+      });
+
+      expect(migration.migrateTenant).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("given a release that declares the migration ready for self-hosting", () => {
     /** @scenario "A release that turns a migration on for self-hosting makes it run on the next pass" */
     it("drives it for every organization on the next pass", async () => {

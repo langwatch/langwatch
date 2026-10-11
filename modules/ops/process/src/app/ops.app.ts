@@ -237,8 +237,7 @@ import {
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
   type OpsUpgradeListTenantsInput,
-  type OpsUpgradePreview,
-  type OpsUpgradePreviewInput,
+  type OpsUpgradeAttentionNotice,
   type OpsUpgradeReleasePage,
   type OpsUpgradeRun,
   type OpsUpgradeRunPage,
@@ -848,6 +847,7 @@ export class OpsModule implements OpsApi {
         clickhouse: repositories.clickhouseHealth,
         redis: repositories.redisHealth,
         upgradeLedger: repositories.upgradeLedger,
+        cloudLatestRelease: repositories.cloudLatestRelease,
       },
       channels: setup.channels,
       // Read only when a report is taken, by which time `app` below exists.
@@ -874,11 +874,6 @@ export class OpsModule implements OpsApi {
       collectBackups: setup.config.collectClickHouseBackupMetrics,
       logger,
     });
-
-    const { adminEmails } = setup.config;
-    for (const warning of PlatformOperatorsService.bootWarnings({ adminEmails })) {
-      logger.warn(warning);
-    }
 
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
@@ -955,7 +950,13 @@ export class OpsModule implements OpsApi {
         }),
       }),
       checkup: setup.checkup,
-      upgrades: OpsUpgradeService.create({ ledger: repositories.upgradeLedger }),
+      upgrades: OpsUpgradeService.create({
+        ledger: repositories.upgradeLedger,
+        routes: repositories.clickhouseRoutes,
+        // A process without the checkup cannot tell self-hosted apart, so it tells no member.
+        isSaas: setup.checkup?.isSaas ?? true,
+        ...(setup.checkup ? { cloudReleases: setup.checkup.usageReports } : {}),
+      }),
       anomalies: setup.anomalies,
       storageStats: setup.storageStats,
       groupQueueReaper: GroupQueueReaperService.create({
@@ -1674,7 +1675,7 @@ export class OpsModule implements OpsApi {
   }
 
   /** One pass of `ops_system_migrations`, on the worker hosting it; not on {@link OpsApi}. */
-  executeSystemMigrationPass(input: { redrive: boolean }): Promise<void> {
+  executeSystemMigrationPass(input: { redrive: boolean; followUp: boolean }): Promise<void> {
     return this.#dependencies.systemMigrations.executePass(input);
   }
 
@@ -1950,6 +1951,10 @@ export class OpsModule implements OpsApi {
     return this.#dependencies.upgrades.getStatus();
   }
 
+  getUpgradeAttentionNotice(): Promise<OpsUpgradeAttentionNotice> {
+    return this.#dependencies.upgrades.getAttentionNotice();
+  }
+
   listUpgradeReleases(): Promise<OpsUpgradeReleasePage> {
     return this.#dependencies.upgrades.listReleases();
   }
@@ -1968,10 +1973,6 @@ export class OpsModule implements OpsApi {
 
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun> {
     return this.#dependencies.upgrades.getRun(input);
-  }
-
-  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview> {
-    return this.#dependencies.upgrades.preview(input);
   }
 
   listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]> {
@@ -2048,9 +2049,16 @@ export class OpsModule implements OpsApi {
     return this.#platformOperators().seedFromAdminEmails({ settings: operatorSeed, dryRun });
   }
 
+  /** user's created fact: a self-hosted install's first user is recorded as the seed's decision. */
+  grantFirstUserPlatformOperator(input: { userId: string; backfilled: boolean }): Promise<boolean> {
+    const { operatorSeed } = this.#dependencies;
+    if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");
+    return this.#platformOperators().grantFirstUser({ ...input, settings: operatorSeed });
+  }
+
   /** The grants `ops_platform_operator_seed`'s recorded decision asks for, as the system. */
   grantSeededPlatformOperators(decision: {
-    via: "admin-emails" | "sole-organization-admin" | "none";
+    via: "admin-emails" | "sole-organization-admin" | "first-user" | "none";
     userIds: string[];
   }): Promise<void> {
     return this.#platformOperators().grantSeeded(decision);
@@ -2062,7 +2070,7 @@ export class OpsModule implements OpsApi {
       send(input: {
         tenantId: string;
         occurredAt: number;
-        via: "admin-emails" | "sole-organization-admin" | "none";
+        via: "admin-emails" | "sole-organization-admin" | "first-user" | "none";
         userIds: string[];
       }): Promise<unknown>;
     };

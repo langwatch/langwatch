@@ -4,6 +4,7 @@
  *           specs/model-providers/model-default-config-cascade.feature.
  */
 import type { WireOf } from "@langwatch/api/web";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -168,21 +169,17 @@ export function DefaultModelsSection({
         </Button>
       </HStack>
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingX={0} paddingY={0} overflowX="auto">
-          <AllConfigsView
-            configs={visibleConfigs}
-            allConfigs={data.configs}
-            features={data.features}
-            hierarchy={hierarchy}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onAdd={openAdd}
-            enabledProviderKeys={enabledProviderKeys}
-            displayNames={displayNames}
-          />
-        </Card.Body>
-      </Card.Root>
+      <AllConfigsView
+        configs={visibleConfigs}
+        allConfigs={data.configs}
+        features={data.features}
+        hierarchy={hierarchy}
+        onEdit={openEdit}
+        onDelete={handleDelete}
+        onAdd={openAdd}
+        enabledProviderKeys={enabledProviderKeys}
+        displayNames={displayNames}
+      />
     </VStack>
   );
 }
@@ -227,32 +224,34 @@ function AllConfigsView({
 }) {
   if (configs.length === 0) {
     return (
-      <EmptyState.Root width="full" paddingY={10}>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <SlidersHorizontal size={24} />
-          </EmptyState.Indicator>
-          <VStack textAlign="center" gap={2}>
-            <EmptyState.Title>No default models configured</EmptyState.Title>
-            <EmptyState.Description>
-              Define a default model for prompt creation, evaluations, traces search, topic
-              clustering and more.
-            </EmptyState.Description>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onAdd}
-              data-testid="empty-state-add-config"
-            >
-              Select default models
-            </Button>
-          </VStack>
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <Card.Root width="full" overflow="hidden">
+        <EmptyState.Root width="full" paddingY={10}>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <SlidersHorizontal size={24} />
+            </EmptyState.Indicator>
+            <VStack textAlign="center" gap={2}>
+              <EmptyState.Title>No default models configured</EmptyState.Title>
+              <EmptyState.Description>
+                Define a default model for prompt creation, evaluations, traces search, topic
+                clustering and more.
+              </EmptyState.Description>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onAdd}
+                data-testid="empty-state-add-config"
+              >
+                Select default models
+              </Button>
+            </VStack>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      </Card.Root>
     );
   }
   return (
-    <Table.Root variant="line" size="md" width="full">
+    <ListTable size="md" width="full">
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Scopes</Table.ColumnHeader>
@@ -343,7 +342,7 @@ function AllConfigsView({
           </Table.Row>
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }
 
@@ -494,37 +493,33 @@ function ScopeChip({ type, name }: { type: ModelProviderScopeType; name: string 
 
 function DefaultModelsTableSkeleton() {
   return (
-    <Card.Root width="full" overflow="hidden" data-testid="default-models-table-skeleton">
-      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-              {MODEL_ROLES.map((role) => (
-                <Table.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</Table.ColumnHeader>
-              ))}
-              <Table.ColumnHeader textAlign="right" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {[0, 1, 2].map((index) => (
-              <Table.Row key={index}>
-                <Table.Cell>
-                  <Skeleton width="100px" height="20px" borderRadius="full" />
-                </Table.Cell>
-                {MODEL_ROLES.map((role) => (
-                  <Table.Cell key={role}>
-                    <Skeleton width="160px" height="16px" />
-                  </Table.Cell>
-                ))}
-                <Table.Cell textAlign="right">
-                  <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
-                </Table.Cell>
-              </Table.Row>
+    <ListTable size="md" width="full" data-testid="default-models-table-skeleton">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+          {MODEL_ROLES.map((role) => (
+            <Table.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</Table.ColumnHeader>
+          ))}
+          <Table.ColumnHeader textAlign="right" />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {[0, 1, 2].map((index) => (
+          <Table.Row key={index}>
+            <Table.Cell>
+              <Skeleton width="100px" height="20px" borderRadius="full" />
+            </Table.Cell>
+            {MODEL_ROLES.map((role) => (
+              <Table.Cell key={role}>
+                <Skeleton width="160px" height="16px" />
+              </Table.Cell>
             ))}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+            <Table.Cell textAlign="right">
+              <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
+            </Table.Cell>
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </ListTable>
   );
 }

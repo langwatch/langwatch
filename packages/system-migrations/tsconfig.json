@@ -13,24 +13,18 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     // Consumers import the TypeScript sources directly (see the package's
     // `exports`), so this project only ever type-checks - nothing is built.
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  // Tests are checked by tsconfig.test.json, which adds the vitest globals
-  // this project does not need.
-  "exclude": ["src/__tests__/**"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

@@ -1,6 +1,7 @@
 import type { MetricRequestCollectionResult } from "@langwatch/metric-contract";
+import type { OtlpIngestCredential } from "@langwatch/otlp/door";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { OtlpIngestCredential, TraceApi } from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { otlpMetricAnswer } from "../../rules/otlp-metric-answer.rules.ts";

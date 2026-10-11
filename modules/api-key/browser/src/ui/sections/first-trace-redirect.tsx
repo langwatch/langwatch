@@ -8,8 +8,8 @@ import { CheckCircle2 } from "lucide-react";
 
 import { useFirstTraceWatch } from "../../behavior/use-first-trace-watch.ts";
 
-export function FirstTraceRedirect() {
-  const watchState = useFirstTraceWatch();
+export function FirstTraceRedirect({ organizationId }: { organizationId: string }) {
+  const watchState = useFirstTraceWatch({ organizationId });
 
   if (watchState === "redirecting") {
     return (

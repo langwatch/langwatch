@@ -4,6 +4,7 @@ import {
   type DataPrivacyConfig,
 } from "@langwatch/data-privacy-contract";
 import { generate } from "@langwatch/ksuid";
+import { type OtlpKeyValue } from "@langwatch/otlp/trace-request";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { mintTestAuthorization } from "@langwatch/test-harness/trpc-members";
@@ -14,7 +15,7 @@ import { mintTestAuthorization } from "@langwatch/test-harness/trpc-members";
  * @vitest-environment node
  * @see specs/data-privacy/content-drop.feature
  */
-import { TraceApi, type OtlpKeyValue, type RecordSpanCommandData } from "@langwatch/trace-contract";
+import { TraceApi, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { bootLiveWorker, liveStoresConfigured, type LiveWorker } from "./worker-live.fixture.ts";

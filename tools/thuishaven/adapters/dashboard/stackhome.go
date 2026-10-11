@@ -40,9 +40,7 @@ type stackHomeJSON struct {
 	Errors      []laneErrorsJSON `json:"errors"`
 	Credentials credentialsJSON  `json:"credentials"`
 	Actions     stackActionsJSON `json:"actions"`
-	// BelowFloor is the upgrade gate's refusal while it holds the api, else "".
-	BelowFloor string   `json:"belowFloor"`
-	Seed       seedJSON `json:"seed"`
+	Seed        seedJSON         `json:"seed"`
 }
 
 // seedJSON is the seed console: the sizes and personas `haven db seed` takes, the
@@ -128,10 +126,8 @@ type stackActionsJSON struct {
 	CanRestart bool   `json:"canRestart"`
 	CanStart   bool   `json:"canStart"`
 	StartDir   string `json:"startDir"`
-	// CanStartService offers Start on Not selected rows; CanResetDatabases the
-	// below-floor callout's reset.
-	CanStartService   bool `json:"canStartService"`
-	CanResetDatabases bool `json:"canResetDatabases"`
+	// CanStartService offers Start on Not selected rows.
+	CanStartService bool `json:"canStartService"`
 }
 
 // IdPTenant is one tenant of the IdP simulator a stack routes to.
@@ -261,11 +257,9 @@ func (s *Server) handleStackHome(w http.ResponseWriter, r *http.Request) {
 			CanStart:   !h.live && s.config.Actions.Start != nil && st.WorktreeDir != "",
 			StartDir:   st.WorktreeDir,
 
-			CanStartService:   h.live && s.config.Actions.StartService != nil,
-			CanResetDatabases: registered && s.config.Actions.ResetDatabases != nil,
+			CanStartService: h.live && s.config.Actions.StartService != nil,
 		},
-		BelowFloor: floorRefusal(surfaces, tails, st.Layout),
-		Seed:       s.seed(slug, h.live),
+		Seed: s.seed(slug, h.live),
 	})
 }
 
@@ -282,25 +276,6 @@ func (s *Server) seed(slug string, live bool) seedJSON {
 		}
 	}
 	return out
-}
-
-// floorRefusal is the upgrade gate's refusal (code refused_below_floor) from
-// the api's lanes while the api is not live, its msg field when it has one.
-func floorRefusal(surfaces []surfaceJSON, tails map[string][]logLine, layout domain.Layout) string {
-	for _, sf := range surfaces {
-		if sf.Name != domain.APIService || sf.Status == statusLive {
-			continue
-		}
-		for _, lane := range surfaceLanes(sf.Name, layout) {
-			if line, ok := newestMentioning(tails[lane], "refused_below_floor"); ok {
-				if rec, parsed := logfmt.Parse(line.Text); parsed && rec.Message != "" {
-					return rec.Message
-				}
-				return line.Text
-			}
-		}
-	}
-	return ""
 }
 
 func newestMentioning(lines []logLine, needle string) (logLine, bool) {

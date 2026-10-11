@@ -18,7 +18,7 @@
 -- each browser subscribes again, and dropping the key pair makes every
 -- existing browser subscription unusable.
 
-CREATE TABLE "WebPushSubscription" (
+CREATE TABLE IF NOT EXISTS "WebPushSubscription" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "endpoint" TEXT NOT NULL,
@@ -31,11 +31,11 @@ CREATE TABLE "WebPushSubscription" (
     CONSTRAINT "WebPushSubscription_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "WebPushSubscription_endpoint_key" ON "WebPushSubscription"("endpoint");
+CREATE UNIQUE INDEX IF NOT EXISTS "WebPushSubscription_endpoint_key" ON "WebPushSubscription"("endpoint");
 
-CREATE INDEX "WebPushSubscription_userId_idx" ON "WebPushSubscription"("userId");
+CREATE INDEX IF NOT EXISTS "WebPushSubscription_userId_idx" ON "WebPushSubscription"("userId");
 
-CREATE TABLE "WebPushVapidKey" (
+CREATE TABLE IF NOT EXISTS "WebPushVapidKey" (
     "id" TEXT NOT NULL DEFAULT 'self',
     "publicKey" TEXT NOT NULL,
     "privateKeyEncrypted" TEXT NOT NULL,

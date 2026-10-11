@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Actions are the lifecycle operations the dashboard may perform. Both are
@@ -23,10 +22,9 @@ type Actions struct {
 	// Down stops a stack and keeps its databases; Destroy also drops them.
 	Down    func(ctx context.Context, slug string) error
 	Destroy func(ctx context.Context, slug string) error
-	// StartService adds one service to a running stack (`haven up +<service>`);
-	// ResetDatabases runs `haven db reset --yes` for it. Both return once spawned.
-	StartService   func(slug, service string) error
-	ResetDatabases func(slug string) error
+	// StartService adds one service to a running stack (`haven up +<service>`)
+	// and returns once spawned.
+	StartService func(slug, service string) error
 	// Seed runs `haven db seed --size <size> --persona <persona>` for a stack and
 	// returns once spawned; SeedReport is its status line and log tail.
 	Seed       func(slug, size, persona string) error
@@ -194,37 +192,6 @@ func (s *Server) handleStartService(w http.ResponseWriter, r *http.Request) {
 	}
 	service := r.URL.Query().Get("service")
 	writeActionResult(w, "restarting "+slug+" with "+service+" — it appears here as it comes up", s.config.Actions.StartService(slug, service))
-}
-
-// handleResetDatabases gives a stack fresh databases: `haven db reset --yes`.
-// The body must repeat the database name, the name `haven db reset` asks for
-// on the shared database, so a stray POST cannot drop anything.
-func (s *Server) handleResetDatabases(w http.ResponseWriter, r *http.Request) {
-	if !guardAction(w, r) {
-		return
-	}
-	if s.config.Actions.ResetDatabases == nil {
-		http.Error(w, "this haven cannot reset a stack's databases", http.StatusNotImplemented)
-		return
-	}
-	slug := r.PathValue("slug")
-	if !s.knownLogStack(slug) {
-		http.Error(w, "unknown stack", http.StatusNotFound)
-		return
-	}
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxActionBody))
-	if err != nil {
-		http.Error(w, "could not read the request", http.StatusBadRequest)
-		return
-	}
-	var req struct {
-		Confirm string `json:"confirm"`
-	}
-	if jerr := json.Unmarshal(body, &req); jerr != nil || req.Confirm != domain.DatabaseForSlug(slug) {
-		http.Error(w, "type the database name to confirm resetting it", http.StatusBadRequest)
-		return
-	}
-	writeActionResult(w, "resetting "+slug+"'s databases: migrating and seeding them fresh", s.config.Actions.ResetDatabases(slug))
 }
 
 // handleSeed is the seed console's start: `haven db seed` at the chosen size and

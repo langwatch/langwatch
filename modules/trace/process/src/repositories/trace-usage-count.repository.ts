@@ -1,14 +1,18 @@
 import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
-/** One project's distinct traces over a UTC window, read from the trace_summaries projection. */
+/** Per-project trace counts read from the trace_summaries projection. */
 export abstract class TraceUsageCountRepository {
-  abstract countDistinctTraces(input: {
+  /**
+   * One page of the trace ids whose summary was first written in `[fromMs, toMs)`, in id order
+   * after `afterTraceId`; a trace first seen before `fromMs` is not listed.
+   */
+  abstract findTraceIdsFirstSeen(input: {
     tenantId: string;
-    /** UTC ClickHouse DateTime64(3): `YYYY-MM-DD HH:mm:ss.SSS`, inclusive. */
-    startDate: string;
-    /** UTC ClickHouse DateTime64(3): `YYYY-MM-DD HH:mm:ss.SSS`, exclusive. */
-    endDate: string;
-  }): Promise<number>;
+    fromMs: number;
+    toMs: number;
+    afterTraceId: string;
+    limit: number;
+  }): Promise<string[]>;
   abstract countTracesInLastDay(input: { tenantId: string }): Promise<number>;
   abstract hasTraceWithAttribute(input: {
     tenantId: string;

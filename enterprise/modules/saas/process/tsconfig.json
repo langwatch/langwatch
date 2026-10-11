@@ -8,51 +8,18 @@
     "lib": ["es2023"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../licensing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/eventing/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/ops/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/process-stores/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

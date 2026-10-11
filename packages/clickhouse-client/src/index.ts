@@ -37,6 +37,7 @@ export {
 export type {
   ClickHouseConfiguration,
   ClickHouseConfigurationInput,
+  ClickHouseMalformedRouteConfiguration,
   ClickHousePrivateRouteConfiguration,
   ClickHouseSharedConfiguration,
 } from "./config.ts";
@@ -119,6 +120,10 @@ export type {
 } from "./retry.ts";
 export { RetryPolicy, runWithRetry } from "./retry.ts";
 export type {
+  PrivateRouteProblem,
+  PrivateRouteRefusal,
+  PrivateRouteVariable,
+  RecordedPrivateDataplane,
   RoutingTable,
   TenantDirectory,
   TenantRoute,
@@ -131,6 +136,10 @@ export {
   PLATFORM_TENANT,
   PRIVATE_ROUTE_ENV_PREFIX,
   parseRoutingTable,
+  PrivateRouteRefusalFactory,
+  PrivateRouteUnavailableError,
+  privateRouteNameOf,
+  privateRouteVariableOf,
   UnknownTenantError,
 } from "./tenancy.ts";
 export type {

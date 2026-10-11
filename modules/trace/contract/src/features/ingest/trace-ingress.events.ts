@@ -1,8 +1,12 @@
 import type { Named } from "@langwatch/module";
+import {
+  instrumentationScopeSchema,
+  resourceSchema,
+  spanSchema,
+} from "@langwatch/otlp/trace-request";
 import { z } from "zod";
 
 import { SPAN_RECEIVED_EVENT_TYPE } from "../../trace.constants.ts";
-import { instrumentationScopeSchema, resourceSchema, spanSchema } from "../../trace.otlp.ts";
 import { piiRedactionLevelSchema } from "./trace-processing.commands.ts";
 
 /** Portable envelope for Trace's durable raw ingress fact. */

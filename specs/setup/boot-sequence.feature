@@ -24,15 +24,14 @@ Feature: The stack migrates once, quietly, under a lock
 
   # --- One process, in order ---
 
-  # `pnpm -s task prisma-migrate clickhouse-migrate lwql-provision` — one
-  # invocation, one secret resolution, one config parse, three tasks in the
-  # order they are named. LangWatchQL provisioning reads both schemas, so it
-  # cannot run before either.
+  # `pnpm -s task lwql-provision system-migrations-pass`: one invocation,
+  # one secret resolution, one config parse, the tasks in the order named.
+  # Schema migrations are not tasks; only `pnpm task upgrade` applies them.
   @unit
   Scenario: Several task names in one invocation run in one process
-    Given a runner asked for the three preparation tasks at once
+    Given a runner asked for two preparation tasks at once
     When the invocation is read
-    Then all three are recognised as tasks to run, in the order given
+    Then both are recognised as tasks to run, in the order given
     And no arguments are left over for any of them
 
   @unit

@@ -399,6 +399,8 @@ export function activeTraceContext(): { traceId?: string; spanId?: string } {
 export const TRANSIENT_REFUSAL_CODES = [
   "clickhouse_overloaded",
   "connect_credential_pending",
+  // Kept through the mask so the refused organization reads why (T7-F3, Alex 2026-10-11).
+  "private_dataplane_unavailable",
   "service_unavailable",
   "upgrade_in_progress",
 ] as const satisfies readonly AppErrorCode[];

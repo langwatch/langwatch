@@ -2,6 +2,10 @@ import { Box, SimpleGrid, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
+  Azure,
+  DSPy,
+  Python,
+  TypeScript,
   AnthropicIcon,
   AWSIcon,
   CustomIcon,
@@ -22,6 +26,10 @@ import {
  * the monochrome ones stay readable on a dark surface.
  */
 const MARKS = [
+  { name: "Azure", icon: <Azure />, monochrome: false },
+  { name: "DSPy", icon: <DSPy />, monochrome: false },
+  { name: "Python", icon: <Python />, monochrome: false },
+  { name: "TypeScript", icon: <TypeScript />, monochrome: false },
   { name: "Anthropic", icon: <AnthropicIcon />, monochrome: true },
   { name: "Amazon Web Services", icon: <AWSIcon />, monochrome: false },
   { name: "Custom", icon: <CustomIcon />, monochrome: true },

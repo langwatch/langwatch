@@ -931,7 +931,10 @@ export function createCanonicalFamilyErrorHandler(options: {
   return async (error, c) => {
     const { status, body } = mapError(error, c);
 
-    logger[body.code === "upgrade_in_progress" ? "warn" : "error"](
+    // The stores log a refused private dataplane once at error, never per request.
+    const expected =
+      body.code === "upgrade_in_progress" || body.code === "private_dataplane_unavailable";
+    logger[expected ? "warn" : "error"](
       {
         path: c.req.path,
         method: c.req.method,

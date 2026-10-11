@@ -274,7 +274,8 @@ model User {
 model VerificationToken {
   id         String   @id @default(nanoid())
   identifier String
-  token      String   @unique
+  /// Not unique alone: better-auth stores plain values here (a user id, a counter). See WEB-19201.
+  token      String
   expires    DateTime
   createdAt  DateTime @default(now())
   updatedAt  DateTime @default(now()) @updatedAt
@@ -1116,6 +1117,10 @@ model Team {
 model Organization {
   id                         String               @id @default(nanoid())
   name                       String
+  /// `customer` for every organization a person founds or an operator provisions; `system` for
+  /// the install's one hidden organization the Ops checkup canaries run in, never listed to a person.
+  /// Spec: modules/ops/specs/checkup-canary-project.feature.
+  kind                       String               @default("customer")
   phoneNumber                String?
   slug                       String               @unique
   members                    OrganizationUser[]
@@ -1129,6 +1134,15 @@ model Organization {
   /// organization, in mebibytes. Null means the default. Set by an operator
   /// from the back office only; every other dataset size limit scales with it.
   datasetAttachmentMaxMb     Int?
+  /// The label of this organization's `CLICKHOUSE_URL__<label>__<id>` route, recorded by the
+  /// organization module the first time it is seen. Once set, a missing route refuses the
+  /// organization instead of serving it from the shared ClickHouse. Null: never private.
+  /// Spec: specs/private-dataplane/clickhouse-routing.feature.
+  privateClickHouseLabel     String?
+  /// The same for `DATAPLANE_S3__<label>__<id>`. Spec: specs/private-dataplane/s3-routing.feature.
+  privateS3Label             String?
+  /// When either label was first recorded.
+  privateDataplaneSeenAt     DateTime?
   /// Phase 8 - admin-configurable max lifetime for CLI device-flow
   /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
   /// gh-style flows). Companies that need finite session lifetime
@@ -1318,7 +1332,10 @@ model IssuedLicense {
   email            String
   planType         String
   maxMembers       Int
-  maxMembersLite   Int
+  /// The lite seats sold: null when not stated or when unlimited. Never a stand-in number.
+  maxMembersLite   Int?
+  /// True when the license sells unlimited lite seats; maxMembersLite is then null.
+  liteSeatsUnlimited Boolean   @default(false)
   issuedAt         DateTime
   expiresAt        DateTime
 
@@ -1415,7 +1432,10 @@ model ActivationCode {
   email            String
   planType         String
   maxMembers       Int
-  maxMembersLite   Int      @default(0)
+  /// The lite seats the minted license carries: null when unlimited. Never a stand-in number.
+  maxMembersLite   Int?     @default(0)
+  /// True when the minted license carries unlimited lite seats; maxMembersLite is then null.
+  liteSeatsUnlimited Boolean @default(false)
   /// How long the license this code mints runs for.
   licenseTermDays  Int
   /// Hosted services the minted license may call.
@@ -7022,4 +7042,16 @@ model WebPushVapidKey {
   /// The private key, base64url, encrypted with the process encryption key.
   privateKeyEncrypted String
   createdAt           DateTime @default(now())
+}
+
+model SignInProviderMount {
+  /// Fixed, so this table holds one row: licensing's copy of sso's sign-in
+  /// provider fact (ADR-179).
+  id                 String   @id @default("self")
+  /// The configured provider's name; null when the deployment signs in by email.
+  provider           String?
+  mounted            Boolean
+  /// The last sso event applied: the row's idempotency guard and its version.
+  lastAppliedEventId String
+  updatedAt          DateTime @default(now()) @updatedAt
 }

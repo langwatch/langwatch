@@ -21,7 +21,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.test.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },

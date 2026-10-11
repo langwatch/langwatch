@@ -64,6 +64,7 @@ import {
   type FindGoverningConnections,
   type SessionMintClaims,
   type SignUpPolicy,
+  toConcretePath,
 } from "./http.better-auth-hooks.channel.ts";
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
 import type { IdTokenIssuerRefusalChannel } from "./http.id-token-issuer-refusal.channel.ts";
@@ -134,6 +135,17 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
  */
 function refuseDirectEmailSignUp(pathname: string): void {
   if (!pathname.endsWith("/sign-up/email")) return;
+
+  throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+}
+
+/**
+ * Seals the plugin's raw `/two-factor/disable`: turning it off belongs to identity's
+ * `twoStepVerification.disable`, which refuses where an organization requires it and
+ * re-proves a current code. Server-side calls carry no request URL and pass.
+ */
+export function refuseDirectTwoStepDisable(pathname: string): void {
+  if (!pathname.endsWith("/two-factor/disable")) return;
 
   throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
 }
@@ -309,6 +321,7 @@ function createBeforeRequestHook({
 
     await refuseLockedOutAddress({ pathname, body: ctx.body, signInLockout });
     refuseDirectEmailSignUp(pathname);
+    refuseDirectTwoStepDisable(pathname);
     await runSignInRouterShadow({ pathname, url, body: ctx.body, shadow });
 
     await refuseConnectionGovernedReset({ pathname, body: ctx.body, addressRoutesToConnection });
@@ -350,6 +363,36 @@ function createBeforeRequestHook({
       });
     }
   };
+}
+
+type CallbackEvidenceArgs = {
+  evidence: SessionMintClaims["evidence"];
+  account: Partial<Record<"providerId" | "accountId" | "idToken", unknown>>;
+  context: { path?: string; params?: Record<string, string | undefined> } | null | undefined;
+};
+
+/**
+ * What an Auth0 or Okta callback proved, kept for the session it is about to mint: the
+ * verified ID token first, then the account it accepted (main's database hooks).
+ */
+export function recordCallbackEvidence({ evidence, account, context }: CallbackEvidenceArgs): void {
+  if (typeof account.providerId !== "string") return;
+  evidence.recordVerifiedCallbackToken({
+    providerId: account.providerId,
+    path: context?.path === undefined ? undefined : toConcretePath(context.path, context.params),
+    verifiedIdToken: typeof account.idToken === "string" ? account.idToken : undefined,
+  });
+  recordCallbackAccount({ evidence, account, context });
+}
+
+/** The written account row: a sign-in's update carries no accountId until after it lands. */
+export function recordCallbackAccount({ evidence, account, context }: CallbackEvidenceArgs): void {
+  if (typeof account.providerId !== "string" || typeof account.accountId !== "string") return;
+  evidence.recordAuthenticatedCallbackAccount({
+    providerId: account.providerId,
+    providerAccountId: account.accountId,
+    path: context?.path === undefined ? undefined : toConcretePath(context.path, context.params),
+  });
 }
 
 /**
@@ -610,6 +653,7 @@ export const createAuthOptions = ({
             findGoverningConnections,
             linkProposals: hooks.linkProposals,
           })(account, context);
+          recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
@@ -617,7 +661,8 @@ export const createAuthOptions = ({
           const pin = await identity.createAccountIdentifier(account);
           return pin.pinned ? { data: pin.data } : undefined;
         },
-        after: async (account) => {
+        after: async (account, context) => {
+          recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
           if (!account.userId || !account.providerId || !account.accountId) return;
           await afterAccountCreate({
             repo,
@@ -631,7 +676,12 @@ export const createAuthOptions = ({
         },
       },
       update: {
-        after: async (account) => {
+        before: async (account, context) => {
+          recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
+          return undefined;
+        },
+        after: async (account, context) => {
+          recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
           // BetterAuth refreshes tokens on the linked Account row on every
           // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
           // for users whose correct-provider account is already linked.

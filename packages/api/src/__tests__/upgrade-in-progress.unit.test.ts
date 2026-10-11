@@ -22,6 +22,20 @@ import { createApiDouble } from "./api-double.ts";
 const schemaBehind = (code: string) =>
   Object.assign(new Error("The table `public.NewThing` does not exist"), { code });
 
+/** Shaped as Prisma 7.10 raises a failed `$queryRaw`: P2010 over the adapter-pg driver error. */
+const rawQueryFailed = ({ originalCode, kind }: { originalCode: string; kind: string }) => {
+  const driverAdapterError = Object.assign(new Error(kind), {
+    name: "DriverAdapterError",
+    cause: { originalCode, originalMessage: 'relation "NewThing" does not exist', kind },
+  });
+  return Object.assign(
+    new Error(
+      `Raw query failed. Code: \`${originalCode}\`. Message: \`relation "NewThing" does not exist\``,
+    ),
+    { code: "P2010", meta: { driverAdapterError } },
+  );
+};
+
 async function restAnswerFor(failure: unknown): Promise<Response> {
   const app = new Hono();
   app.get("/read", () => {
@@ -155,4 +169,73 @@ describe("a Postgres read the schema is not ready for once the gate admitted", (
       );
     },
   );
+});
+
+describe("a raw SQL read the schema is not ready for", () => {
+  afterEach(() => setLedgerCurrent({ current: false }));
+
+  describe("when Prisma reports the failed raw query as P2010", () => {
+    /** @scenario "A raw SQL read the schema is not ready for answers upgrade_in_progress" */
+    it.each([
+      { originalCode: "42P01", kind: "TableDoesNotExist" },
+      { originalCode: "42703", kind: "ColumnNotFound" },
+    ])("answers $originalCode as 503 upgrade_in_progress with Retry-After", async (failure) => {
+      const response = await restAnswerFor(rawQueryFailed(failure));
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Retry-After")).toBe("10");
+      expect(await response.json()).toMatchObject({ code: "upgrade_in_progress" });
+    });
+  });
+
+  describe("when a repository wraps the failure in its own error", () => {
+    /** @scenario "A raw SQL read the schema is not ready for answers upgrade_in_progress" */
+    it("finds the code down the cause chain", async () => {
+      const wrapped = new Error("listing things failed", {
+        cause: rawQueryFailed({ originalCode: "42P01", kind: "TableDoesNotExist" }),
+      });
+
+      const response = await restAnswerFor(wrapped);
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({ code: "upgrade_in_progress" });
+    });
+  });
+
+  describe("when the raw query failed for another reason", () => {
+    /** @scenario "A raw SQL read the schema is not ready for answers upgrade_in_progress" */
+    it.each([
+      { originalCode: "22P02", kind: "InvalidInputValue" },
+      { originalCode: "42704", kind: "postgres" },
+    ])("answers $originalCode as an unhandled 500", async (failure) => {
+      const response = await restAnswerFor(rawQueryFailed(failure));
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
+    });
+
+    /** @scenario "A raw SQL read the schema is not ready for answers upgrade_in_progress" */
+    it("stops walking a cause chain that loops", async () => {
+      const looped = new Error("first");
+      looped.cause = new Error("second", { cause: looped });
+
+      const response = await restAnswerFor(looped);
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe("when the gate already admitted the process", () => {
+    /** @scenario "A missing table on a ledger that says current is not reported as upgrading" */
+    it("answers a raw missing table as an unhandled 500, never upgrade_in_progress", async () => {
+      setLedgerCurrent({ current: true });
+
+      const response = await restAnswerFor(
+        rawQueryFailed({ originalCode: "42P01", kind: "TableDoesNotExist" }),
+      );
+
+      expect(response.status).toBe(500);
+      expect(await response.json()).toMatchObject({ code: "internal_error" });
+    });
+  });
 });

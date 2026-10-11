@@ -35,12 +35,45 @@ const follow = async ({
   }
 };
 
+/** Follows while the tab is shown, or always when `inBackground`; reads at once when shown. */
+const followWhileShown = ({
+  refresh,
+  inBackground,
+}: {
+  refresh: () => Promise<Summary[] | undefined>;
+  inBackground: boolean;
+}) => {
+  let running: AbortController | undefined;
+  const sync = () => {
+    const shown = inBackground || document.visibilityState !== "hidden";
+    if (shown && running === undefined) {
+      running = new AbortController();
+      void follow({ refresh, signal: running.signal });
+    } else if (!shown && running !== undefined) {
+      running.abort();
+      running = undefined;
+    }
+  };
+  sync();
+  document.addEventListener("visibilitychange", sync);
+  return () => {
+    document.removeEventListener("visibilitychange", sync);
+    running?.abort();
+  };
+};
+
 /**
- * The caught messages, newest first, kept live: read the list, then park on
- * /api/messages/wait for anything newer and read it again when mail lands or
- * the wait lapses (so deletions from the CLI show too).
+ * The caught messages, newest first, kept live: read the list, park on /api/messages/wait,
+ * read again when mail lands or the wait lapses (so CLI deletions show). A hidden tab stops
+ * asking unless `inBackground` (desktop notifications on) keeps it following.
  */
-export const useLiveInbox = ({ onList }: { onList: (input: { messages: Summary[] }) => void }) => {
+export const useLiveInbox = ({
+  onList,
+  inBackground = false,
+}: {
+  onList: (input: { messages: Summary[] }) => void;
+  inBackground?: boolean;
+}) => {
   const [messages, setMessages] = useState<Summary[] | undefined>(undefined);
   const [connection, setConnection] = useState<Connection>("starting");
   const [error, setError] = useState<string | undefined>(undefined);
@@ -62,11 +95,7 @@ export const useLiveInbox = ({ onList }: { onList: (input: { messages: Summary[]
     }
   }, []);
 
-  useEffect(() => {
-    const stop = new AbortController();
-    void follow({ refresh, signal: stop.signal });
-    return () => stop.abort();
-  }, [refresh]);
+  useEffect(() => followWhileShown({ refresh, inBackground }), [refresh, inBackground]);
 
   return { messages, connection, error, refresh };
 };

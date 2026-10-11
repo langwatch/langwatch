@@ -90,8 +90,11 @@ func (p permissiveSPProvider) GetServiceProvider(_ *http.Request, serviceProvide
 }
 
 // handleSAMLSSO accepts an AuthnRequest (redirect or POST binding), signs an
-// assertion for the requested (or first) seeded user, and returns crewjam's
-// auto-submitting POST form aimed at the request's ACS URL.
+// assertion for the hinted user, and returns crewjam's auto-submitting POST
+// form aimed at the request's ACS URL. A redirect-binding request with no
+// login_hint lands on the account picker, as an OIDC authorize request does;
+// its links repeat the request with the hint. A POST without one still asserts
+// the first active user, since a link cannot carry its body.
 func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
 	t, ok := s.tenantFor(r)
 	if !ok {
@@ -100,6 +103,10 @@ func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
 	}
 	req, sp, ok := s.readAuthnRequest(w, t, r)
 	if !ok {
+		return
+	}
+	if r.Method == http.MethodGet && samlHintOf(r) == "" {
+		s.serveConsolePage(w, r, http.StatusOK)
 		return
 	}
 	user, ok := s.samlUser(t, r)
@@ -169,7 +176,7 @@ func (s *Server) readAuthnRequest(w http.ResponseWriter, t *Tenant, r *http.Requ
 // samlUser picks who the assertion names: an explicit login_hint, or the
 // tenant's first active user.
 func (s *Server) samlUser(t *Tenant, r *http.Request) (*User, bool) {
-	if hint := r.URL.Query().Get("login_hint"); hint != "" {
+	if hint := samlHintOf(r); hint != "" {
 		u, ok := t.FindUser(hint)
 		return u, ok && u.Active // a user disabled at the IdP is refused here
 	}
@@ -179,6 +186,15 @@ func (s *Server) samlUser(t *Tenant, r *http.Request) (*User, bool) {
 		}
 	}
 	return nil, false
+}
+
+// samlHintOf is who the request names: login_hint, or its `user` alias as on
+// the authorize endpoint.
+func samlHintOf(r *http.Request) string {
+	if hint := r.URL.Query().Get("login_hint"); hint != "" {
+		return hint
+	}
+	return r.URL.Query().Get("user")
 }
 
 func mustParseURL(raw string) url.URL {

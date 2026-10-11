@@ -116,7 +116,7 @@ export type SystemMigrationsServiceDependencies = {
   /** One full pass over both axes, where a worker executes it. */
   runPass: (input: { signal?: AbortSignal }) => Promise<MigrationPassSummary>;
   /** Asks a worker for one pass, sent as the operator; resolves once the request is recorded. */
-  requestPass: (args: { actorUserId: string }) => Promise<void>;
+  requestPass: (args: { actorUserId: string; delayMs?: number }) => Promise<void>;
   /** Whether a pass on this installation could still move a tenant: the re-drive's gate. */
   hasTenantAwaitingRedrive: () => Promise<boolean>;
   /** One migration for one organization; composition scopes runner to (tenant, migration) pair. */

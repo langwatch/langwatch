@@ -30,6 +30,8 @@ func fakeStack(t *testing.T, mints *atomic.Int32, mintStatus int) *httptest.Serv
 			mints.Add(1)
 			w.WriteHeader(mintStatus)
 			_, _ = w.Write([]byte(`{"token":"` + testOrgToken + `","apiKey":{"id":"key_1"},"echo":"` + auth + `"}`))
+		case "/api/projects":
+			_, _ = w.Write([]byte(`{"data":[{"id":"project_default","slug":"local-dev-project"}]}`))
 		case "/api/gateway/v1/virtual-keys":
 			mints.Add(1)
 			w.WriteHeader(mintStatus)
@@ -51,6 +53,25 @@ func TestKeyringRefusesAnUnknownKeyKind(t *testing.T) {
 	_, err := ring.resolve(context.Background(), "admin", "")
 	if err == nil || !strings.Contains(err.Error(), `unknown key kind "admin"`) {
 		t.Fatalf("err = %v, want an unknown key kind refusal", err)
+	}
+}
+
+func TestPersonalKeyNamesTheDefaultProjectWhenAsked(t *testing.T) {
+	var mints atomic.Int32
+	ring := testKeyring(t, fakeStack(t, &mints, http.StatusCreated).URL)
+	key, err := ring.resolve(context.Background(), "personal", "local-dev-project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(key.headers) != 1 || key.headers[0] != "X-Project-Id:project_default" {
+		t.Fatalf("headers = %v, want the default project named by X-Project-Id", key.headers)
+	}
+	seeded, err := ring.resolve(context.Background(), "project", "local-dev-project")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seeded.secret != testAPIKey || len(seeded.headers) != 0 {
+		t.Fatal("the default project's key should stay the seeded, project-bound key")
 	}
 }
 

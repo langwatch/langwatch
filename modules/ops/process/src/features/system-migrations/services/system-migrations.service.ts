@@ -18,6 +18,7 @@ import {
 } from "@langwatch/system-migrations";
 import { nowInstant } from "@langwatch/time";
 
+import { SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER } from "../../../eventing/ops-system-migrations.process.ts";
 import {
   ATTENTION_LIMIT,
   type MigrationEnrollmentRecord,
@@ -30,6 +31,13 @@ import { SystemMigrationRollbackService } from "./system-migration-rollback.serv
 import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");
+
+/** The boot loop's cap and gap (packages/system-migrations/src/convergence.ts:19,27). */
+const PASSES_PER_RUN = 25;
+const PASS_GAP_MS = 5_000;
+
+/** How long the one follow-up pass waits, so the folds a held tenant waits on land first. */
+const FOLLOW_UP_PASS_DELAY_MS = 60_000;
 
 /** How many tenant rows one `listTenants` page holds when the caller names no limit. */
 const TENANT_PAGE_LIMIT = 50;
@@ -88,6 +96,7 @@ export class SystemMigrationsService {
           requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
           availableOnThisInstallation: isSaaS || migration.runsAutomaticallyOnSelfHosted,
           enrolledAutomatically: migration.enrolledAutomatically,
+          tenant: migration.tenant ?? "organization",
           counts,
           // Null for a migration that admits every organization automatically:
           // the gauge would describe rows that decide nothing. That is what
@@ -129,7 +138,6 @@ export class SystemMigrationsService {
 
   /** The enrollment listing for the ops page, audited because it carries enrollers' names. */
   async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
-    isSaaS: boolean;
     enrollments: MigrationEnrollmentRecord[];
   }> {
     return this.enrollment.getEnrollments({ requestedBy });
@@ -191,20 +199,37 @@ export class SystemMigrationsService {
   private passCompletedInProcess = false;
 
   /**
-   * One pass on the worker. An operator's kick and a process's first re-drive always run, so a
-   * pass that died part-way is finished (Alex, 2026-10-09); later re-drives first ask the stored
-   * state whether any tenant could still move or be discovered, so a latched fleet is not swept.
+   * Passes on the worker while each advances something; kicks and a first re-drive always run
+   * (Alex, 2026-10-09). A run that newly holds a tenant asks for ONE follow-up pass a minute on,
+   * and that follow-up never asks for another (Alex, 2026-10-11).
    */
-  async executePass({ redrive }: { redrive: boolean }): Promise<void> {
+  async executePass({
+    redrive,
+    followUp = false,
+  }: {
+    redrive: boolean;
+    followUp?: boolean;
+  }): Promise<void> {
     if (redrive && this.passCompletedInProcess && !(await this.deps.hasTenantAwaitingRedrive())) {
       logger.debug(
         "no parked, held or undiscovered tenant; skipping the system migration re-drive",
       );
       return;
     }
-    const summary = await this.deps.runPass({});
+    let summary = await this.deps.runPass({});
     this.passCompletedInProcess = true;
-    logger.info({ summary, redrive }, "system migration pass complete");
+    let advancedInRun = summary.advanced > 0;
+    for (let pass = 1; summary.advanced > 0 && pass < PASSES_PER_RUN; pass++) {
+      await pauseBetweenPasses();
+      summary = await this.deps.runPass({});
+      advancedInRun ||= summary.advanced > 0;
+    }
+    logger.info({ summary, redrive, followUp }, "system migration pass complete");
+    if (followUp || !advancedInRun || summary.held === 0) return;
+    await this.deps.requestPass({
+      actorUserId: SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER,
+      delayMs: FOLLOW_UP_PASS_DELAY_MS,
+    });
   }
 
   /** One pass of the startup convergence the tasks process drives, stopping at `signal`. */
@@ -270,4 +295,9 @@ export class SystemMigrationsService {
 function refuseWhenNotFound(error: unknown): never {
   if (error instanceof SystemMigrationRecordNotFoundError) throw new MigrationStateNotFoundError();
   throw error;
+}
+
+/** A pass cannot observe its own events, so the next one waits for the folds to land. */
+function pauseBetweenPasses(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, PASS_GAP_MS));
 }

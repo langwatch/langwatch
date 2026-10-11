@@ -312,6 +312,7 @@ function eventingClickHouseResolver(
                 tenantId,
                 sql: request.query,
                 ...(request.query_params === undefined ? {} : { params: request.query_params }),
+                ...(request.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
               })
               .then((result) => result.rows),
         }),

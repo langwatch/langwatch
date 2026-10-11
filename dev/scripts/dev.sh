@@ -429,11 +429,7 @@ EOF
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
   echo "     The browser application alone, no background processing: pnpm dev:ui."
   echo "     Stop redis with: dev/scripts/dev.sh down"
-  # Skip flags must be on the shell env of the pnpm dev subprocess, NOT in
-  # .env.dev-up: the migration scripts run before any application boots dotenv,
-  # so they read the shell environment, not the overlay file. Frontend-only
-  # targets shared dev infra whose ClickHouse schema we don't own, so skip migrate.
-  SKIP_CLICKHOUSE_MIGRATE=true SKIP_PRISMA_MIGRATE=true pnpm dev
+  pnpm dev
 }
 
 run_migration() {

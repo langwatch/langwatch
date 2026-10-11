@@ -2,14 +2,19 @@ import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
+  MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 
 import {
   type FirstTraceRecordedEvent,
+  type MonthTraceIdsListedEvent,
+  RECORD_MONTH_TRACE_IDS_COMMAND_TYPE,
   RECORD_FIRST_TRACE_COMMAND_TYPE,
   RECORD_TRACE_RECEIVED_COMMAND_TYPE,
   type RecordFirstTraceCommandData,
+  type RecordMonthTraceIdsCommandData,
+  recordMonthTraceIdsCommandDataSchema,
   recordFirstTraceCommandDataSchema,
   type RecordTraceReceivedCommandData,
   recordTraceReceivedCommandDataSchema,
@@ -78,6 +83,37 @@ export class RecordTraceReceivedCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordTraceReceivedCommandData): string {
+    return payload.projectId;
+  }
+}
+
+/** Records one page of a project's trace ids for a month; the page's ids key the event. */
+export class RecordMonthTraceIdsCommand implements CommandHandler<
+  Command<RecordMonthTraceIdsCommandData>,
+  MonthTraceIdsListedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_MONTH_TRACE_IDS_COMMAND_TYPE,
+    recordMonthTraceIdsCommandDataSchema,
+    "Record a page of the trace ids a project first saw in a month",
+  );
+
+  handle(command: Command<RecordMonthTraceIdsCommandData>): MonthTraceIdsListedEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<MonthTraceIdsListedEvent>({
+        aggregateType: TRACE_PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
+        version: TRACE_PROJECT_MILESTONES_EVENT_VERSION,
+        data,
+        idempotencyKey: `${data.projectId}:${data.month}:${data.traceIds[0]}:${data.traceIds.at(-1)}:${data.traceIds.length}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordMonthTraceIdsCommandData): string {
     return payload.projectId;
   }
 }

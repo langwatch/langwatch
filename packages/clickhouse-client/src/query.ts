@@ -41,6 +41,11 @@ export interface QueryRequest {
    * gives the reason (`langwatch/skip-tenant-check-reason`).
    */
   SKIP_TENANT_CHECK?: true | undefined;
+  /**
+   * Declares a read that must walk every partition (an upgrade step, a replay, an install-wide
+   * sweep), so the cold-scan warning stays for accidental ones. A comment above gives the reason.
+   */
+  SKIP_COLD_SCAN_CHECK?: true | undefined;
 }
 
 /**

@@ -30,3 +30,17 @@ Feature: Ops SSO connection drawer
     When an operator opens its drawer
     Then the history reports that it could not be loaded
     And it does not claim that nothing happened
+
+  @integration
+  Scenario: The back office imports a replacement for a carried-over connection
+    Given a carried-over connection with no replacement registered
+    When an operator opens its drawer
+    Then the migration inventory draws the import sso lends, for that organization and connection
+    # Main embedded RegisterConnection mode="operator" here; ops draws sso's lend instead (§10.1).
+
+  @integration
+  Scenario: An operator's import starts the guarded migration from the back office
+    Given the operator picks a provider and fills in the customer's supplied configuration
+    When they press Import replacement
+    Then the back office's startLegacyMigration runs for that connection, not the customer's
+    And no service-provider addresses are shown, and the operator is told the current sign-in keeps working

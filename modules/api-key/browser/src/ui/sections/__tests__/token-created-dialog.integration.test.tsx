@@ -98,7 +98,9 @@ describe("given a token has just been minted", () => {
     it("gives the snippet a horizontally scrollable content area", async () => {
       renderDialog();
       const box = await boxLabelled(".env");
-      const content = box.querySelector(".code-block__content") as HTMLElement;
+      // The content slot carries no slot class since the theme's codeBlock recipe (902a5476c2);
+      // it is the element that holds the code.
+      const content = box.querySelector(".code-block__code")?.parentElement as HTMLElement;
       expect(content).not.toBeNull();
       expect(getComputedStyle(content).overflow).toBe("scroll");
     });

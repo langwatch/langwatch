@@ -20,10 +20,12 @@ component choice (`chakra-ui-*` only for raw Chakra v3). Authority:
   `useCallback` or `React.memo`; delete them when you touch a file. A component it
   skips (reads a ref during render, an `eslint-disable` of a hooks rule) is
   logged by the dev server: fix the cause rather than memoising by hand.
-- **Design system first.** Before building a component, look in
-  `packages/design-system/src/components/` (or `/design-system` on the dev
-  server). Use what is there; a piece two modules would reuse is built there, not
-  in a module.
+- **The design system is the source of truth for components.** Every banner or
+  alert, dialog, drawer, empty state, menu, picker and table comes from
+  `@langwatch/design-system`; never hand-roll one in a module (a tinted, bordered
+  box with an icon is a hand-rolled alert). A missing need is added to the design
+  system first, with a story. Look in `packages/design-system/src/components/`
+  (or `/design-system` on the dev server).
 - **Layer order:** flat public entries → `model/` (pure) → `behavior/` (hooks,
   API bindings, stores) → `ui/elements|blocks|sections`. Elements and blocks
   can't fetch. A package that outgrows this nests `features/<name>/` repeating

@@ -58,6 +58,9 @@ type Config struct {
 	// Limits reads and edits the machine resource limits. Zero-valued leaves
 	// the routes answering 501.
 	Limits Limits
+	// MachineSettings reads and flips the machine switches. Zero-valued leaves
+	// the routes answering 501.
+	MachineSettings MachineSettings
 	// Naming reads a Host header as a stack's home and names a stopped
 	// stack's hosts; StackURL builds a routed URL through the live proxy.
 	Naming   domain.Naming
@@ -102,7 +105,6 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)
 	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
 	mux.HandleFunc("/api/stacks/{slug}/start-service", s.handleStartService)
-	mux.HandleFunc("/api/stacks/{slug}/reset-databases", s.handleResetDatabases)
 	mux.HandleFunc("/api/stacks/{slug}/seed", s.handleSeed)
 	mux.HandleFunc("GET /api/stacks/{slug}/cli/{name}", s.handleCLIRead)
 	mux.HandleFunc("/api/stacks/{slug}/feedback/{id}/resolve", s.handleFeedbackResolve)
@@ -112,6 +114,9 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/limits", s.handleLimits)
 	mux.HandleFunc("PUT /api/limits/{name}", s.handleSetLimit)
 	mux.HandleFunc("DELETE /api/limits/{name}", s.handleUnsetLimit)
+	mux.HandleFunc("GET /api/machine-settings", s.handleMachineSettings)
+	mux.HandleFunc("PUT /api/machine-settings/{name}", s.handleSetMachineSetting)
+	mux.HandleFunc("DELETE /api/machine-settings/{name}", s.handleSetMachineSetting)
 	mux.HandleFunc("/v1/", s.handleTelemetry) // OTLP: /v1/traces, /v1/metrics, /v1/logs
 	mux.HandleFunc("/", s.handleIndex)
 	return mux

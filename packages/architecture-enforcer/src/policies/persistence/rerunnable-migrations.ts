@@ -14,6 +14,7 @@ const POLICY = "rerunnable-migrations";
 const PRISMA_MIGRATIONS = "packages/prisma-client/prisma/migrations";
 export const RERUNNABLE_MARKER_FILE = "packages/upgrade/src/stepping/rerunnable-migrations.ts";
 const MARKER = /export const RERUNNABLE_PRISMA_FROM = "([^"]+)";/;
+const EXEMPT = /export const RERUNNABLE_EXEMPT_PRISMA = \[([^\]]*)\]/;
 const ALLOWED =
   "Every statement in a Prisma migration newer than RERUNNABLE_PRISMA_FROM must be a no-op when run a second time, so the upgrade can mark a cancelled migration rolled back and apply it again (round 21, S3-RETRY).";
 
@@ -201,14 +202,24 @@ function readMarker(root: string): string | ArchitectureViolation {
   return marker;
 }
 
+/** Folders the runner names as exempt: main's, which this branch cannot edit (Alex, 2026-10-11). */
+function exemptFolders(root: string): ReadonlySet<string> {
+  const file = join(root, RERUNNABLE_MARKER_FILE);
+  const text = existsSync(file) ? readFileSync(file, "utf8") : "";
+  return new Set(
+    [...(EXEMPT.exec(text)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? ""),
+  );
+}
+
 /** The check over a root: one violation per statement that is not re-runnable. */
 export function lintRerunnableMigrationsAt({ root }: { root: string }): ArchitectureViolation[] {
   const directory = join(root, PRISMA_MIGRATIONS);
   if (!existsSync(directory)) return [];
   const marker = readMarker(root);
   if (typeof marker !== "string") return [marker];
+  const exempt = exemptFolders(root);
   return readdirSync(directory, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name > marker)
+    .filter((entry) => entry.isDirectory() && entry.name > marker && !exempt.has(entry.name))
     .map((entry) => join(directory, entry.name, "migration.sql"))
     .filter((file) => existsSync(file))
     .toSorted()

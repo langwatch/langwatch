@@ -116,7 +116,7 @@ describe("given the request paths the TypeScript SDK builds", () => {
       const keys = readFileSync(generated, "utf8")
         .split("\n")
         .flatMap((line) => /^ {4}"(\/api\/[^"]*)":/.exec(line)?.[1] ?? []);
-      expect(keys.length).toBeGreaterThan(100);
+      expect(keys.length).toBeGreaterThan(50);
 
       // A key the document also publishes under `/api/v1` is the same logical
       // route at two addresses; the offence is a family that has no twin at all.

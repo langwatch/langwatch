@@ -1,9 +1,13 @@
 import type { Named } from "@langwatch/module";
+import {
+  instrumentationScopeSchema,
+  resourceSchema,
+  spanSchema,
+} from "@langwatch/otlp/trace-request";
 import { z } from "zod";
 
 import { customMetadataSchema, langWatchSpanSchema } from "../../trace-format.schemas.ts";
 import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "../../trace.constants.ts";
-import { instrumentationScopeSchema, resourceSchema, spanSchema } from "../../trace.otlp.ts";
 import { normalizedSpanSchema } from "../../trace.spans.ts";
 import { logTraceContributionSchema } from "../span/trace-log-contribution.ts";
 

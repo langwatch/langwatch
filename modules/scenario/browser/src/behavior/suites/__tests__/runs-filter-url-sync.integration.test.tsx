@@ -125,14 +125,14 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
  * (src/components/suites/run-history-panel.tsx, look for the prevFilters/ prevGroupBy
  * useRef + useEffect). Must be kept in sync with that component.
  */
-function Harness({ store }: { store: Store }) {
+function Harness({ store: useRunHistory }: { store: Store }) {
   const { selectedSuiteSlug } = useSuiteRouting();
   const router = useRouter();
   const location = useLocation();
 
-  const syncToUrl = store((s) => s.syncToUrl);
-  const filters = store((s) => s.filters);
-  const groupBy = store((s) => s.groupBy);
+  const syncToUrl = useRunHistory((s) => s.syncToUrl);
+  const filters = useRunHistory((s) => s.filters);
+  const groupBy = useRunHistory((s) => s.groupBy);
 
   const prevFilters = useRef(filters);
   const prevGroupBy = useRef(groupBy);

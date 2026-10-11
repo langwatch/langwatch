@@ -14,4 +14,4 @@ Feature: The upgrade ledger has its own Postgres schema
     Given an empty installation schema
     When the ledger is created
     Then the ledger schema holds the run, step, target, lease and serving roster tables
-    And the step has its owner and description, and the run its floor
+    And the step has its owner and description

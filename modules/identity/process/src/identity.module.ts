@@ -8,6 +8,7 @@ import { identityChannels } from "./channels/identity-channels.registry.ts";
 import { identityEventing } from "./eventing/identity.pipeline.ts";
 import { identityPipelineEventing } from "./eventing/user-identity.pipeline.ts";
 import { joinRequestEventing } from "./features/join-request/eventing/join-request.pipeline.ts";
+import { twoStepRequirementEventing } from "./features/mfa/eventing/two-step-requirement.pipeline.ts";
 import { ssoConnectionEventing } from "./features/sso-connection/eventing/sso-connection.pipeline.ts";
 import { identityRepositories } from "./repositories/identity-repositories.registry.ts";
 import { identityLookupTrpcTransport } from "./transport/identity-lookup.trpc.ts";
@@ -42,6 +43,7 @@ export const identityProcessModule: PublishedProcessModule<
   .withEventing(identityPipelineEventing)
   .withEventing(joinRequestEventing)
   .withEventing(ssoConnectionEventing)
+  .withEventing(twoStepRequirementEventing)
   .withMigrations(({ repositories }) => [
     // Background only: a blocking step may not touch a sign-in table (UIW-IDENTITY-STEP,
     // Alex 2026-10-09). Waits for old writers, which re-finalize reopened accounts.

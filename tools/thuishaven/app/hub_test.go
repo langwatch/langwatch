@@ -17,12 +17,13 @@ import (
 // --- fakes -------------------------------------------------------------------
 
 type fakeStore struct {
-	stacks     []domain.Stack
-	removed    []string
-	slugCache  map[string]string
-	dbActivity map[string]time.Time
-	selection  map[string]domain.Selection
-	touched    []string
+	waiterClaims []domain.SlotClaim
+	stacks       []domain.Stack
+	removed      []string
+	slugCache    map[string]string
+	dbActivity   map[string]time.Time
+	selection    map[string]domain.Selection
+	touched      []string
 
 	pressure           domain.PressureRecord
 	hasWrittenPressure bool
@@ -34,6 +35,13 @@ type fakeStore struct {
 	appendHistoryErr   error
 	prereqSkips        map[string]bool
 	containerPosture   string
+	machineSettings    domain.MachineSettings
+}
+
+func (f *fakeStore) ReadMachineSettings() domain.MachineSettings { return f.machineSettings }
+func (f *fakeStore) WriteMachineSettings(s domain.MachineSettings) error {
+	f.machineSettings = s
+	return nil
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -101,6 +109,7 @@ func (f *fakeStore) WritePressure(rec domain.PressureRecord) error {
 	f.pressure, f.hasWrittenPressure = rec, true
 	return nil
 }
+func (f *fakeStore) WaiterClaims(string) []domain.SlotClaim { return f.waiterClaims }
 func (f *fakeStore) ReadPressure() (domain.PressureRecord, bool) {
 	return f.pressure, f.hasWrittenPressure
 }
@@ -166,6 +175,7 @@ type fakeSystem struct {
 	// matches every process on the machine and group-kills the result.
 	orphanMarker string
 	procSamples  []ProcessSample
+	cwds         map[int]string
 	killed       []int
 	totalMemory  uint64
 	portsInUse   map[int]bool
@@ -219,6 +229,15 @@ func (f *fakeSystem) OrphanedWorkers(marker string) []int {
 }
 func (f *fakeSystem) ProcessSamples() []ProcessSample { return f.procSamples }
 func (f *fakeSystem) Kill(pid int)                    { f.killed = append(f.killed, pid) }
+func (f *fakeSystem) ProcessCwds(pids []int) map[int]string {
+	out := map[int]string{}
+	for _, pid := range pids {
+		if dir, ok := f.cwds[pid]; ok {
+			out[pid] = dir
+		}
+	}
+	return out
+}
 
 // fakeProxy is safe for concurrent calls: provision and teardown route in parallel.
 type fakeProxy struct {
@@ -246,6 +265,38 @@ type fakeDBServer struct {
 	mu        sync.Mutex // guards dropped: the bulk delete drops concurrently
 	dropped   []string
 	dropErr   error // when set, DropDatabase records the attempt then fails
+	// access and weights record EnsureStackAccess and SetStackWeight; accessErr
+	// and weightErr fail them.
+	access    map[string]string
+	weights   map[string]int
+	accessErr error
+	weightErr error
+}
+
+func (f *fakeDBServer) EnsureStackAccess(_ context.Context, db, password string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.accessErr != nil {
+		return f.accessErr
+	}
+	if f.access == nil {
+		f.access = map[string]string{}
+	}
+	f.access[db] = password
+	return nil
+}
+
+func (f *fakeDBServer) SetStackWeight(_ context.Context, db string, weight int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.weightErr != nil {
+		return f.weightErr
+	}
+	if f.weights == nil {
+		f.weights = map[string]int{}
+	}
+	f.weights[db] = weight
+	return nil
 }
 
 func (f *fakeDBServer) Ensure(context.Context) (int, error)               { return 1, nil }

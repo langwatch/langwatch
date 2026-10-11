@@ -4,7 +4,6 @@ import type { InstallationState, InstallationTone } from "./reader.schema.ts";
 export const INSTALLATION_STATES: Readonly<
   Record<InstallationState, { label: string; tone: InstallationTone }>
 > = {
-  unsupported: { label: "Unsupported", tone: "danger" },
   "needs-attention": { label: "Needs attention", tone: "danger" },
   upgrading: { label: "Upgrading", tone: "info" },
   "never-upgraded": { label: "Never upgraded", tone: "warning" },

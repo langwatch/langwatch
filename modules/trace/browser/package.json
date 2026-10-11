@@ -16,7 +16,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -b"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
@@ -56,7 +56,6 @@
     "@langwatch/scenario-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
-    "@langwatch/span-normalisation": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-client": "workspace:*",
@@ -100,6 +99,7 @@
   },
   "devDependencies": {
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/span-normalisation": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@testing-library/jest-dom": "catalog:",

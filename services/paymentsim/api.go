@@ -282,6 +282,7 @@ func (s *Server) createSession(_ *http.Request, p params) (any, error) {
 		ClientReferenceID: optional(p.str("client_reference_id")), Created: s.now().Unix(), Currency: optional(p.str("currency")),
 		Customer: optional(p.str("customer")), Metadata: p.metadata(), Mode: mode, PaymentStatus: "unpaid", Status: "open",
 		SuccessURL: p.str("success_url"), subMeta: p.sub("subscription_data").metadata(),
+		PaymentLink: optional(p.str("payment_link")), customerEmail: p.str("customer_email"),
 	}
 	sess.anchor, _ = p.sub("subscription_data").integer("billing_cycle_anchor")
 	for i, spec := range specs {

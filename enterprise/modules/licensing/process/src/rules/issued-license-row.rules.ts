@@ -41,6 +41,7 @@ export function blankIssuedLicenseRow(): Omit<
   | "planType"
   | "maxMembers"
   | "maxMembersLite"
+  | "liteSeatsUnlimited"
   | "issuedAt"
   | "expiresAt"
   | "source"

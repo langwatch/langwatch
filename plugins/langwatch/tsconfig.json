@@ -7,12 +7,15 @@
     "noUncheckedIndexedAccess": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["__tests__/**/*.ts", "vitest.config.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }

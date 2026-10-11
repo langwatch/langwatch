@@ -171,7 +171,14 @@ export function readDeliveryConfiguration({
   schema,
   delivery,
 }: {
-  schema: ZodType;
+  schema: {
+    safeParse(value: unknown):
+      | { success: true; data: unknown }
+      | {
+          success: false;
+          error: { issues: readonly { message: string; path: readonly PropertyKey[] }[] };
+        };
+  };
   delivery: Record<string, unknown>;
 }): Record<string, unknown> {
   const read = schema.safeParse(delivery);

@@ -132,22 +132,39 @@ func (s *Server) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost:
 		s.serveProvider(w, r, path)
 	default:
-		writeError(w, providerError{anthropic: isAnthropic(path), status: http.StatusMethodNotAllowed, message: "llmsim answers POST here"})
+		writeError(w, providerError{dialect: dialectOf(path), status: http.StatusMethodNotAllowed, message: "llmsim answers POST here"})
 	}
 }
 
-func isAnthropic(path string) bool {
-	return strings.HasSuffix(path, "/messages") || strings.HasSuffix(path, "/messages/count_tokens")
+// Dialects are the wire shapes llmsim answers in, as the console records them.
+const (
+	dialectOpenAI    = "openai"
+	dialectAnthropic = "anthropic"
+	dialectGemini    = "gemini"
+	dialectVertex    = "vertex"
+	dialectBedrock   = "bedrock"
+)
+
+// dialectOf is the wire a provider path speaks.
+func dialectOf(path string) string {
+	switch {
+	case strings.HasSuffix(path, "/messages") || strings.HasSuffix(path, "/messages/count_tokens"):
+		return dialectAnthropic
+	case isGooglePath(path) && strings.Contains(path, "/projects/"):
+		return dialectVertex
+	case isGooglePath(path):
+		return dialectGemini
+	case isBedrockPath(path):
+		return dialectBedrock
+	}
+	return dialectOpenAI
 }
 
 // serveProvider answers one provider call and records it for the console.
 func (s *Server) serveProvider(w http.ResponseWriter, r *http.Request, path string) {
 	started := time.Now()
-	pc := &providerCall{w: w, anthropic: isAnthropic(path)}
-	pc.rec = record{At: started, Path: path, Dialect: "openai", Status: http.StatusOK}
-	if pc.anthropic {
-		pc.rec.Dialect = "anthropic"
-	}
+	pc := &providerCall{w: w, dialect: dialectOf(path), pathModel: modelInPath(r)}
+	pc.rec = record{At: started, Path: path, Dialect: pc.dialect, Status: http.StatusOK}
 	defer func() {
 		pc.rec.LatencyMs = float64(time.Since(started).Microseconds()) / 1000
 		s.calls.add(pc.rec)
@@ -197,13 +214,14 @@ func holdForDelay(r *http.Request, model string) bool {
 // the record the console shows.
 type providerCall struct {
 	w         http.ResponseWriter
-	anthropic bool
+	dialect   string
+	pathModel string // the model a Gemini, Vertex or Bedrock path names
 	rec       record
 }
 
 func (pc *providerCall) fail(status int, message string) {
 	pc.rec.Status, pc.rec.Error = status, message
-	writeError(pc.w, providerError{anthropic: pc.anthropic, status: status, message: message})
+	writeError(pc.w, providerError{dialect: pc.dialect, status: status, message: message})
 }
 
 // readProviderBody reads the JSON body, refusing it when it does not parse
@@ -220,6 +238,9 @@ func (s *Server) readProviderBody(pc *providerCall, r *http.Request) (map[string
 	}
 	pc.rec.Request = recordedBody(raw, s.cfg.MaxBodyBytes)
 	pc.rec.Model = str(body["model"])
+	if pc.rec.Model == "" {
+		pc.rec.Model = pc.pathModel
+	}
 	if status := s.forcedStatus(r.Header, pc.rec.Model); status != 0 {
 		if status == http.StatusTooManyRequests {
 			pc.w.Header().Set("Retry-After", "1")
@@ -231,7 +252,7 @@ func (s *Server) readProviderBody(pc *providerCall, r *http.Request) (map[string
 }
 
 // routeProvider answers the call by its path: chat completions, responses,
-// messages, token counts or embeddings.
+// messages, token counts, embeddings, Gemini/Vertex generateContent or Bedrock Converse.
 func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[string]json.RawMessage) {
 	w, path := pc.w, pc.rec.Path
 	var req request
@@ -250,6 +271,11 @@ func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[strin
 		pc.rec.Dialect, pc.rec.Mode = "embeddings", "embeddings"
 		writeEmbeddings(w, body)
 		return
+	case isGooglePath(path):
+		req = parseGemini(body, pc.rec.Model, strings.HasSuffix(path, ":streamGenerateContent"))
+		req.altSSE = r.URL.Query().Get("alt") == "sse"
+	case isBedrockPath(path):
+		req = parseBedrock(body, pc.rec.Model, strings.HasSuffix(path, "/converse-stream"))
 	default:
 		pc.fail(http.StatusNotFound, "llmsim does not serve "+r.URL.Path)
 		return
@@ -257,8 +283,12 @@ func (s *Server) routeProvider(pc *providerCall, r *http.Request, body map[strin
 	rep := s.answer(r.Header, req)
 	pc.rec.Mode, pc.rec.Stream, pc.rec.InputTokens, pc.rec.OutputTokens, pc.rec.Response = rep.Mode, req.stream, rep.In, rep.Out, &rep
 	switch {
-	case pc.anthropic:
+	case pc.dialect == dialectAnthropic:
 		s.writeAnthropic(w, req, rep)
+	case pc.dialect == dialectGemini || pc.dialect == dialectVertex:
+		writeGemini(w, req, rep)
+	case pc.dialect == dialectBedrock:
+		writeBedrock(w, req, rep)
 	case strings.HasSuffix(path, "/responses"):
 		s.writeResponses(w, req, rep)
 	default:
@@ -305,17 +335,25 @@ func (s *Server) rng(h http.Header, req request) *mrand.Rand {
 	return mrand.New(mrand.NewPCG(binary.LittleEndian.Uint64(sum[:8]), binary.LittleEndian.Uint64(sum[8:16])))
 }
 
-// providerError is an error answer: its status, its message, and whether the
-// caller speaks the Anthropic dialect rather than the OpenAI one.
+// providerError is an error answer: its status, its message, and the dialect
+// the caller speaks (empty is OpenAI's).
 type providerError struct {
-	anthropic bool
-	status    int
-	message   string
+	dialect string
+	status  int
+	message string
 }
 
 // writeError answers in the caller's own dialect, so its SDK maps the status.
 func writeError(w http.ResponseWriter, e providerError) {
-	anthropic, status, message := e.anthropic, e.status, e.message
+	status, message := e.status, e.message
+	switch e.dialect {
+	case dialectGemini, dialectVertex:
+		writeGoogleError(w, status, message)
+		return
+	case dialectBedrock:
+		writeBedrockError(w, status, message)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	kind := "api_error"
@@ -325,7 +363,7 @@ func writeError(w http.ResponseWriter, e providerError) {
 	case status < 500:
 		kind = "invalid_request_error"
 	}
-	if anthropic {
+	if e.dialect == dialectAnthropic {
 		_ = json.NewEncoder(w).Encode(map[string]any{"type": "error", "error": map[string]string{"type": kind, "message": message}})
 		return
 	}

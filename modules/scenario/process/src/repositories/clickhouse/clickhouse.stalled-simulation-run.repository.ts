@@ -77,6 +77,8 @@ export class ClickHouseStalledSimulationRunRepository implements StalledSimulati
       // Install-wide stalled-run sweep: a backfill has no single tenant to scope to, and each
       // terminal write it triggers is scoped to that run's own tenant.
       SKIP_TENANT_CHECK: true,
+      // A run started in any week can still be stalled, so the sweep has no lower StartedAt bound.
+      SKIP_COLD_SCAN_CHECK: true,
     });
 
     if (rows.length >= MAX_ROWS) {

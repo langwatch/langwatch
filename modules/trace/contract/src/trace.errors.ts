@@ -256,11 +256,7 @@ export class TraceAttributeValuesWithheldError extends HandledError {
   }
 }
 
-/**
- * `traces.aiQuery`/`traces.aiAction` declare the merged-in `traces` shape,
- * but no model-invocation capability is wired into the transport yet — see
- * the merge-traces-v2 handoff.
- */
+/** The AI search operations on a process composed without a model seam. */
 export class TraceAiQueryUnavailableError extends HandledError {
   constructor() {
     super("service_unavailable", "AI-assisted trace search is not available on this deployment.", {

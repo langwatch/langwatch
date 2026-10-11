@@ -58,7 +58,11 @@ describe("traceSpanMetricsSync handler", () => {
 
       await handle(SETTLED);
 
-      expect(findSummary).toHaveBeenCalledWith({ projectId: "project-1", traceId: "trace-1" });
+      expect(findSummary).toHaveBeenCalledWith({
+        projectId: "project-1",
+        traceId: "trace-1",
+        occurredAtMs: 1_234,
+      });
       expect(computeRunMetrics).toHaveBeenCalledExactlyOnceWith({
         tenantId: "project-1",
         scenarioRunId: "run-1",

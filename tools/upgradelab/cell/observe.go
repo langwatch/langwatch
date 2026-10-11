@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -139,42 +140,10 @@ func PhaseAt(timeline []PhaseChange, atMs int64) string {
 	return phase
 }
 
-// QueueSample is one reading of the waiting work.
+// QueueSample is one reading of the group queues' waiting jobs.
 type QueueSample struct {
 	AtMs  int64 `json:"atMs"`
 	Depth int   `json:"depth"`
-	Left  int   `json:"cutJobsLeft"` // jobs present at the cut still waiting; -1 unread
-}
-
-// QueueLeft is the jobs of cut still waiting in now.
-func QueueLeft(cut, now map[string]struct{}) []string {
-	var left []string
-	for job := range cut {
-		if _, ok := now[job]; ok {
-			left = append(left, job)
-		}
-	}
-	return left
-}
-
-// LeftByKind counts leftover jobs per job kind: the group key without tenant and aggregate, else the key.
-func LeftByKind(left []string) string {
-	counts := map[string]int{}
-	for _, job := range left {
-		key, _, _ := strings.Cut(job, " ")
-		if at := strings.Index(key, ":gq:group:"); at >= 0 {
-			if parts := strings.Split(strings.TrimSuffix(key[at+len(":gq:group:"):], ":jobs"), "/"); len(parts) >= 3 {
-				key = strings.Join(parts[1:len(parts)-1], "/")
-			}
-		}
-		counts[key]++
-	}
-	rows := make([]string, 0, len(counts))
-	for key, count := range counts {
-		rows = append(rows, fmt.Sprintf("%s: %d", key, count))
-	}
-	slices.Sort(rows)
-	return strings.Join(rows, "; ")
 }
 
 type queueKind struct {
@@ -264,7 +233,7 @@ func StoredIDs(ctx context.Context, stores Stores, label, project string) (map[s
 }
 
 // storedTable is where an ingest kind's id lands.
-var storedTable = map[string]string{"otlp-trace": "spans", "collector": "spans", "otlp-log": "logs", "otlp-metric": "metrics"}
+var storedTable = map[string]string{"otlp-trace": "spans", "collector": "spans", "collector-eval": "spans", "otlp-log": "logs", "otlp-metric": "metrics"}
 
 // LedgerRow is one step of the upgrade ledger, as far as the invariants read it.
 type LedgerRow struct {
@@ -275,11 +244,13 @@ type LedgerRow struct {
 	Attempt  int    `json:"attempt"`
 	Finished string `json:"finished_at"`
 	Started  string `json:"started_at"`
+	// Report is the step's own JSON report; F1 reads the row counts a data step names there.
+	Report json.RawMessage `json:"report,omitempty"`
 }
 
 // Ledger reads every step row; a missing ledger schema is an empty ledger.
 func Ledger(ctx context.Context, stores Stores) ([]LedgerRow, error) {
-	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text, 'started_at', started_at::text) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
+	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text, 'started_at', started_at::text, 'report', report) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
 	if err != nil {
 		if strings.Contains(err.Error(), "does not exist") {
 			return nil, nil
@@ -402,6 +373,18 @@ func mainPageAcrossSwitch(record BrowserRecord, switched int64) bool {
 	return (asset || missing) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
 }
 
+// mainClientOutdated: main's page, fetched just before the switch, sends head its old enveloped tRPC input
+// (`{"json": ...}`) and head answers 400 client_outdated, as packages/api/src/trpc/client-outdated.ts means
+// it to; its console line names no url. The WebSocket's own 404 is the http twin of mainTabAcrossSwitch.
+func mainClientOutdated(record BrowserRecord, switched int64) bool {
+	decoded, _ := url.QueryUnescape(record.URL)
+	enveloped := record.Kind == "http" && record.Status == http.StatusBadRequest && strings.Contains(record.URL, "/api/trpc/") &&
+		strings.Contains(decoded, `"json":`)
+	socket := record.Kind == "http" && record.Status == http.StatusNotFound && strings.Contains(record.URL, "/api/trpc-ws")
+	refused := record.Kind == "console" && strings.Contains(record.Text, "status of 400")
+	return (enveloped || socket || refused) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+}
+
 // browserNoise is a console error or failed request the lab tolerates: every Match substring in the
 // record's url or text. Reason is printed in the report; they are counted apart from findings.
 type browserNoise struct {
@@ -436,6 +419,8 @@ func BrowserFindings(path string, switched, ready int64) (walks, expected int, t
 			tolerated["/api/trpc-ws (main's tab, open across the switch, reconnecting)"]++
 		case mainPageAcrossSwitch(record, switched):
 			tolerated["/assets/* 404 (main's page, fetched across the switch, ADR-086)"]++
+		case mainClientOutdated(record, switched):
+			tolerated["/api/trpc 400 client_outdated (main's page, fetched across the switch, told to reload)"]++
 		default:
 			if noise, ok := accepted(record); ok {
 				tolerated[noise.Match[0]+" ("+noise.Reason+")"]++

@@ -140,9 +140,7 @@ export const liveHome = ({ now, surfaces }: { now: number; surfaces?: Surface[] 
     canStart: false,
     startDir: factsFor({ slug: "feat-x", live: true, now }).worktreeDir,
     canStartService: true,
-    canResetDatabases: true,
   },
-  belowFloor: "",
   seed: {
     canSeed: true,
     sizes: ["tiny", "small", "medium", "large"],
@@ -174,9 +172,7 @@ export const stoppedHome = ({ now }: { now: number }): StackHome => {
       canStart: true,
       startDir: facts.worktreeDir,
       canStartService: false,
-      canResetDatabases: true,
     },
-    belowFloor: "",
     seed: { canSeed: false, sizes: ["tiny"], personas: ["all"], status: "", log: [] },
   };
 };
@@ -212,7 +208,6 @@ export const hub = ({ now }: { now: number }): Hub => {
       canStart: false,
       startDir: "",
       canStartService: false,
-      canResetDatabases: false,
     },
   };
   return {

@@ -191,6 +191,23 @@ export function reconcileColumns({
   return filtered.length > 0 ? filtered : [...capability.defaultColumns];
 }
 
+/**
+ * The columns a grouping switch keeps. A switch that loses the new row kind's
+ * identity column (a group's label, a trace's time) starts from its defaults.
+ * Spec: specs/traces-v2/grouping-engine.feature
+ */
+export function columnsForGrouping({
+  ids,
+  capability,
+}: {
+  ids: readonly string[];
+  capability: LensCapability;
+}): string[] {
+  const columns = reconcileColumns({ ids, capability });
+  const identity = capability.defaultColumns[0];
+  return identity && !columns.includes(identity) ? [...capability.defaultColumns] : columns;
+}
+
 export function reconcileAddons(ids: readonly string[], capability: LensCapability): string[] {
   const valid = new Set(capability.addons.map((a) => a.id));
   return ids.filter((id) => valid.has(id));

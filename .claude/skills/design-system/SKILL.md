@@ -14,6 +14,27 @@ bullet; ADR-001, `packages/design-system/adrs/001-design-system-boundary.md`, as
 
 ## Rules that matter
 
+0. **The design system is the source of truth for components** (Alex,
+   2026-10-10). Every component comes from `@langwatch/design-system`; a
+   module never hand-rolls one. A missing need (a variant, a prop) is added to
+   the design-system component first, with its story, never as a local copy:
+
+   | Need                               | Use                                                                         |
+   | ---------------------------------- | --------------------------------------------------------------------------- |
+   | Page or section notice             | `Banner` + `BannerAction` (`/banner`)                                       |
+   | Form or task message, load failure | `Alert` (`/primitives`), `status` + `size="sm"` when dense                  |
+   | Something just happened            | `toaster` (`/toaster`)                                                      |
+   | Dialog, confirm                    | `/dialog`, `/confirm-dialog`, `/delete-confirmation-dialog`                 |
+   | Drawer                             | `/drawer`, `/detail-drawer-header`                                          |
+   | Empty or no-access state           | `EmptyState` (`/primitives`), `/no-data-info-block`, `/restricted-access`   |
+   | Menu, popover                      | `/menu`, `/popover`                                                         |
+   | Picker                             | `/select`, `/option-list`, `/scope-chip-picker`, `/provider-model-selector` |
+   | Table, list page                   | `/list-table`, `/list-page`, `/pagination`                                  |
+
+   A `Box`/`Flex`/`Card` with a status tint, border and icon is a hand-rolled
+   alert: replace it. Never restyle an alert at the call site
+   (`dev/docs/best_practices/alerts-toasts-and-field-errors.md`).
+
 1. **Only `packages/design-system` imports `@chakra-ui/*` or `@emotion/*`.**
    Feature browsers, apps and tests import `@langwatch/design-system/<subpath>`
    (named subpaths, never a deep path). Enforced by `no-direct-chakra`, which is
@@ -94,6 +115,8 @@ no data) and each owning page renders it with the same entries (§10).
 - **The `chakra-ui-builder` and `chakra-ui-refactor` skills tell you to import `@chakra-ui/react`.** In this repo that is wrong
   (rule 1); use them for Chakra v3 API knowledge only.
 - **A colour from a scale step or hex "just here".** Add a semantic token.
+- **A `*Banner`, `*Notice` or `*Callout` in a module that draws its own box.**
+  It wraps `Banner` or `Alert` and adds only words and wiring, or it goes.
 - **Pattern docs lag the record.** Where one disagrees, the record wins:
   browser packages are `*-browser` (§16), and `best_practices/drawers.md` no
   longer exists: drawers are routed singletons, see `browser-module`.

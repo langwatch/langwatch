@@ -1,1 +1,1 @@
-ALTER TABLE "NurturingOrganization" ADD COLUMN "simulationRunCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "NurturingOrganization" ADD COLUMN IF NOT EXISTS "simulationRunCount" INTEGER NOT NULL DEFAULT 0;

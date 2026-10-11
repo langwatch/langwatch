@@ -8,7 +8,6 @@ import { randomUUID } from "node:crypto";
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
@@ -76,7 +75,6 @@ async function storage() {
       }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
-      licensing: createApiFixture<LicensingApi>(),
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>({
         getSignInProviderMounts: async () => ({ socialProviders: {}, genericOAuthConfigs: [] }),

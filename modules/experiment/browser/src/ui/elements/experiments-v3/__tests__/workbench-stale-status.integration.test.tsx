@@ -31,7 +31,7 @@ describe("stale workbench status", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(onReload).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Out of date" }));
-    await user.click(screen.getByRole("button", { name: "Reload", exact: true }));
+    await user.click(screen.getByRole("button", { name: /^Reload$/ }));
     expect(onReload).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
@@ -47,13 +47,13 @@ describe("stale workbench status", () => {
     renderWithDesignSystem(<WorkbenchStaleStatus isDirty={false} onReload={onReload} />);
     await user.click(screen.getByRole("button", { name: "Out of date" }));
     expect(screen.getByRole("dialog")).not.toHaveTextContent("discards your unsaved edits");
-    await user.click(screen.getByRole("button", { name: "Reload", exact: true }));
+    await user.click(screen.getByRole("button", { name: /^Reload$/ }));
     expect(showErrorToast).toHaveBeenCalledWith({
       error,
       fallbackTitle: "Couldn't reload this evaluation",
     });
     expect(screen.getByRole("dialog")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Reload", exact: true }));
+    await user.click(screen.getByRole("button", { name: /^Reload$/ }));
     expect(onReload).toHaveBeenCalledTimes(2);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });

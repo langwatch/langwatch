@@ -125,6 +125,38 @@ describe("RunKeyMintService", () => {
     expect(created).toHaveLength(0);
   });
 
+  /** @scenario "The scenario canary starts its run as the probe's own API key" */
+  it("mints traces:create for a run a member's key started, as a child of that key", async () => {
+    const { service, created } = createService(["traces:create"], ["traces:create"]);
+
+    await service.mintRunKey({
+      userId: starter,
+      callerApiKeyId: "probe-key-1",
+      projectId,
+      permissions: ["traces:create"],
+    });
+
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({
+      userId: starter,
+      parentApiKeyId: "probe-key-1",
+      permissions: ["traces:create"],
+    });
+  });
+
+  /** @scenario "A run whose starter is no user on the project is refused its key" */
+  it("refuses traces:create, and mints nothing, for a made-up starter that holds no permission", async () => {
+    const { service, created } = createService([]);
+
+    await expect(
+      service.mintRunKey({ userId: "scenario-canary", projectId, permissions: ["traces:create"] }),
+    ).rejects.toMatchObject({
+      code: "api_key_permission_denied",
+      meta: { permission: "traces:create" },
+    });
+    expect(created).toHaveLength(0);
+  });
+
   /** @scenario "A run started with a service key holds no more than that key" */
   it("bounds an ownerless run a service key started by that key's permissions", async () => {
     const { service, created } = createService([], ["traces:create"]);

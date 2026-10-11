@@ -111,7 +111,6 @@ describe.skipIf(!enabled)("the seat read against a real ClickHouse", () => {
           await ClickHouseMigrateTask.createFromConfig({
             config: {
               buildTime: false,
-              skipped: false,
               sharedUrl: endpoint.url,
               privateEndpoints: [],
             },

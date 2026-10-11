@@ -149,4 +149,38 @@ describe("ModelProviderExecutionService.prepare", () => {
       expect(prepared.model).toBe("openai/gpt-5-mini");
     });
   });
+
+  describe("given a Gemini row whose stored keys carry a generic base_url", () => {
+    /** @scenario "A Gemini or Vertex provider with a base URL reaches that host instead of Google's" */
+    it("sends it as api_base, as the gateway wire does", async () => {
+      const gemini = {
+        provider: "gemini",
+        enabled: true,
+        models: ["gemini-2.5-flash"],
+        customKeys: { GEMINI_API_KEY: "llmsim", base_url: "http://127.0.0.1:21651" },
+      };
+      const service = ModelProviderExecutionService.create({
+        query: {
+          getExecutionProviders: async () => ({ gemini }),
+          getByIdForProject: async () => {
+            throw new ModelProviderNotFoundError();
+          },
+          findRowServingModel: async () => null,
+        },
+        catalog: {
+          prepareExecution: async ({ parameters }: { parameters: Record<string, unknown> }) =>
+            parameters,
+          pickExecutionDefinition: () => ({ apiKey: "GEMINI_API_KEY" }),
+          pickExecutionValue: ({ key }: { key: string }) =>
+            (gemini.customKeys as Record<string, string>)[key] ?? null,
+          pickStoredExecutionValue: ({ key }: { key: string }) =>
+            (gemini.customKeys as Record<string, string>)[key] ?? null,
+        },
+      } as never);
+
+      const prepared = await prepare(service, "gemini/gemini-2.5-flash");
+
+      expect(prepared).toMatchObject({ api_base: "http://127.0.0.1:21651" });
+    });
+  });
 });

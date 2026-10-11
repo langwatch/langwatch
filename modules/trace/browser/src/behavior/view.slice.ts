@@ -6,7 +6,7 @@ import type { StateCreator } from "zustand";
 import {
   LENS_CAPABILITIES,
   reconcileAddons,
-  reconcileColumns,
+  columnsForGrouping,
   reconcileSort,
 } from "../model/lens-capabilities.ts";
 import type { ExplorerStore } from "./explorer.store.ts";
@@ -117,6 +117,11 @@ export interface ViewSlice {
    * reference, so `setUserLenses` never runs on a project's first lens.
    */
   discardRefusedLens: (args: { lensId: string; fallbackLensId: string }) => void;
+  /**
+   * Re-read the remembered drafts, dismissed built-ins and last lens. The store is built
+   * when this module loads, which can be before the shell installs device storage.
+   */
+  restoreRememberedView: () => void;
 }
 
 /**
@@ -540,6 +545,7 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   columnOrder: initialActiveDraft?.columns ?? initialActiveLens?.columns ?? defaultColumnOrder,
   draftState: initialDrafts,
 
+  restoreRememberedView: () => set((s) => rememberedViewState(s)),
   ...viewShapeActions(set, get),
   ...lensLibraryActions(set, get),
   ...lensLifecycleActions(set, get),
@@ -583,7 +589,7 @@ function viewShapeActions(
       // e.g. flat knows `time/trace/service`, group knows `group/count/duration`.
       const s = get();
       const capability = LENS_CAPABILITIES[mode];
-      const columns = reconcileColumns({ ids: s.columnOrder, capability });
+      const columns = columnsForGrouping({ ids: s.columnOrder, capability });
       const sort = reconcileSort(s.sort, capability);
       // reconcileSort can swap the sort column out from under the table without
       // the user ever touching a header: a grouped RowKind can't order by
@@ -891,6 +897,28 @@ function discardRefusedLens({
     grouping: draft?.grouping ?? next.grouping,
     columnOrder: draft?.columns ?? next.columns,
   });
+}
+
+/** What device storage remembers, laid over the view as initialisation would have. */
+function rememberedViewState(s: ViewSlice): Partial<ViewSlice> {
+  const dismissed = loadDismissedBuiltInIds();
+  const allLenses = s.allLenses.filter((l) => !(l.isBuiltIn && dismissed.has(l.id)));
+  const persisted = getPersistedActiveLensId();
+  const activeLensId =
+    (persisted && allLenses.find((l) => l.id === persisted)?.id) ||
+    (allLenses.some((l) => l.id === s.activeLensId) ? s.activeLensId : allLenses[0]?.id) ||
+    s.activeLensId;
+  const draftState = loadDrafts();
+  const lens = allLenses.find((l) => l.id === activeLensId);
+  const draft = draftState.get(activeLensId);
+  return {
+    allLenses,
+    activeLensId,
+    draftState,
+    sort: draft?.sort ?? lens?.sort ?? s.sort,
+    grouping: draft?.grouping ?? lens?.grouping ?? s.grouping,
+    columnOrder: draft?.columns ?? lens?.columns ?? s.columnOrder,
+  };
 }
 
 /** A built-in is dismissed locally; a user lens is deleted on the server. */

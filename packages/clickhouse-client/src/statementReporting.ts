@@ -61,6 +61,16 @@ export function guardedLogSink(sink: StatementLogSink): StatementLogSink {
   };
 }
 
+/** Whether the caller set `SKIP_COLD_SCAN_CHECK`: a read declared to walk every partition. */
+function declaresFullScan(params: unknown): boolean {
+  return (
+    typeof params === "object" &&
+    params !== null &&
+    "SKIP_COLD_SCAN_CHECK" in params &&
+    params.SKIP_COLD_SCAN_CHECK === true
+  );
+}
+
 const NOOP_SINK: StatementLogSink = {
   debug: () => undefined,
   warn: () => undefined,
@@ -193,7 +203,9 @@ export class StatementReporter {
       // per call. Worth warning even when fast, because the cost is request
       // count, not latency.
       const coldScanTable =
-        operation === "query" ? this.detectColdScan(extractRawQuery(params)) : null;
+        operation === "query" && !declaresFullScan(params)
+          ? this.detectColdScan(extractRawQuery(params))
+          : null;
 
       if (coldScanTable !== null) {
         this.outcomeLogger.warn(

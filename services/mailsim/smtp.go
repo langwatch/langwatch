@@ -69,7 +69,7 @@ func (s *session) Auth(mech string) (sasl.Server, error) {
 }
 
 func (s *session) Mail(from string, _ *smtp.MailOptions) error {
-	if err := s.fault.refusal(); err != nil {
+	if err := s.fault.refusal(from); err != nil {
 		return err
 	}
 	s.from = from

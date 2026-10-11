@@ -113,6 +113,15 @@ export default function NewExperimentWorkbench() {
   return (
     <Box width="full">
       <Center height="calc(100vh - 100px)">
+        {datasetQuery.isError ? (
+          <Box padding={6} maxWidth="500px">
+            <HandledErrorAlert
+              error={datasetQuery.error}
+              fallbackTitle="Couldn't load the dataset for this experiment"
+              onRetry={() => void datasetQuery.refetch()}
+            />
+          </Box>
+        ) : null}
         {createExperiment.isError ? (
           <Box padding={6} maxWidth="500px">
             <HandledErrorAlert

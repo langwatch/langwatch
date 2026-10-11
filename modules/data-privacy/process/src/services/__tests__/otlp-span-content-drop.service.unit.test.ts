@@ -7,7 +7,7 @@ import {
   type Disposition,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { describe, expect, it, vi } from "vitest";
 
 import type { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";

@@ -110,7 +110,7 @@ import {
   RunawayContainmentService,
   type AutomationRunawaySignals,
 } from "../features/runaway/services/runaway-containment.service.ts";
-import { AutomationDispatchErrorsTerminalService } from "../features/settlement/services/automation-dispatch-errors-terminal.service.ts";
+import { AutomationDispatchErrorsService } from "../features/settlement/services/automation-dispatch-errors.service.ts";
 import { AutomationSettlementBreachLateService } from "../features/settlement/services/automation-settlement-breach-late.service.ts";
 import { AutomationSettlementBreachLoggedService } from "../features/settlement/services/automation-settlement-breach-logged.service.ts";
 import { AutomationSettlementLedgerService } from "../features/settlement/services/automation-settlement-ledger.service.ts";
@@ -184,7 +184,9 @@ type AutomationActionParamsParse =
   | Readonly<{ success: true; data: unknown }>
   | Readonly<{
       success: false;
-      error: Readonly<{ issues: readonly Readonly<{ message: string }>[] }>;
+      error: Readonly<{
+        issues: readonly Readonly<{ message: string; path: readonly PropertyKey[] }>[];
+      }>;
     }>;
 
 /** The per-action `actionParams` parser the process's provider registry owns. */
@@ -535,7 +537,7 @@ export class AutomationModule implements AutomationApi {
       logger,
       slackDestinations: input.slackDestinations,
       slackConnections: input.slackConnections,
-      dispatchErrors: AutomationDispatchErrorsTerminalService.create(),
+      dispatchErrors: AutomationDispatchErrorsService.create(),
       runaway: AutomationRunawayUncontainedService.create(logger),
       testFire: AutomationTestFireService.create({
         mail: input.notifications,

@@ -120,8 +120,16 @@ export class PlatformHealthModule implements PlatformHealthApiContract {
       monitorDoor,
       projectKeyed: ProjectKeyedProbeService.create({
         probes,
-        resolveProject: async (input) =>
-          (await dependencies.apiKeys.findResolvedToken(input))?.project.id ?? null,
+        resolveCaller: async (input) => {
+          const resolved = await dependencies.apiKeys.findResolvedToken(input);
+          if (!resolved) return null;
+          const isApiKey = resolved.type === "apiKey";
+          return {
+            projectId: resolved.project.id,
+            userId: isApiKey ? resolved.userId : null,
+            apiKeyId: isApiKey ? resolved.apiKeyId : null,
+          };
+        },
         scenarioCanary: ScenarioCanaryService.create({
           peers: { scenarios: dependencies.scenarios, suites: dependencies.suites },
         }),

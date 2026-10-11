@@ -340,12 +340,29 @@ export interface LangWatchQLPassSchema extends Named<typeof langWatchQLPassSchem
 export const langWatchQLPassSchema: LangWatchQLPassSchema = langWatchQLPassSchemaDefinition;
 export type LangWatchQLPass = z.infer<typeof langWatchQLPassSchema>;
 
+/**
+ * The caller's answer to whether this project may call an eval function. Instant Evals owns
+ * that rule (flag, licence, opt-in) and states it on every pass; there is no default, so a
+ * caller that does not know says false. @see modules/instant-eval/specs/instant-eval-opt-in.feature
+ */
+const langWatchQLEvalAnswerSchemaDefinition = z
+  .object({ isInstantEvalsEnabled: z.boolean() })
+  .strict()
+  .readonly();
+export interface LangWatchQLEvalAnswerSchema extends Named<
+  typeof langWatchQLEvalAnswerSchemaDefinition
+> {}
+export const langWatchQLEvalAnswerSchema: LangWatchQLEvalAnswerSchema =
+  langWatchQLEvalAnswerSchemaDefinition;
+export type LangWatchQLEvalAnswer = z.infer<typeof langWatchQLEvalAnswerSchema>;
+
 /** A statement re-validated by the full policy, then run inside the wrapper its pass names. */
 export type LangWatchQLPassInput = Pick<
   LangWatchQLExecuteInput,
   "project" | "protections" | "sql" | "parameters"
 > &
-  Readonly<{ pass: LangWatchQLPass }>;
+  Readonly<{ pass: LangWatchQLPass }> &
+  LangWatchQLEvalAnswer;
 
 /**
  * One restricted execution over a SET of projects — every project an API key may read. Their
@@ -367,12 +384,13 @@ export type LangWatchQLTextHydrationInput = Readonly<{
   /** The statement's app-function calls, as the validator recorded them. */
   calls: readonly LangWatchQLAppFunctionCall[];
   traceIds: readonly string[];
-}>;
+}> &
+  LangWatchQLEvalAnswer;
 
 /**
- * The eval-function gate, which Analytics resolves from the project's rollout
- * rather than taking from a caller — it travels only from Analytics to the
- * engine below it.
+ * The eval-function gate Analytics hands the engine below it: resolved from the project's
+ * rollout on a member's own statement, taken from the caller's {@link LangWatchQLEvalAnswer}
+ * on a pass.
  */
 export type LangWatchQLEvalGate = Readonly<{
   /** Whether an eval function may be called. Absent means no. */

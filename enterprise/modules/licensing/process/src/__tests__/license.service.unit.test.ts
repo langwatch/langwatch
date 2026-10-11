@@ -265,6 +265,37 @@ describe("LicenseService", () => {
       expect(repository.listCalls).toBe(2);
     });
 
+    /** @scenario "A licence store that does not answer denies federation within the gate's timeout" */
+    it("denies once the timeout passes, then keeps the stuck scan's answer", async () => {
+      let release: () => void = () => {};
+      const answered = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const listed = repository.findOrganizationsWithLicense.bind(repository);
+      repository.findOrganizationsWithLicense = async () => {
+        await answered;
+        return listed();
+      };
+      repository.stored.set(ORGANIZATION_ID, {
+        licenseKey: VALID_LICENSE_KEY,
+        expiresAt: Temporal.Instant.from("2030-01-01T00:00:00.000Z"),
+        validatedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
+      });
+      const stuck = LicenseService.create({
+        repository,
+        cryptography: NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY }),
+        logger,
+        configuration: LicenseServiceConfiguration.create({ ssoGateTimeoutMs: 20 }),
+      });
+
+      await expect(stuck.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+      expect(logger.errors).toHaveLength(1);
+
+      release();
+      await expect(stuck.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(true);
+      expect(repository.listCalls).toBe(1);
+    });
+
     it("reads a license this process stored at once, and keeps an allow", async () => {
       await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
 
@@ -289,6 +320,18 @@ describe("LicenseService", () => {
     it("answers licensed on LangWatch Cloud without scanning", async () => {
       await expect(service.isPlatformSsoLicensed({ isSaas: true })).resolves.toBe(true);
       expect(repository.listCalls).toBe(0);
+    });
+
+    /** @scenario "The SSO scan before the license table exists logs no error" */
+    it("denies without an error while the license table does not exist yet", async () => {
+      repository.findOrganizationsWithLicense = async () => {
+        throw Object.assign(new Error("table `OrganizationLicense` does not exist"), {
+          code: "P2021",
+        });
+      };
+
+      await expect(service.isPlatformSsoLicensed({ isSaas: false })).resolves.toBe(false);
+      expect(logger.errors).toEqual([]);
     });
 
     it("denies while the scan fails, and scans again on the next ask", async () => {

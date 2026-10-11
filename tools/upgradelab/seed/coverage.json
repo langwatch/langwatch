@@ -108,6 +108,11 @@
       "seed": "unplanned",
       "note": "main has no headless door for a plaintext custom key: SQL row not written yet"
     },
+    "ops:checkup-canary-project": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "creates its own hidden system organization and project; nothing to seed"
+    },
     "ops:copy-automation-migration-state": {
       "status": "pending",
       "seed": "unplanned",

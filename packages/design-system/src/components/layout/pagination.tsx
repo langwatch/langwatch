@@ -105,7 +105,14 @@ function PageSummary({
   if (onPageSizeChange) segments.push("per page");
 
   return (
-    <HStack gap={1.5} justifySelf="start" data-testid="pagination-indicator">
+    <HStack
+      gap={1.5}
+      rowGap={1}
+      flexWrap="wrap"
+      justifySelf="start"
+      minWidth={0}
+      data-testid="pagination-indicator"
+    >
       <Text textStyle="xs" color="fg.muted" flexShrink={0}>
         {segments.join(" · ")}
       </Text>
@@ -175,7 +182,7 @@ function PageNavigator({
       siblingCount={2}
       onPageChange={(details) => onPageChange(details.page)}
     >
-      <HStack gap={0.5}>
+      <HStack gap={0.5} flexWrap="wrap" justifyContent={{ base: "start", md: "end" }}>
         <ChakraPagination.PrevTrigger asChild>
           <Button
             variant="ghost"
@@ -260,8 +267,9 @@ export function Pagination({
 
   return (
     // The count on the left, the pages on the right, on whatever ground the list sits on.
+    // A phone stacks the count above the pages, so neither runs into the other.
     <Grid
-      templateColumns="1fr auto"
+      templateColumns={{ base: "minmax(0, 1fr)", md: "1fr auto" }}
       alignItems="center"
       gap={3}
       paddingX={2}

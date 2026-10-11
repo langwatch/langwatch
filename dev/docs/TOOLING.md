@@ -117,9 +117,9 @@ replay whatever lands in the shared cache.
 
 ## Why some things are in Go
 
-The dev scripts (`generate-modules`, `sync-references`) walk
-the whole tree on every start, so they need to be quick. `devscripts.sh` runs them with `go run` when Go is
-installed, or a prebuilt binary in Docker.
+The dev script (`generate-modules`) walks the whole tree on every start, so it
+needs to be quick. `devscripts.sh` runs it with `go run` when Go is installed, or a
+prebuilt binary in Docker.
 
 ## Builds
 
@@ -151,6 +151,18 @@ pnpm exec nx run workspace:build:types      # tsc -b; `pnpm build:types` calls i
 make herrgen lint-rules test-scripts        # each calls its cached Nx target
 ```
 
+## Project references
+
+Every package's `tsconfig.json` is a container: it compiles nothing and references
+the package's own configs, `tsconfig.build.json` (declarations into `dist`) and
+`tsconfig.test.json` (sources and tests), or `tsconfig.app.json` for a package that
+publishes no declarations. The references between packages come from the Nx project
+graph: `pnpm sync:references` runs `nx sync` (the `@nx/js:typescript-sync`
+generator), `pnpm typecheck` runs it first, and CI's `nx sync:check` fails on drift.
+The generator needs TypeScript 6's compiler API, so pnpm `packageExtensions` gives
+`@nx/js` its own `typescript@6.0.3`; the root `tsc` stays 7.
+[ADR-150](adr/150-nx-task-runner.md) has the 2026-10-10 amendment.
+
 ## What "prepare" does
 
 `pnpm start:prepare:files` runs before the stack starts:
@@ -173,6 +185,7 @@ pnpm lint                    # whole-tree oxlint, uncached (oxlint is fast)
 pnpm lint:changed            # the same for what you changed and its dependents
 pnpm lint:architecture       # whole-tree policies
 pnpm typecheck               # one root tsc -b, incremental: rechecks only what changed
+pnpm sync:references         # nx sync: project references, after a dependency change
 ```
 
 If a heavy command sits there saying it's queued, haven is waiting for a slot.

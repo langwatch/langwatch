@@ -6,9 +6,15 @@
 
 import { TIME_PARTITIONED_TABLES } from "./timePartitionedTables.ts";
 
-/** Strip line and block comments so they can't hide or fake a predicate. */
-function stripComments(sql: string): string {
-  return sql.replace(/--[^\n]*/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");
+/**
+ * Strip comments, which can hide or fake a predicate, and blank out string literals, which name no
+ * table (`table = 'trace_summaries'` in a `system.mutations` read is not a read of it).
+ */
+function stripCommentsAndLiterals(sql: string): string {
+  return sql
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/'(?:[^'\\]|\\.|'')*'/g, "''");
 }
 
 /**
@@ -36,7 +42,7 @@ export function detectColdScan(query: string): string | null {
     return null;
   }
 
-  const sql = stripComments(query);
+  const sql = stripCommentsAndLiterals(query);
   const trimmed = sql.trimStart().toUpperCase();
   const isReadStatement = trimmed.startsWith("SELECT") || trimmed.startsWith("WITH");
   if (!isReadStatement) {

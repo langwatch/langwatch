@@ -42,8 +42,10 @@ export function middleTail({ text, tail }: { text: string; tail?: number }): num
 
 const SELECT_ALL = { userSelect: "all", WebkitUserSelect: "all" } as const;
 const ACCENT = {
-  verticalAlign: "baseline",
+  verticalAlign: "middle",
   paddingX: "1",
+  paddingY: "2px",
+  marginY: "-2px",
   borderRadius: "xs",
   bg: "bg.control",
   color: "blue.fg",

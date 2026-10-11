@@ -36,6 +36,9 @@ haven browser type "hello" --lane qa-1 --as admin          # into the focused el
 haven browser press Enter --lane qa-1 --as admin
 haven browser screenshot --lane qa-1 --as admin --out .claude/tmp/qa-1.png
 haven browser eval "document.title" --lane qa-1 --as admin
+haven browser route add '**/api/trpc/**' --status 503 --times 1 --lane qa-1  # fault matching requests (Playwright context route)
+haven browser route list --lane qa-1                       # rules with their hit counts
+haven browser route off --lane qa-1                        # lift every rule (or name one glob)
 haven browser state-load state.json --lane qa-1            # load a Playwright storage state (see haven-auth)
 haven browser close --lane qa-1                            # this lane only
 haven browser status                                       # the whole browser
@@ -54,6 +57,8 @@ Passkeys, security keys and TOTP codes: `haven browser mfa add|list|remove|uv|to
 | `--stack <slug>`      | another worktree's stack                                                  |
 | `--wait-for <sel>`    | also wait for a CSS or `text=` selector, e.g. `--wait-for 'text=Members'` |
 | `--timeout <dur>`     | bound on page waits (default 30s)                                         |
+| `--status <code>`     | route add: the status matching requests answer (default 503)              |
+| `--times <n>`         | route add: fault only the next n matches, then let requests through       |
 | `--out <file>`        | screenshot PNG, or the script `record stop` writes                        |
 | `--json`              | machine-readable reply                                                    |
 

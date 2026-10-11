@@ -89,3 +89,16 @@ Feature: Experiment run results say whether they are whole
     Given a finished run whose results answer is not complete
     When the MCP results tool renders it
     Then it says the run is still being stored and how much of it is stored so far
+
+  # NO-HOLDS (ARCHITECTURE.md section 7): head's api serves while goose 00105 is still pending.
+  @unit
+  Scenario: A run's state read before the expected-results columns exist answers no counts
+    Given the ClickHouse target has no ExpectedTargetResults or ExpectedEvaluatorResults on experiment_runs yet
+    When the run's state is read
+    Then the read selects NULL counts under the column names instead of failing
+
+  @unit
+  Scenario: A run's state read once the expected-results columns exist answers the stored counts
+    Given the ClickHouse target has the expected-results columns on experiment_runs
+    When the run's state is read
+    Then the read selects the stored expected-results columns

@@ -8,6 +8,7 @@ import { SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import {
+  cachedTenantDirectory,
   type PrivateTenantRows,
   prismaTenantDirectory,
   privateTenantListing,
@@ -18,6 +19,7 @@ function directoryOver(world: {
   projects?: Record<string, string>;
   organizations?: string[];
   users?: string[];
+  recorded?: Record<string, { clickhouse?: string; s3?: string }>;
 }) {
   const asked: string[] = [];
   const rows: TenantDirectoryRows = {
@@ -29,9 +31,16 @@ function directoryOver(world: {
       },
     },
     organization: {
-      findUnique: async ({ where }) => {
+      findUnique: async ({ where }: { where: { id: string } }) => {
         asked.push(`organization:${where.id}`);
-        return (world.organizations ?? []).includes(where.id) ? { id: where.id } : null;
+        const recorded = world.recorded?.[where.id];
+        return (world.organizations ?? []).includes(where.id)
+          ? {
+              id: where.id,
+              privateClickHouseLabel: recorded?.clickhouse ?? null,
+              privateS3Label: recorded?.s3 ?? null,
+            }
+          : null;
       },
     },
     user: {
@@ -165,6 +174,27 @@ describe("the private tenant listing", () => {
 
       expect(privateTenantListing({ prisma: rows, organizationIds: [] })).toBeUndefined();
       expect(afters).toEqual([]);
+    });
+  });
+});
+
+describe("given an organization the organization module recorded as private", () => {
+  describe("when the stores ask for its record", () => {
+    /** @scenario "A recorded private organization whose route is missing is refused, naming the variable" */
+    it("answers the recorded labels, read once per process through the cache", async () => {
+      const { directory, asked } = directoryOver({
+        organizations: ["org_1"],
+        recorded: { org_1: { clickhouse: "acme" } },
+      });
+      const cached = cachedTenantDirectory(directory);
+
+      await expect(cached.recordedPrivateDataplaneOf?.("org_1")).resolves.toEqual({
+        clickhouseLabel: "acme",
+        s3Label: null,
+      });
+      await cached.recordedPrivateDataplaneOf?.("org_1");
+
+      expect(asked).toEqual(["organization:org_1"]);
     });
   });
 });

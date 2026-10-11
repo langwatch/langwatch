@@ -13,7 +13,8 @@ export function IssuerRow({
   issuer,
   onEdit = null,
 }: {
-  issuer: string;
+  /** Null for a SAML connection registered from metadata alone: nothing recorded it. */
+  issuer: string | null;
   onEdit?: (() => void) | null;
 }) {
   return (
@@ -27,24 +28,32 @@ export function IssuerRow({
         </Text>
       </VStack>
       <HStack gap={1} minWidth={0} maxWidth="full">
-        <Text
-          fontFamily="mono"
-          fontSize="xs"
-          color="fg.muted"
-          truncate
-          maxWidth="full"
-          title={issuer}
-        >
-          {issuer.replace(/^https?:\/\//, "")}
-        </Text>
-        <CopyButton
-          value={issuer}
-          label="Issuer address"
-          aria-label="Copy issuer address"
-          size="xs"
-          flexShrink={0}
-          color="fg.subtle"
-        />
+        {issuer === null ? (
+          <Text fontSize="xs" color="fg.subtle">
+            Not recorded
+          </Text>
+        ) : (
+          <>
+            <Text
+              fontFamily="mono"
+              fontSize="xs"
+              color="fg.muted"
+              truncate
+              maxWidth="full"
+              title={issuer}
+            >
+              {issuer.replace(/^https?:\/\//, "")}
+            </Text>
+            <CopyButton
+              value={issuer}
+              label="Issuer address"
+              aria-label="Copy issuer address"
+              size="xs"
+              flexShrink={0}
+              color="fg.subtle"
+            />
+          </>
+        )}
         {onEdit && (
           <Tooltip content="Edit identity provider settings">
             <IconButton

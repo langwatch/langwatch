@@ -348,7 +348,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     },
     build: {
       outDir: "dist/client",
-      sourcemap: true,
+      sourcemap: !IS_LOCAL_BUILD,
       reportCompressedSize: !IS_LOCAL_BUILD,
       rollupOptions: {
         // Vite 8.3's bundled client lacks the `requestLazy` rolldown 1.2.9 emits for lazy imports.

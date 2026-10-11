@@ -18,10 +18,10 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.js.json",
     "dev": "vite --config preview/vite.config.ts",
     "build:studio": "vite build --config preview/vite.config.ts",
-    "typecheck": "tsc -b tsconfig.json preview/tsconfig.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

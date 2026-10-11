@@ -92,6 +92,7 @@ export class AuthzGrantProjection implements MapProjectionDefinition<
         createdByUserId: data.resource?.createdByUserId ?? null,
         expiresAt: expiresAtMs ? Temporal.Instant.fromEpochMilliseconds(expiresAtMs) : null,
         maxViews: data.resource?.maxViews ?? null,
+        ...(data.condition !== undefined ? { condition: data.condition } : {}),
         occurredAt: Temporal.Instant.fromEpochMilliseconds(event.occurredAt),
       },
     };

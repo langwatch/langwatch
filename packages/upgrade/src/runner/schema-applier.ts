@@ -13,6 +13,14 @@ export type SchemaTargetReport =
       applied: ReadonlySet<string> | null;
     };
 
+/** How the ledger names a private ClickHouse target: `private:<organizationId>`. */
+export const PRIVATE_TARGET_PREFIX = "private:";
+
+/** A private target holds only its organizations; any other target holds the installation. */
+export function isPrivateTarget({ target }: { target: string }): boolean {
+  return target.startsWith(PRIVATE_TARGET_PREFIX);
+}
+
 /**
  * Applies the image's schema. `release` is the release to stop at (null: every step the image
  * ships); an applier that cannot step applies everything on its first call (rethink 6.4, 6.5).
@@ -23,6 +31,8 @@ export interface UpgradeSchemaApplier {
     release: string | null;
     lockTimeoutMs: number;
     signal: AbortSignal;
+    /** ClickHouse targets this run already holds back; the applier leaves them alone. */
+    skipTargets?: ReadonlySet<string>;
   }): Promise<readonly SchemaTargetReport[]>;
   /**
    * `prisma migrate resolve --rolled-back` for one failed migration the image ships. Absent: the
@@ -38,6 +48,8 @@ export interface UpgradeSchemaApplier {
 /** A level-triggered reconciler run as the last phase of every upgrade (TTL, LangWatchQL). */
 export interface UpgradeReconciler {
   readonly name: string;
+  /** The ClickHouse target it reconciles, when one; skipped while the run holds that target. */
+  readonly target?: string;
   run(args: { signal: AbortSignal }): Promise<void>;
 }
 

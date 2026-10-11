@@ -18,7 +18,6 @@ export function formatStatus({ status }: { status: UpgradeStatus }): string {
     "",
     `Installed:    ${status.installed ?? "no release recorded"}${status.origin === "inferred" ? " (inferred from another tool's record)" : ""}`,
     `Image:        ${status.image}`,
-    `Floor:        ${status.floor ?? "none"}${status.ledgerFloor ? ` (the ledger was last upgraded with ${status.ledgerFloor})` : ""}`,
     `Steps:        ${counts.length > 0 ? counts.join(", ") : "none recorded"}`,
   ];
   if (status.failedStepIds.length > 0) {

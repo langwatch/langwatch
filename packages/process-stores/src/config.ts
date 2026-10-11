@@ -25,6 +25,16 @@ export interface ClickHousePrivateRoute {
   readonly organizationId: string;
   /** With credentials in the URL, as the driver expects. */
   readonly url: string;
+  /** The variable's human label and its name, never its value. */
+  readonly label?: string;
+  readonly variable?: string;
+}
+
+/** A private route or S3 account variable present but unusable: its organization is refused. */
+export interface MalformedPrivateVariable {
+  readonly organizationId: string;
+  readonly label: string;
+  readonly variable: string;
 }
 
 /** ClickHouse, as the endpoints this process may reach. */
@@ -33,6 +43,8 @@ export interface ClickHouseConfig {
   readonly url?: string;
   /** `CLICKHOUSE_URL__<label>__<orgId>`, the stores' secret family parsed once at boot. */
   readonly privateRoutes?: readonly ClickHousePrivateRoute[];
+  /** Route variables that did not parse: those organizations are refused, never shared. */
+  readonly malformedRoutes?: readonly MalformedPrivateVariable[];
   /** What sizes the per-endpoint pool, as main's `CLICKHOUSE_*` pool variables state it. */
   readonly poolSizing?: PoolSizingInput;
   /** How long one statement may take before the driver abandons it. */
@@ -124,6 +136,9 @@ export interface ObjectStorageAccount {
 /** One organization writing to its own S3 account rather than the shared backend. */
 export interface ObjectStoragePrivateAccount extends ObjectStorageAccount {
   readonly organizationId: string;
+  /** The variable's human label and its name, never its value. */
+  readonly label?: string;
+  readonly variable?: string;
 }
 
 /** The identity a Kubernetes workload-identity webhook injected, as the boot seam read it. */
@@ -160,6 +175,8 @@ export type ObjectStorageConfig = (
 ) &
   Readonly<{
     privateAccounts?: readonly ObjectStoragePrivateAccount[];
+    /** `DATAPLANE_S3__` variables that did not parse: those organizations are refused. */
+    malformedPrivateAccounts?: readonly MalformedPrivateVariable[];
     legacyAzure?: ObjectStorageAzureConfig;
   }>;
 

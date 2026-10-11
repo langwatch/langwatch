@@ -22,6 +22,8 @@ export interface FilterTranslation {
   requiredJoins: CHTable[];
   /** Parameter values for parameterized queries */
   params: Record<string, unknown>;
+  /** The selection inverted, for the negate toggle; set by {@link combineFilters}. */
+  negatedWhereClause?: string;
 }
 
 /**
@@ -719,7 +721,39 @@ export function combineFilters(translations: FilterTranslation[]): FilterTransla
     whereClause: whereClauses.join(" AND "),
     requiredJoins: Array.from(allJoins),
     params: allParams,
+    negatedWhereClause: negatedConjunction(nonTrivial.map((t) => t.whereClause)),
   };
+}
+
+/** `NOT (a AND b)` as `NOT a OR NOT b`, one bracket around the disjunction. */
+function negatedConjunction(whereClauses: string[]): string {
+  const negated = whereClauses.map(negateFilterClause);
+  return negated.length === 1 ? negated[0]! : `(${negated.join(" OR ")})`;
+}
+
+const SPAN_SUBQUERY_FILTER = /^(\w+\.TraceId) IN (\(.*\))$/s;
+
+/**
+ * One filter inverted. A trace-id subquery becomes `NOT IN`: its subquery carries its own
+ * tenant predicate, which a `NOT (…)` bracket would appear to negate to the tenant guard
+ * (WEB-17801).
+ */
+function negateFilterClause(whereClause: string): string {
+  const subquery = SPAN_SUBQUERY_FILTER.exec(whereClause.trim());
+  return subquery && closesAtEnd(subquery[2]!)
+    ? `${subquery[1]} NOT IN ${subquery[2]}`
+    : `NOT (${whereClause})`;
+}
+
+/** Whether the bracket opening `text` is the one closing it, so the match is one operand. */
+function closesAtEnd(text: string): boolean {
+  let depth = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    if (text[index] === "(") depth += 1;
+    if (text[index] === ")") depth -= 1;
+    if (depth === 0) return index === text.length - 1;
+  }
+  return false;
 }
 
 /** The translations one nested filter value yields, at one or two key levels. */

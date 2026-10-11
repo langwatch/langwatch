@@ -133,7 +133,12 @@ func (s *Server) handleAPISignIn(w http.ResponseWriter, r *http.Request) {
 		authorizePath, view.Provider = path, query.Get("social")
 	}
 	query.Del("social")
-	if notice, _, refused := unregisteredRedirect(t, parseAuthorizeRequest(query)); refused {
+	// A SAML request carries its ACS URL inside the signed request, not a redirect_uri.
+	isSAML := query.Get("saml") == "1"
+	query.Del("saml")
+	if isSAML {
+		authorizePath = "/t/" + strconv.Itoa(t.ID) + "/saml/sso"
+	} else if notice, _, refused := unregisteredRedirect(t, parseAuthorizeRequest(query)); refused {
 		view.Refusal = &notice
 		writeJSON(w, http.StatusOK, view)
 		return
@@ -152,6 +157,10 @@ func (s *Server) handleAPISignIn(w http.ResponseWriter, r *http.Request) {
 	cancelled := maps.Clone(query)
 	cancelled.Set("cancel", "1")
 	view.CancelHref = authorizePath + "?" + cancelled.Encode()
+	if isSAML {
+		// SAML has no access_denied to send back; leaving goes to the tenant page.
+		view.CancelHref = "/t/" + strconv.Itoa(t.ID) + "/"
+	}
 	writeJSON(w, http.StatusOK, view)
 }
 

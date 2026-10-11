@@ -333,6 +333,9 @@ func (o *Orchestrator) restartObservability(ctx context.Context) error {
 	if o.obs == nil {
 		return fmt.Errorf("observability is not managed here")
 	}
+	if o.isObservabilityOff() {
+		return fmt.Errorf("observability is switched off: haven machine settings set %s on", domain.SettingObservability)
+	}
 	_ = o.obs.Stop(ctx)
 	endpoints, err := o.obs.Ensure(ctx)
 	if err != nil {

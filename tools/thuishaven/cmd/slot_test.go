@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -21,36 +21,39 @@ import (
 )
 
 func TestParseSlotRun(t *testing.T) {
-	t.Run("the label defaults to the command", func(t *testing.T) {
-		label, _, argv, err := parseSlotRun([]string{"--", "tsgo", "--noEmit"})
-		if err != nil || label != "tsgo" || len(argv) != 2 {
-			t.Fatalf("got label=%q argv=%v err=%v", label, argv, err)
+	t.Run("the label defaults to the command and the class to a check", func(t *testing.T) {
+		args, err := parseSlotRun([]string{"--", "tsgo", "--noEmit"})
+		if err != nil || args.label != "tsgo" || len(args.argv) != 2 || args.class != domain.ClassCheck {
+			t.Fatalf("got %+v err=%v", args, err)
 		}
 	})
 
 	t.Run("an explicit label survives", func(t *testing.T) {
-		label, _, argv, err := parseSlotRun([]string{"--label", "typecheck (wt)", "--", "tsgo"})
-		if err != nil || label != "typecheck (wt)" || argv[0] != "tsgo" {
-			t.Fatalf("got label=%q argv=%v err=%v", label, argv, err)
+		args, err := parseSlotRun([]string{"--label", "typecheck (wt)", "--", "tsgo"})
+		if err != nil || args.label != "typecheck (wt)" || args.argv[0] != "tsgo" {
+			t.Fatalf("got %+v err=%v", args, err)
 		}
 	})
 
 	t.Run("no command is an error", func(t *testing.T) {
-		if _, _, _, err := parseSlotRun([]string{"--label", "x", "--"}); err == nil {
+		if _, err := parseSlotRun([]string{"--label", "x", "--"}); err == nil {
 			t.Fatal("expected an error for a missing command")
 		}
 	})
 
-	t.Run("a timeout is read in either order with the label", func(t *testing.T) {
-		label, limit, argv, err := parseSlotRun([]string{"--timeout", "10m", "--label", "lint", "--", "golangci-lint"})
-		if err != nil || label != "lint" || limit != 10*time.Minute || argv[0] != "golangci-lint" {
-			t.Fatalf("got label=%q limit=%s argv=%v err=%v", label, limit, argv, err)
+	t.Run("flags are read in any order", func(t *testing.T) {
+		args, err := parseSlotRun([]string{"--timeout", "10m", "--class", "test", "--label", "lint", "--", "golangci-lint"})
+		if err != nil || args.label != "lint" || args.limit != 10*time.Minute || args.class != domain.ClassTest || args.argv[0] != "golangci-lint" {
+			t.Fatalf("got %+v err=%v", args, err)
 		}
 	})
 
-	t.Run("a timeout that is not a positive duration is an error", func(t *testing.T) {
-		if _, _, _, err := parseSlotRun([]string{"--timeout", "soon", "--", "x"}); err == nil {
+	t.Run("a bad timeout or class is an error", func(t *testing.T) {
+		if _, err := parseSlotRun([]string{"--timeout", "soon", "--", "x"}); err == nil {
 			t.Fatal("expected an error for a bad timeout")
+		}
+		if _, err := parseSlotRun([]string{"--class", "unit", "--", "x"}); err == nil {
+			t.Fatal("expected an error for an unknown class")
 		}
 	})
 }
@@ -135,50 +138,132 @@ func TestSlotRunIsTransparentToTheCommand(t *testing.T) {
 	})
 }
 
+// childEnv runs job with a command that dumps the named variables, and
+// returns their values in order ("unset" for one the child did not get).
+func childEnv(t *testing.T, job *slotJob, names ...string) []string {
+	t.Helper()
+	out := filepath.Join(t.TempDir(), "env.txt")
+	var script []string
+	for _, name := range names {
+		script = append(script, `printf '%s ' "${`+name+`:-unset}"`)
+	}
+	job.argv = []string{"sh", "-c", "{ " + strings.Join(script, "; ") + "; } > " + out}
+	job.progress = &bytes.Buffer{}
+	if code := job.run(context.Background()); code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	env, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading the child's env dump: %v", err)
+	}
+	return strings.Fields(string(env))
+}
+
 // @scenario "Memory pressure lowers the memory ceiling to the floor"
-// @scenario "Memory pressure halves the compiler's parallelism"
+// @scenario "A run's parallelism is the units it holds, on every machine"
+// @scenario "A test run is told its worker count"
 func TestSlotRunUnderPressure(t *testing.T) {
 	sem := semaphore.New(t.TempDir())
-	t.Setenv("CHECK_SLOTS", "1")
+	t.Setenv("CHECK_SLOTS", "2")
 	t.Setenv("CI", "")
 	t.Setenv("GOMEMLIMIT", "")
 	t.Setenv("GOMAXPROCS", "")
+	t.Setenv("VITEST_MAX_WORKERS", "")
 
-	t.Run("a pressured run gets the floor and half the cores", func(t *testing.T) {
-		out := filepath.Join(t.TempDir(), "env.txt")
-		job := &slotJob{sem: sem, label: "pressured", argv: []string{
-			"sh", "-c", `printf '%s %s' "$GOMEMLIMIT" "$GOMAXPROCS" > ` + out,
-		}, progress: &bytes.Buffer{}, pressure: domain.Red}
-		if code := job.run(context.Background()); code != 0 {
-			t.Fatalf("exit code = %d, want 0", code)
-		}
-		env, err := os.ReadFile(out)
-		if err != nil {
-			t.Fatalf("reading the child's env dump: %v", err)
-		}
-		fields := strings.Fields(string(env))
-		wantProcs := strconv.Itoa(max(2, runtime.NumCPU()/2))
-		if len(fields) != 2 || fields[0] != "3GiB" || fields[1] != wantProcs {
-			t.Fatalf("child env = %q, want the 3GiB floor and GOMAXPROCS=%s", string(env), wantProcs)
+	t.Run("a pressured run gets the floor and its units", func(t *testing.T) {
+		got := childEnv(t, &slotJob{sem: sem, label: "pressured", pressure: domain.Red}, "GOMEMLIMIT", "GOMAXPROCS", "VITEST_MAX_WORKERS")
+		if strings.Join(got, " ") != "3GiB 2 unset" {
+			t.Fatalf("child env = %v, want the 3GiB floor, GOMAXPROCS=2 and no worker count", got)
 		}
 	})
 
-	t.Run("a green run leaves GOMAXPROCS alone", func(t *testing.T) {
-		out := filepath.Join(t.TempDir(), "env.txt")
-		job := &slotJob{sem: sem, label: "green", argv: []string{
-			"sh", "-c", `printf '%s' "${GOMAXPROCS:-unset}" > ` + out,
-		}, progress: &bytes.Buffer{}, pressure: domain.Green}
-		if code := job.run(context.Background()); code != 0 {
-			t.Fatalf("exit code = %d, want 0", code)
-		}
-		env, err := os.ReadFile(out)
-		if err != nil {
-			t.Fatalf("reading the child's env dump: %v", err)
-		}
-		if string(env) != "unset" {
-			t.Fatalf("child GOMAXPROCS = %q, want unset on a green machine", string(env))
+	t.Run("a green run is capped to its units too", func(t *testing.T) {
+		got := childEnv(t, &slotJob{sem: sem, label: "green", pressure: domain.Green}, "GOMAXPROCS")
+		if strings.Join(got, " ") != "2" {
+			t.Fatalf("child GOMAXPROCS = %v, want 2 on a green machine", got)
 		}
 	})
+
+	t.Run("a test run gets its worker count", func(t *testing.T) {
+		got := childEnv(t, &slotJob{sem: sem, label: "vitest", class: domain.ClassTest, pressure: domain.Green}, "GOMAXPROCS", "VITEST_MAX_WORKERS")
+		if strings.Join(got, " ") != "2 2" {
+			t.Fatalf("child env = %v, want GOMAXPROCS=2 VITEST_MAX_WORKERS=2", got)
+		}
+	})
+}
+
+// @scenario "An operator's explicit parallelism wins, up to the units held"
+func TestSlotRunKeepsTheOperatorsParallelism(t *testing.T) {
+	t.Setenv("CHECK_SLOTS", "2")
+	t.Setenv("CI", "")
+	t.Setenv("GOMAXPROCS", "7")
+	t.Setenv("VITEST_MAX_WORKERS", "3")
+	job := &slotJob{sem: semaphore.New(t.TempDir()), label: "vitest", class: domain.ClassTest, pressure: domain.Red}
+	got := childEnv(t, job, "GOMAXPROCS", "VITEST_MAX_WORKERS")
+	if strings.Join(got, " ") != "7 3" {
+		t.Fatalf("child env = %v, want the operator's 7 and 3", got)
+	}
+	if job.units != 3 {
+		t.Fatalf("a test run with 3 workers weighs 3 units, got %d", job.units)
+	}
+
+	t.Setenv("CHECK_SLOTS", "1")
+	t.Setenv("VITEST_MAX_WORKERS", "4")
+	small := &slotJob{sem: semaphore.New(t.TempDir()), label: "vitest", class: domain.ClassTest, pressure: domain.Red}
+	if got := childEnv(t, small, "GOMAXPROCS", "VITEST_MAX_WORKERS"); strings.Join(got, " ") != "7 2" {
+		t.Fatalf("child env = %v, want GOMAXPROCS 7 and 4 workers capped at the 2 units held", got)
+	}
+}
+
+// refusingSlots fails the test if a run touches the budget at all.
+type refusingSlots struct{ t *testing.T }
+
+func (r refusingSlots) TryAcquireUnits(string, int, domain.SlotClaim) (func(), bool, error) {
+	r.t.Fatal("a run inside a slot must not take a second one")
+	return nil, false, nil
+}
+
+// @scenario "A run inside a slot takes no second slot"
+func TestSlotRunInsideASlotTakesNoSecondSlot(t *testing.T) {
+	t.Setenv("CHECK_SLOTS", "0") // what slotExec hands every child
+	t.Setenv("CLAUDECODE", "")
+	t.Setenv("CI", "")
+	t.Setenv("GOMAXPROCS", "2")
+	got := childEnv(t, &slotJob{sem: refusingSlots{t}, label: "nested", class: domain.ClassTypecheck}, "GOMAXPROCS")
+	if strings.Join(got, " ") != "2" {
+		t.Fatalf("the nested run keeps its parent's GOMAXPROCS, got %v", got)
+	}
+}
+
+// @scenario "A big run at the head of the queue is not starved by small ones"
+func TestSlotJobLetsTheHeadOfTheQueueGoFirst(t *testing.T) {
+	head := fileregistry.WaiterSnapshot{PID: os.Getpid() + 1, WaiterClaim: fileregistry.WaiterClaim{
+		Command: "vitest run", Caller: domain.SubAgent, QueuedAt: time.Now().Add(-time.Minute),
+	}}
+	job := &slotJob{caller: domain.SubAgent, queuedAt: time.Now(), registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{head}}}
+	if !job.shouldYieldToHigherPriority() {
+		t.Fatal("a typecheck queued after a test run of the same class must let it go first")
+	}
+}
+
+// @scenario "slot explain names who holds the units"
+func TestExplainUnitHoldersNamesClassUnitsAndWorktree(t *testing.T) {
+	sem := semaphore.New(t.TempDir())
+	if out := captureStdout(t, func() { explainUnitHolders(sem) }); strings.TrimSpace(out) != "unit holders: none" {
+		t.Fatalf("expected \"unit holders: none\", got %q", out)
+	}
+	release, ok, err := sem.TryAcquireUnits(checkSlotName, 8, domain.SlotClaim{
+		PID: os.Getpid(), Class: "test", Units: 3, Worktree: "/src/langwatch", Label: "vitest run", StartedAt: time.Now(),
+	})
+	if err != nil || !ok {
+		t.Fatalf("acquire: ok=%v err=%v", ok, err)
+	}
+	defer release()
+	out := captureStdout(t, func() { explainUnitHolders(sem) })
+	want := "unit holder: test, 3 units, worktree langwatch, pid " + strconv.Itoa(os.Getpid())
+	if !strings.Contains(out, want) {
+		t.Fatalf("expected %q, got %q", want, out)
+	}
 }
 
 // @scenario "A run killed from outside is reported as not the queue's doing"
@@ -281,7 +366,7 @@ func TestReportOutsideKillReadsTheSignalThatKilled(t *testing.T) {
 				time.Sleep(100 * time.Millisecond)
 				cancel()
 			}()
-			slotExec(ctx, []string{"sh", "-c", "sleep 5"}, domain.Green)
+			slotExec(ctx, []string{"sh", "-c", "sleep 5"}, slotRunEnv{pressure: domain.Green, class: domain.ClassCheck, units: 2})
 		})
 		if strings.Contains(out, "killed from outside") {
 			t.Fatalf("a canceled run must not be reported as an outside kill: %q", out)
@@ -737,5 +822,82 @@ func TestSignalRelayForwardsASignalThatArrivedBeforeTheChild(t *testing.T) {
 	status, ok := exit.Sys().(syscall.WaitStatus)
 	if !ok || !status.Signaled() || status.Signal() != syscall.SIGTERM {
 		t.Fatalf("the child must be ended by SIGTERM, got %v", exit)
+	}
+}
+
+// @scenario "A slot reads the published memory pressure instead of measuring it"
+// @scenario "A slot measures the pressure when no fresh level is published"
+func TestSlotPressureReadsThePublishedLevel(t *testing.T) {
+	now := time.Now()
+	cases := []struct {
+		name      string
+		rec       domain.PressureRecord
+		ok        bool
+		want      domain.Pressure
+		wantFresh bool
+	}{
+		{"a fresh record is believed without probing", domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "red", WrittenAt: now.Add(-5 * time.Second)}, true, domain.Red, true},
+		{"a missing record is measured", domain.PressureRecord{}, false, domain.Green, false},
+		{"an unknown version is measured", domain.PressureRecord{Version: 99, Level: "red", WrittenAt: now}, true, domain.Green, false},
+		{"a stale record is measured", domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "red", WrittenAt: now.Add(-domain.PressureStaleAfter - time.Second)}, true, domain.Green, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, fresh := freshPublishedPressure(tc.rec, tc.ok)
+			if got != tc.want || fresh != tc.wantFresh {
+				t.Fatalf("got %s fresh=%v, want %s fresh=%v", got, fresh, tc.want, tc.wantFresh)
+			}
+		})
+	}
+
+	t.Run("slot run reads the record the daemon wrote", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("LANGWATCH_PORTLESS_HOME", home)
+		t.Setenv("CHECK_PRESSURE", "")
+		t.Setenv("CI", "")
+		rec := domain.PressureRecord{Version: domain.PressureRecordVersion, Level: "amber", WrittenAt: time.Now()}
+		if err := fileregistry.New(home).WritePressure(rec); err != nil {
+			t.Fatalf("writing the record: %v", err)
+		}
+		if got := resolveSlotPressure(); got != domain.Amber {
+			t.Fatalf("resolveSlotPressure() = %s, want the published amber", got)
+		}
+	})
+}
+
+// @scenario "An agent's run on macOS runs in the utility band"
+func TestAgentQoSArgvClampsOnlyAnAgentOnMacOS(t *testing.T) {
+	argv := []string{"sh", "-c", "true"}
+	env := func(pairs ...string) func(string) string {
+		m := map[string]string{}
+		for i := 0; i+1 < len(pairs); i += 2 {
+			m[pairs[i]] = pairs[i+1]
+		}
+		return func(k string) string { return m[k] }
+	}
+	utility := []string{"/usr/sbin/taskpolicy", "-c", "utility", "sh", "-c", "true"}
+	cases := []struct {
+		name   string
+		goos   string
+		getenv func(string) string
+		argv   []string
+		want   []string
+	}{
+		{"claude agent on darwin", "darwin", env("CLAUDECODE", "1"), argv, utility},
+		{"sub-agent id on darwin", "darwin", env("HAVEN_AGENT_ID", "a1"), argv, utility},
+		{"explicit utility", "darwin", env("CLAUDECODE", "1", "HAVEN_AGENT_QOS", "utility"), argv, utility},
+		{"opted out", "darwin", env("CLAUDECODE", "1", "HAVEN_AGENT_QOS", "off"), argv, argv},
+		{"a person's shell", "darwin", env(), argv, argv},
+		{"linux agent", "linux", env("CLAUDECODE", "1"), argv, argv},
+		{"command not found stays bare", "darwin", env("CLAUDECODE", "1"), []string{"no-such-binary-haven-qos"}, []string{"no-such-binary-haven-qos"}},
+	}
+	for _, c := range cases {
+		got := agentQoSArgv(c.goos, c.getenv, c.argv)
+		if strings.Join(got, " ") != strings.Join(c.want, " ") {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+		if slices.Contains(got, "-b") {
+			t.Errorf("%s: the background band is never used: %q", c.name, got)
+		}
 	}
 }

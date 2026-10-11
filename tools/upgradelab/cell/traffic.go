@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -32,7 +33,8 @@ type Call struct {
 	UpgradeInProgress int   `json:"upgradeInProgress,omitempty"`
 	NonOK             int   `json:"nonOk,omitempty"`
 	MissingRetryAfter int   `json:"missingRetryAfter,omitempty"`
-	Gap               int   `json:"gap,omitempty"` // attempts no release answered (retried in stop-start) // upgrade_in_progress answers with no Retry-After
+	Reloads           int   `json:"reloads,omitempty"` // client_outdated answers: main's tab reloaded onto head's wire and retried
+	Gap               int   `json:"gap,omitempty"`     // attempts no release answered (retried in stop-start) // upgrade_in_progress answers with no Retry-After
 	firstRetryMs      int64
 }
 
@@ -41,6 +43,7 @@ type Client struct {
 	URL, APIKey, Project, BasePrompt string
 	Session                          http.Header
 	Seed                             int64
+	PlainWire                        bool // tRPC input as head's plain JSON, once head told main's client to reload
 }
 
 // Kind is one stream of the mix: an ingest door, a read or a write, fired every Every.
@@ -159,6 +162,9 @@ func restRead(ctx context.Context, client Client, n int) (*http.Request, string,
 // trpcRead is the signed-in user's organization list, the first query every screen makes.
 func trpcRead(ctx context.Context, client Client, _ int) (*http.Request, string, error) {
 	input := url.QueryEscape(`{"json":{}}`)
+	if client.PlainWire {
+		input = url.QueryEscape(`{}`)
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, client.URL+"/api/trpc/organization.getAll?input="+input, http.NoBody)
 	if err == nil {
 		request.Header = client.Session.Clone()
@@ -196,10 +202,11 @@ type Traffic struct {
 	// RetryUnanswered: a stop-start deploy has a gap with no release; clients retry it as they would a 503.
 	RetryUnanswered bool
 
-	http  *http.Client
-	mu    sync.Mutex
-	calls []Call
-	wait  sync.WaitGroup
+	http     *http.Client
+	mu       sync.Mutex
+	calls    []Call
+	wait     sync.WaitGroup
+	reloaded atomic.Bool // head answered client_outdated: the tab reloads and speaks head's wire from then on
 }
 
 // Run fires each kind on its own ticker until ctx ends, then waits for calls in flight.
@@ -255,7 +262,9 @@ func (traffic *Traffic) one(ctx context.Context, kind Kind, n int) Call {
 
 // attempt sends once and answers how long to wait before retrying; 0 means the answer is final.
 func (traffic *Traffic) attempt(ctx context.Context, kind Kind, call *Call) time.Duration {
-	request, id, err := kind.Do(ctx, traffic.Client, call.N)
+	client := traffic.Client
+	client.PlainWire = traffic.reloaded.Load()
+	request, id, err := kind.Do(ctx, client, call.N)
 	call.ID = id
 	if err != nil {
 		call.Status, call.Error = 0, err.Error()
@@ -282,6 +291,11 @@ func (traffic *Traffic) attempt(ctx context.Context, kind Kind, call *Call) time
 		return 0
 	}
 	call.NonOK++
+	if response.StatusCode == http.StatusBadRequest && strings.Contains(call.Error, "client_outdated") && !client.PlainWire {
+		traffic.reloaded.Store(true)
+		call.Reloads++
+		return time.Millisecond
+	}
 	if response.StatusCode != http.StatusServiceUnavailable || !strings.Contains(call.Error, "upgrade_in_progress") {
 		return 0
 	}

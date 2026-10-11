@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "ProjectActiveDay" (
+CREATE TABLE IF NOT EXISTS "ProjectActiveDay" (
     "id" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "day" TEXT NOT NULL,
@@ -9,4 +9,4 @@ CREATE TABLE "ProjectActiveDay" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ProjectActiveDay_projectId_day_key" ON "ProjectActiveDay"("projectId", "day");
+CREATE UNIQUE INDEX IF NOT EXISTS "ProjectActiveDay_projectId_day_key" ON "ProjectActiveDay"("projectId", "day");

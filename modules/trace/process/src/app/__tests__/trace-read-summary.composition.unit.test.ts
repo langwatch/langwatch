@@ -210,3 +210,10 @@ describe("TraceModule.composeDependencies summary reader", () => {
     );
   });
 });
+
+describe("TraceModule.composeDependencies model seam", () => {
+  /** @scenario "The composed trace module carries the model seam" */
+  it("hands AI search the model provider peer, so Ask AI does not refuse", () => {
+    expect(compose({}).models).toBeDefined();
+  });
+});

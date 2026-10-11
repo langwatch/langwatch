@@ -22,8 +22,6 @@ type TaskRun = (input: TaskInput) => Promise<void>;
 
 // Each task loads its own graph when it runs, so a seed never pays for the migration pass.
 const tasks = new Map<string, () => Promise<TaskRun>>([
-  ["prisma-migrate", async () => (await import("./prisma-migrate.ts")).prismaMigrate],
-  ["clickhouse-migrate", async () => (await import("./clickhouse-migrate.ts")).clickhouseMigrate],
   ["lwql-provision", async () => (await import("./lwql-provision.ts")).lwqlProvision],
   [
     "lwql-render-access-config",

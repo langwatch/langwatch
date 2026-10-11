@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +21,8 @@ import (
 // Client reaches the server whose HTTP port Port reports (0 = not provisioned).
 type Client struct {
 	Port func() int
+	// CPUs caps the root workload; 0 means this machine's core count.
+	CPUs int
 }
 
 // Ping does not authenticate: /ping is a pre-auth liveness probe on every
@@ -58,9 +62,56 @@ func (c Client) EnsureDatabase(ctx context.Context, database string) error {
 	return c.Exec(ctx, "CREATE DATABASE IF NOT EXISTS "+quoteIdent(database))
 }
 
-// DropDatabase removes a stack's database.
+// DropDatabase removes a stack's database, then the login and workload
+// EnsureStackAccess made for it (absent ones are no error).
 func (c Client) DropDatabase(ctx context.Context, database string) error {
-	return c.Exec(ctx, "DROP DATABASE IF EXISTS "+quoteIdent(database))
+	if err := c.Exec(ctx, "DROP DATABASE IF EXISTS "+quoteIdent(database)); err != nil {
+		return err
+	}
+	return c.execAll(ctx, domain.ClickHouseDropStackAccessStatements(database))
+}
+
+// EnsureStackAccess declares the workload hierarchy, then the stack's own
+// workload and login, capped at half the server's memory. Re-runnable: an
+// existing login gets the password and settings again, an existing workload
+// keeps its weight.
+func (c Client) EnsureStackAccess(ctx context.Context, database, password string) error {
+	cpus := c.CPUs
+	if cpus <= 0 {
+		cpus = runtime.NumCPU()
+	}
+	if err := c.execAll(ctx, domain.ClickHouseWorkloadHierarchyStatements(cpus)); err != nil {
+		return err
+	}
+	memory := domain.ClickHouseStackUserMemory(c.maxServerMemory(ctx))
+	return c.execAll(ctx, domain.ClickHouseStackAccessStatements(database, password, memory))
+}
+
+// SetStackWeight sets a provisioned stack's workload weight.
+func (c Client) SetStackWeight(ctx context.Context, database string, weight int) error {
+	return c.Exec(ctx, domain.ClickHouseStackWeightStatement(database, weight))
+}
+
+// maxServerMemory is the server's own memory ceiling, 0 when unreadable.
+func (c Client) maxServerMemory(ctx context.Context) int64 {
+	body, err := c.Query(ctx, "SELECT value FROM system.server_settings WHERE name = 'max_server_memory_usage' FORMAT TabSeparated")
+	if err != nil {
+		return 0
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(body), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+func (c Client) execAll(ctx context.Context, statements []string) error {
+	for _, sql := range statements {
+		if err := c.Exec(ctx, sql); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Databases lists the lw_* databases currently on the server.

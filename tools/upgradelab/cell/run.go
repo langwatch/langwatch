@@ -39,10 +39,12 @@ type Options struct {
 	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
 	Ledger                           []string // #8553 rows this cell claims and reports to
 	FromSnapshot                     string   // a produce entry directory or cache key: restore instead of seeding
+	Overlays                         []string // planted on top of the shape (OverlayRetention)
 	MaxLoad                          float64  // refuse to start above this 1-minute load average
 	TestedBy                         string   // who runs the cell, for the ledger's Tested by (lane:<id> (model) or @handle)
 	Keep, Shots                      bool
 	NoAdminEmails                    bool      // boot self-hosted-free without ADMIN_EMAILS
+	Signups                          bool      // two people sign up through head's door once it is ready (P1)
 	Stdout                           io.Writer // where the live origin lines go; nil prints nothing
 }
 
@@ -69,7 +71,8 @@ type run struct {
 	poller             *Poller
 	queue              []QueueSample
 	queueMu            sync.Mutex
-	cutJobs            map[string]struct{} // jobs waiting when main's worker was paused (N4 judges these)
+	queueReads         queueReads // failed depth reads, so a blind probe shows in N4
+	cutDepth           int        // group-queue jobs waiting when main's worker was paused; -1 unread
 	marks              map[string]int64
 	shotsWG            sync.WaitGroup
 	atReady            []LedgerRow
@@ -83,6 +86,26 @@ type run struct {
 	recipe             snapshot.Recipe
 	anchor             time.Time
 	sso                ssoSeed
+	retention          retentionState
+	legacy             legacySeed
+	legacyOrg          legacyOrgSeed
+	license            TestLicense
+	licensedOrgs       map[string]bool // organizations main licensed through license.upload
+	scim               scimSeed
+	extras             licensedSSOSeed
+	signups            []signupResult
+	signupUsersBefore  int
+	signupUsersErr     error
+	signupSessions     map[string]*seed.Seeder // each sign-up signed in once
+	memberNotice       bool                    // the member notice showed while the retry drill's step was failed
+	gates              map[string]*Gate        // private-down drill: a gate in front of each private target
+	down               downState
+	downWG             sync.WaitGroup
+	placedBefore       []string // H1: misplaced rows at the cut
+	placedBeforeErr    error
+	routeProbes        []routeProbe
+	routeAfter         []string
+	routeAfterErr      error
 
 	stopTraffic, stopPoller, stopSampler context.CancelFunc
 	trafficDone                          chan struct{}
@@ -90,7 +113,11 @@ type run struct {
 
 // Name is the cell's store suffix and report id, e.g. cloud_s_typical_1.
 func (options Options) Name() string {
-	return strings.ToLower(strings.ReplaceAll(fmt.Sprintf("%s_%s_%s_%d", options.Deployment, options.Tier, options.Shape, options.Seed), "-", "_"))
+	name := fmt.Sprintf("%s_%s_%s_%d", options.Deployment, options.Tier, options.Shape, options.Seed)
+	for _, overlay := range options.Overlays {
+		name += "_" + overlay
+	}
+	return strings.ToLower(strings.ReplaceAll(name, "-", "_"))
 }
 
 // Run executes the cell and writes report.json and report.md into RunDir; the error is operational only.
@@ -109,15 +136,26 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	if options.FromSnapshot != "" {
 		origin = []step{{"stores", cell.freshStores}, {"restore", cell.restore}, {"from-up", cell.fromUp}, {"sign-in", cell.resumeSeed}}
 	}
-	cell.runSteps(ctx, slices.Concat([]step{{"build", cell.buildBoth}}, origin, []step{
-		{"traffic-before", cell.trafficBefore}, {"cut", cell.cut}, {"switch", cell.switchToHead}, {"ready", cell.awaitReady},
-		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"checks", func(ctx context.Context) error {
+	before, cut := []step{{"traffic-before", cell.trafficBefore}}, []step{{"cut", cell.cut}}
+	if cell.overlay(OverlayRetention) {
+		origin = append(origin, step{"retention-rules", cell.retentionRules})
+		before = append(before, step{"retention-age", cell.retentionAge})
+		cut = append(cut, step{"retention-cut", cell.retentionAtCut})
+	}
+	steps := slices.Concat([]step{{"build", cell.buildBoth}}, origin, before, cut, []step{
+		{"switch", cell.switchToHead}, {"ready", cell.awaitReady},
+		{"settle", cell.settle}, {"drill-retry", cell.retryFailedStep}, {"drill-route", cell.routeBrokenDrill}, {"checks", func(ctx context.Context) error {
+			cell.downWG.Wait()
 			cell.stopObservers()
 			return cell.checks(ctx)
 		}},
-	}))
+	})
+	if cell.emptyOrigin() {
+		steps = cell.emptySteps()
+	}
+	cell.runSteps(ctx, steps)
 	cell.finishTraffic()
-	cell.partialTraffic()
+	cell.partialChecks(ctx)
 	cell.noteLoad("end")
 	cell.reportLedger(ctx)
 	return cell.report, cell.write()
@@ -158,8 +196,9 @@ func (cell *run) announce(when string) {
 	fmt.Fprintf(cell.options.Stdout, "upgradelab: %s: open %s and sign in as %s for Ops > Upgrades\n", when, cell.url(), email)
 }
 
-// partialTraffic keeps what a stopped cell measured: calls and phases, writes unchecked.
-func (cell *run) partialTraffic() {
+// partialChecks keeps what a stopped cell measured: calls, phases, the backlog and the verdicts
+// that need no settled stores; writes stay unchecked.
+func (cell *run) partialChecks(ctx context.Context) {
 	if cell.report.Traffic != nil || cell.traffic == nil {
 		return
 	}
@@ -168,7 +207,21 @@ func (cell *run) partialTraffic() {
 		cell.report.Phases = cell.poller.Timeline()
 	}
 	cell.report.Traffic, cell.report.Timeline = Summarize(cell.allCalls(), ServedTimeline(cell.report.Phases, cell.marks["switched"]), nil)
-	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked, so Lost counts every 2xx write")
+	read, stop := context.WithTimeout(context.WithoutCancel(ctx), 3*time.Minute) // a TERM cancelled ctx; the stores are still up
+	defer stop()
+	cell.report.Queue = cell.queueSummary(read)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.partialVerdicts()...)
+	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked (Visible and Lost read unchecked); only the verdicts that need no settled stores were judged")
+}
+
+// partialVerdicts are the checks a stopped cell can still judge from its traffic, phases and queue readings.
+func (cell *run) partialVerdicts() []Verdict {
+	verdicts := []Verdict{cell.holdingVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic),
+		ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), queueVerdict(cell.report.Queue)}
+	for index := range verdicts {
+		verdicts[index].Scenarios = scenarioIDs[verdicts[index].ID]
+	}
+	return verdicts
 }
 
 func prepare(options Options) (*run, error) {
@@ -180,6 +233,13 @@ func prepare(options Options) (*run, error) {
 		return nil, fmt.Errorf("deployment %s cannot run yet: %s", options.Deployment, profile.Missing)
 	case !contains(Tiers, options.Tier) || !contains(DataShapes, options.Shape):
 		return nil, fmt.Errorf("tier %q shape %q: only %v x %v so far", options.Tier, options.Shape, Tiers, DataShapes)
+	case len(options.Overlays) > 0 && options.Shape == EmptyShape:
+		return nil, errors.New("an overlay needs seeded data: the empty shape takes none")
+	}
+	for _, overlay := range options.Overlays {
+		if !contains(Overlays, overlay) {
+			return nil, fmt.Errorf("unknown overlay %q: want one of %v", overlay, Overlays)
+		}
 	}
 	for _, dir := range []string{options.FromDir, options.HeadDir} {
 		if err := CheckSourceDir(dir); err != nil {
@@ -190,7 +250,7 @@ func prepare(options Options) (*run, error) {
 		return nil, err
 	}
 	profile.NoAdminEmails = options.NoAdminEmails
-	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{})}
+	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{}), cutDepth: -1}
 	cell.report = &Report{Cell: options.Name(), Deployment: options.Deployment, Tier: options.Tier, Shape: options.Shape,
 		Release: options.Release, Head: options.HeadDir, HeadCommit: HeadCommit(options.HeadDir), Started: cell.origin.UTC().Format(time.RFC3339)}
 	return cell, nil
@@ -220,12 +280,15 @@ func (cell *run) freshStores(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	cell.private = shape.PrivateTargets()
+	cell.private = PrivateTargetsFor(shape.PrivateTargets(), cell.options.Tier)
 	for label := range cell.private {
 		cell.stores.Private = append(cell.stores.Private, label)
 	}
 	if err := cell.stores.Fresh(ctx); err != nil {
 		return err
+	}
+	if err := cell.startGates(); err != nil {
+		return fmt.Errorf("private-down gates: %w", err)
 	}
 	if cell.profile.Objects {
 		if err := cell.startObjectStores(slices.Collect(maps.Keys(shape.PrivateObjectTargets()))); err != nil {
@@ -250,7 +313,13 @@ func (cell *run) freshStores(ctx context.Context) error {
 		return err
 	}
 	email, _ := generate.SeedAccount(cell.options.Seed)
-	cell.env, err = BuildEnv(EnvInput{Profile: cell.profile, Stores: cell.stores, APIPort: cell.apiPort, Admin: email})
+	cell.licensedOrgs = map[string]bool{}
+	if cell.licensed() {
+		if cell.license, err = ReadTestLicense(cell.options.FromDir); err != nil {
+			return fmt.Errorf("test license: %w", err)
+		}
+	}
+	cell.env, err = BuildEnv(EnvInput{Profile: cell.profile, PrivateTargets: cell.private, Stores: cell.stores, APIPort: cell.apiPort, Admin: email, LicensePublicKey: cell.license.PublicKey})
 	return err
 }
 
@@ -367,7 +436,7 @@ func waitFor(ctx context.Context, within time.Duration, done func() bool) error 
 func (cell *run) seed(ctx context.Context) error {
 	cell.anchor = time.Now().UTC().Truncate(24 * time.Hour)
 	plan, err := generate.Build(generate.Request{Shape: cell.profile.Shape, Release: cell.options.Release, Volume: cell.options.Tier,
-		Seed: cell.options.Seed, Anchor: cell.anchor})
+		Seed: cell.options.Seed, Anchor: cell.anchor, Checkout: true})
 	if err != nil {
 		return err
 	}
@@ -388,6 +457,11 @@ func (cell *run) seed(ctx context.Context) error {
 	}
 	if err := cell.basePrompt(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
+	}
+	if cell.licensed() {
+		if err := cell.grantEnterprise(ctx, cell.seeder.Context.OrganizationID, ""); err != nil {
+			cell.report.Notes = append(cell.report.Notes, "seed organization license: "+err.Error())
+		}
 	}
 	if cell.profile.SSO {
 		cell.seedSSO(ctx)
@@ -466,32 +540,20 @@ func sleep(ctx context.Context, span time.Duration) error {
 }
 
 func (cell *run) sampleQueueOnce(ctx context.Context) {
-	if depth, err := QueueDepth(ctx, cell.stores.RedisPort); err == nil {
-		left := cell.cutJobsLeft(ctx)
-		cell.queueMu.Lock()
-		cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth, Left: left})
-		cell.queueMu.Unlock()
-	}
-}
-
-// cutJobsLeft counts the jobs present at the cut that still wait; -1 on a read error, 0 before the cut.
-func (cell *run) cutJobsLeft(ctx context.Context) int {
-	left, ok := cell.cutJobsStill(ctx)
-	if !ok {
-		return -1
-	}
-	return len(left)
-}
-
-func (cell *run) cutJobsStill(ctx context.Context) ([]string, bool) {
+	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
 	cell.queueMu.Lock()
-	cut := cell.cutJobs
-	cell.queueMu.Unlock()
-	now, err := QueueJobs(ctx, cell.stores.RedisPort)
+	defer cell.queueMu.Unlock()
 	if err != nil {
-		return nil, false
+		cell.queueReads.fail(err)
+		return
 	}
-	return QueueLeft(cut, now), true
+	cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth})
+}
+
+// queueDrained reads the depth now and asks whether it is within the slack of the baseline.
+func (cell *run) queueDrained(ctx context.Context) bool {
+	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
+	return err == nil && depth <= drainLimit(queueBase)
 }
 
 func (cell *run) sampleQueue(ctx context.Context) {
@@ -510,15 +572,14 @@ func (cell *run) cut(ctx context.Context) error {
 	if err := sleep(ctx, cell.options.AtCut); err != nil {
 		return err
 	}
-	if jobs, err := QueueJobs(ctx, cell.stores.RedisPort); err == nil {
-		cell.queueMu.Lock()
-		cell.cutJobs = jobs
-		cell.queueMu.Unlock()
+	if depth, err := QueueDepth(ctx, cell.stores.RedisPort); err == nil {
+		cell.cutDepth = depth
 	} else {
-		cell.report.Notes = append(cell.report.Notes, "queue jobs at the cut: "+err.Error())
+		cell.report.Notes = append(cell.report.Notes, "queue depth at the cut: "+err.Error())
 	}
 	fingerprint, err := cell.fingerprint(ctx)
 	cell.before = fingerprint
+	cell.placementAtCut(ctx)
 	return err
 }
 
@@ -527,11 +588,21 @@ func (cell *run) fingerprint(ctx context.Context) (snapshot.Fingerprint, error) 
 	if err != nil {
 		return nil, err
 	}
-	clickhouse, err := snapshot.NewClickHouseHTTP(cell.stores.ClickHouseURL(""))
-	if err != nil {
-		return nil, err
+	targets := map[string]snapshot.ClickHouse{}
+	for _, label := range append([]string{""}, cell.stores.Private...) {
+		if targets[clickHouseTarget(label)], err = snapshot.NewClickHouseHTTP(cell.stores.ClickHouseURL(label)); err != nil {
+			return nil, err
+		}
 	}
-	return snapshot.TakeFingerprint(ctx, snapshot.Stores{Postgres: postgres, ClickHouse: map[string]snapshot.ClickHouse{"shared": clickhouse}})
+	return snapshot.TakeFingerprint(ctx, snapshot.Stores{Postgres: postgres, ClickHouse: targets})
+}
+
+// clickHouseTarget names a ClickHouse target as snapshots do: shared, or private-<label>.
+func clickHouseTarget(label string) string {
+	if label == "" {
+		return "shared"
+	}
+	return "private-" + label
 }
 
 func (cell *run) addProc(proc *Proc) {
@@ -553,7 +624,7 @@ func (cell *run) startObservers(ctx context.Context) {
 	cell.sampleStop = stop
 	go SampleResources(sampleCtx, SampleSpec{Path: filepath.Join(cell.options.RunDir, "resources.jsonl"), Origin: cell.origin,
 		Every: 5 * time.Second, Procs: cell.procList, ClickHouseBase: cell.stores.ClickHouseBase, RedisPort: cell.stores.RedisPort})
-	if cell.options.Shots {
+	if cell.options.Shots && !cell.emptyOrigin() { // the walker signs in, and an empty install has no account until ready
 		email, password := generate.SeedAccount(cell.options.Seed)
 		cell.walker, _ = StartWalker(ctx, WalkSpec{Dir: filepath.Join(cell.options.HeadDir, "apps", "ui"), RunDir: cell.options.RunDir,
 			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: 10 * time.Second})
@@ -599,15 +670,23 @@ func (cell *run) switchToHead(ctx context.Context) error {
 		}
 		cell.mark("switched")
 	}
+	apiStarted := time.Now()
 	if err := cell.startHeadAPI(); err != nil {
 		return err
 	}
 	cell.mark("headApiStarted")
-	if err := sleep(ctx, cell.options.WorkerDelay); err != nil {
+	if err := cell.switchEarly(ctx); err != nil {
+		return err
+	}
+	if err := sleep(ctx, cell.options.WorkerDelay-time.Since(apiStarted)); err != nil {
 		return err
 	}
 	cell.proc("from-worker").Stop(20 * time.Second)
 	cell.mark("headWorkerStarted")
+	if len(cell.gates) > 0 {
+		cell.downWG.Add(1)
+		go cell.holdPrivateDown(ctx)
+	}
 	if err := cell.startHeadWorker(); err != nil {
 		return err
 	}
@@ -628,11 +707,34 @@ func (cell *run) rollOver(ctx context.Context) error {
 	if err != nil || cell.headDied() {
 		return errors.Join(err, cell.deathNote())
 	}
+	if cell.marks["switched"] == 0 {
+		if err := cell.balancer.Switch(cell.headURL()); err != nil {
+			return err
+		}
+		cell.mark("switched")
+	}
+	cell.stopFrom()
+	return nil
+}
+
+// switchEarly (D1, UD-7): the balancer sends every call to head's api once it listens, a full worker
+// delay before any head worker runs; the old release keeps running until the worker starts.
+func (cell *run) switchEarly(ctx context.Context) error {
+	if !cell.drill(DrillAPIEarly) || cell.profile.StopStart {
+		return nil
+	}
+	err := waitFor(ctx, cell.options.WorkerDelay, func() bool {
+		cell.reviveAPI()
+		status, _, err := get(ctx, httpClient, cell.headURL()+"/healthz")
+		return err == nil && status/100 == 2
+	})
+	if err != nil {
+		return fmt.Errorf("head's api did not listen within the worker delay: %w", err)
+	}
 	if err := cell.balancer.Switch(cell.headURL()); err != nil {
 		return err
 	}
 	cell.mark("switched")
-	cell.stopFrom()
 	return nil
 }
 
@@ -696,6 +798,12 @@ func (cell *run) awaitReady(ctx context.Context) error {
 		return errors.Join(err, cell.deathNote())
 	}
 	cell.mark("ready")
+	if cell.options.Signups {
+		cell.signUpTwo(ctx) // before the seed account exists, so an empty install's first user is a sign-up
+	}
+	if cell.emptyOrigin() {
+		cell.emptyAccount(ctx)
+	}
 	cell.grantOperator(ctx)
 	cell.assertOldWritersGone(ctx)
 	ledger, err := Ledger(ctx, cell.stores)
@@ -704,21 +812,6 @@ func (cell *run) awaitReady(ctx context.Context) error {
 		return err
 	}
 	return sleep(ctx, cell.options.AfterReady)
-}
-
-// grantOperator makes the seed account a platform operator on head: ADMIN_EMAILS grants nothing there.
-func (cell *run) grantOperator(ctx context.Context) {
-	defer close(cell.granted)
-	email, _ := generate.SeedAccount(cell.options.Seed)
-	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "src/main.ts", "grant-platform-operator", email) // #nosec G204 -- fixed argv.
-	command.Dir, command.Env = filepath.Join(cell.options.HeadDir, "apps", "tasks"), cell.envWith(nil)
-	out, err := command.CombinedOutput()
-	_ = os.WriteFile(cell.logPath("grant-operator"), out, 0o600)
-	if err != nil {
-		cell.report.Notes = append(cell.report.Notes, "grant-platform-operator: "+err.Error()+": "+tail(out))
-		return
-	}
-	_ = os.WriteFile(filepath.Join(cell.options.RunDir, "operator.granted"), nil, 0o600) // the walk signs in again
 }
 
 // assertOldWritersGone is the operator's act once the old release is stopped (rehearse.sh does the
@@ -758,8 +851,7 @@ func (cell *run) settle(ctx context.Context) error {
 	cell.mark("trafficStopped")
 	err := waitFor(ctx, cell.options.SettleWithin, func() bool {
 		rows, err := Ledger(ctx, cell.stores)
-		left := cell.cutJobsLeft(ctx)
-		return err == nil && len(rows) > 0 && len(Outstanding(rows)) == 0 && left == 0
+		return err == nil && len(rows) > 0 && len(Outstanding(rows)) == 0 && cell.queueDrained(ctx)
 	})
 	cell.mark("settled")
 	if cell.stopSampler != nil {
@@ -798,6 +890,12 @@ func (cell *run) teardown() {
 	if cell.balancer != nil {
 		cell.balancer.Close()
 	}
+	for _, gate := range cell.gates {
+		gate.Close()
+	}
+	if cell.legacy.proxy != nil {
+		_ = cell.legacy.proxy.Close()
+	}
 	if !cell.options.Keep && cell.stores.Name != "" && cell.report.Error == "" {
 		_ = cell.stores.Drop(context.Background())
 	}
@@ -819,16 +917,19 @@ func (cell *run) shootPhases(ctx context.Context) {
 	}
 }
 
-func (cell *run) shoot(ctx context.Context, phase string) {
-	signIn := phase == "holding:upgrading" || phase == "ready" || phase == "settled" || phase == "drill-failed"
+func (cell *run) shoot(ctx context.Context, phase string) { cell.shootPage(ctx, phase, nil) }
+
+// shootPage screenshots one phase; extra adds ops-upgrades.mjs fields (path, open, expect). Answers the page text and file.
+func (cell *run) shootPage(ctx context.Context, phase string, extra map[string]any) (string, string) {
+	signIn := extra != nil || phase == "holding:upgrading" || phase == "ready" || phase == "settled" || phase == "drill-failed"
 	if phase == "down" {
-		return
+		return "", ""
 	}
 	if signIn {
 		select { // a signed-in shot before the grant shows "Access Restricted"
 		case <-cell.granted:
 		case <-ctx.Done():
-			return
+			return "", ""
 		}
 	}
 	email, password := generate.SeedAccount(cell.options.Seed)
@@ -838,10 +939,12 @@ func (cell *run) shoot(ctx context.Context, phase string) {
 	if !signIn {
 		target = cell.headURL()
 	}
-	args, _ := json.Marshal(map[string]any{"url": target, "email": email, "password": password, "out": out, "signIn": signIn})
+	fields := map[string]any{"url": target, "email": email, "password": password, "out": out, "signIn": signIn}
+	maps.Copy(fields, extra)
+	args, _ := json.Marshal(fields)
 	script := filepath.Join(cell.options.RunDir, "ops-upgrades.mjs")
 	if err := os.WriteFile(script, opsScript, 0o600); err != nil {
-		return
+		return "", ""
 	}
 	shotCtx, cancel := context.WithTimeout(ctx, 3*time.Minute) // the script's own waits add up to about 140 s
 	defer cancel()
@@ -853,12 +956,13 @@ func (cell *run) shoot(ctx context.Context, phase string) {
 		err = fmt.Errorf("%w: %s", err, tail(exit.Stderr))
 	}
 	shot := Shot{Phase: phase, AtMs: time.Since(cell.origin).Milliseconds(), File: filepath.Join("shots", name)}
-	var page struct{ URL, Text string }
+	var page struct{ URL, Text, SelectedTab string }
 	if err != nil || json.Unmarshal(output, &page) != nil {
 		shot.Error = fmt.Sprint(err)
 	}
 	shot.URL, shot.State = page.URL, OpsState(page.Text)
 	cell.addShot(shot)
+	return "selected tab: " + page.SelectedTab + "\n" + page.Text, shot.File
 }
 
 func (cell *run) addShot(shot Shot) {

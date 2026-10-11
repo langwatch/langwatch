@@ -95,7 +95,7 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	// PostHog: posthog-node's batch, posthog-js's capture paths, and the legacy ones.
 	for _, path := range []string{"/batch/", "/e/", "/i/v0/e/", "/capture/", "/track/", "/engage/"} {
-		mux.HandleFunc("POST "+path, s.failing(s.handlePostHogCapture))
+		mux.HandleFunc("POST "+path, s.handlePostHogCapture)
 	}
 	mux.HandleFunc("POST /s/", s.handleDiscard) // session recordings: accepted, not kept
 	mux.HandleFunc("POST /flags/", s.handlePostHogFlags)
@@ -103,9 +103,9 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 	mux.HandleFunc("GET /array/", s.handlePostHogRemoteConfig)
 	mux.HandleFunc("GET /static/", handlePostHogExtension)
 	// Customer.io: the CDP API nurturing posts to, and the Track API.
-	mux.HandleFunc("POST /v1/{call}", s.failing(s.handleCustomerIOCDP))
-	mux.HandleFunc("PUT /api/v1/customers/{id}", s.failing(s.handleCustomerIOTrack))
-	mux.HandleFunc("POST /api/v1/customers/{id}/events", s.failing(s.handleCustomerIOTrack))
+	mux.HandleFunc("POST /v1/{call}", s.handleCustomerIOCDP)
+	mux.HandleFunc("PUT /api/v1/customers/{id}", s.handleCustomerIOTrack)
+	mux.HandleFunc("POST /api/v1/customers/{id}/events", s.handleCustomerIOTrack)
 	// The query API.
 	mux.HandleFunc("GET /_sim/api/status", s.handleStatus)
 	mux.HandleFunc("GET /_sim/api/records", s.handleRecords)
@@ -200,8 +200,7 @@ func (s *Server) handlePostHogCapture(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		var records []Record
 		if records, err = NormalizePostHog(body); err == nil {
-			s.records.add(records, s.now())
-			writeJSON(w, http.StatusOK, map[string]int{"status": 1})
+			s.keep(w, records, map[string]int{"status": 1})
 			return
 		}
 	}
@@ -252,8 +251,7 @@ func (s *Server) handleCustomerIOCDP(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		var records []Record
 		if records, err = NormalizeCustomerIOCDP(call, body); err == nil {
-			s.records.add(records, s.now())
-			writeJSON(w, http.StatusOK, map[string]any{})
+			s.keep(w, records, map[string]any{})
 			return
 		}
 	}
@@ -266,8 +264,7 @@ func (s *Server) handleCustomerIOTrack(w http.ResponseWriter, r *http.Request) {
 		var record Record
 		isEvent := strings.HasSuffix(r.URL.Path, "/events")
 		if record, err = NormalizeCustomerIOTrack(r.PathValue("id"), isEvent, body); err == nil {
-			s.records.add([]Record{record}, s.now())
-			writeJSON(w, http.StatusOK, map[string]any{})
+			s.keep(w, []Record{record}, map[string]any{})
 			return
 		}
 	}

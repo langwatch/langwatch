@@ -184,7 +184,10 @@ import { HttpAnomalyAlertChannel } from "../channels/http/http.anomaly-alert.cha
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
 import { HttpCopilotStudioDataverseChannel } from "../channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.channel.ts";
-import { ssrfSafeFetch } from "../channels/http/http.governance-http.channel.ts";
+import {
+  createSsrfSafeFetch,
+  type GovernanceEgressPolicy,
+} from "../channels/http/http.governance-http.channel.ts";
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
@@ -567,6 +570,11 @@ export class GovernanceModule implements GovernanceRestApi {
       gatewayBaseUrl: governanceGatewayBaseUrl({ config }),
       publicBaseUrl: config?.publicBaseUrl,
       ingestRateLimitDisabled: config?.ingestRateLimitDisabled ?? false,
+      // Main's default: local addresses allowed unless BLOCK_LOCAL_HTTP_CALLS says otherwise.
+      pullEgress: {
+        blockLocal: config?.blockLocalHttpCalls ?? false,
+        allowedHosts: config?.allowedProxyHosts ?? [],
+      },
     });
   }
 
@@ -579,6 +587,7 @@ export class GovernanceModule implements GovernanceRestApi {
     gatewayBaseUrl,
     publicBaseUrl,
     ingestRateLimitDisabled,
+    pullEgress,
   }: {
     ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
@@ -588,6 +597,7 @@ export class GovernanceModule implements GovernanceRestApi {
     gatewayBaseUrl: string;
     publicBaseUrl: string | undefined;
     ingestRateLimitDisabled: boolean;
+    pullEgress: GovernanceEgressPolicy;
   }) {
     this.dependencies = dependencies;
     this.repositories = repositories;
@@ -832,7 +842,7 @@ export class GovernanceModule implements GovernanceRestApi {
     const sourceCredentials = SourceCredentialAccessService.create({
       sources: repositories.ingestionSources,
     });
-    const http: GovernanceHttpClient = { fetch: ssrfSafeFetch };
+    const http: GovernanceHttpClient = { fetch: createSsrfSafeFetch(pullEgress) };
     this.http = http;
     const channels = governanceListingChannels.live;
     const signIn = channels.providerSignIn.create({ http });

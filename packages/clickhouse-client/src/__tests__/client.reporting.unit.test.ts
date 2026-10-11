@@ -94,6 +94,46 @@ describe("ClickHouseQueryClient reporting", () => {
     });
   });
 
+  describe("given a read that declares a full-history scan", () => {
+    /** @scenario "A read that declares a full-history scan is not warned about" */
+    it("stays quiet for the declared read and still warns for the same read undeclared", async () => {
+      const { client, lines } = reportingClient({ execute: async () => ({ rows: [] }) });
+      const sql = "SELECT count() FROM event_log WHERE TenantId = {tenantId:String}";
+
+      await client.query({
+        tenantId: "project_abc",
+        sql,
+        params: { tenantId: "project_abc" },
+        // A replay count that must see every partition.
+        SKIP_COLD_SCAN_CHECK: true,
+      });
+      expect(lines.filter((line) => line.level === "warn")).toEqual([]);
+
+      await client.query({ tenantId: "project_abc", sql, params: { tenantId: "project_abc" } });
+      expect(lines.filter((line) => line.level === "warn")).toEqual([
+        expect.objectContaining({
+          fields: expect.objectContaining({ coldScan: true, coldScanTable: "event_log" }),
+        }),
+      ]);
+    });
+  });
+
+  describe("given a system.mutations read naming a table in a string literal", () => {
+    /** @scenario "A table named only in a string literal is not a cold scan" */
+    it("does not warn about the named table", async () => {
+      const { client, lines } = reportingClient({ execute: async () => ({ rows: [] }) });
+
+      await client.query({
+        tenantId: "",
+        sql: "SELECT mutation_id FROM system.mutations WHERE database = currentDatabase() AND table = 'trace_summaries'",
+        // A system table read for the whole install: no tenant owns it.
+        SKIP_TENANT_CHECK: true,
+      });
+
+      expect(lines.filter((line) => line.level === "warn")).toEqual([]);
+    });
+  });
+
   describe("given a read that fails", () => {
     /** @scenario "A statement that fails is reported and still reaches its caller" */
     it("logs and counts the failure, then raises the original error", async () => {

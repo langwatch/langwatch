@@ -75,9 +75,9 @@ export const clippedBandMask = ({
   end: boolean;
 }): string | undefined => {
   if (start && end)
-    return "linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%)";
-  if (start) return "linear-gradient(to right, transparent 0%, #000 14%)";
-  if (end) return "linear-gradient(to left, transparent 0%, #000 14%)";
+    return "linear-gradient(to right, transparent 0%, var(--chakra-colors-fg) 14%, var(--chakra-colors-fg) 86%, transparent 100%)";
+  if (start) return "linear-gradient(to right, transparent 0%, var(--chakra-colors-fg) 14%)";
+  if (end) return "linear-gradient(to left, transparent 0%, var(--chakra-colors-fg) 14%)";
   return undefined;
 };
 

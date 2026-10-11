@@ -336,18 +336,6 @@ describe("PlatformOperatorsService", () => {
     });
   });
 
-  describe("when boot reads ADMIN_EMAILS", () => {
-    /** @scenario "A set ADMIN_EMAILS only warns at boot" */
-    it("warns that a set list grants nothing and names the page and the task", () => {
-      const [warning] = PlatformOperatorsService.bootWarnings({ adminEmails: ["ana@acme.com"] });
-
-      expect(warning).toMatch(/grants nothing/);
-      expect(warning).toMatch(/\/ops\/operators/);
-      expect(warning).toMatch(/grant-platform-operator/);
-      expect(PlatformOperatorsService.bootWarnings({ adminEmails: [] })).toEqual([]);
-    });
-  });
-
   describe("when the task grants as the system", () => {
     /** @scenario "The recovery task grants the role as the system" */
     it("grants the account behind the address as the system", async () => {
@@ -513,6 +501,128 @@ describe("PlatformOperatorsService.seedFromAdminEmails", () => {
 
       await expect(service.seedFromAdminEmails({ settings: step, dryRun: false })).resolves.toBe(0);
       expect(granted).toEqual([]);
+    });
+  });
+});
+
+describe("PlatformOperatorsService.grantFirstUser", () => {
+  const selfHosted = { adminEmails: ["someone-else@acme.com"], cloud: false };
+
+  function signingUp(options: Parameters<typeof world>[0]) {
+    const seeded = world(options);
+    const record = vi.fn(async () => undefined);
+    seeded.service.connectSeedRecorder({ record });
+    return { ...seeded, record };
+  }
+
+  describe("given a self-hosted install nobody operates and its only user was created", () => {
+    /** @scenario "The first user of a self-hosted install becomes a platform operator" */
+    it("records that user as the seed's decision, whatever ADMIN_EMAILS names", async () => {
+      const { service, record, granted } = signingUp({ users: [user("ana")] });
+
+      await expect(service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted })).resolves.toBe(
+        true,
+      );
+
+      expect(record).toHaveBeenCalledExactlyOnceWith({ via: "first-user", userIds: ["ana"] });
+      expect(granted).toEqual([]);
+    });
+
+    /** @scenario "The first user of a self-hosted install becomes a platform operator" */
+    it("grants the recorded first user as the system, as every seeded grant is", async () => {
+      const { service, granted } = world({ users: [user("ana")] });
+
+      await service.grantSeeded({ via: "first-user", userIds: ["ana"] });
+
+      expect(granted).toEqual([
+        expect.objectContaining({
+          principal: { type: "user", id: "ana" },
+          caller: { type: "system" },
+          actor: PLATFORM_OPERATOR_SEED_ACTOR,
+        }),
+      ]);
+    });
+  });
+
+  describe("given another user already exists", () => {
+    /** @scenario "A second user never becomes an operator by signing up" */
+    it("records nothing for the second user", async () => {
+      const { service, record } = signingUp({ users: [user("ana"), user("bo")] });
+
+      await expect(service.grantFirstUser({ userId: "bo", backfilled: false, settings: selfHosted })).resolves.toBe(
+        false,
+      );
+      expect(record).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Two users signing up at once never both become operators" */
+    it("records nothing for either of two users whose facts both find two users", async () => {
+      const { service, record } = signingUp({ users: [user("ana"), user("bo")] });
+
+      await Promise.all([
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted }),
+        service.grantFirstUser({ userId: "bo", backfilled: false, settings: selfHosted }),
+      ]);
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the hosted service", () => {
+    /** @scenario "The hosted service never makes its first user an operator" */
+    it("records nothing", async () => {
+      const { service, record } = signingUp({ users: [user("ana")] });
+
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: { ...selfHosted, cloud: true } }),
+      ).resolves.toBe(false);
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given somebody already holds the grant", () => {
+    /** @scenario "An existing operator means no first-user grant" */
+    it("records nothing and grants nobody", async () => {
+      const { service, record, granted, authz } = signingUp({
+        users: [user("ana")],
+        holders: [holder("carol")],
+      });
+
+      await expect(service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted })).resolves.toBe(
+        false,
+      );
+      expect(record).not.toHaveBeenCalled();
+      expect(granted).toEqual([]);
+      expect(authz.revokePlatformOperator).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a backfilled fact for the install's only user", () => {
+    /** @scenario "A backfilled or stale creation fact grants nobody" */
+    it("records nothing", async () => {
+      const { service, record } = signingUp({ users: [user("ana")] });
+
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: true, settings: selfHosted }),
+      ).resolves.toBe(false);
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the fact names a user who is gone or deactivated", () => {
+    /** @scenario "A backfilled or stale creation fact grants nobody" */
+    it.each([
+      { case: "erased", users: [user("bo")] },
+      {
+        case: "deactivated",
+        users: [user("ana", { deactivatedAt: new Date("2025-02-01T00:00:00Z") })],
+      },
+    ])("records nothing when the user was $case", async ({ users }) => {
+      const { service, record } = signingUp({ users });
+
+      await expect(service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted })).resolves.toBe(
+        false,
+      );
+      expect(record).not.toHaveBeenCalled();
     });
   });
 });

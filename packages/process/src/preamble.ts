@@ -5,6 +5,7 @@
  */
 import { SESSION_SECRET_LOG_PATHS } from "@langwatch/authorization";
 import { parseProcessConfig, type ConfigOwner, type ProcessConfigOf } from "@langwatch/config";
+import { createLogger } from "@langwatch/observability";
 import {
   refuseDoubleClaims,
   SecretsChain,
@@ -171,7 +172,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
 
     const boundary: Parameters<typeof ProcessServer.create>[0] = {
       name: this.name,
-      logger: telemetry?.logger ?? silentLogger(),
+      logger: telemetry?.logger ?? hostLogger(this.name),
       config,
       resolver,
       ownsProcess: this.state.ownsProcess,
@@ -209,9 +210,17 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
   }
 }
 
-/** A process that composed no telemetry logs nowhere rather than crashing. */
-function silentLogger(): ServerLogger {
-  return { info: () => undefined, error: () => undefined };
+/**
+ * A process that composed no telemetry (an api embedded beside the worker) still logs: telemetry
+ * owns exporters, not lines. Taken per line, so it writes as the host configured logging.
+ */
+function hostLogger(name: string): ServerLogger {
+  const logger = () => createLogger(`langwatch:${name}`);
+  return {
+    info: (fields, line) => logger().info(fields, line),
+    warn: (fields, line) => logger().warn(fields, line),
+    error: (fields, line) => logger().error(fields, line),
+  };
 }
 
 export class Server extends ServerBoundary {

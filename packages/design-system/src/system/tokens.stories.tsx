@@ -160,6 +160,16 @@ const SEMANTIC_GROUPS: { title: string; note: string; matches: (name: string) =>
     note: 'The brand orange; `colorPalette="accent"` follows it.',
     matches: (n) => n.startsWith("accent."),
   },
+  {
+    title: "Terminal",
+    note: "Named ANSI colours and screen chrome.",
+    matches: (n) => n.startsWith("terminal."),
+  },
+  {
+    title: "Illustration",
+    note: "Fixed artwork pigments, identical in both modes.",
+    matches: (n) => n.startsWith("illustration."),
+  },
   { title: "Status", note: "A state, never decoration.", matches: (n) => n.startsWith("status.") },
   {
     title: "Chart series",

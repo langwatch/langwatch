@@ -35,7 +35,7 @@
 
 import { createHash } from "node:crypto";
 
-import type { spanSchema } from "@langwatch/trace-contract";
+import type { spanSchema } from "@langwatch/otlp/trace-request";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import type { z } from "zod";
 

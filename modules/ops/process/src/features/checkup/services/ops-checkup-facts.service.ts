@@ -1,5 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { CHECKUP_CANARY_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import type {
   ConnectStatus,
   LicenseStatus,
@@ -17,9 +17,14 @@ import type {
   StoredObjectApi,
   StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type { CheckupProbeChannel } from "../../../channels/checkup-probe.channel.ts";
-import { CANARY_KEY_PERMISSIONS } from "../../../rules/checkup-canary-key.rules.ts";
+import {
+  CANARY_KEY_PERMISSIONS,
+  CHECKUP_CANARY_KEY,
+  CHECKUP_PROJECT_CANARIES,
+} from "../../../rules/checkup-canary-key.rules.ts";
 import {
   type CheckupConnectView,
   type CheckupFacts,
@@ -29,9 +34,12 @@ import {
 } from "../../../rules/checkup-facts.rules.ts";
 import { type UsageReportPeers } from "../../../services/usage-report-collection.service.ts";
 import { type UsageReportInstall } from "../../../services/usage-report.service.ts";
+import { findCheckupProjectId } from "./checkup-canary-project.service.ts";
 
 export const GATEWAY_PROBE_TIMEOUT_MS = 5_000;
 const CANARY_TIMEOUT_MS = 150_000;
+const CHECKUP_PROJECT_MISSING =
+  "the checkup project is not set up yet: run the upgrade so step ops:checkup-canary-project creates it";
 
 /** Every peer the checkup and the report ask, by the one operation each needs. */
 export type OpsCheckupPeers = UsageReportPeers &
@@ -39,13 +47,16 @@ export type OpsCheckupPeers = UsageReportPeers &
     organizationDirectory: Pick<OrganizationApi, "listAllIds">;
     licensing: UsageReportInstall & Pick<LicensingApi, "getLicenseStatus" | "getConnectStatus">;
     providerTests: Pick<ModelProviderApi, "listForOrganization" | "testConnection">;
-    projectDirectory: Pick<ProjectApi, "listByOrganization">;
+    projectDirectory: Pick<
+      ProjectApi,
+      "listByOrganization" | "findInternalIds" | "getOrganizationId"
+    >;
     mail: Pick<NotificationApi, "getMailDelivery" | "verifySmtp">;
     storage: Pick<StoredObjectApi, "getStorageDestination" | "probeStorage">;
     lwql: Pick<AnalyticsApi, "findAppFunctionsProvisionable">;
     gateway: Pick<GatewayApi, "getDeploymentAddresses">;
     /** Mints the minimal system key each canary runs with. */
-    apiKeys: Pick<ApiKeyApi, "mintRunKey">;
+    apiKeys: Pick<ApiKeyApi, "mintRunKey" | "create">;
   }>;
 
 /** The addresses this app is reached at, public first, each once. */
@@ -70,12 +81,9 @@ export function storageFacts({
       );
     },
     probe: async () => {
-      const [project] = await findOldestProjects({
-        projects: peers.projectDirectory,
-        organizationId,
-      });
-      if (!project) throw new Error("no project to write for");
-      await peers.storage.probeStorage({ projectId: project.id });
+      const projectId = await findCheckupProjectId({ projects: peers.projectDirectory });
+      if (!projectId) throw new Error(CHECKUP_PROJECT_MISSING);
+      await peers.storage.probeStorage({ projectId });
     },
   };
 }
@@ -118,24 +126,66 @@ export function canaryFact({
   organizationId: string;
 }): CheckupFacts["canary"] {
   return async (name, params) => {
-    const [project] = await findOldestProjects({
-      projects: peers.projectDirectory,
-      organizationId,
-    });
-    if (!project) return { status: 412, body: { message: "no project" } };
-    // A minimal key of the checkup's own, acting as the system: never the project's legacy key.
-    const token = await peers.apiKeys.mintRunKey({
-      userId: null,
-      projectId: project.id,
-      permissions: [...CANARY_KEY_PERMISSIONS[name]],
-    });
+    const credential = CHECKUP_PROJECT_CANARIES.has(name)
+      ? await checkupProjectCredential({ peers })
+      : await customerProjectCredential({ peers, organizationId, name });
+    if ("refusal" in credential) return { status: 412, body: { message: credential.refusal } };
     const query = new URLSearchParams(params).toString();
     return channels.probes.get({
       url: `${publicBaseUrl ?? ""}/api/health/${name}${query ? `?${query}` : ""}`,
-      headers: { "X-Auth-Token": token, "X-Project-Id": project.id },
+      headers: { "X-Auth-Token": credential.token, "X-Project-Id": credential.projectId },
       timeoutMs: CANARY_TIMEOUT_MS,
     });
   };
+}
+
+type CanaryCredential = { projectId: string; token: string } | { refusal: string };
+
+/** A trace canary's own short-lived key on the hidden checkup project; never a customer's. */
+async function checkupProjectCredential({
+  peers,
+}: {
+  peers: OpsCheckupPeers;
+}): Promise<CanaryCredential> {
+  const projectId = await findCheckupProjectId({ projects: peers.projectDirectory });
+  if (!projectId) return { refusal: CHECKUP_PROJECT_MISSING };
+  const { token } = await peers.apiKeys.create({
+    isSystemManaged: true,
+    name: CHECKUP_CANARY_API_KEY_NAME,
+    description: "Sends and reads back one checkup's canary traces, and expires by itself.",
+    userId: null,
+    createdByUserId: null,
+    organizationId: await peers.projectDirectory.getOrganizationId(projectId),
+    permissionMode: "restricted",
+    permissions: [...CHECKUP_CANARY_KEY.permissions],
+    bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: projectId }],
+    expiresAt: toDate(nowInstant().add({ milliseconds: CHECKUP_CANARY_KEY.ttlMs })),
+  });
+  return { projectId, token };
+}
+
+/** The other canaries reach what a customer configured, so they keep the oldest project. */
+async function customerProjectCredential({
+  peers,
+  organizationId,
+  name,
+}: {
+  peers: OpsCheckupPeers;
+  organizationId: string;
+  name: keyof typeof CANARY_KEY_PERMISSIONS;
+}): Promise<CanaryCredential> {
+  const [project] = await findOldestProjects({
+    projects: peers.projectDirectory,
+    organizationId,
+  });
+  if (!project) return { refusal: "no project" };
+  // A minimal key of the checkup's own, acting as the system: never the project's legacy key.
+  const token = await peers.apiKeys.mintRunKey({
+    userId: null,
+    projectId: project.id,
+    permissions: [...CANARY_KEY_PERMISSIONS[name]],
+  });
+  return { projectId: project.id, token };
 }
 
 export function connectFact({

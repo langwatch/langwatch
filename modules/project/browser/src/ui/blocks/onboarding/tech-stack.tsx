@@ -1,20 +1,16 @@
+import { Azure, DSPy, Python, TypeScript } from "@langwatch/design-system/icons";
 /**
  * Project language and framework selector with icons; moved to project once
  * before, moved back so `project-browser` stops reaching into onboarding for
  * its one caller and this is the caller's own module.
  */
-
 import { Box, Field, HStack, VStack } from "@langwatch/design-system/primitives";
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import { Code } from "lucide-react";
 
-import { Azure } from "../../elements/onboarding/icons/azure.tsx";
-import { DSPy } from "../../elements/onboarding/icons/ds-py.tsx";
 import { LangChainParrot } from "../../elements/onboarding/icons/lang-chain-parrot.tsx";
 import { OpenAI } from "../../elements/onboarding/icons/open-ai.tsx";
 import { PuzzleIcon } from "../../elements/onboarding/icons/puzzle-icon.tsx";
-import { Python } from "../../elements/onboarding/icons/python.tsx";
-import { TypeScript } from "../../elements/onboarding/icons/type-script.tsx";
 import { Vercel } from "../../elements/onboarding/icons/vercel.tsx";
 import { RadioCard } from "../../elements/onboarding/radio-card.tsx";
 

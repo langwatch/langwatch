@@ -407,6 +407,13 @@ Feature: Workflow service boundary
     And the project's legacy key is not in the run
 
   @unit
+  Scenario: A run whose starter is no user on the project is refused its key
+    Given a run whose recorded starter is a made-up name rather than a member
+    When its target is prepared to run
+    Then api_key_permission_denied names traces:create
+    And no key is minted
+
+  @unit
   Scenario: A run nobody started in a personal workspace acts as the system, not the owner
     Given a monitor in a member's personal workspace
     When its run's key is minted

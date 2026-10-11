@@ -85,4 +85,18 @@ describe("the session window decision", () => {
     expect(lastSeenWriteIntervalMs(bound(2))).toBe(60_000);
     expect(lastSeenWriteIntervalMs(NO_SESSION_BOUND)).toBe(0);
   });
+
+  /** @scenario "Using it keeps it alive" */
+  it("keeps a session used every twenty seconds under a one-minute window", () => {
+    const window = bound(1);
+    let lastSeenAt = SIGNED_IN_AT;
+    for (let seconds = 20; seconds <= 300; seconds += 20) {
+      const now = SIGNED_IN_AT.add({ seconds });
+      expect(
+        sessionBoundVerdict({ bound: window, createdAt: SIGNED_IN_AT, lastSeenAt, now }),
+      ).toEqual({ withinBound: true });
+      const sinceStamp = now.epochMilliseconds - lastSeenAt.epochMilliseconds;
+      if (sinceStamp >= lastSeenWriteIntervalMs(window)) lastSeenAt = now;
+    }
+  });
 });

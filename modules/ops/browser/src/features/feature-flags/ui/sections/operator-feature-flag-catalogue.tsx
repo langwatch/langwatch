@@ -137,7 +137,7 @@ export function OperatorFeatureFlagCatalogueView({
             <Table.Body>
               {catalogue.families.map((family) => (
                 <Table.Row key={family.keyPrefix}>
-                  <Table.Cell>
+                  <Table.Cell whiteSpace="nowrap">
                     <InlineCode>{`${family.keyPrefix}*`}</InlineCode>
                   </Table.Cell>
                   <Table.Cell>
@@ -274,7 +274,7 @@ function FlagRow({
       <Table.Cell>
         <VStack align="start" gap={2}>
           <HStack gap={2} wrap="wrap">
-            <Text fontFamily="mono" fontSize="xs" overflowWrap="anywhere">
+            <Text fontFamily="mono" fontSize="xs" whiteSpace="nowrap" title={row.key}>
               {row.key}
             </Text>
             <ScopeBadge scope={row.scope} />

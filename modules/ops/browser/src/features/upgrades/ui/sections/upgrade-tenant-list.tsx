@@ -33,7 +33,7 @@ function stateOf(value: string) {
   return TENANT_STATES.find((state) => state.value === value);
 }
 
-/** Every tenant's state per tenant step, filtered by step and state, newest movement first. */
+/** Every organization's state per step, filtered by step and state, newest movement first. */
 export function UpgradeTenantList({
   steps,
 }: {
@@ -55,7 +55,7 @@ export function UpgradeTenantList({
     <Stack gap={3} data-testid="upgrade-tenant-list">
       <HStack gap={3} flexWrap="wrap">
         <Heading size="sm" flex={1}>
-          Tenants
+          Organizations
         </Heading>
         <NativeSelect.Root size="sm" width={{ base: "full", md: "60" }}>
           <NativeSelect.Field
@@ -122,12 +122,13 @@ function TenantRows({
   rows: readonly TenantRow[];
   titleOf: (name: string) => string;
 }) {
-  if (error) return <HandledErrorAlert error={error} fallbackTitle="Couldn't load the tenants" />;
-  if (isLoading) return <ListPageSkeleton label="Loading tenants" />;
+  if (error)
+    return <HandledErrorAlert error={error} fallbackTitle="Couldn't load the organizations" />;
+  if (isLoading) return <ListPageSkeleton label="Loading organizations" />;
   if (rows.length === 0) {
     return (
       <Text textStyle="sm" color="fg.muted">
-        No tenant has a recorded state here yet.
+        No organization has a recorded state here yet.
       </Text>
     );
   }
@@ -135,7 +136,7 @@ function TenantRows({
     <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
       <Table.Header>
         <Table.Row>
-          <Table.ColumnHeader>Tenant</Table.ColumnHeader>
+          <Table.ColumnHeader>Organization</Table.ColumnHeader>
           <Table.ColumnHeader>Step</Table.ColumnHeader>
           <Table.ColumnHeader>State</Table.ColumnHeader>
           <Table.ColumnHeader>Last moved</Table.ColumnHeader>

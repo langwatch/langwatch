@@ -101,18 +101,22 @@ export const Sizes: Story = {
 
 export const LongTextAndNarrowWidth: Story = {
   render: (args) => (
-    <Box maxWidth="260px">
-      <ListTable {...args} containerProps={{ overflowX: "auto" }}>
+    <Box maxWidth="320px">
+      <ListTable {...args}>
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Prompt</Table.ColumnHeader>
+            <Table.ColumnHeader>Run plan</Table.ColumnHeader>
             <Table.ColumnHeader>Model</Table.ColumnHeader>
+            <Table.ColumnHeader>Last updated</Table.ColumnHeader>
           </Table.Row>
         </Table.Header>
         <Table.Body>
           <Table.Row>
             <Table.Cell>Refund policy answer for European Union customers</Table.Cell>
+            <Table.Cell>Nightly regression</Table.Cell>
             <Table.Cell>claude-opus-4</Table.Cell>
+            <Table.Cell>2 hours ago</Table.Cell>
           </Table.Row>
         </Table.Body>
       </ListTable>

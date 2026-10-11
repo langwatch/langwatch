@@ -39,6 +39,13 @@ const registry = {
   },
 
   // ---- dataset storage ----
+  private_dataplane_unavailable: {
+    tips: [
+      "Set the variable this error names (CLICKHOUSE_URL__<label>__<orgId> or DATAPLANE_S3__<label>__<orgId>) and restart the api and worker",
+      "If it is set, check its value parses: a ClickHouse URL, or S3 JSON with endpoint, bucket, accessKeyId and secretAccessKey",
+    ],
+  },
+
   storage_not_writable: {
     tips: [
       "Set S3_BUCKET_NAME (with its credentials) so datasets are stored in object storage",
@@ -106,6 +113,12 @@ const registry = {
       "Read `meta.violations`; each entry names the rule (`code`) and the clause (`clause`) that was refused",
       "Submit one read-only SELECT; writes, DDL, SETTINGS, FORMAT, INTO OUTFILE and table functions are all refused",
       "Read only the datasets the schema endpoint lists for this key, and select fields by name rather than with `*`",
+    ],
+  },
+  lwql_parameter_invalid: {
+    tips: [
+      "Read `meta.parameter`; it names the placeholder whose value could not be read as its declared type",
+      "A `DateTime` or `DateTime64` placeholder takes `YYYY-MM-DD HH:MM:SS[.fff]` with no `T` or `Z`; send UTC in that form",
     ],
   },
   lwql_parameter_missing: {

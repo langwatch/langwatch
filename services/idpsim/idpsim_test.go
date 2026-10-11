@@ -290,7 +290,7 @@ func samlRedirectRequest(t *testing.T) string {
 // @scenario "A SAML authentication request produces a signed response for a seeded user"
 func TestSAMLSSO(t *testing.T) {
 	s := newTestServer(t, 1)
-	target := testBase + "/t/1/saml/sso?SAMLRequest=" + url.QueryEscape(samlRedirectRequest(t))
+	target := testBase + "/t/1/saml/sso?login_hint=admin%40acme1.test&SAMLRequest=" + url.QueryEscape(samlRedirectRequest(t))
 	rec := do(s, httptest.NewRequest(http.MethodGet, target, nil))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	body := rec.Body.String()
@@ -306,6 +306,34 @@ func TestSAMLSSO(t *testing.T) {
 	assert.Contains(t, response, "SignatureValue")
 	assert.Contains(t, stripWhitespace(response), base64.StdEncoding.EncodeToString(tenant.Cert.Raw))
 	assert.Contains(t, response, "admin@acme1.test")
+}
+
+// @scenario "A SAML authentication request without a login hint offers the tenant's users"
+func TestSAMLAccountPicker(t *testing.T) {
+	s := newTestServer(t, 1)
+	q := url.Values{"SAMLRequest": {samlRedirectRequest(t)}, "RelayState": {"rs-1"}}
+	rec := do(s, httptest.NewRequest(http.MethodGet, testBase+"/t/1/saml/sso?"+q.Encode(), nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "idpsim console", "the picker is the console's page")
+	assert.NotContains(t, rec.Body.String(), "SAMLResponse", "nobody is asserted before somebody is chosen")
+
+	picker := getJSON(t, s, "/api/t/1/sign-in?"+q.Encode()+"&saml=1")
+	assert.Nil(t, picker["refusal"])
+	users := picker["users"].([]any)
+	require.Len(t, users, 2)
+	member := users[1].(map[string]any)
+	assert.Equal(t, "member@acme1.test", member["email"])
+	assert.Equal(t, "/t/1/", picker["cancelHref"])
+
+	// Choosing somebody repeats the same SAML request with the hint filled in.
+	chosen := do(s, httptest.NewRequest(http.MethodGet, testBase+member["href"].(string), nil))
+	require.Equal(t, http.StatusOK, chosen.Code, chosen.Body.String())
+	match := regexp.MustCompile(`name="SAMLResponse" value="([^"]+)"`).FindStringSubmatch(chosen.Body.String())
+	require.NotNil(t, match, "no SAMLResponse form field in: %s", chosen.Body.String())
+	decoded, err := base64.StdEncoding.DecodeString(html.UnescapeString(match[1]))
+	require.NoError(t, err)
+	assert.Contains(t, string(decoded), "member@acme1.test")
+	assert.NotContains(t, string(decoded), "admin@acme1.test")
 }
 
 func scimRequest(method, path, token, body string) *http.Request {

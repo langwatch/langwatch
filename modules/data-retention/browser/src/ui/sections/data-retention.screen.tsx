@@ -4,6 +4,7 @@
  */
 
 import { type ScopeAssignment } from "@langwatch/data-retention-contract";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -500,62 +501,54 @@ function RetentionPolicyList({
     );
   }
   return (
-    <Card.Root width="full" overflow="hidden">
-      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Scope</Table.ColumnHeader>
-              <Table.ColumnHeader>Policy</Table.ColumnHeader>
-              <Table.ColumnHeader />
+    <ListTable size="md" width="full">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Scope</Table.ColumnHeader>
+          <Table.ColumnHeader>Policy</Table.ColumnHeader>
+          <Table.ColumnHeader />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {scopeGroups.map((group) => {
+          const Icon = SCOPE_ICON[group.scopeType];
+          return (
+            <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
+              <Table.Cell>
+                <HStack gap={3}>
+                  <Icon size={16} />
+                  <VStack align="start" gap={0}>
+                    <Text fontWeight="medium">{group.name}</Text>
+                    <Text fontSize="xs" color="fg.muted" textTransform="capitalize">
+                      {group.scopeType.toLowerCase()}
+                    </Text>
+                  </VStack>
+                </HStack>
+              </Table.Cell>
+              <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>
+              <Table.Cell textAlign="end">
+                {canWrite && (
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <Button size="xs" variant="ghost" aria-label={`Actions for ${group.name}`}>
+                        <MoreVertical size={14} />
+                      </Button>
+                    </Menu.Trigger>
+                    <Menu.Content>
+                      <Menu.Item value="edit" onClick={() => onEdit(group)}>
+                        <Pencil size={14} /> Edit
+                      </Menu.Item>
+                      <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(group)}>
+                        <Trash2 size={14} /> Remove
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Root>
+                )}
+              </Table.Cell>
             </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {scopeGroups.map((group) => {
-              const Icon = SCOPE_ICON[group.scopeType];
-              return (
-                <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
-                  <Table.Cell>
-                    <HStack gap={3}>
-                      <Icon size={16} />
-                      <VStack align="start" gap={0}>
-                        <Text fontWeight="medium">{group.name}</Text>
-                        <Text fontSize="xs" color="fg.muted" textTransform="capitalize">
-                          {group.scopeType.toLowerCase()}
-                        </Text>
-                      </VStack>
-                    </HStack>
-                  </Table.Cell>
-                  <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>
-                  <Table.Cell textAlign="end">
-                    {canWrite && (
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            aria-label={`Actions for ${group.name}`}
-                          >
-                            <MoreVertical size={14} />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Menu.Item value="edit" onClick={() => onEdit(group)}>
-                            <Pencil size={14} /> Edit
-                          </Menu.Item>
-                          <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(group)}>
-                            <Trash2 size={14} /> Remove
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
-                    )}
-                  </Table.Cell>
-                </Table.Row>
-              );
-            })}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+          );
+        })}
+      </Table.Body>
+    </ListTable>
   );
 }

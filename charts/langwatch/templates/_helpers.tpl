@@ -1093,8 +1093,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 # inputs) until the operator states that the container has a lifecycle rule for
 # every prefix in the values.yaml table. That policy is management-plane; the
 # app holds a data-plane key and cannot read it back, so this is an assertion,
-# not a check. The earlier spool-only value still sets it (expand; retired at
-# the LTS floor). It gates only the WRITE path, so a legacyAzureRead migration
+# not a check. The earlier spool-only value still sets it (expand; stops being
+# read in 3.23). It gates only the WRITE path, so a legacyAzureRead migration
 # reads existing objects without it.
 - name: OBJECT_RETENTION_CONFIRMED
   value: "true"

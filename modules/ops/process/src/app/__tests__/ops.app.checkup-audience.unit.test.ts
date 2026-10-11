@@ -16,11 +16,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
 import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
+import { MemoryCloudLatestReleaseRepository } from "../../repositories/memory/memory.cloud-latest-release.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
 } from "../../repositories/memory/memory.datastore-health.repository.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import { UsageReportWorld } from "../../services/__tests__/support/usage-report-peers.ts";
 import {
@@ -67,6 +69,7 @@ function checkupService(): OpsCheckupService {
       productAnalytics: { key: undefined, host: undefined },
       grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },
       bugReportSlackChannel: undefined,
+      slackApiBase: "https://slack.com/api",
       cloudOps: false,
       adminEmails: [],
       nodeEnvironment: "production",
@@ -119,6 +122,9 @@ function checkupService(): OpsCheckupService {
       clickhouse: MemoryClickHouseHealthRepository.create(),
       redis: MemoryRedisHealthRepository.create(),
       upgradeLedger: MemoryUpgradeLedgerRepository.create(),
+      cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
+        store: MemoryOpsStore.create(),
+      }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),

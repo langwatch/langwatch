@@ -34,6 +34,11 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import {
+  type OtlpIngestCredential,
+  type OtlpIngestCredentialInput,
+  type OtlpIngestProject,
+} from "@langwatch/otlp/door";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -116,9 +121,6 @@ import {
   predefinedEventTypes,
   TRACK_EVENT_SPAN_NAME,
   type TrackEventRESTParamsValidator,
-  type OtlpIngestCredential,
-  type OtlpIngestCredentialInput,
-  type OtlpIngestProject,
   type OtlpTraceCollectionResult,
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,
@@ -345,6 +347,10 @@ import type { TraceProjectedReadRepository } from "../repositories/trace-project
 import { TraceRecordRepository } from "../repositories/trace-record.repository.ts";
 import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
 import { TraceSummaryReaderRepository } from "../repositories/trace-summary-reader.repository.ts";
+import {
+  TRACE_SUMMARY_LOOKUP_FORWARD_MS,
+  TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS,
+} from "../repositories/trace-summary.repository.ts";
 import type { TraceUsageCountRepository } from "../repositories/trace-usage-count.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { gateEvaluationContent } from "../rules/evaluation-content-gate.rules.ts";
@@ -365,6 +371,11 @@ import {
   TraceMetadataWriteService,
   type TraceSpanIngest,
 } from "../services/trace-metadata-write.service.ts";
+import {
+  TraceMonthIdsMigrationService,
+  type TraceMonthIdsInput,
+  type TraceMonthIdsReport,
+} from "../services/trace-month-ids-migration.service.ts";
 import { TraceOffloadResolutionBatchService } from "../services/trace-offload-resolution-batch.service.ts";
 import { TraceOffloadResolutionService } from "../services/trace-offload-resolution.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
@@ -373,7 +384,6 @@ import type { TraceProcessingCommands } from "../services/trace-processing-comma
 import { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 import { TraceRetentionFloorService } from "../services/trace-retention-floor.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
-import { TraceUsageCountService } from "../services/trace-usage-count.service.ts";
 import {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,
@@ -417,7 +427,9 @@ import {
   buildContentPrivacy,
   buildSpanContentRedactions,
   mapSpanToDetail,
+  canSearchCapturedContent,
   contentSearchTermsForViewer,
+  hiddenAttributeKeyMatcher,
   readDroppedFromParams,
   readPiiIncompleteFromParams,
   redactV2Content,
@@ -950,10 +962,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
     });
     app.#processingCommands = commands;
-    app.#usageCounts = TraceUsageCountService.create({
-      projects: setup.dependencies.projects,
-      usageCount: setup.repositories.usageCount,
-    });
     app.#modelSpend = setup.repositories.modelSpend;
     app.#attributeSpend = setup.repositories.attributeSpend;
     app.#attributedRollup = setup.repositories.attributedRollup;
@@ -966,6 +974,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
+    app.#traceMonthIds = TraceMonthIdsMigrationService.create({
+      projects: setup.dependencies.projects,
+      usageCount: setup.repositories.usageCount,
+      milestones,
+    });
     app.#retention = {
       resolve: (tenantId) =>
         setup.dependencies.dataRetention.getResolvedForProject({ projectId: tenantId }),
@@ -1168,6 +1181,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       explorerEvalRuns: TraceInstantEvalRunService.create({
         runs: options.repositories.instantEvalRuns,
       }),
+      models: options.modelProviders,
       storedObjects: options.storedObjects,
       ...(options.presence ? { presence: options.presence } : {}),
       share: options.share,
@@ -1263,10 +1277,10 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   #processing: TraceProcessingRuntimeAdapter | null = null;
   #milestones: TraceProjectMilestonesService | null = null;
+  #traceMonthIds: TraceMonthIdsMigrationService | null = null;
   #retention: RetentionPolicyResolver | null = null;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
-  #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
   #attributeSpend: TraceAttributeSpendRepository | null = null;
   #attributedRollup: TraceAttributedRollupRepository | null = null;
@@ -1280,16 +1294,6 @@ export class TraceModule implements TraceApi, CollectorApp {
       throw new TraceCapabilityUnavailableError("this process", "the precondition sample");
     }
     return this.#preconditionSamples.readSample(input);
-  }
-
-  async countTracesByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[]> {
-    if (!this.#usageCounts) {
-      throw new TraceCapabilityUnavailableError("this process", "the trace usage count");
-    }
-    return this.#usageCounts.countByProjects(input);
   }
 
   /** trace_processing for this process's role: producers send, consumers fold and react. */
@@ -1317,6 +1321,14 @@ export class TraceModule implements TraceApi, CollectorApp {
   /** Binds the milestone senders the worker's project-metadata subscriber records through. */
   connectProjectMilestones(commands: EventingCommands<TraceProjectMilestonesDefinition>): void {
     this.#milestones?.connect(commands);
+  }
+
+  /** Sends each project's trace ids first seen this month, for the upgrade step. */
+  sendMonthTraceIds(input: TraceMonthIdsInput): Promise<TraceMonthIdsReport> {
+    if (!this.#traceMonthIds) {
+      throw new TraceCapabilityUnavailableError("this process", "the month trace ids migration");
+    }
+    return this.#traceMonthIds.sendMonthTraceIds(input);
   }
 
   /** trace_collector_evaluations: the same in every role; evaluation reports from its side (§9). */
@@ -1408,11 +1420,12 @@ export class TraceModule implements TraceApi, CollectorApp {
         ? TraceExportDownloadService.create({
             exports: TraceExportService.create({
               traceService: dependencies.traces.read,
-              compileFilter: ({ request }) =>
+              compileFilter: ({ request, protections }) =>
                 this.compileExplorerTraceFilter({
                   query: request.query ?? "",
                   tenantId: request.projectId,
                   timeRange: { from: request.startDate, to: request.endDate },
+                  protections,
                 }),
               authorizeOwnRead: ({ projectId }) =>
                 this.#authorizeOwnRead({
@@ -1921,6 +1934,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
     authorization: Authorization;
+    protections?: Protections;
   }): Promise<DiscoverResult> {
     if (input.query === null || input.query === undefined) {
       return this.readDiscover({ authorization: input.authorization, timeRange: input.timeRange });
@@ -1930,6 +1944,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       authorization: input.authorization,
       timeRange: input.timeRange,
       query: input.query,
+      ...(input.protections ? { protections: input.protections } : {}),
       evalRuns: await this.findExplorerEvalRuns({
         projectId: input.projectId,
         evalRuns: input.evalRuns,
@@ -2504,11 +2519,23 @@ export class TraceModule implements TraceApi, CollectorApp {
     tenantId: string;
     timeRange: { from: number; to: number };
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    /** The viewer's; under any content protection free text skips captured I/O. */
+    protections?: Protections;
   }): { sql: string; params: Record<string, unknown> } | null {
     return this.#queryTranslation.translateFilter({
       queryText: input.query,
       timeRange: input.timeRange,
       ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
+      ...(input.protections
+        ? {
+            searchContent: canSearchCapturedContent(input.protections),
+            isHiddenAttribute: hiddenAttributeKeyMatcher({
+              protections: input.protections,
+              contentPrivacy: traceReadMapperPorts.contentPrivacy,
+              derivedPrefixes: traceDerivedAttrPrefixes,
+            }),
+          }
+        : {}),
     });
   }
 
@@ -2536,6 +2563,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     evalRuns?: readonly ResolvedInstantEvalRun[];
     originNamed?: boolean;
     dateField?: TraceDateField;
+    protections?: Protections;
   }): { sql: string; params: Record<string, unknown> } {
     const compiled = this.translateTraceFilter(input);
 
@@ -2570,11 +2598,34 @@ export class TraceModule implements TraceApi, CollectorApp {
         query: input.filter,
         tenantId: input.projectId,
         timeRange: input.window,
+        protections: await this.#protectionsOfProof({
+          projectId: input.projectId,
+          authorization: input.authorization,
+        }),
       }),
       limit: input.limit,
     });
 
     return refs.map((ref) => ref.traceId);
+  }
+
+  /** The protections of whoever holds the proof; a system or internal read is unprotected. */
+  async #protectionsOfProof(input: {
+    projectId: string;
+    authorization: Authorization;
+  }): Promise<Protections | undefined> {
+    const { principal } = input.authorization;
+    if (principal.type === "user") {
+      return this.resolveViewerProtections({
+        projectId: input.projectId,
+        userId: principal.id,
+        authorization: input.authorization,
+      });
+    }
+    if (principal.type === "apiKey") {
+      return this.resolveApiKeyProtections({ projectId: input.projectId, principal });
+    }
+    return undefined;
   }
 
   /** The query's positive bare-word terms, for a content (log-body) search. */
@@ -2609,6 +2660,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       query: input.query ?? "",
       tenantId: input.projectId,
       timeRange: input.timeRange,
+      protections,
       evalRuns: await this.findExplorerEvalRuns({
         projectId: input.projectId,
         evalRuns: input.evalRuns,
@@ -2650,6 +2702,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     query: string;
     evalRuns?: readonly ResolvedInstantEvalRun[];
     authorization: Authorization;
+    protections?: Protections;
   }): Promise<DiscoverResult> {
     const filterFor = createFacetFilterResolver({
       queryText: input.query,
@@ -2659,6 +2712,7 @@ export class TraceModule implements TraceApi, CollectorApp {
           tenantId: input.projectId,
           timeRange: input.timeRange,
           ...(input.evalRuns ? { evalRuns: input.evalRuns } : {}),
+          ...(input.protections ? { protections: input.protections } : {}),
         }) ?? undefined,
       hide: explorerOriginExclusion({ hiddenOrigins: explorerHiddenOrigins(input.query) }),
     });
@@ -3911,7 +3965,7 @@ class TraceComposedIngressCommand extends TraceIngressCommand {
 }
 
 /** The trace tree's summary, read from the folded `trace_summaries` projection. */
-class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
+export class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
   static create(store: FoldProjectionStore<TraceSummaryData>): FoldedTraceSummaryReader {
     return new FoldedTraceSummaryReader(store);
   }
@@ -3926,16 +3980,34 @@ class FoldedTraceSummaryReader extends TraceSummaryReaderRepository {
   async findSummary({
     tenantId,
     traceId,
+    occurredAtMs,
+    widen = true,
   }: {
     tenantId: string;
     traceId: string;
+    occurredAtMs?: number;
+    widen?: boolean;
   }): Promise<TraceSummaryData | null> {
-    const read = await this.#store.get(traceId, {
-      aggregateId: traceId,
-      tenantId: createTenantId(tenantId),
-    });
+    const context = { aggregateId: traceId, tenantId: createTenantId(tenantId) };
+    if (occurredAtMs === undefined) {
+      const read = await this.#store.get(traceId, context);
+      return read.kind === "folded" ? read.state : null;
+    }
 
-    return read.kind === "folded" ? read.state : null;
+    // Anchored: adjacent bounded slices, narrowest first; a miss at the widest is final.
+    const steps = widen
+      ? TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS
+      : TRACE_SUMMARY_LOOKUP_LOOKBACK_STEPS_MS.slice(0, 1);
+    let toMs = occurredAtMs + TRACE_SUMMARY_LOOKUP_FORWARD_MS;
+    for (const lookbackMs of steps) {
+      const fromMs = occurredAtMs - lookbackMs;
+      const read = await this.#store.get(traceId, { ...context, readWindow: { fromMs, toMs } });
+      if (read.kind === "folded") return read.state;
+      // Both bounds are inclusive, so the next slice ends one millisecond before this one.
+      toMs = fromMs - 1;
+    }
+
+    return null;
   }
 }
 

@@ -14,6 +14,7 @@ import { ConnectedIdentityEventing } from "../../eventing/identity-command-sende
 import { identityEventing } from "../../eventing/identity.pipeline.ts";
 import { identityPipelineEventing } from "../../eventing/user-identity.pipeline.ts";
 import { joinRequestEventing } from "../../features/join-request/eventing/join-request.pipeline.ts";
+import { twoStepRequirementEventing } from "../../features/mfa/eventing/two-step-requirement.pipeline.ts";
 import { ssoConnectionEventing } from "../../features/sso-connection/eventing/sso-connection.pipeline.ts";
 import { identityProcessModule } from "../../identity.module.ts";
 
@@ -114,7 +115,7 @@ describe("ConnectedIdentityEventing", () => {
 describe("given identity's process module", () => {
   describe("when a process composes the module's eventing", () => {
     /** @scenario "The identity module declares its identity, join-request and SSO connection ledgers itself" */
-    it("declares the three ledgers beside its maintenance sweeps, and no directory-sync ledger", () => {
+    it("declares the three ledgers and the two-step requirement fact beside its maintenance sweeps, and no directory-sync ledger", () => {
       const eventing = identityProcessModule.eventing;
       const declarations = eventing && "declarations" in eventing ? eventing.declarations : [];
 
@@ -123,6 +124,7 @@ describe("given identity's process module", () => {
         identityPipelineEventing,
         joinRequestEventing,
         ssoConnectionEventing,
+        twoStepRequirementEventing,
       ]);
       expect(
         [identityPipelineEventing, joinRequestEventing, ssoConnectionEventing].map(

@@ -21,7 +21,6 @@ import {
 
 import { formatDurationSeconds } from "../../../../model/coding-agent/duration.ts";
 import {
-  CLAUDE_MARK_GRADIENT,
   TERMINAL_FONT_STACK,
   TERMINAL_TOKENS,
 } from "../../../../model/coding-agent/trace/terminal-palette.ts";
@@ -47,6 +46,14 @@ import {
   findCacheRebuilds,
 } from "../../../../model/coding-agent/trace/token-timeline.ts";
 import { toolResultBodyToString } from "../../../../model/coding-agent/trace/tool-result-body.ts";
+import {
+  CLAUDE_MARK_GRADIENT,
+  GEMINI_MARK_GRADIENT,
+  OPENCODE_GRAY,
+  OPENCODE_GRAY_FILL,
+  OPENCODE_WHITE,
+  OPENCODE_WHITE_FILL,
+} from "../../../../model/explorer/ai/ai-brand-palette.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
 import { TerminalPatch } from "./terminal-patch.tsx";
@@ -878,20 +885,13 @@ function claudeGradientMark(rows: readonly string[]): MarkSpec {
  * (tmux capture-pane -e of `gemini` v0.51): a five-column gradient from
  * blue to pink, colored by COLUMN, not by row.
  */
-const GEMINI_MARK = columnColoredMark(
-  ["▝▜▄  ", "  ▝▜▄", " ▗▟▀ ", "▝▀   "],
-  ["#4796E4", "#6688D9", "#847ACE", "#A471A7", "#C3677F"],
-);
+const GEMINI_MARK = columnColoredMark(["▝▜▄  ", "  ▝▜▄", " ▗▟▀ ", "▝▀   "], GEMINI_MARK_GRADIENT);
 
 /**
  * opencode's block wordmark, segment-for-segment from the real TUI (tmux capture-pane -e of
  * `opencode` v1.18): "open" in gray, "code" in near-white, letter counters filled with a
  * raised tone. Without the fills the letters read as hollow outlines and the n welds into an o.
  */
-const OPENCODE_GRAY = "#808080";
-const OPENCODE_GRAY_FILL = "#282828";
-const OPENCODE_WHITE = "#EEEEEE";
-const OPENCODE_WHITE_FILL = "#434343";
 const OPENCODE_MARK: MarkSpec = {
   rows: [
     [{ text: "                                 ▄", color: OPENCODE_WHITE }],

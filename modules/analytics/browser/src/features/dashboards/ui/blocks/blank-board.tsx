@@ -77,7 +77,7 @@ function CardLink({ href, label, children }: { href: string; label: string; chil
       textDecoration="none"
       color="inherit"
       transition="box-shadow 0.15s"
-      _hover={{ boxShadow: "0 2px 10px rgb(16 16 32 / 0.08)", textDecoration: "none" }}
+      _hover={{ boxShadow: "sm", textDecoration: "none" }}
       onClick={(event) => {
         if (opensElsewhere(event)) return;
         event.preventDefault();

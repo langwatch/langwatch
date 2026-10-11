@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -37,6 +38,8 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 			"selection":     r.selection,
 			"overlay":       o.worktreeOverlay(worktreeDir, reveal),
 			"nxDaemons":     r.nxDaemons,
+			"duplicates":    o.InfraDuplicates(context.Background()),
+			"slots":         r.slots,
 		})
 	}
 	if r.haveSelection {
@@ -45,6 +48,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 	o.printStacks(r)
 	fmt.Println()
 	o.printShared(r)
+	printSlots(r.slots)
 	o.printWorktreeOverlay(worktreeDir, reveal)
 	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
 		len(r.stacks), r.live, domain.HumanBytes(int64(r.rss)), r.shared(domain.HubService), o.cfg.Naming.TLD)
@@ -63,6 +67,7 @@ type statusReport struct {
 	rss           uint64
 	selection     domain.Selection
 	haveSelection bool
+	slots         slotsStatus
 }
 
 func (o *Orchestrator) collectStatus(worktreeDir string) statusReport {
@@ -83,6 +88,11 @@ func (o *Orchestrator) collectStatus(worktreeDir string) statusReport {
 		r.selection = domain.DefaultSelection()
 		r.haveSelection = true
 	}
+	var holders []domain.SlotClaim
+	if o.sem != nil {
+		holders = o.sem.Holders("checks")
+	}
+	r.slots = o.collectSlots(holders, o.store.WaiterClaims("checks"), time.Now())
 	return r
 }
 
@@ -94,7 +104,12 @@ func (o *Orchestrator) serverHealth(ctx context.Context) map[string]health {
 		isManaged bool
 		probe     func() (bool, string)
 	}{
-		{"observability", o.obs != nil, func() (bool, string) { return o.obs.Health(ctx) }},
+		{"observability", o.obs != nil, func() (bool, string) {
+			if o.isObservabilityOff() {
+				return true, "off (haven machine settings set " + domain.SettingObservability + " on)"
+			}
+			return o.obs.Health(ctx)
+		}},
 		{"clickhouse", o.ch != nil && o.cfg.ShouldManageClickHouse, func() (bool, string) { return o.ch.Health(ctx) }},
 		{"postgres", o.pg != nil && o.cfg.ShouldManagePostgres, func() (bool, string) { return o.pg.Health(ctx) }},
 		{"redis", o.rds != nil && o.cfg.ShouldManageRedis, func() (bool, string) { return o.rds.Health(ctx) }},
@@ -137,7 +152,7 @@ func (o *Orchestrator) containerNeedInputs() domain.ContainerNeedInputs {
 	if o.cfg.ShouldManageClickHouse {
 		in.ClickHouse = o.cfg.ClickHouseRuntime
 	}
-	if o.cfg.ShouldStartObservability {
+	if o.cfg.ShouldStartObservability && !o.isObservabilityOff() {
 		in.Observability = o.cfg.ObservabilityTier
 	}
 	return in
@@ -192,6 +207,9 @@ func (o *Orchestrator) printShared(r statusReport) {
 	}
 	for _, d := range r.nxDaemons {
 		fmt.Printf("ok   nx daemon pid %d (%s, ~%s)\n", d.PID, d.Worktree, domain.HumanBytes(d.RSS))
+	}
+	for _, g := range o.InfraDuplicates(context.Background()) {
+		fmt.Printf("dup  %s\n", g.Describe())
 	}
 }
 

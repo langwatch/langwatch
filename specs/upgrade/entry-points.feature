@@ -75,10 +75,10 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     And the development api service runs the upgrade instead of its own migrations
 
   @unimplemented
-  Scenario: A serving process refused below the floor closes its ledger connection
-    Given an installation whose ledger recorded a floor above this image's release
+  Scenario: A refused serving process closes its ledger connection
+    Given a database role that cannot create the upgrade ledger
     When the worker's gate asks
-    Then it refuses, naming the floor
+    Then it refuses, naming the refusal
     And it closes its ledger connection
 
   @integration

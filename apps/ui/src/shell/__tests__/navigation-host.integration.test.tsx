@@ -449,4 +449,58 @@ describe("the application chrome", () => {
       expect(reload).toHaveBeenCalledTimes(1);
     });
   });
+  describe("when somebody outside its organization opens the demo project", () => {
+    /** @scenario The demo project resolves for somebody who is not a member of its organization */
+    it("reads the graph that carries the demo project and finds it", async () => {
+      const DEMO_ORGANIZATION = {
+        id: "org_demo",
+        name: "Demo",
+        members: [],
+        teams: [
+          {
+            id: "team_demo",
+            name: "Demo team",
+            members: [],
+            projects: [{ id: "project_demo", name: "Demo", slug: "demo-project" }],
+          },
+        ],
+      };
+      class DemoRpc extends GraphRpc {
+        override query(path: string, input?: { isDemo?: boolean }): Promise<unknown> {
+          if (path === "organization.getAll" && input?.isDemo) {
+            return Promise.resolve([DEMO_ORGANIZATION, ...GRAPH]);
+          }
+          return super.query(path);
+        }
+      }
+      class DemoScope extends UiScope {
+        activeScope(): UiActiveScope {
+          return { organizationId: "org_demo", projectId: "project_demo" };
+        }
+      }
+
+      renderChrome(
+        {
+          ...HOST_SERVICES,
+          rpc: new DemoRpc(),
+          scope: new DemoScope(),
+          deployment: {
+            isDevelopment: false,
+            isSaaS: true,
+            appBaseUrl: "https://app.test",
+            hasNlpService: true,
+            hasLangevals: true,
+            hasEmailProvider: false,
+            hasCloudOps: false,
+            demoProjectSlug: "demo-project",
+          },
+        },
+        { path: "/demo-project/traces", pattern: "/:project/traces" },
+      );
+
+      await waitFor(() =>
+        expect(screen.getByTestId("probe").getAttribute("data-project")).toBe("demo-project"),
+      );
+    });
+  });
 });

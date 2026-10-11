@@ -526,3 +526,31 @@ func TestLoadConfigStartsIDsPastEarlierRuns(t *testing.T) {
 		t.Fatalf("id base %d", got)
 	}
 }
+
+// @scenario "A payment-link checkout carries the link and the buyer's details"
+func TestPaymentLinkCheckoutCarriesBuyer(t *testing.T) {
+	g := newRig(t)
+	form := url.Values{
+		"mode": {"subscription"}, "success_url": {"http://app/ok"}, "payment_link": {"plink_sim_license"},
+		"customer_email": {"buyer@acme.test"}, "line_items[0][price]": {seatPrice}, "line_items[0][quantity]": {"4"},
+	}
+	status, sess := g.stripe(http.MethodPost, "/v1/checkout/sessions", form.Encode())
+	if status != http.StatusOK || sess["payment_link"] != "plink_sim_license" || sess["customer_details"] != nil {
+		t.Fatalf("create: %d %v", status, sess)
+	}
+	status, done := g.control(http.MethodPost, "/_sim/api/checkout/"+sess["id"].(string)+"/complete", `{"name":"Acme Ltd"}`)
+	if status != http.StatusOK {
+		t.Fatalf("complete: %d %v", status, done)
+	}
+	g.deliver(g.eventIDs("checkout.session.completed"), "")
+	ev := g.rc.received[0]
+	var obj map[string]any
+	if err := json.Unmarshal(ev.Data.Object, &obj); err != nil {
+		t.Fatal(err)
+	}
+	details, _ := obj["customer_details"].(map[string]any)
+	if ev.Type != "checkout.session.completed" || obj["payment_link"] != "plink_sim_license" ||
+		details["email"] != "buyer@acme.test" || details["name"] != "Acme Ltd" {
+		t.Fatalf("event %s %v", ev.Type, obj)
+	}
+}

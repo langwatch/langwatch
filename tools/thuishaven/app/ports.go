@@ -71,6 +71,10 @@ type Store interface {
 	// which is what makes haven fall back to looking.
 	ReadContainerPosture() string
 	WriteContainerPosture(string) error
+	// The machine settings (observability on/off, VM auto-stop), saved in
+	// haven's home. Absent or corrupt reads as the defaults.
+	ReadMachineSettings() domain.MachineSettings
+	WriteMachineSettings(domain.MachineSettings) error
 	// TouchDBActivity records "slug's databases were in use now" — the clock the
 	// daemon's idle-database pruning reads. Touched on every `up` and refreshed
 	// by the daemon while a stack stays registered.
@@ -91,6 +95,8 @@ type Store interface {
 	// and nothing else, so slot counting never depends on the daemon running.
 	WritePressure(domain.PressureRecord) error
 	ReadPressure() (domain.PressureRecord, bool)
+	// WaiterClaims lists the runs queued for name's units: Label is the command, StartedAt when it queued.
+	WaiterClaims(name string) []domain.SlotClaim
 	// HeavyRuns counts the heavy runs live on this machine right now, across
 	// every worktree and terminal. Occupancy is derived from whether each
 	// recorded pid is still alive, so a killed run frees its place with no
@@ -266,6 +272,9 @@ type System interface {
 	// OrphanedWorkers lists processes matching marker whose parent is PID 1 —
 	// test workers an interrupted run left behind, owned by nobody.
 	OrphanedWorkers(marker string) []int
+	// ProcessCwds maps each pid to its working directory; a pid it cannot read
+	// is absent. Asked only for the orphan sweep's few candidates.
+	ProcessCwds(pids []int) map[int]string
 }
 
 // ClickHouse manages one shared, memory-capped Altinity ClickHouse container (on
@@ -279,7 +288,13 @@ type ClickHouse interface {
 	// EnsureDatabase creates a stack's database if it does not exist.
 	EnsureDatabase(ctx context.Context, database string) error
 	// DropDatabase removes a stack's database — the "give me a fresh DB" affordance.
+	// Its login and workload go with it.
 	DropDatabase(ctx context.Context, database string) error
+	// EnsureStackAccess gives a stack its own workload and login (password as
+	// given), so its queries are CPU-scheduled and memory-capped per stack.
+	EnsureStackAccess(ctx context.Context, database, password string) error
+	// SetStackWeight sets a provisioned stack's workload weight.
+	SetStackWeight(ctx context.Context, database string, weight int) error
 	// HTTPPort returns the managed server's HTTP port if known, without starting it
 	// (0 when it has never been provisioned).
 	HTTPPort() int
@@ -379,6 +394,11 @@ type Semaphore interface {
 	Acquire(ctx context.Context, name string, slots int) (release func(), slot int, err error)
 	// TryAcquire takes a free slot now or reports ok=false, never waiting.
 	TryAcquire(name string, slots int) (release func(), slot int, ok bool, err error)
+	// TryAcquireUnits takes claim.Units of a `budget`-unit counter now, all or
+	// none, and records claim against them; ok=false means not enough are free.
+	TryAcquireUnits(name string, budget int, claim domain.SlotClaim) (release func(), ok bool, err error)
+	// Holders lists who holds name's units, one claim per holder; a unit with no claim is its own.
+	Holders(name string) []domain.SlotClaim
 }
 
 // Hygiene is the disk-reclamation surface: enumerating a repo's worktrees,

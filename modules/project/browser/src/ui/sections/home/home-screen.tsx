@@ -14,7 +14,11 @@ import { LuCalendarClock } from "react-icons/lu";
 
 // The serif display face (Sentient) is declared once in apps/ui globals.scss.
 import { homeApi } from "../../../behavior/home-api.ts";
-import { GuidedOnboardingOffer, PendingJoinRequests } from "../../../behavior/lent-peers.tsx";
+import {
+  GuidedOnboardingOffer,
+  PendingJoinRequests,
+  UpgradeActionNeeded,
+} from "../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { safeReturnToPath } from "../../../model/project-switch.ts";
 import { HomeBriefingSection, SetupHairline } from "./briefing/index.ts";
@@ -65,6 +69,8 @@ export function HomePage() {
               <ConsideringLangWatch />
             </HStack>
 
+            {/* First, ops' unfinished operator steps for whoever holds ops:view. */}
+            <UpgradeActionNeeded />
             {/* Above every composition: whoever can answer a join request sees the
                 wait wherever the home opens. Organization draws nothing for anyone else. */}
             <PendingJoinRequests />

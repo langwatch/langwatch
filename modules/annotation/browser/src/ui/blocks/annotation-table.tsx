@@ -1,5 +1,6 @@
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -429,7 +430,7 @@ function annotatorNames(annotations: AnnotationWithUser[]): string[] {
 export function AnnotationTableSkeleton() {
   return (
     <Box flex={1} minWidth={0} overflow="auto" paddingX={6} paddingTop={6}>
-      <Table.Root variant="line" width="full">
+      <ListTable width="full">
         <Table.Header>
           <Table.Row>
             {Array.from({ length: 6 }).map((_, index) => (
@@ -453,7 +454,7 @@ export function AnnotationTableSkeleton() {
             </Table.Row>
           ))}
         </Table.Body>
-      </Table.Root>
+      </ListTable>
     </Box>
   );
 }

@@ -29,6 +29,7 @@ function rowFor(overrides: Partial<IssuedLicenseRecord> = {}): IssuedLicenseReco
     planType: "ENTERPRISE",
     maxMembers: 50,
     maxMembersLite: 0,
+    liteSeatsUnlimited: false,
     issuedAt: Temporal.Instant.from("2025-12-01T00:00:00.000Z"),
     expiresAt: Temporal.Instant.from("2027-01-01T00:00:00.000Z"),
     source: "BACKOFFICE",

@@ -13,6 +13,7 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type LaneAlias,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
@@ -101,6 +102,21 @@ import {
 } from "./spend-spike-evaluation.process.ts";
 
 export const GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME = "governance_activity_monitor";
+
+const PULLED_TRACE_FACTS =
+  "governance's governanceTraceFacts process pulls the window's traces; no trace job feeds it";
+
+/** Main's trace-side KPI and OCSF rollups, retired: their jobs are acknowledged for one release. */
+export const MAIN_TRACE_GOVERNANCE_LANE_TOMBSTONES: readonly LaneAlias[] = [
+  {
+    from: "trace_processing:reactor:governanceKpisSync",
+    tombstone: PULLED_TRACE_FACTS,
+  },
+  {
+    from: "trace_processing:reactor:governanceOcsfEventsSync",
+    tombstone: PULLED_TRACE_FACTS,
+  },
+];
 
 /** Seeds only an organization with no entries, so a redelivered fact seeds nothing twice. */
 export function seedDefaultAiToolCatalog({
@@ -293,6 +309,7 @@ function buildGovernanceActivityMonitor({
           .onWake(aggregateSweepWake)
           .outbox({ maxAttempts: AGGREGATE_RECONCILE_MAX_ATTEMPTS }),
       )
+      .withLaneAliases(MAIN_TRACE_GOVERNANCE_LANE_TOMBSTONES)
       .build()
   );
 }

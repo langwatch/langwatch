@@ -289,7 +289,7 @@ export class AuthzGrantNotConfirmedError extends HandledError {
   constructor() {
     super(
       "authz_grant_not_confirmed",
-      "We could not confirm the access change in time. Nothing was granted. Try again in a moment.",
+      "Your access change is still processing. Refresh to check its status before trying again.",
       { httpStatus: 503, fault: "platform" },
     );
     this.name = "AuthzGrantNotConfirmedError";

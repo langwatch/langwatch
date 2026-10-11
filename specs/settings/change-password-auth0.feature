@@ -191,6 +191,15 @@ Feature: Change password from /settings/security
     And the server logs the grant-misconfig error
     And I see an error toast telling an administrator to enable the Password grant
 
+  # The reason rides on the error's meta; the shared error registry turns it
+  # into the sentence main showed. An unknown reason keeps the generic line.
+  @unit
+  Scenario: An Auth0 misconfiguration names the setting an administrator must change
+    Given Auth0 refused a password change as insufficient_scope, password_grant_not_enabled or not_configured
+    When the refusal is shown to me
+    Then the notice names the Auth0 setting an administrator must change
+    And any other refusal shows the generic sign-in configuration line
+
   # The email-mode end-to-end flow (router-level test that wires
   # together password verification + Prisma update + session revoke)
   # has no integration test today. The pieces are tested individually:

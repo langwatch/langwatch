@@ -265,14 +265,6 @@ Feature: Feature package boundary lint
     Then it reports the exported declaration and fails
 
   @unit @architecture
-  Scenario: Declaration producers prepare their production dependencies
-    Given an adopted package imports another adopted workspace package
-    And only its no-emit config references that dependency's declaration producer
-    When architecture lint checks the declaration project graph
-    Then it reports a declaration-project-references finding on the producer
-    And adding a reachable producer reference resolves the finding without generated output
-
-  @unit @architecture
   Scenario: Feature services are classes
     Given a feature server service module
     When it exports a standalone service factory or a service class without static create
@@ -359,3 +351,28 @@ Feature: Feature package boundary lint
     And a separate pair of packages that depend on each other
     When architecture lint checks the fixture workspace
     Then it reports one package cycle per component, each naming every member and one concrete cycle
+
+  @unit @architecture
+  Scenario: An unused workspace dependency is refused
+    Given a workspace package declaring a workspace dependency that none of its files import
+    When architecture lint checks the fixture workspace
+    Then it reports the dependency with the fix "remove it from dependencies"
+
+  @unit @architecture
+  Scenario: A workspace dependency only tests import is refused in dependencies
+    Given a workspace package whose only import of a workspace dependency is in a test file
+    And that dependency is declared in dependencies
+    When architecture lint checks the fixture workspace
+    Then it reports the dependency with the fix "move it to devDependencies"
+
+  @unit @architecture
+  Scenario: A workspace dependency its source imports passes
+    Given a workspace package whose source imports a declared workspace dependency by a subpath
+    When architecture lint checks the fixture workspace
+    Then no dependency-use violation is reported for it
+
+  @unit @architecture
+  Scenario: A third-party dependency is never judged for use
+    Given a workspace package declaring a registry dependency that none of its files import
+    When architecture lint checks the fixture workspace
+    Then no dependency-use violation is reported for it

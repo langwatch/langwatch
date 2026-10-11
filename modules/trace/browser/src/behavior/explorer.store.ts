@@ -1,3 +1,4 @@
+import { onUiStorageReaderChange } from "@langwatch/browser-host/storage";
 import { useMemo } from "react";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
@@ -26,6 +27,9 @@ export const useExplorerStore = create<ExplorerStore>()((...args) => ({
   ...createSelectionSlice(...args),
   ...createRowsSlice(...args),
 }));
+
+// The reader is answered once the shell has installed storage, before the page paints.
+onUiStorageReaderChange(() => useExplorerStore.getState().restoreRememberedView());
 
 /**
  * The names the page used while the Explorer kept three stores. They address

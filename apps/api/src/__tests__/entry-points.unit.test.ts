@@ -123,9 +123,7 @@ describe("the entry points", () => {
       expect(runtime).not.toMatch(/runMigrations|migrate\.ts|task upgrade/);
       expect(runtime).toMatch(/startLangwatch\(/);
       expect(runtime).toMatch(/startLangwatchWorkers\(/);
-      expect(workers).not.toMatch(
-        /SKIP_PRISMA_MIGRATE|SKIP_CLICKHOUSE_MIGRATE|SKIP_LWQL_PROVISION/,
-      );
+      expect(workers).not.toMatch(/SKIP_LWQL_PROVISION/);
     });
   });
 

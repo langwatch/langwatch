@@ -3,6 +3,7 @@
  * Spec: specs/langy/langy-navigation-persistence.feature, specs/langy/langy-mount-scope.feature
  *       specs/langy/langy-worker-prewarm.feature
  */
+import { useDrawerEndInset } from "@langwatch/design-system/drawer";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -476,6 +477,24 @@ describe("ProjectLangyLayout", () => {
       // The panel rides beside the drawer as an overlay; the page keeps its
       // full width underneath the pair.
       expect(dockWrapper()?.getAttribute("data-langy-dock")).toBe("none");
+    });
+
+    /** @scenario "A drawer turns the DOCKED panel into its floating companion" */
+    it("makes a drawer yield the docked panel's room on a page without the app shell", async () => {
+      function InsetProbe() {
+        return <output data-testid="drawer-end-inset">{useDrawerEndInset()}</output>;
+      }
+      render(<InsetProbe />);
+      renderAt("/demo/traces");
+      act(() => {
+        useLangyStore.setState({ panelMode: "sidebar" });
+      });
+      await openLangy();
+      expect(screen.getByTestId("drawer-end-inset").textContent).toBe("412");
+      act(() => {
+        useLangyStore.getState().closePanel();
+      });
+      expect(screen.getByTestId("drawer-end-inset").textContent).toBe("0");
     });
 
     /** @scenario "Closing the dock returns the page to full width" */

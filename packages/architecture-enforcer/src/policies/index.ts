@@ -30,7 +30,6 @@ import { lintRerunnableMigrations } from "./persistence/rerunnable-migrations.ts
 import { lintUpgradeSignInTables } from "./persistence/upgrade-sign-in-tables.ts";
 import { lintComposedExports } from "./quality/composed-exports.ts";
 import { lintStrictContractBuildConfigs } from "./quality/contract-build-config.ts";
-import { lintDeclarationProjectReferences } from "./quality/declaration-project-references.ts";
 import { lintDeclarations } from "./quality/declarations.ts";
 import { lintDefaultTestLanes } from "./quality/default-test-lane.ts";
 import {
@@ -169,11 +168,6 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "contract-build-config",
     spec: FEATURE_PACKAGE_BOUNDARIES,
     run: lintStrictContractBuildConfigs,
-  }),
-  definePolicy({
-    id: "declaration-project-references",
-    spec: FEATURE_PACKAGE_BOUNDARIES,
-    run: lintDeclarationProjectReferences,
   }),
   definePolicy({
     id: "manifests",

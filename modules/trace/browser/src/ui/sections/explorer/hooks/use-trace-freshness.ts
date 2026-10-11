@@ -83,6 +83,22 @@ function useSpanStoredInvalidation(projectId: string | undefined) {
   );
 }
 
+/**
+ * While the project has never received a trace, a trace event on the stream the page already
+ * holds IS the first trace: the empty state leaves and the list re-reads at once, before the
+ * stored flag catches up (WEB-17803, WEB-17707). Once the flag is true this does nothing.
+ */
+function useFirstTraceArrival(project: { id: string; firstMessage?: boolean } | undefined) {
+  const trpcUtils = api.useUtils();
+  const waiting = project !== undefined && project.firstMessage === false;
+  const projectId = project?.id;
+  return useCallback(() => {
+    if (!waiting || !projectId) return;
+    trpcUtils.project.getHasFirstMessage.setData({ projectId }, { firstMessage: true });
+    void trpcUtils.traces.list.invalidate();
+  }, [trpcUtils, waiting, projectId]);
+}
+
 /** Mirrors the connection into the toolbar's store; disabled live updates read as disconnected. */
 function useSseStatusSync({
   connectionState,
@@ -112,6 +128,7 @@ export function useTraceFreshness() {
   const trpcUtils = api.useUtils();
   const pulse = useRowPulseStore((s) => s.pulse);
   const visibleTraceIds = useVisibleTraceIds();
+  const onFirstTraceEvent = useFirstTraceArrival(project);
 
   // A busy trace fires on nearly every span; the pill's count seldom changes.
   const refreshNewCount = useCoalesced({
@@ -131,6 +148,7 @@ export function useTraceFreshness() {
 
   const onTraceSummaryUpdated = useCallback(
     (traceIds: string[]) => {
+      onFirstTraceEvent();
       const isLive = useSseStatusStore.getState().liveUpdatesMode === "live";
       refreshNewCount();
       const { visible, hasNewTrace } = partitionUpdates({
@@ -156,10 +174,25 @@ export function useTraceFreshness() {
       void trpcUtils.traces.spanTree.invalidate(key);
       void trpcUtils.traces.evals.invalidate(key);
     },
-    [trpcUtils, project?.id, visibleTraceIds, pulse, refreshNewCount, refreshDiscover],
+    [
+      trpcUtils,
+      project?.id,
+      visibleTraceIds,
+      pulse,
+      refreshNewCount,
+      refreshDiscover,
+      onFirstTraceEvent,
+    ],
   );
 
-  const onSpanStored = useSpanStoredInvalidation(project?.id);
+  const invalidateOpenTrace = useSpanStoredInvalidation(project?.id);
+  const onSpanStored = useCallback(
+    (traceIds: string[]) => {
+      onFirstTraceEvent();
+      invalidateOpenTrace(traceIds);
+    },
+    [onFirstTraceEvent, invalidateOpenTrace],
+  );
 
   // Honour the operator's "live updates" preference — when disabled,
   // skip subscribing and force the connection state to disconnected so

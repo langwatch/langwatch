@@ -4,9 +4,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { IdentityMigrationRepository } from "../identity-migration.repository.ts";
 
 /**
- * Frozen SQL against the schema of the release that ships it: the D01 backfill's state rows
- * joined to the `User` columns the unproven test reads (`unproven-account.rules.ts`). The
- * migration name is the backfill's stable key, written out so the step never follows a rename.
+ * Frozen SQL: the D01 state rows joined to the `User` columns and sign-in rows the hold reads
+ * (`unproven-account.rules.ts`). The migration name is written out so it never follows a rename.
  */
 export class PrismaIdentityMigrationRepository extends IdentityMigrationRepository {
   static create(database: PrismaClient): PrismaIdentityMigrationRepository {
@@ -32,6 +31,9 @@ export class PrismaIdentityMigrationRepository extends IdentityMigrationReposito
            AND u."email" IS NOT NULL
            AND u."emailVerified" = false
            AND u."lastLoginAt" IS NULL
+           AND (u."passkeySignupClaimHash" IS NOT NULL
+                OR EXISTS (SELECT 1 FROM "Account" a WHERE a."userId" = u."id")
+                OR EXISTS (SELECT 1 FROM "Passkey" p WHERE p."userId" = u."id"))
       `;
       return Number(row?.count ?? 0);
     }
@@ -52,6 +54,9 @@ export class PrismaIdentityMigrationRepository extends IdentityMigrationReposito
          AND u."email" IS NOT NULL
          AND u."emailVerified" = false
          AND u."lastLoginAt" IS NULL
+         AND (u."passkeySignupClaimHash" IS NOT NULL
+              OR EXISTS (SELECT 1 FROM "Account" a WHERE a."userId" = u."id")
+              OR EXISTS (SELECT 1 FROM "Passkey" p WHERE p."userId" = u."id"))
     `;
   }
 }

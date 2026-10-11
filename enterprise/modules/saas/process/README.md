@@ -49,7 +49,6 @@ interface Response {
     release: string;
     commit: string | null;
   };
-  floor?: string;
 }
 ```
 
@@ -90,6 +89,5 @@ Declared at `src/eventing/saas-usage-report.pipeline.ts:55`. Events: `usageRepor
 | config | `isSaas`              | `IS_SAAS`                         | `../contract/src/saas.config.ts:18` |
 | config | `latestRelease`       | `LANGWATCH_LATEST_RELEASE`        | `../contract/src/saas.config.ts:20` |
 | config | `latestReleaseCommit` | `LANGWATCH_LATEST_RELEASE_COMMIT` | `../contract/src/saas.config.ts:22` |
-| config | `releaseFloor`        | `LANGWATCH_RELEASE_FLOOR`         | `../contract/src/saas.config.ts:24` |
 
 <!-- readme:generated:end -->

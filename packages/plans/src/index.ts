@@ -26,11 +26,13 @@ export {
   licenseResourceLimitsShape,
   licenseSeats,
   licenseSeatsShape,
+  MAX_STATED_LITE_SEATS,
   OPEN_SOURCE_LICENSING_PLAN,
   planPublishing,
   planPublishingShape,
   PRO_TEMPLATE,
   resolveMembersLite,
+  statedLiteSeatsSchema,
   type LicensePlanTemplate,
   type LicenseResourceCounts,
 } from "./licensing.ts";

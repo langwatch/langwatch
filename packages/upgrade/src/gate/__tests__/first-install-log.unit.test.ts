@@ -45,7 +45,7 @@ describe("admitAfterFirstInstall", () => {
     it("says the installation is behind, naming the step, before running the upgrade", async () => {
       const said: { message: string; fields?: Record<string, unknown> }[] = [];
       const answers: ServingVerdict[] = [
-        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
         { admitted: true, outcome: "current" },
       ];
       const verdict = await admitAfterFirstInstall({
@@ -73,7 +73,7 @@ describe("admitAfterFirstInstall", () => {
     it("says the installation is current and it takes jobs, after the upgrade's lines", async () => {
       const said: string[] = [];
       const answers: ServingVerdict[] = [
-        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+        assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
         { admitted: true, outcome: "current" },
       ];
       await admitAfterFirstInstall({
@@ -109,8 +109,8 @@ describe("admitAfterFirstInstall", () => {
         const said: string[] = [];
         const exits = [3, 0];
         const answers: ServingVerdict[] = [
-          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
-          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null }),
+          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
+          assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE }),
           { admitted: true, outcome: "current" },
         ];
         const verdict = await admitAfterFirstInstall({
@@ -128,28 +128,7 @@ describe("admitAfterFirstInstall", () => {
     });
   });
 
-  describe("given a worker whose release is below the ledger's floor", () => {
-    /** @scenario "An image below the installation's floor runs nothing and refuses" */
-    it("runs no upgrade and refuses naming the floor", async () => {
-      let runs = 0;
-      const verdict = await admitAfterFirstInstall({
-        gate: {
-          admit: async () =>
-            assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: "3.22.0" }),
-        },
-        firstInstall: async () => {
-          runs += 1;
-          return { exitCode: 0, logTail: [] };
-        },
-        warn: () => undefined,
-      });
-
-      expect(runs).toBe(0);
-      expect(verdict).toMatchObject({ admitted: false, outcome: "below-floor", floor: "3.22.0" });
-    });
-  });
-
-  const behind = () => assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE, floor: null });
+  const behind = () => assertCurrent({ ledger: { steps: [] }, image: BEHIND_IMAGE });
   const current: ServingVerdict = { admitted: true, outcome: "current" };
 
   describe("given another runner holding the upgrade lease", () => {

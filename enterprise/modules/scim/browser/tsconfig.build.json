@@ -21,46 +21,49 @@
   ],
   "references": [
     {
-      "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/browser-host/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../governance/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../client/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/error-views/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/feature-flag/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/identity/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/identity/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/organization/client/tsconfig.build.json"
+      "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/time/tsconfig.build.json"
+      "path": "../../../../modules/organization/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/identity/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/error-views/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
+      "path": "../../governance/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/identity-contract", "@langwatch/vitest-config"]
+    }
+  }
 }

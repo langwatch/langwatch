@@ -36,7 +36,7 @@ const TENANT = createTenantId("organization-1");
 
 const renamed: UpcastDeclaration<typeof CURRENT> = {
   events: [{ from: { type: STORED, aggregateType: "usage_organization" }, to: CURRENT }],
-  drain: { pipeline: "usage", removeAfter: "3.21.0" },
+  drain: { pipeline: "usage" },
 };
 
 function entitlementPipeline({

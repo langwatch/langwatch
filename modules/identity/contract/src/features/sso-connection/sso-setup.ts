@@ -101,6 +101,9 @@ export interface SsoSetupView {
   /** The compatibility route a grandfathered connection stands in for. It
    *  names its connection, so a replacement can be offered for it. */
   legacyRoute: { connectionId: string; domain: string; provider: string } | null;
+  /** The legacy settings' domain still to move onto this organization's own connection
+   *  (ADR-124 §7); empty when there is none. */
+  legacyDomainsToMove: string[];
   /** Where the cutover stands, when this connection replaces a
    *  grandfathered one. Null for every connection outside a pair. */
   migration: SsoMigrationView | null;

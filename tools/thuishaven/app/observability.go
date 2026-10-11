@@ -47,8 +47,8 @@ func (o *Orchestrator) ObservabilityLogs(ctx context.Context, follow bool) error
 // running. Booting a 2 GiB telemetry stack behind everyone's back on every
 // `pnpm dev` is not a default anyone would choose.
 func (o *Orchestrator) linkObservability(ctx context.Context, st *domain.Stack) {
-	if o.obs == nil {
-		return
+	if o.obs == nil || o.isObservabilityOff() {
+		return // switched off in machine settings: no collector, no OTel vars
 	}
 	if o.cfg.ShouldStartObservability {
 		if _, err := o.obs.Ensure(ctx); err != nil {

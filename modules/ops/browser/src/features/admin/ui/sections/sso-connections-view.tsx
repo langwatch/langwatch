@@ -1,4 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -21,6 +22,7 @@ import { useDebounce } from "use-debounce";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { useOpsHost } from "../../../../model/ops-host.ts";
 import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
@@ -100,7 +102,7 @@ function ConnectionsTable({
   onOpen: (connectionId: string) => void;
 }) {
   return (
-    <Table.Root variant="line" size="md" width="full">
+    <ListTable size="md" width="full">
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Organization</Table.ColumnHeader>
@@ -156,7 +158,7 @@ function ConnectionsTable({
           </Table.Row>
         ))}
       </Table.Body>
-    </Table.Root>
+    </ListTable>
   );
 }
 
@@ -600,7 +602,7 @@ function ConnectionDrawer({
               <ConnectionSummary connection={held} />
               <ConnectionDomains connection={held} />
               {held.source === "legacy-grandfathered" && (
-                <MigrationInventory migration={migration.data ?? null} />
+                <MigrationInventory connection={held} migration={migration.data ?? null} />
               )}
               {held.state === "VERIFIED" && <ActivationPanel connection={held} />}
               <ConnectionHistory connectionId={held.connectionId} />
@@ -613,7 +615,15 @@ function ConnectionDrawer({
 }
 
 /** A carried-over connection's replacement, and how far the cutover has come. */
-function MigrationInventory({ migration }: { migration: SsoSetupMigration | null }) {
+function MigrationInventory({
+  connection,
+  migration,
+}: {
+  connection: ConnectionRow;
+  migration: SsoSetupMigration | null;
+}) {
+  // Sso lends the import form (§10.1): ops draws it, sso owns it.
+  const ImportReplacement = useOpsHost().ssoReplacementImport();
   return (
     <Box>
       <Text fontWeight="semibold" marginBottom={2}>
@@ -636,10 +646,18 @@ function MigrationInventory({ migration }: { migration: SsoSetupMigration | null
             )}
           </>
         ) : (
-          <Text fontSize="sm" color="fg.muted">
-            No replacement is registered. Import the customer's supplied OIDC or SAML configuration
-            to begin the guarded migration.
-          </Text>
+          <>
+            <Text fontSize="sm" color="fg.muted">
+              No replacement is registered. Import the customer's supplied OIDC or SAML
+              configuration to begin the guarded migration.
+            </Text>
+            {ImportReplacement && (
+              <ImportReplacement
+                organizationId={connection.organizationId}
+                replacesConnectionId={connection.connectionId}
+              />
+            )}
+          </>
         )}
       </VStack>
     </Box>

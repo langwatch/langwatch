@@ -57,6 +57,32 @@ func TestObservabilityEnvEnablesBrowserTelemetryWithTheStack(t *testing.T) {
 	}
 }
 
+// A tester booting with RUM off, or without a collector, sets the key in the
+// shell that runs `haven up`; the overlay leaves every key they set alone.
+//
+// @scenario "The overlay leaves browser telemetry keys the operator exported alone"
+func TestRUMEnvLeavesOperatorSetKeysAlone(t *testing.T) {
+	operator := map[string]string{"RUM_ENABLED": "false", "RUM_COLLECTOR_ENDPOINT": ""}
+	lookup := func(key string) (string, bool) { v, ok := operator[key]; return v, ok }
+	if got := RUMEnv(lookup, "http://127.0.0.1:4318"); len(got) != 0 {
+		t.Errorf("RUMEnv must emit nothing the operator set; got %v", got)
+	}
+
+	delete(operator, "RUM_COLLECTOR_ENDPOINT")
+	got := RUMEnv(lookup, "http://127.0.0.1:4318")
+	if valueOf(got, "RUM_ENABLED") != "" || valueOf(got, "RUM_COLLECTOR_ENDPOINT") != "http://127.0.0.1:4318" {
+		t.Errorf("RUMEnv = %v, want only the collector endpoint", got)
+	}
+
+	t.Setenv("RUM_ENABLED", "false")
+	up := Stack{Slug: "portless", ObservabilityOTLPPort: 4318}
+	for _, kv := range up.OverlayEnv() {
+		if strings.HasPrefix(kv, "RUM_ENABLED=") {
+			t.Errorf("OverlayEnv clobbered the shell's RUM_ENABLED with %q", kv)
+		}
+	}
+}
+
 // The slug tag is the whole point of one shared collector: an agent debugging a
 // worktree filters Grafana to that worktree and sees only its own telemetry.
 func TestObservabilityEnvTagsTelemetryWithTheSlug(t *testing.T) {

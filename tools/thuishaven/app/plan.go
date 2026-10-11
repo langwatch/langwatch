@@ -505,9 +505,10 @@ const nxCacheEnv = "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false "
 // UIBuildShell builds apps/ui through Nx's cached `build:local` target (an
 // unchanged tree restores in seconds), moves it to a per-pid staging dir and
 // swaps it in with two renames, so the api never serves a half-written bundle.
-// A lock (pid file, stale when its owner is gone) serialises the shared output.
+// A lock (pid file, stale when its owner is gone) serializes the shared output.
+// HAVEN_STACK_BUILD lets with-build-slot.sh run it at once, capped, never queued.
 const UIBuildShell = "set -e; " + uiStageVars + "s=$d/client.local; " + uiLockShell + "rm -rf $n; " +
-	nxCacheEnv + "pnpm --silent nx run " + UIPackage + ":build:local --outputStyle=static; mv $s $n; " + uiSwapShell
+	"HAVEN_STACK_BUILD=1 " + nxCacheEnv + "pnpm --silent nx run " + UIPackage + ":build:local --outputStyle=static; mv $s $n; " + uiSwapShell
 
 // uiStageVars names the served bundle's dir, this shell's staging and old dirs, and the lock.
 const uiStageVars = "d=" + UIDirRel + "/dist; n=$d/client.next.$$; o=$d/client.old.$$; l=$d/client.lock; mkdir -p $d; "

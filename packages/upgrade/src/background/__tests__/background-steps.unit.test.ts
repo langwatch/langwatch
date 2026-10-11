@@ -33,6 +33,7 @@ describe("BackgroundStepsService", () => {
         renewLease: refuse,
         releaseLease: refuse,
         markRunning: refuse,
+        reopen: refuse,
         setStatus: refuse,
         saveReport: refuse,
       };
@@ -75,6 +76,7 @@ describe("BackgroundStepsService", () => {
         renewLease: refuse,
         releaseLease: refuse,
         markRunning: refuse,
+        reopen: refuse,
         setStatus: refuse,
         saveReport: refuse,
       };
@@ -112,6 +114,7 @@ describe("BackgroundStepsService", () => {
         renewLease: refuse,
         releaseLease: refuse,
         markRunning: refuse,
+        reopen: refuse,
         setStatus: refuse,
         saveReport: refuse,
       };
@@ -158,6 +161,7 @@ describe("BackgroundStepsService", () => {
         renewLease: refuse,
         releaseLease: async ({ name }) => (released.push(name), true),
         markRunning: refuse,
+        reopen: refuse,
         setStatus: refuse,
         saveReport: refuse,
       };
@@ -226,6 +230,11 @@ class MemoryBackgroundLedger implements BackgroundStepsLedger {
   };
   saveReport = async ({ report }: { report: Record<string, unknown> }) => {
     this.row = { ...this.row, report };
+  };
+  reopen = async ({ ids, reason }: { ids: readonly string[]; reason: string }) => {
+    if (this.row.status !== "running") return [];
+    this.row = { ...this.row, status: "pending", report: null, lastError: reason };
+    return [...ids];
   };
 }
 
@@ -463,6 +472,7 @@ describe("BackgroundStepsService deadline", () => {
             update(id, { status, lastError: lastError ?? null, ...(report ? { report } : {}) });
         },
         saveReport: async ({ id, report }) => update(id, { report }),
+        reopen: async () => [],
       };
       let lateSave: Promise<string> | undefined;
       const stuck = defineMigrationStep({
@@ -528,6 +538,52 @@ describe("BackgroundStepsService deadline", () => {
   });
 });
 
+describe("BackgroundStepsService.sweep() with old writers", () => {
+  describe("given a step that needs old writers gone, live on the first sweep and gone on the next", () => {
+    /** @scenario "A step is stamped started only once old writers are gone" */
+    it("marks it running only on the sweep that finds them gone", async () => {
+      const id = "data-retention:keep-control-plane-events-forever";
+      const marked: number[] = [];
+      let sweepNo = 0;
+      const service = BackgroundStepsService.create({
+        ledger: {
+          findSteps: async () => [{ id, status: "pending", report: null }],
+          acquireLease: async () => ({}),
+          renewLease: async () => ({}),
+          releaseLease: async () => true,
+          markRunning: async () => {
+            marked.push(sweepNo);
+          },
+          setStatus: async () => undefined,
+          saveReport: async () => undefined,
+          reopen: async () => [],
+        },
+        steps: [
+          defineMigrationStep({
+            id,
+            kind: "data",
+            mode: "background",
+            description: "Keeps control-plane events forever.",
+            needsOldWritersGone: true,
+            run: async () => ({}),
+          }),
+        ],
+        serving: () => true,
+        oldWritersGoneFor: async () => sweepNo > 1,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+      const signal = new AbortController().signal;
+
+      sweepNo = 1;
+      expect((await service.sweep({ signal })).waiting).toEqual([id]);
+      sweepNo = 2;
+      expect((await service.sweep({ signal })).ran).toEqual([id]);
+      expect(marked).toEqual([2]);
+    });
+  });
+});
+
 describe("BackgroundStepsService.runNow()", () => {
   const id = "identity:reopen-unproven-accounts";
   const reopen = (run: MigrationStepRun) =>
@@ -557,6 +613,7 @@ describe("BackgroundStepsService.runNow()", () => {
             statuses.push(status);
           },
           saveReport: async () => undefined,
+          reopen: async () => [],
         },
         steps: [reopen(async () => ({ runs: ++runs }))],
         serving: () => false,
@@ -585,6 +642,7 @@ describe("BackgroundStepsService.runNow()", () => {
           renewLease: refuse,
           releaseLease: refuse,
           markRunning: refuse,
+          reopen: refuse,
           setStatus: refuse,
           saveReport: refuse,
         },
@@ -599,6 +657,162 @@ describe("BackgroundStepsService.runNow()", () => {
 
       expect(outcome).toBe("skipped");
       expect(runs).toBe(0);
+    });
+  });
+});
+
+describe("BackgroundStepsService one copy at a time", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const serviceFor = ({
+    ledger,
+    run,
+    gone = async () => true,
+    clock,
+    deadlineMs,
+    log = () => undefined,
+  }: {
+    ledger: MemoryBackgroundLedger;
+    run: MigrationStepRun;
+    gone?: () => Promise<boolean>;
+    clock?: { now: number };
+    deadlineMs?: number;
+    log?: BackgroundStepsLog;
+  }) =>
+    BackgroundStepsService.create({
+      ledger,
+      steps: [
+        defineMigrationStep({
+          id: STEP,
+          kind: "data",
+          mode: "background",
+          description: "Reopens accounts that never proved their address.",
+          needsOldWritersGone: true,
+          run,
+        }),
+      ],
+      serving: () => true,
+      oldWritersGoneFor: gone,
+      identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+      log,
+      renewEveryMs: 1_000,
+      leaseTtlMs: 3_000,
+      ...(deadlineMs === undefined ? {} : { deadlineMs }),
+      ...(clock ? { now: () => clock.now } : {}),
+    });
+
+  describe("given a step whose run ignores its signal past its deadline", () => {
+    /** @scenario "A step cut at its deadline keeps its lease until its run settles" */
+    it("sets it pending and moves on, renewing its lease until the cut run settles", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      let finish: (report: Record<string, unknown>) => void = () => undefined;
+      const service = serviceFor({
+        ledger,
+        deadlineMs: 5_000,
+        run: () => new Promise((resolve) => (finish = resolve)),
+      });
+
+      const pass = sweepOnce(service);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(await pass).toMatchObject({ ran: [], failed: [] });
+      expect(ledger.row).toMatchObject({
+        status: "pending",
+        lastError: expect.stringContaining("deadline"),
+      });
+
+      const renewalsAtCut = ledger.renewals;
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(ledger.renewals).toBeGreaterThan(renewalsAtCut);
+      expect(ledger.leaseOwner).toBe("worker-1");
+      expect(await sweepOnce(service)).toMatchObject({ ran: [] });
+
+      finish({ late: true });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(ledger.leaseOwner).toBeNull();
+      expect(ledger.row.status).toBe("pending");
+    });
+  });
+
+  describe("given a checkpoint that moved after the sweep read it", () => {
+    /** @scenario "A step resumes from the checkpoint read after taking its lease" */
+    it("resumes from the checkpoint read after taking the lease", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      ledger.row = { ...ledger.row, report: { cursor: "project_1" } };
+      const acquire = ledger.acquireLease;
+      ledger.acquireLease = async (input) => {
+        ledger.row = { ...ledger.row, report: { cursor: "project_7" } };
+        return acquire(input);
+      };
+      let resumedFrom: unknown = null;
+      const service = serviceFor({
+        ledger,
+        run: async ({ checkpoint }) => {
+          resumedFrom = checkpoint.resumeFrom;
+          return { done: true };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+      expect(resumedFrom).toEqual({ cursor: "project_7" });
+    });
+  });
+
+  describe("given a running step whose lease renewal never answers", () => {
+    /** @scenario "A background step whose renewal never answers is stopped" */
+    it("aborts it once the time to live less one interval passes, and records it neither done nor failed", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      ledger.renewLease = () => new Promise(() => undefined);
+      const clock = { now: 0 };
+      const warnings: string[] = [];
+      const service = serviceFor({
+        ledger,
+        clock,
+        log: (level, _message, fields) =>
+          void (level === "warn" && warnings.push(String(fields.reason))),
+        run: async ({ signal }) => {
+          for (let tick = 0; tick < 10 && !signal.aborted; tick++) {
+            clock.now += 1_000;
+            await vi.advanceTimersByTimeAsync(1_000);
+          }
+          expect(signal.aborted).toBe(true);
+          expect(clock.now).toBe(2_000);
+          return { stopped: true };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [], failed: [], retrying: [] });
+      expect(ledger.row.status).toBe("running");
+      expect(warnings).toContain("the lease was not renewed in time");
+    });
+  });
+
+  describe("given an older image that starts serving while the step runs", () => {
+    /** @scenario "A step that needs old writers gone is reopened when an old writer starts during its run" */
+    it("reopens it with its checkpoint cleared instead of recording it done", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      let gone = true;
+      const service = serviceFor({
+        ledger,
+        gone: async () => gone,
+        run: async ({ checkpoint }) => {
+          await checkpoint.save({ report: { cursor: "project_3" } });
+          gone = false;
+          return { done: true };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [], waiting: [STEP] });
+      expect(ledger.row).toMatchObject({
+        status: "pending",
+        report: null,
+        lastError: expect.stringContaining("older image"),
+      });
+      expect(ledger.leaseOwner).toBeNull();
     });
   });
 });

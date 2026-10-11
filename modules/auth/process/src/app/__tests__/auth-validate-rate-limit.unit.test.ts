@@ -1,7 +1,6 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
  * The token check counts its callers: past the registry's per-minute ceiling
@@ -100,7 +99,6 @@ async function appFor(
       }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
-      licensing: createApiFixture<LicensingApi>(),
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>(),
       authz: createApiFixture<AuthzApi>({}),

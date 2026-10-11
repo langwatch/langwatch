@@ -9,22 +9,18 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../clickhouse-client/tsconfig.build.json"
-    },
-    {
-      "path": "../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../task/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

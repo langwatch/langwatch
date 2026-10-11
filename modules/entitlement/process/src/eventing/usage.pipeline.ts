@@ -17,7 +17,7 @@ import {
 import type { EntitlementModule } from "../app/entitlement.app.ts";
 import type { BillableEventRecord } from "../repositories/billable-events-meter.repository.ts";
 import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
-import type { TraceMeterRecord } from "../repositories/trace-meter.repository.ts";
+import type { TraceUsageService } from "../services/trace-usage.service.ts";
 import { BillableEventsMeterProjection } from "./billable-events-meter.projection.ts";
 import {
   limitStateSchema,
@@ -25,7 +25,12 @@ import {
   REFUSED_ORGANIZATIONS_PROCESS_NAME,
   refusedOrganizationWake,
 } from "./refused-organizations.process.ts";
-import { TRACE_METER_EVENT, TraceMeterProjection } from "./trace-meter.projection.ts";
+import {
+  TRACE_USAGE_MONTH_IDS_SUBSCRIBER_NAME,
+  TRACE_USAGE_SPAN_SUBSCRIBER_NAME,
+  traceUsageMonthIdsSubscriber,
+  traceUsageSpanSubscriber,
+} from "./trace-usage.subscriber.ts";
 import { usageMeterCountSubscriber } from "./usage-meter-count.subscriber.ts";
 import {
   CountMonthCommand,
@@ -61,18 +66,18 @@ export type UsageSenders = Readonly<{
 }>;
 
 /**
- * The metering pipeline. The trace meter is appended on every deployment (round 22); the
+ * The metering pipeline. Trace usage is written on every deployment (round 22); the
  * billable-events meter, its subscriber and the limit decider stay SaaS only.
  */
 export function buildUsagePipeline({
   countMonth,
-  traceMeter,
+  traceUsage,
   billableEventsMeter,
   projects,
   send,
 }: {
   countMonth: CountMonthCommand;
-  traceMeter: AppendStore<TraceMeterRecord>;
+  traceUsage: Pick<TraceUsageService, "recordTraces">;
   billableEventsMeter: AppendStore<BillableEventRecord> | undefined;
   projects: Pick<TenancyRepository, "getProjectPlacement">;
   send: () => UsageSenders;
@@ -103,7 +108,7 @@ export function buildUsagePipeline({
           to: USAGE_LIMIT_CLEARED_EVENT_TYPE,
         },
       ],
-      drain: { pipeline: "usage", removeAfter: "3.21.0" },
+      drain: { pipeline: "usage" },
     })
     .withCommandInstance({
       name: "countMonth",
@@ -119,10 +124,11 @@ export function buildUsagePipeline({
     })
     .withCommand("recordLimitDecision", RecordLimitDecisionCommand)
     .withCommand("recordUsageWarning", RecordUsageWarningCommand)
-    .withPeerMapProjection({
-      events: [TRACE_METER_EVENT] as const,
-      map: TraceMeterProjection.create(traceMeter).build(),
-    });
+    .withPeerSubscriber(TRACE_USAGE_SPAN_SUBSCRIBER_NAME, traceUsageSpanSubscriber(traceUsage))
+    .withPeerSubscriber(
+      TRACE_USAGE_MONTH_IDS_SUBSCRIBER_NAME,
+      traceUsageMonthIdsSubscriber(traceUsage),
+    );
   if (!billableEventsMeter) return pipeline.build();
   return (
     pipeline
@@ -145,7 +151,6 @@ export function buildUsagePipeline({
         {
           from: "global:reactor:billingMeterDispatch",
           to: { jobType: "reactor", lane: "usageMeterCount" },
-          removeAfter: "3.21.0",
         },
       ])
       .build()

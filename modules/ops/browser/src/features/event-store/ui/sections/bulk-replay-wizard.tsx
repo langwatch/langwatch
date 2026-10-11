@@ -1,4 +1,5 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Box,
@@ -253,32 +254,30 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
               </Button>
             }
           >
-            <Table.ScrollArea borderRadius="lg" overflow="hidden">
-              <Table.Root size="sm" variant="line">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader width="40px" />
-                    <Table.ColumnHeader>Projection</Table.ColumnHeader>
-                    <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="end">Aggregates</Table.ColumnHeader>
-                    <Table.ColumnHeader>Tenants</Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {discoverQuery.data!.projections.map((proj) => (
-                    <ProjectionRow
-                      key={proj.projectionName}
-                      projectionName={proj.projectionName}
-                      aggregateCount={proj.aggregateCount}
-                      tenantCount={proj.tenantBreakdown.length}
-                      meta={projectionMetaByName.get(proj.projectionName)}
-                      isSelected={selectedProjections.has(proj.projectionName)}
-                      onToggle={toggleProjection}
-                    />
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </Table.ScrollArea>
+            <ListTable size="sm">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader width="40px" />
+                  <Table.ColumnHeader>Projection</Table.ColumnHeader>
+                  <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="end">Aggregates</Table.ColumnHeader>
+                  <Table.ColumnHeader>Tenants</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {discoverQuery.data!.projections.map((proj) => (
+                  <ProjectionRow
+                    key={proj.projectionName}
+                    projectionName={proj.projectionName}
+                    aggregateCount={proj.aggregateCount}
+                    tenantCount={proj.tenantBreakdown.length}
+                    meta={projectionMetaByName.get(proj.projectionName)}
+                    isSelected={selectedProjections.has(proj.projectionName)}
+                    onToggle={toggleProjection}
+                  />
+                ))}
+              </Table.Body>
+            </ListTable>
           </WizardStep>
 
           {selectedProjections.size > 0 && (

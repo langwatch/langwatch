@@ -156,3 +156,15 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When a request tries to throw the switch anyway
       Then it is refused as not offered, and nothing is recorded
       And the refusal says what turns Instant Evals on instead: the plan, or on a self-hosted install its license, or whoever runs it when it has judging turned off
+
+  Rule: Instant Evals decide whether a run's statement may call an eval function, and Analytics takes that answer
+
+    @unit
+    Scenario: Every read a run makes carries Instant Evals' own answer to whether eval functions may run
+      Given a project whose statement calls an eval function
+      When a run reads its rows through Analytics
+      Then each read states whether the project is released, by the flag, the license or the organization's switch
+      And a connected install whose license names Instant Evals is allowed without the flag
+      And an organization on the hosted service that switched them on is allowed without the flag
+      And an install whose license does not name them, with the flag off and no switch, is refused "lwql_not_permitted"
+      And Analytics never reads the release flag for that read itself

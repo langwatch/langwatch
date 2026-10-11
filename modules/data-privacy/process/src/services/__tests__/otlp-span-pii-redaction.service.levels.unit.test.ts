@@ -1,12 +1,8 @@
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type {
-  PIIRedactionLevel,
-  OtlpKeyValue,
-  OtlpResource,
-  OtlpSpan,
-} from "@langwatch/trace-contract";
+import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";

@@ -1,3 +1,4 @@
+import { isUpgradeInProgress } from "@langwatch/api";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -18,6 +19,11 @@ import {
 import type { PromptService } from "./prompt.service.ts";
 
 const restLogger = createLogger("langwatch:api:prompts");
+
+/** A write ahead of the schema mid-upgrade answers `upgrade_in_progress`: expected, so warn. */
+function unhandledLevel(error: unknown): "warn" | "error" {
+  return isUpgradeInProgress(error) ? "warn" : "error";
+}
 
 /**
  * A prompt as the `/api/prompts` REST family reads and writes it, tags included:
@@ -114,7 +120,10 @@ export class PromptLibraryService {
     } catch (error: unknown) {
       const refusal = PromptTagUnprocessableError.fromRestRefusal(error);
       if (!(refusal instanceof HandledError))
-        restLogger.error({ projectId: data.projectId, error }, "Error creating prompt");
+        restLogger[unhandledLevel(error)](
+          { projectId: data.projectId, error },
+          "Error creating prompt",
+        );
       throw refusal;
     }
   }
@@ -148,7 +157,10 @@ export class PromptLibraryService {
     } catch (error: unknown) {
       const refusal = PromptTagUnprocessableError.fromRestRefusal(error);
       if (!(refusal instanceof HandledError))
-        restLogger.error({ projectId, promptId: id, error }, "Error updating prompt");
+        restLogger[unhandledLevel(error)](
+          { projectId, promptId: id, error },
+          "Error updating prompt",
+        );
       throw refusal;
     }
   }
@@ -174,7 +186,10 @@ export class PromptLibraryService {
     } catch (error: unknown) {
       const refusal = PromptTagUnprocessableError.fromRestRefusal(error);
       if (!(refusal instanceof HandledError))
-        restLogger.error({ projectId, promptId: id, error }, "Error syncing prompt");
+        restLogger[unhandledLevel(error)](
+          { projectId, promptId: id, error },
+          "Error syncing prompt",
+        );
       throw refusal;
     }
   }

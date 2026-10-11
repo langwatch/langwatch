@@ -5,7 +5,10 @@ const logger = createLogger("langwatch:ops:system-migrations:kick");
 
 /** The kick command's sender, as ops' own pipeline answers with it once registered. */
 export type SystemMigrationPassRequestSender = {
-  send(input: { tenantId: string; occurredAt: number }): Promise<unknown>;
+  send(
+    input: { tenantId: string; occurredAt: number },
+    options?: { delay?: number },
+  ): Promise<unknown>;
 };
 
 /**
@@ -26,7 +29,14 @@ export class SystemMigrationPassRequestsService {
     this.#sender = sender;
   }
 
-  async request({ actorUserId }: { actorUserId: string }): Promise<void> {
+  /** `delayMs` holds the pass back: a delayed send, as evaluation-command-dispatcher.service.ts. */
+  async request({
+    actorUserId,
+    delayMs,
+  }: {
+    actorUserId: string;
+    delayMs?: number;
+  }): Promise<void> {
     if (!this.#sender) {
       logger.warn(
         { actorUserId },
@@ -35,10 +45,10 @@ export class SystemMigrationPassRequestsService {
       return;
     }
     try {
-      await this.#sender.send({
-        tenantId: actorUserId,
-        occurredAt: nowInstant().epochMilliseconds,
-      });
+      await this.#sender.send(
+        { tenantId: actorUserId, occurredAt: nowInstant().epochMilliseconds },
+        delayMs === undefined ? undefined : { delay: delayMs },
+      );
     } catch (error) {
       logger.error({ error, actorUserId }, "system migration pass request failed to send");
     }

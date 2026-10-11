@@ -157,6 +157,7 @@ describe("LangWatchQLHydrationService.hydrateTexts", () => {
 
     await service.hydrateTexts({
       ...caller,
+      isInstantEvalsEnabled: true,
       sql: "SELECT TraceId FROM analytics.traces",
       parameters: { since: "yesterday" },
       calls: [{ column: "transcript", function: "conversation", options: [] }],
@@ -167,6 +168,7 @@ describe("LangWatchQLHydrationService.hydrateTexts", () => {
     expect(input?.sql).toBe("SELECT TraceId FROM analytics.traces");
     expect(input?.parameters).toEqual({ since: "yesterday" });
     expect(input?.pass).toEqual({ kind: "page", traceIds: ["trace-a"] });
+    expect(input?.isInstantEvalsEnabled).toBe(true);
   });
 
   /** @scenario "A page read for a run holds the text that would be judged, not a verdict" */
@@ -175,6 +177,7 @@ describe("LangWatchQLHydrationService.hydrateTexts", () => {
 
     const rows = await service.hydrateTexts({
       ...caller,
+      isInstantEvalsEnabled: true,
       sql: "SELECT ConversationId FROM analytics.traces",
       calls: [
         {
@@ -196,6 +199,7 @@ describe("LangWatchQLHydrationService.hydrateTexts", () => {
     expect(
       await service.hydrateTexts({
         ...caller,
+        isInstantEvalsEnabled: true,
         sql: "SELECT 1",
         calls: [{ column: "transcript", function: "conversation", options: [] }],
         traceIds: [],

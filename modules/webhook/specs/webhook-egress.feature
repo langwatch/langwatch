@@ -304,6 +304,13 @@ Feature: The fence a customer-supplied webhook leaves through
       And the refusal is filed in the delivery log
 
     @unit
+    Scenario: A webhook request honours the local-URL dev switch the endpoints read
+      Given a process that sets the webhook module's local-URL dev switch
+      When an automation's webhook action points at a plain-http loopback receiver
+      Then the request is sent
+      And a cloud metadata destination is still refused, naming why for the author
+
+    @unit
     Scenario: An automation reads its trigger's webhook attempts from the webhook module
       Given attempts filed for one trigger
       When automation asks for that trigger's recent attempts

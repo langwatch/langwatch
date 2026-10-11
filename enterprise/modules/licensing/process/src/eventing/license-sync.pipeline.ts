@@ -4,6 +4,10 @@
  * walks every organization whose license names a hosted service.
  */
 import {
+  SSO_SIGN_IN_PROVIDER_RECORDED_EVENT_TYPE,
+  ssoSignInProviderRecordedEventDataSchema,
+} from "@langwatch/enterprise-sso-contract";
+import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
@@ -29,6 +33,7 @@ import {
 
 export const LICENSE_SYNC_PIPELINE_NAME = "license_sync";
 export const CONFIGURED_LICENSE_ON_SIGN_UP = "configuredLicenseOnSignUp";
+export const SSO_SIGN_IN_PROVIDER_RECORDED = "ssoSignInProviderRecorded";
 
 /**
  * An activation code in LANGWATCH_LICENSE_KEY on a fresh install waits for the
@@ -46,12 +51,28 @@ export function configuredLicenseOnSignUp(
   };
 }
 
-/** The pipeline, over only the one app operation it calls. */
+/** sso's sign-in provider fact, applied under the row's event id guard (ADR-179). */
+export function ssoSignInProviderRecorded(
+  app: Pick<LicensingModule, "applySignInProvider">,
+): PeerSubscriberDefinition<typeof ssoSignInProviderRecordedEventDataSchema> {
+  return {
+    eventType: SSO_SIGN_IN_PROVIDER_RECORDED_EVENT_TYPE,
+    data: ssoSignInProviderRecordedEventDataSchema,
+    handle: async (fact, { eventId }) => {
+      await app.applySignInProvider({ ...fact, eventId });
+    },
+  };
+}
+
+/** The pipeline, over only the app operations it calls. */
 export function buildLicenseSync({
   app,
   processStore,
   bootedAt = nowInstant().epochMilliseconds,
-}: EventingSetup<unknown, Pick<LicensingModule, "syncLicenses" | "activateConfiguredLicense">> & {
+}: EventingSetup<
+  unknown,
+  Pick<LicensingModule, "syncLicenses" | "activateConfiguredLicense" | "applySignInProvider">
+> & {
   bootedAt?: number;
 }): StaticPipelineDefinition<never> {
   return definePipeline({
@@ -60,6 +81,7 @@ export function buildLicenseSync({
   })
     .withEvents([])
     .withPeerSubscriber(CONFIGURED_LICENSE_ON_SIGN_UP, configuredLicenseOnSignUp(app))
+    .withPeerSubscriber(SSO_SIGN_IN_PROVIDER_RECORDED, ssoSignInProviderRecorded(app))
     .withProcessManager(LICENSE_SYNC_PROCESS_NAME, (pm) =>
       pm
         .state(licenseSyncStateSchema, LICENSE_SYNC_INITIAL_STATE)

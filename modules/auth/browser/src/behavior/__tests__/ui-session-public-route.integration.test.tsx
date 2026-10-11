@@ -18,7 +18,6 @@ vi.mock("@langwatch/browser-host/navigation", async (importOriginal) => ({
 }));
 
 import type { UiAuthClient } from "@langwatch/auth-contract";
-import { UiFeedback } from "@langwatch/browser-host/capabilities";
 import type { UiActiveScopeReading } from "@langwatch/browser-host/session";
 
 import { useBrowserUiSession, useUiSessionReading } from "../ui-session";
@@ -61,13 +60,6 @@ const neverAnswers: UiAuthClient = {
   signOut: refusesToSignOut,
 };
 
-class SilentFeedback extends UiFeedback {
-  succeeded(): void {}
-  warned(): void {}
-  informed(): void {}
-  failed(): void {}
-}
-
 /** Grants every permission asked about, in any scope, and records each grant read. */
 function grantingTransport() {
   const reads: Record<string, unknown>[] = [];
@@ -94,7 +86,6 @@ function SessionProbe({
   isPublicRoute: boolean;
 }) {
   const reading = useUiSessionReading({
-    feedback: new SilentFeedback(),
     isPublicRoute,
     authClient,
   });

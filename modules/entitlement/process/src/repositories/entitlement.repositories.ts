@@ -2,7 +2,7 @@ import type { BillableEventsMeterRepository } from "./billable-events-meter.repo
 import type { MemberSeatRepository } from "./member-seat.repository.ts";
 import type { OrganizationSpendRepository } from "./organization-spend.repository.ts";
 import type { TenancyRepository } from "./tenancy.repository.ts";
-import type { TraceMeterRepository } from "./trace-meter.repository.ts";
+import type { TraceCountRepository } from "./trace-count.repository.ts";
 import type { UsageMembershipRepository } from "./usage-membership.repository.ts";
 
 export interface EntitlementRepositories {
@@ -12,7 +12,7 @@ export interface EntitlementRepositories {
   readonly seats: MemberSeatRepository;
   /** Project placement and organisation pricing columns, through their owners' shares. */
   readonly tenancy: TenancyRepository;
-  /** The two meters the month's count is read from. */
+  /** The billable-events meter and the trace count the month's count is read from. */
   readonly billableEvents: BillableEventsMeterRepository;
-  readonly traces: TraceMeterRepository;
+  readonly traces: TraceCountRepository;
 }

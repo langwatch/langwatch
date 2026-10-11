@@ -62,7 +62,12 @@ export function useDashboardAutoRefresh({ live = false }: { live?: boolean } = {
   const calls = useRef(0);
   const clock = useQuery({
     queryKey: ["analytics", "dashboard-refresh-clock"],
-    queryFn: () => (calls.current++ === 0 ? 0 : nowInstant().epochMilliseconds),
+    // Not `calls.current++ === 0`: the React Compiler compiles that as a pre-increment.
+    queryFn: () => {
+      const first = calls.current === 0;
+      calls.current += 1;
+      return first ? 0 : nowInstant().epochMilliseconds;
+    },
     enabled: refetchInterval !== false,
     refetchInterval,
     gcTime: 0,

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 type fakeSemaphore struct {
@@ -25,6 +27,15 @@ func (f *fakeSemaphore) TryAcquire(name string, slots int) (func(), int, bool, e
 	f.free--
 	f.acquired++
 	return func() { f.released++ }, 2, true, nil
+}
+
+func (f *fakeSemaphore) Holders(string) []domain.SlotClaim { return nil }
+
+func (f *fakeSemaphore) TryAcquireUnits(name string, budget int, _ domain.SlotClaim) (func(), bool, error) {
+	f.acquired++
+	f.lastSlots = budget
+	f.lastName = name
+	return func() { f.released++ }, true, nil
 }
 
 func (f *fakeSemaphore) Acquire(_ context.Context, name string, slots int) (func(), int, error) {
@@ -53,7 +64,7 @@ func TestTypecheckDisablesTheScriptsOwnQueue(t *testing.T) {
 	if sem.acquired != 1 || sem.released != 1 {
 		t.Fatalf("expected exactly one slot taken and released, got %d/%d", sem.acquired, sem.released)
 	}
-	if sem.lastSlots != 3 {
+	if sem.lastSlots != 6 {
 		t.Fatalf("expected the override to pick the slot count, got %d", sem.lastSlots)
 	}
 	if len(sup.envs) != 1 || !slices.Contains(sup.envs[0], "CHECK_SLOTS=0") {
@@ -89,7 +100,7 @@ func TestTypecheckDefaultUsesTheSharedCapacityPolicy(t *testing.T) {
 	if err := orch.Typecheck(context.Background(), TypecheckRun{RepoDir: "/repo"}); err != nil {
 		t.Fatal(err)
 	}
-	if sem.lastSlots != 2 {
+	if sem.lastSlots != 4 {
 		t.Fatalf("typecheck ignored the shared queue capacity: %d", sem.lastSlots)
 	}
 }

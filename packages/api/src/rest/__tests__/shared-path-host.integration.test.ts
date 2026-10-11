@@ -3,7 +3,6 @@
  * Spec: packages/api/specs/shared-path.feature.
  */
 import { moduleApi, type ModuleName } from "@langwatch/module";
-import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -13,6 +12,7 @@ import { getRoutePolicy } from "../../route-registry.ts";
 import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter, type RestSharedPath } from "../declaration.ts";
 import { RestHost } from "../host.ts";
+import { generateSpecs } from "./generate-specs.ts";
 
 const VERSION = "2026-10-06";
 

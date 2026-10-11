@@ -3,6 +3,7 @@ package outboundsim
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -31,13 +32,15 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		hooks[info.Name] = base + "/hooks/" + info.Name
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"baseUrl":         base,
-		"slackWebhookUrl": base + "/services/" + s.slack.teamID + "/B0SIM/x",
-		"slackApiUrl":     base + "/api",
-		"webhookUrls":     hooks,
-		"receivers":       s.receivers.list(),
-		"sqsQueueUrl":     seedQueueURL,
-		"sqsEndpoint":     base,
+		"baseUrl":                base,
+		"slackWebhookUrl":        base + "/services/" + s.slack.teamID + "/B0SIM/x",
+		"slackApiUrl":            base + "/api",
+		"webhookUrls":            hooks,
+		"receivers":              s.receivers.list(),
+		"sqsQueueUrl":            seedQueueURL,
+		"sqsEndpoint":            base,
+		"databricksWorkspaceUrl": base,
+		"feedUrl":                base + "/feeds/usage",
 	})
 }
 
@@ -162,4 +165,21 @@ func (s *Server) handleSetReceiver(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleClearReceiver(w http.ResponseWriter, r *http.Request) {
 	s.receivers.clearSecret(r.PathValue("name"))
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleSetDbxUsers replaces the Databricks SCIM directory with the posted users.
+func (s *Server) handleSetDbxUsers(w http.ResponseWriter, r *http.Request) {
+	var users []dbxUser
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBody)).Decode(&users); err != nil {
+		writeError(w, http.StatusBadRequest, "body must be a JSON array of {id, userName, displayName, active}")
+		return
+	}
+	for i, user := range users {
+		if user.ID == "" || user.UserName == "" {
+			writeFieldError(w, fieldError{fmt.Sprintf("[%d]", i), "needs an id and a userName"})
+			return
+		}
+	}
+	s.databricks.setUsers(users)
+	writeJSON(w, http.StatusOK, map[string]any{"users": users})
 }

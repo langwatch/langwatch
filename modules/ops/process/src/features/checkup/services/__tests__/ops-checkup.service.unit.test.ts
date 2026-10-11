@@ -2,7 +2,7 @@
  * The checkup's facts, each answered by the module that owns it.
  * Spec: specs/self-hosting/checkup/checkup.feature
  */
-import type { MintRunKeyInput } from "@langwatch/api-key-contract";
+import type { CreateApiKeyInput, MintRunKeyInput } from "@langwatch/api-key-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayDeploymentAddresses } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -14,11 +14,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../../../channels/memory/memory.usage-report.channel.ts";
+import { MemoryCloudLatestReleaseRepository } from "../../../../repositories/memory/memory.cloud-latest-release.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
 } from "../../../../repositories/memory/memory.datastore-health.repository.ts";
+import { MemoryOpsStore } from "../../../../repositories/memory/memory.ops.store.ts";
 import { ledgerOf, stepOf } from "../../../../services/__tests__/support/upgrade-ledger.ts";
 import { UsageReportWorld } from "../../../../services/__tests__/support/usage-report-peers.ts";
 import { OpsCheckupService } from "../ops-checkup.service.ts";
@@ -31,6 +33,7 @@ const CONFIG: OpsServerConfig = {
   productAnalytics: { key: undefined, host: undefined },
   grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },
   bugReportSlackChannel: undefined,
+  slackApiBase: "https://slack.com/api",
   cloudOps: false,
   adminEmails: [],
   nodeEnvironment: "production",
@@ -81,6 +84,8 @@ let probedProjects: string[];
 let provisionable: boolean[];
 let probes: MemoryCheckupProbeChannel;
 let mintedKeys: MintRunKeyInput[];
+let checkupProjectIds: string[];
+let createdKeys: CreateApiKeyInput[];
 let gatewayAddresses: GatewayDeploymentAddresses;
 let upgrade: ReturnType<typeof ledgerOf>;
 
@@ -122,6 +127,8 @@ function service() {
           data: [PROJECT],
           pagination: { page, limit, total: 1 },
         }),
+        findInternalIds: async () => checkupProjectIds,
+        getOrganizationId: async () => "org-system",
       },
       mail: {
         getMailDelivery: async () => ({
@@ -147,11 +154,18 @@ function service() {
           mintedKeys.push(input);
           return "sk-lw-canary";
         },
+        create: async (input) => {
+          createdKeys.push(input);
+          return createApiFixture<{ token: string; apiKey: never }>({ token: "sk-lw-checkup" });
+        },
       },
     },
     repositories: {
       ...datastores,
       upgradeLedger: { findStatus: upgrade.status, findSteps: upgrade.listSteps },
+      cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
+        store: MemoryOpsStore.create(),
+      }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),
@@ -176,6 +190,8 @@ beforeEach(() => {
   provisionable = [true];
   probes = MemoryCheckupProbeChannel.create();
   mintedKeys = [];
+  checkupProjectIds = ["project-checkup"];
+  createdKeys = [];
   gatewayAddresses = {
     baseUrl: void 0,
     publicUrl: void 0,
@@ -237,7 +253,8 @@ describe("OpsCheckupService", () => {
   });
 
   describe("given the oldest project writes to S3", () => {
-    it("names the bucket, and the write probe writes for that project", async () => {
+    /** @scenario "The storage probe writes into the checkup project" */
+    it("names the bucket, and the write probe writes for the checkup project", async () => {
       await expect(verdictOf("storage")).resolves.toMatchObject({
         outcome: "verified",
         detail: "Stored objects go to S3 bucket langwatch-objects.",
@@ -246,18 +263,67 @@ describe("OpsCheckupService", () => {
       const { rows } = await checkup().explicit({ checks: ["storage_probe"] });
 
       expect(rows.find((row) => row.id === "storage_probe")?.verdict.outcome).toBe("verified");
-      expect(probedProjects).toEqual(["project-1"]);
+      expect(probedProjects).toEqual(["project-checkup"]);
     });
   });
 
-  describe("given a canary runs against the oldest project", () => {
+  describe("given a trace canary runs in the hidden checkup project", () => {
     /** @scenario "A checkup canary runs with a minimal key of its own, never the project key" */
-    it("mints an ownerless key holding only what that canary calls", async () => {
+    it("sends with a key of its own on the checkup project, never a customer project", async () => {
       await checkup().explicit({ checks: ["canary_collector"] });
 
-      expect(mintedKeys).toEqual([
-        { userId: null, projectId: "project-1", permissions: ["traces:create"] },
+      expect(mintedKeys).toEqual([]);
+      expect(createdKeys.map(({ userId, bindings }) => ({ userId, bindings }))).toEqual([
+        {
+          userId: null,
+          bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "project-checkup" }],
+        },
       ]);
+    });
+
+    /** @scenario "The canary key is short-lived and holds only the trace permissions" */
+    it("names the key, holds the two trace permissions and expires in 5 minutes", async () => {
+      const before = Date.now();
+      await checkup().explicit({ checks: ["canary_processor"] });
+
+      const [key] = createdKeys;
+      expect(key).toMatchObject({
+        name: "Checkup canary",
+        isSystemManaged: true,
+        organizationId: "org-system",
+        permissionMode: "restricted",
+        permissions: ["traces:create", "traces:view"],
+      });
+      const expiresInMs = (key?.expiresAt?.getTime() ?? 0) - before;
+      expect(expiresInMs).toBeGreaterThanOrEqual(5 * 60_000);
+      expect(expiresInMs).toBeLessThan(5 * 60_000 + 10_000);
+    });
+  });
+
+  describe("given a canary that reaches what a customer configured", () => {
+    it("keeps the oldest customer project and its minimal run key", async () => {
+      await checkup().explicit({ checks: ["canary_evaluations"] });
+
+      expect(createdKeys).toEqual([]);
+      expect(mintedKeys).toEqual([
+        { userId: null, projectId: "project-1", permissions: ["evaluations:manage"] },
+      ]);
+    });
+  });
+
+  describe("given the checkup project's migration step has not run yet", () => {
+    /** @scenario "Running the checkup never creates the hidden project" */
+    it("mints no key and writes no probe object anywhere", async () => {
+      checkupProjectIds = [];
+
+      const { rows } = await checkup().explicit({
+        checks: ["canary_collector", "storage_probe"],
+      });
+
+      expect(mintedKeys).toEqual([]);
+      expect(createdKeys).toEqual([]);
+      expect(probedProjects).toEqual([]);
+      expect(rows.find((row) => row.id === "storage_probe")?.verdict.outcome).not.toBe("verified");
     });
   });
 

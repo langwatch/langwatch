@@ -1,10 +1,10 @@
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
 /**
  * Caps oversized attribute values at ingestion to keep Redis fold state small and prevent
  * throughput collapse. Capping replaces an oversized value with a placeholder that SAYS it was
  * truncated: a silent shortening would be indistinguishable from what the customer sent.
  */
-import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
 
 type AttributeList = OtlpSpan["attributes"];
 

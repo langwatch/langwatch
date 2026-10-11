@@ -396,3 +396,41 @@ func TestTypecheckScopeDefaultsByCaller(t *testing.T) {
 		t.Errorf("--affected must win for a person")
 	}
 }
+
+func TestIsSlotCommandSkipsWiringOnlyForTheSlot(t *testing.T) {
+	cases := map[string]struct {
+		args []string
+		want bool
+	}{
+		"slot run":          {[]string{"machine", "slot", "run", "--", "true"}, true},
+		"slot explain":      {[]string{"machine", "slot", "explain"}, true},
+		"machine typecheck": {[]string{"machine", "typecheck"}, false},
+		"bare machine":      {[]string{"machine"}, false},
+		"stack command":     {[]string{"slot", "run"}, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			if got := isSlotCommand(tc.args); got != tc.want {
+				t.Fatalf("isSlotCommand(%v) = %v, want %v", tc.args, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDotenvRootFindsTheCheckoutWithoutGit(t *testing.T) {
+	root := t.TempDir()
+	deep := filepath.Join(root, "a", "b")
+	if err := os.MkdirAll(deep, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	// A linked worktree's .git is a file, and it still marks the root.
+	if err := os.WriteFile(filepath.Join(root, ".git"), []byte("gitdir: elsewhere\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := dotenvRoot(deep); got != root {
+		t.Fatalf("dotenvRoot(%q) = %q, want %q", deep, got, root)
+	}
+	if _, ok := nearestGitAncestor(filepath.Join(t.TempDir(), "none")); ok {
+		t.Fatal("a directory outside any checkout must not report a root")
+	}
+}

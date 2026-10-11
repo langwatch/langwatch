@@ -33,8 +33,7 @@ agent, haven refuses without `--yes`; adding `--yes` is the user's decision, not
   is louder: a person must type the database's name; `--yes` still works and says what it drops.
 - `haven down --destroy --stack <slug> --yes` stops a stack by slug and drops its databases (`haven-lifecycle`).
 - `db seed` refuses `--yes` (nothing to confirm). `db url` refuses it too.
-- `haven db reset` on the stack home: an api refused because the database is below the LTS floor
-  shows a reset button; it migrates and seeds exactly the databases it dropped.
+- `haven db reset` migrates and seeds exactly the databases it dropped.
 - The seed guard refuses when a database URL points anywhere but local dev.
 
 ## Connection strings

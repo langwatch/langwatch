@@ -59,6 +59,23 @@ type Settings struct {
 	ForcedError int `json:"forcedError"`
 	// Seed pins the random source ("" hashes each request, "random" draws).
 	Seed string `json:"seed"`
+	// NextJSON is the exact answer to the next JSON request, consumed once.
+	NextJSON json.RawMessage `json:"nextJson,omitempty"`
+}
+
+// takeNextJSON hands out the queued JSON answer once, to a request that asks for JSON.
+func (s *Server) takeNextJSON(req request) (string, bool) {
+	if req.schema == nil && !req.jsonObject {
+		return "", false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	next := s.set.NextJSON
+	if len(next) == 0 {
+		return "", false
+	}
+	s.set.NextJSON = nil
+	return string(next), true
 }
 
 func (s *Server) settings() Settings {
@@ -186,6 +203,10 @@ func (s *Server) putConsoleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if next.ForcedError != 0 && (next.ForcedError < 400 || next.ForcedError > 599) {
 		writeError(w, providerError{status: http.StatusBadRequest, message: "forcedError is 0 (off) or a 4xx/5xx status"})
+		return
+	}
+	if len(next.NextJSON) > 0 && (next.NextJSON[0] != '{' || !json.Valid(next.NextJSON)) {
+		writeError(w, providerError{status: http.StatusBadRequest, message: "nextJson is a JSON object"})
 		return
 	}
 	s.mu.Lock()

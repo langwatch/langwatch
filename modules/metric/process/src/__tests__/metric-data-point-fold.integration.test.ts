@@ -358,9 +358,9 @@ describe("given a cumulative series long enough to span several rollup buckets",
     }, 300_000);
 
     it("keeps its read count flat however many points the chunk holds", async () => {
-      // Seek budget: one for successor seeks, one for affected buckets, one for
-      // predecessor pass. Read count stays at 3 regardless of chunk size.
-      expect(reads).toBe(3);
+      // Seek budget: successor seeks, bucket keys, predecessor keys, then one
+      // payload read for the picked rows. Stays at 4 regardless of chunk size.
+      expect(reads).toBe(4);
     });
 
     it("still produces the same rollups as the uncounted chunk", async () => {

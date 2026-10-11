@@ -46,7 +46,6 @@ export async function startMigratedGatewayClickHouse(): Promise<MigratedClickHou
         await ClickHouseMigrateTask.createFromConfig({
           config: {
             buildTime: false,
-            skipped: false,
             sharedUrl: provisioned.url,
             privateEndpoints: [],
           },

@@ -10,9 +10,7 @@ function facts(overrides: Partial<InstallationFacts> = {}): InstallationFacts {
   return {
     imageRelease: "3.21.0",
     imageSteps: [],
-    floor: "3.20.1",
     installed: "3.21.0",
-    ledgerFloor: null,
     ledgerHoldsRecords: true,
     steps: [{ id: "prisma:1", status: "done" }],
     failedTargets: 0,
@@ -87,24 +85,10 @@ describe("computeInstallationState", () => {
     expect(verdict.state).toBe("finishing-in-background");
   });
 
-  /** @scenario "An image older than the ledger and at or above the floor reads as rolled back" */
-  it("reads an older image at or above the floor as rolled back", () => {
+  /** @scenario "An image older than the ledger reads as rolled back" */
+  it("reads an older image as rolled back", () => {
     const verdict = computeInstallationState(facts({ installed: "3.22.0" }));
     expect(verdict).toMatchObject({ state: "rolled-back", reason: "image-older" });
-  });
-
-  /** @scenario "An installed release below the floor reads as unsupported" */
-  it("reads an installed release below the floor as unsupported", () => {
-    const verdict = computeInstallationState(facts({ installed: "3.16.0" }));
-    expect(verdict).toMatchObject({ state: "unsupported", reason: "installed-below-floor" });
-  });
-
-  /** @scenario "An image below the floor the ledger recorded reads as unsupported" */
-  it("reads an image below the ledger's floor as unsupported", () => {
-    const verdict = computeInstallationState(
-      facts({ imageRelease: "3.19.0", installed: "3.21.0", ledgerFloor: "3.20.1" }),
-    );
-    expect(verdict).toMatchObject({ state: "unsupported", reason: "image-below-ledger-floor" });
   });
 
   /** @scenario "A failed step reads as needs attention before anything softer" */
@@ -127,21 +111,9 @@ describe("computeInstallationState", () => {
     expect(verdict).toMatchObject({ state: "needs-attention", reason: "failed-target" });
   });
 
-  /** @scenario "Unsupported wins over every other state" */
-  it("lets unsupported win over needs attention and upgrading", () => {
+  it("does not order an unversioned cloud build against the ledger", () => {
     const verdict = computeInstallationState(
-      facts({
-        installed: "3.16.0",
-        steps: [{ id: "prisma:1", status: "failed" }],
-        holdsLease: true,
-      }),
-    );
-    expect(verdict.state).toBe("unsupported");
-  });
-
-  it("does not order an unversioned cloud build against the floor or the ledger", () => {
-    const verdict = computeInstallationState(
-      facts({ imageRelease: "git-1a2b3c4", installed: "git-9f8e7d6", floor: "3.20.1" }),
+      facts({ imageRelease: "git-1a2b3c4", installed: "git-9f8e7d6" }),
     );
     expect(verdict.state).toBe("up-to-date");
   });

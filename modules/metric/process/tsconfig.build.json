@@ -24,43 +24,55 @@
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
+      "path": "../../../sdks/typescript"
     },
     {
-      "path": "../../data-privacy/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../data-retention/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/eventing/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ksuid/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/otlp/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/plans/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/process/tsconfig.build.json"
+      "path": "../../trace/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../trace/contract/tsconfig.build.json"
+      "path": "../../../packages/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/otlp/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-privacy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/clickhouse-migrations",
+        "@langwatch/ksuid",
+        "@langwatch/module",
+        "@langwatch/process-stores",
+        "@langwatch/test-harness"
+      ]
+    }
+  }
 }

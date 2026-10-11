@@ -216,7 +216,15 @@ export abstract class OrganizationMembershipRepository {
    */
   abstract createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult>;
 
-  /** Every organization on the instance, newest first. Instance-admin only. */
+  /**
+   * The hidden system organization and its team: the existing one, or the one this call (or a
+   * racing one, by slug) created.
+   */
+  abstract createSystemOrFind(
+    input: Omit<CreateForProvisioningInput, "pricingModel">,
+  ): Promise<{ id: string }>;
+
+  /** Every customer organization on the instance, newest first. Instance-admin only. */
   abstract findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
 
   /** Throws `OrganizationNotFoundError`. */

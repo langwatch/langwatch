@@ -3,6 +3,7 @@ import { createLogger } from "@langwatch/observability";
 
 import type { OrganizationMfaRequirementMailChannel } from "../../../channels/organization-mfa-requirement-mail.channel.ts";
 import type { IdentityEmailService } from "../../../services/identity-email.service.ts";
+import type { TwoStepRequirementNotices } from "../eventing/two-step-requirement-notice.process.ts";
 import type { TwoStepVerificationRepository } from "../repositories/two-step-verification.repository.ts";
 
 const logger = createLogger("langwatch:identity:organization-mfa");
@@ -15,12 +16,15 @@ type OrganizationMfaNotifierServiceDeps = {
 
 type Notified = { userId: string; email: string | null };
 
+/** Sends in bounded batches, so a large organization never opens thousands of sends at once. */
+const NOTICE_BATCH_SIZE = 25;
+
 /**
  * Tells an organization's active members its requirement changed (main's
- * EmailOrganizationMfaNotifier): every recipient is attempted before a failure is
- * reported, and the log names the failed count rather than claiming the whole audience.
+ * EmailOrganizationMfaNotifier), on the worker. Every recipient is attempted before a failure
+ * is reported; each mail carries `<notificationKey>:<userId>`, so a retry is not a second mail.
  */
-export class OrganizationMfaNotifierService {
+export class OrganizationMfaNotifierService implements TwoStepRequirementNotices {
   static create(deps: OrganizationMfaNotifierServiceDeps): OrganizationMfaNotifierService {
     return new OrganizationMfaNotifierService(deps);
   }
@@ -28,25 +32,31 @@ export class OrganizationMfaNotifierService {
   private constructor(private readonly deps: OrganizationMfaNotifierServiceDeps) {}
 
   async notifyRequirementChanged({
+    notificationKey,
     organizationId,
-    organizationName,
     actorUserId,
     required,
-    members,
   }: {
+    notificationKey: string;
     organizationId: string;
-    organizationName: string;
     actorUserId: string;
     required: boolean;
-    members: readonly Notified[];
   }): Promise<void> {
-    const [actor] = await this.deps.accounts.findPeople({ userIds: [actorUserId] });
+    const [organization, members, [actor]] = await Promise.all([
+      this.deps.accounts.getOrganizationSetting({ organizationId }),
+      this.deps.accounts.findMemberAccountFactors({ organizationId }),
+      this.deps.accounts.findPeople({ userIds: [actorUserId] }),
+    ]);
     const actorName = actor?.name ?? actor?.email ?? "An administrator";
     const { destinations, failures } = await this.resolveDestinations(members);
-    const deliveries = await Promise.allSettled(
-      [...destinations.values()].map((to) =>
-        this.deps.mail.sendRequirementChanged({ to, organizationName, actorName, required }),
-      ),
+    const deliveries = await settleInBatches([...destinations.values()], ({ userId, email }) =>
+      this.deps.mail.sendRequirementChanged({
+        to: email,
+        organizationName: organization.name,
+        actorName,
+        required,
+        idempotencyKey: `${notificationKey}:${userId}`,
+      }),
     );
     failures.push(
       ...deliveries.flatMap((result) => (result.status === "rejected" ? [result.reason] : [])),
@@ -71,15 +81,13 @@ export class OrganizationMfaNotifierService {
   /** Identity owns the address once a person is latched; one mail per normalized address. */
   private async resolveDestinations(
     members: readonly Notified[],
-  ): Promise<{ destinations: Map<string, string>; failures: unknown[] }> {
-    const destinations = new Map<string, string>();
+  ): Promise<{ destinations: Map<string, Notified & { email: string }>; failures: unknown[] }> {
+    const destinations = new Map<string, Notified & { email: string }>();
     const failures: unknown[] = [];
-    const resolutions = await Promise.allSettled(
-      members.map(async ({ userId, email }) => {
-        const resolution = await this.deps.emails.resolveEmail({ userId });
-        return { userId, email: resolution.kind === "resolved" ? resolution.email : email };
-      }),
-    );
+    const resolutions = await settleInBatches(members, async ({ userId, email }) => {
+      const resolution = await this.deps.emails.resolveEmail({ userId });
+      return { userId, email: resolution.kind === "resolved" ? resolution.email : email };
+    });
     for (const resolution of resolutions) {
       if (resolution.status === "rejected") {
         failures.push(resolution.reason);
@@ -93,8 +101,21 @@ export class OrganizationMfaNotifierService {
         continue;
       }
       const normalized = normalizeIdentifierValue(email);
-      if (!destinations.has(normalized)) destinations.set(normalized, email);
+      if (!destinations.has(normalized)) destinations.set(normalized, { userId, email });
     }
     return { destinations, failures };
   }
+}
+
+async function settleInBatches<T, R>(
+  items: readonly T[],
+  run: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const settled: PromiseSettledResult<R>[] = [];
+  for (let start = 0; start < items.length; start += NOTICE_BATCH_SIZE) {
+    settled.push(
+      ...(await Promise.allSettled(items.slice(start, start + NOTICE_BATCH_SIZE).map(run))),
+    );
+  }
+  return settled;
 }

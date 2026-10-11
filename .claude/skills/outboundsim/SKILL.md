@@ -51,3 +51,16 @@ GET    /_sim/api/status | /_sim/api/setup
 
 A wrong or missing signature is recorded with its verdict, never refused. Spec:
 `specs/setup/outboundsim.feature`.
+
+## Governance pull vendors
+
+outboundsim also answers the reads governance pull sources make (`databricks.go`, `feed.go`):
+Databricks Genie (`/api/2.0/genie/spaces`, conversations, messages), Databricks SCIM users
+(`/api/2.0/preview/scim/v2/Users`), the service-principal sign-in (`POST /oidc/v1/token`) and a
+generic usage feed for custom HTTP pulls (`GET /feeds/<name>?cursor=<n>`; events at `$.events`,
+cursor at `$.next_cursor`). A word in the bearer token (or client id) picks the workspace:
+`empty`, `revoked` (401), `noscope` (403), `ratelimited` (429), `down` (503), `malformed`
+(200 HTML) or `cycle` (repeating page token); anything else is a seeded three-space workspace.
+Faults use channels `databricks` and `feed`, target = the path. `PUT /_sim/api/databricks/users`
+replaces the SCIM directory. The product cannot reach these yet: the Databricks workspace URL
+guard and the hard-wired OpenAI, Anthropic and Microsoft hosts await a ruling (handoff fl-vsim).

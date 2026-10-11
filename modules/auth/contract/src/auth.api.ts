@@ -151,9 +151,11 @@ export interface AuthApi {
    * composed answers null, so callers are anonymous rather than failing.
    */
   verifyBrowserSession(input: { headers: Headers }): Promise<BrowserSessionVerification>;
-  /** A missing, revoked, expired, or unusable session resolves as anonymous. */
+  /** A missing, revoked, expired, or unusable session resolves as anonymous. `background`: the
+   *  browser's own polling read, judged against the idle window but never counted as use. */
   resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;
+    background?: boolean;
   }): Promise<BrowserSessionResolution>;
   /** The CLI token door's verifier: the session and its severing key, or `invalid_credentials`. */
   getCliAccessSession(input: {

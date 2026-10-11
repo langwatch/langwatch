@@ -93,6 +93,12 @@ const notAuthenticated: UiAuthClient = {
   signOut: refusesToSignOut,
 };
 
+/** A proxy in front of the API refused: something answered, but not who is here. */
+const proxyRefusal: UiAuthClient = {
+  $fetch: () => Promise.resolve({ error: { status: 400, statusText: "Bad Request" } }),
+  signOut: refusesToSignOut,
+};
+
 /** Refuses until told the API is up, then answers with a signed-in reader. */
 function bootingApi(): { client: UiAuthClient; comeUp: () => void } {
   let up = false;
@@ -186,9 +192,8 @@ function renderShell({
     transport: answeringTransport,
     // The composition root's four calls, with the recorded session client
     // drilled in — see `useBrowserUiHostServices` in main.tsx.
-    session: ({ transport: mounted, feedback: told }) => {
+    session: ({ transport: mounted }) => {
       const sessionReading = root.session.useUiSessionReading({
-        feedback: told,
         isPublicRoute: root.scope.isUiPublicRoute(path),
         authClient,
       });
@@ -283,6 +288,30 @@ describe("given nothing is listening on the API's address", () => {
       api.comeUp();
       await waitFor(() => expect(view.getByTestId("page")).toBeTruthy(), { timeout: 5_000 });
       expect(view.queryByTestId("api-waiting")).toBeNull();
+      expect(feedback.failures).toEqual([]);
+    });
+  });
+});
+
+describe("given a proxy refuses the session read without answering who is here", () => {
+  describe("when the application resolves who is here", () => {
+    /** @scenario "A failed session read shows no toast" */
+    it("holds the reader on the waiting screen, signs nobody out, and tells them nothing", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
+      );
+      const feedback = new RecordingFeedback();
+
+      const view = renderShell({
+        path: "/acme-app/traces",
+        authClient: proxyRefusal,
+        feedback,
+        page: PAGE,
+      });
+
+      await waitFor(() => expect(view.getByTestId("api-waiting")).toBeTruthy());
+      expect(departures.to).toEqual([]);
       expect(feedback.failures).toEqual([]);
     });
   });
