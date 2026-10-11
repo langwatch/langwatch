@@ -424,3 +424,10 @@ Feature: haven answers an agent's tool call before it runs
     Then the registration is not touched
     Because it covers both hooks, and widening it would re-route the developer's
     And own hook onto tools they never pointed it at
+
+  @unit
+  Scenario: The gate points an agent at haven browser instead of interactive Playwright
+    Given haven's gate hook is installed
+    When an agent calls a Playwright MCP tool, playwright-cli or `npx playwright open`
+    Then the call is denied with a reason naming `haven browser`
+    And `playwright test` and `pnpm test:e2e` are not affected

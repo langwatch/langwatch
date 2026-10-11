@@ -29,7 +29,7 @@ import (
 // defer — the same defect as the one above, pointing the other way. Whoever
 // wires it adds Agent back, and the test makes that mandatory rather than
 // something to remember.
-var GatedTools = []string{"Bash", "Edit", "Write"}
+var GatedTools = []string{"Bash", "Edit", "Write", PlaywrightToolMatcher}
 
 // HookMatcher is the PreToolUse matcher routing exactly GatedTools to the gate.
 // Claude Code matches a tool name against it as an alternation.

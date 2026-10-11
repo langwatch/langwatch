@@ -33,3 +33,25 @@ func TestReadBrowserDaemonRefusesAReapedDaemon(t *testing.T) {
 		t.Fatal("a live daemon was reported gone")
 	}
 }
+
+// A worktree whose daemon script predates the shared browser keeps a browser of
+// its own, since that script serves one stack only.
+func TestLegacyDaemonScriptKeepsItsOwnBrowser(t *testing.T) {
+	worktree := t.TempDir()
+	script := filepath.Join(worktree, "apps", "haven-web", "scripts", "browser-daemon.ts")
+	if err := os.MkdirAll(filepath.Dir(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(script, []byte(`const DIR = env("HAVEN_BROWSER_DIR");`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := browserHomeFor(worktree, "s1"); got != browserDir("s1") {
+		t.Fatalf("a legacy worktree was sent to the machine's browser: %s", got)
+	}
+	if err := os.WriteFile(script, []byte(`const PROTOCOL = 2;`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := browserHomeFor(worktree, "s1"); got != browserHome() {
+		t.Fatalf("a current worktree did not share the machine's browser: %s", got)
+	}
+}

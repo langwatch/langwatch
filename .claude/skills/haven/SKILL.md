@@ -25,7 +25,7 @@ only the part you need.
 | reset, seed presets, connection strings, prune                                                  | `haven-db`                  |
 | seeded data, logins, auto-seed                                                                  | `haven-seed`                |
 | a signed-in storage state (`browser login`)                                                     | `haven-auth`                |
-| a signed-in headless browser, record and replay                                                 | `haven-browser`             |
+| a signed-in headless browser (one per machine): diffs, network, console, profile, lean, replay  | `haven-browser`             |
 | the haven orb: feedback, page console and network                                               | `haven-orb`                 |
 | try a PR: `haven pr`, `haven pr --throwaway`                                                    | `haven-play`                |
 | slots, `haven machine typecheck`, the agent gate, `haven self upgrade`                          | `haven-machine`             |

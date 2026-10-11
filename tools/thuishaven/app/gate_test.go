@@ -296,6 +296,8 @@ func gatedToolPayload(t *testing.T, tool string) map[string]any {
 		return bashPayload("pnpm lint")
 	case "Edit", "Write":
 		return editPayload(t, tool)
+	case domain.PlaywrightToolMatcher:
+		return map[string]any{"tool_name": "mcp__playwright__browser_navigate", "tool_input": map[string]any{"url": "https://example.com"}}
 	default:
 		t.Fatalf("%q is routed to the gate but nothing here answers for it; "+
 			"either give it a branch or take it out of domain.GatedTools", tool)
