@@ -14,6 +14,14 @@ export type RetentionMutationProgress = {
   partsToDo: number;
 };
 
+function sentenceCase(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
+function labelOf(m: RetentionMutationProgress): string {
+  return m.category ? sentenceCase(CATEGORY_LABELS[m.category]) : "Stored data";
+}
+
 export function RetroactiveProgressCard({
   mutations,
   onCancel,
@@ -27,39 +35,47 @@ export function RetroactiveProgressCard({
   return (
     <Card
       title="Applying retention to existing data"
-      description="ClickHouse rewrites the affected parts during background merges. Large datasets can take a while; the count below is parts still pending."
+      description="Applying your retention policy to existing data can take a while."
       padding="lg"
     >
       <VStack gap={4} align="stretch">
-        {mutations.map((m) => (
-          <VStack key={m.mutationId} gap={1} align="stretch">
-            <HStack justifyContent="space-between">
-              <Text>
-                {m.table}
-                {m.category ? ` · ${CATEGORY_LABELS[m.category]}` : ""}
-              </Text>
-              <HStack gap={3}>
-                <Text fontSize="sm" color="fg.muted">
-                  {m.partsToDo} parts remaining
-                </Text>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  colorPalette="red"
-                  loading={isCancelling}
-                  onClick={() => onCancel(m.mutationId)}
-                >
-                  Cancel
-                </Button>
+        {mutations.map((m, index) => {
+          const label = labelOf(m);
+          const sameLabel = mutations.filter((o) => labelOf(o) === label);
+          return (
+            <VStack key={`${m.mutationId}:${index}`} gap={1} align="stretch">
+              <HStack justifyContent="space-between">
+                <HStack gap={2}>
+                  <Text>{label}</Text>
+                  {sameLabel.length > 1 && (
+                    <Text textStyle="caption" color="fg.muted">
+                      Update {sameLabel.indexOf(m) + 1}
+                    </Text>
+                  )}
+                </HStack>
+                <HStack gap={3}>
+                  <Text fontSize="sm" color="fg.muted">
+                    In progress
+                  </Text>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="red"
+                    loading={isCancelling}
+                    onClick={() => onCancel(m.mutationId)}
+                  >
+                    Cancel
+                  </Button>
+                </HStack>
               </HStack>
-            </HStack>
-            <Progress.Root value={null} size="xs" colorPalette="blue">
-              <Progress.Track>
-                <Progress.Range />
-              </Progress.Track>
-            </Progress.Root>
-          </VStack>
-        ))}
+              <Progress.Root value={null} size="xs" colorPalette="blue">
+                <Progress.Track>
+                  <Progress.Range />
+                </Progress.Track>
+              </Progress.Root>
+            </VStack>
+          );
+        })}
       </VStack>
     </Card>
   );

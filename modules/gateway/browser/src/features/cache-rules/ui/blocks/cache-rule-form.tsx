@@ -210,7 +210,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
         <Field.Label>
           Name
           <FieldInfoTooltip
-            description="Shown in /gateway/cache-rules list + audit log. Must be unique within the org."
+            description="Choose a name unique within your organization, shown in Cache rules and the audit log."
             docHref="/ai-gateway/cache-control#cache-rules"
           />
         </Field.Label>
@@ -335,7 +335,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
             <Field.Label>
               Model
               <FieldInfoTooltip
-                description="Exact match OR trailing-'*' glob against the resolved upstream model (e.g. 'claude-haiku-*'). No regex in v1. Fires on both /v1/messages + /v1/chat/completions."
+                description="Match the resolved model exactly or use a trailing asterisk to match a prefix; regular expressions are not supported."
                 docHref="/ai-gateway/cache-control#matchers"
               />
             </Field.Label>

@@ -133,7 +133,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
           <Field.Label>
             Name
             <FieldInfoTooltip
-              description="Short identifier shown in /gateway/usage and audit log. Rename is non-breaking; scope and window are immutable below."
+              description="The name shown in Usage and the audit log; renaming does not change the budget's scope or reset schedule."
               docHref="/ai-gateway/budgets#creating-a-budget"
             />
           </Field.Label>

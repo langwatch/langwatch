@@ -341,7 +341,7 @@ function VirtualKeyLimitsFields({
           Rate limits
         </Text>
         <FieldInfoTooltip
-          description="Per-VK caps on the gateway hot path, blank = unlimited. Enforced in-memory on every gateway replica; on breach the gateway returns HTTP 429 with Retry-After and X-LangWatch-RateLimit-Dimension. Changes propagate to all replicas within ~60s."
+          description="Set request limits for this key, leave a field blank for no limit, and allow up to one minute for changes to apply."
           docHref="/ai-gateway/rate-limits"
         />
       </HStack>
@@ -360,11 +360,11 @@ function VirtualKeyLimitsFields({
           <Field.Label>
             tpm
             <FieldInfoTooltip
-              description="Tokens / minute; requires pre-request token estimation and ships with Redis-coordinated cluster counters (v1.1)."
+              description="Token limits are not available."
               docHref="/ai-gateway/rate-limits"
             />
           </Field.Label>
-          <Input value={tpm} placeholder="deferred" inputMode="numeric" disabled />
+          <Input value={tpm} placeholder="Not available" inputMode="numeric" disabled />
           <Field.HelperText>Tokens / minute</Field.HelperText>
         </Field.Root>
         <Field.Root flex={1}>
