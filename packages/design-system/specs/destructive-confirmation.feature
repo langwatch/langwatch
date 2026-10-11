@@ -20,3 +20,10 @@ Feature: Shared destructive confirmation
   Scenario: Exact operator phrases preserve case and whitespace rules
     Given an operator action requiring an exact phrase
     Then the dialog preserves case sensitivity and the caller's whitespace policy
+
+  @integration
+  Scenario: The confirmation is an alert dialog that does not click through
+    Given a destructive dialog opened from a clickable row
+    Then it is an alert dialog named by its title
+    And clicking inside it does not reach the row
+    And Escape asks the caller to close it

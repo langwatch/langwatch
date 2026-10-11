@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DeleteConfirmationDialog } from "../src/components/overlays/delete-confirmation-dialog.tsx";
@@ -105,5 +106,27 @@ describe("destructive confirmation", () => {
     expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
     fireEvent.change(input, { target: { value: " RECLAIM " } });
     expect(screen.getByRole("button", { name: "Delete" })).toBeEnabled();
+  });
+
+  /** @scenario The confirmation is an alert dialog that does not click through */
+  it("is an alert dialog, stops clicks reaching the opener and asks to close on Escape", async () => {
+    const onRowClick = vi.fn();
+    const onClose = vi.fn();
+    renderWithDesignSystem(
+      <div role="presentation" onClick={onRowClick}>
+        <DeleteConfirmationDialog
+          title="Delete dataset?"
+          open
+          onClose={onClose}
+          onConfirm={vi.fn()}
+        />
+      </div>,
+    );
+    const dialog = screen.getByRole("alertdialog", { name: "Delete dataset?" });
+    expect(dialog).toBeInTheDocument();
+    await userEvent.click(screen.getByText("This action cannot be undone."));
+    expect(onRowClick).not.toHaveBeenCalled();
+    await userEvent.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalled();
   });
 });
