@@ -3,7 +3,7 @@
  * chat and execute_tool spans, and a LangWatch SDK RAG call whose retrieved passages ride in a
  * later system message. `witnesses` are the values a judge needs to see in the rendering.
  */
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 
 export interface JudgeLabTrace {
   scope: { name: string; version: string };

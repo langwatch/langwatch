@@ -1,11 +1,8 @@
 import type { ComputeExperimentRunMetricsCommandData } from "@langwatch/experiment-contract";
 import { createLogger } from "@langwatch/observability";
+import { spanSchema } from "@langwatch/otlp/trace-request";
 import { nowInstant } from "@langwatch/time";
-import {
-  spanSchema,
-  type TraceSummaryData,
-  type TraceSummaryLookupInput,
-} from "@langwatch/trace-contract";
+import { type TraceSummaryData, type TraceSummaryLookupInput } from "@langwatch/trace-contract";
 import { z } from "zod";
 
 const logger = createLogger("langwatch:experiment:trace-metrics-sync");

@@ -2698,6 +2698,9 @@ importers:
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../modules/organization/contract
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../packages/otlp
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../packages/prisma-client
@@ -7343,12 +7346,12 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../packages/module
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       '@langwatch/redaction':
         specifier: workspace:*
         version: link:../../../packages/redaction
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -7395,6 +7398,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -8144,6 +8150,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -8902,6 +8911,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/otlp':
+        specifier: workspace:*
+        version: link:../../../packages/otlp
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -10680,9 +10692,6 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../packages/otlp
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -10787,9 +10796,6 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
-      '@langwatch/trace-contract':
-        specifier: workspace:*
-        version: link:../../trace/contract
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -17759,6 +17765,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability

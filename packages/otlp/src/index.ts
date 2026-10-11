@@ -44,6 +44,11 @@ export {
   type OtlpSignal,
   otlpSourcePolicySchema,
   type OtlpSourcePolicy,
+  otlpIngestCredentialSchema,
+  type OtlpIngestCredential,
+  type OtlpIngestCredentialInput,
+  type OtlpIngestCredentialSchema,
+  type OtlpIngestProject,
 } from "./door.ts";
 export {
   OTLP_CORRECTED_PATH_HEADER,

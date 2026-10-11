@@ -1,6 +1,7 @@
 import type { LogRequestCollectionResult } from "@langwatch/log-contract";
+import type { OtlpIngestCredential } from "@langwatch/otlp/door";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { OtlpIngestCredential, TraceApi } from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { otlpLogAnswer } from "../../rules/otlp-log-answer.rules.ts";

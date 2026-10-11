@@ -237,6 +237,9 @@
       "path": "../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../packages/otlp/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/organization/contract/tsconfig.build.json"
     },
     {

@@ -2,6 +2,7 @@ import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contrac
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
+import { type OtlpKeyValue, type OtlpSpan } from "@langwatch/otlp/trace-request";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   MAX_PROCESSED_SPANS,
@@ -13,8 +14,6 @@ import {
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
   TRACK_EVENT_SPAN_NAME,
   isSpanReceivedEvent,
-  type OtlpKeyValue,
-  type OtlpSpan,
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";

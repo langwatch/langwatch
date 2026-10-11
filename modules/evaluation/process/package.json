@@ -46,6 +46,7 @@
     "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",

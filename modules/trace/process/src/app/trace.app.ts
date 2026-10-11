@@ -34,6 +34,11 @@ import type { InstantEvalRunReference } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import {
+  type OtlpIngestCredential,
+  type OtlpIngestCredentialInput,
+  type OtlpIngestProject,
+} from "@langwatch/otlp/door";
 import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -116,9 +121,6 @@ import {
   predefinedEventTypes,
   TRACK_EVENT_SPAN_NAME,
   type TrackEventRESTParamsValidator,
-  type OtlpIngestCredential,
-  type OtlpIngestCredentialInput,
-  type OtlpIngestProject,
   type OtlpTraceCollectionResult,
   TraceApi as TraceApiToken,
   DEFAULT_PII_REDACTION_LEVEL,

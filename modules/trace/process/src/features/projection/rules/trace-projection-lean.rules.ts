@@ -5,6 +5,7 @@
  */
 
 import type { ReplayEventLean } from "@langwatch/eventing/server";
+import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
@@ -12,7 +13,6 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   traceEventReferenceKey,
 } from "@langwatch/trace-contract";
-import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import { clonePayload } from "../../../rules/payload-clone.rules.ts";
 import {

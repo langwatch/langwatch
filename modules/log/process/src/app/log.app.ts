@@ -15,8 +15,9 @@ import {
   type LogServerConfig,
 } from "@langwatch/log-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
+import { type OtlpIngestCredential } from "@langwatch/otlp/door";
 import type { FeatureSetup } from "@langwatch/process";
-import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import { LogProcessingAdapter, type LogProcessingPipeline } from "../eventing/log.pipeline.ts";
 import type { LogRepositories } from "../repositories/log.repositories.ts";

@@ -24,7 +24,6 @@
     "@langwatch/module": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

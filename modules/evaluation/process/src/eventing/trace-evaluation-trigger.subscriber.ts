@@ -3,11 +3,11 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
+import { spanSchema } from "@langwatch/otlp/trace-request";
 import {
   MAX_PROCESSED_SPANS,
   passesTraceOriginGuards,
   SPAN_RECEIVED_EVENT_TYPE,
-  spanSchema,
   SYNTHETIC_TRACE_SPAN_NAMES,
   type TraceSummaryData,
   type TraceSummaryLookupInput,

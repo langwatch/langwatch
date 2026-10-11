@@ -1,10 +1,9 @@
 import type {
-  NormalizedSpan,
   OtlpInstrumentationScope,
   OtlpResource,
   OtlpSpan,
-  TraceCanonicalisationService,
-} from "@langwatch/trace-contract";
+} from "@langwatch/otlp/trace-request";
+import type { NormalizedSpan, TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 import type { TraceSpanNormalization } from "./span-normalization.service.ts";
 import { SpanNormalizationPipelineService } from "./span-normalization.service.ts";

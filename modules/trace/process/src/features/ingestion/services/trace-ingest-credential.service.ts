@@ -9,7 +9,7 @@ import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { OtlpIngestCredential, OtlpIngestCredentialInput } from "@langwatch/trace-contract";
+import type { OtlpIngestCredential, OtlpIngestCredentialInput } from "@langwatch/otlp/door";
 
 import type { CollectorCredential } from "../../../transport/collector.rest.ts";
 import {

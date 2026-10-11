@@ -48,6 +48,9 @@
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/otlp/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {

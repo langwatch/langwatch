@@ -5,12 +5,8 @@
  */
 
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import {
-  type RecordSpanCommandData,
-  containsMediaMarkers,
-  type OtlpKeyValue,
-  type OtlpSpan,
-} from "@langwatch/trace-contract";
+import { type OtlpKeyValue, type OtlpSpan } from "@langwatch/otlp/trace-request";
+import { type RecordSpanCommandData, containsMediaMarkers } from "@langwatch/trace-contract";
 
 import type { ExtractedRef } from "../../conversation/rules/content-part-extraction.rules.ts";
 import type { TraceEdgeMediaTelemetry } from "./trace-edge-media-telemetry.service.ts";

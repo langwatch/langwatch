@@ -6,12 +6,12 @@ import { createTenantId, type Command } from "@langwatch/eventing";
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature
  */
 import type { ModelCost } from "@langwatch/model-provider-contract";
+import { type OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { Project } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   spanReceivedEventSchema,
-  type OtlpSpan,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

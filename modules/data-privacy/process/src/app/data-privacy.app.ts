@@ -19,8 +19,8 @@ import {
 } from "@langwatch/data-privacy-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { FeatureSetup } from "@langwatch/process";
-import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import type { DataPrivacyChannels } from "../channels/data-privacy.channels.ts";
 import { googleApplicationCredentials } from "../channels/google-dlp.channel.ts";

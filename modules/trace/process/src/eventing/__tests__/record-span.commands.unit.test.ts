@@ -1,9 +1,6 @@
 import { createTenantId, type Command } from "@langwatch/eventing";
-import {
-  RECORD_SPAN_COMMAND_TYPE,
-  type OtlpSpan,
-  type RecordSpanCommandData,
-} from "@langwatch/trace-contract";
+import { type OtlpSpan } from "@langwatch/otlp/trace-request";
+import { RECORD_SPAN_COMMAND_TYPE, type RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -1,17 +1,19 @@
 import type { shouldFilterCodingAgentSpan } from "@langwatch/coding-agent-contract";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
 import {
   instrumentationScopeSchema,
   type OtlpInstrumentationScope,
   type OtlpResource,
   type OtlpSpan,
+  resourceSchema,
+  spanSchema,
+} from "@langwatch/otlp/trace-request";
+import { nowInstant } from "@langwatch/time";
+import {
   type PIIRedactionLevel,
   type RecordSpanCommandData,
-  resourceSchema,
   SPAN_BACKFILL_MAX_PAST_DAYS,
   SPAN_MAX_PAST_MS,
-  spanSchema,
   storableSpanTimesOf,
   type UnstorableSpanTime,
 } from "@langwatch/trace-contract";

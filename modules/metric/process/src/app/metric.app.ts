@@ -15,8 +15,9 @@ import {
   type MetricServerConfig,
 } from "@langwatch/metric-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
+import { type OtlpIngestCredential } from "@langwatch/otlp/door";
 import type { FeatureSetup } from "@langwatch/process";
-import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import {
   buildMetricProcessingPipeline,

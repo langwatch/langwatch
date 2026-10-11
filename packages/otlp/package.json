@@ -19,6 +19,10 @@
     "./door": {
       "types": "./dist/door.d.ts",
       "default": "./src/door.ts"
+    },
+    "./trace-request": {
+      "types": "./dist/trace-request.d.ts",
+      "default": "./src/trace-request.ts"
     }
   },
   "scripts": {
@@ -27,6 +31,7 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",

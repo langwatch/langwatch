@@ -110,6 +110,7 @@
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/module": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
