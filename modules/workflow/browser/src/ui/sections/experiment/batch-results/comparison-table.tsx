@@ -3,8 +3,8 @@
  */
 
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { ListTable } from "@langwatch/design-system/list-table";
-import { Box, HStack, Spacer, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { ListTable, RawTable as Table } from "@langwatch/design-system/list-table";
+import { Box, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   createColumnHelper,
   flexRender,
@@ -517,7 +517,7 @@ const GroupSection = ({
   onToggleCollapse: (value: string) => void;
   tableRowByIndex: Map<number, Row<ComparisonRow>>;
 }) => (
-  <Table.Body data-testid={`group-section-${value}`}>
+  <ListTable.Body data-testid={`group-section-${value}`}>
     <GroupHeaderRow
       value={value}
       rowCount={rows.length}
@@ -532,16 +532,16 @@ const GroupSection = ({
         const tableRow = tableRowByIndex.get(comparisonRow.index);
         if (!tableRow) return null;
         return (
-          <Table.Row key={tableRow.id} data-index={tableRow.index}>
+          <ListTable.Row key={tableRow.id} data-index={tableRow.index}>
             {tableRow.getVisibleCells().map((cell) => (
               <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
               </Table.Cell>
             ))}
-          </Table.Row>
+          </ListTable.Row>
         );
       })}
-  </Table.Body>
+  </ListTable.Body>
 );
 
 /**
@@ -743,10 +743,10 @@ export function ComparisonTable({
         minHeight={0}
         css={tableStyles}
       >
-        <ListTable variant="embedded" stickyHeader containerProps={{ overflow: "visible" }}>
-          <Table.Header>
+        <ListTable variant="embedded" scroll="external" stickyHeader>
+          <ListTable.Header>
             {table.getHeaderGroups().map((headerGroup) => (
-              <Table.Row key={headerGroup.id}>
+              <ListTable.Row key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <Table.ColumnHeader key={header.id} style={{ width: header.getSize() }}>
                     {header.isPlaceholder
@@ -754,9 +754,9 @@ export function ComparisonTable({
                       : flexRender(header.column.columnDef.header, header.getContext())}
                   </Table.ColumnHeader>
                 ))}
-              </Table.Row>
+              </ListTable.Row>
             ))}
-          </Table.Header>
+          </ListTable.Header>
 
           {groupedRows ? (
             // Grouped mode: one body per group. Header row spans all
@@ -775,17 +775,17 @@ export function ComparisonTable({
               />
             ))
           ) : (
-            <Table.Body>
+            <ListTable.Body>
               {disableVirtualization ? (
                 // Test mode: render all rows without virtualization
                 tableRows.map((row) => (
-                  <Table.Row key={row.id} data-index={row.index}>
+                  <ListTable.Row key={row.id} data-index={row.index}>
                     {row.getVisibleCells().map((cell) => (
                       <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </Table.Cell>
                     ))}
-                  </Table.Row>
+                  </ListTable.Row>
                 ))
               ) : (
                 <>
@@ -798,7 +798,7 @@ export function ComparisonTable({
                     const row = tableRows[virtualRow.index];
                     if (!row) return null;
                     return (
-                      <Table.Row
+                      <ListTable.Row
                         key={row.id}
                         data-index={virtualRow.index}
                         ref={rowVirtualizer.measureElement}
@@ -808,7 +808,7 @@ export function ComparisonTable({
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </Table.Cell>
                         ))}
-                      </Table.Row>
+                      </ListTable.Row>
                     );
                   })}
                   {/* Bottom padding row to maintain scroll position */}
@@ -817,7 +817,7 @@ export function ComparisonTable({
                   )}
                 </>
               )}
-            </Table.Body>
+            </ListTable.Body>
           )}
         </ListTable>
       </Box>

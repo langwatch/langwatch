@@ -4621,5 +4621,47 @@
     "reason": "Protected experiments surface: chart or summary panel, inline cell placeholder or the experiments list page (R10e2 review).",
     "owner": "experiment",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/comparison-table.tsx",
+    "rule": "raw-export",
+    "line": 455,
+    "reason": "Approved: the protected batch comparison grid keeps its own cells, widths and group heading (astra review batch-comparison-table.md).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/comparison-table.tsx",
+    "rule": "raw-export",
+    "line": 456,
+    "reason": "Approved: the protected batch comparison grid keeps its own cells, widths and group heading (astra review batch-comparison-table.md).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/comparison-table.tsx",
+    "rule": "raw-export",
+    "line": 537,
+    "reason": "Approved: the protected batch comparison grid keeps its own cells, widths and group heading (astra review batch-comparison-table.md).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/comparison-table.tsx",
+    "rule": "raw-export",
+    "line": 751,
+    "reason": "Approved: the protected batch comparison grid keeps its own cells, widths and group heading (astra review batch-comparison-table.md).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/comparison-table.tsx",
+    "rule": "raw-export",
+    "line": 784,
+    "reason": "Approved: the protected batch comparison grid keeps its own cells, widths and group heading (astra review batch-comparison-table.md).",
+    "owner": "workflow"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/experiment/batch-results/comparison-table.tsx",
+    "rule": "raw-export",
+    "line": 807,
+    "reason": "Approved: the protected batch comparison grid keeps its own cells, widths and group heading (astra review batch-comparison-table.md).",
+    "owner": "workflow"
   }
 ]
