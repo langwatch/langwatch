@@ -5,6 +5,7 @@ import { promisify } from "node:util";
 
 import { build } from "vite";
 
+import { writeCloudFrontFunction } from "../cloudfront/generate.mjs";
 import { createViteConfig } from "../vite.config.mjs";
 import { readBuildOptions } from "./options.mjs";
 
@@ -32,6 +33,10 @@ try {
   ]);
   process.stdout.write(stdout);
   process.stderr.write(stderr);
+  await writeCloudFrontFunction({
+    docsRoot: fileURLToPath(new URL("../..", import.meta.url)),
+    outDir,
+  });
 } finally {
   await rm(ssrDir, { recursive: true, force: true });
 }

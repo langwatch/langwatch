@@ -144,3 +144,66 @@ pnpm --filter @langwatch/docs-site preview --out-dir "$TMPDIR/docs-test-dist" --
 `--out-dir` is resolved from the package directory; absolute paths avoid
 ambiguity. Omitting it retains the normal `docs/site/dist` output. Preview still
 defaults to port 4173, and fails if its chosen port is occupied.
+
+## Publish to S3 and CloudFront
+
+`.github/workflows/docs-site-deploy.yml` builds and tests changes under `docs/**`
+on pull requests and main, with a manual dispatch option. Deployment runs only on
+main when the repository variable `DOCS_DEPLOY_ENABLED` is `true`. It uses the
+`docs-production` GitHub environment; configure its protection rules before
+turning deployment on. No cloud resources are created by this workflow.
+
+The following settings must name existing resources:
+
+| Setting                           | Kind                | Purpose                                        |
+| --------------------------------- | ------------------- | ---------------------------------------------- |
+| `DOCS_DEPLOY_ENABLED`             | Repository variable | Explicit deployment switch, initially unset    |
+| `DOCS_AWS_REGION`                 | Repository variable | Region of the S3 bucket                        |
+| `DOCS_S3_BUCKET`                  | Repository variable | Dedicated documentation bucket, no path prefix |
+| `DOCS_CLOUDFRONT_DISTRIBUTION_ID` | Repository variable | Distribution to invalidate                     |
+| `DOCS_CLOUDFRONT_FUNCTION_NAME`   | Repository variable | Existing viewer request function               |
+| `DOCS_AWS_ROLE_ARN`               | Repository secret   | AWS role assumed through GitHub OIDC           |
+
+The role trust policy must restrict the repository and `docs-production`
+environment. Grant only bucket list/location, object get/put/delete, function
+get/describe/update/publish, and distribution create/get invalidation permissions
+for those resources. Static AWS access keys are unnecessary.
+
+The distribution must use the dedicated private S3 REST origin with Origin Access
+Control, the function associated with its default viewer-request behaviour, and
+runtime `cloudfront-js-2.0`. Cache policy minimum TTL must be zero so origin cache
+headers are honoured; maximum TTL must allow one year. Configure both S3 403 and
+404 errors to serve `/404.html` with status **404**, with a short error-cache TTL.
+Do not map missing pages to `index.html` or return a success status for them.
+The site currently deploys at the hostname root, not underneath `/docs`.
+
+The build assembles `dist/_deployment/viewer-request.js` from the checked-in
+`cloudfront/viewer-request.js` and all redirects in `docs/docs.json` (currently
+116). It enforces CloudFront’s 10 KB limit. The function checks redirects before
+mapping `/path` and `/path/` to `/path/index.html`; asset paths remain intact.
+Incoming query parameters are retained, with destination values taking precedence.
+As in local preview, repeated incoming keys retain their first value. The function
+configuration is emitted beside the code. Neither deployment metadata nor link
+reports are uploaded to the public bucket.
+
+Uploads happen in two stages: hashed `assets/` first with a one-year immutable
+cache header, then HTML and other mutable files with `max-age=60,must-revalidate`.
+The second sync deletes removed pages. Previous hashed assets are retained so
+readers of cached HTML can still load their chunks; any later bucket lifecycle
+cleanup must retain them beyond the HTML cache window and rollback period.
+The workflow updates and publishes the existing function, invalidates `/*`, and
+waits for that invalidation to complete. Deployments are serialised and are not
+cancelled mid-sync. S3 updates are not atomic; rerun the complete workflow after a
+partial failure. To roll back, dispatch from main after reverting the relevant
+source commit. The workflow will build and validate that source again.
+
+The local link check is a release gate. Four authored fragments currently also
+fail on live Mintlify (control-plane routing and audit ingest, Python OpenTelemetry,
+and TypeScript custom attributes); these must be corrected before a deployment
+can pass. No link failures are excluded. Reports remain in the uploaded CI artefact
+when validation fails. The existing Mintlify `docs-release.yml` remains untouched;
+retiring that workflow and switching DNS are separate cutover decisions.
+
+AWS references: [function runtime](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/functions-javascript-runtime-20.html),
+[function quotas](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cloudfront-limits.html),
+[custom error responses](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/GeneratingCustomErrorResponses.html).
