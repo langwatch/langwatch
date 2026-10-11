@@ -5622,5 +5622,657 @@
     "reason": "Kept as today: the template code editor frame, resizable email preview, Slack-style preview, wireframe block, or an inline filter chip (R4w2 review).",
     "owner": "automation",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 171,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 181,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 182,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 196,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 206,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 216,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 220,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 224,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 234,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 235,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 252,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 263,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 264,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 267,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 273,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 274,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/llm-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 277,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 126,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 136,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 137,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 146,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 155,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 165,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 168,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 171,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 179,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 180,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 183,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 189,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 190,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/user-metrics.tsx",
+    "rule": "legacy-card-part",
+    "line": 193,
+    "reason": "Approved: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 174,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "gateway"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 199,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "gateway"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 218,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "gateway"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 220,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "gateway"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 247,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "gateway"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-usage-snippet.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 249,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "gateway"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 30,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 44,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 63,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 65,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 85,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/onboarding/browser/src/ui/sections/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 87,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "onboarding"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 221,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 261,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/draggable-tabs-browser.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 314,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 198,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 234,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 245,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 253,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 258,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 260,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 264,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 305,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 328,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 350,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/browser/window/prompt-tabbed-section.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 361,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 110,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 123,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/generate-api-snippet-dialog.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 125,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "prompt"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/onboarding/integrate-drawer.tsx",
+    "rule": "local-copy",
+    "line": 111,
+    "reason": "Approved: the local drawer carries Langy dock behaviour the shared drawer lacks (LEFTOVER-1 review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/onboarding/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 30,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/onboarding/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 44,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/onboarding/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 63,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/onboarding/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 65,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/onboarding/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 85,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/sections/onboarding/observability/install-preview.tsx",
+    "rule": "legacy-tabs-part",
+    "line": 87,
+    "reason": "Approved: code-window, glass install preview or draggable tabs kept as today (LEFTOVER-1 review).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/workflow/browser/src/ui/sections/workflow-list-card.tsx",
+    "rule": "unresolved-props",
+    "line": 128,
+    "reason": "Approved: the old workflow card display stays as today (LEFTOVER-1 review).",
+    "owner": "workflow"
+  },
+  {
+    "path": "enterprise/modules/billing/browser/src/ui/sections/plans-comparison.tsx",
+    "rule": "page-title-size",
+    "line": 185,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "billing",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/ui/sections/governance/analytics.tsx",
+    "rule": "card-box",
+    "line": 149,
+    "reason": "Reviewed: protected analytics metric tabs and chart cards (LEFTOVER-1 review).",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/ui/sections/governance/governance-people.screen.tsx",
+    "rule": "card-box",
+    "line": 874,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/ui/sections/governance/governance-people.screen.tsx",
+    "rule": "card-box",
+    "line": 994,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/ui/sections/governance/governance-people.screen.tsx",
+    "rule": "card-box",
+    "line": 1075,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/ui/sections/governance/governance-people.screen.tsx",
+    "rule": "card-box",
+    "line": 1246,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/licensing/browser/src/ui/sections/no-license-card.tsx",
+    "rule": "card-box",
+    "line": 214,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "licensing",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/evaluator-selection.tsx",
+    "rule": "grid-row",
+    "line": 177,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "evaluator",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/evaluator/browser/src/ui/sections/checks/evaluator-selection.tsx",
+    "rule": "card-box",
+    "line": 193,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "evaluator",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/notification/browser/src/ui/sections/email-suppressions-screen.tsx",
+    "rule": "list-page-inference",
+    "line": 208,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "notification",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/secret/browser/src/ui/sections/secrets-screen.tsx",
+    "rule": "list-page-inference",
+    "line": 299,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "secret",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/governance-getting-started-banner.tsx",
+    "rule": "card-box",
+    "line": 45,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/home-page-picker.tsx",
+    "rule": "card-box",
+    "line": 112,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/ingestion-template-install-drawer.tsx",
+    "rule": "card-box",
+    "line": 312,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/model-provider-tile.tsx",
+    "rule": "card-box",
+    "line": 271,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/personal-workspace/personal-configure.screen.tsx",
+    "rule": "card-box",
+    "line": 252,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/personal-workspace/personal-configure.screen.tsx",
+    "rule": "empty-text",
+    "line": 305,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/personal-workspace/personal-configure.screen.tsx",
+    "rule": "card-box",
+    "line": 440,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/personal-workspace/personal-configure.screen.tsx",
+    "rule": "card-box",
+    "line": 561,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/personal-workspace/personal-configure.screen.tsx",
+    "rule": "card-box",
+    "line": 581,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/trace-ingest-section.tsx",
+    "rule": "card-box",
+    "line": 221,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/user/browser/src/ui/sections/trace-ingest-section.tsx",
+    "rule": "card-box",
+    "line": 277,
+    "reason": "Reviewed: kept as today: a shell, tile, dropzone, heading or header that is not a plain card or empty state (LEFTOVER-1 review).",
+    "owner": "user",
+    "disposition": "reviewed"
   }
 ]
