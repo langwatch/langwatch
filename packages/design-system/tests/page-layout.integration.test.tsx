@@ -55,7 +55,7 @@ describe("PageLayout", () => {
       );
 
       expect(document.querySelector("[data-header-description]")).toBeNull();
-      expect(getComputedStyle(screen.getByTestId("header")).maxHeight).toBe(
+      expect(getComputedStyle(screen.getByTestId("header")).minHeight).toBe(
         "var(--chakra-sizes-page-header-lg)",
       );
     });
@@ -155,8 +155,8 @@ describe("area-owned header geometry", () => {
       const row = screen.getByTestId(`row-${count}`);
       const style = getComputedStyle(row);
       expect(row.dataset.headerSize).toBe("lg");
-      expect(style.height).toBe("var(--chakra-sizes-page-header-lg)");
-      expect(style.maxHeight).toBe(style.height);
+      expect(style.minHeight).toBe("var(--chakra-sizes-page-header-lg)");
+      expect(style.height).toBe("auto");
       expect(style.paddingInline).toBe("var(--page-inset, var(--chakra-spacing-6))");
       expect(style.paddingTop).toBe("1px");
       // jsdom shows the phone layout, which wraps; from `md` up the row stays single-line.
@@ -177,7 +177,7 @@ describe("area-owned header geometry", () => {
         </PageLayout.Header>
       </PageHeaderSizeProvider>,
     );
-    expect(getComputedStyle(screen.getByTestId("tool")).height).toBe(
+    expect(getComputedStyle(screen.getByTestId("tool")).minHeight).toBe(
       "var(--chakra-sizes-page-header-sm)",
     );
     expect(getComputedStyle(screen.getByRole("heading")).fontSize).toBe("16px");

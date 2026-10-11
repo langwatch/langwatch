@@ -189,14 +189,14 @@ function Header({
         background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 65%), transparent)"
         backdropFilter="var(--lw-backdrop-blur, blur(16px))"
         {...props}
-        // A phone wraps the actions under the title instead of squeezing the title.
-        height={described ? "auto" : { base: `pageHeader.${size}`, mdDown: "auto" }}
+        // Actions wrap under the title when they do not fit, so the header grows to hold them.
+        height="auto"
         minHeight={`pageHeader.${size}`}
-        maxHeight={described ? "none" : { base: `pageHeader.${size}`, mdDown: "none" }}
+        maxHeight="none"
         paddingX={PAGE_INSET}
         paddingTop={paddingTop}
         paddingBottom={described ? 3 : { base: 0, mdDown: 2 }}
-        flexWrap={described ? "wrap" : { base: "wrap", md: "nowrap" }}
+        flexWrap="wrap"
         rowGap={2}
         css={{
           "& h1": {
@@ -204,8 +204,8 @@ function Header({
             lineHeight: "28px",
             height: described ? "28px" : { base: "28px", mdDown: "auto" },
             margin: 0,
-            flexShrink: described ? 1 : 0,
-            minWidth: described ? 0 : undefined,
+            flexShrink: 1,
+            minWidth: 0,
             overflow: described ? "hidden" : undefined,
             textOverflow: described ? "ellipsis" : undefined,
             whiteSpace: described ? "nowrap" : { base: "nowrap", mdDown: "normal" },
@@ -233,12 +233,12 @@ function Header({
         {actions && (
           <HStack
             data-header-actions
-            marginStart={described ? 0 : "auto"}
+            marginStart={{ base: 0, md: "auto" }}
             marginTop={described && size === "lg" ? "-1" : 0}
+            marginBottom={described ? 0 : { base: 0, md: 1 }}
             minWidth={0}
             maxWidth="full"
-            flexWrap={{ base: "wrap", md: "nowrap" }}
-            overflowX="auto"
+            flexWrap="wrap"
             gap={2}
           >
             {actions}

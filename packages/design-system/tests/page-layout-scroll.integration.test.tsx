@@ -104,7 +104,7 @@ describe("header geometry", () => {
       headerWith({ actions, requested: "sm" });
       const header = screen.getByTestId("header");
       expect(header.getAttribute("data-header-size")).toBe("lg");
-      expect(getComputedStyle(header).height).toBe("var(--chakra-sizes-page-header-lg)");
+      expect(getComputedStyle(header).minHeight).toBe("var(--chakra-sizes-page-header-lg)");
       cleanup();
     }
   });
@@ -118,6 +118,6 @@ describe("header geometry", () => {
     );
     const header = screen.getByTestId("header");
     expect(header.getAttribute("data-header-size")).toBe("sm");
-    expect(getComputedStyle(header).height).toBe("var(--chakra-sizes-page-header-sm)");
+    expect(getComputedStyle(header).minHeight).toBe("var(--chakra-sizes-page-header-sm)");
   });
 });

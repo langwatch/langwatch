@@ -33,3 +33,11 @@ Feature: Page header actions
     When the header is narrower than the medium breakpoint
     Then the tabs form a full-width 36 pixel row under the heading that scrolls sideways
     And from the medium breakpoint up, and for tabs that do not opt in, the tabs keep their inline geometry
+
+  @integration
+  Scenario: Header actions wrap under the title instead of leaving the screen
+    Given a header with a long title and several actions
+    When the window is too narrow for the title and the actions on one line
+    Then the actions wrap onto a second line and every one stays inside the window
+    And the header grows to hold them, aligned to the start on a phone and the end from medium up
+    And when everything fits the header keeps its single row

@@ -193,4 +193,74 @@ describe("page header geometry", () => {
       expect(nav.getBoundingClientRect().top).toBeLessThan(title.getBoundingClientRect().bottom);
     });
   });
+
+  /** @scenario Header actions wrap under the title instead of leaving the screen */
+  it("keeps actions in view: one row at 1280px, wrapped and grown at 900px, start-aligned at 390px", async () => {
+    const actions = (
+      <>
+        <PageLayout.HeaderButton>Rotate</PageLayout.HeaderButton>
+        <PageLayout.HeaderButton>Disable</PageLayout.HeaderButton>
+        <PageLayout.HeaderButton>Revoke</PageLayout.HeaderButton>
+      </>
+    );
+    const longTitle = "Production support key for the payments gateway in Frankfurt and Dublin";
+    const parts = (testId: string) => {
+      const header = screen.getByTestId(testId);
+      const title = header.querySelector("h1");
+      const buttons = header.querySelector("[data-header-actions]");
+      if (!title || !buttons) throw new Error("header missing its parts");
+      return { header, title, buttons };
+    };
+    const render = (width: number, title: string) => {
+      renderWithDesignSystem(
+        <div style={{ width }}>
+          <PageLayout.Header data-testid="h" actions={actions}>
+            <PageLayout.Heading>{title}</PageLayout.Heading>
+          </PageLayout.Header>
+        </div>,
+      );
+    };
+
+    await page.viewport(1280, 800);
+    render(1280, "Key");
+    await waitFor(() => {
+      const { header, title, buttons } = parts("h");
+      expect(height({ element: header })).toBe(48);
+      expect(buttons.getBoundingClientRect().left).toBeGreaterThan(
+        title.getBoundingClientRect().right,
+      );
+      expect(buttons.getBoundingClientRect().top).toBeLessThan(
+        header.getBoundingClientRect().bottom - 36,
+      );
+    });
+    cleanup();
+
+    await page.viewport(900, 800);
+    render(500, longTitle);
+    await waitFor(() => {
+      const { header, title, buttons } = parts("h");
+      const box = header.getBoundingClientRect();
+      const row = buttons.getBoundingClientRect();
+      expect(box.height).toBeGreaterThan(48);
+      expect(row.top).toBeGreaterThanOrEqual(title.getBoundingClientRect().bottom);
+      expect(row.right).toBeLessThanOrEqual(Math.min(box.right, window.innerWidth));
+      expect(row.right).toBeGreaterThan(box.right - 40);
+      for (const button of buttons.querySelectorAll("button")) {
+        const rect = button.getBoundingClientRect();
+        expect(rect.left).toBeGreaterThanOrEqual(0);
+        expect(rect.right).toBeLessThanOrEqual(window.innerWidth);
+      }
+    });
+    cleanup();
+
+    await page.viewport(390, 800);
+    render(390, longTitle);
+    await waitFor(() => {
+      const { header, buttons } = parts("h");
+      const box = header.getBoundingClientRect();
+      expect(buttons.getBoundingClientRect().left).toBeLessThan(box.left + 40);
+      expect(buttons.getBoundingClientRect().right).toBeLessThanOrEqual(box.right);
+      expect(box.height).toBeGreaterThan(48);
+    });
+  });
 });
