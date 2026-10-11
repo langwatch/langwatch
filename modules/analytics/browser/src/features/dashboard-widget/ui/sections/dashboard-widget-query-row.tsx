@@ -8,12 +8,12 @@ import {
   type DashboardWidgetQuery,
   RESERVED_PARAMETERS,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { Card } from "@langwatch/design-system/card";
 import {
   chakra,
   Accordion,
   Box,
   Button,
-  Card,
   HStack,
   IconButton,
   Input,
@@ -93,9 +93,9 @@ export function DashboardWidgetQueryRow({
   const parameters = useMemo(() => editorParameters(query.parameters), [query.parameters]);
 
   return (
-    <Card.Root size="sm" width="full" marginBottom={3}>
-      <Accordion.Item value={value} border="none">
-        <Card.Body gap={2}>
+    <Accordion.Item value={value} border="none" marginBottom={3}>
+      <Card padding="sm">
+        <VStack align="stretch" gap={2}>
           <HStack>
             {/* Chakra's own indicator applies no rotation here (verified:
                 transform: none in both states) — pick the icon by hand so
@@ -137,21 +137,17 @@ export function DashboardWidgetQueryRow({
           )}
           <Accordion.ItemContent>
             <VStack align="stretch" gap={2} paddingTop={2}>
-              <Box
-                height="140px"
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="md"
-                overflow="hidden"
-              >
-                <LwqlEditor
-                  schema={schema}
-                  markers={markers}
-                  value={query.sql}
-                  onChange={(sql) => onChange({ ...query, sql })}
-                  parameters={parameters}
-                />
-              </Box>
+              <Card variant="frame" padding="none">
+                <Box height="140px" overflow="hidden">
+                  <LwqlEditor
+                    schema={schema}
+                    markers={markers}
+                    value={query.sql}
+                    onChange={(sql) => onChange({ ...query, sql })}
+                    parameters={parameters}
+                  />
+                </Box>
+              </Card>
 
               <DashboardWidgetQueryParamsEditor
                 params={query.parameters ?? []}
@@ -161,9 +157,9 @@ export function DashboardWidgetQueryRow({
               <DashboardWidgetQueryResultView run={lastRun} />
             </VStack>
           </Accordion.ItemContent>
-        </Card.Body>
-      </Accordion.Item>
-    </Card.Root>
+        </VStack>
+      </Card>
+    </Accordion.Item>
   );
 }
 

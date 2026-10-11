@@ -14,6 +14,7 @@ import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -233,18 +234,22 @@ export function QueryParametersPanel({
         </Text>
         <Stack gap={2}>
           {rows.length === 0 && (
-            <Text textStyle="caption" color="fg.muted">
-              No parameters declared yet.
-            </Text>
+            <NoDataInfoBlock
+              size="line"
+              title="No parameters declared yet."
+              action={{ label: "Add parameter", onClick: onAdd }}
+            />
           )}
           {rows.map((row) => (
             <ParameterRow key={row.id} row={row} typeOptions={typeOptions} />
           ))}
-          <Box>
-            <Button size="xs" variant="outline" onClick={onAdd}>
-              <Plus size={14} /> Add parameter
-            </Button>
-          </Box>
+          {rows.length > 0 && (
+            <Box>
+              <Button size="xs" variant="outline" onClick={onAdd}>
+                <Plus size={14} /> Add parameter
+              </Button>
+            </Box>
+          )}
         </Stack>
       </Box>
     </VStack>

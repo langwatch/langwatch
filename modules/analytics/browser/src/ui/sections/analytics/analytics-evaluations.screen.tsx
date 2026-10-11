@@ -1,13 +1,6 @@
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
-import {
-  Box,
-  Card,
-  GridItem,
-  Heading,
-  HStack,
-  SimpleGrid,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, GridItem, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { BarChart2 } from "lucide-react";
 import { Fragment, useCallback } from "react";
@@ -58,6 +51,12 @@ const aggregatePassFailTrend: CustomGraphInput = {
   timeScale: ONE_DAY,
   height: 200,
 };
+
+const DisabledNote = () => (
+  <Text color="fg.muted" fontSize="sm">
+    (disabled)
+  </Text>
+);
 
 const renderGridItems = (
   checks: readonly AnalyticsMonitorSummary[],
@@ -256,78 +255,67 @@ const renderGridItems = (
     return (
       <Fragment key={check.id}>
         <GridItem colSpan={1} display="inline-grid">
-          <Card.Root>
-            <Card.Header>
-              <HStack gap={2}>
-                <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                <Heading textStyle="cardTitle">{check.name}</Heading>
-              </HStack>
-              {!check.enabled && (
-                <Text color="fg.muted" fontSize="sm">
-                  (disabled)
-                </Text>
-              )}
-            </Card.Header>
-            <Card.Body>
-              <CustomGraph
-                input={checksSummary as CustomGraphInput}
-                onDataPointClick={(params) => {
-                  onGraphClick({
-                    evaluatorId: check.id,
-                    groupKey: params.groupKey,
-                    checkType: check.checkType,
-                    isGuardrail: traceCheck?.isGuardrail ?? false,
-                  });
-                }}
-              />
-            </Card.Body>
-          </Card.Root>
+          <Card
+            padding="lg"
+            icon={<BarChart2 color="var(--chakra-colors-orange-fg)" />}
+            title={check.name}
+            badge={!check.enabled && <DisabledNote />}
+          >
+            <CustomGraph
+              input={checksSummary as CustomGraphInput}
+              onDataPointClick={(params) => {
+                onGraphClick({
+                  evaluatorId: check.id,
+                  groupKey: params.groupKey,
+                  checkType: check.checkType,
+                  isGuardrail: traceCheck?.isGuardrail ?? false,
+                });
+              }}
+            />
+          </Card>
         </GridItem>
         <GridItem colSpan={3} display="inline-grid">
-          <Card.Root>
-            <Card.Header>
-              <HStack gap={2}>
-                <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                <Heading textStyle="cardTitle">{check.name}</Heading>
-                {traceCheck && <Text fontWeight={300}>- {traceCheck.name}</Text>}
-              </HStack>
-              {!check.enabled && (
-                <Text color="fg.muted" fontSize="sm">
-                  (disabled)
-                </Text>
-              )}
-            </Card.Header>
-            <Card.Body>
-              <CustomGraph
-                input={checksAverage as CustomGraphInput}
-                onDataPointClick={(params) => {
-                  onGraphClick({
-                    evaluatorId: check.id,
-                    groupKey: params.groupKey,
-                    date: params.date,
-                    startDate: params.startDate,
-                    endDate: params.endDate,
-                    checkType: check.checkType,
-                    isGuardrail: traceCheck?.isGuardrail ?? false,
-                  });
-                }}
-              />
-            </Card.Body>
-          </Card.Root>
+          <Card
+            padding="lg"
+            icon={<BarChart2 color="var(--chakra-colors-orange-fg)" />}
+            title={
+              <>
+                {check.name}
+                {traceCheck && (
+                  <Text as="span" fontWeight={300}>
+                    {" "}
+                    - {traceCheck.name}
+                  </Text>
+                )}
+              </>
+            }
+            badge={!check.enabled && <DisabledNote />}
+          >
+            <CustomGraph
+              input={checksAverage as CustomGraphInput}
+              onDataPointClick={(params) => {
+                onGraphClick({
+                  evaluatorId: check.id,
+                  groupKey: params.groupKey,
+                  date: params.date,
+                  startDate: params.startDate,
+                  endDate: params.endDate,
+                  checkType: check.checkType,
+                  isGuardrail: traceCheck?.isGuardrail ?? false,
+                });
+              }}
+            />
+          </Card>
         </GridItem>
         {passRateTrend && (
           <GridItem colSpan={4} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                  <Heading textStyle="cardTitle">{check.name} - Pass Rate Trend</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={passRateTrend} />
-              </Card.Body>
-            </Card.Root>
+            <Card
+              padding="lg"
+              icon={<BarChart2 color="var(--chakra-colors-orange-fg)" />}
+              title={`${check.name} - Pass Rate Trend`}
+            >
+              <CustomGraph input={passRateTrend} />
+            </Card>
           </GridItem>
         )}
       </Fragment>
@@ -454,24 +442,14 @@ function EvaluationsContent() {
           {visibleChecks.length > 0 && !selectedEvaluation && (
             <>
               <GridItem colSpan={1} display="inline-grid">
-                <Card.Root>
-                  <Card.Header>
-                    <Heading textStyle="cardTitle">Overall Health</Heading>
-                  </Card.Header>
-                  <Card.Body>
-                    <CustomGraph input={aggregateHealthSummary} />
-                  </Card.Body>
-                </Card.Root>
+                <Card padding="lg" title="Overall Health">
+                  <CustomGraph input={aggregateHealthSummary} />
+                </Card>
               </GridItem>
               <GridItem colSpan={3} display="inline-grid">
-                <Card.Root>
-                  <Card.Header>
-                    <Heading textStyle="cardTitle">Pass / Fail Trend</Heading>
-                  </Card.Header>
-                  <Card.Body>
-                    <CustomGraph input={aggregatePassFailTrend} />
-                  </Card.Body>
-                </Card.Root>
+                <Card padding="lg" title="Pass / Fail Trend">
+                  <CustomGraph input={aggregatePassFailTrend} />
+                </Card>
               </GridItem>
             </>
           )}

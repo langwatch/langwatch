@@ -597,5 +597,45 @@
     "reason": "False positive: the design system EmptyOptionsHint with an action link inside a picker (R4a1 review).",
     "owner": "annotation",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/analytics/browser/src/features/dashboard-widget/ui/sections/langwatch-ql-vega-lite-chart.tsx",
+    "rule": "card-box",
+    "line": 118,
+    "reason": "An output region with a test id around a protected chart. (R5a1 review)",
+    "owner": "analytics",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/elements/chart-tooltip.tsx",
+    "rule": "card-box",
+    "line": 35,
+    "reason": "A floating chart tooltip surface. (R5a1 review)",
+    "owner": "analytics",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/elements/filter-display.tsx",
+    "rule": "card-box",
+    "line": 34,
+    "reason": "An inline filter row with a conditional border. (R5a1 review)",
+    "owner": "analytics",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/elements/langwatch-ql-chart-failure.tsx",
+    "rule": "card-box",
+    "line": 95,
+    "reason": "An output region with data-failure-code that tests read. (R5a1 review)",
+    "owner": "analytics",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/elements/summary-metric.tsx",
+    "rule": "empty-text",
+    "line": 150,
+    "reason": "No data yet inside a stat figure, with a Set up link when given. (R5a1 review)",
+    "owner": "analytics",
+    "disposition": "reviewed"
   }
 ]
