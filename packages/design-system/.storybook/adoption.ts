@@ -1,13 +1,14 @@
 /**
- * Adoption numbers for the workshop, read from the import sites at build time:
- * which files import each entry point (and each name from it), plus the debt
- * the Consistency pages count. `node .storybook/adoption.ts` prints the inventory.
+ * Adoption numbers for the workshop, read at build time: who imports each entry point
+ * (and each name), the debt and shape census the Consistency pages count. `node
+ * .storybook/adoption.ts` prints it; `--report <path>` also writes the census as markdown.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { PACKAGE_ROOT, publishedEntries, storyExists, storyFor } from "./catalogue.ts";
+import { type Census, collectCensus, renderCensusMarkdown } from "./census.ts";
 import { collectRawColours } from "./raw-colours.ts";
 
 const ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -41,7 +42,11 @@ export type Adoption = {
     rawColour: Debt;
     paletteStep: Debt;
     handRolledTable: Debt;
+    shapeDrift: Debt;
+    pixelSpacing: Debt;
+    literalFontSize: Debt;
   };
+  census: Census;
 };
 
 /** `git grep` over the consumer tree; tracked and untracked files alike. */
@@ -147,6 +152,13 @@ export function collectAdoption(): Adoption {
   }
 
   const listTableFiles = new Set(filesBySubpath.get("./list-table") ?? []);
+  const { census, sites, literals } = collectCensus();
+  const drift = sites.filter(
+    (site) =>
+      site.kind === "lookalike" || Object.keys(site.props).some((prop) => prop !== "Root.size"),
+  );
+  const literalLines = ({ kind }: { kind: string }) =>
+    literals.filter((literal) => literal.kind === kind).map(({ file, line }) => `${file}:${line}`);
 
   return {
     entries,
@@ -172,10 +184,21 @@ export function collectAdoption(): Adoption {
           (line) => !listTableFiles.has(fileOf(line)),
         ),
       }),
+      shapeDrift: debtFrom({ lines: drift.map(({ file, line }) => `${file}:${line}`) }),
+      pixelSpacing: debtFrom({ lines: literalLines({ kind: "pixelSpacing" }) }),
+      literalFontSize: debtFrom({ lines: literalLines({ kind: "fontSize" }) }),
     },
+    census,
   };
 }
 
 if (import.meta.main) {
-  process.stdout.write(`${JSON.stringify(collectAdoption(), null, 2)}\n`);
+  const adoption = collectAdoption();
+  const report = process.argv.indexOf("--report");
+  const target = report === -1 ? undefined : process.argv[report + 1];
+  if (target) {
+    mkdirSync(path.dirname(path.resolve(target)), { recursive: true });
+    writeFileSync(target, renderCensusMarkdown({ census: adoption.census }));
+  }
+  process.stdout.write(`${JSON.stringify(adoption, null, 2)}\n`);
 }

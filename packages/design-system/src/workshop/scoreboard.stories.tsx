@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { adoption } from "../../.storybook/adoption-data.ts";
 import type { Debt } from "../../.storybook/adoption.ts";
+import type { Census } from "../../.storybook/census.ts";
 import { StatTile, StatTileFigure } from "../components/values/stat-tile.tsx";
 
 const DEBT: { key: keyof NonNullable<typeof adoption>["debt"]; label: string; rule: string }[] = [
@@ -14,7 +15,48 @@ const DEBT: { key: keyof NonNullable<typeof adoption>["debt"]; label: string; ru
   { key: "rawColour", label: "Hex or rgb() literals in browser code", rule: "no-raw-color" },
   { key: "paletteStep", label: "Palette steps named as a colour prop", rule: "no-raw-color" },
   { key: "handRolledTable", label: "Table.Root outside a List table", rule: "list-table.md" },
+  {
+    key: "shapeDrift",
+    label: "Restyled or hand-built tables, cards, pages, drawers and dialogs",
+    rule: "design system first",
+  },
+  { key: "pixelSpacing", label: "Pixel paddings, margins and gaps", rule: "spacing tokens" },
+  { key: "literalFontSize", label: "Literal font sizes", rule: "text styles" },
 ];
+
+/** Per family: shared sites, restyled elements, look-alikes and distinct restyles. */
+function CensusTable({ census }: { census: Census }) {
+  return (
+    <Table.Root size="sm" variant="line">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Family</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Design-system sites</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Restyled</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Look-alikes</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Variants</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {Object.entries(census.families).map(
+          ([family, { ds, overridden, lookalike, variants }]) => {
+            return (
+              <Table.Row key={family}>
+                <Table.Cell>
+                  <Code fontSize="xs">{family}</Code>
+                </Table.Cell>
+                <Table.Cell textAlign="end">{ds}</Table.Cell>
+                <Table.Cell textAlign="end">{overridden}</Table.Cell>
+                <Table.Cell textAlign="end">{lookalike}</Table.Cell>
+                <Table.Cell textAlign="end">{variants}</Table.Cell>
+              </Table.Row>
+            );
+          },
+        )}
+      </Table.Body>
+    </Table.Root>
+  );
+}
 
 function DebtTable({ debt }: { debt: Debt }) {
   return (
@@ -76,6 +118,15 @@ function Scoreboard() {
             ))}
           </Table.Body>
         </Table.Root>
+      </Stack>
+
+      <Stack gap={2}>
+        <Heading textStyle="cardTitle">Shapes: shared, restyled, or built by hand</Heading>
+        <Text color="fg.muted">
+          The variant clusters, the worst files and the totals per module are in the report written
+          by <Code>{"node packages/design-system/.storybook/adoption.ts --report <path>"}</Code>.
+        </Text>
+        <CensusTable census={adoption.census} />
       </Stack>
 
       {DEBT.map(({ key, label, rule }) => (
