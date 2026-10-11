@@ -36,8 +36,9 @@ domain another organization's connection proved), plaintext provider keys, a Pos
 with a prompt and no tags, and judges them as A1 to A4. `-overlays operator-damage` plants, by SQL on main, a
 `_prisma_migrations` row an interrupted deploy left failed (a folder below head's re-runnable marker) and a hand-built
 `AuditLog_idempotencyKey_key` on another column; on each refusal the cell records `/readyz`, `pnpm task upgrade status` and
-head's page, does the fix the refusal names as the operator (restarting head's worker when the upgrade does not run again
-within 2 min), and judges D1 to D3; pass `-ready-within 20m`. Exit 0 all pass, 1 an invariant failed, 2 a
+head's page, does the fix the refusal names as the operator (restarting head's worker when no upgrade run starts within
+2 min of a resolved row or 6 min of a fixed index, and reporting the time from fix to rerun), and judges D1 to D3; pass
+`-ready-within 20m`. Exit 0 all pass, 1 an invariant failed, 2 a
 step stopped the cell (its databases are kept for inspection).
 
 Built code only, both sides: main runs `pnpm build` in `platform/app`, then `runtime:app` and

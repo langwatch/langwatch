@@ -7,12 +7,13 @@ import (
 )
 
 func refusedAndFixed() damageState {
+	planted := `CREATE INDEX "` + damageIndex + `" ON mydb."AuditLog" USING btree ("createdAt")`
 	row := damageRefusal{Kind: damageKindRow, Step: "prisma:" + damageFolder, ReadyzWhile: 503, PrismaRowsWhile: 346, FinishedRowsBefore: 345, FinishedRowsWhile: 345,
-		Text:      "Prisma migration " + damageFolder + " failed ... run \"prisma migrate resolve --rolled-back " + damageFolder + "\"",
-		StatusOut: "failed prisma:" + damageFolder, RerunHow: "on its own"}
-	index := damageRefusal{Kind: damageKindIndex, Step: "prisma:20261006170500_audit_log_idempotency_key", ReadyzWhile: 503, PrismaRowsWhile: 360,
-		Text: "index " + damageIndex + " exists with another definition", StatusOut: damageIndex, RerunHow: "on its own"}
-	return damageState{plantedRows: 346, finishedRows: 345, refusals: []damageRefusal{row, index},
+		Text:      "Prisma migration " + damageFolder + " failed ... in packages/prisma-client with DATABASE_URL set, run \"prisma migrate resolve --rolled-back " + damageFolder + "\"",
+		StatusOut: "failed prisma:" + damageFolder, RerunHow: "on its own", IndexWhile: planted}
+	index := damageRefusal{Kind: damageKindIndex, Step: "run:x", Code: "prebuilt_index_differs", ReadyzWhile: 503, PrismaRowsWhile: 346, FinishedRowsBefore: 346, FinishedRowsWhile: 346,
+		Text: "prebuilt_index_differs: index \"" + damageIndex + "\" on \"AuditLog\" ... It should be: x. It is: y. Drop or rename it; nothing drops it for you.", StatusOut: damageIndex, RerunHow: "on its own", IndexWhile: planted}
+	return damageState{plantedRows: 346, finishedRows: 345, plantedIndex: planted, refusals: []damageRefusal{row, index},
 		finalIndex: damageWantIndex, finalFolder: "1 applied, 0 failed"}
 }
 
@@ -38,6 +39,9 @@ func TestJudgeDamageFailsEachWayOnItsOwn(t *testing.T) {
 		"applied more while refused": {"D1", func(d *damageState) { d.refusals[0].FinishedRowsWhile = 350 }},
 		"row deleted":                {"D1", func(d *damageState) { d.refusals[0].PrismaRowsWhile = 300 }},
 		"fix failed":                 {"D1", func(d *damageState) { d.refusals[0].FixErr = "P3008" }},
+		"index dropped for them":     {"D2", func(d *damageState) { d.refusals[1].IndexWhile = "(none)" }},
+		"folders applied first":      {"D2", func(d *damageState) { d.refusals[1].FinishedRowsWhile = 360 }},
+		"index refusal names no fix": {"D2", func(d *damageState) { d.refusals[1].Text = "prebuilt_index_differs: " + damageIndex }},
 		"folder left failed":         {"D1", func(d *damageState) { d.finalFolder = "0 applied, 1 failed" }},
 		"status silent":              {"D3", func(d *damageState) { d.refusals[0].StatusOut = "all good" }},
 	}
