@@ -12,7 +12,10 @@ export interface DetailDrawerHeaderProps {
   children?: ReactNode;
 }
 
-/** Entity identity inside Drawer.Header; the host owns padding and close controls. */
+/**
+ * Entity identity inside Drawer.Header; the host owns padding and close controls.
+ * @deprecated Use the Drawer shape's `eyebrow`, `title` and `badges`. Goes in W-final.
+ */
 export function DetailDrawerHeader({ icon, kind, title, children }: DetailDrawerHeaderProps) {
   return (
     <VStack align="stretch" gap={3}>

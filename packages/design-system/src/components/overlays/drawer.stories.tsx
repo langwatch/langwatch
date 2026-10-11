@@ -1,228 +1,166 @@
-import { Box, Button, HStack, Spinner, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Database } from "lucide-react";
+import { Copy, Database, Expand, Plus, Server, Trash2 } from "lucide-react";
 
+import { Badge, Box, IconButton, Input, Stack, Text } from "../../primitives.ts";
+import { SearchInput } from "../forms/search-input.tsx";
 import { NoDataInfoBlock } from "../states/no-data-info-block.tsx";
-import { SkeletonRows } from "../states/skeletons.tsx";
 import { Drawer } from "./drawer.tsx";
+
+const noop = () => undefined;
 
 const meta = {
   title: "Overlays/Drawer",
   parameters: {
     usage: {
-      use: "Details, editing a record and multi-step forms beside the page. Drawers are routed singletons. End a form with Drawer.Actions: Cancel (outline) then one orange primary, a Delete on the left via `start`. Fields inside stack on their own (Settings field).",
+      use: "Details, editing a record, pickers and multi-step forms beside the page. Render `<Drawer title onClose footer={{ primaryAction }}>`: the shape draws the header, body and footer. Drawers are routed singletons; pass `onBack` when the stack can go back. The footer never has Cancel: the X and Escape close.",
       avoid:
-        "A quick yes or no: use Dialog. Never a drawer inside a drawer: navigate instead. Never `bg`, `background` or `borderRadius` on Drawer.Content, nor fontSize or fontWeight on Drawer.Title: the recipe owns them. A Spinner as the body while loading: use Skeleton rows.",
+        "A quick yes or no: use Dialog. Assembling `Drawer.Root`/`Drawer.Content` parts (deprecated; they go in W-final). A drawer inside a drawer: navigate instead. A primary disabled before input: say why with `disabledReason`, or validate on submit.",
     },
   },
-  component: Drawer.Root,
+  component: Drawer,
   tags: ["autodocs"],
-  args: { open: true, size: "md", children: null },
-  argTypes: {
-    size: { control: "select", options: ["xs", "sm", "md", "lg", "xl", "2xl", "full"] },
+  args: {
+    title: "Production key",
+    onClose: noop,
+    size: "md",
+    children: <Text>The customer asked how to rotate a virtual key.</Text>,
+    footer: { primaryAction: { label: "Save", onClick: noop } },
   },
-  render: (args) => (
-    <Drawer.Root {...args}>
-      <Drawer.Trigger asChild>
-        <Button size="sm">Open trace</Button>
-      </Drawer.Trigger>
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <Drawer.Title>Trace details</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <Stack gap="2">
-            <Text textStyle="sm" color="fg.muted">
-              gpt-5-mini · 1.4 seconds · 3,204 tokens
-            </Text>
-            <Text>The customer asked how to rotate a virtual key.</Text>
-          </Stack>
-        </Drawer.Body>
-        <Drawer.Actions primary={<Button colorPalette="orange">Save</Button>} />
-      </Drawer.Content>
-    </Drawer.Root>
-  ),
-} satisfies Meta<typeof Drawer.Root>;
+  argTypes: { size: { control: "select", options: ["sm", "md", "lg", "xl", "full"] } },
+} satisfies Meta<typeof Drawer>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
-
-export const Closed: Story = {
-  args: { open: false },
+export const Form: Story = {
+  args: {
+    title: "New budget",
+    onSubmit: noop,
+    children: (
+      <Stack gap={4}>
+        <Input aria-label="Budget name" placeholder="Monthly spend" />
+        <Input aria-label="Limit" placeholder="500" />
+      </Stack>
+    ),
+    footer: {
+      primaryAction: { label: "Create budget", type: "submit" },
+      destructiveAction: { label: "Delete", icon: <Trash2 size={14} />, onClick: noop },
+    },
+  },
 };
 
-export const Loading: Story = {
-  render: (args) => (
-    <Drawer.Root {...args}>
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Trace details</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <SkeletonRows rows={6} />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
-  ),
+export const Picker: Story = {
+  args: {
+    title: "Choose an agent",
+    onBack: noop,
+    headerAction: { label: "New agent", icon: <Plus size={14} />, onClick: noop },
+    toolbar: <SearchInput aria-label="Search agents" placeholder="Search agents" />,
+    footer: undefined,
+    children: <Text>Support bot · Billing triage · Release notes writer</Text>,
+  },
+};
+
+export const Detail: Story = {
+  args: {
+    title: "eu-west-1 instance",
+    eyebrow: { label: "Self-hosted instance", icon: <Server size={14} /> },
+    subtitle: "Version 3.21.0, last seen 2 minutes ago",
+    badges: (
+      <>
+        <Badge colorPalette="green">Healthy</Badge>
+        <Badge>Enterprise</Badge>
+      </>
+    ),
+    headerTools: (
+      <IconButton aria-label="Copy instance id" variant="ghost" size="sm">
+        <Copy />
+      </IconButton>
+    ),
+    footer: { secondaryAction: { label: "Open logs", onClick: noop } },
+  },
+};
+
+export const Editor: Story = {
+  args: {
+    title: "Support prompt",
+    titleContent: <Input aria-label="Prompt name" defaultValue="Support prompt" size="sm" />,
+    badges: <Badge>v12</Badge>,
+    body: "flush",
+    bodyScroll: "content",
+    size: "xl",
+    headerTools: (
+      <IconButton aria-label="Expand" variant="ghost" size="sm">
+        <Expand />
+      </IconButton>
+    ),
+    children: (
+      <Box flex={1} overflowY="auto" padding={6}>
+        <Text>{"You are a helpful support agent. ".repeat(80)}</Text>
+      </Box>
+    ),
+    footer: {
+      secondaryAction: { label: "Save version", onClick: noop },
+      primaryAction: { label: "Apply", onClick: noop },
+    },
+  },
+};
+
+export const Wizard: Story = {
+  args: {
+    title: "New automation",
+    footer: {
+      note: "Step 2 of 3",
+      secondaryAction: { label: "Back", onClick: noop },
+      primaryAction: { label: "Next", onClick: noop, disabledReason: "Pick a trigger first" },
+    },
+  },
+};
+
+export const Summary: Story = {
+  args: {
+    title: "Manage seats",
+    footer: {
+      summary: <Text textStyle="sm">12 seats · $240 a month, prorated $96 today</Text>,
+      primaryAction: { label: "Done", onClick: noop },
+    },
+  },
 };
 
 export const Empty: Story = {
-  render: (args) => (
-    <Drawer.Root {...args}>
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <Drawer.Title>Datasets</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <NoDataInfoBlock
-            title="No datasets yet"
-            description="Datasets hold the examples you evaluate a prompt against."
-            icon={<Database />}
-          />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
-  ),
+  args: {
+    title: "Datasets",
+    footer: undefined,
+    children: (
+      <NoDataInfoBlock
+        size="inline"
+        icon={<Database />}
+        title="No datasets yet"
+        description="Upload a CSV or save traces to start one."
+      />
+    ),
+  },
 };
 
-/** The standard footer with a destructive secondary on the left edge. */
-export const ActionsWithStart: Story = {
-  render: (args) => (
-    <Drawer.Root {...args}>
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <Drawer.Title>Edit model provider</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <Text textStyle="sm">OpenAI · 4 models enabled</Text>
-        </Drawer.Body>
-        <Drawer.Actions
-          start={
-            <Button variant="ghost" colorPalette="red">
-              Remove provider
-            </Button>
-          }
-          primary={<Button colorPalette="orange">Save</Button>}
-        />
-      </Drawer.Content>
-    </Drawer.Root>
-  ),
+export const Loading: Story = { args: { loading: true } };
+
+export const Failed: Story = {
+  args: { error: { title: "Couldn't load the key", description: "Try again.", onRetry: noop } },
 };
 
-/** A drawer that keeps a draft: Save takes Cancel's place via `secondary`, Discard on the left. */
-export const ActionsWithSecondary: Story = {
-  render: (args) => (
-    <Drawer.Root {...args}>
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <Drawer.Title>Evaluator</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <Text textStyle="sm">Exact match · 2 unsaved changes</Text>
-        </Drawer.Body>
-        <Drawer.Actions
-          start={<Button variant="outline">Discard</Button>}
-          secondary={<Button variant="outline">Save</Button>}
-          primary={<Button colorPalette="orange">Apply</Button>}
-        />
-      </Drawer.Content>
-    </Drawer.Root>
-  ),
+export const Busy: Story = {
+  args: { busy: true, footer: { primaryAction: { label: "Save", onClick: noop, loading: true } } },
 };
 
-/** The width steps this product adds on top of Chakra's own. */
-export const Sizes: Story = {
-  args: { size: "2xl" },
+export const LongText: Story = {
+  args: {
+    title: "A drawer title long enough to wrap onto a second line in a medium drawer",
+    subtitle: "A subtitle that also runs long, so the header shows how it wraps beside the X.",
+  },
 };
 
-/** Inline panels make header, body and footer states comparable in both modes. */
-export const StatesSideBySide: Story = {
-  render: () => (
-    <Stack gap={6}>
-      {(["light", "dark"] as const).map((mode) => (
-        <HStack
-          key={mode}
-          className={mode}
-          bg="bg.panel"
-          color="fg"
-          align="start"
-          gap={4}
-          padding={4}
-          wrap="wrap"
-        >
-          {(["Ready", "Loading", "Empty", "Error", "Long content"] as const).map((state) => (
-            <Box
-              key={state}
-              width="360px"
-              height="360px"
-              position="relative"
-              css={{
-                "& [data-part=positioner]": { position: "absolute", inset: 0 },
-                "& [data-part=content]": {
-                  width: "full",
-                  maxWidth: "full",
-                  height: "calc(100% - 16px)",
-                },
-              }}
-            >
-              <Drawer.Root open size="md" trapFocus={false}>
-                <Drawer.Content portalled={false}>
-                  <Drawer.CloseTrigger />
-                  <Drawer.Header>
-                    <Drawer.Title>
-                      {state === "Long content"
-                        ? "Organization notification preferences"
-                        : "Connection details"}
-                    </Drawer.Title>
-                    <Drawer.Description>
-                      {mode} · {state}
-                    </Drawer.Description>
-                  </Drawer.Header>
-                  <Drawer.Body>
-                    <DrawerStoryBody state={state} />
-                  </Drawer.Body>
-                  <Drawer.Footer>
-                    <Button variant="outline" size="sm">
-                      Cancel
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={state === "Empty" || state === "Error"}
-                      loading={state === "Loading"}
-                    >
-                      Save
-                    </Button>
-                  </Drawer.Footer>
-                </Drawer.Content>
-              </Drawer.Root>
-            </Box>
-          ))}
-        </HStack>
-      ))}
-    </Stack>
-  ),
+export const Narrow: Story = {
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+  args: { size: "lg" },
 };
 
-function DrawerStoryBody({ state }: { state: string }) {
-  if (state === "Loading") return <Spinner aria-label="Loading connection" />;
-  if (state === "Empty") return <Text color="fg.muted">No connections yet.</Text>;
-  if (state === "Error")
-    return (
-      <Text role="alert" color="red.fg">
-        Couldn't load the connection. Try again.
-      </Text>
-    );
-  return (
-    <Stack gap={4}>
-      {Array.from({ length: state === "Long content" ? 12 : 1 }, (_, index) => (
-        <Text key={index}>Choose where this connection can send notifications.</Text>
-      ))}
-    </Stack>
-  );
-}
+export const Closed: Story = { args: { open: false } };

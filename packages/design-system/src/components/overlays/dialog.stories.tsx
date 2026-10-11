@@ -1,111 +1,97 @@
-import { Button, Input, Spinner, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { ExternalLink } from "lucide-react";
 
+import { Input, Stack, Text } from "../../primitives.ts";
+import { Checkbox } from "../forms/checkbox.tsx";
 import { Dialog } from "./dialog.tsx";
+
+const noop = () => undefined;
 
 const meta = {
   title: "Overlays/Dialog",
   parameters: {
     usage: {
-      use: "A short, focused task or decision that blocks the page: confirm, rename, a small form.",
+      use: "A short, focused task or a choice that blocks the page: confirm, two choices, a small form, a secret to save, read-only details. Render `<Dialog open onClose title primaryAction>`; Cancel is drawn for you, and `secondaryAction` takes its place.",
       avoid:
-        "Long forms, details or anything with its own navigation: use Drawer (design/components.md). Never fontSize, fontWeight or textStyle on Dialog.Title: the recipe owns it.",
+        "Editing a record or a long form: use Drawer. A yes or no about a destroying act: ConfirmDialog. Assembling `Dialog.Root`/`Dialog.Content` parts (deprecated) or a `maxWidth`: pick `size`.",
     },
   },
-  component: Dialog.Root,
+  component: Dialog,
   tags: ["autodocs"],
-  args: { open: true, children: null },
-  argTypes: {
-    size: { control: "select", options: ["xs", "sm", "md", "lg", "xl", "cover", "full"] },
+  args: {
+    open: true,
+    onClose: noop,
+    title: "Copy dataset",
+    description: "Copies every row into another project.",
+    primaryAction: { label: "Copy", onClick: noop },
   },
-  render: (args) => (
-    <Dialog.Root {...args}>
-      <Dialog.Trigger asChild>
-        <Button size="sm">New project</Button>
-      </Dialog.Trigger>
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>New project</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Stack gap="3">
-            <Text textStyle="sm" color="fg.muted">
-              A project holds its own traces, prompts and evaluations.
-            </Text>
-            <Input placeholder="Project name" />
-          </Stack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="ghost">Cancel</Button>
-          <Button>Create</Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
-  ),
-} satisfies Meta<typeof Dialog.Root>;
+  argTypes: { size: { control: "select", options: ["sm", "md", "lg", "xl"] } },
+} satisfies Meta<typeof Dialog>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-export const Closed: Story = {
-  args: { open: false },
+export const TwoChoices: Story = {
+  args: {
+    title: "Revoke shared links?",
+    description: "3 links are paused. Revoking stops them for good.",
+    primaryAction: { label: "Revoke 3 links", onClick: noop, danger: true },
+    secondaryAction: { label: "Keep links paused", onClick: noop },
+  },
 };
 
-export const Loading: Story = {
-  render: (args) => (
-    <Dialog.Root {...args}>
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Creating the project</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Stack align="center" paddingY="6">
-            <Spinner />
-          </Stack>
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
-  ),
+export const FormDialog: Story = {
+  args: {
+    size: "md",
+    title: "Push to copies",
+    onSubmit: noop,
+    primaryAction: { label: "Push", type: "submit" },
+    children: (
+      <Stack gap={3}>
+        <Input aria-label="Commit message" placeholder="What changed" />
+      </Stack>
+    ),
+  },
 };
 
-export const WithoutBackdrop: Story = {
-  render: (args) => (
-    <Dialog.Root {...args}>
-      <Dialog.Content backdrop={false}>
-        <Dialog.Header>
-          <Dialog.Title>No backdrop</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>The page behind stays fully visible.</Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
-  ),
+export const MustAcknowledge: Story = {
+  args: {
+    title: "Save your key",
+    description: "This is the only time the key is shown.",
+    dismissible: false,
+    role: "alertdialog",
+    note: <Checkbox>I've saved it</Checkbox>,
+    primaryAction: { label: "Done", onClick: noop },
+    children: <Text fontFamily="mono">sk-lw-••••••••••••</Text>,
+  },
 };
 
-export const LongText: Story = {
-  render: (args) => (
-    <Dialog.Root {...args}>
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>
-            Move every prompt in this project to another organization workspace
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Text>
-            Moving a project takes its traces, prompts, datasets and evaluations with it. Members
-            who are not in the destination organization lose access the moment the move finishes,
-            and any software development kit key scoped to this project keeps working.
-          </Text>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="ghost">Cancel</Button>
-          <Button>Move</Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
-  ),
+export const ReadOnly: Story = {
+  args: {
+    size: "lg",
+    title: "Role permissions",
+    cancelLabel: "Close",
+    primaryAction: undefined,
+    children: <Text>{"Can view traces, datasets and evaluations. ".repeat(30)}</Text>,
+  },
 };
+
+export const StepTwo: Story = {
+  args: { title: "Choose a template", onBack: noop, icon: <ExternalLink size={18} /> },
+};
+
+export const Loading: Story = { args: { loading: true } };
+
+export const Failed: Story = {
+  args: { error: { title: "Couldn't load projects", onRetry: noop } },
+};
+
+export const Busy: Story = {
+  args: { busy: true, primaryAction: { label: "Copy", onClick: noop, loading: true } },
+};
+
+export const Narrow: Story = { parameters: { viewport: { defaultViewport: "mobile1" } } };
+
+export const Closed: Story = { args: { open: false } };
