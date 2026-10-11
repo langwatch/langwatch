@@ -42,6 +42,18 @@ export function imagePrismaFolders({
   );
 }
 
+/** One Prisma folder's SQL in the image, or null when the image does not ship it. */
+export function imagePrismaSql({
+  folder,
+  directory = IMAGE_MIGRATION_DIRECTORIES.prisma,
+}: {
+  folder: string;
+  directory?: string;
+}): string | null {
+  const path = join(directory, folder, "migration.sql");
+  return existsSync(path) ? readFileSync(path, "utf8") : null;
+}
+
 /**
  * What the serving gate requires and what the serving roster declares (blitz plan 3.1, 5.3): the
  * blocking ids are the tree's schema and blocking code steps, the same ids the runner registers.

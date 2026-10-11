@@ -47,6 +47,47 @@ Feature: The upgrade command
     Then it exits with code 1 before the schema applier is called
     And its message names "20261001000000_broken"
     And its message gives the command "prisma migrate resolve --rolled-back 20261001000000_broken"
+    And its message says to run it in packages/prisma-client with DATABASE_URL set
+    And its message says a waiting worker runs the upgrade again by itself once the row is resolved
+
+  # T9-F1: the command the refusal names works in the image as written.
+  @unit
+  Scenario: The Prisma config where the refusal sends the operator carries DATABASE_URL
+    Given DATABASE_URL is set in the operator's shell
+    When packages/prisma-client/prisma.config.ts loads
+    Then its datasource url is DATABASE_URL, so "prisma migrate resolve" runs there
+
+  # T9-F3: an index of another definition under a migration's index name is never accepted in
+  # silence and never dropped automatically; a matching pre-built index (ops pre-build) passes.
+  @integration
+  Scenario: A pre-built index that differs from a pending migration's stops the upgrade by name
+    Given a pending migration creates "Widget_key_key" UNIQUE on "Widget" ("key") if it does not exist
+    And the database already holds an index "Widget_key_key" on "Widget" ("createdAt")
+    When the upgrade runs
+    Then it exits with code 1 and code "prebuilt_index_differs" before the schema applier is called
+    And its message names the index, the table, the definition it should have and the one it has
+    And its message says to drop or rename the index, and the index is left in place
+
+  @integration
+  Scenario: A pre-built index that matches a pending migration's passes
+    Given a pending migration creates "Widget_key_key" UNIQUE on "Widget" ("key") if it does not exist
+    And the database already holds the same unique index, built ahead as the ops pre-build note says
+    When the upgrade runs
+    Then it completes with code 0
+
+  @unit
+  Scenario: An invalid pre-built index under a migration's index name is refused
+    Given a pending migration creates an index if it does not exist
+    And an index of that name exists but a build that never finished left it invalid
+    When the pending folders are checked
+    Then the index is named as differing
+
+  @unit
+  Scenario: An index a pending migration drops before it creates it again is not compared
+    Given a pending migration drops "Widget_key_key" and a later pending one creates it if it does not exist
+    And the database holds an index "Widget_key_key" of another definition
+    When the pending folders are checked
+    Then nothing is named as differing
 
   # Each ClickHouse target upgrades on its own (Alex, 2026-10-11, T7-F1): a private target that
   # fails holds only its organizations; the shared target and the release go on.

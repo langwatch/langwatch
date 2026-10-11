@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { generate } from "@langwatch/ksuid";
 
 import { BLOCKING_STEP_DEADLINE_MS, stepDeadline } from "../background/step-deadline.ts";
-import { imageContractArchives } from "../gate/image-tree.ts";
+import { imageContractArchives, imagePrismaSql } from "../gate/image-tree.ts";
 import { UpgradeLedgerSeedService, withReinferred } from "../ledger-seed.service.ts";
 import { LEDGER_LOCK_TIMEOUT_MS } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
@@ -17,6 +17,7 @@ import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
+import { type DifferingIndex, differingPrebuiltIndexes } from "../stepping/prebuilt-indexes.ts";
 import {
   findHandAppliedSql,
   isRerunnablePrismaMigration,
@@ -29,7 +30,7 @@ import {
 } from "./contract-archive/contract-archive.service.ts";
 import { blocksRelease, type HeldTargets, newlyHeld, withHeldReports } from "./held-targets.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
-import { redactSecrets, resolveCommand, UpgradeRunLog } from "./run-log.ts";
+import { redactSecrets, resolveCommand, UPGRADE_RUN_COMMAND, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
 import { DEFAULT_LEASE_TIMING, holdUpgradeLease, type UpgradeLeaseTiming } from "./runner-lease.ts";
 import {
@@ -64,6 +65,8 @@ export interface UpgradeRunnerOptions {
   releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
   codeSteps?: readonly MigrationStep[];
+  /** A Prisma folder's SQL, for the pre-built index check; else read from the image. */
+  prismaSql?: (args: { folder: string }) => string | null;
   /** Contract ids, each with the tables its `-- archive:` notes name; else read from the image. */
   archives?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
@@ -205,9 +208,30 @@ function prismaFailure({
     "failed_prisma_migration",
     `Prisma migration ${names.join(", ")} failed and is recorded as failed in _prisma_migrations. ` +
       why +
-      `Check what it left behind, then run "${command}" if nothing of it remains, or ` +
-      `"prisma migrate resolve --applied ${names[0]}" if you completed it by hand; then upgrade again.`,
+      `Check what it left behind. Then, in packages/prisma-client with DATABASE_URL set, run ` +
+      `"${command}" if nothing of it remains, or "prisma migrate resolve --applied ${names[0]}" ` +
+      `if you completed it by hand. A waiting worker sees the row resolved and runs the upgrade ` +
+      `again by itself within 10 s; or run \`${UPGRADE_RUN_COMMAND}\`.`,
     { migrations: names, command },
+  );
+}
+
+/** Pending folders whose `IF NOT EXISTS` index another index of that name would skip (T9-F3). */
+function prebuiltIndexFailure({ differing }: { differing: readonly DifferingIndex[] }) {
+  const each = differing.map(
+    ({ migration, name, table, should, is }) =>
+      `Prisma migration ${migration} creates index "${name}" on "${table}" if it does not exist, ` +
+      `but an index of that name already exists and differs. It should be: ${should}. It is: ${is}.`,
+  );
+  const names = differing.map(({ name }) => `"${name}"`).join(", ");
+  return new UpgradeRunFailure(
+    "prebuilt_index_differs",
+    `${each.join(" ")} The migration would skip it and leave the table without the index it ` +
+      `expects, so nothing was applied. Drop or rename ${names} (for example ALTER INDEX ` +
+      `"${differing[0]!.name}" RENAME TO "${differing[0]!.name}_prebuilt"); nothing drops it for ` +
+      `you. Then this worker runs the upgrade again by itself within 5 minutes, or run ` +
+      `\`${UPGRADE_RUN_COMMAND}\` now.`,
+    { indexes: differing.map((index) => ({ ...index })) },
   );
 }
 
@@ -575,6 +599,7 @@ export class UpgradeRunnerService {
     const recorded = new Map(before.steps.map((step) => [step.id, step]));
     const applied: string[] = [];
     await this.refuseMisorderedSteps();
+    await this.refuseDifferingIndexes({ plan });
     const declared = this.options.archives ?? imageContractArchives();
     const archived: ContractArchiveEntry[] = [];
     for (const [index, release] of plan.releases.entries()) {
@@ -668,6 +693,20 @@ export class UpgradeRunnerService {
   private whyRerun({ name }: { name: string }): string {
     if (isRerunnablePrismaMigration({ name })) return "is re-runnable";
     return this.permit.firstInstall ? "this is a first install" : "an operator pressed Retry on it";
+  }
+
+  /** Before any folder applies, so a refusal leaves nothing half done; reads every pending one. */
+  private async refuseDifferingIndexes({ plan }: { plan: UpgradePlan }): Promise<void> {
+    const read = this.options.prismaSql ?? imagePrismaSql;
+    const folders = plan.releases.flatMap((release) =>
+      release.schema.filter(isPrisma).flatMap((id) => {
+        const folder = id.slice("prisma:".length);
+        const sql = read({ folder });
+        return sql === null ? [] : [{ name: folder, sql }];
+      }),
+    );
+    const differing = await differingPrebuiltIndexes({ postgres: this.options.postgres, folders });
+    if (differing.length > 0) throw prebuiltIndexFailure({ differing });
   }
 
   /** Marks each failed migration rolled back; refuses by name when one cannot be. */

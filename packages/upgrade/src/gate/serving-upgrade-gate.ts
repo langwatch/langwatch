@@ -169,6 +169,8 @@ export function upgradeGateOver({
   const blocking = new Set(blockingSteps);
   const findBlockingFailures = async () =>
     (await findFailedSteps()).filter(({ id }) => blocking.has(id));
+  const findUnresolvedFailures = async () =>
+    unresolvedFailures({ failed: await findBlockingFailures(), postgres });
   const findLeaseHolder = () => liveLeaseHolder({ runner });
   const connection = gateConnection({ close });
   return {
@@ -181,7 +183,7 @@ export function upgradeGateOver({
                 gate,
                 firstInstall,
                 warn,
-                findFailedSteps: findBlockingFailures,
+                findFailedSteps: findUnresolvedFailures,
                 findLeaseHolder,
                 wait,
               })
@@ -336,6 +338,27 @@ async function liveLeaseHolder({ runner }: { runner: UpgradeRunnerRepository }) 
   return runner.findLiveLease({ name: UPGRADE_LEASE_NAME });
 }
 
+/**
+ * A failed Prisma step whose `_prisma_migrations` row an operator since resolved, applied or
+ * rolled back, waits no more: the worker runs the upgrade again by itself (T9-F2).
+ */
+export async function unresolvedFailures({
+  failed,
+  postgres,
+}: {
+  failed: UpgradeFailedRun["failedSteps"];
+  postgres: UpgradePostgres;
+}): Promise<UpgradeFailedRun["failedSteps"]> {
+  if (!failed.some(({ id }) => id.startsWith("prisma:"))) return failed;
+  const history = await readPrismaMigrations({ postgres }).catch(() => null);
+  if (history === null) return failed;
+  const rows = prismaSteps({ rows: history });
+  const status = new Map(rows.map((step) => [step.id, step.status]));
+  const waiting = (id: string) =>
+    !id.startsWith("prisma:") || (status.get(id) ?? "failed") === "failed";
+  return failed.filter(({ id }) => waiting(id));
+}
+
 /** Why the worker runs nothing yet: a live lease holder, or a failed step awaiting a Retry. */
 async function waitReason({
   findLeaseHolder,
@@ -356,7 +379,9 @@ async function waitReason({
   if (failed.length === 0) return null;
   const ids = failed.map(({ id }) => id).join(", ");
   return {
-    line: `the upgrade failed on ${ids}; this worker waits for a Retry`,
+    line:
+      `the upgrade failed on ${ids}; this worker waits for a Retry in Ops > Upgrades, or for a ` +
+      `failed Prisma migration to be resolved as its message says, and then runs it by itself`,
     waitingOn: "a Retry",
   };
 }
@@ -518,7 +543,9 @@ function warnFailedRun({
   warn(`\`${UPGRADE_COMMAND}\` ended ${code}; this worker waits for a Retry`, {
     phase: verdict.outcome,
     waitingOn: "a Retry",
-    next: "retry the failed step from Ops > Upgrades or the upgrade console",
+    next:
+      "retry the failed step from Ops > Upgrades or the upgrade console, or resolve a failed " +
+      "Prisma migration as the run's message says; this worker then runs the upgrade by itself",
   });
 }
 

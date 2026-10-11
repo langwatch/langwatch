@@ -85,6 +85,15 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Then the ledger records the step as failed and the worker runs nothing
     And once a Retry returns the step to pending the worker runs the upgrade again
 
+  # T9-F2: the wait is level-triggered on the migration's row, so an operator's
+  # `prisma migrate resolve` frees the worker without a Retry or a restart.
+  @integration
+  Scenario: A waiting worker runs the upgrade again once the failed migration's row is resolved
+    Given the worker's upgrade run failed on a Prisma migration the upgrade does not re-run unasked
+    And the worker waits, saying it waits for a Retry or for the migration to be resolved
+    When an operator marks the migration's _prisma_migrations row rolled back or applied
+    Then on its next ask the worker runs the upgrade again by itself, with no Retry and no restart
+
   @unit
   Scenario: The worker waits on the run's outcome, never on a process exit code
     Given the worker's gate runs the upgrade

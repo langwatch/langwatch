@@ -176,6 +176,29 @@ const ledger = () => UpgradeLedgerRepository.create({ postgres: scratch.postgres
 const statusOf = async (id: string) =>
   (await ledger().findSteps()).find((s) => s.id === id)?.status;
 
+const INDEX_SQL = `CREATE UNIQUE INDEX IF NOT EXISTS "Widget_key_key" ON "Widget" ("key");`;
+const indexDefinition = async () =>
+  (
+    await scratch.postgres.query<{ definition: string }>(
+      `SELECT indexdef AS definition FROM pg_indexes
+        WHERE schemaname = current_schema() AND indexname = 'Widget_key_key'`,
+    )
+  ).rows[0]?.definition;
+
+/** A "Widget" table with the operator's index, then a run whose pending folder makes INDEX_SQL. */
+async function runOverPrebuilt({ index }: { index: string }) {
+  await scratch.postgres.query(
+    `CREATE TABLE "Widget" ("key" TEXT, "createdAt" TIMESTAMPTZ DEFAULT now())`,
+  );
+  await scratch.postgres.query(index);
+  const before = await indexDefinition();
+  const applier = fakeApplier({ release: "3.21.0" });
+  const prismaSql = ({ folder }: { folder: string }) =>
+    folder === "20261002000000_add" ? INDEX_SQL : null;
+  const outcome = await run(runnerFor({ release: "3.21.0", applier, prismaSql }));
+  return { outcome, applier, before, after: await indexDefinition() };
+}
+
 const ARCHIVE_DROP = "prisma:20261003000000_drop_old";
 const ARCHIVE_MANIFESTS: ReleaseManifest[] = [
   ...MANIFESTS.slice(0, 2),
@@ -323,6 +346,42 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
         },
       });
       expect(applier.calls).toEqual([]);
+      expect(outcome.message).toContain("in packages/prisma-client with DATABASE_URL set");
+      expect(outcome.message).toContain("runs the upgrade again by itself");
+    });
+  });
+
+  describe("when a pending migration creates an index another index already holds the name of", () => {
+    /** @scenario "A pre-built index that differs from a pending migration's stops the upgrade by name" */
+    it("exits 1 naming the index, what it should be and what it is, and leaves it in place", async () => {
+      const { outcome, applier, before, after } = await runOverPrebuilt({
+        index: `CREATE INDEX "Widget_key_key" ON "Widget" ("createdAt")`,
+      });
+      expect(outcome).toMatchObject({
+        exitCode: 1,
+        code: "prebuilt_index_differs",
+        detail: {
+          indexes: [
+            expect.objectContaining({
+              migration: "20261002000000_add",
+              name: "Widget_key_key",
+              table: "Widget",
+              should: INDEX_SQL.slice(0, -1),
+              is: expect.stringContaining('USING btree ("createdAt")'),
+            }),
+          ],
+        },
+      });
+      expect(applier.calls).toEqual([]);
+      expect(after).toBe(before);
+    });
+
+    /** @scenario "A pre-built index that matches a pending migration's passes" */
+    it("exits 0 when the pre-built index has the migration's definition", async () => {
+      const { outcome } = await runOverPrebuilt({
+        index: `CREATE UNIQUE INDEX "Widget_key_key" ON "Widget" ("key")`,
+      });
+      expect(outcome.code).toBe("done");
     });
   });
 
