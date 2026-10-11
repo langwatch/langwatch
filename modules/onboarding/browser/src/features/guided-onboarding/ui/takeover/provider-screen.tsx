@@ -169,7 +169,7 @@ export function ProviderScreen({
         size="sm"
         placement="center"
       >
-        <Dialog.Content maxW="400px">
+        <Dialog.Content>
           <Dialog.Header pb={1}>
             <Dialog.Title>{SKIP_TOUR_COPY.title}</Dialog.Title>
           </Dialog.Header>

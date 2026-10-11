@@ -42,13 +42,14 @@ export function AuditExportDialog({
 
   return (
     <Dialog.Root
+      size="sm"
       open={open}
       onOpenChange={(details) => {
         if (!details.open) onClose();
       }}
       placement="center"
     >
-      <Dialog.Content maxWidth="440px">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>Export audit log</Dialog.Title>

@@ -18,13 +18,14 @@ export function EndSessionDialog({
 }) {
   return (
     <Dialog.Root
+      size="sm"
       open={open}
       placement="center"
       onOpenChange={({ open: nextOpen }) => {
         if (!nextOpen) onCancel();
       }}
     >
-      <Dialog.Content maxWidth="480px">
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title fontSize="sm" fontWeight="500">

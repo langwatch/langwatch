@@ -102,8 +102,8 @@ export function GrantDialog({
   const canSubmit = !!roleId && (!!editing || !!principal);
 
   return (
-    <Dialog.Root open onOpenChange={(event) => !event.open && onClose()}>
-      <Dialog.Content maxWidth="560px">
+    <Dialog.Root size="md" open onOpenChange={(event) => !event.open && onClose()}>
+      <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
           <Dialog.Title>{editing ? "Change role" : "Grant a role"}</Dialog.Title>

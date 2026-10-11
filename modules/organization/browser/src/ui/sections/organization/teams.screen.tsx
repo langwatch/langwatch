@@ -219,8 +219,8 @@ function AddToTeamDialog({
   }, [selectedMemberRole, role, customRoleId]);
 
   return (
-    <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content maxWidth="440px">
+    <Dialog.Root size="sm" open={open} onOpenChange={(e) => !e.open && onClose()}>
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Add member to {teamName}</Dialog.Title>
         </Dialog.Header>
@@ -362,8 +362,8 @@ function AddToProjectDialog({
   const allRoleCollection = createListCollection({ items: allRoleItems });
 
   return (
-    <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content maxWidth="440px">
+    <Dialog.Root size="sm" open={open} onOpenChange={(e) => !e.open && onClose()}>
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Add access to {projectName}</Dialog.Title>
         </Dialog.Header>

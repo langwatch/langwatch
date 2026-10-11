@@ -24,8 +24,8 @@ export function RoleDetailDialog({
   const byArea = permissionsByArea(permissions);
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
-      <Dialog.Content maxWidth="640px" maxHeight="80vh" overflowY="auto">
+    <Dialog.Root size="lg" open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
+      <Dialog.Content maxHeight="80vh" overflowY="auto">
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>
         </Dialog.Header>

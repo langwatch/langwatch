@@ -248,44 +248,28 @@ export default function GroupsScreen() {
         onClose={() => setCreating(false)}
       />
 
-      <Dialog.Root
+      <Dialog
         open={!!groupToDelete}
-        onOpenChange={(e) => {
-          if (!e.open) setGroupToDelete(null);
+        onClose={() => setGroupToDelete(null)}
+        title="Delete group"
+        primaryAction={{
+          label: "Delete",
+          onClick: () =>
+            groupToDelete &&
+            deleteGroup.mutate({
+              organizationId: organization.id,
+              groupId: groupToDelete.id,
+            }),
+          loading: deleteGroup.isPending,
+          danger: true,
         }}
       >
-        <Dialog.Content maxWidth="440px">
-          <Dialog.Header>
-            <Dialog.Title>Delete group</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body>
-            <Text fontSize="sm">
-              {groupToDelete?.scimSource
-                ? "This SCIM group will be re-created by your IdP on next sync. Delete anyway?"
-                : `Delete "${groupToDelete?.name}" and all its access rules?`}
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="outline" onClick={() => setGroupToDelete(null)}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              loading={deleteGroup.isPending}
-              onClick={() =>
-                groupToDelete &&
-                deleteGroup.mutate({
-                  organizationId: organization.id,
-                  groupId: groupToDelete.id,
-                })
-              }
-            >
-              Delete
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+        <Text fontSize="sm">
+          {groupToDelete?.scimSource
+            ? "This SCIM group will be re-created by your IdP on next sync. Delete anyway?"
+            : `Delete "${groupToDelete?.name}" and all its access rules?`}
+        </Text>
+      </Dialog>
     </>
   );
 }
