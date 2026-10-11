@@ -2,6 +2,7 @@ import { Banner } from "@langwatch/design-system/banner";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { InlineCode } from "@langwatch/design-system/inline-code";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
@@ -415,14 +416,10 @@ function BudgetsSection({ budgetOverview }: { budgetOverview: PersonalBudgetOver
     <SectionCard title="Budgets that apply to you">
       {hasBudgets && <BudgetOverviewList items={budgetOverview.budgets} />}
       {!hasBudgets && budgetOverview.isResolved && (
-        <VStack align="start" gap={1}>
-          <Text fontSize="sm" color="fg.muted">
-            No budgets apply to your usage yet.
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            If you'd like one, ask your admin.
-          </Text>
-        </VStack>
+        <NoDataInfoBlock
+          size="line"
+          title="No budgets apply to your usage yet. If you'd like one, ask your admin."
+        />
       )}
     </SectionCard>
   );

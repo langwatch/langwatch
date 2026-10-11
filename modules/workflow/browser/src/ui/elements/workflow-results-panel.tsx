@@ -1,8 +1,8 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Alert,
   Box,
   Center,
-  EmptyState,
   Heading,
   HStack,
   IconButton,
@@ -104,17 +104,18 @@ export function WorkflowEvaluationResultsLayout(props: WorkflowEvaluationResults
   if (props.status === "waiting") {
     return (
       <Center width="full" height="full">
-        <EmptyState.Root marginTop="-60px">
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <SquareCheckBig />
-            </EmptyState.Indicator>
-            <EmptyState.Title>Waiting for evaluation results</EmptyState.Title>
-            <EmptyState.Description>
-              Run your first evaluation to see the results here
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
+        <NoDataInfoBlock
+          title="Waiting for evaluation results"
+          description="Run your first evaluation to see the results here"
+          icon={<SquareCheckBig />}
+          next={[
+            {
+              kind: "docs",
+              label: "How workflows work",
+              href: "https://docs.langwatch.ai/workflows/building-a-workflow",
+            },
+          ]}
+        />
       </Center>
     );
   }
