@@ -101,6 +101,7 @@ type run struct {
 	signupUsersBefore  int
 	signupUsersErr     error
 	signupSessions     map[string]*seed.Seeder // each sign-up signed in once
+	emptyOrg           emptyOrgAnswer          // the seed account's organization, made just after ready
 	memberNotice       bool                    // the member notice showed while the retry drill's step was failed
 	gates              map[string]*Gate        // private-down drill: a gate in front of each private target
 	down               downState

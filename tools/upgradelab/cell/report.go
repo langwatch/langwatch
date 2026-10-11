@@ -157,6 +157,7 @@ var invariantNames = map[string]string{
 	"E11": "an organization on main's old per-organization SSO (legacy columns, no connection) is grandfathered onto a connection, its member signs in on head and Ops shows the migration inventory",
 	"E15": "the mixed legacy-SSO organization's administrator sees the hint to move its legacy domain in SSO settings",
 	"F1":  "empty origin: every data step ends done over zero rows (or not-needed)",
+	"F3":  "empty origin: an organization made just after ready keeps its founder (membership and role bindings) after settle",
 	"R2":  "the oldest aged trace each organization keeps reads back through head's API",
 	"R1":  "aged data: no organization's age slice loses rows across the upgrade beyond what main's own retention TTL expires",
 	"E5":  "the seed account is a platform operator after the upgrade (ADMIN_EMAILS set, or the sole-organization bootstrap)",
