@@ -13,6 +13,21 @@ import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);
 
+/** jsdom resolves no cascade layers, so read the rules a node's classes were given. */
+function rulesOf(element: Element): string {
+  const css = Array.from(document.querySelectorAll("style"))
+    .map((style) => style.textContent ?? "")
+    .join("\n");
+  return Array.from(element.classList)
+    .flatMap((name) => css.match(new RegExp(`\\.${name}\\{[^}]*\\}`, "g")) ?? [])
+    .join("");
+}
+
+function found(element: Element | null): Element {
+  if (!element) throw new Error("expected the element to be in the document");
+  return element;
+}
+
 describe("Card", () => {
   describe("given every header slot and a footer", () => {
     /** @scenario "A section card draws its header slots, body and footer" */
@@ -182,6 +197,119 @@ describe("Card", () => {
       expect(card.dataset.cardVariant).toBe("panel");
       expect(within(card).getByText("Provision members from your directory.")).toBeTruthy();
       expect(within(card).getByRole("button", { name: "Rotate token" })).toBeTruthy();
+    });
+  });
+});
+
+describe("a linked Card", () => {
+  describe("given a native link opener", () => {
+    /** @scenario "A linked card has one native keyboard target and keeps browser navigation" */
+    it("is one link named by its label or string title, with the caller's href", () => {
+      renderWithDesignSystem(
+        <CardGrid columns={2}>
+          <Card
+            padding="none"
+            opener={
+              <a href="/dashboards/1" target="_blank" rel="noopener" aria-label="Open traffic" />
+            }
+          >
+            <p>Traffic</p>
+          </Card>
+          <Card
+            padding="none"
+            title="Latency"
+            opener={<a href="/dashboards/2" aria-label="Open latency" />}
+          />
+          <Card
+            padding="none"
+            title="Errors"
+            opener={createElement("a", { href: "/dashboards/3", "aria-label": undefined })}
+          />
+        </CardGrid>,
+      );
+
+      const links = screen.getAllByRole("link");
+      expect(links.map((link) => link.getAttribute("href"))).toEqual([
+        "/dashboards/1",
+        "/dashboards/2",
+        "/dashboards/3",
+      ]);
+      expect(links[0]?.getAttribute("target")).toBe("_blank");
+      expect(links[0]?.getAttribute("rel")).toBe("noopener");
+      expect(screen.getByRole("link", { name: "Open latency" })).toBe(links[1]);
+      expect(screen.getByRole("link", { name: "Errors" })).toBe(links[2]);
+    });
+  });
+
+  describe("given a button opener", () => {
+    /** @scenario "A linked card has one native keyboard target and keeps browser navigation" */
+    it("never submits an enclosing form and runs the caller's callback once", () => {
+      const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+      const onOpen = vi.fn();
+      renderWithDesignSystem(
+        <form onSubmit={onSubmit}>
+          <Card
+            padding="none"
+            title="Create a dashboard"
+            opener={createElement("button", { onClick: onOpen, "aria-label": undefined })}
+          />
+        </form>,
+      );
+
+      const opener = screen.getByRole("button", { name: "Create a dashboard" });
+      expect(opener.getAttribute("type")).toBe("button");
+      fireEvent.click(opener);
+      expect(onOpen).toHaveBeenCalledTimes(1);
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an opener that cannot work", () => {
+    /** @scenario "A linked card has one native keyboard target and keeps browser navigation" */
+    it("refuses a div, and a link with no name from label, text or string title", () => {
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      expect(() => renderWithDesignSystem(<Card opener={<div />} title="Nope" />)).toThrow(
+        /must be a link or a button/,
+      );
+      expect(() =>
+        renderWithDesignSystem(
+          <Card
+            opener={createElement("a", { href: "/x", "aria-label": undefined })}
+            title={<b>Rich</b>}
+          />,
+        ),
+      ).toThrow(/needs a name/);
+    });
+  });
+
+  describe("given a card with no opener", () => {
+    /** @scenario "Existing cards keep their appearance when the optional capabilities are absent" */
+    it("draws no opener element", () => {
+      renderWithDesignSystem(<Card title="Plain" data-testid="plain" />);
+
+      const card = screen.getByTestId("plain");
+      expect(card.querySelector("[data-card-opener]")).toBeNull();
+      expect(screen.queryAllByRole("link")).toHaveLength(0);
+    });
+  });
+});
+
+describe("a frame-fill Card", () => {
+  describe("given no padding", () => {
+    /** @scenario "An editor frame fills its bounded parent without a second scroller" */
+    it("marks itself frame-fill with no inset and lays its content out as a stretching column", () => {
+      renderWithDesignSystem(
+        <Card variant="frame-fill" data-testid="editor">
+          <p>Editor</p>
+        </Card>,
+      );
+
+      const card = screen.getByTestId("editor");
+      expect(card.dataset).toMatchObject({ cardVariant: "frame-fill", cardPadding: "none" });
+      const content = found(within(card).getByText("Editor").parentElement);
+      const rules = rulesOf(content);
+      expect(rules).toContain("flex-direction:column");
+      expect(rules).toContain("min-height:0");
     });
   });
 });

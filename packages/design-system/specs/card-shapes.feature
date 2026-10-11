@@ -60,3 +60,24 @@ Feature: Card, resource tile, load more and the one-line empty state
   Scenario: An empty picker says so in one line
     Given a picker with nothing to show
     Then one muted sentence and its one action replace the list
+
+  @integration @browser
+  Scenario: An editor frame fills its bounded parent without a second scroller
+    Given a frame-fill card in a parent of a given height with a neighbour above and below
+    When the editor inside it overflows
+    Then the card takes the room the neighbours leave, at two parent heights
+    And only the editor scrolls, and the card keeps its border and radius
+
+  @integration @browser
+  Scenario: A linked card has one native keyboard target and keeps browser navigation
+    Given a card with a native link opener and a card with a button opener
+    Then the link is one tab stop named by its label or the title, with the caller's href
+    And Enter activates it once and a modified click is left to the browser
+    And a button opener never submits an enclosing form and its focus ring is not clipped
+    And an opener that is not a link or a button, or has no name, is refused
+
+  @integration @browser
+  Scenario: Existing cards keep their appearance when the optional capabilities are absent
+    Given a panel, nested, frame and showcase card with no opener and no fill
+    Then each draws the border, radius, ground and content inset it drew before
+    And none carries an opener, a hover response or a focus ring of its own
