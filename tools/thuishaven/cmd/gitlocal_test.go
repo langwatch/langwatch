@@ -68,9 +68,9 @@ func TestGitBranchWhenDetached(t *testing.T) {
 }
 
 func TestStripProfileFlags(t *testing.T) {
-	args, flags := stripProfileFlags([]string{"--cpuprofile=/c", "--memprofile=/m", "gate", "--cpuprofile=/x"})
-	if flags.cpu != "/c" || flags.mem != "/m" {
-		t.Errorf("flags = %+v, want cpu /c and mem /m", flags)
+	args, flags := stripProfileFlags([]string{"--cpuprofile=/c", "--memprofile=/m", "--trace=/t", "gate", "--cpuprofile=/x"})
+	if flags.cpu != "/c" || flags.mem != "/m" || flags.trace != "/t" {
+		t.Errorf("flags = %+v, want cpu /c, mem /m and trace /t", flags)
 	}
 	if len(args) != 2 || args[0] != "gate" || args[1] != "--cpuprofile=/x" {
 		t.Errorf("args = %q, want the command and its own flags untouched", args)

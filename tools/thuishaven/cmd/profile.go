@@ -5,15 +5,18 @@ import (
 	"os"
 	"runtime"
 	"runtime/pprof"
+	"runtime/trace"
 	"strings"
 )
 
-// profileFlags are the leading `--cpuprofile=FILE` and `--memprofile=FILE`
-// flags: `haven --cpuprofile=/tmp/cpu.out gate`. Only leading ones are read,
-// so a wrapped command's own flags are never taken.
+// profileFlags are the leading `--cpuprofile=FILE`, `--memprofile=FILE` and
+// `--trace=FILE` flags: `haven --cpuprofile=/tmp/cpu.out gate`. Only leading
+// ones are read, so a wrapped command's own flags are never taken. The trace
+// shows the wall time a CPU profile cannot (`go tool trace -pprof=syscall`).
 type profileFlags struct {
-	cpu string
-	mem string
+	cpu   string
+	mem   string
+	trace string
 }
 
 // stripProfileFlags removes the leading profile flags from args.
@@ -25,6 +28,8 @@ func stripProfileFlags(args []string) ([]string, profileFlags) {
 			flags.cpu = strings.TrimPrefix(args[0], "--cpuprofile=")
 		case strings.HasPrefix(args[0], "--memprofile="):
 			flags.mem = strings.TrimPrefix(args[0], "--memprofile=")
+		case strings.HasPrefix(args[0], "--trace="):
+			flags.trace = strings.TrimPrefix(args[0], "--trace=")
 		default:
 			return args, flags
 		}
@@ -40,9 +45,32 @@ func (p profileFlags) start() func() {
 		runtime.MemProfileRate = 1
 	}
 	stopCPU := startCPUProfile(p.cpu)
+	stopTrace := startTrace(p.trace)
 	return func() {
+		stopTrace()
 		stopCPU()
 		writeAllocsProfile(p.mem)
+	}
+}
+
+// startTrace starts an execution trace into path and returns its stop.
+func startTrace(path string) func() {
+	if path == "" {
+		return func() {}
+	}
+	f, err := os.Create(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "haven: trace not started:", err)
+		return func() {}
+	}
+	if err := trace.Start(f); err != nil {
+		fmt.Fprintln(os.Stderr, "haven: trace not started:", err)
+		_ = f.Close()
+		return func() {}
+	}
+	return func() {
+		trace.Stop()
+		_ = f.Close()
 	}
 }
 

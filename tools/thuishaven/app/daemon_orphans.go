@@ -39,7 +39,7 @@ func (o *Orchestrator) sweepRepoOrphans() {
 		return
 	}
 	o.orphanSweptAt = now
-	samples := o.sys.ProcessSamples()
+	samples := o.processSamples()
 	byPID, children := processTree(samples)
 	killed := o.killIgnoredTerms(byPID, now)
 	roots := o.orphanRoots()

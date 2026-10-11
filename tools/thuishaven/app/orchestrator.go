@@ -89,6 +89,9 @@ type Orchestrator struct {
 	// later sweep SIGKILLs the ones that ignored it; orphanSweptAt paces it.
 	orphanTermed  map[int]orphanTerm
 	orphanSweptAt time.Time
+	// cycleSamples is the one `ps` a monitor tick shares between its sweeps;
+	// nil outside a tick (see processSamples).
+	cycleSamples atomic.Pointer[func() []ProcessSample]
 	// orphanWorktrees is the repository's worktree list, re-read at most every
 	// worktreeIdleTTL: sibling checkouts sit outside the main root.
 	orphanWorktrees   []string

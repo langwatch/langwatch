@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -22,8 +23,16 @@ type health struct {
 // observability, the managed database servers) in a single one-shot report.
 // asJSON is the agent-friendly form.
 func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) error {
-	r := o.collectStatus(worktreeDir)
 	if asJSON {
+		// The overlay's secret scan and the duplicate sweep wait on disk and
+		// subprocesses, not on each other or the report: run them alongside it.
+		var overlay map[string]string
+		var duplicates []domain.DuplicateGroup
+		var wg sync.WaitGroup
+		wg.Go(func() { overlay = o.worktreeOverlay(worktreeDir, reveal) })
+		wg.Go(func() { duplicates = o.InfraDuplicates(context.Background()) })
+		r := o.collectStatus(worktreeDir)
+		wg.Wait()
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		return enc.Encode(map[string]any{
@@ -36,12 +45,13 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 			"servers":       r.servers,
 			"footprint":     map[string]any{"live": r.live, "rssBytes": r.rss},
 			"selection":     r.selection,
-			"overlay":       o.worktreeOverlay(worktreeDir, reveal),
+			"overlay":       overlay,
 			"nxDaemons":     r.nxDaemons,
-			"duplicates":    o.InfraDuplicates(context.Background()),
+			"duplicates":    duplicates,
 			"slots":         r.slots,
 		})
 	}
+	r := o.collectStatus(worktreeDir)
 	if r.haveSelection {
 		fmt.Printf("this worktree — %s\n\n", r.selection.Describe())
 	}
@@ -71,6 +81,8 @@ type statusReport struct {
 }
 
 func (o *Orchestrator) collectStatus(worktreeDir string) statusReport {
+	servers := make(chan map[string]health, 1)
+	go func() { servers <- o.serverHealth(context.Background()) }()
 	scheme, port := o.proxy.Endpoint()
 	info, daemonUp := o.store.Daemon()
 	r := statusReport{
@@ -78,7 +90,6 @@ func (o *Orchestrator) collectStatus(worktreeDir string) statusReport {
 		shared:   func(svc string) string { return o.cfg.Naming.URL(svc, "", scheme, port) },
 		proxy:    health{OK: o.proxy.Running(), Detail: fmt.Sprintf("%s on :%d", scheme, port)},
 		daemon:   health{OK: daemonUp && o.sys.ProcessAlive(info.PID), Detail: fmt.Sprintf("pid %d", info.PID)},
-		servers:  o.serverHealth(context.Background()),
 		stackRSS: o.StackRSSByLauncher(),
 	}
 	r.nxDaemons = o.NxDaemons()
@@ -93,6 +104,7 @@ func (o *Orchestrator) collectStatus(worktreeDir string) statusReport {
 		holders = o.sem.Holders("checks")
 	}
 	r.slots = o.collectSlots(holders, o.store.WaiterClaims("checks"), time.Now())
+	r.servers = <-servers
 	return r
 }
 
@@ -114,15 +126,29 @@ func (o *Orchestrator) serverHealth(ctx context.Context) map[string]health {
 		{"postgres", o.pg != nil && o.cfg.ShouldManagePostgres, func() (bool, string) { return o.pg.Health(ctx) }},
 		{"redis", o.rds != nil && o.cfg.ShouldManageRedis, func() (bool, string) { return o.rds.Health(ctx) }},
 	}
+	// The probes are independent subprocesses and sockets: asked one after
+	// another, status waited for their sum; asked together, for the slowest.
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 	for _, p := range probes {
 		if p.isManaged {
-			ok, detail := p.probe()
-			servers[p.name] = health{OK: ok, Detail: detail}
+			wg.Go(func() {
+				ok, detail := p.probe()
+				mu.Lock()
+				servers[p.name] = health{OK: ok, Detail: detail}
+				mu.Unlock()
+			})
 		}
 	}
 	if o.container != nil {
-		servers["colima"] = o.colimaHealth(ctx)
+		wg.Go(func() {
+			colima := o.colimaHealth(ctx)
+			mu.Lock()
+			servers["colima"] = colima
+			mu.Unlock()
+		})
 	}
+	wg.Wait()
 	return servers
 }
 

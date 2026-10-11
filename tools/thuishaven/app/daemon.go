@@ -211,10 +211,12 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 			o.reapDeadStacks()
 			o.governPressure()
 			o.weightFocusedWorkload(ctx)
+			endSamples := o.shareCycleSamples()
 			o.governProcesses()
 			o.reapOrphanNxDaemons()
 			o.sweepRepoOrphans()
 			o.sweepDuplicates(ctx)
+			endSamples()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 			o.stopColimaIfIdle(ctx)
@@ -581,5 +583,7 @@ func (o *Orchestrator) refreshObservability(ctx context.Context) {
 		o.routeObservability()
 		return
 	}
-	o.proxy.Remove(domain.ObservabilityService, "")
+	if o.hasRoute(domain.ObservabilityService) {
+		o.proxy.Remove(domain.ObservabilityService, "")
+	}
 }
