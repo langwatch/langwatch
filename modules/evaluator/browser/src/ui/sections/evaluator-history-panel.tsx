@@ -6,6 +6,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { toEpochMs } from "@langwatch/time";
@@ -75,9 +76,17 @@ export function EvaluatorHistoryPanel({
         </Text>
       )}
       {!isLoading && !isError && (data?.length ?? 0) === 0 && (
-        <Text color="fg.muted" textAlign="center" paddingY={8}>
-          No history recorded yet.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No history recorded yet. Changes to this evaluator appear here once it is edited."
+          next={[
+            {
+              kind: "docs",
+              label: "Saved evaluators",
+              href: "https://docs.langwatch.ai/evaluations/evaluators/saved-evaluators",
+            },
+          ]}
+        />
       )}
       {data && data.length > 0 && (
         <VStack gap={0} align="stretch">
