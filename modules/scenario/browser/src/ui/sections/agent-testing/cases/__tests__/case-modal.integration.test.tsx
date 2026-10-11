@@ -9,6 +9,7 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AgentTestingCaseEditorDrawer } from "../agent-testing-case-editor-drawer.tsx";
@@ -145,19 +146,31 @@ const mockDrawerParams = vi.hoisted(() => ({
   current: {} as Record<string, string>,
 }));
 const mockDrawerOpenFor = vi.hoisted(() => ({ current: "" }));
+const drawerListeners = vi.hoisted(() => new Set<() => void>());
 const flowCallbacksStore = vi.hoisted(() => ({}) as Record<string, Record<string, unknown>>);
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
-  useDrawer: () => ({
-    openDrawer: mockOpenDrawer,
-    closeDrawer: () => {
-      mockDrawerOpenFor.current = "";
-    },
-    drawerOpen: (drawer: string) => drawer === mockDrawerOpenFor.current,
-    setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
-      flowCallbacksStore[drawer] = callbacks;
-    },
-  }),
+  useDrawer: () => {
+    // The address names the open drawer, so closing it moves every reader.
+    const openFor = useSyncExternalStore(
+      (listener) => {
+        drawerListeners.add(listener);
+        return () => void drawerListeners.delete(listener);
+      },
+      () => mockDrawerOpenFor.current,
+    );
+    return {
+      openDrawer: mockOpenDrawer,
+      closeDrawer: () => {
+        mockDrawerOpenFor.current = "";
+        drawerListeners.forEach((listener) => listener());
+      },
+      drawerOpen: (drawer: string) => drawer === openFor,
+      setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
+        flowCallbacksStore[drawer] = callbacks;
+      },
+    };
+  },
   useDrawerParams: () => mockDrawerParams.current,
   getFlowCallbacks: (drawer: string) => flowCallbacksStore[drawer],
   setFlowCallbacks: (drawer: string, callbacks: Record<string, unknown>) => {
