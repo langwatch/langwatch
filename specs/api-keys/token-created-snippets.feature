@@ -327,8 +327,3 @@ Feature: Token Created modal command snippets
   Scenario: Reopening starts from the new key alone
     Given a second key is minted after the first dialog closed
     Then no earlier token, selection, reveal or copy tick is shown
-
-Also in that file: the scenario "Basic Auth tab without a resolvable project" still holds for
-several projects with none chosen; the .env tab now behaves the same way (note instead of the
-`<your-project-id>` placeholder).
-
