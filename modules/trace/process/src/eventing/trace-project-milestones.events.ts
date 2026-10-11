@@ -2,8 +2,12 @@ import { EventSchema } from "@langwatch/eventing";
 import {
   FIRST_TRACE_RECORDED_EVENT_TYPE,
   firstTraceRecordedEventDataSchema,
+  TRACE_FIRST_SEEN_EVENT_TYPE,
   TRACE_RECEIVED_EVENT_TYPE,
+  TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE,
+  traceFirstSeenEventDataSchema,
   traceReceivedEventDataSchema,
+  tracesCountedBeforeCutEventDataSchema,
 } from "@langwatch/trace-contract";
 import { z } from "zod";
 
@@ -14,12 +18,23 @@ export const TRACE_PROJECT_MILESTONES_EVENT_VERSION = "2026-10-01" as const;
 
 export const RECORD_FIRST_TRACE_COMMAND_TYPE = "lw.trace.record_first_trace" as const;
 export const RECORD_TRACE_RECEIVED_COMMAND_TYPE = "lw.trace.record_trace_received" as const;
+export const RECORD_TRACE_FIRST_SEEN_COMMAND_TYPE = "lw.trace.record_trace_first_seen" as const;
+export const RECORD_TRACES_COUNTED_BEFORE_CUT_COMMAND_TYPE =
+  "lw.trace.record_traces_counted_before_cut" as const;
 
 export const recordFirstTraceCommandDataSchema = firstTraceRecordedEventDataSchema;
 export type RecordFirstTraceCommandData = z.infer<typeof recordFirstTraceCommandDataSchema>;
 
 export const recordTraceReceivedCommandDataSchema = traceReceivedEventDataSchema;
 export type RecordTraceReceivedCommandData = z.infer<typeof recordTraceReceivedCommandDataSchema>;
+
+export const recordTraceFirstSeenCommandDataSchema = traceFirstSeenEventDataSchema;
+export type RecordTraceFirstSeenCommandData = z.infer<typeof recordTraceFirstSeenCommandDataSchema>;
+
+export const recordTracesCountedBeforeCutCommandDataSchema = tracesCountedBeforeCutEventDataSchema;
+export type RecordTracesCountedBeforeCutCommandData = z.infer<
+  typeof recordTracesCountedBeforeCutCommandDataSchema
+>;
 
 const event = <Type extends string, Data extends z.ZodTypeAny>(type: Type, data: Data) =>
   z.object({
@@ -39,3 +54,13 @@ export const traceReceivedEventSchema = event(
 );
 export type FirstTraceRecordedEvent = z.infer<typeof firstTraceRecordedEventSchema>;
 export type TraceReceivedEvent = z.infer<typeof traceReceivedEventSchema>;
+export const traceFirstSeenEventSchema = event(
+  TRACE_FIRST_SEEN_EVENT_TYPE,
+  recordTraceFirstSeenCommandDataSchema,
+);
+export const tracesCountedBeforeCutEventSchema = event(
+  TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE,
+  recordTracesCountedBeforeCutCommandDataSchema,
+);
+export type TraceFirstSeenEvent = z.infer<typeof traceFirstSeenEventSchema>;
+export type TracesCountedBeforeCutEvent = z.infer<typeof tracesCountedBeforeCutEventSchema>;

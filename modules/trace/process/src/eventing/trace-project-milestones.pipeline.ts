@@ -9,13 +9,17 @@ import {
 import type { TraceModule } from "../app/trace.app.ts";
 import {
   RecordFirstTraceCommand,
+  RecordTraceFirstSeenCommand,
   RecordTraceReceivedCommand,
+  RecordTracesCountedBeforeCutCommand,
 } from "./trace-project-milestones.commands.ts";
 import {
   firstTraceRecordedEventSchema,
   TRACE_PROJECT_AGGREGATE_TYPE,
   TRACE_PROJECT_MILESTONES_PIPELINE_NAME,
+  traceFirstSeenEventSchema,
   traceReceivedEventSchema,
+  tracesCountedBeforeCutEventSchema,
 } from "./trace-project-milestones.events.ts";
 
 function milestoneCommands(retention?: RetentionPolicyResolver) {
@@ -23,9 +27,16 @@ function milestoneCommands(retention?: RetentionPolicyResolver) {
     name: TRACE_PROJECT_MILESTONES_PIPELINE_NAME,
     aggregate: defineAggregate({ type: TRACE_PROJECT_AGGREGATE_TYPE }),
   })
-    .withEvents([firstTraceRecordedEventSchema, traceReceivedEventSchema])
+    .withEvents([
+      firstTraceRecordedEventSchema,
+      traceReceivedEventSchema,
+      traceFirstSeenEventSchema,
+      tracesCountedBeforeCutEventSchema,
+    ])
     .withCommand("recordFirstTrace", RecordFirstTraceCommand)
-    .withCommand("recordTraceReceived", RecordTraceReceivedCommand);
+    .withCommand("recordTraceReceived", RecordTraceReceivedCommand)
+    .withCommand("recordTraceFirstSeen", RecordTraceFirstSeenCommand)
+    .withCommand("recordTracesCountedBeforeCut", RecordTracesCountedBeforeCutCommand);
   return retention === undefined ? pipeline : pipeline.withRetention(retention);
 }
 
@@ -33,7 +44,7 @@ export type TraceProjectMilestonesDefinition = ReturnType<
   ReturnType<typeof milestoneCommands>["build"]
 >;
 
-/** trace_project_milestones records; peers (nurturing) react to its events from their side (§9). */
+/** trace_project_milestones records; peers (nurturing, entitlement) react from their side (§9). */
 export function buildTraceProjectMilestonesPipeline(
   retention?: RetentionPolicyResolver,
 ): TraceProjectMilestonesDefinition {

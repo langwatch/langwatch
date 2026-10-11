@@ -85,14 +85,6 @@
     "needsOldWritersGone": true
   },
   {
-    "id": "entitlement:seed-trace-meter",
-    "kind": "data",
-    "mode": "background",
-    "owner": "entitlement",
-    "description": "Seeds entitlement's trace meter from trace's span log at deploy.",
-    "needsOldWritersGone": true
-  },
-  {
     "id": "governance:record-coding-assistant-billing",
     "kind": "data",
     "mode": "background",
@@ -263,6 +255,14 @@
     "owner": "trace",
     "description": "Waits for ClickHouse to build the trace summaries updated-at index over existing rows.",
     "needsOldWritersGone": false
+  },
+  {
+    "id": "trace:record-trace-counts-before-cut",
+    "kind": "data",
+    "mode": "background",
+    "owner": "trace",
+    "description": "Records each project's traces seen so far this month, so plan trace limits count from a complete month.",
+    "needsOldWritersGone": true
   },
   {
     "id": "user:record-created-facts",

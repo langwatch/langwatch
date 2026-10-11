@@ -14,6 +14,7 @@ import { traceProjectMilestonesEventing } from "./eventing/trace-project-milesto
 import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing/trace-collector-evaluations.pipeline.ts";
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import { traceCountSeedReportSchema } from "./services/trace-count-seed.service.ts";
 import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { exportProgressTrpcTransport } from "./transport/export-progress.trpc.ts";
@@ -79,7 +80,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
     .withEventing(traceIngestSourceBillingEventing)
-    .withMigrations(({ repositories }) => [
+    .withMigrations(({ app, repositories }) => [
       defineMigrationStep({
         id: "trace:track-updated-at-index-materialisation",
         kind: "data",
@@ -95,5 +96,23 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             signal,
             onPoll: (progress) => checkpoint.save({ report: progress }),
           }),
+      }),
+      defineMigrationStep({
+        id: "trace:record-trace-counts-before-cut",
+        kind: "data",
+        mode: "background",
+        description:
+          "Records each project's traces seen so far this month, so plan trace limits count from a complete month.",
+        // An old worker records no first sighting, so the cut falls after the last one is gone.
+        needsOldWritersGone: true,
+        run: ({ checkpoint, dryRun, signal }) => {
+          const resumed = traceCountSeedReportSchema.safeParse(checkpoint.resumeFrom);
+          return app.recordTraceCountsBeforeCut({
+            resumeFrom: resumed.success ? resumed.data : null,
+            dryRun,
+            signal,
+            onPage: (report) => checkpoint.save({ report }),
+          });
+        },
       }),
     ]);

@@ -14,7 +14,12 @@ import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { SPAN_RECEIVED_EVENT_TYPE, TraceApi } from "@langwatch/trace-contract";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  TRACE_FIRST_SEEN_EVENT_TYPE,
+  TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE,
+  TraceApi,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -54,7 +59,7 @@ class RecordingSpendRepository implements OrganizationSpendRepository {
   }
 }
 
-/** The role's eventing, with trace's pipeline standing in as the owner of span_received. */
+/** The role's eventing, with trace's pipelines standing in as the owners of the facts it reads. */
 function eventingFor(role: "api" | "worker"): EventSourcing {
   const eventing = new EventSourcing({
     eventStore: EventStoreMemory.createForTesting(),
@@ -65,6 +70,17 @@ function eventingFor(role: "api" | "worker"): EventSourcing {
   eventing.register(
     definePipeline({ name: "trace_stand_in", aggregate: defineAggregate({ type: "trace" }) })
       .withEvents([testEventSchema(SPAN_RECEIVED_EVENT_TYPE, z.object({}))])
+      .build(),
+  );
+  eventing.register(
+    definePipeline({
+      name: "trace_milestones_stand_in",
+      aggregate: defineAggregate({ type: "trace_project_milestone" }),
+    })
+      .withEvents([
+        testEventSchema(TRACE_FIRST_SEEN_EVENT_TYPE, z.object({})),
+        testEventSchema(TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE, z.object({})),
+      ])
       .build(),
   );
   return eventing;

@@ -44,3 +44,38 @@ export interface TraceReceivedEventDataSchema extends Named<
 export const traceReceivedEventDataSchema: TraceReceivedEventDataSchema =
   traceReceivedEventDataSchemaDefinition;
 export type TraceReceivedEventData = z.infer<typeof traceReceivedEventDataSchema>;
+
+/** A trace's first span reached its summary: once per trace, the fact entitlement counts. */
+export const TRACE_FIRST_SEEN_EVENT_TYPE = "lw.trace.trace_first_seen" as const;
+/** The project's traces first seen in a month before a cut, recorded once by trace's upgrade. */
+export const TRACES_COUNTED_BEFORE_CUT_EVENT_TYPE = "lw.trace.traces_counted_before_cut" as const;
+
+const traceFirstSeenEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  traceId: z.string().min(1),
+  /** Epoch ms the trace's summary was first written: `trace_summaries.CreatedAt`. */
+  firstSeenAt: z.number().int().nonnegative(),
+});
+export interface TraceFirstSeenEventDataSchema extends Named<
+  typeof traceFirstSeenEventDataSchemaDefinition
+> {}
+export const traceFirstSeenEventDataSchema: TraceFirstSeenEventDataSchema =
+  traceFirstSeenEventDataSchemaDefinition;
+export type TraceFirstSeenEventData = z.infer<typeof traceFirstSeenEventDataSchema>;
+
+const tracesCountedBeforeCutEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  /** `YYYY-MM`, the UTC month counted from its first instant up to `cutAt`. */
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  /** Epoch ms; traces first seen from here on arrive as {@link TRACE_FIRST_SEEN_EVENT_TYPE}. */
+  cutAt: z.number().int().nonnegative(),
+  traces: z.number().int().nonnegative(),
+});
+export interface TracesCountedBeforeCutEventDataSchema extends Named<
+  typeof tracesCountedBeforeCutEventDataSchemaDefinition
+> {}
+export const tracesCountedBeforeCutEventDataSchema: TracesCountedBeforeCutEventDataSchema =
+  tracesCountedBeforeCutEventDataSchemaDefinition;
+export type TracesCountedBeforeCutEventData = z.infer<typeof tracesCountedBeforeCutEventDataSchema>;

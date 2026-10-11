@@ -10,6 +10,7 @@ import {
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type FoldProjectionStore,
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
@@ -17,7 +18,7 @@ import {
 import type { EntitlementModule } from "../app/entitlement.app.ts";
 import type { BillableEventRecord } from "../repositories/billable-events-meter.repository.ts";
 import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
-import type { TraceMeterRecord } from "../repositories/trace-meter.repository.ts";
+import type { TraceCountState } from "../repositories/trace-count.repository.ts";
 import { BillableEventsMeterProjection } from "./billable-events-meter.projection.ts";
 import {
   limitStateSchema,
@@ -25,7 +26,7 @@ import {
   REFUSED_ORGANIZATIONS_PROCESS_NAME,
   refusedOrganizationWake,
 } from "./refused-organizations.process.ts";
-import { TRACE_METER_EVENT, TraceMeterProjection } from "./trace-meter.projection.ts";
+import { traceCountPeerFold } from "./trace-count.projection.ts";
 import { usageMeterCountSubscriber } from "./usage-meter-count.subscriber.ts";
 import {
   CountMonthCommand,
@@ -61,18 +62,18 @@ export type UsageSenders = Readonly<{
 }>;
 
 /**
- * The metering pipeline. The trace meter is appended on every deployment (round 22); the
+ * The metering pipeline. The trace count is folded on every deployment (round 22); the
  * billable-events meter, its subscriber and the limit decider stay SaaS only.
  */
 export function buildUsagePipeline({
   countMonth,
-  traceMeter,
+  traceCount,
   billableEventsMeter,
   projects,
   send,
 }: {
   countMonth: CountMonthCommand;
-  traceMeter: AppendStore<TraceMeterRecord>;
+  traceCount: FoldProjectionStore<TraceCountState>;
   billableEventsMeter: AppendStore<BillableEventRecord> | undefined;
   projects: Pick<TenancyRepository, "getProjectPlacement">;
   send: () => UsageSenders;
@@ -119,10 +120,7 @@ export function buildUsagePipeline({
     })
     .withCommand("recordLimitDecision", RecordLimitDecisionCommand)
     .withCommand("recordUsageWarning", RecordUsageWarningCommand)
-    .withPeerMapProjection({
-      events: [TRACE_METER_EVENT] as const,
-      map: TraceMeterProjection.create(traceMeter).build(),
-    });
+    .withPeerFoldProjection(traceCountPeerFold(traceCount));
   if (!billableEventsMeter) return pipeline.build();
   return (
     pipeline

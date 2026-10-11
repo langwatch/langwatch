@@ -366,6 +366,11 @@ import { formatSpansDigest, formatSpansDigestBounded } from "../rules/trace-read
 import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
+import {
+  TraceCountSeedService,
+  type TraceCountSeedInput,
+  type TraceCountSeedReport,
+} from "../services/trace-count-seed.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import {
   TraceMetadataWriteService,
@@ -974,6 +979,11 @@ export class TraceModule implements TraceApi, CollectorApp {
     setup.resources.own("Trace tokenizer", () => tokenizer.close());
     const milestones = TraceProjectMilestonesService.create({ role });
     app.#milestones = milestones;
+    app.#traceCountSeed = TraceCountSeedService.create({
+      projects: setup.dependencies.projects,
+      usageCount: setup.repositories.usageCount,
+      milestones,
+    });
     app.#retention = {
       resolve: (tenantId) =>
         setup.dependencies.dataRetention.getResolvedForProject({ projectId: tenantId }),
@@ -1272,6 +1282,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   #processing: TraceProcessingRuntimeAdapter | null = null;
   #milestones: TraceProjectMilestonesService | null = null;
+  #traceCountSeed: TraceCountSeedService | null = null;
   #retention: RetentionPolicyResolver | null = null;
   #collectorEvaluations: TraceCollectorEvaluationsService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
@@ -1326,6 +1337,14 @@ export class TraceModule implements TraceApi, CollectorApp {
   /** Binds the milestone senders the worker's project-metadata subscriber records through. */
   connectProjectMilestones(commands: EventingCommands<TraceProjectMilestonesDefinition>): void {
     this.#milestones?.connect(commands);
+  }
+
+  /** Records each project's traces first seen this month before the cut, for the upgrade step. */
+  recordTraceCountsBeforeCut(input: TraceCountSeedInput): Promise<TraceCountSeedReport> {
+    if (!this.#traceCountSeed) {
+      throw new TraceCapabilityUnavailableError("this process", "the trace count seed");
+    }
+    return this.#traceCountSeed.recordCountsBeforeCut(input);
   }
 
   /** trace_collector_evaluations: the same in every role; evaluation reports from its side (§9). */

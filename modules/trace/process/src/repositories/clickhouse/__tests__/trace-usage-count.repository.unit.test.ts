@@ -1,3 +1,4 @@
+/** Spec: modules/trace/specs/trace-first-seen.feature */
 import type { QueryRequest } from "@langwatch/clickhouse-client";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { describe, expect, it } from "vitest";
@@ -62,7 +63,46 @@ describe("TraceUsageCountClickHouseRepository", () => {
   });
 });
 
+describe("TraceUsageCountClickHouseRepository traces first seen", () => {
+  /** @scenario "The upgrade counts a trace in the month it was first seen" */
+  it("counts traces by their earliest summary write inside the window", async () => {
+    const { queries, repository } = createRepository([{ total: "40" }]);
+    const fromMs = Date.UTC(2026, 9, 1);
+    const toMs = Date.UTC(2026, 9, 8, 15);
+
+    await expect(
+      repository.countTracesFirstSeen({ tenantId: "project-1", fromMs, toMs }),
+    ).resolves.toBe(40);
+    const sql = queries[0]?.sql.replace(/\s+/g, " ");
+    expect(queries[0]?.tenantId).toBe("project-1");
+    expect(sql).toContain("SELECT TraceId, min(CreatedAt) AS FirstSeenAt FROM trace_summaries");
+    expect(sql).toContain("WHERE TenantId = {tenantId:String} AND OccurredAt >=");
+    expect(sql).toContain("WHERE FirstSeenAt >= fromUnixTimestamp64Milli({from:Int64})");
+    expect(queries[0]?.params).toMatchObject({ from: fromMs, to: toMs });
+  });
+});
+
 describe("MemoryTraceUsageCountRepository", () => {
+  /** @scenario "The upgrade counts a trace in the month it was first seen" */
+  it("counts a trace once, in the window holding its earliest summary write", async () => {
+    const repository = MemoryTraceUsageCountRepository.create();
+    const at = (traceId: string, createdAt: string) =>
+      repository.record({ tenantId: "project-1", traceId, createdAt });
+    at("last-month", "2026-09-30 23:00:00.000");
+    at("last-month", "2026-10-02 00:00:00.000");
+    at("this-month", "2026-10-02 00:00:00.000");
+    at("this-month", "2026-10-03 00:00:00.000");
+    at("after-cut", "2026-10-08 15:00:00.000");
+
+    await expect(
+      repository.countTracesFirstSeen({
+        tenantId: "project-1",
+        fromMs: Date.UTC(2026, 9, 1),
+        toMs: Date.UTC(2026, 9, 8, 15),
+      }),
+    ).resolves.toBe(1);
+  });
+
   it("probes and groups the tenant's matching traces since the cutoff", async () => {
     const repository = MemoryTraceUsageCountRepository.create();
     const base = { tenantId: "project-1", createdAt: "", occurredAtMs: 2_000 };

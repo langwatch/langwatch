@@ -7,7 +7,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
-import { MemoryTraceMeterRepository } from "../../repositories/memory/memory.trace-meter.repository.ts";
+import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
 import { UsageCountingService } from "../usage-counting.service.ts";
 import {
   type EntitlementUsagePeers,
@@ -384,7 +384,7 @@ describe("UsageService.overPeers counting events", () => {
   });
 });
 
-describe("UsageService over the trace meter", () => {
+describe("UsageService over the trace count", () => {
   const projectIds = ["project-1", "project-2", "project-3"];
   const liveCounts = [
     { projectId: "project-1", count: 600 },
@@ -392,20 +392,21 @@ describe("UsageService over the trace meter", () => {
     { projectId: "project-3", count: 0 },
   ];
 
-  /** The month's traces on the meter, two span rows each, as the live count would see them. */
-  async function meterHolding(): Promise<MemoryTraceMeterRepository> {
-    const meter = MemoryTraceMeterRepository.create();
+  /** The month's traces on the count: half seeded before the cut, half first seen after it. */
+  async function meterHolding(): Promise<MemoryTraceCountRepository> {
+    const meter = MemoryTraceCountRepository.create();
     const month = UsageCountingService.monthOf(Date.now());
     for (const { projectId, count } of liveCounts) {
-      for (let trace = 0; trace < count * 2; trace++) {
-        const record = {
-          organizationId: "org-1",
-          tenantId: projectId,
-          traceId: `${projectId}-trace-${trace % count}`,
-          month,
-        };
-        await meter.insert({ records: [record], organizationId: "org-1" });
-      }
+      if (count === 0) continue;
+      const seeded = Math.floor(count / 2);
+      const state = {
+        projectId,
+        month,
+        seeded: { traces: seeded, cutAt: 0 },
+        liveByHour: { "3600000": count - seeded },
+        LastEventOccurredAt: 0,
+      };
+      await meter.save({ organizationId: "org-1", state, traces: count, appliedEventIds: [] });
     }
     return meter;
   }
@@ -414,7 +415,7 @@ describe("UsageService over the trace meter", () => {
     meter,
     allowance,
   }: {
-    meter: MemoryTraceMeterRepository;
+    meter: MemoryTraceCountRepository;
     allowance: number;
   }) {
     return UsageService.overPeers({
@@ -444,7 +445,7 @@ describe("UsageService over the trace meter", () => {
     });
   }
 
-  /** @scenario "The trace meter decides a limit as the live trace count did, over the same traces" */
+  /** @scenario "The trace count decides a limit as the live trace count did, over the same traces" */
   it.each([1_000, 1_100, 5_000])(
     "decides an allowance of %i and counts each project as the live count did",
     async (allowance) => {
