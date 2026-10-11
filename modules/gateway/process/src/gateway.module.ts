@@ -108,6 +108,7 @@ export const gatewayProcessModule: PublishedProcessModule<
   .withMigrations(({ app }) => [
     defineMigrationStep({
       id: "gateway:fill-id-indexes",
+      after: ["coding-agent:fill-id-indexes"],
       kind: "data",
       mode: "background",
       description:

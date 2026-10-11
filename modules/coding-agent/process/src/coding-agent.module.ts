@@ -55,6 +55,7 @@ export const codingAgentProcessModule: PublishedProcessModule<
   .withMigrations(({ app }) => [
     defineMigrationStep({
       id: "coding-agent:fill-id-indexes",
+      after: ["suite:fill-id-indexes"],
       kind: "data",
       mode: "background",
       description:

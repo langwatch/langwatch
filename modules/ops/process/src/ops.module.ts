@@ -193,6 +193,7 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
       // Ops hosts operator work over the event tables (§7); the fill itself is eventing's.
       defineMigrationStep({
         id: "ops:fill-event-log-id-index",
+        after: ["gateway:fill-id-indexes"],
         kind: "data",
         mode: "background",
         description:

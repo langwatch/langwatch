@@ -70,6 +70,7 @@ export const scenarioProcessModule: PublishedProcessModule<
     }),
     defineMigrationStep({
       id: "scenario:fill-id-indexes",
+      after: ["experiment:fill-id-indexes"],
       kind: "data",
       mode: "background",
       description:

@@ -46,6 +46,7 @@ export const analyticsProcessModule: PublishedProcessModule<
     }),
     defineMigrationStep({
       id: "analytics:fill-id-indexes",
+      after: ["evaluation:fill-id-indexes"],
       kind: "data",
       mode: "background",
       description:

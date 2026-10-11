@@ -24,6 +24,7 @@ export const evaluationProcessModule: PublishedProcessModule<
   .withMigrations(({ app }) => [
     defineMigrationStep({
       id: "evaluation:fill-id-indexes",
+      after: ["trace:fill-id-indexes"],
       kind: "data",
       mode: "background",
       description:

@@ -68,6 +68,7 @@ export const suiteProcessModule: PublishedProcessModule<"suite", SuiteApi, Suite
       }),
       defineMigrationStep({
         id: "suite:fill-id-indexes",
+        after: ["scenario:fill-id-indexes"],
         kind: "data",
         mode: "background",
         description:

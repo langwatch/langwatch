@@ -90,6 +90,7 @@ export const experimentProcessModule: PublishedProcessModule<
   .withMigrations(({ app }) => [
     defineMigrationStep({
       id: "experiment:fill-id-indexes",
+      after: ["analytics:fill-id-indexes"],
       kind: "data",
       mode: "background",
       description:
