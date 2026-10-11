@@ -280,6 +280,43 @@ Feature: Machine-wide slots for whole-repo checks
     When it runs "haven machine slot run --class typecheck" itself
     Then it runs at once without touching the budget
 
+  # Ruling 2026-10-11: a run rush's gate owns (a shim in rush's gate/bin folder
+  # and a runnable rush) queues in rush, never in haven's slots as well.
+  @unit
+  Scenario: A launcher hands a run rush's gate owns to rush
+    Given rush's gate holds a shim for the program and rush is runnable
+    When tsc, vitest, oxlint or with-build-slot.sh starts a run
+    Then it runs under "rush gate run --name <program> --dir <cwd>"
+    And its environment carries GOMAXPROCS 2, GOMEMLIMIT 3GiB or VITEST_MAX_WORKERS 2 unless set
+    And it takes no haven slot
+
+  @unit
+  Scenario: A run rush already admitted takes no haven slot
+    Given RUSH_GATE_HELD is set in the environment
+    When tsc, vitest, oxlint or with-build-slot.sh starts a run
+    Then it runs directly under haven's caps, asking neither rush nor haven
+
+  @unit
+  Scenario: Without rush, haven queues as before
+    Given rush's gate holds no shim for the program, or the shim's rush is not runnable
+    When tsc, vitest, oxlint or with-build-slot.sh starts a run
+    Then it takes its haven slot through "haven machine slot run" as before
+
+  # Ruling 2026-10-11: the stack's UI rebuild is the developer waiting on
+  # their own page, so it skips both queues and keeps the build caps.
+  @unit
+  Scenario: haven's own UI rebuild never waits behind agent runs
+    Given rush's gate owns vite, or haven's slots are full of agent runs
+    When haven rebuilds a stack's UI through build:local
+    Then with-build-slot.sh runs vite at once, capped at GOMAXPROCS 2 and GOMEMLIMIT 3GiB
+    And it asks neither rush nor haven for a slot
+
+  @unit
+  Scenario: haven status names rush's gate as the queue for what it owns
+    Given rush's gate holds shims for some programs
+    When "haven status" prints the slots block
+    Then one line reads "queue: rush gate (<programs>)" listing them
+
   @unit
   Scenario: slot explain names who holds the units
     Given runs hold units of the budget

@@ -1,8 +1,8 @@
 diff --git a/lib/tsc.js b/lib/tsc.js
-index eb869b715737e45fcf1af33d1af3157b59ba08de..d86d4f00ebd57e2cac1ab130ad4e420bf4531a20 100644
+index eb869b715737e45fcf1af33d1af3157b59ba08de..bda11650f6b68415f9171710c74002a51350c9f0 100644
 --- a/lib/tsc.js
 +++ b/lib/tsc.js
-@@ -2,21 +2,126 @@
+@@ -2,21 +2,142 @@
  
  import getExePath from "#getExePath";
  import { execFileSync } from "node:child_process";
@@ -20,12 +20,12 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..d86d4f00ebd57e2cac1ab130ad4e420b
 +// folders in ~/.cache/langwatch/tsc-slots, capped at 2 threads and ADR-100's 3GiB floor.
 +const args = process.argv.slice(2);
 +const exempt = args.some((arg) => /^(-w|--watch|-v|--version|-h|--help|--lsp)$/.test(arg));
-+const held = process.env.CHECK_QUEUE_HELD || process.env.LANGWATCH_TSC_SLOT;
++const held = process.env.RUSH_GATE_HELD || process.env.CHECK_QUEUE_HELD || process.env.LANGWATCH_TSC_SLOT;
 +const canExec = process.platform !== "win32" && typeof process.execve === "function";
 +
-+function findHaven() {
-+    const path = (process.env.PATH ?? "").split(delimiter).filter(Boolean).map((dir) => join(dir, "haven"));
-+    for (const candidate of [process.env.HAVEN_BIN, ...path]) {
++function findBin(name, override) {
++    const path = (process.env.PATH ?? "").split(delimiter).filter(Boolean).map((dir) => join(dir, name));
++    for (const candidate of [override, ...path]) {
 +        try {
 +            if (candidate && statSync(candidate).isFile()) {
 +                accessSync(candidate, constants.X_OK);
@@ -38,14 +38,28 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..d86d4f00ebd57e2cac1ab130ad4e420b
 +    }
 +}
 +
++// Rush's gate owns a program when its bin folder holds a shim for it (none while the gate is off).
++function rushOwns(program) {
++    const config = join(homedir(), ".config");
++    const marked = (dir) => { try { return statSync(join(dir, "config.json")).isFile(); } catch { return false; } };
++    const root = process.env.RUSH_HOME || (!marked(join(config, "rush")) && marked(join(config, "agtop")) ? join(config, "agtop") : join(config, "rush"));
++    try { return statSync(join(root, "gate", "bin", program)).isFile(); } catch { return false; }
++}
++
 +if (!exempt && !held && canExec) {
-+    const haven = findHaven();
-     try {
--        process.execve(exe, [exe, ...process.argv.slice(2)]);
++    const rush = rushOwns("tsc") ? findBin("rush", process.env.RUSH_BIN) : undefined;
++    const capped = { ...process.env, GOMAXPROCS: process.env.GOMAXPROCS ?? "2", GOMEMLIMIT: process.env.GOMEMLIMIT ?? "3GiB" };
++    try {
++        if (rush) process.execve(rush, [rush, "gate", "run", "--name", "tsc", "--dir", process.cwd(), "--", exe, ...args], capped);
++    }
++    catch {
++        // execve refused: haven's slot below
++    }
++    const haven = findBin("haven", process.env.HAVEN_BIN);
++    try {
 +        if (haven) process.execve(haven, [haven, "machine", "slot", "run", "--class", "typecheck", "--label", "tsc", "--", exe, ...args]);
-     }
-     catch {
--        // may not be available, ignore the error and fallback
++    }
++    catch {
 +        // execve refused: fall back to the lock folder below
 +    }
 +}
@@ -58,10 +72,12 @@ index eb869b715737e45fcf1af33d1af3157b59ba08de..d86d4f00ebd57e2cac1ab130ad4e420b
 +
 +function ownerAlive(lock) {
 +    let pid;
-+    try {
+     try {
+-        process.execve(exe, [exe, ...process.argv.slice(2)]);
 +        pid = Number(readFileSync(join(lock, "pid"), "utf8"));
-+    }
-+    catch {
+     }
+     catch {
+-        // may not be available, ignore the error and fallback
 +        return Date.now() - statSync(lock).mtimeMs < 10_000;
 +    }
 +    try {

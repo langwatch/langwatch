@@ -493,3 +493,27 @@ func TestLauncherOwnedCoversOnlyLauncherRuns(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "Haven steps aside for programs rush's gate owns"
+// @scenario "Haven keeps its gate for programs rush's gate does not own"
+func TestRushOwnedNeedsEveryHeavySegmentOwned(t *testing.T) {
+	owns := func(program string) bool { return program == "tsc" || program == "vitest" || program == "oxlint" }
+	for _, command := range []string{
+		"tsc --noEmit --ignoreConfig f.ts", "pnpm typecheck", "pnpm --filter x test", "npx vitest run",
+		"pnpm exec oxlint src", "pnpm lint:fix", "pnpm exec tsc -b && vitest run",
+	} {
+		if !RushOwned(command, owns) {
+			t.Errorf("RushOwned(%q) = false, want true", command)
+		}
+	}
+	for _, command := range []string{
+		"pnpm lint", "oxfmt --write f.ts", "tsc -b && oxfmt --check f.ts", "eslint .", "go build ./...", "ls -la",
+	} {
+		if RushOwned(command, owns) {
+			t.Errorf("RushOwned(%q) = true, want false", command)
+		}
+	}
+	if RushOwned("tsc -b", func(string) bool { return false }) {
+		t.Error("RushOwned with rush's gate off = true, want false")
+	}
+}

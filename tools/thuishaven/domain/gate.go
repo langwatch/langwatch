@@ -147,6 +147,35 @@ func LauncherOwned(command string) bool {
 	return owned
 }
 
+// gatedPrograms is the program a heavy bucket runs, by the name rush's gate
+// queues it under: a package script by the launcher it reaches. A bucket
+// missing here (`pnpm lint`, `format`, docker build) runs no one program.
+var gatedPrograms = map[string]string{
+	TypeScriptCompilerClass: "tsc", "typecheck": "tsc", "typecheck:one": "tsc", "typecheck:all": "tsc",
+	"test": "vitest", "test:unit": "vitest", "test:integration": "vitest", "vitest": "vitest",
+	"oxlint": "oxlint", "lint:fix": "oxlint", "oxfmt": "oxfmt", "eslint": "eslint",
+	"golangci-lint": "golangci-lint", "go build": "go", "next build": "next",
+}
+
+// RushOwned reports whether every heavy segment of a command runs a program
+// rush's gate owns, so rush admits it and haven's gate stands down even at
+// red (heavy-run-admission.feature, "haven steps aside ...").
+func RushOwned(command string, owns func(program string) bool) bool {
+	owned := false
+	for _, segment := range commandSegments(command) {
+		bucket, ok := heavyInvocationBucket(segment)
+		if !ok {
+			continue
+		}
+		program, known := gatedPrograms[bucket]
+		if !known || !owns(program) {
+			return false
+		}
+		owned = true
+	}
+	return owned
+}
+
 // Watches cannot hold a finite check slot for the lifetime of a dev session.
 // Informational flags bypass admission only for a single shell command, so
 // `tsc --version && pnpm typecheck` still counts the check that follows.

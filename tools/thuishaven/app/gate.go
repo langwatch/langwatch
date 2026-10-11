@@ -97,7 +97,8 @@ func (o *Orchestrator) decodeGateContext(stdin io.Reader) (gateContext, hookRepl
 		return gateContext{}, deferReply()
 	}
 	kind, heavy := domain.ClassifyCommand(command)
-	if !heavy {
+	if !heavy || domain.RushOwned(command, rushOwnsFunc()) {
+		// Rush's gate admits what it owns; its own hook already holds the call.
 		return gateContext{}, deferReply()
 	}
 	return gateContext{payload: p, command: command, kind: kind, ready: true}, hookReply{}

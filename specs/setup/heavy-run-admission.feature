@@ -295,6 +295,25 @@ Feature: Heavy runs are admitted, queued, or refused
     Then the gate still describes the queue it expects
     Because one segment without a launcher keeps the whole command gated
 
+  # --- Rush's gate, when it owns the program ---
+
+  # Ruling 2026-10-11: rush's gate and haven's slots never both queue one run.
+  # Rush owns a program while its gate keeps a shim for it in rush's gate/bin
+  # folder (none while the gate is off) and a rush binary is runnable.
+  @unit
+  Scenario: Haven steps aside for programs rush's gate owns
+    Given rush's gate holds shims for tsc, vitest and oxlint and rush is runnable
+    And pressure is red and no slot is free
+    When an agent runs tsc, pnpm typecheck, pnpm test:unit, vitest or oxlint
+    Then the gate answers with no decision and no message
+    Because rush's own hook and the launchers queue the run in rush
+
+  @unit
+  Scenario: Haven keeps its gate for programs rush's gate does not own
+    Given rush's gate holds shims for tsc and vitest only, or rush is not runnable
+    When an agent runs pnpm lint, oxfmt, tsc chained with oxfmt, or tsc with no runnable rush
+    Then the gate decides as it did before rush's gate existed
+
   # --- A tightened ceiling, only where it is earned ---
 
   @unit

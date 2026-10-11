@@ -29,6 +29,8 @@ type slotsStatus struct {
 	Waiters     []slotWaiterStatus   `json:"waiters"`
 	MoreWaiters int                  `json:"moreWaiters,omitempty"`
 	Fallback    []slotFallbackStatus `json:"fallback,omitempty"`
+	// RushGate is the programs rush's gate queues; their runs hold no haven slot.
+	RushGate []string `json:"rushGate,omitempty"`
 }
 
 type slotHolderStatus struct {
@@ -63,6 +65,7 @@ type slotsInput struct {
 	Holders  []domain.SlotClaim
 	Waiters  []domain.SlotClaim
 	Fallback map[string]int
+	RushGate []string
 	Now      time.Time
 }
 
@@ -96,6 +99,7 @@ func buildSlotsStatus(in slotsInput) slotsStatus {
 		})
 	}
 	s.Waiters, s.MoreWaiters = capSlots(waiters)
+	s.RushGate = in.RushGate
 	for _, folder := range fallbackSlotDirs {
 		if n := in.Fallback[folder]; n > 0 {
 			s.Fallback = append(s.Fallback, slotFallbackStatus{Folder: folder, Runs: n})
@@ -133,6 +137,9 @@ func printSlots(s slotsStatus) {
 	if s.MoreWaiters > 0 {
 		fmt.Printf("       +%d more waiting\n", s.MoreWaiters)
 	}
+	if len(s.RushGate) > 0 {
+		fmt.Printf("       queue: rush gate (%s)\n", strings.Join(s.RushGate, ", "))
+	}
 	for _, f := range s.Fallback {
 		fmt.Printf("warn fallback %s in use by %d run(s) (a launcher that found no haven)\n", f.Folder, f.Runs)
 	}
@@ -160,7 +167,8 @@ func secondsText(s int) string { return (time.Duration(s) * time.Second).String(
 func (o *Orchestrator) collectSlots(holders, waiters []domain.SlotClaim, now time.Time) slotsStatus {
 	budget, pressure := o.slotBudget(now)
 	return buildSlotsStatus(slotsInput{
-		Budget: budget, Pressure: pressure, Holders: holders, Waiters: waiters, Fallback: fallbackSlotRuns(), Now: now,
+		Budget: budget, Pressure: pressure, Holders: holders, Waiters: waiters, Fallback: fallbackSlotRuns(),
+		RushGate: rushGatePrograms(), Now: now,
 	})
 }
 
