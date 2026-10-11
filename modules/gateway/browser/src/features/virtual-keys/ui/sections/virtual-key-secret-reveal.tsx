@@ -1,6 +1,7 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: the empty
 // blocks in this file are deliberate no-ops.
 
+import { Banner } from "@langwatch/design-system/banner";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Alert,
@@ -14,8 +15,9 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Check, Copy, Eye, EyeOff } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import { useLentGuidedTour } from "../../../../behavior/lent-guided-tour.ts";
 import { VirtualKeyUsageSnippet } from "./virtual-key-usage-snippet.tsx";
 
@@ -50,21 +52,42 @@ export function VirtualKeySecretReveal({
 }: VirtualKeySecretRevealProps) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  const toaster = useGatewayToaster();
   // The guided tour shows the secret rather than the mask when its cursor lands on it.
   const { useRegisterActions } = useLentGuidedTour();
   const tourActions = useMemo(() => ({ revealVirtualKeySecret: () => setRevealed(true) }), []);
   useRegisterActions(tourActions);
 
+  const clearCopiedTimer = () => window.clearTimeout(copiedTimer.current);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
+
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(secret);
+    clearCopiedTimer();
+    try {
+      await navigator.clipboard.writeText(secret);
+    } catch {
+      setCopied(false);
+      setCopyFailed(true);
+      return;
+    }
+    setCopyFailed(false);
     setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    toaster.create({
+      title: "Secret copied",
+      description: `${keyName} copied to clipboard`,
+      type: "success",
+    });
+    copiedTimer.current = window.setTimeout(() => setCopied(false), 1500);
   };
 
   const close = () => {
+    clearCopiedTimer();
     setRevealed(false);
     setCopied(false);
+    setCopyFailed(false);
     setConfirmed(false);
     onClose();
   };
@@ -139,6 +162,7 @@ export function VirtualKeySecretReveal({
                     bg="transparent"
                     paddingX={0}
                     whiteSpace="nowrap"
+                    userSelect="all"
                     data-testid="gateway-virtual-key-secret"
                   >
                     {revealed ? secret : maskSecret(secret)}
@@ -153,10 +177,25 @@ export function VirtualKeySecretReveal({
                 >
                   {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
                 </IconButton>
-                <IconButton aria-label="Copy secret" variant="ghost" size="sm" onClick={handleCopy}>
+                <IconButton
+                  data-testid="gateway-virtual-key-secret-copy"
+                  aria-label="Copy secret"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void handleCopy()}
+                >
                   {copied ? <Check size={14} /> : <Copy size={14} />}
                 </IconButton>
               </HStack>
+              {copyFailed && (
+                <Banner
+                  status="error"
+                  title="Couldn't copy to the clipboard."
+                  data-testid="gateway-virtual-key-secret-copy-failed"
+                >
+                  Reveal the secret and copy it by hand, or try again.
+                </Banner>
+              )}
             </VStack>
 
             <Separator />
