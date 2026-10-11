@@ -29,6 +29,26 @@ const STRETCH = {
   "&::after": { content: '""', position: "absolute", inset: "0", borderRadius: "showcase" },
 } satisfies SystemStyleObject;
 
+function CardHeading({
+  title,
+  href,
+  external,
+  showArrow,
+}: {
+  title?: string;
+  href?: string;
+  external: boolean;
+  showArrow: boolean;
+}) {
+  const Direction = external ? ArrowUpRight : ArrowRight;
+  return (
+    <Flex alignItems="center" gap="1" fontSize="16px" lineHeight="24px" fontWeight="600" color="fg">
+      <span>{title}</span>
+      {href && showArrow ? <Direction size={16} aria-hidden="true" /> : null}
+    </Flex>
+  );
+}
+
 /** An outlined card; with authored links inside, only the title navigates. */
 export function Card({ title, description, icon, href, horizontal, arrow, children }: CardProps) {
   const external = Boolean(href && /^https?:/.test(href));
@@ -36,13 +56,9 @@ export function Card({ title, description, icon, href, horizontal, arrow, childr
   const tileBackground = icon ? "accent.subtle" : "transparent";
   const compact = Boolean(icon && !description && !Children.toArray(children).length);
   const showArrow = arrow === true || arrow === "true";
-  const Direction = external ? ArrowUpRight : ArrowRight;
   const alignment = horizontal ? "flex-start" : "stretch";
   const heading = (
-    <Flex alignItems="center" gap="1" fontSize="16px" lineHeight="24px" fontWeight="600" color="fg">
-      <span>{title}</span>
-      {href && showArrow ? <Direction size={16} aria-hidden="true" /> : null}
-    </Flex>
+    <CardHeading title={title} href={href} external={external} showArrow={showArrow} />
   );
   return (
     <Box

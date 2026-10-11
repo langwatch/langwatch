@@ -68,6 +68,7 @@ export function DocsVideo({ autoPlay, children, ...rest }: ComponentProps<"video
           borderRadius: "var(--chakra-radii-showcase)",
         }}
         {...rest}
+        muted
       >
         {children}
       </video>

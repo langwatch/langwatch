@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 const SPEC_FILES = ["api-reference/openapiLangWatch.json", "api-reference/openapi-evals.json"];
@@ -7,8 +7,13 @@ const LIST_ID = "virtual:docs-operations";
 const specCache = new Map();
 
 function loadSpec({ docsRoot, file }) {
-  if (!specCache.has(file)) specCache.set(file, JSON.parse(readFileSync(path.join(docsRoot, file), "utf8")));
-  return specCache.get(file);
+  const filename = path.join(docsRoot, file);
+  const revision = statSync(filename).mtimeMs;
+  const cached = specCache.get(filename);
+  if (cached?.revision === revision) return cached.spec;
+  const spec = JSON.parse(readFileSync(filename, "utf8"));
+  specCache.set(filename, { revision, spec });
+  return spec;
 }
 
 function lookupRef({ spec, ref }) {
@@ -59,11 +64,15 @@ export function resolveOperation({ docsRoot, openapi }) {
     if (!raw) continue;
     const operation = deref({ spec, node: raw, seen: [] });
     const shared = deref({ spec, node: methods.parameters ?? [], seen: [] });
-    const { origin, basePath } = splitServer({ url: (operation.servers ?? spec.servers)?.[0]?.url ?? "https://app.langwatch.ai" });
+    const { origin, basePath } = splitServer({
+      url: (operation.servers ?? spec.servers)?.[0]?.url ?? "https://app.langwatch.ai",
+    });
     const requirements = operation.security ?? spec.security ?? [];
-    const schemes = [...new Set(requirements.flatMap((requirement) => Object.keys(requirement)))].map((name) => ({
+    const schemes = [
+      ...new Set(requirements.flatMap((requirement) => Object.keys(requirement))),
+    ].map((name) => ({
       id: name,
-      ...(spec.components?.securitySchemes?.[name] ?? {}),
+      ...spec.components?.securitySchemes?.[name],
     }));
     return {
       method: verb.toUpperCase(),
@@ -82,7 +91,11 @@ export function resolveOperation({ docsRoot, openapi }) {
         schema: param.schema ?? {},
       })),
       body: operation.requestBody
-        ? { required: Boolean(operation.requestBody.required), description: operation.requestBody.description ?? "", contents: contentsOf({ content: operation.requestBody.content }) }
+        ? {
+            required: Boolean(operation.requestBody.required),
+            description: operation.requestBody.description ?? "",
+            contents: contentsOf({ content: operation.requestBody.content }),
+          }
         : null,
       responses: Object.entries(operation.responses ?? {}).map(([status, response]) => ({
         status,
@@ -103,7 +116,9 @@ export function docsOpenapiPlugin({ docsRoot, openapiBySlug }) {
     },
     load(id) {
       if (id === `\0${LIST_ID}`) {
-        const entries = Object.keys(openapiBySlug()).map((slug) => `${JSON.stringify(slug)}: () => import(${JSON.stringify(PREFIX + slug)})`);
+        const entries = Object.keys(openapiBySlug()).map(
+          (slug) => `${JSON.stringify(slug)}: () => import(${JSON.stringify(PREFIX + slug)})`,
+        );
         return `export default {${entries.join(",")}};`;
       }
       if (!id.startsWith(`\0${PREFIX}`)) return null;

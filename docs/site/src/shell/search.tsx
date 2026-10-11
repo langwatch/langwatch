@@ -107,6 +107,154 @@ function Highlighted({ text, terms }: { text: string; terms: string[] }) {
 
 type Load = { state: "idle" | "loading" | "failed" } | { state: "ready"; index: SearchEntry[] };
 
+function hrefOf({ result }: { result: Result }) {
+  return `/${result.entry.slug}${result.heading ? `#${result.heading.id}` : ""}`;
+}
+
+function SearchResults({
+  results,
+  terms,
+  selected,
+  setSelected,
+}: {
+  results: Result[];
+  terms: string[];
+  selected: number;
+  setSelected: (index: number) => void;
+}) {
+  return (
+    <Box
+      as="ul"
+      id="docs-search-results"
+      margin="0"
+      padding="0"
+      aria-label={`${results.length} results`}
+    >
+      {results.map((result, position) => (
+        <Box as="li" key={`${result.entry.slug}-${result.heading?.id ?? ""}`} listStyleType="none">
+          <Link
+            id={`docs-search-result-${position}`}
+            onFocus={() => setSelected(position)}
+            href={hrefOf({ result })}
+            display="block"
+            minHeight="64px"
+            padding="3"
+            borderRadius="lg"
+            bg={position === selected ? "accent.subtle" : void 0}
+            borderInlineStartWidth="2px"
+            borderColor={position === selected ? "accent.fg" : "transparent"}
+            textDecoration="none"
+            _hover={{ bg: "nav.bgHover", textDecoration: "none" }}
+            onMouseMove={() => setSelected(position)}
+          >
+            <Text
+              as="span"
+              display="block"
+              fontSize="14px"
+              lineHeight="20px"
+              fontWeight="600"
+              color="fg"
+            >
+              <Highlighted text={result.entry.title} terms={terms} />
+            </Text>
+            {result.heading ? (
+              <Text as="span" display="block" fontSize="13px" lineHeight="20px" color="fg.muted">
+                {result.heading.text}
+              </Text>
+            ) : null}
+            <Text as="span" display="block" fontSize="12px" lineHeight="20px" color="fg.muted">
+              {result.entry.trail || result.entry.section}
+            </Text>
+            {result.entry.description ? (
+              <Text
+                as="span"
+                display="-webkit-box"
+                fontSize="12px"
+                lineHeight="20px"
+                color="fg.muted"
+                css={{
+                  WebkitLineClamp: 1,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                }}
+              >
+                {result.entry.description}
+              </Text>
+            ) : null}
+          </Link>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function SearchContent({
+  load,
+  query,
+  results,
+  terms,
+  selected,
+  setSelected,
+  start,
+}: {
+  load: Load;
+  query: string;
+  results: Result[];
+  terms: string[];
+  selected: number;
+  setSelected: (index: number) => void;
+  start: () => void;
+}) {
+  if (load.state === "loading" || load.state === "idle")
+    return (
+      <Flex alignItems="center" gap="2" padding="4" color="fg.muted">
+        <Spinner size="sm" /> Loading search...
+      </Flex>
+    );
+  if (load.state === "failed")
+    return (
+      <Flex direction="column" gap="2" padding="4">
+        <Text margin="0">Search could not load.</Text>
+        <Flex gap="3">
+          <Button type="button" size="sm" variant="outline" colorPalette="gray" onClick={start}>
+            Retry
+          </Button>
+          <Link href="/introduction" color="blue.fg" alignSelf="center">
+            Browse sections
+          </Link>
+        </Flex>
+      </Flex>
+    );
+  if (!query.trim())
+    return (
+      <Box padding="4">
+        <Text margin="0" color="fg.muted" fontSize="14px">
+          Search by topic, integration or endpoint
+        </Text>
+        <Flex direction="column" marginTop="3">
+          {[
+            ["Introduction", "/introduction"],
+            ["Quick Start", "/integration/quick-start"],
+            ["API Reference", "/api-reference/introduction"],
+          ].map(([label, href]) => (
+            <Link key={href} href={href} paddingY="2" fontSize="14px" color="blue.fg">
+              {label}
+            </Link>
+          ))}
+        </Flex>
+      </Box>
+    );
+  if (results.length === 0)
+    return (
+      <Text margin="0" padding="4" color="fg.muted">
+        No results for “{query}”. Try a broader term.
+      </Text>
+    );
+  return (
+    <SearchResults results={results} terms={terms} selected={selected} setSelected={setSelected} />
+  );
+}
+
 export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [load, setLoad] = useState<Load>({ state: "idle" });
@@ -133,18 +281,15 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
   useEffect(() => {
     document.getElementById(`docs-search-result-${selected}`)?.scrollIntoView({ block: "nearest" });
   }, [selected]);
-  const hrefOf = ({ result }: { result: Result }) =>
-    `/${result.entry.slug}${result.heading ? `#${result.heading.id}` : ""}`;
   const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setSelected((value) => Math.min(value + 1, results.length - 1));
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setSelected((value) => Math.max(value - 1, 0));
-    } else if (event.key === "Enter" && results[selected]) {
-      window.location.href = hrefOf({ result: results[selected] });
-    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    if (results.length === 0) return;
+    event.preventDefault();
+    const fromInput = event.target === input.current;
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    const next = fromInput ? 0 : Math.max(0, Math.min(selected + step, results.length - 1));
+    setSelected(next);
+    document.getElementById(`docs-search-result-${next}`)?.focus();
   };
   return (
     <Dialog.Root
@@ -163,6 +308,7 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
         display="flex"
         flexDirection="column"
         bg="bg.overlay"
+        onKeyDown={onKeyDown}
       >
         <Dialog.Title className="docs-sr-only">Search the LangWatch docs</Dialog.Title>
         <Flex
@@ -174,16 +320,15 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
           minHeight="56px"
         >
           <Search size={18} aria-hidden="true" />
+          <span id="docs-search-help" className="docs-sr-only">
+            Use the down arrow to move to the results, or Tab to browse links.
+          </span>
           <chakra.input
             ref={input}
-            role="combobox"
-            aria-expanded={results.length > 0}
-            aria-controls="docs-search-results"
-            aria-activedescendant={results[selected] ? `docs-search-result-${selected}` : void 0}
-            aria-autocomplete="list"
+            type="search"
+            aria-describedby="docs-search-help"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={onKeyDown}
             placeholder="Search the LangWatch docs"
             aria-label="Search the LangWatch docs"
             flex="1"
@@ -205,132 +350,19 @@ export function SearchDialog({ open, onClose }: { open: boolean; onClose: () => 
             Close
           </Button>
         </Flex>
-        <Box overflowY="auto" padding="2" aria-live="polite" flex="1">
-          {load.state === "loading" || load.state === "idle" ? (
-            <Flex alignItems="center" gap="2" padding="4" color="fg.muted">
-              <Spinner size="sm" /> Loading search...
-            </Flex>
-          ) : load.state === "failed" ? (
-            <Flex direction="column" gap="2" padding="4">
-              <Text margin="0">Search could not load.</Text>
-              <Flex gap="3">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  colorPalette="gray"
-                  onClick={start}
-                >
-                  Retry
-                </Button>
-                <Link href="/introduction" color="blue.fg" alignSelf="center">
-                  Browse sections
-                </Link>
-              </Flex>
-            </Flex>
-          ) : query.trim() === "" ? (
-            <Box padding="4">
-              <Text margin="0" color="fg.muted" fontSize="14px">
-                Search by topic, integration or endpoint
-              </Text>
-              <Flex direction="column" marginTop="3">
-                {[
-                  ["Introduction", "/introduction"],
-                  ["Quick Start", "/integration/quick-start"],
-                  ["API Reference", "/api-reference/introduction"],
-                ].map(([label, href]) => (
-                  <Link key={href} href={href} paddingY="2" fontSize="14px" color="blue.fg">
-                    {label}
-                  </Link>
-                ))}
-              </Flex>
-            </Box>
-          ) : results.length === 0 ? (
-            <Text margin="0" padding="4" color="fg.muted">
-              No results for “{query}”. Try a broader term.
-            </Text>
-          ) : (
-            <Box
-              as="ul"
-              id="docs-search-results"
-              margin="0"
-              padding="0"
-              role="listbox"
-              aria-label={`${results.length} results`}
-            >
-              {results.map((result, position) => (
-                <Box
-                  as="li"
-                  id={`docs-search-result-${position}`}
-                  key={`${result.entry.slug}-${result.heading?.id ?? ""}`}
-                  listStyleType="none"
-                  role="option"
-                  aria-selected={position === selected}
-                >
-                  <Link
-                    href={hrefOf({ result })}
-                    display="block"
-                    minHeight="64px"
-                    padding="3"
-                    borderRadius="lg"
-                    bg={position === selected ? "accent.subtle" : void 0}
-                    borderInlineStartWidth="2px"
-                    borderColor={position === selected ? "accent.fg" : "transparent"}
-                    textDecoration="none"
-                    _hover={{ bg: "nav.bgHover", textDecoration: "none" }}
-                    onMouseMove={() => setSelected(position)}
-                  >
-                    <Text
-                      as="span"
-                      display="block"
-                      fontSize="14px"
-                      lineHeight="20px"
-                      fontWeight="600"
-                      color="fg"
-                    >
-                      <Highlighted text={result.entry.title} terms={terms} />
-                    </Text>
-                    {result.heading ? (
-                      <Text
-                        as="span"
-                        display="block"
-                        fontSize="13px"
-                        lineHeight="20px"
-                        color="fg.muted"
-                      >
-                        {result.heading.text}
-                      </Text>
-                    ) : null}
-                    <Text
-                      as="span"
-                      display="block"
-                      fontSize="12px"
-                      lineHeight="20px"
-                      color="fg.muted"
-                    >
-                      {result.entry.trail || result.entry.section}
-                    </Text>
-                    {result.entry.description ? (
-                      <Text
-                        as="span"
-                        display="-webkit-box"
-                        fontSize="12px"
-                        lineHeight="20px"
-                        color="fg.muted"
-                        css={{
-                          WebkitLineClamp: 1,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {result.entry.description}
-                      </Text>
-                    ) : null}
-                  </Link>
-                </Box>
-              ))}
-            </Box>
-          )}
+        <Box overflowY="auto" padding="2" flex="1">
+          <output className="docs-sr-only" aria-live="polite">
+            {results.length} results
+          </output>
+          <SearchContent
+            load={load}
+            query={query}
+            results={results}
+            terms={terms}
+            selected={selected}
+            setSelected={setSelected}
+            start={start}
+          />
         </Box>
       </Dialog.Content>
     </Dialog.Root>

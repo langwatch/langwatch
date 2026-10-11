@@ -39,7 +39,6 @@ export const TYPE_MODES: Record<TypeMode, Record<string, string | Record<string,
   },
 };
 
-/** A region that sets one type mode for everything inside it; dense components nest a productive one. */
 export function TypeRegion({ mode, children, css, ...rest }: BoxProps & { mode: TypeMode }) {
   return (
     <Box

@@ -30,7 +30,8 @@ declare module "virtual:docs-nav" {
 }
 
 declare module "virtual:docs-operations" {
-  const operations: Record<string, () => Promise<{ default: import("./api/operation.ts").Operation }>>;
+  import type { Operation } from "./api/operation.ts";
+  const operations: Record<string, () => Promise<{ default: Operation }>>;
   export default operations;
 }
 
@@ -38,4 +39,10 @@ declare module "*.mdx" {
   import type { ComponentType } from "react";
   const Component: ComponentType;
   export default Component;
+}
+
+declare module "virtual:docs-pages" {
+  import type { PageModule } from "./pages.ts";
+  const pages: Record<string, () => Promise<PageModule>>;
+  export default pages;
 }

@@ -1,11 +1,11 @@
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import { Link, Text } from "@langwatch/design-system/primitives";
 import { Star } from "lucide-react";
+
 import { site } from "../lib/nav-model.ts";
 
 const COUNT = new Intl.NumberFormat("en-GB");
 
-/** The repository link (`compact` drops the repo name below 1280px) with the build-supplied star count; the count is omitted when none is known. */
 export function GithubLink({ compact }: { compact: boolean }) {
   const stars = site.stars;
   return (

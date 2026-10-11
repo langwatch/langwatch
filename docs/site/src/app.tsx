@@ -25,6 +25,16 @@ export type AppProps = {
 };
 
 export function App({ slug, page, operation, examples }: AppProps) {
+  return (
+    <DesignSystemProvider system={docsSystem}>
+      <MDXProvider components={mdxComponents}>
+        <PageContent slug={slug} page={page} operation={operation} examples={examples} />
+      </MDXProvider>
+    </DesignSystemProvider>
+  );
+}
+
+function PageContent({ slug, page, operation, examples }: AppProps) {
   const meta = nav.pages[slug];
   const Content = page?.default;
   const toc = operation
@@ -46,50 +56,43 @@ export function App({ slug, page, operation, examples }: AppProps) {
         ...(page?.headings ?? []),
       ]
     : (page?.headings ?? []);
+  if (!Content || !meta) return <NotFound />;
+  if (operation)
+    return (
+      <EndpointStateProvider operation={operation}>
+        <DocsShell
+          slug={slug}
+          kind="endpoint"
+          title={meta.title}
+          description={meta.description || operation.description}
+          toc={toc}
+          endpoint={{
+            summary: <EndpointSummary operation={operation} />,
+            playground: (
+              <TypeRegion mode="productive">
+                <Playground operation={operation} highlighted={examples} slug={slug} />
+              </TypeRegion>
+            ),
+            reference: (
+              <EndpointReference operation={operation}>
+                <Content />
+              </EndpointReference>
+            ),
+          }}
+        />
+      </EndpointStateProvider>
+    );
   return (
-    <DesignSystemProvider system={docsSystem}>
-      <MDXProvider components={mdxComponents}>
-        {Content && meta ? (
-          operation ? (
-            <EndpointStateProvider operation={operation}>
-              <DocsShell
-                slug={slug}
-                kind="endpoint"
-                title={meta.title}
-                description={meta.description || operation.description}
-                toc={toc}
-                endpoint={{
-                  summary: <EndpointSummary operation={operation} />,
-                  playground: (
-                    <TypeRegion mode="productive">
-                      <Playground operation={operation} highlighted={examples} slug={slug} />
-                    </TypeRegion>
-                  ),
-                  reference: (
-                    <EndpointReference operation={operation}>
-                      <Content />
-                    </EndpointReference>
-                  ),
-                }}
-              />
-            </EndpointStateProvider>
-          ) : (
-            <DocsShell
-              slug={slug}
-              kind={slug === "introduction" ? "home" : "guide"}
-              title={meta.title}
-              description={meta.description}
-              toc={toc}
-              wide={meta.mode === "wide"}
-            >
-              <Content />
-            </DocsShell>
-          )
-        ) : (
-          <NotFound />
-        )}
-      </MDXProvider>
-    </DesignSystemProvider>
+    <DocsShell
+      slug={slug}
+      kind={slug === "introduction" ? "home" : "guide"}
+      title={meta.title}
+      description={meta.description}
+      toc={toc}
+      wide={meta.mode === "wide"}
+    >
+      <Content />
+    </DocsShell>
   );
 }
 

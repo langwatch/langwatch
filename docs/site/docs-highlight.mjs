@@ -1,15 +1,10 @@
-import { pathToFileURL } from "node:url";
-import { resolveFromDesignSystem } from "./ds-deps.mjs";
+import { bundledLanguages, createHighlighter } from "shiki";
 
 const THEMES = { light: "github-light", dark: "github-dark" };
 let loading;
 
 function loadShiki() {
-  loading ??= (async () => {
-    const shiki = await import(pathToFileURL(resolveFromDesignSystem({ name: "shiki" })).href);
-    const highlighter = await shiki.createHighlighter({ themes: Object.values(THEMES), langs: [] });
-    return { shiki, highlighter };
-  })();
+  loading ??= createHighlighter({ themes: Object.values(THEMES), langs: [] });
   return loading;
 }
 
@@ -19,8 +14,8 @@ function escapeHtml({ text }) {
 
 /** Returns one HTML string per source line, with light and dark colours as CSS variables. */
 export async function highlightLines({ code, lang }) {
-  const { shiki, highlighter } = await loadShiki();
-  const known = lang && lang in shiki.bundledLanguages;
+  const highlighter = await loadShiki();
+  const known = lang && lang in bundledLanguages;
   if (known) await highlighter.loadLanguage(lang);
   const lines = known
     ? highlighter.codeToTokensWithThemes(code, { lang, themes: THEMES })

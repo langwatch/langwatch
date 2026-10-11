@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { parse } from "yaml";
@@ -46,23 +46,27 @@ function operationKey({ openapi }) {
   return match[1] ? `${match[1].toUpperCase()} ${match[2]}` : match[2];
 }
 
-function operationIndex({ docsRoot }) {
-  if (!operationCache.has(docsRoot)) {
-    const index = new Map();
-    for (const file of SPEC_FILES) {
-      const spec = JSON.parse(readFileSync(path.join(docsRoot, file), "utf8"));
-      for (const [route, methods] of Object.entries(spec.paths)) {
-        for (const verb of VERBS) {
-          if (!methods[verb]?.responses) continue;
-          const entry = { verb, route, operation: methods[verb] };
-          index.set(`${verb.toUpperCase()} ${route}`, entry);
-          if (!index.has(route)) index.set(route, entry);
-        }
-      }
-    }
-    operationCache.set(docsRoot, index);
+function indexMethods({ index, route, methods }) {
+  for (const verb of VERBS) {
+    if (!methods[verb]?.responses) continue;
+    const entry = { verb, route, operation: methods[verb] };
+    index.set(`${verb.toUpperCase()} ${route}`, entry);
+    if (!index.has(route)) index.set(route, entry);
   }
-  return operationCache.get(docsRoot);
+}
+
+function operationIndex({ docsRoot }) {
+  const revision = SPEC_FILES.map((file) => statSync(path.join(docsRoot, file)).mtimeMs).join(":");
+  const cached = operationCache.get(docsRoot);
+  if (cached?.revision === revision) return cached.index;
+  const index = new Map();
+  for (const file of SPEC_FILES) {
+    const spec = JSON.parse(readFileSync(path.join(docsRoot, file), "utf8"));
+    for (const [route, methods] of Object.entries(spec.paths))
+      indexMethods({ index, route, methods });
+  }
+  operationCache.set(docsRoot, { revision, index });
+  return index;
 }
 
 /** "getApiTraceId" becomes "Get trace by ID"; the verb word maps to what the call does. */
@@ -91,29 +95,31 @@ function operationTitle({ entry, fallback }) {
   return fallback;
 }
 
+function buildPage({ item, docsRoot, pages }) {
+  const file = path.join(docsRoot, `${item}.mdx`);
+  if (!existsSync(file)) throw new Error(`Configured documentation page is missing: ${item}`);
+  const meta = readFrontmatter({ file });
+  const entry = meta.openapi
+    ? operationIndex({ docsRoot }).get(operationKey({ openapi: String(meta.openapi) }))
+    : undefined;
+  const derived = meta.openapi
+    ? operationTitle({ entry, fallback: titleCase({ text: item.split("/").pop() }) })
+    : item;
+  pages[item] = {
+    title: String(meta.title ?? derived),
+    description: meta.description
+      ? String(meta.description)
+      : String(entry?.operation.description ?? "").split("\n")[0],
+    sidebarTitle: String(meta.sidebarTitle ?? meta.title ?? derived),
+    openapi: meta.openapi ? String(meta.openapi) : "",
+    mode: meta.mode ? String(meta.mode) : "",
+    icon: meta.icon ? String(meta.icon) : "",
+  };
+  return { type: "page", slug: item, title: pages[item].sidebarTitle };
+}
+
 function buildItem({ item, docsRoot, pages }) {
-  if (typeof item === "string") {
-    const file = path.join(docsRoot, `${item}.mdx`);
-    if (!existsSync(file)) return null;
-    const meta = readFrontmatter({ file });
-    const entry = meta.openapi
-      ? operationIndex({ docsRoot }).get(operationKey({ openapi: String(meta.openapi) }))
-      : undefined;
-    const derived = meta.openapi
-      ? operationTitle({ entry, fallback: titleCase({ text: item.split("/").pop() }) })
-      : item;
-    pages[item] = {
-      title: String(meta.title ?? derived),
-      description: meta.description
-        ? String(meta.description)
-        : String(entry?.operation.description ?? "").split("\n")[0],
-      sidebarTitle: String(meta.sidebarTitle ?? meta.title ?? derived),
-      openapi: meta.openapi ? String(meta.openapi) : "",
-      mode: meta.mode ? String(meta.mode) : "",
-      icon: meta.icon ? String(meta.icon) : "",
-    };
-    return { type: "page", slug: item, title: pages[item].sidebarTitle };
-  }
+  if (typeof item === "string") return buildPage({ item, docsRoot, pages });
   if (item && typeof item === "object" && item.group) {
     const children = (item.pages ?? [])
       .map((child) => buildItem({ item: child, docsRoot, pages }))
@@ -177,7 +183,7 @@ export function openapiPages({ docsRoot }) {
 
 const STARS_URL = "https://api.github.com/repos/langwatch/langwatch";
 
-/** The public star count at build time; the last known value is kept when GitHub cannot be reached. */
+/** Keep the last known star count when GitHub is unavailable. */
 let starsRead;
 function readStars({ docsRoot }) {
   starsRead ??= fetchStars({ docsRoot });
@@ -198,7 +204,9 @@ async function fetchStars({ docsRoot }) {
       writeFileSync(cacheFile, JSON.stringify({ count }));
       return count;
     }
-  } catch {}
+  } catch {
+    // Fall back to the last successful public count.
+  }
   try {
     return JSON.parse(readFileSync(cacheFile, "utf8")).count ?? null;
   } catch {
@@ -216,6 +224,9 @@ export function docsNavPlugin({ docsRoot }) {
       if (id !== RESOLVED_ID) return null;
       this.addWatchFile(path.join(docsRoot, "docs.json"));
       const nav = buildNav({ docsRoot });
+      for (const slug of Object.keys(nav.pages))
+        this.addWatchFile(path.join(docsRoot, `${slug}.mdx`));
+      for (const file of SPEC_FILES) this.addWatchFile(path.join(docsRoot, file));
       nav.site.stars = await readStars({ docsRoot });
       return `export default ${JSON.stringify(nav)};`;
     },

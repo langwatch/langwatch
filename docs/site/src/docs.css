@@ -225,10 +225,10 @@ body {
   background: color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent);
   box-shadow: inset 2px 0 0 var(--chakra-colors-accent-solid);
 }
-.docs-code[data-numbered="true"] code {
+[data-numbered="true"] .docs-code code {
   counter-reset: docs-line;
 }
-.docs-code[data-numbered="true"] .docs-line::before {
+[data-numbered="true"] .docs-code .docs-line::before {
   counter-increment: docs-line;
   content: counter(docs-line);
   display: inline-block;
@@ -561,4 +561,10 @@ body {
 }
 .dark .docs-ground[data-home="true"] {
   opacity: 0.35;
+}
+
+.docs-code-region > pre {
+  margin: 0;
+  font: inherit;
+  tab-size: inherit;
 }

@@ -1,0 +1,26 @@
+function trailOf({ items, slug }) {
+  for (const item of items) {
+    if (item.type === "page" && item.slug === slug) return [];
+    if (item.type === "group") {
+      const trail = trailOf({ items: item.children, slug });
+      if (trail) return [item.title, ...trail];
+    }
+  }
+  return null;
+}
+export function searchTrail({ nav, slug }) {
+  for (const anchor of nav.anchors) {
+    const trail = trailOf({ items: anchor.children, slug });
+    if (trail) return { section: anchor.title, trail: [anchor.title, ...trail].join(" › ") };
+  }
+  return { section: "", trail: "" };
+}
+export function bodyText({ html }) {
+  const article = html.match(/<article[^>]*>([\s\S]*?)<\/article>/)?.[1] ?? "";
+  return article
+    .replace(/<style[\s\S]*?<\/style>/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&[^;]+;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}

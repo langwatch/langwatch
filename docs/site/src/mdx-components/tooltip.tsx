@@ -1,13 +1,40 @@
-import { Tooltip as DsTooltip } from "@langwatch/design-system/tooltip";
+import { Popover } from "@langwatch/design-system/popover";
+import { Button } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
-export function Tooltip({ tip, children }: { tip?: string; headline?: string; cta?: string; href?: string; children?: ReactNode }) {
+export function Tooltip({
+  tip,
+  children,
+}: {
+  tip?: string;
+  headline?: string;
+  cta?: string;
+  href?: string;
+  children?: ReactNode;
+}) {
   if (!tip) return <>{children}</>;
   return (
-    <DsTooltip content={tip} contentProps={{ maxWidth: "280px" }}>
-      <span tabIndex={0} style={{ textDecoration: "underline dotted", textUnderlineOffset: "3px", cursor: "help" }}>
-        {children}
-      </span>
-    </DsTooltip>
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <Button
+          type="button"
+          variant="plain"
+          size="xs"
+          display="inline"
+          height="auto"
+          minWidth="0"
+          padding="0"
+          font="inherit"
+          color="inherit"
+          textDecoration="underline dotted"
+          textUnderlineOffset="3px"
+        >
+          {children}
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content maxWidth="280px" padding="3" fontSize="14px">
+        <Popover.Body>{tip}</Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
   );
 }

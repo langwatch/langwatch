@@ -2,6 +2,7 @@ import { Box, Button, Text, VisuallyHidden } from "@langwatch/design-system/prim
 import { Check, Copy } from "lucide-react";
 import { z } from "zod";
 
+import type { CopyState } from "../lib/clipboard.ts";
 import { useCopy } from "../lib/clipboard.ts";
 
 export type CodeSource = {
@@ -36,6 +37,12 @@ export function sourceFromProps(props: Record<string, unknown>): CodeSource {
   };
 }
 
+function copyAnnouncement({ state }: { state: CopyState }) {
+  if (state === "copied") return "Copied to clipboard";
+  if (state === "failed") return "Could not copy. Select the code instead.";
+  return "";
+}
+
 export function CopyAction({ code, label = "Copy code" }: { code: string; label?: string }) {
   const { state, copy } = useCopy();
   return (
@@ -61,11 +68,7 @@ export function CopyAction({ code, label = "Copy code" }: { code: string; label?
         </Text>
       </Button>
       <VisuallyHidden as="output" aria-live="polite">
-        {state === "copied"
-          ? "Copied to clipboard"
-          : state === "failed"
-            ? "Could not copy. Select the code instead."
-            : ""}
+        {copyAnnouncement({ state })}
       </VisuallyHidden>
       {state === "failed" ? (
         <Text as="span" fontSize="12px" color="red.fg">
@@ -81,11 +84,10 @@ export function CodeBody({ source, expanded }: { source: CodeSource; expanded: b
   const capped = source.lines.length > EXPAND_AFTER_LINES && !expanded;
   return (
     <Box
-      as="pre"
-      className="docs-code"
+      as="section"
+      className="docs-code-region"
       data-numbered={source.numbered ? "true" : undefined}
       tabIndex={0}
-      role="region"
       aria-label={`${source.title || source.lang || "Code"} source`}
       margin="0"
       padding="4"
@@ -102,16 +104,18 @@ export function CodeBody({ source, expanded }: { source: CodeSource; expanded: b
       bg="transparent"
       color="fg"
     >
-      <code>
-        {source.lines.map((html, index) => (
-          <span
-            key={index}
-            className="docs-line"
-            data-highlighted={source.highlight.includes(index + 1) ? "true" : undefined}
-            dangerouslySetInnerHTML={{ __html: html || "&#8203;" }}
-          />
-        ))}
-      </code>
+      <pre className="docs-code">
+        <code>
+          {source.lines.map((html, index) => (
+            <span
+              key={index}
+              className="docs-line"
+              data-highlighted={source.highlight.includes(index + 1) ? "true" : undefined}
+              dangerouslySetInnerHTML={{ __html: html || "&#8203;" }}
+            />
+          ))}
+        </code>
+      </pre>
     </Box>
   );
 }

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { ExampleLanguage, Operation, Schema } from "./operation.ts";
 
 export type RequestState = { values: Record<string, string>; body: string };
@@ -28,8 +30,8 @@ export function exampleFromSchema({
   depth?: number;
 }): unknown {
   if (!schema || depth > 5) return null;
-  if (schema.example !== undefined) return schema.example;
-  if (schema.default !== undefined) return schema.default;
+  if (schema.example !== void 0) return schema.example;
+  if (schema.default !== void 0) return schema.default;
   if (schema.enum?.length) return schema.enum[0];
   const merged = mergeExampleSchema({ schema });
   const branch = merged.oneOf?.[0] ?? merged.anyOf?.[0];
@@ -37,16 +39,22 @@ export function exampleFromSchema({
   const type = Array.isArray(merged.type)
     ? merged.type.find((entry) => entry !== "null")
     : merged.type;
-  if (type === "object" || merged.properties) {
-    const result: Record<string, unknown> = {};
-    for (const [name, child] of Object.entries(merged.properties ?? {})) {
-      result[name] = exampleFromSchema({ schema: child, depth: depth + 1 });
-    }
-    return result;
-  }
+  if (type === "object" || merged.properties) return objectExample({ schema: merged, depth });
   if (type === "array") return [exampleFromSchema({ schema: merged.items, depth: depth + 1 })];
-  if (type === "string") return merged.format === "date-time" ? "2026-01-01T00:00:00Z" : "string";
-  if (type === "integer" || type === "number") return merged.minimum ?? 0;
+  return primitiveExample({ schema: merged, type });
+}
+
+function objectExample({ schema, depth }: { schema: Schema; depth: number }) {
+  const result: Record<string, unknown> = {};
+  for (const [name, child] of Object.entries(schema.properties ?? {})) {
+    result[name] = exampleFromSchema({ schema: child, depth: depth + 1 });
+  }
+  return result;
+}
+
+function primitiveExample({ schema, type }: { schema: Schema; type?: string }) {
+  if (type === "string") return schema.format === "date-time" ? "2026-01-01T00:00:00Z" : "string";
+  if (type === "integer" || type === "number") return schema.minimum ?? 0;
   if (type === "boolean") return false;
   return null;
 }
@@ -98,11 +106,11 @@ function pythonLiteral({ value, indent = 0 }: { value: unknown; indent?: number 
 }
 
 function parseBody({ text }: { text: string }): unknown {
-  if (!text.trim()) return undefined;
+  if (!text.trim()) return void 0;
   try {
     return JSON.parse(text);
   } catch {
-    return undefined;
+    return void 0;
   }
 }
 
@@ -123,57 +131,73 @@ export function generateExample({
   const method = operation.method;
   const allHeaders: [string, string][] = [...headers];
   if (body !== void 0 || needsBody) allHeaders.push(["Content-Type", "application/json"]);
-  if (language === "curl") {
-    const parts = [`curl --request ${method} \\`, `  --url "${url}" \\`];
-    if (auth)
-      parts.push(`  --header "${auth.name}: ${auth.value.replace("$KEY", `$${KEY_ENV}`)}" \\`);
-    for (const [name, value] of allHeaders) parts.push(`  --header "${name}: ${value}" \\`);
-    if (needsBody) parts.push("  --data @payload.json " + String.fromCharCode(92));
-    if (body !== undefined) parts.push(`  --data '${JSON.stringify(body)}' \\`);
-    const last = parts.length - 1;
-    parts[last] = parts[last].replace(/ \\$/, "");
-    return parts.join("\n");
-  }
-  if (language === "python") {
-    const headerLines = [
-      ...(auth
-        ? [
-            `    ${JSON.stringify(auth.name)}: ${auth.value.includes("Bearer") ? '"Bearer " + api_key' : "api_key"},`,
-          ]
-        : []),
-      ...allHeaders.map(
-        ([name, value]) => `    ${JSON.stringify(name)}: ${JSON.stringify(value)},`,
-      ),
-    ];
-    const lines = [
-      "import os",
-      "import requests",
-      ...(needsBody ? ["import json"] : []),
-      "",
-      `origin = "${operation.origin}"`,
-      `path = "${url.slice(operation.origin.length)}"`,
-    ];
-    if (auth) lines.push(`api_key = os.environ["${KEY_ENV}"]`);
-    if (headerLines.length) lines.push("headers = {", ...headerLines, "}");
-    if (needsBody)
-      lines.push(
-        "",
-        "# Supply your request body in payload.json",
-        'with open("payload.json") as file:',
-        "    payload = json.load(file)",
-      );
-    if (body !== void 0) lines.push(`payload = ${pythonLiteral({ value: body })}`);
+  const request = { url, origin: operation.origin, method, auth, allHeaders, body, needsBody };
+  if (language === "curl") return curlExample(request);
+  if (language === "python") return pythonExample(request);
+  return typescriptExample(request);
+}
+
+const exampleRequestSchema = z.object({
+  url: z.string(),
+  origin: z.string(),
+  method: z.string(),
+  auth: z.object({ name: z.string(), value: z.string() }).nullable(),
+  allHeaders: z.array(z.tuple([z.string(), z.string()])),
+  body: z.unknown(),
+  needsBody: z.boolean(),
+});
+type ExampleRequest = z.infer<typeof exampleRequestSchema>;
+
+function curlExample({ url, method, auth, allHeaders, body, needsBody }: ExampleRequest) {
+  const parts = [`curl --request ${method} \\`, `  --url "${url}" \\`];
+  if (auth)
+    parts.push(`  --header "${auth.name}: ${auth.value.replace("$KEY", `$${KEY_ENV}`)}" \\`);
+  for (const [name, value] of allHeaders) parts.push(`  --header "${name}: ${value}" \\`);
+  if (needsBody) parts.push("  --data @payload.json " + String.fromCharCode(92));
+  if (body !== void 0) parts.push(`  --data '${JSON.stringify(body)}' \\`);
+  const last = parts.length - 1;
+  parts[last] = parts[last].replace(/ \\$/, "");
+  return parts.join("\n");
+}
+function pythonExample({ url, origin, method, auth, allHeaders, body, needsBody }: ExampleRequest) {
+  const headerLines = [
+    ...(auth
+      ? [
+          `    ${JSON.stringify(auth.name)}: ${auth.value.includes("Bearer") ? '"Bearer " + api_key' : "api_key"},`,
+        ]
+      : []),
+    ...allHeaders.map(([name, value]) => `    ${JSON.stringify(name)}: ${JSON.stringify(value)},`),
+  ];
+  const lines = [
+    "import os",
+    "import requests",
+    ...(needsBody ? ["import json"] : []),
+    "",
+    `origin = "${origin}"`,
+    `path = "${url.slice(origin.length)}"`,
+  ];
+  if (auth) lines.push(`api_key = os.environ["${KEY_ENV}"]`);
+  if (headerLines.length) lines.push("headers = {", ...headerLines, "}");
+  if (needsBody)
     lines.push(
       "",
-      `response = requests.${method.toLowerCase()}(`,
-      "    origin + path,",
-      ...(headerLines.length ? ["    headers=headers,"] : []),
-      ...(needsBody || body !== void 0 ? ["    json=payload,"] : []),
-      ")",
-      "print(response.json())",
+      "# Supply your request body in payload.json",
+      'with open("payload.json") as file:',
+      "    payload = json.load(file)",
     );
-    return lines.join("\n");
-  }
+  if (body !== void 0) lines.push(`payload = ${pythonLiteral({ value: body })}`);
+  lines.push(
+    "",
+    `response = requests.${method.toLowerCase()}(`,
+    "    origin + path,",
+    ...(headerLines.length ? ["    headers=headers,"] : []),
+    ...(needsBody || body !== void 0 ? ["    json=payload,"] : []),
+    ")",
+    "print(response.json())",
+  );
+  return lines.join("\n");
+}
+function typescriptExample({ url, method, auth, allHeaders, body, needsBody }: ExampleRequest) {
   const headerLines = [
     ...(auth
       ? [
@@ -198,7 +222,7 @@ export function generateExample({
   ];
   if (headerLines.length) lines.push("  headers: {", ...headerLines, "  },");
   if (needsBody) lines.push("  body: JSON.stringify(payload),");
-  if (body !== undefined)
+  if (body !== void 0)
     lines.push(
       `  body: JSON.stringify(${JSON.stringify(body, null, 2).split("\n").join("\n  ")}),`,
     );
@@ -220,8 +244,8 @@ export function liveRequest({
   const auth = authHeader({ operation });
   const init: Record<string, string> = Object.fromEntries(headers);
   if (auth && key) init[auth.name] = auth.value.replace("$KEY", key);
-  const body = operation.body && state.body.trim() ? state.body : undefined;
-  if (body !== undefined) init["Content-Type"] = "application/json";
+  const body = operation.body && state.body.trim() ? state.body : void 0;
+  if (body !== void 0) init["Content-Type"] = "application/json";
   return { url, headers: init, body };
 }
 

@@ -30,47 +30,52 @@ export function parseFenceMeta({ meta }) {
   return { title: title || label, highlight, flags };
 }
 
-/** Highlights every fenced block at build time into per-line HTML on the `pre` element. */
+function visitTree({ node, visitor }) {
+  visitor(node);
+  for (const child of node.children ?? []) visitTree({ node: child, visitor });
+}
+
+function codeBlocks({ tree }) {
+  const blocks = [];
+  visitTree({
+    node: tree,
+    visitor: (node) => {
+      if (node.type !== "element" || node.tagName !== "pre") return;
+      const code = node.children?.find(
+        (child) => child.type === "element" && child.tagName === "code",
+      );
+      if (code) blocks.push({ pre: node, code });
+    },
+  });
+  return blocks;
+}
+
+async function highlightBlock({ pre, code }) {
+  const className = [code.properties?.className ?? []].flat();
+  const lang =
+    className.find((name) => String(name).startsWith("language-"))?.slice("language-".length) ?? "";
+  const source = textOf({ node: code }).replace(/\n$/, "");
+  const meta = parseFenceMeta({ meta: code.data?.meta });
+  const lines = lang === "mermaid" ? [] : await highlightLines({ code: source, lang });
+  pre.properties = {
+    dataLang: lang,
+    dataTitle: meta.title,
+    dataCode: source,
+    dataLines: JSON.stringify(lines),
+    dataHighlight: meta.highlight.join(","),
+    dataFlags: meta.flags.join(","),
+  };
+  if (lang === "mermaid") {
+    const diagram = await renderDiagram({ source });
+    pre.properties.dataDiagramLight = diagram.light;
+    pre.properties.dataDiagramDark = diagram.dark;
+  }
+  pre.children = [];
+}
+
 export function rehypeDocsCode() {
   return async (tree) => {
-    const jobs = [];
-    const visit = (node) => {
-      if (node.type === "element" && node.tagName === "pre") {
-        const code = node.children?.find(
-          (child) => child.type === "element" && child.tagName === "code",
-        );
-        if (code) jobs.push({ pre: node, code });
-        return;
-      }
-      for (const child of node.children ?? []) visit(child);
-    };
-    visit(tree);
-    for (const { pre, code } of jobs) {
-      const className = [code.properties?.className ?? []].flat();
-      const lang =
-        className.find((name) => String(name).startsWith("language-"))?.slice("language-".length) ??
-        "";
-      const source = textOf({ node: code }).replace(/\n$/, "");
-      const meta = parseFenceMeta({ meta: code.data?.meta });
-      const lines =
-        lang === "mermaid"
-          ? source.split("\n").map(() => "")
-          : await highlightLines({ code: source, lang });
-      pre.properties = {
-        dataLang: lang,
-        dataTitle: meta.title,
-        dataCode: source,
-        dataLines: JSON.stringify(lines),
-        dataHighlight: meta.highlight.join(","),
-        dataFlags: meta.flags.join(","),
-      };
-      if (lang === "mermaid") {
-        const diagram = await renderDiagram({ source });
-        pre.properties.dataDiagramLight = diagram.light;
-        pre.properties.dataDiagramDark = diagram.dark;
-      }
-      pre.children = [];
-    }
+    for (const block of codeBlocks({ tree })) await highlightBlock(block);
   };
 }
 
@@ -104,77 +109,78 @@ function estreeOf({ value }) {
   return { type: "Literal", value };
 }
 
-/** Exports `headings` (h2, h3 and step titles) so the contents rail renders in the first HTML. */
+function collectStep({ node, state }) {
+  if (!["mdxJsxFlowElement", "mdxJsxTextElement"].includes(node.type) || node.name !== "Step")
+    return;
+  const title = node.attributes?.find(
+    (attr) => attr.name === "title" && typeof attr.value === "string",
+  );
+  if (!title) return;
+  let id = node.attributes.find((attr) => attr.name === "id")?.value;
+  if (!id) {
+    id = slugOf({ text: title.value, used: state.used });
+    node.attributes.push({ type: "mdxJsxAttribute", name: "id", value: id });
+  }
+  state.headings.push({ depth: state.sawH2 ? 3 : 2, text: title.value, id });
+}
+
+function collectHeading({ node, state }) {
+  if (node.type === "element" && /^h[23]$/.test(node.tagName) && node.properties?.id) {
+    const depth = Number(node.tagName[1]);
+    if (depth === 2) state.sawH2 = true;
+    state.headings.push({ depth, text: textOf({ node }).trim(), id: String(node.properties.id) });
+  }
+  collectStep({ node, state });
+}
+
 export function rehypeDocsHeadings() {
   return (tree) => {
-    const used = new Map();
-    const headings = [];
-    let sawH2 = false;
-    const visit = (node) => {
-      if (node.type === "element" && /^h[1-6]$/.test(node.tagName) && node.properties?.id) {
-        used.set(String(node.properties.id), 1);
-      }
-      for (const child of node.children ?? []) visit(child);
-    };
-    visit(tree);
-    const collect = (node) => {
-      if (node.type === "element" && /^h[23]$/.test(node.tagName) && node.properties?.id) {
-        const depth = Number(node.tagName[1]);
-        if (depth === 2) sawH2 = true;
-        headings.push({ depth, text: textOf({ node }).trim(), id: String(node.properties.id) });
-      }
-      if (
-        (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") &&
-        node.name === "Step"
-      ) {
-        const title = node.attributes?.find(
-          (attr) => attr.name === "title" && typeof attr.value === "string",
-        );
-        if (title) {
-          let id = node.attributes.find((attr) => attr.name === "id")?.value;
-          if (!id) {
-            id = slugOf({ text: title.value, used });
-            node.attributes.push({ type: "mdxJsxAttribute", name: "id", value: id });
-          }
-          headings.push({ depth: sawH2 ? 3 : 2, text: title.value, id });
-        }
-      }
-      for (const child of node.children ?? []) collect(child);
-    };
-    collect(tree);
-    tree.children.push({
-      type: "mdxjsEsm",
-      value: "export const headings = []",
-      data: {
-        estree: {
-          type: "Program",
-          sourceType: "module",
-          body: [
-            {
-              type: "ExportNamedDeclaration",
-              specifiers: [],
-              declaration: {
-                type: "VariableDeclaration",
-                kind: "const",
-                declarations: [
-                  {
-                    type: "VariableDeclarator",
-                    id: { type: "Identifier", name: "headings" },
-                    init: estreeOf({ value: headings }),
-                  },
-                ],
-              },
-            },
-          ],
-        },
+    const state = { used: new Map(), headings: [], sawH2: false };
+    visitTree({
+      node: tree,
+      visitor: (node) => {
+        if (node.type === "element" && /^h[1-6]$/.test(node.tagName) && node.properties?.id)
+          state.used.set(String(node.properties.id), 1);
       },
     });
+    visitTree({ node: tree, visitor: (node) => collectHeading({ node, state }) });
+    tree.children.push(headingsExport({ headings: state.headings }));
+  };
+}
+
+function headingsExport({ headings }) {
+  return {
+    type: "mdxjsEsm",
+    value: "export const headings = []",
+    data: {
+      estree: {
+        type: "Program",
+        sourceType: "module",
+        body: [
+          {
+            type: "ExportNamedDeclaration",
+            specifiers: [],
+            declaration: {
+              type: "VariableDeclaration",
+              kind: "const",
+              declarations: [
+                {
+                  type: "VariableDeclarator",
+                  id: { type: "Identifier", name: "headings" },
+                  init: estreeOf({ value: headings }),
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
   };
 }
 
 const MEDIA = { img: "DocsImg", video: "DocsVideo", iframe: "DocsIframe" };
 
-/** Raw `<img>`, `<video>` and `<iframe>` tags are not mapped by MDX, so route them to docs components. */
+/** Raw media tags bypass MDX component mappings. */
 export function rehypeDocsMedia() {
   return (tree) => {
     const visit = (node) => {
