@@ -502,11 +502,10 @@ func (cell *run) routeBrokenDrill(ctx context.Context) error {
 	}
 	trace, _ := cell.firstPrivateWrites()
 	_ = waitFor(ctx, 7*time.Minute, func() bool { return cell.routesRecorded(ctx) >= len(cell.private) })
-	for label, organization := range cell.private {
-		key := "CLICKHOUSE_URL__" + label + "__" + organization
-		for _, variant := range []string{"missing", "malformed"} {
-			cell.routeProbes = append(cell.routeProbes, cell.probeRoute(ctx, routeBreak{variant: variant, key: key, trace: trace}))
-		}
+	// Only the organization whose key and trace the probe asks with: breaking another's route probed a healthy one (T7-F20).
+	key := "CLICKHOUSE_URL__" + cell.privateLabel + "__" + cell.private[cell.privateLabel]
+	for _, variant := range []string{"missing", "malformed"} {
+		cell.routeProbes = append(cell.routeProbes, cell.probeRoute(ctx, routeBreak{variant: variant, key: key, trace: trace}))
 	}
 	misplaced, _, err := cell.placement(ctx)
 	cell.routeAfter, cell.routeAfterErr = misplaced, err
@@ -582,7 +581,13 @@ func (cell *run) askProbe(ctx context.Context, probe *routeProbe, broken routeBr
 		"search": {http.MethodPost, base + "/api/traces/search", client.APIKey, fmt.Sprintf(`{"startDate": %d, "endDate": %d, "pageSize": 5}`, now-86_400_000, now)},
 	}
 	for kind, read := range reads {
-		status, text := readAs(ctx, read)
+		// /healthz answers before the api serves: wait out its "is starting" 503 (T7-F19).
+		var status int
+		var text string
+		_ = waitFor(ctx, 2*time.Minute, func() bool {
+			status, text = readAs(ctx, read)
+			return status != http.StatusServiceUnavailable || !strings.Contains(text, "is starting")
+		})
 		probe.Answers[kind] = status
 		probe.Bodies = append(probe.Bodies, fmt.Sprintf("%s: %.200s", kind, text))
 		if match := errorCode.FindStringSubmatch(text); match != nil {
