@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   clickHouseRunOptions,
   closingLines,
+  PRIVATE_TARGET_WAIT_SECONDS,
   noClickHouseLine,
   sqlReader,
   upcastStepsOf,
@@ -144,5 +145,28 @@ describe("clickHouseRunOptions()", () => {
     expect(
       "upTo" in clickHouseRunOptions({ url, settings, upTo: undefined, signal: undefined }),
     ).toBe(false);
+  });
+
+  /** @scenario "A private ClickHouse target is waited for briefly before it is held" */
+  it("waits the full connect wait only for the shared target", () => {
+    const url = "http://clickhouse:8123/langwatch";
+    const configured = { ...settings, waitSeconds: 180 };
+    const waitFor = (options: { waitSeconds: number; privateTarget: boolean }) =>
+      clickHouseRunOptions({
+        url,
+        settings: { ...settings, waitSeconds: options.waitSeconds },
+        upTo: undefined,
+        signal: undefined,
+        privateTarget: options.privateTarget,
+      }).waitSeconds;
+
+    expect(
+      clickHouseRunOptions({ url, settings: configured, upTo: undefined, signal: undefined })
+        .waitSeconds,
+    ).toBe(180);
+    expect(waitFor({ waitSeconds: 180, privateTarget: true })).toBe(PRIVATE_TARGET_WAIT_SECONDS);
+    expect(PRIVATE_TARGET_WAIT_SECONDS).toBe(5);
+    expect(waitFor({ waitSeconds: 0, privateTarget: true })).toBe(0);
+    expect(waitFor({ waitSeconds: 0, privateTarget: false })).toBe(0);
   });
 });

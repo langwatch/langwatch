@@ -71,6 +71,33 @@ describe("UpgradesTabs", () => {
     });
   });
 
+  describe("given the shared target and a private one", () => {
+    /** @scenario "The dataplanes tab lists the shared ClickHouse target beside the private ones" */
+    it("lists the shared target first with its version and outstanding steps", async () => {
+      renderTabs([
+        {
+          target: "private:org_1",
+          version: "00041",
+          outstanding: 1,
+          lastError: null,
+          route: "present",
+        },
+        { target: "shared", version: "00042", outstanding: 3, lastError: null, route: "present" },
+      ]);
+
+      fireEvent.click(screen.getByRole("tab", { name: "Dataplanes" }));
+
+      const shared = await screen.findByTestId("upgrade-dataplane-shared");
+      expect(shared.textContent).toContain("00042");
+      expect(shared.textContent).toContain("3");
+      const rows = screen.getAllByTestId(/^upgrade-dataplane-(shared|private:org_1)$/);
+      expect(rows.map((row) => row.dataset.testid)).toEqual([
+        "upgrade-dataplane-shared",
+        "upgrade-dataplane-private:org_1",
+      ]);
+    });
+  });
+
   describe("given a private target whose route variable is missing", () => {
     /** @scenario "The dataplanes tab marks a private target whose route is missing or malformed" */
     it("marks that target's route as missing and the organization as refused", async () => {

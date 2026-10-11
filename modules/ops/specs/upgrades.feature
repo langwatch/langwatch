@@ -329,6 +329,14 @@ Feature: Ops shows an installation's release upgrades, read-only
     Then each target shows its goose version and how many steps are outstanding
     And the failed target shows its last error
 
+  # T7-F5: the shared target is a row of the table too, so an operator compares it with each private one.
+  @integration
+  Scenario: The dataplanes tab lists the shared ClickHouse target beside the private ones
+    Given the shared ClickHouse target and a private one
+    When an operator opens the Dataplanes tab
+    Then the shared target is listed first with its goose version and outstanding steps
+    And the private target is listed after it
+
   # A private organization recorded by the organization module whose route variable is missing or
   # malformed is refused by the stores (specs/private-dataplane/clickhouse-routing.feature); the
   # tab shows it so an operator sees why (Alex, 2026-10-11, T7-F2/T7-F3).

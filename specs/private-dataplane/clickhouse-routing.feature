@@ -289,3 +289,11 @@ Feature: Private ClickHouse Routing
     When the routed client is resolved for that tenant
     Then it answers the shared ClickHouse
     And no project, organization or user is looked up to get there
+
+  @unit
+  Scenario: A read whose ClickHouse stops answering is refused as clickhouse_unavailable
+    Given the private ClickHouse for "org123" drops every connection
+    When a read for one of its projects runs out of retries on "read ECONNRESET"
+    Then the read fails with the handled 503 "clickhouse_unavailable"
+    And the dropped connection is kept as its reason
+    But a ClickHouse server error is passed through unchanged

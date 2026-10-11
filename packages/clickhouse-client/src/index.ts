@@ -28,7 +28,7 @@ export {
   CLICKHOUSE_COLUMNS_REFRESH_MS,
   ClickHouseColumns,
 } from "./present-columns.ts";
-export { ClickHouseQueryClient } from "./client.ts";
+export { ClickHouseQueryClient, ClickHouseUnavailableErrorFactory } from "./client.ts";
 export {
   ClickHouseConfigService,
   DuplicatePrivateClickHouseRouteError,

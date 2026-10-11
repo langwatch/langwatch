@@ -15,6 +15,7 @@ import {
   ClickHouseQueryClient,
   ClickHouseShutdownService,
   ClickHouseStatementAdmission,
+  ClickHouseUnavailableErrorFactory,
   detectColdScan,
   RetryPolicy,
   routingDriver,
@@ -154,6 +155,27 @@ class ClickHouseOverloadedError extends HandledError {
 export class OverloadedRefusal extends ClickHouseOverloadErrorFactory {
   create({ cause }: { cause: unknown }): unknown {
     return new ClickHouseOverloadedError({ reasons: cause instanceof Error ? [cause] : [] });
+  }
+}
+
+/** Main's refusal for a read whose ClickHouse did not answer (analytics-contract's twin). */
+class ClickHouseUnavailableError extends HandledError {
+  declare readonly code: "clickhouse_unavailable";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super("clickhouse_unavailable", "Database temporarily unavailable", {
+      httpStatus: 503,
+      fault: "platform",
+      ...remediation("clickhouse_unavailable"),
+      reasons: options.reasons,
+    });
+    this.name = "ClickHouseUnavailableError";
+  }
+}
+
+export class UnavailableRefusal extends ClickHouseUnavailableErrorFactory {
+  create({ cause }: { cause: Error }): unknown {
+    return new ClickHouseUnavailableError({ reasons: [cause] });
   }
 }
 
@@ -307,6 +329,7 @@ export function buildClickHouse(options: {
     }),
     reporter,
     limiter: admission,
+    unavailableErrorFactory: new UnavailableRefusal(),
     privateRoutes: new Map(
       (config.privateRoutes ?? []).map((route) => [route.organizationId, route.url]),
     ),

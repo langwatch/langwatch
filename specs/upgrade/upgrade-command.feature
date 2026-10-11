@@ -78,6 +78,15 @@ Feature: The upgrade command
     Then it asks the applier once for every shipped step and exits with code 0
     And the private target's rows stay failed
 
+  # T7-F16: only the shared target delays ready by the full connect wait.
+  @unit
+  Scenario: A private ClickHouse target is waited for briefly before it is held
+    Given CLICKHOUSE_MIGRATE_WAIT_SECONDS is 180
+    When goose is run for the shared target and for "private:org_1"
+    Then the shared target is waited for 180 seconds
+    And "private:org_1" is waited for 5 seconds at most
+    And a wait of 0 stays 0 on both
+
   @integration
   Scenario: A failing shared ClickHouse target fails the run
     Given a ClickHouse step and two targets, "shared" and "private:org_1"

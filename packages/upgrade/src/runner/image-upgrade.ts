@@ -51,6 +51,7 @@ import { upgradeReadHintMessage, type UpgradeReadHintPublish } from "./run-hint.
 import { redactSecrets, UPGRADE_NEXT_ACTION, UPGRADE_STATUS_COMMAND } from "./run-log.ts";
 import {
   gooseAppliedStepIds,
+  isPrivateTarget,
   PRIVATE_TARGET_PREFIX,
   type SchemaTargetReport,
   type UpgradeReconciler,
@@ -185,24 +186,36 @@ async function resolvePrismaRolledBack({
   return { ok: error === null, error };
 }
 
+/**
+ * How long a private target is waited for before the runner holds it: only the shared target
+ * delays ready by the full connect wait; a held private target catches up on a later pass.
+ */
+export const PRIVATE_TARGET_WAIT_SECONDS = 5;
+
 /** What goose is run with for one target; `upTo` is set only when stepping a release. */
 export function clickHouseRunOptions({
   url,
   settings,
   upTo,
   signal,
+  privateTarget = false,
 }: {
   url: string;
   settings: Pick<GooseOptions, "clusterName" | "childEnvironment" | "waitSeconds"> | undefined;
   upTo: number | undefined;
   /** The upgrade lease's signal: losing the lease kills goose. */
   signal: AbortSignal | undefined;
+  /** A private target is tried briefly, then held (T7-F16). */
+  privateTarget?: boolean;
 }): GooseOptions {
+  const waitSeconds = privateTarget
+    ? Math.min(settings?.waitSeconds ?? PRIVATE_TARGET_WAIT_SECONDS, PRIVATE_TARGET_WAIT_SECONDS)
+    : settings?.waitSeconds;
   return {
     connectionUrl: url,
     clusterName: settings?.clusterName,
     childEnvironment: settings?.childEnvironment,
-    waitSeconds: settings?.waitSeconds,
+    waitSeconds,
     verbose: true,
     signal,
     ...(upTo === undefined ? {} : { upTo }),
@@ -227,7 +240,15 @@ async function migrateClickHouse({
   for (const target of targets.filter(({ name }) => !skipTargets?.has(name))) {
     let error: string | null = null;
     try {
-      await runMigrations(clickHouseRunOptions({ url: target.url, settings, upTo, signal }));
+      await runMigrations(
+        clickHouseRunOptions({
+          url: target.url,
+          settings,
+          upTo,
+          signal,
+          privateTarget: isPrivateTarget({ target: target.name }),
+        }),
+      );
     } catch (failure) {
       error = String(failure instanceof Error ? failure.message : failure)
         .split(target.url)

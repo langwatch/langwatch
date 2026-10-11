@@ -472,6 +472,38 @@ describe("projectionLaneReplayer", () => {
     });
   });
 
+  describe("given a listed tenant whose organisation the router does not know", () => {
+    /** @scenario "A tenant with no known organisation is skipped and the replay finishes" */
+    it("skips that tenant and replays every other one", async () => {
+      const { log, readModel, replayer, tenantsDone, onTenantComplete } = setUpTwoTenants({
+        sharedTenants: ["tenant-1", "tenant-2"],
+        directoryPages: [["ghost-org"]],
+      });
+      const discover = log.discoverAffectedAggregates.bind(log);
+      log.discoverAffectedAggregates = async (input) => {
+        if (input.tenantId !== "ghost-org") return discover(input);
+        const unknown = new Error('tenant "ghost-org" has no known organisation');
+        unknown.name = "UnknownTenantError";
+        throw unknown;
+      };
+
+      const result = await replayer.replayLane({
+        lane: LANE,
+        since: FROM_START,
+        dryRun: false,
+        onTenantComplete,
+      });
+
+      expect(Object.fromEntries(readModel)).toEqual({ "directory-a": 1, "directory-b": 2 });
+      expect(result).toMatchObject({ aggregatesReplayed: 2, totalEvents: 3 });
+      expect(tenantsDone.map((done) => done.tenantId)).toEqual([
+        "ghost-org",
+        "tenant-1",
+        "tenant-2",
+      ]);
+    });
+  });
+
   describe("given a tenant both the shared log and the tenant directory list", () => {
     /** @scenario "A tenant listed by both the shared log and the tenant directory is replayed once" */
     it("discovers and replays it once", async () => {
