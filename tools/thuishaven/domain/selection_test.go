@@ -104,3 +104,14 @@ func TestDescribeNamesTheDeltas(t *testing.T) {
 		t.Errorf("Describe() = %q, want the exact delta that adds langy", got)
 	}
 }
+
+// @scenario "Selecting Langy also selects the AI gateway it forwards to"
+func TestSelectingLangyAlsoSelectsGateway(t *testing.T) {
+	sel, err := ApplySelectionDeltas(Selection{}, []string{"+langy"})
+	if err != nil {
+		t.Fatalf("+langy was rejected: %v", err)
+	}
+	if !sel.Langy || !sel.Gateway {
+		t.Errorf("+langy must select langy and the gateway, got %+v", sel)
+	}
+}

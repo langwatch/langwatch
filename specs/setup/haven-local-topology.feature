@@ -195,6 +195,13 @@ Feature: The local development topology
     And with LANGWATCH_DEV_ONE_PROCESS=0 the "go" and "sims" lanes are planned as before
     And Langy keeps a lane of its own either way
 
+  # Langy's LLM proxy forwards to the AI gateway; without it every reply fails.
+  @unit
+  Scenario: Selecting Langy also selects the AI gateway it forwards to
+    Given a selection with neither Langy nor the gateway
+    When the developer adds "+langy"
+    Then both Langy and the gateway are selected
+
   # Bound by tools/thuishaven/app/plan_langy_test.go. A global CLI from a package
   # manager lags the checkout, so Langy's commands would be tested against old flags.
   @unit

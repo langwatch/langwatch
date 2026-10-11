@@ -202,6 +202,9 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.NLP = on
 	case "langy":
 		sel.Langy = on
+		if on {
+			sel.Gateway = true
+		}
 	case "idp":
 		sel.IDP = on
 	case "mail":
