@@ -12,8 +12,8 @@ func TestCheckRecipeRefusesAnUnknownVersion(t *testing.T) {
 		t.Fatalf("the known version is refused: %v", err)
 	}
 	err := CheckRecipe(RecipeVersion + 1)
-	if err == nil || !strings.Contains(err.Error(), "is unknown") || !strings.Contains(err.Error(), "knows recipe version 2") {
-		t.Fatalf("err %v, want the unknown version and the known version 2 named", err)
+	if err == nil || !strings.Contains(err.Error(), "is unknown") || !strings.Contains(err.Error(), "knows recipe version 3") {
+		t.Fatalf("err %v, want the unknown version and the known version 3 named", err)
 	}
 }
 

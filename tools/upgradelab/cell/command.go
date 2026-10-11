@@ -89,6 +89,7 @@ func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags.DurationVar(&options.Rate, "rate", time.Second, "each ingest kind fires once per rate; API kinds slower")
 	flags.DurationVar(&options.DrainWithin, "drain-within", 60*time.Minute, "produce: bound on main's worker draining the seed backlog before the cut")
 	flags.IntVar(&options.DrainNear, "drain-near", 100, "produce: group-queue depth at or below which the backlog counts as drained")
+	flags.IntVar(&options.PaceAbove, "pace-above", 50000, "produce, tier M: group-queue depth above which the next telemetry wave waits")
 	flags.IntVar(&options.Trickle, "trickle", 300, "produce, tier M: spans sent live after the drain, so the cut still catches in-flight jobs")
 	flags.DurationVar(&options.Hold, "hold", 60*time.Second, "how long a held request may take before it counts as failed")
 	flags.StringVar(&options.ServiceBin, "service-bin", ".claude/tmp/upgradelab/bin/service", "the Go service binary hosting storagesim (go build -tags dev -o <path> ./cmd/service), for profiles with object stores")

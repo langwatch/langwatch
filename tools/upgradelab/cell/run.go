@@ -37,7 +37,7 @@ type Options struct {
 	WorkerDelay, Rate, Hold          time.Duration
 	WalkEvery                        time.Duration // the browser walker's pause between rounds
 	DrainWithin                      time.Duration // produce: bound on main draining its queue after the seed burst
-	DrainNear, Trickle               int           // produce: depth that counts as drained; spans sent live before the cut
+	DrainNear, Trickle, PaceAbove    int           // produce: depth that counts as drained; spans sent live before the cut
 	SwitchOn, ServiceBin             string
 	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
 	Ledger                           []string // #8553 rows this cell claims and reports to

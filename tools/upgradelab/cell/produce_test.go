@@ -130,7 +130,7 @@ func TestDrainVerdict(t *testing.T) {
 
 func TestCacheKeyCarriesTheRecipeRevision(t *testing.T) {
 	key := CacheKey(Options{Deployment: "cloud", Tier: "M", Shape: "typical", Seed: 1, Release: "main@abc"})
-	if want := "cloud-M-typical-seed1-main-abc-r2"; key != want {
-		t.Errorf("got %q, want %q: old -r1 snapshots must not match", key, want)
+	if want := "cloud-M-typical-seed1-main-abc-r3"; key != want {
+		t.Errorf("got %q, want %q: old -r2 snapshots must not match", key, want)
 	}
 }

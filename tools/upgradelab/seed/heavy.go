@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/seedgen"
@@ -24,6 +26,54 @@ type HeavyInput struct {
 	TelemetryOnly        bool // skip the product kinds: a trickle of live telemetry, not a second seed
 	Workers              int  // concurrent doors; default 8: requests carry up to 500 spans, so 32 timed out and starved the grants projection
 	Log                  io.Writer
+	Pace                 *Pace // nil sends the telemetry in one burst, as a trickle does
+}
+
+// HeavyVolumes is the spans a heavy seed sends per tier; metric points and logs follow the spans.
+// M is a tenth of seedgen's medium so one main worker drains it; L keeps the medium for bigger runs.
+var HeavyVolumes = map[string]int{"M": 30_000, "L": 300_000}
+
+// HeavySpans is the span volume of a tier; an unknown tier is seedgen's medium.
+func HeavySpans(tier string) int { return cmp.Or(HeavyVolumes[tier], HeavyVolumes["L"]) }
+
+// Pace sends telemetry in waves: after every WaveChunks requests the seed waits while Depth is above Above.
+type Pace struct {
+	Depth      func(ctx context.Context) (int, error)
+	Above      int           // the queue depth above which the next wave waits
+	WaveChunks int           // requests per wave; default 20
+	Within     time.Duration // longest one wait; past it the seed stops
+	Poll       time.Duration // between depth reads; default 5s
+}
+
+const (
+	defaultWaveChunks = 20
+	defaultPacePoll   = 5 * time.Second
+)
+
+// ErrOrganizationsRefused means a product organization could not be made, so no telemetry was sent.
+var ErrOrganizationsRefused = errors.New("a product organization could not be created")
+
+// ErrPaceExpired means the queue stayed above the pacing threshold for longer than the bound.
+var ErrPaceExpired = errors.New("the queue stayed above the pacing threshold")
+
+type paceState int
+
+const (
+	paceGo paceState = iota
+	paceWait
+	paceExpired
+)
+
+// paceVerdict judges one depth reading: go at or below above (or when unread, which never blocks a
+// wave); expired once waited passes limit; wait otherwise.
+func paceVerdict(depth int, readErr error, above int, waited, limit time.Duration) paceState {
+	switch {
+	case readErr != nil || depth <= above:
+		return paceGo
+	case waited >= limit:
+		return paceExpired
+	}
+	return paceWait
 }
 
 // HeavyResult counts what main accepted and refused, by kind.
@@ -32,9 +82,10 @@ type HeavyResult struct {
 	Refused map[string]int
 }
 
-// Heavy sends seedgen's medium telemetry into the tenancy's projects through the OTLP door, then makes
-// the product's own organizations and one of every product and REST kind in each. One refused kind
-// never stops the others; the error names each.
+// Heavy first makes the product's own organizations and one of every product and REST kind in each
+// (a refused organization stops the seed before any telemetry), then sends the telemetry into the
+// tenancy's projects through the OTLP door, in waves when Pace is set. One refused kind never stops
+// the others; the error names each.
 func Heavy(ctx context.Context, in HeavyInput) (HeavyResult, error) {
 	door := &seedgen.Door{App: in.App, Email: in.Email, Password: in.Password, Keys: map[string]string{}}
 	result := HeavyResult{Sent: map[string]int{}, Refused: map[string]int{}}
@@ -63,10 +114,15 @@ func Heavy(ctx context.Context, in HeavyInput) (HeavyResult, error) {
 		return result, err
 	}
 	run := &heavyRun{door: door, plan: plan, live: live, workers: cmp.Or(in.Workers, defaultHeavyWorkers), count: count}
+	run.pace, run.log = in.Pace, in.Log
 	if in.TelemetryOnly {
 		return result, errors.Join(run.telemetry(ctx)...)
 	}
-	return result, errors.Join(append(run.telemetry(ctx), run.product(ctx)...)...)
+	productErrs := run.product(ctx)
+	if slices.ContainsFunc(productErrs, func(err error) bool { return errors.Is(err, ErrOrganizationsRefused) }) {
+		return result, errors.Join(productErrs...)
+	}
+	return result, errors.Join(append(productErrs, run.telemetry(ctx)...)...)
 }
 
 func heavyPlan(in HeavyInput) (*seedgen.Plan, error) {
@@ -86,6 +142,7 @@ func heavyPlan(in HeavyInput) (*seedgen.Plan, error) {
 func (run *heavyRun) telemetry(ctx context.Context) []error {
 	chunks := make(chan seedgen.Action, run.workers)
 	pool := &chunkPool{door: run.door, count: run.count, packer: &seedgen.Packer{Now: time.Now()}}
+	waves := 0
 	for range run.workers {
 		pool.wg.Go(func() { pool.drain(ctx, chunks) })
 	}
@@ -98,6 +155,10 @@ func (run *heavyRun) telemetry(ctx context.Context) []error {
 			owner[step.Cell.Project] = run.live[len(owner)%len(run.live)].ID
 		}
 		pool.deal(dealt{plan: run.plan, step: step, project: owner[step.Cell.Project]}, chunks)
+		if err := run.wave(ctx, pool, &waves); err != nil {
+			pool.fail(err)
+			break
+		}
 	}
 	requests := pool.packer.Flush()
 	for i := range requests {
@@ -116,6 +177,45 @@ type heavyRun struct {
 	live    []Project
 	workers int
 	count   func(string, seedgen.Reply)
+	pace    *Pace
+	log     io.Writer
+}
+
+// wave holds the next chunk back, while the queue is above the pace threshold, once a wave of
+// requests has been sent.
+func (run *heavyRun) wave(ctx context.Context, pool *chunkPool, waves *int) error {
+	pace := run.pace
+	if pace == nil || pace.Depth == nil {
+		return nil
+	}
+	size := cmp.Or(pace.WaveChunks, defaultWaveChunks)
+	if pool.sent.Load() < int64(size*(*waves+1)) {
+		return nil
+	}
+	*waves++
+	start := time.Now()
+	for {
+		depth, err := pace.Depth(ctx)
+		switch paceVerdict(depth, err, pace.Above, time.Since(start), pace.Within) {
+		case paceGo:
+			run.logf("upgradelab: telemetry wave %d sent (%d requests so far), queue depth %d (unread: %v), next wave goes\n", *waves, pool.sent.Load(), depth, err)
+			return nil
+		case paceExpired:
+			return fmt.Errorf("%w: %d jobs above %d after %s", ErrPaceExpired, depth, pace.Above, pace.Within)
+		}
+		run.logf("upgradelab: telemetry wave %d sent, queue depth %d above %d, waiting %s\n", *waves, depth, pace.Above, time.Since(start).Round(time.Second))
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(cmp.Or(pace.Poll, defaultPacePoll)):
+		}
+	}
+}
+
+func (run *heavyRun) logf(format string, args ...any) {
+	if run.log != nil {
+		fmt.Fprintf(run.log, format, args...)
+	}
 }
 
 type chunkPool struct {
@@ -123,6 +223,7 @@ type chunkPool struct {
 	count  func(string, seedgen.Reply)
 	packer *seedgen.Packer // only deal touches it, from one goroutine
 	wg     sync.WaitGroup
+	sent   atomic.Int64 // requests the workers finished
 	mu     sync.Mutex
 	errs   []error
 }
@@ -140,6 +241,7 @@ func (pool *chunkPool) drain(ctx context.Context, chunks <-chan seedgen.Action) 
 			pool.fail(fmt.Errorf("%s: %w", chunk.Kind, err))
 		}
 		pool.count(chunk.Kind, reply)
+		pool.sent.Add(1)
 	}
 }
 
@@ -188,10 +290,10 @@ type heavyOrgInput struct {
 func heavyOrg(ctx context.Context, door *seedgen.Door, in heavyOrgInput) []error {
 	label := strconv.Itoa(in.index)
 	name := fmt.Sprintf("Heavy %s %s", in.persona, label)
-	reply, _ := sendRetrying(ctx, door, seedgen.Action{Kind: seedgen.KindProductOrg, Input: marshal(map[string]string{"orgName": name, "projectName": "heavy " + label})})
+	reply, _ := sendOrg(ctx, door, seedgen.Action{Kind: seedgen.KindProductOrg, Input: marshal(map[string]string{"orgName": name, "projectName": "heavy " + label})})
 	in.count(seedgen.KindProductOrg, reply)
 	if !reply.OK {
-		return []error{fmt.Errorf("kind %s for %s refused: %s", seedgen.KindProductOrg, name, reply.Code)}
+		return []error{fmt.Errorf("%w: kind %s for %s refused: %s", ErrOrganizationsRefused, seedgen.KindProductOrg, name, reply.Code)}
 	}
 	projectID, key, err := heavyProject(ctx, door, reply.Refs["projectSlug"])
 	if err != nil {
@@ -277,12 +379,31 @@ const (
 	heavyAttempts       = 5
 )
 
-// sendRetrying resends a retryable refusal (a timeout, a 5xx such as an unconfirmed grant) with doubling back-off.
-func sendRetrying(ctx context.Context, door *seedgen.Door, action seedgen.Action) (seedgen.Reply, error) {
-	wait := 2 * time.Second
+const orgAttempts = 10
+
+var orgBackoff, orgBackoffMax = 2 * time.Second, 30 * time.Second
+
+// sendOrg resends an organization the door refused, whatever the cause: the grant projection answers
+// "access change still processing" until it catches up, and the refusal does not carry that text. It
+// is the only door that is idempotent enough to repeat without a retryable mark.
+func sendOrg(ctx context.Context, door *seedgen.Door, action seedgen.Action) (seedgen.Reply, error) {
+	return resendWith(ctx, resendInput{door: door, action: action, attempts: orgAttempts, wait: orgBackoff, max: orgBackoffMax, always: true})
+}
+
+type resendInput struct {
+	door     *seedgen.Door
+	action   seedgen.Action
+	attempts int
+	wait     time.Duration
+	max      time.Duration
+	always   bool // resend any refusal, not only a retryable one
+}
+
+func resendWith(ctx context.Context, in resendInput) (seedgen.Reply, error) {
+	wait := in.wait
 	for attempt := 1; ; attempt++ {
-		reply, err := door.Send(ctx, action)
-		if err != nil || reply.OK || !reply.Retryable || attempt == heavyAttempts {
+		reply, err := in.door.Send(ctx, in.action)
+		if err != nil || reply.OK || !(reply.Retryable || in.always) || attempt == in.attempts {
 			return reply, err
 		}
 		select {
@@ -290,6 +411,11 @@ func sendRetrying(ctx context.Context, door *seedgen.Door, action seedgen.Action
 			return reply, ctx.Err()
 		case <-time.After(wait):
 		}
-		wait *= 2
+		wait = min(wait*2, in.max)
 	}
+}
+
+// sendRetrying resends a retryable refusal (a timeout, a 5xx such as an unconfirmed grant) with doubling back-off.
+func sendRetrying(ctx context.Context, door *seedgen.Door, action seedgen.Action) (seedgen.Reply, error) {
+	return resendWith(ctx, resendInput{door: door, action: action, attempts: heavyAttempts, wait: 2 * time.Second, max: time.Hour})
 }

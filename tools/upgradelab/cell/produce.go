@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -163,10 +164,16 @@ func (cell *run) seedTier(ctx context.Context) error {
 	if err := cell.basePrompt(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
 	}
-	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: tenancy, Seed: cell.options.Seed, Anchor: cell.anchor})
+	pace := &seed.Pace{Depth: func(ctx context.Context) (int, error) { return QueueDepth(ctx, cell.stores.RedisPort) },
+		Above: cell.options.PaceAbove, Within: cell.options.DrainWithin}
+	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: tenancy, Seed: cell.options.Seed,
+		Anchor: cell.anchor, Spans: seed.HeavySpans(cell.options.Tier), Pace: pace, Log: cell.options.Stdout})
 	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("heavy seed sent %v, refused %v", result.Sent, result.Refused))
 	if err != nil {
 		cell.report.Notes = append(cell.report.Notes, "heavy seed: "+err.Error())
+		if errors.Is(err, seed.ErrOrganizationsRefused) || errors.Is(err, seed.ErrPaceExpired) {
+			return fmt.Errorf("heavy seed: %w", err)
+		}
 	}
 	return nil
 }
