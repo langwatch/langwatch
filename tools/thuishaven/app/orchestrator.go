@@ -1315,6 +1315,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.DesignSystem
 	case domain.MailRoomService:
 		return opts.Selection.MailRoom
+	case domain.DocsService:
+		return opts.Selection.Docs
 	case domain.LangevalsService:
 		return opts.Selection.Langevals
 	case domain.StorageService:

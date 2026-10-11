@@ -83,7 +83,12 @@ for ours (`tools/thuishaven/app/identity.go`).
 
 ## The consoles: always built, never a dev server
 
-Every haven web console is a build served by Go; none runs Vite, Storybook dev or HMR.
+Every haven web console is a build served by Go; none runs Vite, Storybook dev or HMR. The one
+exception is the docs site (`haven up +docs`): the `docs` lane runs `@langwatch/docs-site`'s Vite dev
+server on a haven port, hot reloading at `docs.<slug>.langwatch.localhost`; `haven logs docs`
+reads it and `haven browser open https://docs.<slug>.langwatch.localhost:1355/ --lane docs` opens it (signed out
+is fine). `haven up --only docs` runs the docs ALONE (portless route + the dev server, no stack, no
+databases), in the foreground until stopped (agents: run it in the background); the browser opens it the same way.
 
 | Console                                                                             | Where                                                                    | Served by                                                                                                                                                           |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

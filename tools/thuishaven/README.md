@@ -60,13 +60,19 @@ hit `127.0.0.1:<port>` (see `haven status`). Mail, storage and analytics start w
 a little sample content (`MAILSIM_SEED`, `STORAGESIM_SEED`, `ANALYTICSSIM_SEED`,
 set to 1 by haven); each simulator's delete endpoint empties it.
 
-Two more are there only when the worktree asked for them (`haven up
-+design-system +mail-room`) — developer tools rather than parts of the product:
+Three more are there only when the worktree asked for them (`haven up
++design-system +mail-room +docs`) — developer tools rather than parts of the product:
 
-| Hostname                                   | Service                                   |
-| ------------------------------------------ | ----------------------------------------- |
-| `design-system.<slug>.langwatch.localhost` | The design system's Storybook             |
-| `mail-room.<slug>.langwatch.localhost`     | The mail studio — every message previewed |
+| Hostname                                   | Service                                                       |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| `design-system.<slug>.langwatch.localhost` | The design system's Storybook                                 |
+| `mail-room.<slug>.langwatch.localhost`     | The mail studio — every message previewed                     |
+| `docs.<slug>.langwatch.localhost`          | The docs site on its Vite dev server (`+docs`), hot reloading |
+
+`haven up --only docs` runs the docs site alone, with no stack at all (no app, api, worker,
+databases, migrations or simulators): the route and the Vite dev server, in the foreground
+until stopped, the way `haven sim idp` runs the IdP alone. `haven browser open` reaches it
+with no app to wait on. A running stack refuses it; use `haven up +docs` there.
 
 The design system answers to a shorter spelling too: `ds` stands in for
 `design-system`. The mail studio has no alias — its hostname is
@@ -139,7 +145,7 @@ haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch project tabs; the logs tab has per-service streams. q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
-                 sticks (+langy, +langevals, -nlp, -gateway, +design-system, +mail-room); a fresh
+                 sticks (+langy, +langevals, -nlp, -gateway, +design-system, +mail-room, +docs); a fresh
                  worktree runs ui + api + workers + nlp + gateway + idp, with
                  langy, langevals and the two developer tools off. -w watches
                  the Go services via
@@ -658,7 +664,7 @@ haven stack. On such a stack:
   an origin mismatch (`PORTLESS=0` makes the two agree). And its port pre-flight
   checks `PORT + 1000` even though the API binds the port haven allocated, so a
   busy `PORT + 1000` refuses a boot that would have worked.
-- The two developer-tool lanes (`design-system`, `mail-room`) have no packages
+- The developer-tool lanes (`design-system`, `mail-room`, `docs`) have no packages
   there. They are off by default; selecting one on a monolith stack starts a lane
   that fails.
 

@@ -97,3 +97,38 @@ func TestDeveloperToolsDoNotDisturbTheThreeNodeLanes(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "The docs site is a developer tool served with hot reload"
+func TestDocsLaneRunsTheDocsDevServerOnItsAllocatedPort(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	st := domain.Stack{Slug: "test", Services: []domain.Service{{Name: domain.DocsService, Port: 45173}}}
+	plan := func(sel domain.Selection) []Child {
+		return o.planChildren(st, PlanOptions{Selection: sel}, t.TempDir())
+	}
+	if _, ok := findChild(plan(domain.DefaultSelection()), domain.DocsService); ok {
+		t.Fatal("the docs lane was planned for a worktree that never asked for it")
+	}
+	on, err := domain.ApplySelectionDeltas(domain.DefaultSelection(), []string{"+docs"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, ok := findChild(plan(on), domain.DocsService)
+	if !ok {
+		t.Fatal("no docs lane was planned for a worktree that selected it")
+	}
+	for _, want := range []string{"--filter @langwatch/docs-site dev", "--port 45173", "--strictPort"} {
+		if !strings.Contains(child.Shell, want) {
+			t.Errorf("docs lane runs %q, want it to contain %q", child.Shell, want)
+		}
+	}
+	if !slices.Contains(child.Env, domain.LaneEnv(domain.DocsService)) {
+		t.Errorf("docs lane env is missing %q", domain.LaneEnv(domain.DocsService))
+	}
+	off, err := domain.ApplySelectionDeltas(on, []string{"-docs"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := findChild(plan(off), domain.DocsService); ok {
+		t.Error("the docs lane is still planned after -docs")
+	}
+}

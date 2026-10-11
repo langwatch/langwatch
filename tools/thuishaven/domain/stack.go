@@ -216,6 +216,7 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{McpService, "MCP clients against hosted MCP (mcpsim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
+	{DocsService, "Docs site — Vite dev server"},
 	{LangevalsService, "Evaluators (Python)"},
 }
 

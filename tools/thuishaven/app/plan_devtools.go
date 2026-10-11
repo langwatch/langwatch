@@ -58,6 +58,27 @@ func (p *childPlan) mailRoomChild() Child {
 	}
 }
 
+// DocsPackage is the public docs site, run on its Vite dev server.
+const DocsPackage = "@langwatch/docs-site"
+
+// docsChild is the docs lane: the docs site's own `vite` dev server on the port
+// haven allocated, hot reloading through the proxy like the --hmr ui lane.
+func (p *childPlan) docsChild() Child {
+	port := p.port(domain.DocsService)
+	return Child{
+		Name: domain.DocsService, Dir: p.repoDir, Color: palette[4],
+		LogPath: p.logPath(domain.DocsService),
+		Shell:   docsShell(port),
+		Env:     append(append([]string{}, p.base...), domain.LaneEnv(domain.DocsService)),
+	}
+}
+
+// docsShell runs the docs site's dev server on port; `haven up +docs` and
+// `haven up --only docs` both run it.
+func docsShell(port int) string {
+	return fmt.Sprintf("pnpm --silent --filter %s dev --host 127.0.0.1 --port %d --strictPort", DocsPackage, port)
+}
+
 // havenExecutable is this haven binary, the first word of the simulator command.
 func (o *Orchestrator) havenExecutable() string {
 	if len(o.cfg.SimulatorArgv) == 0 {

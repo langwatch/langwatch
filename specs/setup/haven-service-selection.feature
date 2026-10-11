@@ -187,6 +187,24 @@ Feature: haven service selection
       And the Storybook's output appears in "haven logs design-system"
       And the mail studio's output appears in "haven logs mail-room"
 
+    # The docs site is the one developer tool run on its own dev server: the
+    # person writing docs wants each edit on screen, so it hot reloads.
+    Scenario: The docs site is a developer tool served with hot reload
+      When the developer runs "haven up +docs"
+      Then the docs site's Vite dev server runs on the port haven allocated
+      And it is served at "docs.<slug>.langwatch.localhost"
+      And its output appears in "haven logs docs"
+      And a later "haven up -docs" stops it
+
+    # Writing docs needs none of the product: no app, api, worker, databases,
+    # migrations or simulators. The docs run alone, the way "haven sim idp" does.
+    Scenario: The docs site runs alone without the stack
+      When the developer runs "haven up --only docs"
+      Then only the docs site's dev server runs, in the foreground
+      And it is served at "docs.<slug>.langwatch.localhost" until it stops
+      And "haven browser open" reaches it with no app to wait on
+      And a running stack refuses it, naming "haven up +docs"
+
     # Haven hands the ui lane the routed URL of the built Storybook, so the
     # hostname and the application's /design-system reach the same Storybook.
     Scenario: The application frames the Storybook the stack routes to
