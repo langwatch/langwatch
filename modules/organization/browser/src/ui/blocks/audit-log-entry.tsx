@@ -5,6 +5,7 @@ import { UserAvatar } from "@langwatch/design-system/avatar";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { InlineCode } from "@langwatch/design-system/inline-code";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Box,
@@ -13,25 +14,14 @@ import {
   HStack,
   IconButton,
   SimpleGrid,
-  Table,
   Text,
   VisuallyHidden,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCopyToClipboard } from "@langwatch/design-system/use-copy-to-clipboard";
 import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/organization-contract";
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Globe,
-  KeyRound,
-  Settings,
-  UserX,
-  VenetianMask,
-} from "lucide-react";
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Check, Copy, Globe, KeyRound, Settings, UserX, VenetianMask } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import {
   auditActionPhrase,
@@ -47,34 +37,18 @@ type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 
 /** Fixed widths; Event takes what is left. The table's minimum keeps Event at 280px. */
 export const AUDIT_TABLE_COLUMNS = [
+  { label: "Details", width: "40px" },
   { label: "Time", width: "112px" },
   { label: "Actor", width: "224px" },
   { label: "Event", width: void 0 },
   { label: "Via", width: "72px" },
   { label: "Project", width: "136px" },
   { label: "Source", width: "152px" },
-  { label: "Details", width: "52px" },
 ] as const;
-export const AUDIT_TABLE_MIN_WIDTH = "1028px";
+export const AUDIT_TABLE_MIN_WIDTH = "1016px";
 
-const CELL = {
-  verticalAlign: "middle",
-  lineHeight: "20px",
-  height: "56px",
-  paddingY: "8px",
-  paddingX: "12px",
-} as const;
-const EDGES = {
-  "& > td:first-of-type": { paddingLeft: "16px" },
-  "& > td:last-of-type": { paddingX: "12px" },
-} as const;
-const ROW_CELLS = { "& > td": CELL, ...EDGES } as const;
-/** An open row drops its rule into the detail below; the cell layout stays whole. */
-const OPEN_ROW_CELLS = { "& > td": { ...CELL, borderBottomWidth: 0 }, ...EDGES } as const;
 /** Field, old value, arrow, new value: the arrows land in one place. */
 const CHANGE_COLUMNS = "160px minmax(0, max-content) 16px minmax(0, 1fr)";
-/** The detail's left edge lines up with the Time column's text. */
-const DETAIL_CELL = { "& > td": { padding: "16px" } } as const;
 const SECONDARY = { textStyle: "caption" } as const;
 
 /** `…` and the key id's last six characters: enough to tell keys apart in a row. */
@@ -91,34 +65,30 @@ function viaLabel(log: Pick<EnrichedAuditLog, "channel" | "userId">): string {
 
 export function AuditTableHead() {
   return (
-    <Table.Header>
-      <Table.Row>
-        {AUDIT_TABLE_COLUMNS.map((column) => (
-          <Table.ColumnHeader
-            key={column.label}
-            width={column.width}
-            minWidth={column.width ? void 0 : "280px"}
-            whiteSpace="nowrap"
-            lineHeight="16px"
-          >
-            {column.label === "Details" ? (
-              <VisuallyHidden>{column.label}</VisuallyHidden>
-            ) : (
-              column.label
-            )}
-          </Table.ColumnHeader>
-        ))}
-      </Table.Row>
-    </Table.Header>
+    <ListTable.Header>
+      <ListTable.Row>
+        {AUDIT_TABLE_COLUMNS.map((column) =>
+          column.label === "Details" ? (
+            <ListTable.ColumnHeader key={column.label} width={column.width} label={column.label} />
+          ) : (
+            <ListTable.ColumnHeader
+              key={column.label}
+              width={column.width}
+              minWidth={column.width ? void 0 : "280px"}
+            >
+              {column.label}
+            </ListTable.ColumnHeader>
+          ),
+        )}
+      </ListTable.Row>
+    </ListTable.Header>
   );
 }
 
 type Openness = "closed" | "detail" | "occurrences";
 
-/** Clicks on a value the reader may want to select or follow never fold the row. */
-function isInteractiveTarget(target: EventTarget): boolean {
-  return target instanceof Element && target.closest("code, time, a, button") !== null;
-}
+/** Clicks on a value the reader may want to select never fold the row. */
+const KEEPS_ROW_CLOSED = { "data-stop-row-activation": "" } as const;
 
 export function AuditLogEntry({
   run,
@@ -132,31 +102,35 @@ export function AuditLogEntry({
   const count = run.entries.length;
   const actor = auditActor(log);
   const hasDiff = log.before != null || log.after != null;
+  const detailId = useId();
   const toggle = () => setOpen((current) => (current === "closed" ? "detail" : "closed"));
-  const onRowClick = (event: MouseEvent<HTMLTableRowElement>) => {
-    if (isInteractiveTarget(event.target)) return;
+  const onRowClick = () => {
     if (document.getSelection()?.toString()) return;
     toggle();
   };
 
   return (
     <>
-      <Table.Row
+      <ListTable.Row
         data-testid="audit-log-entry"
-        cursor="pointer"
-        _hover={{ bg: "bg.subtle" }}
-        onClick={onRowClick}
-        css={open === "closed" ? ROW_CELLS : OPEN_ROW_CELLS}
+        expanded={open !== "closed"}
+        onActivate={onRowClick}
       >
-        <Table.Cell>
-          <Text as="span" textStyle="bodySm" color="fg.muted">
+        <ListTable.ExpandCell
+          expanded={open !== "closed"}
+          onToggle={toggle}
+          label={hasDiff ? "View diff" : "Details"}
+          panelId={detailId}
+        />
+        <ListTable.Cell>
+          <Text as="span" textStyle="bodySm" color="fg.muted" {...KEEPS_ROW_CLOSED}>
             <FormattedDate value={log.createdAt} display="time" seconds />
           </Text>
-        </Table.Cell>
-        <Table.Cell>
+        </ListTable.Cell>
+        <ListTable.Cell>
           <ActorCell actor={actor} />
-        </Table.Cell>
-        <Table.Cell>
+        </ListTable.Cell>
+        <ListTable.Cell>
           <Box display="flex" flexDirection="column" gap="0.5" minWidth={0}>
             <HStack gap={2} minWidth={0} height="20px">
               <Text textStyle="label" title={log.action} truncate>
@@ -170,7 +144,7 @@ export function AuditLogEntry({
             </HStack>
             <HStack gap={2} minWidth={0} height="18px" {...SECONDARY}>
               {log.targetId && (
-                <InlineCode variant="neutral" truncate="middle" minWidth={0}>
+                <InlineCode variant="neutral" truncate="middle" minWidth={0} {...KEEPS_ROW_CLOSED}>
                   {log.targetId}
                 </InlineCode>
               )}
@@ -193,13 +167,13 @@ export function AuditLogEntry({
               )}
             </HStack>
           </Box>
-        </Table.Cell>
-        <Table.Cell>
+        </ListTable.Cell>
+        <ListTable.Cell>
           <Text {...SECONDARY} color="fg.muted" truncate>
             {viaLabel(log)}
           </Text>
-        </Table.Cell>
-        <Table.Cell>
+        </ListTable.Cell>
+        <ListTable.Cell>
           {log.projectId ? (
             <Text textStyle="bodySm" color="fg" truncate>
               {projectLabel(log.projectId)}
@@ -210,42 +184,23 @@ export function AuditLogEntry({
               <VisuallyHidden>Not recorded</VisuallyHidden>
             </Text>
           )}
-        </Table.Cell>
-        <Table.Cell>
+        </ListTable.Cell>
+        <ListTable.Cell>
           <Text textStyle="bodySm" color="fg" truncate>
             {log.source === "gateway" ? "AI Gateway" : "Platform"}
           </Text>
           <Text {...SECONDARY} textStyle="monoSm" color="fg.muted" truncate>
             {log.ipAddress || "—"}
           </Text>
-        </Table.Cell>
-        <Table.Cell textAlign="center">
-          <IconButton
-            size="2xs"
-            boxSize="28px"
-            minWidth="28px"
-            borderRadius="4px"
-            variant="ghost"
-            bg="transparent"
-            borderWidth={0}
-            boxShadow="none"
-            color="fg.muted"
-            _hover={{ bg: "bg.muted" }}
-            aria-label={hasDiff ? "View diff" : "Details"}
-            aria-expanded={open !== "closed"}
-            onClick={toggle}
-          >
-            {open === "closed" ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-          </IconButton>
-        </Table.Cell>
-      </Table.Row>
+        </ListTable.Cell>
+      </ListTable.Row>
 
       {open !== "closed" && (
-        <Table.Row css={DETAIL_CELL}>
-          <Table.Cell colSpan={AUDIT_TABLE_COLUMNS.length} bg="bg.subtle">
+        <ListTable.SpanRow band columns={AUDIT_TABLE_COLUMNS.length} id={detailId}>
+          <Box padding={4}>
             <EntryDetail run={run} actor={actor} focusOccurrences={open === "occurrences"} />
-          </Table.Cell>
-        </Table.Row>
+          </Box>
+        </ListTable.SpanRow>
       )}
     </>
   );

@@ -364,5 +364,49 @@
     "reason": "A bordered pending-domain row with no fill; Card and ResourceRow would add one (X3o review).",
     "owner": "ops",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/organization/browser/src/features/join-offer/ui/sections/join-your-team-takeover.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 140,
+    "reason": "Approved raw dialog: a full-screen join-your-team takeover with no X, Escape or outside dismiss; the Dialog shape has no cover size (R1a1 review).",
+    "owner": "organization"
+  },
+  {
+    "path": "modules/organization/browser/src/features/join-offer/ui/sections/join-your-team-takeover.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 148,
+    "reason": "Approved raw dialog: a full-screen join-your-team takeover with no X, Escape or outside dismiss; the Dialog shape has no cover size (R1a1 review).",
+    "owner": "organization"
+  },
+  {
+    "path": "modules/organization/browser/src/features/join-offer/ui/sections/join-your-team-takeover.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 149,
+    "reason": "Approved raw dialog: a full-screen join-your-team takeover with no X, Escape or outside dismiss; the Dialog shape has no cover size (R1a1 review).",
+    "owner": "organization"
+  },
+  {
+    "path": "modules/organization/browser/src/features/join-offer/ui/sections/join-your-team-takeover.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 152,
+    "reason": "Approved raw dialog: a full-screen join-your-team takeover with no X, Escape or outside dismiss; the Dialog shape has no cover size (R1a1 review).",
+    "owner": "organization"
+  },
+  {
+    "path": "modules/organization/browser/src/ui/blocks/audit-log-entry.tsx",
+    "rule": "grid-row",
+    "line": 458,
+    "reason": "The change-diff and occurrences grids inside a protected audit entry detail (R1a1 review).",
+    "owner": "organization",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/organization/browser/src/ui/blocks/audit-log-entry.tsx",
+    "rule": "grid-row",
+    "line": 517,
+    "reason": "The change-diff and occurrences grids inside a protected audit entry detail (R1a1 review).",
+    "owner": "organization",
+    "disposition": "reviewed"
   }
 ]
