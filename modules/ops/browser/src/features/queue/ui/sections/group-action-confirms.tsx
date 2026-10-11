@@ -3,6 +3,7 @@ import type { DrawerFooterProps } from "@langwatch/design-system/drawer";
 
 import type { GroupTarget, useGroupActions } from "../../behavior/use-group-actions.ts";
 
+type FooterAction = NonNullable<DrawerFooterProps["secondaryActions"]>[number];
 type GroupActions = ReturnType<typeof useGroupActions>;
 
 export function GroupActionConfirms({
@@ -44,18 +45,20 @@ export function groupDrawerFooter({
   actions: GroupActions;
   isBlocked: boolean;
 }): DrawerFooterProps {
-  return {
-    primaryAction: isBlocked
-      ? {
-          label: "Retry now",
-          loading: actions.unblockMutation.isPending,
-          onClick: () => actions.unblockMutation.mutate(target),
-        }
-      : void 0,
-    secondaryAction: {
-      label: "Move to dead-letter queue",
-      onClick: () => actions.setConfirmAction("dlq"),
-    },
-    destructiveAction: { label: "Drain", onClick: () => actions.setConfirmAction("drain") },
+  const retry: FooterAction = {
+    label: "Retry now",
+    tone: "success",
+    loading: actions.unblockMutation.isPending,
+    onClick: () => actions.unblockMutation.mutate(target),
   };
+  const deadLetter: FooterAction = {
+    label: "Move to dead-letter queue",
+    onClick: () => actions.setConfirmAction("dlq"),
+  };
+  const drain: FooterAction = {
+    label: "Drain",
+    tone: "danger",
+    onClick: () => actions.setConfirmAction("drain"),
+  };
+  return { secondaryActions: [...(isBlocked ? [retry] : []), deadLetter, drain] };
 }
