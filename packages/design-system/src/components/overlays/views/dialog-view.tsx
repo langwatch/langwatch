@@ -255,7 +255,7 @@ export function Dialog({
   const frame = (
     <>
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
-        <ChakraDialog.Header>
+        <ChakraDialog.Header flexDirection="column" alignItems="stretch" paddingEnd={12}>
           <HStack gap={2} align="center" minWidth={0}>
             {onBack && (
               <IconButton
