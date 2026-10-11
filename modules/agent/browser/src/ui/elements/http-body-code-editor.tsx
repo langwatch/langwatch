@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box } from "@langwatch/design-system/primitives";
 import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
@@ -45,30 +46,32 @@ export function HttpBodyCodeEditor({
     <Box
       width="full"
       height="220px"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      overflow="hidden"
+      display="flex"
+      flexDirection="column"
       data-testid="body-template-editor"
     >
-      <Suspense fallback={null}>
-        <MonacoEditor
-          height="100%"
-          language={language}
-          value={value}
-          theme={colorMode === "dark" ? "vs-dark" : "vs"}
-          beforeMount={registerUrlencoded}
-          onChange={(next: string | undefined) => onChange(next ?? "")}
-          options={{
-            readOnly: disabled,
-            minimap: { enabled: false },
-            fontSize: TYPE_SCALE_PX.bodySm,
-            scrollBeyondLastLine: false,
-            lineNumbers: "off",
-            wordWrap: "on",
-          }}
-        />
-      </Suspense>
+      <Card variant="frame-fill">
+        <Box height="100%">
+          <Suspense fallback={null}>
+            <MonacoEditor
+              height="100%"
+              language={language}
+              value={value}
+              theme={colorMode === "dark" ? "vs-dark" : "vs"}
+              beforeMount={registerUrlencoded}
+              onChange={(next: string | undefined) => onChange(next ?? "")}
+              options={{
+                readOnly: disabled,
+                minimap: { enabled: false },
+                fontSize: TYPE_SCALE_PX.bodySm,
+                scrollBeyondLastLine: false,
+                lineNumbers: "off",
+                wordWrap: "on",
+              }}
+            />
+          </Suspense>
+        </Box>
+      </Card>
     </Box>
   );
 }
