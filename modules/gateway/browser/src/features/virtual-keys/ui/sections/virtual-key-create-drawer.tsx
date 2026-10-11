@@ -1,18 +1,7 @@
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Separator,
-  Spacer,
-  Text,
-  Textarea,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Field, Input, Separator, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
@@ -285,44 +274,25 @@ function PostMintRecoveryBanner({
 }
 
 /** Create, held back with its reason until the form can issue, and for good once a key exists. */
-function CreateAction({
-  reason,
-  minted,
-  loading,
-  onCreate,
-}: {
-  reason: string | null | undefined;
-  minted: boolean;
-  loading: boolean;
-  onCreate: () => void;
-}) {
-  if (minted) {
-    return (
-      <Button colorPalette="orange" disabled>
-        Create
-      </Button>
-    );
-  }
-  if (reason) {
-    return (
-      <Tooltip content={reason}>
-        <Button colorPalette="orange" disabled>
-          Create
-        </Button>
-      </Tooltip>
-    );
-  }
-  return (
-    <Button
-      colorPalette="orange"
-      data-testid="gateway-virtual-key-create-submit"
-      data-tour="vk-create"
-      onClick={onCreate}
-      loading={loading}
-    >
-      Create
-    </Button>
-  );
+/** A refused create focuses the name when it is the gap; any other reason is a toast. */
+function refuseCreate(input: {
+  reason: string;
+  nameMissing: boolean;
+  focusName: () => void;
+  toast: (title: string) => void;
+}): void {
+  if (input.nameMissing) input.focusName();
+  else input.toast(input.reason);
+}
+
+/** The footer says why a create was refused only once the reader has tried. */
+function noteAfterAttempt(input: { attempted: boolean; reason: string | null | undefined }) {
+  return input.attempted ? input.reason : void 0;
+}
+
+/** A key already created cannot be created again: the one genuine unavailability here. */
+function mintedReason(minted: boolean): string | undefined {
+  return minted ? "This key is already created." : void 0;
 }
 
 export function VirtualKeyCreateDrawer({
@@ -336,6 +306,8 @@ export function VirtualKeyCreateDrawer({
   const host = useGatewayHost();
   const currentUser = useCurrentUser();
   const [name, setName] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const nameInput = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState("");
   const [tagsCsv, setTagsCsv] = useState("");
   const [ownership, setOwnership] = useState<VirtualKeyOwnership>({
@@ -444,6 +416,7 @@ export function VirtualKeyCreateDrawer({
     setRouting(ROUTING_NONE);
     setExpiration(NEVER_EXPIRES);
     setExpiryFieldError(null);
+    setAttempted(false);
   };
 
   const { recovery, submitLockRef, handOffKey, closeForm } = usePostMintRecovery({
@@ -477,8 +450,14 @@ export function VirtualKeyCreateDrawer({
   const recordMintedKey = useRecordMintedKey();
 
   const handleSubmit = async ({ revealOnce = false }: { revealOnce?: boolean } = {}) => {
+    setAttempted(true);
     if (cannotIssueReason) {
-      toaster.create({ title: cannotIssueReason, type: "error" });
+      refuseCreate({
+        reason: cannotIssueReason,
+        nameMissing: !name,
+        focusName: () => nameInput.current?.focus(),
+        toast: (title) => toaster.create({ title, type: "error" }),
+      });
       return;
     }
     if (submitLockRef.current) return;
@@ -538,129 +517,114 @@ export function VirtualKeyCreateDrawer({
   useVirtualKeyTourActions({ organizationId, setName, submit: handleSubmit });
 
   return (
-    <Drawer.Root open={open} onOpenChange={() => handleClose()} placement="end" size="md">
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>New virtual key</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {recovery && (
-            <PostMintRecoveryBanner
-              recovery={recovery}
-              onShowKey={handOffKey}
-              onClose={closeForm}
+    <Drawer
+      open={open}
+      onClose={handleClose}
+      title="New virtual key"
+      size="md"
+      busy={createMutation.isPending || recovery?.kind === "handoff"}
+      footer={{
+        note: noteAfterAttempt({ attempted, reason: cannotIssueReason }),
+        cancel: { label: "Cancel", onClick: handleClose },
+        primaryAction: {
+          label: "Create",
+          loading: createMutation.isPending,
+          disabledReason: mintedReason(recovery !== null),
+          onClick: () => void handleSubmit(),
+          "data-testid": "gateway-virtual-key-create-submit",
+          "data-tour": "vk-create",
+        },
+      }}
+    >
+      {recovery && (
+        <PostMintRecoveryBanner recovery={recovery} onShowKey={handOffKey} onClose={closeForm} />
+      )}
+      <VStack align="stretch" gap={4} inert={recovery ? true : undefined}>
+        <Field.Root required invalid={attempted && !name}>
+          <Field.Label>
+            Name
+            <FieldInfoTooltip
+              description="A name to help you recognize this key in the list and audit log. For example, 'prod-openai' or 'codex-cli-team-ml'."
+              docHref="/ai-gateway/virtual-keys#creating-a-vk"
             />
-          )}
-          <VStack align="stretch" gap={4} inert={recovery ? true : undefined}>
-            <Field.Root required>
-              <Field.Label>
-                Name
-                <FieldInfoTooltip
-                  description="A name to help you recognize this key in the list and audit log. For example, 'prod-openai' or 'codex-cli-team-ml'."
-                  docHref="/ai-gateway/virtual-keys#creating-a-vk"
-                />
-              </Field.Label>
-              <Input
-                data-testid="gateway-virtual-key-name"
-                data-tour="vk-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. codex-prod"
-                maxLength={128}
-              />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional. Shown in the list."
-              />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>
-                Tags
-                <FieldInfoTooltip
-                  description={VK_TAGS_FIELD_DESCRIPTION}
-                  docHref="/ai-gateway/cache-control#cache-rules"
-                  testId="vk-tags-info"
-                />
-              </Field.Label>
-              <Input
-                value={tagsCsv}
-                onChange={(e) => setTagsCsv(e.target.value)}
-                placeholder="e.g. tier=enterprise, team=ml"
-                maxLength={TAGS_CSV_MAX_LENGTH}
-              />
-              {tagsNotice && <Field.HelperText color="orange.fg">{tagsNotice}</Field.HelperText>}
-            </Field.Root>
+          </Field.Label>
+          <Input
+            ref={nameInput}
+            data-testid="gateway-virtual-key-name"
+            data-tour="vk-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. codex-prod"
+            maxLength={128}
+          />
+          <Field.ErrorText>Name is required.</Field.ErrorText>
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Description</Field.Label>
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Optional. Shown in the list."
+          />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>
+            Tags
+            <FieldInfoTooltip
+              description={VK_TAGS_FIELD_DESCRIPTION}
+              docHref="/ai-gateway/cache-control#cache-rules"
+              testId="vk-tags-info"
+            />
+          </Field.Label>
+          <Input
+            value={tagsCsv}
+            onChange={(e) => setTagsCsv(e.target.value)}
+            placeholder="e.g. tier=enterprise, team=ml"
+            maxLength={TAGS_CSV_MAX_LENGTH}
+          />
+          {tagsNotice && <Field.HelperText color="orange.fg">{tagsNotice}</Field.HelperText>}
+        </Field.Root>
 
-            <Separator />
-            <VirtualKeyOwnershipSection
-              value={ownership}
-              onChange={setOwnership}
-              ctx={ownershipCtx}
-              canCreateShared={canCreateShared}
-            />
+        <Separator />
+        <VirtualKeyOwnershipSection
+          value={ownership}
+          onChange={setOwnership}
+          ctx={ownershipCtx}
+          canCreateShared={canCreateShared}
+        />
 
-            <Separator />
-            <VirtualKeyBudgetSection
-              value={budget}
-              onChange={setBudget}
-              organizationId={organizationId}
-              scopes={scopes}
-              principalUserId={ownership.kind === "PERSONAL" ? (currentUser?.id ?? null) : null}
-            />
+        <Separator />
+        <VirtualKeyBudgetSection
+          value={budget}
+          onChange={setBudget}
+          organizationId={organizationId}
+          scopes={scopes}
+          principalUserId={ownership.kind === "PERSONAL" ? (currentUser?.id ?? null) : null}
+        />
 
-            <Separator />
-            <VirtualKeyProviderAccessSection
-              value={providerAccess}
-              onChange={setProviderAccess}
-              scopes={scopes}
-              organizationId={organizationId}
-              organizationName={organization?.name}
-              availableTeams={availableTeams}
-              availableProjects={availableProjects}
-              providers={providers}
-              isLoading={orgProvidersQuery.isLoading}
-            />
+        <Separator />
+        <VirtualKeyProviderAccessSection
+          value={providerAccess}
+          onChange={setProviderAccess}
+          scopes={scopes}
+          organizationId={organizationId}
+          organizationName={organization?.name}
+          availableTeams={availableTeams}
+          availableProjects={availableProjects}
+          providers={providers}
+          isLoading={orgProvidersQuery.isLoading}
+        />
 
-            <Separator />
-            <VirtualKeyRoutingSection value={routing} onChange={setRouting} policies={policies} />
+        <Separator />
+        <VirtualKeyRoutingSection value={routing} onChange={setRouting} policies={policies} />
 
-            <Separator />
-            <VirtualKeyExpirationSection
-              value={expiration}
-              onChange={setExpiration}
-              fieldError={expiryFieldError}
-            />
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            {cannotIssueReason && (
-              <Text fontSize="xs" color="fg.muted">
-                {cannotIssueReason}
-              </Text>
-            )}
-            <Spacer />
-            <Button
-              variant="ghost"
-              onClick={handleClose}
-              disabled={createMutation.isPending || recovery?.kind === "handoff"}
-            >
-              Cancel
-            </Button>
-            <CreateAction
-              reason={cannotIssueReason}
-              minted={recovery !== null}
-              loading={createMutation.isPending}
-              onCreate={() => handleSubmit()}
-            />
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        <Separator />
+        <VirtualKeyExpirationSection
+          value={expiration}
+          onChange={setExpiration}
+          fieldError={expiryFieldError}
+        />
+      </VStack>
+    </Drawer>
   );
 }

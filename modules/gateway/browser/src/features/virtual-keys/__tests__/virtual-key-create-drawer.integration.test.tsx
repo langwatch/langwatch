@@ -380,7 +380,8 @@ describe("given the new-virtual-key drawer", () => {
       expect(screen.getByTestId("vk-providers-invalid").textContent).toContain(
         "Select at least one provider, or allow all providers.",
       );
-      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
   });
@@ -417,8 +418,9 @@ describe("given the new-virtual-key drawer", () => {
       await userEvent.click(screen.getByTestId("vk-ownership-organization"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
 
+      expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
       expect(screen.getByText("Pick the project where traces and costs land.")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
   });
@@ -547,9 +549,7 @@ describe("given the new-virtual-key drawer", () => {
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await userEvent.selectOptions(screen.getByTestId("vk-expiration-preset"), "custom");
 
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
-      });
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
   });
