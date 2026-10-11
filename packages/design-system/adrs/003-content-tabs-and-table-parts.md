@@ -36,6 +36,12 @@ not a rebrand. Three of the four products already draw the accent orange; only M
    `colorPalette` from the hook. Geometry, mount policy, keyboard controls and code glass are
    unchanged. Navigation owns declaring the scope for routed pages; it proves its registry has
    the same keys as `ProductName`.
+6. **A 16px side inset** (DS-cap1). `inset` is `none | sm | md`: 0, 16px (`sm`) and 24px
+   (`md`) on the list and the panel sides, with the strip's rule still full width. The default
+   stays `none`; only the new `sm` step is added, for a drawer pane that aligns with 16px blocks.
+7. **A counted tab is named with a space.** `TabCount` puts a visually hidden space before the
+   figure, so the tab's accessible name reads "People 5", "People 0", or just "People" while
+   the count is unknown. The badge itself, its size and its zero behaviour are unchanged.
 
 ## Consequences
 

@@ -28,7 +28,7 @@ export interface TabsMachineProps<Value extends string> {
   look?: "content" | "metric" | "code";
   density?: "default" | "compact";
   body?: "padded" | "flush";
-  inset?: "none" | "md";
+  inset?: "none" | "sm" | "md";
   scroll?: "page" | "panel" | "content";
   mount?: "lazy" | "active" | "all";
   activationMode?: "automatic" | "manual";
@@ -40,6 +40,9 @@ export interface TabsMachineProps<Value extends string> {
 
 /** The one look switch for every content tab; the colour is the product's, from product-colours. */
 export const CONTENT_TABS_LOOK = { variant: "line" } as const;
+
+/** The list and panel side space: 16px for sm, 24px for md; the strip's rule stays full width. */
+const SIDE_INSET = { none: 0, sm: 4, md: 6 } as const;
 
 const TRIGGER_BASE = { flexShrink: 0, whiteSpace: "nowrap" } as const;
 const TRIGGER_COMPACT = {
@@ -314,7 +317,7 @@ export function TabsMachine<Value extends string>({
 
   const compact = density === "compact" || look === "code";
   const gap = compact ? 3 : 4;
-  const sideInset = inset === "md" ? 6 : 0;
+  const sideInset = SIDE_INSET[inset];
   const fills = scroll !== "page";
   const padded = body === "padded";
   const padding = {

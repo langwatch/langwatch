@@ -87,3 +87,15 @@ Feature: Content tabs
     Then each tab is named by its label then its figure
     And closed panels are unmounted
     And arrowing past a tab selects nothing until Enter
+
+  @integration
+  Scenario: A counted tab has a separated accessible name
+    Given tabs labelled People with a count of 5, Teams with a count of 0 and Audit with none
+    Then their accessible names are People 5, Teams 0 and Audit
+    And arrow keys still move between them
+
+  @integration @browser
+  Scenario: A side inset keeps the strip's rule full width
+    Given content tabs with no inset, a 16px inset and a 24px inset, padded and flush
+    Then the tabs and the open panel's content start 0, 16 and 24px in
+    And the rule under the strip spans the whole width, in a narrow host too

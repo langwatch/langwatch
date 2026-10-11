@@ -79,6 +79,28 @@ export const DisabledWithReason: Story = {
 export const ManualActivation: Story = { render: () => <Controlled activationMode="manual" /> };
 export const Flush: Story = { render: () => <Controlled body="flush" /> };
 export const Inset: Story = { render: () => <Controlled inset="md" /> };
+/** none, sm (16px) and md (24px) side space: the strip's rule stays full width in each. */
+export const InsetScale: Story = {
+  render: () => (
+    <Stack gap={8}>
+      {(["none", "sm", "md"] as const).map((inset) => (
+        <Controlled key={inset} inset={inset} label={`Inset ${inset}`} />
+      ))}
+    </Stack>
+  ),
+};
+/** The 16px inset in a 320px host, flush and padded. */
+export const InsetNarrow: Story = {
+  render: () => (
+    <Box maxWidth="320px">
+      <Stack gap={8}>
+        {(["padded", "flush"] as const).map((body) => (
+          <Controlled key={body} inset="sm" body={body} label={`Inset sm ${body}`} />
+        ))}
+      </Stack>
+    </Box>
+  ),
+};
 
 function Counter({ label }: { label: string }) {
   const [count, setCount] = useState(0);

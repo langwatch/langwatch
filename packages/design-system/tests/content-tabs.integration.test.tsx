@@ -96,6 +96,31 @@ describe("ContentTabs roles and relationships", () => {
     expect(tab("Overview")).not.toHaveTextContent(/\d/);
   });
 
+  /** @scenario "A counted tab has a separated accessible name" */
+  it("puts a hidden space before a count, none on an uncounted tab, and keeps arrow keys", async () => {
+    const user = userEvent.setup();
+    renderWithDesignSystem(
+      <Harness
+        tabs={[
+          { value: "overview", label: "Overview", content: <p>overview panel</p> },
+          { value: "people", label: "People", count: 5, content: <p>people panel</p> },
+          { value: "billing", label: "Teams", count: 0, content: <p>billing panel</p> },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: /^Overview$/ }).textContent).toBe("Overview");
+    expect(screen.getByRole("tab", { name: /^People/ }).textContent).toBe("People 5");
+    expect(screen.getByRole("tab", { name: /^Teams/ }).textContent).toBe("Teams 0");
+    const space = screen.getByRole("tab", { name: /^People/ }).querySelector("span > span");
+    expect(space?.textContent).toBe(" ");
+
+    screen.getByRole("tab", { name: /^Overview$/ }).focus();
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(screen.getByRole("tab", { name: /^People/ })).toHaveFocus());
+    expect(screen.getByRole("tab", { name: /^People/ })).toHaveAttribute("aria-selected", "true");
+  });
+
   /** @scenario Tabs expose the tablist, tab and tabpanel relationships */
   it("sets aria-describedby on the open panel that has a description", async () => {
     renderWithDesignSystem(

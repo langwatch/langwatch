@@ -36,8 +36,11 @@ export interface ContentTabsProps<Value extends string = string> {
   density?: "default" | "compact";
   /** `flush`: the content draws its own panes (editors, code, grids). Default "padded". */
   body?: "padded" | "flush";
-  /** `md` pads the list and the panel sides by 24px. Default "none". */
-  inset?: "none" | "md";
+  /**
+   * `sm` pads the list and the panel sides by 16px, `md` by 24px; the rule stays full width.
+   * Default "none".
+   */
+  inset?: "none" | "sm" | "md";
   /**
    * `page`: no height of its own. `panel`: fills its parent, the open panel scrolls. `content`:
    * as `panel`, but the content owns the scrolling. Default "page".

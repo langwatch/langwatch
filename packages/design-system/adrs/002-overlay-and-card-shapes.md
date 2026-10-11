@@ -77,6 +77,25 @@ drawers and dialogs on 2026-09-29 therefore did not keep them the same.
     its confirm is gated with a `disabledReason` naming the phrase.
 14. **Rules switch on tree-wide at zero** (Q4); reasoned disables only for
     `no-raw-overlay-parts`, `no-hand-drawn-card`, `no-raw-table` and `no-raw-page-title` (Q6).
+15. **Bounded capabilities that keep today's look** (DS-cap1, 2026-10-11). Each is optional,
+    finite and absent by default, so a caller that does not pass it draws exactly what it drew.
+    - `Card variant="frame-fill"`: the editor frame (1px `border`, radius `md`, transparent,
+      no shadow or blur) that fills a bounded parent (`flex: 1`, `min-height: 0`, clipped),
+      zero inset by default, header and footer never shrink, the editor owns its scrolling. The
+      parent supplies the height; the card never reads the viewport.
+    - `Card opener`: a native link, a link component that renders one, or a button, stretched
+      under the card as its one focus target, named by its own label, text or a string `title`.
+      `actions` and `footer` are refused by type beside it, because the children are only
+      presentation. Buttons are `type="button"`. The opener opts in to the existing link-tile
+      paint: border `border`, hover border the product accent's `emphasized` with `shadow sm`
+      over 150ms (none under reduced motion), focus ring `focusRing` drawn inside the card.
+      Without an opener a card gains no cursor, hover or focus response.
+    - `Drawer icon`: decorative, before the title, a slot of at least 24px that never clips or
+      shrinks its child; no icon draws the header it had. `Dialog icon` is untouched.
+    - `Drawer backButtonTestId`: the Back button's id, else `<data-testid>-back`, else none.
+      `FrameAction`'s sibling `cancel` descriptor takes `data-testid` for the Cancel button.
+    - `Dialog closeOnInteractOutside` (default true): `false` ignores an outside click only, so
+      X and Escape keep their `dismissible` and `busy` rules. It is not `dismissible={false}`.
 
 ## Consequences
 
