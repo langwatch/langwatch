@@ -913,5 +913,106 @@
     "reason": "False positive: the No PR yet status value in a cell, not an empty state (R4a2 review).",
     "owner": "coding-agent",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/langy/browser/src/features/langy/ui/sections/panel/langy-panel-conversation.tsx",
+    "rule": "local-copy",
+    "line": 322,
+    "reason": "Approved: the protected Langy home greeting keeps its own empty state. (rollout review)",
+    "owner": "langy"
+  },
+  {
+    "path": "modules/langy/browser/src/features/langy/ui/sections/derived-cards/langy-derived-cards-testing-ground.tsx",
+    "rule": "empty-text",
+    "line": 211,
+    "reason": "A dev-only live tape whose next step is sending a message. (rollout review)",
+    "owner": "langy",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/langy/browser/src/features/langy/ui/sections/langy-dev-drawer.tsx",
+    "rule": "empty-text",
+    "line": 559,
+    "reason": "A dev-only live tape whose next step is sending a message. (rollout review)",
+    "owner": "langy",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/langy/browser/src/features/langy/ui/sections/langy-dev-drawer.tsx",
+    "rule": "empty-text",
+    "line": 603,
+    "reason": "A dev-only live tape whose next step is sending a message. (rollout review)",
+    "owner": "langy",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/langy/browser/src/features/langy/ui/sections/langy-dev-drawer.tsx",
+    "rule": "empty-text",
+    "line": 749,
+    "reason": "A dev-only live tape whose next step is sending a message. (rollout review)",
+    "owner": "langy",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/navigation/browser/src/features/command-bar/ui/blocks/command-bar-langy-mode.tsx",
+    "rule": "card-box",
+    "line": 72,
+    "reason": "The Ask Langy input surface, not a card. (rollout review)",
+    "owner": "navigation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/navigation/browser/src/features/command-bar/ui/sections/command-palette.tsx",
+    "rule": "card-box",
+    "line": 575,
+    "reason": "The inline results overlay panel, not a card. (rollout review)",
+    "owner": "navigation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/navigation/browser/src/features/command-bar/ui/sections/inline-command-palette.tsx",
+    "rule": "card-box",
+    "line": 46,
+    "reason": "The search field box, not a card. (rollout review)",
+    "owner": "navigation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/navigation/browser/src/ui/blocks/theme-toggle.tsx",
+    "rule": "card-box",
+    "line": 44,
+    "reason": "An icon button, not a card. (rollout review)",
+    "owner": "navigation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/navigation/browser/src/ui/elements/page-error-fallback.tsx",
+    "rule": "card-box",
+    "line": 50,
+    "reason": "The dev-only error details code block. (rollout review)",
+    "owner": "navigation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/custom-graph.tsx",
+    "rule": "card-box",
+    "line": 1455,
+    "reason": "The summary chart glow frame; charts stay as they are. (rollout review)",
+    "owner": "analytics",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/draggable-graph-card.tsx",
+    "rule": "legacy-card-part",
+    "line": 135,
+    "reason": "Approved: the dashboard chart frame the owner liked fills its grid cell and clips; no Card variant draws it (R5a2 review).",
+    "owner": "analytics"
+  },
+  {
+    "path": "modules/analytics/browser/src/ui/sections/draggable-graph-card.tsx",
+    "rule": "legacy-card-part",
+    "line": 136,
+    "reason": "Approved: the dashboard chart frame the owner liked fills its grid cell and clips; no Card variant draws it (R5a2 review).",
+    "owner": "analytics"
   }
 ]

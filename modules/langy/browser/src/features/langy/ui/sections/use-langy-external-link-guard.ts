@@ -115,6 +115,7 @@ export function useLangyExternalLinkGuard(): LangyExternalLinkGuard {
       link: pending,
       onCancel: cancel,
       onConfirm: confirm,
+      finalFocusEl: () => anchorRef.current,
     },
   };
 }
