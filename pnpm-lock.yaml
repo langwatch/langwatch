@@ -248,9 +248,6 @@ catalogs:
     '@opentelemetry/core':
       specifier: 2.10.0
       version: 2.10.0
-    '@opentelemetry/exporter-logs-otlp-http':
-      specifier: 0.221.0
-      version: 0.221.0
     '@opentelemetry/exporter-logs-otlp-proto':
       specifier: 0.221.0
       version: 0.221.0
@@ -1571,10 +1568,10 @@ importers:
       '@opentelemetry/core':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-logs-otlp-http':
+      '@opentelemetry/exporter-logs-otlp-proto':
         specifier: 'catalog:'
         version: 0.221.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-trace-otlp-http':
+      '@opentelemetry/exporter-trace-otlp-proto':
         specifier: 'catalog:'
         version: 0.221.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/instrumentation':
