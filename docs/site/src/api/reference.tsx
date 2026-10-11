@@ -1,16 +1,28 @@
-import { TypeRegion } from "../lib/type-mode.tsx";
 import { Box, Button, Flex, Tabs, Text } from "@langwatch/design-system/primitives";
 import { Play } from "lucide-react";
+
+import { TypeRegion } from "../lib/type-mode.tsx";
+import { readingTabList, readingTabTrigger } from "../mdx-components/tabs.tsx";
 import { useEndpointState } from "./endpoint-state.tsx";
 import { MethodBadge } from "./method-badge.tsx";
 import type { Operation } from "./operation.ts";
 import { ParameterFields, SchemaFields, SchemaNote } from "./schema.tsx";
-import { readingTabList, readingTabTrigger } from "../mdx-components/tabs.tsx";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <Box as="section" marginTop="10">
-      <Text as="h2" margin="0" paddingBottom="3" fontSize="var(--docs-h2-size)" lineHeight="var(--docs-h2-line)" fontWeight="var(--docs-weight-heading)" fontFamily="var(--docs-font-heading)" letterSpacing="var(--docs-heading-tracking)" borderBottomWidth="1px" borderColor="border.muted">
+    <Box as="section" marginTop="9">
+      <Text
+        as="h2"
+        margin="0"
+        paddingBottom="3"
+        fontSize="18px"
+        lineHeight="var(--docs-h2-line)"
+        fontWeight="var(--docs-weight-heading)"
+        fontFamily="var(--docs-font-heading)"
+        letterSpacing="var(--docs-heading-tracking)"
+        borderBottomWidth="1px"
+        borderColor="border.muted"
+      >
         {title}
       </Text>
       {children}
@@ -22,6 +34,7 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
   const { tryOpen, setTryOpen } = useEndpointState();
   return (
     <Flex
+      className="docs-method-bar"
       alignItems="center"
       gap="3"
       wrap="wrap"
@@ -34,7 +47,17 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
       bg="bg.panel"
     >
       <MethodBadge method={operation.method} />
-      <Box as="code" flex="1" minWidth="0" fontFamily="mono" fontSize="13px" lineHeight="20px" overflowWrap="anywhere" wordBreak="break-word" css={{ userSelect: "all" }}>
+      <Box
+        as="code"
+        flex="1"
+        minWidth="0"
+        fontFamily="mono"
+        fontSize="13px"
+        lineHeight="20px"
+        overflowWrap="anywhere"
+        wordBreak="break-word"
+        css={{ userSelect: "all" }}
+      >
         {operation.path}
       </Box>
       <Button
@@ -45,12 +68,12 @@ export function EndpointSummary({ operation }: { operation: Operation }) {
         onClick={() => setTryOpen(!tryOpen)}
         height="40px"
         paddingX="4"
-        borderRadius="full"
-        bg="fg"
-        color="fg.inverted"
+        borderRadius="lg"
+        bg="green.fg"
+        color="bg.surface"
         fontWeight="500"
         fontSize="13px"
-        _hover={{ bg: "fg", opacity: 0.9 }}
+        _hover={{ bg: "green.fg", opacity: 0.9 }}
         width={{ base: "100%", md: "auto" }}
       >
         Try it <Play size={12} aria-hidden="true" />
@@ -65,7 +88,13 @@ export function Responses({ operation }: { operation: Operation }) {
   if (statuses.length === 0) return null;
   return (
     <Section title="Responses">
-      <Tabs.Root value={active} onValueChange={({ value }) => setActive(value)} variant="line" colorPalette="accent" marginTop="2">
+      <Tabs.Root
+        value={active}
+        onValueChange={({ value }) => setActive(value)}
+        variant="line"
+        colorPalette="accent"
+        marginTop="2"
+      >
         <Tabs.List css={readingTabList} aria-label="Response status">
           {statuses.map((status) => (
             <Tabs.Trigger key={status} value={status} css={readingTabTrigger}>
@@ -76,11 +105,21 @@ export function Responses({ operation }: { operation: Operation }) {
         {operation.responses.map((response) => {
           const content = response.contents[0];
           return (
-            <Tabs.Content key={response.status} value={response.status} paddingX="0" paddingTop="4" data-docs-panel="">
+            <Tabs.Content
+              key={response.status}
+              value={response.status}
+              paddingX="0"
+              paddingTop="4"
+              data-docs-panel=""
+            >
               <Text margin="0" fontSize="16px" lineHeight="28px">
                 {response.description}
               </Text>
-              {content ? <Text margin="0" fontSize="12px" color="fg.muted">{content.type}</Text> : null}
+              {content ? (
+                <Text margin="0" fontSize="12px" color="fg.muted">
+                  {content.type}
+                </Text>
+              ) : null}
               {content?.schema ? (
                 Object.keys(content.schema.properties ?? {}).length > 0 ? (
                   <SchemaFields schema={content.schema} />
@@ -96,10 +135,22 @@ export function Responses({ operation }: { operation: Operation }) {
   );
 }
 
-export function EndpointReference({ operation, children }: { operation: Operation; children?: React.ReactNode }) {
+export function EndpointReference({
+  operation,
+  children,
+}: {
+  operation: Operation;
+  children?: React.ReactNode;
+}) {
   const groups = [
-    { title: "Path parameters", params: operation.parameters.filter((param) => param.in === "path") },
-    { title: "Query parameters", params: operation.parameters.filter((param) => param.in === "query") },
+    {
+      title: "Path parameters",
+      params: operation.parameters.filter((param) => param.in === "path"),
+    },
+    {
+      title: "Query parameters",
+      params: operation.parameters.filter((param) => param.in === "query"),
+    },
     { title: "Headers", params: operation.parameters.filter((param) => param.in === "header") },
   ].filter((group) => group.params.length > 0);
   const bodyContent = operation.body?.contents[0];
@@ -109,7 +160,7 @@ export function EndpointReference({ operation, children }: { operation: Operatio
         <Section title="Authorisation">
           {operation.schemes.map((scheme) => (
             <Box key={scheme.id} paddingY="4" fontSize="14px" lineHeight="24px">
-              <Box as="code" fontFamily="mono" fontWeight="600">
+              <Box as="code" fontFamily="mono" fontWeight="500" color="accent.fg">
                 {scheme.type === "apiKey" ? scheme.name : "Authorization: Bearer"}
               </Box>{" "}
               <Text as="span" color="fg.muted">
@@ -135,11 +186,19 @@ export function EndpointReference({ operation, children }: { operation: Operatio
             {bodyContent.type}
             {operation.body.required ? " · Required" : ""}
           </Text>
-          {Object.keys(bodyContent.schema.properties ?? {}).length > 0 ? <SchemaFields schema={bodyContent.schema} /> : <SchemaNote schema={bodyContent.schema} />}
+          {Object.keys(bodyContent.schema.properties ?? {}).length > 0 ? (
+            <SchemaFields schema={bodyContent.schema} />
+          ) : (
+            <SchemaNote schema={bodyContent.schema} />
+          )}
         </Section>
       ) : null}
       <Responses operation={operation} />
-      {children ? <TypeRegion mode="expressive" className="docs-prose" marginTop="10">{children}</TypeRegion> : null}
+      {children ? (
+        <TypeRegion mode="expressive" className="docs-prose" marginTop="14">
+          {children}
+        </TypeRegion>
+      ) : null}
     </TypeRegion>
   );
 }

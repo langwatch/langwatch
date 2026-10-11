@@ -1,40 +1,96 @@
-import { Alert, Badge, Box, Button, chakra, Flex, Input, NativeSelect, Spinner, Tabs, Text, Textarea } from "@langwatch/design-system/primitives";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  chakra,
+  Flex,
+  Input,
+  NativeSelect,
+  Spinner,
+  Tabs,
+  Text,
+  Textarea,
+} from "@langwatch/design-system/primitives";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+
 import { CodeFrame } from "../code/code-block.tsx";
 import { CodeBody, CopyAction } from "../code/code-parts.tsx";
 import type { CodeSource } from "../code/code-parts.tsx";
-import { readingTabList, readingTabTrigger } from "../mdx-components/tabs.tsx";
 import { usePreference, writePreference } from "../lib/storage.ts";
-import { exampleFromSchema, generateExample, initialBodyOf, liveRequest, paramKey } from "./codegen.ts";
+import { readingTabList, readingTabTrigger } from "../mdx-components/tabs.tsx";
+import {
+  exampleFromSchema,
+  generateExample,
+  initialBodyOf,
+  liveRequest,
+  paramKey,
+} from "./codegen.ts";
 import { useEndpointState } from "./endpoint-state.tsx";
-import { Panel } from "./panel.tsx";
 import { EXAMPLE_LANGUAGES } from "./operation.ts";
 import type { ExampleLanguage, HighlightedExamples, Operation, Parameter } from "./operation.ts";
+import { Panel } from "./panel.tsx";
 
 type Outcome =
   | { kind: "idle" }
   | { kind: "sending" }
-  | { kind: "response"; status: number; statusText: string; ms: number; contentType: string; body: string; headers: [string, string][] }
+  | {
+      kind: "response";
+      status: number;
+      statusText: string;
+      ms: number;
+      contentType: string;
+      body: string;
+      headers: [string, string][];
+    }
   | { kind: "error"; message: string; retry: boolean };
 
 const REQUEST_TIMEOUT_MS = 30000;
 
 function plainLines({ code }: { code: string }): string[] {
-  return code.split("\n").map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+  return code
+    .split("\n")
+    .map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
 }
 
 function plainSource({ code }: { code: string }): CodeSource {
-  return { lang: "json", title: "Example", code, lines: plainLines({ code }), highlight: [], numbered: false };
+  return {
+    lang: "json",
+    title: "Example",
+    code,
+    lines: plainLines({ code }),
+    highlight: [],
+    numbered: false,
+  };
 }
 
-function ParamInput({ param, value, error, onChange }: { param: Parameter; value: string; error?: string; onChange: (value: string) => void }) {
+function ParamInput({
+  param,
+  value,
+  error,
+  onChange,
+}: {
+  param: Parameter;
+  value: string;
+  error?: string;
+  onChange: (value: string) => void;
+}) {
   const id = `pg-${param.in}-${param.name}`;
   const options = param.schema.enum;
   const numeric = param.schema.type === "integer" || param.schema.type === "number";
   return (
     <Box>
-      <chakra.label htmlFor={id} display="flex" alignItems="center" gap="2" fontSize="13px" lineHeight="20px" fontWeight="600" marginBottom="1">
+      <chakra.label
+        htmlFor={id}
+        display="flex"
+        alignItems="center"
+        gap="2"
+        fontSize="13px"
+        lineHeight="20px"
+        fontWeight="600"
+        marginBottom="1"
+      >
         <Box as="span" fontFamily="mono">
           {param.name}
         </Box>
@@ -50,7 +106,11 @@ function ParamInput({ param, value, error, onChange }: { param: Parameter; value
       </chakra.label>
       {options ? (
         <NativeSelect.Root size="sm">
-          <NativeSelect.Field id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+          <NativeSelect.Field
+            id={id}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+          >
             <option value="">{param.required ? "Select a value" : "Omit"}</option>
             {options.map((option) => (
               <option key={String(option)} value={String(option)}>
@@ -62,7 +122,11 @@ function ParamInput({ param, value, error, onChange }: { param: Parameter; value
         </NativeSelect.Root>
       ) : param.schema.type === "boolean" ? (
         <NativeSelect.Root size="sm">
-          <NativeSelect.Field id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+          <NativeSelect.Field
+            id={id}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+          >
             <option value="">Omit</option>
             <option value="true">true</option>
             <option value="false">false</option>
@@ -92,7 +156,15 @@ function ParamInput({ param, value, error, onChange }: { param: Parameter; value
   );
 }
 
-export function Playground({ operation, highlighted, slug }: { operation: Operation; highlighted?: HighlightedExamples; slug: string }) {
+export function Playground({
+  operation,
+  highlighted,
+  slug,
+}: {
+  operation: Operation;
+  highlighted?: HighlightedExamples;
+  slug: string;
+}) {
   const bodyContent = operation.body?.contents.find((content) => content.type.includes("json"));
   const initialBody = initialBodyOf({ operation });
   const [values, setValues] = useState<Record<string, string>>({});
@@ -106,7 +178,9 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
   const { tryOpen, setTryOpen, status, setStatus } = useEndpointState();
   const statuses = operation.responses.map((response) => response.status);
   const stored = usePreference({ key: "api-language" });
-  const language = EXAMPLE_LANGUAGES.find((entry) => entry.label.toLowerCase() === stored?.toLowerCase())?.id ?? "python";
+  const language =
+    EXAMPLE_LANGUAGES.find((entry) => entry.label.toLowerCase() === stored?.toLowerCase())?.id ??
+    "python";
   const languageLabel = EXAMPLE_LANGUAGES.find((entry) => entry.id === language)?.label ?? "Python";
   const [touched, setTouched] = useState(false);
   const state = { values, body };
@@ -125,7 +199,14 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
           const code = generateExample({ operation, state: { values, body }, language: entry.id });
           const initial = highlighted?.[entry.id];
           const lines = !touched && initial ? initial : plainLines({ code });
-          const source: CodeSource = { lang: entry.lang, title: entry.label, code, lines, highlight: [], numbered: false };
+          const source: CodeSource = {
+            lang: entry.lang,
+            title: entry.label,
+            code,
+            lines,
+            highlight: [],
+            numbered: false,
+          };
           return [entry.id, source];
         }),
       ),
@@ -148,7 +229,9 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
   const send = async () => {
     const nextErrors: Record<string, string> = {};
     for (const param of required) {
-      if (!values[paramKey({ location: param.in, name: param.name })]?.trim()) nextErrors[paramKey({ location: param.in, name: param.name })] = `${param.name} is required.`;
+      if (!values[paramKey({ location: param.in, name: param.name })]?.trim())
+        nextErrors[paramKey({ location: param.in, name: param.name })] =
+          `${param.name} is required.`;
     }
     if (body.trim()) {
       try {
@@ -160,7 +243,9 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       const first = Object.keys(nextErrors)[0];
-      document.getElementById(first === "body" ? "pg-body" : `pg-${first.replace(":", "-")}`)?.focus();
+      document
+        .getElementById(first === "body" ? "pg-body" : `pg-${first.replace(":", "-")}`)
+        ?.focus();
       return;
     }
     const request = liveRequest({ operation, state, key });
@@ -171,7 +256,12 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
     setOutcome({ kind: "sending" });
     const started = performance.now();
     try {
-      const response = await fetch(request.url, { method: operation.method, headers: request.headers, body: request.body, signal: abort.signal });
+      const response = await fetch(request.url, {
+        method: operation.method,
+        headers: request.headers,
+        body: request.body,
+        signal: abort.signal,
+      });
       const text = await response.text();
       setOutcome({
         kind: "response",
@@ -184,9 +274,18 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
       });
     } catch (error) {
       if (abort.signal.aborted) {
-        setOutcome({ kind: "error", message: abort.signal.reason === "timeout" ? "Request timed out" : "Request cancelled", retry: true });
+        setOutcome({
+          kind: "error",
+          message: abort.signal.reason === "timeout" ? "Request timed out" : "Request cancelled",
+          retry: true,
+        });
       } else {
-        setOutcome({ kind: "error", message: "The browser could not reach this endpoint. Copy the curl request to run it locally.", retry: true });
+        setOutcome({
+          kind: "error",
+          message:
+            "The browser could not reach this endpoint. Copy the curl request to run it locally.",
+          retry: true,
+        });
       }
     } finally {
       window.clearTimeout(timeout);
@@ -207,11 +306,15 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
     setTryOpen(false);
     window.setTimeout(() => document.getElementById("try-it-button")?.focus(), 0);
   };
-  const chosen = operation.responses.find((response) => response.status === status) ?? operation.responses[0];
+  const chosen =
+    operation.responses.find((response) => response.status === status) ?? operation.responses[0];
   const chosenContent = chosen?.contents[0];
   const declared = chosenContent?.example;
-  const example = declared ?? (chosenContent?.schema ? exampleFromSchema({ schema: chosenContent.schema }) : undefined);
-  const exampleCode = example === undefined || example === null ? "" : JSON.stringify(example, null, 2);
+  const example =
+    declared ??
+    (chosenContent?.schema ? exampleFromSchema({ schema: chosenContent.schema }) : undefined);
+  const exampleCode =
+    example === undefined || example === null ? "" : JSON.stringify(example, null, 2);
 
   return (
     <Flex direction="column" gap="6" minWidth="0" data-type-mode="productive">
@@ -220,7 +323,16 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
           id="try-it-form"
           title="Try this endpoint"
           aside={
-            <Button type="button" size="xs" variant="ghost" colorPalette="gray" minHeight="40px" flexShrink={0} aria-label="Close request form" onClick={closeForm}>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              colorPalette="gray"
+              minHeight="40px"
+              flexShrink={0}
+              aria-label="Close request form"
+              onClick={closeForm}
+            >
               Close
             </Button>
           }
@@ -229,114 +341,207 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
             <Text margin="0" fontSize="12px" color="fg.muted">
               {host}
             </Text>
-    {scheme ? (
-      <chakra.details open={required.length === 0 || undefined} css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", fontWeight: 600 } }}>
-        <summary>Authorisation: {scheme.type === "apiKey" ? scheme.name : "Authorization"}</summary>
-        <Flex gap="2" marginTop="1">
-          <Input
-            size="sm"
-            type={reveal ? "text" : "password"}
-            value={key}
-            onChange={(event) => setKey(event.target.value)}
-            placeholder={scheme.type === "apiKey" ? "API key" : "Bearer token"}
-            aria-label={scheme.type === "apiKey" ? `${scheme.name} value` : "Bearer token"}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <Button type="button" size="sm" variant="outline" colorPalette="gray" aria-label={reveal ? "Hide key" : "Reveal key"} onClick={() => setReveal((value) => !value)}>
-            {reveal ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
-          </Button>
-          <Button type="button" size="sm" variant="ghost" colorPalette="gray" onClick={() => setKey("")}>
-            Clear
-          </Button>
-        </Flex>
-        <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
-          Kept in this tab. Cleared when you reload.
-        </Text>
-      </chakra.details>
-    ) : null}
+            {scheme ? (
+              <chakra.details
+                open={required.length === 0 || undefined}
+                css={{
+                  "& > summary": {
+                    cursor: "pointer",
+                    minHeight: "32px",
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                  },
+                }}
+              >
+                <summary>
+                  Authorisation: {scheme.type === "apiKey" ? scheme.name : "Authorization"}
+                </summary>
+                <Flex gap="2" marginTop="1">
+                  <Input
+                    size="sm"
+                    type={reveal ? "text" : "password"}
+                    value={key}
+                    onChange={(event) => setKey(event.target.value)}
+                    placeholder={scheme.type === "apiKey" ? "API key" : "Bearer token"}
+                    aria-label={scheme.type === "apiKey" ? `${scheme.name} value` : "Bearer token"}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    colorPalette="gray"
+                    aria-label={reveal ? "Hide key" : "Reveal key"}
+                    onClick={() => setReveal((value) => !value)}
+                  >
+                    {reveal ? (
+                      <EyeOff size={16} aria-hidden="true" />
+                    ) : (
+                      <Eye size={16} aria-hidden="true" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    colorPalette="gray"
+                    onClick={() => setKey("")}
+                  >
+                    Clear
+                  </Button>
+                </Flex>
+                <Text margin="0" marginTop="1" fontSize="12px" color="fg.muted">
+                  Kept in this tab. Cleared when you reload.
+                </Text>
+              </chakra.details>
+            ) : null}
 
-    {required.length > 0 ? <Flex direction="column" gap="3">{required.map(renderParam)}</Flex> : null}
-    {optional.length > 0 ? (
-      <Flex direction="column" gap="3">
-        {optional.map(renderParam)}
-      </Flex>
-    ) : null}
-    {deprecated.length > 0 ? (
-      <chakra.details css={{ "& > summary": { cursor: "pointer", minHeight: "32px", display: "flex", alignItems: "center", fontSize: "13px", color: "var(--chakra-colors-fg-muted)" } }}>
-        <summary>Optional fields (deprecated)</summary>
-        <Flex direction="column" gap="3" marginTop="2">
-          {deprecated.map(renderParam)}
-        </Flex>
-      </chakra.details>
-    ) : null}
+            {required.length > 0 ? (
+              <Flex direction="column" gap="3">
+                {required.map(renderParam)}
+              </Flex>
+            ) : null}
+            {optional.length > 0 ? (
+              <Flex direction="column" gap="3">
+                {optional.map(renderParam)}
+              </Flex>
+            ) : null}
+            {deprecated.length > 0 ? (
+              <chakra.details
+                css={{
+                  "& > summary": {
+                    cursor: "pointer",
+                    minHeight: "32px",
+                    display: "flex",
+                    alignItems: "center",
+                    fontSize: "13px",
+                    color: "var(--chakra-colors-fg-muted)",
+                  },
+                }}
+              >
+                <summary>Optional fields (deprecated)</summary>
+                <Flex direction="column" gap="3" marginTop="2">
+                  {deprecated.map(renderParam)}
+                </Flex>
+              </chakra.details>
+            ) : null}
 
-    {operation.body && bodyContent ? (
-      <Box>
-        <chakra.label htmlFor="pg-body" display="block" fontSize="13px" fontWeight="600" marginBottom="1">
-          Body <Text as="span" fontWeight="400" color="fg.muted">(application/json)</Text>
-        </chakra.label>
-        <Textarea
-          id="pg-body"
-          size="sm"
-          rows={Math.min(14, Math.max(4, body.split("\n").length))}
-          fontFamily="mono"
-          fontSize="12px"
-          value={body}
-          spellCheck={false}
-          aria-invalid={errors.body ? true : undefined}
-          aria-describedby={errors.body ? "pg-body-error" : undefined}
-          onChange={(event) => {
-            setTouched(true);
-            setBody(event.target.value);
-          }}
-        />
-        {errors.body ? (
-          <Text id="pg-body-error" margin="0" marginTop="1" fontSize="12px" color="red.fg">
-            {errors.body}
-          </Text>
-        ) : null}
-      </Box>
-    ) : null}
+            {operation.body && bodyContent ? (
+              <Box>
+                <chakra.label
+                  htmlFor="pg-body"
+                  display="block"
+                  fontSize="13px"
+                  fontWeight="600"
+                  marginBottom="1"
+                >
+                  Body{" "}
+                  <Text as="span" fontWeight="400" color="fg.muted">
+                    (application/json)
+                  </Text>
+                </chakra.label>
+                <Textarea
+                  id="pg-body"
+                  size="sm"
+                  rows={Math.min(14, Math.max(4, body.split("\n").length))}
+                  fontFamily="mono"
+                  fontSize="12px"
+                  value={body}
+                  spellCheck={false}
+                  aria-invalid={errors.body ? true : undefined}
+                  aria-describedby={errors.body ? "pg-body-error" : undefined}
+                  onChange={(event) => {
+                    setTouched(true);
+                    setBody(event.target.value);
+                  }}
+                />
+                {errors.body ? (
+                  <Text id="pg-body-error" margin="0" marginTop="1" fontSize="12px" color="red.fg">
+                    {errors.body}
+                  </Text>
+                ) : null}
+              </Box>
+            ) : null}
 
-    <Box>
-      {mutating ? (
-        <Text margin="0" marginBottom="2" fontSize="12px" color="fg.muted">
-          This sends a live request to {host}.
-        </Text>
-      ) : null}
-      {jsonOnly ? (
-        <Flex gap="2">
-          <Button type="button" variant="solid" colorPalette="gray" flex="1" height="44px" borderRadius="full" bg="fg" color="fg.inverted" _hover={{ bg: "fg", opacity: 0.9 }} disabled={outcome.kind === "sending"} onClick={send}>
-            {outcome.kind === "sending" ? (
-              <>
-                <Spinner size="sm" /> Sending...
-              </>
-            ) : (
-              "Send request"
-            )}
-          </Button>
-          {outcome.kind === "sending" ? (
-            <Button type="button" variant="outline" colorPalette="gray" height="44px" onClick={() => controller.current?.abort("cancel")}>
-              Cancel
-            </Button>
-          ) : null}
-        </Flex>
-      ) : (
-        <Text margin="0" fontSize="13px" color="fg.muted">
-          This request cannot be sent from the browser. Run this request in your terminal.
-        </Text>
-      )}
-    </Box>
-
+            <Box>
+              {mutating ? (
+                <Text margin="0" marginBottom="2" fontSize="12px" color="fg.muted">
+                  This sends a live request to {host}.
+                </Text>
+              ) : null}
+              {jsonOnly ? (
+                <Flex gap="2">
+                  <Button
+                    type="button"
+                    variant="solid"
+                    colorPalette="gray"
+                    flex="1"
+                    height="44px"
+                    borderRadius="full"
+                    bg="fg"
+                    color="fg.inverted"
+                    _hover={{ bg: "fg", opacity: 0.9 }}
+                    disabled={outcome.kind === "sending"}
+                    onClick={send}
+                  >
+                    {outcome.kind === "sending" ? (
+                      <>
+                        <Spinner size="sm" /> Sending...
+                      </>
+                    ) : (
+                      "Send request"
+                    )}
+                  </Button>
+                  {outcome.kind === "sending" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      colorPalette="gray"
+                      height="44px"
+                      onClick={() => controller.current?.abort("cancel")}
+                    >
+                      Cancel
+                    </Button>
+                  ) : null}
+                </Flex>
+              ) : (
+                <Text margin="0" fontSize="13px" color="fg.muted">
+                  This request cannot be sent from the browser. Run this request in your terminal.
+                </Text>
+              )}
+            </Box>
           </Flex>
         </Panel>
       ) : null}
 
-      <Panel title="Request example" aside={<Text as="span" fontSize="12px" fontWeight="500" color="fg.muted">{operation.method}</Text>}>
-        <Tabs.Root value={languageLabel} onValueChange={({ value }) => writePreference({ key: "api-language", value })} variant="line" colorPalette="accent" minWidth="0" maxWidth="100%">
-          <Flex alignItems="center" borderBottomWidth="1px" borderColor="border.nested" paddingX="2">
-            <Tabs.List css={{ ...readingTabList, flex: 1, minWidth: 0, borderBottomWidth: 0, boxShadow: "none" }}>
+      <Panel showHeader={false} title="Request example">
+        <Tabs.Root
+          value={languageLabel}
+          onValueChange={({ value }) => writePreference({ key: "api-language", value })}
+          variant="line"
+          colorPalette="accent"
+          minWidth="0"
+          maxWidth="100%"
+        >
+          <Flex
+            alignItems="center"
+            borderBottomWidth="1px"
+            borderColor="border.nested"
+            paddingX="2"
+            bg="bg.subtle"
+          >
+            <Tabs.List
+              css={{
+                ...readingTabList,
+                flex: 1,
+                minWidth: 0,
+                borderBottomWidth: 0,
+                boxShadow: "none",
+              }}
+            >
               {EXAMPLE_LANGUAGES.map((entry) => (
                 <Tabs.Trigger key={entry.id} value={entry.label} css={readingTabTrigger}>
                   {entry.label}
@@ -346,7 +551,16 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
             <CopyAction code={examples[language].code} />
           </Flex>
           {EXAMPLE_LANGUAGES.map((entry) => (
-            <Tabs.Content key={entry.id} value={entry.label} padding="0" data-docs-panel="" bg="bg.nested" minWidth="0" maxWidth="100%" overflow="hidden">
+            <Tabs.Content
+              key={entry.id}
+              value={entry.label}
+              padding="0"
+              data-docs-panel=""
+              bg="bg.nested"
+              minWidth="0"
+              maxWidth="100%"
+              overflow="hidden"
+            >
               <CodeBody source={examples[entry.id]} expanded />
             </Tabs.Content>
           ))}
@@ -354,21 +568,45 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
       </Panel>
 
       {statuses.length > 0 ? (
-        <Panel title="Documented response" aside={exampleCode ? <CopyAction code={exampleCode} label="Copy example" /> : undefined}>
-          <Tabs.Root value={status} onValueChange={({ value }) => setStatus(value)} variant="line" colorPalette="accent">
-            <Tabs.List aria-label="Response status" css={{ ...readingTabList, paddingInline: "8px", borderBottomWidth: "1px" }}>
-              {statuses.map((entry) => (
-                <Tabs.Trigger key={entry} value={entry} css={readingTabTrigger}>
-                  {entry}
-                </Tabs.Trigger>
-              ))}
-            </Tabs.List>
-          </Tabs.Root>
+        <Panel showHeader={false} title="Documented response">
+          <Flex
+            alignItems="center"
+            bg="bg.subtle"
+            borderBottomWidth="1px"
+            borderColor="border"
+            paddingInlineEnd="2"
+          >
+            <Tabs.Root
+              value={status}
+              onValueChange={({ value }) => setStatus(value)}
+              variant="line"
+              colorPalette="accent"
+              minWidth="0"
+              flex="1"
+            >
+              <Tabs.List
+                aria-label="Response status"
+                css={{ ...readingTabList, paddingInline: "8px", borderBottomWidth: "0" }}
+              >
+                {statuses.map((entry) => (
+                  <Tabs.Trigger key={entry} value={entry} css={readingTabTrigger}>
+                    {entry}
+                  </Tabs.Trigger>
+                ))}
+              </Tabs.List>
+            </Tabs.Root>
+            {exampleCode ? <CopyAction code={exampleCode} label="Copy example" /> : null}
+          </Flex>
           <Box paddingX="4" paddingTop="3" fontSize="12px" lineHeight="18px" color="fg.muted">
             <Text margin="0">{chosen?.description}</Text>
             {chosenContent ? (
               <Text margin="0">
-                {exampleCode ? (declared !== undefined ? "Declared example" : "Example from schema") : "No example supplied"} · {chosenContent.type}
+                {exampleCode
+                  ? declared !== undefined
+                    ? "Declared example"
+                    : "Example from schema"
+                  : "No example supplied"}{" "}
+                · {chosenContent.type}
               </Text>
             ) : null}
           </Box>
@@ -397,7 +635,15 @@ export function Playground({ operation, highlighted, slug }: { operation: Operat
   );
 }
 
-function ResponseArea({ outcome, onRetry, curl }: { outcome: Outcome; onRetry: () => void; curl: string }) {
+function ResponseArea({
+  outcome,
+  onRetry,
+  curl,
+}: {
+  outcome: Outcome;
+  onRetry: () => void;
+  curl: string;
+}) {
   if (outcome.kind === "idle") {
     return (
       <Text margin="0" fontSize="13px" color="fg.muted">
@@ -422,7 +668,13 @@ function ResponseArea({ outcome, onRetry, curl }: { outcome: Outcome; onRetry: (
             <Button type="button" size="xs" variant="outline" colorPalette="gray" onClick={onRetry}>
               Retry
             </Button>
-            <Button type="button" size="xs" variant="outline" colorPalette="gray" onClick={() => navigator.clipboard.writeText(curl)}>
+            <Button
+              type="button"
+              size="xs"
+              variant="outline"
+              colorPalette="gray"
+              onClick={() => navigator.clipboard.writeText(curl)}
+            >
               Copy curl
             </Button>
           </Flex>
@@ -436,11 +688,22 @@ function ResponseArea({ outcome, onRetry, curl }: { outcome: Outcome; onRetry: (
   } catch {
     pretty = outcome.body;
   }
-  const source: CodeSource = { lang: "json", title: "Body", code: pretty, lines: plainLines({ code: pretty }), highlight: [], numbered: false };
+  const source: CodeSource = {
+    lang: "json",
+    title: "Body",
+    code: pretty,
+    lines: plainLines({ code: pretty }),
+    highlight: [],
+    numbered: false,
+  };
   return (
     <Box>
       <Flex gap="3" alignItems="center" fontSize="12px" wrap="wrap" marginBottom="2">
-        <Badge size="sm" variant="subtle" colorPalette={outcome.status < 300 ? "green" : outcome.status < 500 ? "yellow" : "red"}>
+        <Badge
+          size="sm"
+          variant="subtle"
+          colorPalette={outcome.status < 300 ? "green" : outcome.status < 500 ? "yellow" : "red"}
+        >
           {outcome.status} {outcome.statusText}
         </Badge>
         <Text as="span" color="fg.muted">

@@ -1,5 +1,6 @@
 import { Box, Button, Text, VisuallyHidden } from "@langwatch/design-system/primitives";
 import { Check, Copy } from "lucide-react";
+
 import { useCopy } from "../lib/clipboard.ts";
 
 export type CodeSource = {
@@ -21,8 +22,13 @@ export function sourceFromProps(props: Record<string, unknown>): CodeSource {
     title: String(props["data-title"] ?? ""),
     code: String(props["data-code"] ?? ""),
     lines,
-    highlight: String(props["data-highlight"] ?? "").split(",").filter(Boolean).map(Number),
-    numbered: String(props["data-flags"] ?? "").split(",").includes("lines"),
+    highlight: String(props["data-highlight"] ?? "")
+      .split(",")
+      .filter(Boolean)
+      .map(Number),
+    numbered: String(props["data-flags"] ?? "")
+      .split(",")
+      .includes("lines"),
   };
 }
 
@@ -41,13 +47,21 @@ export function CopyAction({ code, label = "Copy code" }: { code: string; label?
         aria-label={state === "copied" ? "Copied" : label}
         onClick={() => copy({ text: code })}
       >
-        {state === "copied" ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-        <Text as="span" fontSize="12px" display={{ base: "none", md: "inline" }}>
+        {state === "copied" ? (
+          <Check size={14} aria-hidden="true" />
+        ) : (
+          <Copy size={14} aria-hidden="true" />
+        )}
+        <Text as="span" fontSize="12px" display="none">
           {state === "copied" ? "Copied" : "Copy"}
         </Text>
       </Button>
       <VisuallyHidden role="status" aria-live="polite">
-        {state === "copied" ? "Copied to clipboard" : state === "failed" ? "Could not copy. Select the code instead." : ""}
+        {state === "copied"
+          ? "Copied to clipboard"
+          : state === "failed"
+            ? "Could not copy. Select the code instead."
+            : ""}
       </VisuallyHidden>
       {state === "failed" ? (
         <Text as="span" fontSize="12px" color="red.fg">
@@ -98,11 +112,27 @@ export function CodeBody({ source, expanded }: { source: CodeSource; expanded: b
   );
 }
 
-export function ExpandControl({ lines, expanded, onToggle }: { lines: number; expanded: boolean; onToggle: () => void }) {
+export function ExpandControl({
+  lines,
+  expanded,
+  onToggle,
+}: {
+  lines: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   if (lines <= EXPAND_AFTER_LINES) return null;
   return (
     <Box borderTopWidth="1px" borderColor="border.nested" paddingX="3" paddingY="1">
-      <Button type="button" size="xs" variant="ghost" colorPalette="gray" minHeight="40px" onClick={onToggle} aria-expanded={expanded}>
+      <Button
+        type="button"
+        size="xs"
+        variant="ghost"
+        colorPalette="gray"
+        minHeight="40px"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
         {expanded ? "Collapse code" : "Expand code"}
       </Button>
     </Box>

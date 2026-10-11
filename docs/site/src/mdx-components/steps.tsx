@@ -1,5 +1,7 @@
 import { Box } from "@langwatch/design-system/primitives";
+import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
+
 import { Icon } from "./icon.tsx";
 
 const STEPS_CSS = {
@@ -17,17 +19,15 @@ const STEPS_CSS = {
       content: "counter(docs-step)",
       position: "absolute",
       insetInlineStart: "0",
-      top: "21px",
+      top: "0",
       width: "28px",
       height: "28px",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       borderRadius: "full",
-      bg: "bg.surface",
+      bg: "bg.subtle",
       color: "fg",
-      borderWidth: "1px",
-      borderColor: "border",
       fontFamily: "body",
       fontSize: "14px",
       lineHeight: "20px",
@@ -37,40 +37,49 @@ const STEPS_CSS = {
       content: '""',
       position: "absolute",
       insetInlineStart: "13.5px",
-      top: "57px",
+      top: "36px",
       bottom: "8px",
       width: "1px",
       bg: "border.muted",
     },
     "&:last-of-type": { paddingBottom: "0" },
   },
-} as const;
+} satisfies SystemStyleObject;
 
 export function Steps({ children }: { children?: ReactNode }) {
   return (
-    <Box as="ol" marginY="6" css={STEPS_CSS}>
+    <Box as="ol" className="docs-steps" marginY="6" css={STEPS_CSS}>
       {children}
     </Box>
   );
 }
 
-export function Step({ title, icon, id, children }: { title?: string; icon?: string; id?: string; children?: ReactNode }) {
+export function Step({
+  title,
+  icon,
+  id,
+  children,
+}: {
+  title?: string;
+  icon?: string;
+  id?: string;
+  children?: ReactNode;
+}) {
   return (
     <li>
       {title ? (
         <Box
           as="h3"
+          color="fg"
           id={id}
           display="flex"
           alignItems="center"
           gap="2"
           margin="0"
-          marginBottom="3"
-          paddingTop="5"
-          borderTopWidth="1px"
-          borderColor="border.muted"
-          fontSize="var(--docs-h3-size)"
-          lineHeight="var(--docs-h3-line)"
+          marginBottom="6"
+          paddingTop="0"
+          fontSize="16px"
+          lineHeight="28px"
           fontWeight="var(--docs-weight-heading)"
           fontFamily="var(--docs-font-heading)"
         >

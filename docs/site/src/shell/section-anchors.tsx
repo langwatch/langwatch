@@ -1,4 +1,5 @@
 import { Box, Flex, Link, Text } from "@langwatch/design-system/primitives";
+
 import { GenericIcon, ICONS } from "../lib/icon-registry.tsx";
 import { firstSlug, sections, support } from "../lib/nav-model.ts";
 import type { Section } from "../lib/nav-model.ts";
@@ -14,15 +15,27 @@ function Tile({ icon, selected }: { icon: string; selected: boolean }) {
       width="1.5rem"
       height="1.5rem"
       borderRadius="lg"
-      bg={selected ? "accent.subtle" : "fg"}
-      color={selected ? "accent.fg" : "fg.inverted"}
+      bg={selected ? "docs.primary" : "bg.subtle"}
+      borderWidth="1px"
+      borderColor={selected ? "accent.fg" : "border"}
+      color={selected ? "accent.onSolid" : "fg.muted"}
     >
       <Glyph size={14} />
     </Flex>
   );
 }
 
-function AnchorLink({ href, title, icon, selected }: { href: string; title: string; icon: string; selected: boolean }) {
+function AnchorLink({
+  href,
+  title,
+  icon,
+  selected,
+}: {
+  href: string;
+  title: string;
+  icon: string;
+  selected: boolean;
+}) {
   return (
     <Link
       href={href}
@@ -31,7 +44,7 @@ function AnchorLink({ href, title, icon, selected }: { href: string; title: stri
       alignItems="center"
       gap="3"
       minHeight={{ base: "44px", lg: "40px" }}
-      paddingX="3"
+      paddingX="4"
       borderRadius="lg"
       fontSize="14px"
       lineHeight="20px"
@@ -54,7 +67,12 @@ export function SectionAnchors({ active }: { active: Section | undefined }) {
         <Box as="ul" margin="0" padding="0">
           {sections.map((section) => (
             <Box as="li" key={section.title} listStyleType="none">
-              <AnchorLink href={`/${firstSlug({ items: section.children })}`} title={section.title} icon={section.icon} selected={section === active} />
+              <AnchorLink
+                href={`/${firstSlug({ items: section.children })}`}
+                title={section.title}
+                icon={section.icon}
+                selected={section === active}
+              />
             </Box>
           ))}
         </Box>

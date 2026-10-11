@@ -1,6 +1,7 @@
 import { Box } from "@langwatch/design-system/primitives";
 import { Link2 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+
 import { TypeRegion } from "../lib/type-mode.tsx";
 
 /** A heading with a hover and focus anchor; a body H1 is presented as H2 and keeps its id. */
@@ -25,7 +26,7 @@ export function DocsInlineCode({ children }: { children?: ReactNode }) {
     <Box
       as="code"
       bg="bg.control"
-      color="blue.fg"
+      color="fg"
       fontFamily="mono"
       fontSize="0.875em"
       lineHeight="1.7"
@@ -42,7 +43,15 @@ export function DocsInlineCode({ children }: { children?: ReactNode }) {
 
 export function DocsTable(props: ComponentProps<"table">) {
   return (
-    <TypeRegion mode="productive" className="docs-table-scroll" role="region" tabIndex={0} aria-label="Table" overflowX="auto" marginY="6">
+    <TypeRegion
+      mode="productive"
+      className="docs-table-scroll"
+      role="region"
+      tabIndex={0}
+      aria-label="Table"
+      overflowX="auto"
+      marginY="6"
+    >
       <table {...props} />
     </TypeRegion>
   );

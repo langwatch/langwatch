@@ -1,9 +1,9 @@
-import { Banner } from "@langwatch/design-system/banner";
-import { Box, Link } from "@langwatch/design-system/primitives";
+import { Box, IconButton, Link } from "@langwatch/design-system/primitives";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { readPreference, writePreference } from "../lib/storage.ts";
+
 import { site } from "../lib/nav-model.ts";
-import { FRAME_MAX, GUTTER } from "./layout.ts";
+import { readPreference, writePreference } from "../lib/storage.ts";
 
 function hashOf({ text }: { text: string }): string {
   let hash = 0;
@@ -22,30 +22,51 @@ export function SiteBanner() {
   if (!banner || hidden) return null;
   const match = /^\*\*\[([^\]]+)\]\(([^)]+)\):?\*\*:?\s*(.*)$/.exec(banner.content);
   return (
-    <Box maxWidth={FRAME_MAX.guide} marginX="auto" paddingX={GUTTER} paddingTop="3">
-      <Banner
-        status="info"
-        placement="inline"
-        onDismiss={
-          banner.dismissible
-            ? () => {
-                writePreference({ key, value: "dismissed" });
-                setHidden(true);
-              }
-            : undefined
-        }
-      >
-        {match ? (
-          <>
-            <Link href={match[2]} fontWeight="600" color="fg" textDecoration="underline" textUnderlineOffset="2px">
-              {match[1]}
-            </Link>{" "}
-            {match[3]}
-          </>
-        ) : (
-          banner.content
-        )}
-      </Banner>
+    <Box
+      position="relative"
+      bg="docs.primary"
+      color="accent.onSolid"
+      minHeight="40px"
+      paddingY="2"
+      paddingX="12"
+      textAlign="center"
+      fontSize="14px"
+      lineHeight="24px"
+    >
+      {banner.dismissible ? (
+        <IconButton
+          aria-label="Dismiss announcement"
+          variant="ghost"
+          color="inherit"
+          position="absolute"
+          right="2"
+          top="0"
+          minWidth="40px"
+          height="40px"
+          onClick={() => {
+            writePreference({ key, value: "dismissed" });
+            setHidden(true);
+          }}
+        >
+          <X size={16} />
+        </IconButton>
+      ) : null}
+      {match ? (
+        <>
+          <Link
+            href={match[2]}
+            fontWeight="600"
+            color="inherit"
+            textDecoration="underline"
+            textUnderlineOffset="2px"
+          >
+            {match[1]}
+          </Link>{" "}
+          {match[3]}
+        </>
+      ) : (
+        banner.content
+      )}
     </Box>
   );
 }

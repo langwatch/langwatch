@@ -1,5 +1,6 @@
 import { Box, Flex, Text } from "@langwatch/design-system/primitives";
 import { useState } from "react";
+
 import { CodeBody, CopyAction, ExpandControl, sourceFromProps } from "./code-parts.tsx";
 import { languageName } from "./languages.ts";
 
@@ -24,7 +25,15 @@ export function CodeFrame({ children }: { children: React.ReactNode }) {
 
 export function CodeBar({ children }: { children: React.ReactNode }) {
   return (
-    <Flex alignItems="center" gap="2" minHeight="44px" paddingX="3" bg="bg.subtle" borderBottomWidth="1px" borderColor="border.nested">
+    <Flex
+      alignItems="center"
+      gap="2"
+      minHeight="44px"
+      paddingX="3"
+      bg="bg.subtle"
+      borderBottomWidth="1px"
+      borderColor="border.nested"
+    >
       {children}
     </Flex>
   );
@@ -39,15 +48,32 @@ export function DocsCodeBlock(props: Record<string, unknown>) {
   const title = source.title || (terminal ? "Terminal" : languageName({ lang: source.lang }));
   return (
     <CodeFrame>
-      <CodeBar>
-        {terminal ? <span className="docs-terminal-dots" aria-hidden="true"><i /><i /><i /></span> : null}
-        <Text as="span" flex="1" minWidth="0" fontSize="12px" lineHeight="20px" color="fg.muted" fontFamily={source.title ? "mono" : "body"}>
-          {title}
-        </Text>
-        <CopyAction code={source.code} />
-      </CodeBar>
+      {source.title ? (
+        <CodeBar>
+          <Text
+            as="span"
+            flex="1"
+            minWidth="0"
+            fontSize="12px"
+            lineHeight="20px"
+            color="fg.muted"
+            fontFamily={source.title ? "mono" : "body"}
+          >
+            {title}
+          </Text>
+          <CopyAction code={source.code} />
+        </CodeBar>
+      ) : (
+        <Box className="docs-code-copy">
+          <CopyAction code={source.code} />
+        </Box>
+      )}
       <CodeBody source={source} expanded={expanded} />
-      <ExpandControl lines={source.lines.length} expanded={expanded} onToggle={() => setExpanded((value) => !value)} />
+      <ExpandControl
+        lines={source.lines.length}
+        expanded={expanded}
+        onToggle={() => setExpanded((value) => !value)}
+      />
     </CodeFrame>
   );
 }
@@ -55,7 +81,10 @@ export function DocsCodeBlock(props: Record<string, unknown>) {
 /** Mermaid renders its source for now; a build-rendered SVG replaces it later. */
 function DocsMermaid(props: Record<string, unknown>) {
   const source = sourceFromProps(props);
-  const plain = { ...source, lines: source.code.split("\n").map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;")) };
+  const plain = {
+    ...source,
+    lines: source.code.split("\n").map((line) => line.replace(/&/g, "&amp;").replace(/</g, "&lt;")),
+  };
   return (
     <CodeFrame>
       <CodeBar>

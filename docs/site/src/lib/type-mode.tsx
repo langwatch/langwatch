@@ -5,20 +5,17 @@ export type TypeMode = "expressive" | "productive";
 
 const COMPACT = "@media (max-width: 47.99rem)";
 
-/**
- * The two type systems as CSS variables. Expressive is the brand voice (Sentient headings, a
- * looser larger body); productive is the dense application scale. docs.css reads these only.
- */
+/** Reading and reference scales share Inter; prose keeps the more generous measure and leading. */
 export const TYPE_MODES: Record<TypeMode, Record<string, string | Record<string, string>>> = {
   expressive: {
-    "--docs-font-heading": "var(--chakra-fonts-display)",
-    "--docs-weight-heading": "400",
-    "--docs-body-size": "18px",
-    "--docs-body-line": "29.25px",
-    "--docs-h2-size": "30px",
-    "--docs-h2-line": "38px",
-    "--docs-h3-size": "24px",
-    "--docs-h3-line": "32px",
+    "--docs-font-heading": "var(--chakra-fonts-heading)",
+    "--docs-weight-heading": "600",
+    "--docs-body-size": "16px",
+    "--docs-body-line": "28px",
+    "--docs-h2-size": "24px",
+    "--docs-h2-line": "32px",
+    "--docs-h3-size": "20px",
+    "--docs-h3-line": "28px",
     "--docs-heading-tracking": "0",
     [COMPACT]: {
       "--docs-body-size": "16px",
@@ -45,7 +42,14 @@ export const TYPE_MODES: Record<TypeMode, Record<string, string | Record<string,
 /** A region that sets one type mode for everything inside it; dense components nest a productive one. */
 export function TypeRegion({ mode, children, css, ...rest }: BoxProps & { mode: TypeMode }) {
   return (
-    <Box data-type-mode={mode} fontSize="var(--docs-body-size)" lineHeight="var(--docs-body-line)" minWidth="0" css={{ ...TYPE_MODES[mode], ...css }} {...rest}>
+    <Box
+      data-type-mode={mode}
+      fontSize="var(--docs-body-size)"
+      lineHeight="var(--docs-body-line)"
+      minWidth="0"
+      css={{ ...TYPE_MODES[mode], ...css }}
+      {...rest}
+    >
       {children}
     </Box>
   );

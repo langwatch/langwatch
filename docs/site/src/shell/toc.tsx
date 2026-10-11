@@ -7,7 +7,9 @@ export type TocEntry = { depth: number; text: string; id: string };
 function useActiveId({ entries }: { entries: TocEntry[] }) {
   const [active, setActive] = useState(entries[0]?.id ?? "");
   useEffect(() => {
-    const elements = entries.map((entry) => document.getElementById(entry.id)).filter((node): node is HTMLElement => node !== null);
+    const elements = entries
+      .map((entry) => document.getElementById(entry.id))
+      .filter((node): node is HTMLElement => node !== null);
     if (elements.length === 0) return;
     const update = () => {
       const line = window.innerHeight * 0.25;
@@ -24,7 +26,15 @@ function useActiveId({ entries }: { entries: TocEntry[] }) {
   return active;
 }
 
-function TocLinks({ entries, active, onChoose }: { entries: TocEntry[]; active: string; onChoose?: () => void }) {
+function TocLinks({
+  entries,
+  active,
+  onChoose,
+}: {
+  entries: TocEntry[];
+  active: string;
+  onChoose?: () => void;
+}) {
   return (
     <Box as="ul" margin="0" padding="0">
       {entries.map((entry) => {
@@ -36,15 +46,14 @@ function TocLinks({ entries, active, onChoose }: { entries: TocEntry[]; active: 
               onClick={onChoose}
               aria-current={current ? "location" : undefined}
               display="block"
-              paddingY="2"
-              fontSize="13px"
+              paddingY="1"
+              fontSize="14px"
               lineHeight="20px"
               textDecoration="none"
-              color={current ? "fg" : "fg.muted"}
+              color={current ? "accent.fg" : "fg.muted"}
               fontWeight={current ? "600" : "400"}
-              boxShadow={current ? "inset 2px 0 0 var(--chakra-colors-accent-solid)" : "inset 1px 0 0 var(--chakra-colors-border-muted)"}
               _hover={{ color: "fg", textDecoration: "none" }}
-              paddingInlineStart={entry.depth > 2 ? "6" : "3"}
+              paddingInlineStart={entry.depth > 2 ? "3" : "0"}
             >
               {entry.text}
             </chakra.a>
@@ -60,7 +69,7 @@ export function TocRail({ entries }: { entries: TocEntry[] }) {
   const active = useActiveId({ entries });
   return (
     <Box as="nav" aria-label="On this page">
-      <Text margin="0" paddingBottom="2" fontSize="12px" lineHeight="20px" fontWeight="600">
+      <Text margin="0" paddingBottom="2" fontSize="14px" lineHeight="20px" fontWeight="500">
         On this page
       </Text>
       <TocLinks entries={entries} active={active} />
@@ -81,14 +90,32 @@ export function TocDisclosure({ entries, always }: { entries: TocEntry[]; always
       borderColor="border"
       borderRadius="lg"
       display={always ? "block" : { base: "block", xl: "none" }}
-      css={{ "& > summary::-webkit-details-marker": { display: "none" }, "&[open] .docs-toc-chevron": { transform: "rotate(180deg)" } }}
+      css={{
+        "& > summary::-webkit-details-marker": { display: "none" },
+        "&[open] .docs-toc-chevron": { transform: "rotate(180deg)" },
+      }}
     >
-      <Box as="summary" display="flex" alignItems="center" justifyContent="space-between" minHeight="44px" paddingX="4" cursor="pointer" fontSize="14px" fontWeight="500" listStyle="none">
+      <Box
+        as="summary"
+        display="flex"
+        alignItems="center"
+        justifyContent="space-between"
+        minHeight="44px"
+        paddingX="4"
+        cursor="pointer"
+        fontSize="14px"
+        fontWeight="500"
+        listStyle="none"
+      >
         On this page
         <ChevronDown size={16} className="docs-toc-chevron" aria-hidden="true" />
       </Box>
       <Box paddingX="2" paddingBottom="2">
-        <TocLinks entries={entries} active={active} onChoose={() => ref.current?.removeAttribute("open")} />
+        <TocLinks
+          entries={entries}
+          active={active}
+          onChoose={() => ref.current?.removeAttribute("open")}
+        />
       </Box>
     </Box>
   );

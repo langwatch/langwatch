@@ -1,12 +1,14 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
-import path from "node:path";
 import { createRequire } from "node:module";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import react from "@vitejs/plugin-react";
+
 import { docsMdxPlugin } from "./docs-mdx.mjs";
-import { lucideRoot } from "./ds-deps.mjs";
 import { docsNavPlugin, openapiPages } from "./docs-nav.mjs";
 import { docsOpenapiPlugin } from "./docs-openapi.mjs";
+import { lucideRoot } from "./ds-deps.mjs";
 
 const siteRoot = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -35,8 +37,14 @@ export function createViteConfig({ failures = new Map() } = {}) {
   const openapiBySlug = () => (operationSlugs ??= openapiPages({ docsRoot }));
   return {
     root: siteRoot,
-    publicDir: false,
-    plugins: [docsNavPlugin({ docsRoot }), docsOpenapiPlugin({ docsRoot, openapiBySlug }), docsMdxPlugin({ failures }), react({ include: /\.(tsx|jsx|mdx)$/ }), serveDocsAssets()],
+    publicDir: "public",
+    plugins: [
+      docsNavPlugin({ docsRoot }),
+      docsOpenapiPlugin({ docsRoot, openapiBySlug }),
+      docsMdxPlugin({ failures }),
+      react({ include: /\.(tsx|jsx|mdx)$/ }),
+      serveDocsAssets(),
+    ],
     resolve: {
       alias: [
         { find: /^lucide-react$/, replacement: lucideRoot() },

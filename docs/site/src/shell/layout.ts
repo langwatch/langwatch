@@ -7,6 +7,9 @@ export const NAV_WIDTH = { lg: "14.5rem", xl: "16rem" } as const;
 export type PageKind = "home" | "guide" | "endpoint";
 
 /** Maximum frame width per page kind: guide 1312, endpoint 90rem (the 1440 split). */
-export const FRAME_MAX: Record<PageKind, string> = { home: "82rem", guide: "82rem", endpoint: "90rem" };
+export const FRAME_MAX: Record<PageKind, string> = {
+  home: "90rem",
+  guide: "90rem",
+  endpoint: "90rem",
+};
 export const ENDPOINT_QUERY = "@media (min-width: 90rem)";
-export const GROUND_HEIGHT = "35rem";
