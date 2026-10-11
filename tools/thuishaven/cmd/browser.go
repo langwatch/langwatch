@@ -490,7 +490,7 @@ type browserTarget struct {
 // directories made; it refuses a worktree with no running stack.
 func browserStack(d deps, inv invocation, slug string) (map[string]any, error) {
 	dir, home := browserDir(slug), browserHomeFor(d.worktree, slug)
-	appURL := lastOverlayValue(telemetryOverlay(d, inv), "LANGWATCH_ENDPOINT")
+	appURL := telemetryOverlayValue(telemetryOverlay(d, inv), "LANGWATCH_ENDPOINT")
 	if appURL == "" {
 		return nil, errors.New("this worktree has no running stack; run haven up --agent -d")
 	}
@@ -540,18 +540,6 @@ func currentProtocol(ctx context.Context, daemon browserDaemon) error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	return nil
-}
-
-// lastOverlayValue is key's effective value: the overlay is an environment, where a
-// later entry wins (a root .env naming another stack comes before this stack's own).
-func lastOverlayValue(overlay []string, key string) string {
-	value := ""
-	for _, kv := range overlay {
-		if v, ok := strings.CutPrefix(kv, key+"="); ok {
-			value = v
-		}
-	}
-	return value
 }
 
 // appLogPath is the Node host's log, whose ready line ends a backend reload (app/reload.go).

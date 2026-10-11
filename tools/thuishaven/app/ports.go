@@ -6,6 +6,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -385,6 +386,10 @@ type Observability interface {
 type Dashboard interface {
 	Serve(ctx context.Context, port int) error
 }
+
+// ErrDaemonNotReady is a hand-over the daemon did not take up: no answer, or a
+// daemon that does not know the stack yet (one restarting after a rebuild).
+var ErrDaemonNotReady = errors.New("the daemon is not ready for this stack")
 
 // DaemonClient is how an up asks the running daemon to act (ruling D-S4c-1).
 type DaemonClient interface {

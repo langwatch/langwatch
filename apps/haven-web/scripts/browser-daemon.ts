@@ -29,6 +29,7 @@ import {
   type Route,
 } from "playwright";
 
+import { stampStderr } from "./browser-log.ts";
 import {
   consoleLine,
   diffSnapshots,
@@ -62,6 +63,8 @@ import {
 import { faultBody, routeRule, takeFault, type RouteRule } from "./browser-route.ts";
 import { filterSnapshot } from "./browser-snapshot.ts";
 import { parseTotp, redactSecrets, totpCode, wrongCode, type Totp } from "./mfa-totp.ts";
+
+stampStderr();
 
 const env = (name: string) => {
   const value = process.env[name];
@@ -135,7 +138,22 @@ const browser = await chromium.launch({
     "--disable-features=Translate,MediaRouter,OptimizationHints",
   ],
 });
-browser.on("disconnected", () => process.exit(1));
+/** Set once shutdown closes the browser on purpose, so that disconnect is not a crash. */
+let closing = false;
+/** The browser tree's RSS at the last measure: all that is known once it is gone. */
+let lastTreeMb: number | undefined;
+const memoryNote = () => {
+  const own = Math.round(process.memoryUsage().rss / 2 ** 20);
+  const tree =
+    lastTreeMb === undefined ? "not measured" : `${Math.round(lastTreeMb)} MB at the last measure`;
+  return `daemon RSS ${own} MB, browser tree ${tree}`;
+};
+browser.on("disconnected", () => {
+  if (closing) return;
+  console.error(`browser disconnected (crashed or killed), exiting: ${memoryNote()}`);
+  process.exit(1);
+});
+process.on("exit", (code) => console.error(`daemon exited with code ${code}; ${memoryNote()}`));
 
 type Lane = {
   /** `<stack>/<lane>`: two stacks may both have a lane called qa-1. */
@@ -200,7 +218,8 @@ async function treeRssMb(): Promise<number> {
     }
   }
   for (const [pid = 0, , rss = 0] of rows) if (inTree.has(pid)) kb += rss;
-  return kb / 1024;
+  lastTreeMb = kb / 1024;
+  return lastTreeMb;
 }
 
 function closeGate({ stack }: { stack: Stack }) {
@@ -472,7 +491,7 @@ async function closeLane({ key }: { key: string }) {
 let exitTimer: NodeJS.Timeout | undefined;
 function scheduleExit() {
   clearTimeout(exitTimer);
-  exitTimer = setTimeout(() => void shutdown(), IDLE_MS);
+  exitTimer = setTimeout(() => void shutdown({ why: `idle ${IDLE_MS} ms with no lane` }), IDLE_MS);
 }
 
 function touch({ lane }: { lane: Lane }) {
@@ -1361,7 +1380,7 @@ async function status({ body }: { body: Request }) {
 async function stop({ body }: { body: Request }) {
   const slug = body.stack?.slug;
   if (!slug || body.everything) {
-    setImmediate(() => void shutdown());
+    setImmediate(() => void shutdown({ why: "haven browser stop --all" }));
     return { stopped: true };
   }
   const closed = [...lanes.values()].filter((lane) => lane.stack.slug === slug);
@@ -1625,13 +1644,15 @@ const server = createServer((req, res) => {
     );
 });
 
-async function shutdown() {
+async function shutdown({ why }: { why: string }) {
+  console.error(`daemon stopping: ${why}; ${memoryNote()}`);
+  closing = true;
   server.close();
   await browser.close().catch(() => undefined);
   process.exit(0);
 }
 for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"] as const)
-  process.on(signal, () => void shutdown());
+  process.on(signal, () => void shutdown({ why: `killed by ${signal}` }));
 
 server.listen(0, "127.0.0.1", () => {
   const address = server.address();

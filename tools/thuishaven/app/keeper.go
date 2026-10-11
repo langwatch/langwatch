@@ -289,15 +289,41 @@ func (o *Orchestrator) handOver(ctx context.Context, st domain.Stack, plan Keepe
 	if o.daemon == nil {
 		return errors.New("no daemon client configured")
 	}
+	deadline := time.Now().Add(keeperAskWindow)
+	for {
+		err := o.askKeeper(ctx, st)
+		if err != nil && o.keeperTook(st.Slug, plan.ProvisionerPID) {
+			return nil // a timed-out ask the daemon still carried out
+		}
+		if !errors.Is(err, ErrDaemonNotReady) || !time.Now().Before(deadline) {
+			if err != nil {
+				return fmt.Errorf("the daemon did not start the keeper: %w", err)
+			}
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(keeperAskEvery):
+		}
+	}
+}
+
+// keeperAskWindow is how long an up keeps asking: a daemon rebuilt mid-boot hands
+// over to its successor (up to successorWait), which then has to come up.
+const (
+	keeperAskWindow = 2 * successorWait
+	keeperAskEvery  = 250 * time.Millisecond
+)
+
+// askKeeper is one ask of whichever daemon runs now, started first if none does.
+func (o *Orchestrator) askKeeper(ctx context.Context, st domain.Stack) error {
 	o.ensureDaemon(st.WorktreeDir)
 	info, ok := o.store.Daemon()
 	if !ok || !o.daemonAlive() {
-		return errors.New("no haven daemon is running to start the keeper (see haven.log in the haven home)")
+		return fmt.Errorf("%w: no haven daemon is running (see haven.log in the haven home)", ErrDaemonNotReady)
 	}
-	if err := o.daemon.StartKeeper(ctx, info.Port, st.Slug); err != nil {
-		return fmt.Errorf("the daemon did not start the keeper: %w", err)
-	}
-	return nil
+	return o.daemon.StartKeeper(ctx, info.Port, st.Slug)
 }
 
 // StartKeeper is the daemon's half of the hand-over: it starts slug's keeper
@@ -345,15 +371,20 @@ func (o *Orchestrator) spawnKeeper(st domain.Stack) error {
 	return nil
 }
 
+// keeperTook is whether slug's record names a live launcher other than the provisioner.
+func (o *Orchestrator) keeperTook(slug string, provisioner int) bool {
+	st, ok := o.stackBySlug(slug)
+	return ok && st.LauncherPID != provisioner && st.LauncherPID != 0 && o.launcherIsOurs(st)
+}
+
 // awaitKeeper waits until the record names a launcher that is ours and is not
 // the provisioner, until ctx's deadline. A canceled ctx (Ctrl-C) returns at once (ruling R4).
 func (o *Orchestrator) awaitKeeper(ctx context.Context, slug string, provisioner int) error {
 	for {
-		st, ok := o.stackBySlug(slug)
-		if !ok {
+		if _, ok := o.stackBySlug(slug); !ok {
 			return fmt.Errorf("stack %q was torn down during the hand-over", slug)
 		}
-		if st.LauncherPID != provisioner && st.LauncherPID != 0 && o.launcherIsOurs(st) {
+		if o.keeperTook(slug, provisioner) {
 			return nil
 		}
 		select {
