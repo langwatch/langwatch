@@ -287,14 +287,15 @@ Feature: Evaluator management
     Then the code editor opens with its saved code, inputs and outputs
     And in the workbench each input shows its source mapping inline
 
-  # A disabled Create button must say why instead of being a silent dead button:
-  # the drawer surfaces the missing requirement and clears it once the field is met.
+  # Create stays available and, when pressed, names the missing requirement and puts
+  # the cursor on the name; the message clears once the requirement is met.
   Scenario: A disabled code evaluator Create button explains what is missing
     Given the code evaluator drawer is open in create mode without a name
-    Then the Create button is disabled
-    And the drawer shows the reason, naming the missing name
+    Then the Create button is available and no reason is shown
+    When I press Create
+    Then the drawer names the missing name, focuses it and saves nothing
     When I fill in the name
-    Then the reason clears and the Create button is enabled
+    Then the message clears and Create is still available
 
   # Same behavior as the studio code node: the Python entrypoint is kept in
   # sync with the declared inputs, so changing the inputs keeps the evaluator

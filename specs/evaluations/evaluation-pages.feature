@@ -99,6 +99,7 @@ Feature: The evaluators and online evaluations pages
     When I open the replicate dialog
     Then both projects are listed
     And the project I may not create in cannot be chosen
+    And pressing Replicate without a project I may use names the missing project and copies nothing
 
   @unit
   Scenario: Each online evaluation is one row
