@@ -6,7 +6,7 @@ The server half of [insight](../README.md). The `insight_processing` pipeline, i
 
 ## Installation
 
-`defineProcessModule("insight").withRepositories(insightRepositories).withApi(InsightModule).withTransports(insightTrpcTransport).withEventing(insightEventing).withEventing(insightDailyRunEventing).withTasks(…)`, `src/insight.module.ts:10`.
+`defineProcessModule("insight").withRepositories(insightRepositories).withApi(InsightModule).withTransports(insightTrpcTransport).withEventing(insightEventing).withEventing(insightDailyRunEventing).withTasks(…)`, `src/insight.module.ts:12`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Each person's own insights in a project. Every operation refuses with `insights_not_enabled` while `release_insights` is off for the project, and an insight another person owns answers `insight_not_found`, exactly as an id no insight has.
 
-Peers call these through the token, declared at `../contract/src/insight.api.ts:21`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/insight.api.ts:22`; nothing else in this package is public.
 
 #### `findInsights`
 
@@ -96,6 +96,14 @@ Turns the reader's daily run off for a board; "No thanks" on the offer stores th
 turnOffDailyRun(input: TurnOffInsightDailyRunInput & Reader): Promise<void>;
 ```
 
+#### `findOperatorDailySchedules`
+
+Every person's daily run that is on or off, in every project, for the operator's list: the ones that are on first. It names no reader and asks no flag; its door asks the operator.
+
+```typescript
+findOperatorDailySchedules(input: { limit: number }): Promise<InsightOperatorDailySchedule[]>;
+```
+
 ## REST transport
 
 None: this module declares no REST family.
@@ -153,7 +161,7 @@ type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:1
 type Output = unknown;
 
 // insights.getBoardDailyRun
-// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:178
+// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:234
 interface Input {
   projectId: string;
   board: {
@@ -161,15 +169,15 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:166
+type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:196
 
 // insights.configureBoardDailyRun
-type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:191
+type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:247
 // Output: inline, ../contract/src/insight.trpc.ts:56
 type Output = unknown;
 
 // insights.turnOffBoardDailyRun
-type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:203
+type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:259
 // Output: inline, ../contract/src/insight.trpc.ts:60
 type Output = unknown;
 ```
@@ -182,19 +190,22 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `insight_daily_run` (aggregate `insight_daily_schedule`)
 
-Declared at `src/eventing/insight-daily-run.pipeline.ts:87`. Events: `INSIGHT_DAILY_RUN_EVENT_SCHEMAS`.
+Declared at `src/eventing/insight-daily-run.pipeline.ts:100`. Events: `INSIGHT_DAILY_RUN_EVENT_SCHEMAS`.
 
 | Kind                | Name                                                                    | Handles                                                                                                   | Declared at                                      |
 | ------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| command             | `configureSchedule`                                                     | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:93`  |
-| command             | `turnOffSchedule`                                                       | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:94`  |
-| command             | `requestScheduleRearm`                                                  | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:95`  |
-| command             | `requestRun`                                                            | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:96`  |
-| command             | `recordRunStarted`                                                      | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:97`  |
-| command             | `settleRun`                                                             | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:98`  |
-| process manager     | `dailyInsightsSchedule`                                                 | intents `runBoard` (outbox)                                                                               | `src/eventing/insight-daily-run.pipeline.ts:99`  |
-| process manager     | `dailyInsightsScheduleReconcile`                                        | every 1 h (`INSIGHT_SCHEDULE_RECONCILE_INTERVAL_MS = 60 * 60_000`); intents `reconcileSchedules` (outbox) | `src/eventing/insight-daily-run.pipeline.ts:116` |
-| Postgres projection | `≈ createInsightDailyScheduleProjection({ store: deps.scheduleStore })` | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:92`  |
+| command             | `configureSchedule`                                                     | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:106` |
+| command             | `turnOffSchedule`                                                       | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:107` |
+| command             | `requestScheduleRearm`                                                  | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:108` |
+| command             | `requestRun`                                                            | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:109` |
+| command             | `recordRunStarted`                                                      | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:110` |
+| command             | `settleRun`                                                             | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:111` |
+| process manager     | `dailyInsightsSchedule`                                                 | intents `runBoard` (outbox)                                                                               | `src/eventing/insight-daily-run.pipeline.ts:133` |
+| process manager     | `dailyInsightsScheduleReconcile`                                        | every 1 h (`INSIGHT_SCHEDULE_RECONCILE_INTERVAL_MS = 60 * 60_000`); intents `reconcileSchedules` (outbox) | `src/eventing/insight-daily-run.pipeline.ts:150` |
+| subscriber          | `dailyRunAudit`                                                         | `lw.insight.daily_schedule.run_settled` from [insight](../README.md)                                      | `src/eventing/insight-daily-run.pipeline.ts:113` |
+| peer subscriber     | `memberRemoved`                                                         | `lw.organization.member_removed` from [organization](../../organization/README.md)                        | `src/eventing/insight-daily-run.pipeline.ts:121` |
+| peer subscriber     | `projectArchived`                                                       | `lw.project.archived` from [project](../../project/README.md)                                             | `src/eventing/insight-daily-run.pipeline.ts:127` |
+| Postgres projection | `≈ createInsightDailyScheduleProjection({ store: deps.scheduleStore })` | –                                                                                                         | `src/eventing/insight-daily-run.pipeline.ts:105` |
 
 ### Pipeline `insight_processing` (aggregate `insight`)
 

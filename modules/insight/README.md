@@ -37,7 +37,7 @@ and [the daily run](./specs/insight-daily-run.feature). Decisions: [ADRs](./adrs
 | Classification | core (`modules/catalogue.json`)                                                                       |
 | Subjects       | insight                                                                                               |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                              |
-| Api token      | `InsightApi` = `moduleApi<InsightApi>()("insight")`, `contract/src/insight.api.ts:52` (10 operations) |
+| Api token      | `InsightApi` = `moduleApi<InsightApi>()("insight")`, `contract/src/insight.api.ts:58` (11 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                            |
 
 ## What insight owns
@@ -57,6 +57,7 @@ Anything else insight needs belongs to another module and is reached through its
 | Name           | Token            | Module                                    |
 | -------------- | ---------------- | ----------------------------------------- |
 | `analytics`    | `AnalyticsApi`   | [analytics](../analytics/README.md)       |
+| `auditLog`     | `AuditLogApi`    | [audit-log](../audit-log/README.md)       |
 | `authz`        | `AuthzApi`       | [authz](../authz/README.md)               |
 | `dashboards`   | `DashboardApi`   | [dashboard](../dashboard/README.md)       |
 | `featureFlags` | `FeatureFlagApi` | [feature-flag](../feature-flag/README.md) |
@@ -66,6 +67,6 @@ Anything else insight needs belongs to another module and is reached through its
 
 ## Who depends on insight
 
-No module names insight as a peer.
+[ops](../ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->
