@@ -30,6 +30,7 @@ import {
   MemoryRedisHealthRepository,
 } from "./memory.datastore-health.repository.ts";
 import { MemoryEventExplorerRepository } from "./memory.event-explorer.repository.ts";
+import { MemoryEventLogIdIndexFillRepository } from "./memory.event-log-id-index-fill.repository.ts";
 import { MemoryGroupQueueReaperRepository } from "./memory.group-queue-reaper.repository.ts";
 import { MemoryImpersonationRepository } from "./memory.impersonation.repository.ts";
 import { MemoryInstanceAdminRepository } from "./memory.instance-admin.repository.ts";
@@ -193,6 +194,7 @@ export class MemoryOpsRepositories {
       redisHealth: MemoryRedisHealthRepository.create(),
       clickhouseHealth: MemoryClickHouseHealthRepository.create(),
       events: MemoryEventExplorerRepository.create({ store }),
+      eventLogIdIndexFill: MemoryEventLogIdIndexFillRepository.create(),
       storageFootprint: MemoryStorageFootprintRepository.create(),
       upgradeLedger: MemoryUpgradeLedgerRepository.create(),
       tenantStepState,

@@ -80,6 +80,7 @@ export {
 } from "./pipeline/eventingModule.ts";
 export {
   type OpenPipelineDefinition,
+  pipelineEventLogIndexOf,
   pipelineRetentionOf,
   type SealedPipelineDefinition,
   sealPipelineDefinition,

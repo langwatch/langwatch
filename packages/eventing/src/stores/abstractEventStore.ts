@@ -2,6 +2,7 @@ import type { AggregateType } from "../domain/aggregateType.ts";
 import type { Event } from "../domain/types.ts";
 import { ValidationError } from "../services/errorHandling.ts";
 import { EventUtils } from "../utils/event.utils.ts";
+import { readEventRecord } from "./eventReadSeat.ts";
 import type {
   EventStore as BaseEventStore,
   EventStoreAggregateKey,
@@ -128,7 +129,8 @@ export abstract class AbstractEventStore<
         "tenant.id": context.tenantId,
       },
       async () => {
-        const record = await this.repository.getEventRecord({
+        const record = await readEventRecord({
+          repository: this.repository,
           tenantId: context.tenantId,
           aggregateType,
           aggregateId,

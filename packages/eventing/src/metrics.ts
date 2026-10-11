@@ -564,3 +564,26 @@ export async function withMetrics<T>({
     throw error;
   }
 }
+
+const eventLogIndexReadTotal = counter(
+  "es_event_log_index_read_total",
+  "Event log reads by how they were bounded: the aggregate index, an event id's time, or unbounded",
+  ["read", "outcome"],
+);
+
+/** How one event log read was bounded (dev/docs/plans/id-index-2026-10-10.md §4). */
+export type EventLogIndexReadOutcome =
+  | "index_hit"
+  | "index_miss"
+  | "unindexed"
+  | "window_hit"
+  | "window_fallback"
+  | "not_ksuid";
+
+export const incrementEventLogIndexRead = ({
+  read,
+  outcome,
+}: {
+  read: "aggregate" | "event" | "replay";
+  outcome: EventLogIndexReadOutcome;
+}) => eventLogIndexReadTotal.labels(read, outcome).inc();

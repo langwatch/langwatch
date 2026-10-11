@@ -10,7 +10,7 @@ Feature: A lookup by id reads only the partitions its id index names
   Background:
     Given a time-partitioned table with an id index owned by the same module
 
-  @integration @unimplemented
+  @integration
   Scenario: a lookup by id reads only the partitions the index names
     Given a record written eight weeks ago
     When it is looked up by its id alone
@@ -23,14 +23,14 @@ Feature: A lookup by id reads only the partitions its id index names
     When a record is inserted into the source table
     Then its id index row exists without any application code writing it
 
-  @integration @unimplemented
+  @integration
   Scenario: a trace's spans arriving over time widen its index range
     Given a trace whose first span started on Monday
     When a late span from the same trace starting on Thursday is stored
     Then the trace's index range covers Monday to Thursday
     And a lookup of the trace's spans returns both spans
 
-  @integration @unimplemented
+  @integration
   Scenario: a span lookup hits before the trace summary is projected
     Given a trace whose spans are stored but whose summary is not yet projected
     When its spans are looked up by trace id
@@ -45,13 +45,13 @@ Feature: A lookup by id reads only the partitions its id index names
     And it never scans without a time bound
     And it is recorded as an index miss
 
-  @integration @unimplemented
+  @integration
   Scenario: the index expires with the data it points at
     Given a record in a project with a 30-day retention
     When the record's last row passes its retention
     Then its index row expires on the same retention, never before the source rows
 
-  @unit @unimplemented
+  @unit
   Scenario: the index table has no partition key
     When the id index migrations are read
     Then no id index table declares a PARTITION BY
@@ -70,14 +70,14 @@ Feature: A lookup by id reads only the partitions its id index names
     When a record is looked up by its id alone
     Then the read uses the existing windowed fallback rather than trusting the index
 
-  @integration @unimplemented
+  @integration
   Scenario: replaying an aggregate reads only the weeks its events span
     Given an aggregate whose events span three weeks, a year ago
     When its events are read for replay with no lower bound
     Then the read touches only those weeks' partitions
     And events with an unknown occurred time are still included
 
-  @integration @unimplemented
+  @integration
   Scenario: a projection replay re-inserting rows leaves the index range correct
     Given a trace whose index range covers Monday to Thursday
     When its projection is replayed and its rows are inserted again
@@ -95,7 +95,7 @@ Feature: A lookup by id reads only the partitions its id index names
     When the project's trace retention is changed to 30 days
     Then the aggregate's index row is still kept forever
 
-  @integration @unimplemented
+  @integration
   Scenario: an aggregate the index has not seen reads its whole history
     Given the event log index's flag is on
     And an aggregate whose only events have no occurred time
@@ -108,19 +108,19 @@ Feature: A lookup by id reads only the partitions its id index names
     When a later row for the same id arrives with a 30-day retention
     Then the id's index row is still kept forever
 
-  @integration @unimplemented
+  @integration
   Scenario: events with an unknown occurred time do not widen an aggregate's range
     Given an aggregate with events last month and one event with no occurred time
     When its index range is read
     Then the range covers last month only
 
-  @unit @unimplemented
+  @unit
   Scenario: an event is found first in the window its id's time names
     Given an event stored eight weeks ago whose occurred time is close to when its id was made
     When it is looked up by tenant and event id
     Then the first read touches only the partitions within seven days of the id's time
 
-  @unit @unimplemented
+  @unit
   Scenario: an event whose occurred time drifted far from its id falls back
     Given a span exported today whose occurred time is three months ago
     When its event is looked up by tenant and event id
@@ -141,7 +141,7 @@ Feature: A lookup by id reads only the partitions its id index names
     Then it retries that batch after a growing pause
     And after a restart it resumes from the last committed batch, not the start
 
-  @integration @unimplemented
+  @integration
   Scenario: a trace opens with no time
     Given a trace stored eight weeks ago and its owner's id index flag on
     When its summary and spans are read with no time given
@@ -160,7 +160,7 @@ Feature: A lookup by id reads only the partitions its id index names
     When the backfill completes
     Then every index row for that project carries the new retention
 
-  @unit @unimplemented
+  @unit
   Scenario: an event id that is not a KSUID takes the existing lookup path
     Given a legacy event id that is not a KSUID
     When it is looked up by tenant and event id

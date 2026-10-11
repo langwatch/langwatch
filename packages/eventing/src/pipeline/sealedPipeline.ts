@@ -1,3 +1,5 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
+
 import type { AggregateDefinition } from "../domain/definitions.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type { RetentionPolicyResolver } from "../runtime.types.ts";
@@ -51,6 +53,22 @@ export function pipelineRetentionOf({
     if (sealed.metadata.aggregateType !== aggregateType) continue;
     const resolver = sealed.open((definition) => definition.retentionPolicyResolver);
     if (resolver) return resolver;
+  }
+  return undefined;
+}
+
+/** The event log index flags the first registered pipeline of this aggregate type declares. */
+export function pipelineEventLogIndexOf({
+  definitions,
+  aggregateType,
+}: {
+  definitions: readonly SealedPipelineDefinition[];
+  aggregateType: string;
+}): IdIndexFlags | undefined {
+  for (const sealed of definitions) {
+    if (sealed.metadata.aggregateType !== aggregateType) continue;
+    const flags = sealed.open((definition) => definition.eventLogIndexFlags);
+    if (flags) return flags;
   }
   return undefined;
 }

@@ -1,5 +1,7 @@
 import { ClientAddress } from "@langwatch/api/policy";
 import { bindRestCredential, browserSessionOfRequest } from "@langwatch/api/rest";
+import { EVENT_LOG_ID_INDEX_OWNER } from "@langwatch/eventing/server";
+import { idIndexFlagKey } from "@langwatch/feature-flag-contract";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
@@ -187,5 +189,34 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
           const granted = await app.seedPlatformOperatorsFromAdminEmails({ dryRun });
           return dryRun ? { wouldGrant: granted } : { granted };
         },
+      }),
+      // Ops hosts operator work over the event tables (§7); the fill itself is eventing's.
+      defineMigrationStep({
+        id: "ops:fill-event-log-id-index",
+        kind: "data",
+        mode: "background",
+        description:
+          "Fills the event log's aggregate index from older events, then turns each ClickHouse target's event log index flag on.",
+        needsOldWritersGone: false,
+        run: ({ checkpoint, dryRun, signal }) =>
+          repositories.eventLogIdIndexFill.fill({
+            checkpoint,
+            dryRun,
+            signal,
+            beforeFlag: async ({ target }) => {
+              await dependencies.retention.raiseIdIndexRetention({
+                ...(target.organizationId === undefined
+                  ? {}
+                  : { organizationId: target.organizationId }),
+                indexes: repositories.eventLogIdIndexFill.indexesWithCopiedRetention(),
+              });
+            },
+            setFlag: ({ target }) =>
+              dependencies.featureFlags.setEnabled({
+                key: idIndexFlagKey({ owner: EVENT_LOG_ID_INDEX_OWNER, target }),
+                lastEditedBy: null,
+                enabled: true,
+              }),
+          }),
       }),
     ]);

@@ -71,6 +71,7 @@ type NotPostgres =
   | "redisHealth"
   | "clickhouseHealth"
   | "events"
+  | "eventLogIdIndexFill"
   | "storageFootprint";
 
 // The upgrade ledger and its tenant step table describe the installation, not a tenant.

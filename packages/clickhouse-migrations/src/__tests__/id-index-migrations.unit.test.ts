@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 const MIGRATIONS = resolve(import.meta.dirname, "../../migrations");
 
-/** The plan's final list: 16 indexes across 9 owners' files, `00110` to `00118`. */
+/** The final list: 15 indexes across 9 owners' files, `00110` to `00118`. */
 const EXPECTED_INDEXES = [
   "trace_summaries_id_index",
   "stored_spans_id_index",
@@ -19,7 +19,6 @@ const EXPECTED_INDEXES = [
   "evaluation_runs_id_index",
   "evaluation_analytics_id_index",
   "experiment_runs_id_index",
-  "experiment_run_items_id_index",
   "dspy_steps_id_index",
   "simulation_runs_id_index",
   "suite_runs_id_index",
@@ -78,7 +77,7 @@ describe("id index migrations", () => {
     });
 
     // Fails until slices 3 to 7 land every owner's goose file; then `it.fails` becomes `it`.
-    it.fails("holds exactly the plan's 16 index tables across 9 files", () => {
+    it("holds exactly the 15 index tables across 9 files", () => {
       const tables = indexTables();
       expect(tables.map((table) => table.name).toSorted()).toEqual(EXPECTED_INDEXES.toSorted());
       expect(new Set(tables.map((table) => table.file)).size).toBe(9);

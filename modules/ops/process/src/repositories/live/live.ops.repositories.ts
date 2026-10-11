@@ -1,6 +1,9 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
-import { EventingClickHouseEventExplorer } from "@langwatch/eventing/server";
+import {
+  EventingClickHouseEventExplorer,
+  EventingClickHouseEventLogIdIndexFill,
+} from "@langwatch/eventing/server";
 import { privateTenantListing } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -73,6 +76,7 @@ export const LiveOpsRepositories = {
       redisHealth: RedisRedisHealthRepository.create(redis),
       clickhouseHealth: ClickHouseClickHouseHealthRepository.create({ clickhouse }),
       events: EventingClickHouseEventExplorer.create({ clickhouse }),
+      eventLogIdIndexFill: EventingClickHouseEventLogIdIndexFill.create({ clickhouse }),
       storageFootprint: ClickHouseStorageFootprintRepository.create({ clickhouse }),
     };
   },

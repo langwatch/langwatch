@@ -5,7 +5,8 @@
 # read by design (producer-only-event-store.feature), and that rule stands
 # (Q209, 2026-10-06). So the single-event read is a separate, narrow seat
 # beside the store: one event, inside its tenant's aggregate stream, inside
-# main's two-day window around the time its KSUID carries.
+# a seven-day window around the time its KSUID carries, falling back to the
+# stream when the event's own time drifted further (specs/clickhouse/id-index-reads.feature).
 
 @event-sourcing
 Feature: One event is read by id through a narrow seat beside the event store
@@ -17,15 +18,9 @@ Feature: One event is read by id through a narrow seat beside the event store
 
     @unit
     Scenario: An event inside the window is answered
-      Given an event whose recorded time is within two days of the time its id carries
+      Given an event whose recorded time is within seven days of the time its id carries
       When the seat is asked for that event by tenant, stream and id
       Then that event is answered, with its data
-
-    @unit
-    Scenario: An event recorded outside the window is not found
-      Given an event whose recorded time is more than two days from the time its id carries
-      When the seat is asked for that event
-      Then the read fails as not found
 
     @unit
     Scenario: An event with no recorded time is always answered

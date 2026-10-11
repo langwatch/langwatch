@@ -1,3 +1,4 @@
+import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { z } from "zod";
 
 import type { Command, CommandHandler } from "../commands/command.ts";
@@ -130,6 +131,7 @@ export class PipelineBuilder<
   private eventSubscribers = new Map<string, EventSubscriberDefinition<EventType>>();
   private prepareEventForProjection?: (event: EventType) => EventType;
   private retentionPolicyResolver?: RetentionPolicyResolver;
+  private eventLogIndexFlags?: IdIndexFlags;
   private upcastDeclaration?: UpcastDeclaration;
   private laneAliases: readonly LaneAlias[] = [];
   private readonly globalProjections: GlobalProjection[] = [];
@@ -160,6 +162,16 @@ export class PipelineBuilder<
    */
   withRetention(resolver: RetentionPolicyResolver): this {
     this.retentionPolicyResolver = resolver;
+    return this;
+  }
+
+  /**
+   * Whether the event log's aggregate index is filled on each ClickHouse target, asked of the
+   * owning module's feature flags (`clickhouse_id_index_eventing_<target>`). Absent, this
+   * aggregate's folds and replays read the event log unbounded by it, as today.
+   */
+  withEventLogIndex(flags: IdIndexFlags): this {
+    this.eventLogIndexFlags = flags;
     return this;
   }
 
@@ -711,6 +723,9 @@ export class PipelineBuilder<
       ...(this.retentionPolicyResolver === undefined
         ? {}
         : { retentionPolicyResolver: this.retentionPolicyResolver }),
+      ...(this.eventLogIndexFlags === undefined
+        ? {}
+        : { eventLogIndexFlags: this.eventLogIndexFlags }),
       foldProjections: this.foldProjections,
       stateProjections: this.stateProjections,
       mapProjections: this.mapProjections,

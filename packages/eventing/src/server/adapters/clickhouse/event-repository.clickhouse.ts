@@ -12,6 +12,7 @@ import type {
 } from "../../clickhouse-client-resolver.ts";
 import type { EventingRetentionConfiguration } from "../../eventing-server-runtime.ts";
 import { EventLogAppendFold, type EventLogInsert } from "./event-log-append-fold.ts";
+import { type EventLogIdIndex, eventLogOccurredRange } from "../../tables/event-log-id-index.ts";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 
@@ -146,6 +147,8 @@ export class EventingClickHouseEventRepository implements EventRepository {
     private readonly retention: EventingRetentionConfiguration | undefined,
     /** The organisation a tenant's rows are written for; absent, every append inserts alone. */
     private readonly organizationOf?: (tenantId: string) => Promise<string | null>,
+    /** Bounds an aggregate's reads once its pipeline's flag is on; absent, reads stay as today. */
+    private readonly eventLogIndex?: EventLogIdIndex,
   ) {
     this.appendFold = new EventLogAppendFold({
       insert: (insert) => this.insertEventLog(insert),
@@ -157,8 +160,14 @@ export class EventingClickHouseEventRepository implements EventRepository {
   /** Reads only, for a read seat: a process that appends nothing states no retention. */
   static createForEventReads(options: {
     resolveClient: EventingClickHouseClientResolver;
+    eventLogIndex?: EventLogIdIndex;
   }): Pick<EventRepository, "getEventRecord" | "getEventRecords"> {
-    return new EventingClickHouseEventRepository(options.resolveClient, undefined);
+    return new EventingClickHouseEventRepository(
+      options.resolveClient,
+      undefined,
+      undefined,
+      options.eventLogIndex,
+    );
   }
 
   static create(options: {
@@ -166,12 +175,41 @@ export class EventingClickHouseEventRepository implements EventRepository {
     retention: EventingRetentionConfiguration;
     /** The directory the routed member places tenants with; folds appends per organisation. */
     organizationOf?: (tenantId: string) => Promise<string | null>;
+    eventLogIndex?: EventLogIdIndex;
   }): EventingClickHouseEventRepository {
     return new EventingClickHouseEventRepository(
       options.resolveClient,
       options.retention,
       options.organizationOf,
+      options.eventLogIndex,
     );
+  }
+
+  /**
+   * The lower bound an aggregate's read takes: the index's earliest occurred time, else the
+   * caller's own. A miss keeps today's unbounded read: a fold reads its whole history, and rows
+   * with no occurred time are not in the index (the `EventOccurredAt = 0` arm keeps them).
+   */
+  private async occurredAtFloor({
+    tenantId,
+    aggregateType,
+    aggregateId,
+    occurredAtFromMs,
+  }: {
+    tenantId: string;
+    aggregateType: string;
+    aggregateId: string;
+    occurredAtFromMs: number | undefined;
+  }): Promise<number | undefined> {
+    const range = await eventLogOccurredRange({
+      index: this.eventLogIndex,
+      read: "aggregate",
+      tenantId,
+      aggregateTypes: [aggregateType],
+      aggregateIds: [String(aggregateId)],
+    });
+    if (range === null) return occurredAtFromMs;
+    return Math.max(range.fromMs, occurredAtFromMs ?? 0);
   }
 
   private async getClient(tenantId: string): Promise<EventingClickHouseClient> {
@@ -185,8 +223,16 @@ export class EventingClickHouseEventRepository implements EventRepository {
     eventId: string;
     occurredAt?: EventOccurredAtWindow;
   }): Promise<EventRecord> {
-    const { tenantId, aggregateType, aggregateId, eventId, occurredAt } = request;
-    const window = occurredAtPredicate(occurredAt);
+    const { tenantId, aggregateType, aggregateId, eventId } = request;
+    // The aggregate's indexed span first (Alex, Q6, 2026-10-11); else the caller's window.
+    const indexed = await eventLogOccurredRange({
+      index: this.eventLogIndex,
+      read: "event",
+      tenantId,
+      aggregateTypes: [aggregateType],
+      aggregateIds: [String(aggregateId)],
+    });
+    const window = occurredAtPredicate(indexed ?? request.occurredAt);
     const client = await this.getClient(tenantId);
     const result = await client.query({
       query: `
@@ -225,7 +271,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
     tenantId,
     aggregateType,
     aggregateId,
-    occurredAtFromMs,
+    occurredAtFromMs: requestedFromMs,
   }: {
     tenantId: string;
     aggregateType: string;
@@ -233,6 +279,12 @@ export class EventingClickHouseEventRepository implements EventRepository {
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
     try {
+      const occurredAtFromMs = await this.occurredAtFloor({
+        tenantId,
+        aggregateType,
+        aggregateId,
+        occurredAtFromMs: requestedFromMs,
+      });
       const client = await this.getClient(tenantId);
       // When a lower bound is supplied, add a predicate on EventOccurredAt so
       // ClickHouse can prune weekly partitions older than the bound instead of
@@ -349,9 +401,14 @@ export class EventingClickHouseEventRepository implements EventRepository {
     upToEventId: string;
     occurredAtFromMs?: number;
   }): Promise<EventRecord[]> {
-    const { tenantId, aggregateType, aggregateId, upToTimestamp, upToEventId, occurredAtFromMs } =
-      request;
+    const { tenantId, aggregateType, aggregateId, upToTimestamp, upToEventId } = request;
     try {
+      const occurredAtFromMs = await this.occurredAtFloor({
+        tenantId,
+        aggregateType,
+        aggregateId,
+        occurredAtFromMs: request.occurredAtFromMs,
+      });
       const client = await this.getClient(tenantId);
       // Same partition-pruning bound as `getEventRecords`, and for the same
       // reason: the upper bound is on EventTimestamp (acceptance order), but the
@@ -429,8 +486,17 @@ export class EventingClickHouseEventRepository implements EventRepository {
   }): Promise<EventRecord[]> {
     const { tenantId, aggregateType, aggregateId } = request;
     try {
+      const occurredAtFromMs = await this.occurredAtFloor({
+        tenantId,
+        aggregateType,
+        aggregateId,
+        occurredAtFromMs: request.occurredAtFromMs,
+      });
       const client = await this.getClient(tenantId);
-      const { query, query_params, declaresFullScan } = this.buildPagedQuery(request);
+      const { query, query_params, declaresFullScan } = this.buildPagedQuery({
+        ...request,
+        occurredAtFromMs,
+      });
       const result = await client.query({
         query,
         query_params,
@@ -533,6 +599,13 @@ export class EventingClickHouseEventRepository implements EventRepository {
     beforeEventId: string;
   }): Promise<number> {
     try {
+      const occurredAtFromMs = await this.occurredAtFloor({
+        tenantId,
+        aggregateType,
+        aggregateId,
+        occurredAtFromMs: undefined,
+      });
+      const hasLowerBound = occurredAtFromMs !== undefined;
       const client = await this.getClient(tenantId);
       const result = await client.query({
         query: `
@@ -541,6 +614,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
             AND AggregateId = {aggregateId:String}
+            ${hasLowerBound ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})" : ""}
             AND (
               EventTimestamp < {beforeTimestamp:UInt64}
               OR (EventTimestamp = {beforeTimestamp:UInt64} AND EventId < {beforeEventId:String})
@@ -553,6 +627,7 @@ export class EventingClickHouseEventRepository implements EventRepository {
           aggregateId: String(aggregateId),
           beforeTimestamp,
           beforeEventId,
+          ...(hasLowerBound ? { occurredAtFromMs } : {}),
         },
         format: "JSONEachRow",
       });
