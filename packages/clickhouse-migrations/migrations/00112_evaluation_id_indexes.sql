@@ -17,8 +17,8 @@
 -- raise-only through RETENTION_ID_INDEX_TABLES.
 --
 -- Rows older than the view are filled by the background step
--- `evaluation:fill-id-indexes`, which then sets
--- `clickhouse_id_index_evaluation_<target>`. The view fills only new inserts: a new table
+-- `evaluation:fill-id-indexes`, which then writes the index's ready marker
+-- row. The view fills only new inserts: a new table
 -- and view, no mutation, no rewrite at deploy.
 -- ============================================================================
 

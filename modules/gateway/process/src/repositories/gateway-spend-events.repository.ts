@@ -76,7 +76,7 @@ export abstract class GatewaySpendEventsRepository {
   abstract findForFold(input: {
     tenantId: string;
     gatewayRequestId: string;
-    /** With its flag on, the id index bounds the read to the request's partitions. */
+    /** Once it is ready, the id index bounds the read to the request's partitions. */
     idIndex?: IdIndexFlags | undefined;
   }): Promise<GatewaySpendState | null>;
 

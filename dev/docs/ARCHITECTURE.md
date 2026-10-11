@@ -1707,7 +1707,9 @@ window; the producer-only rule stands for everything else (Alex, 2026-10-06, rou
 table looked up by id alone has an unpartitioned `<table>_id_index` (TenantId, id to its time range),
 owned by the table's owner and filled by a materialised view, with one background step per owner
 filling history. A read takes the caller's time when given, else the index's range, else (index not
-yet ready, or a miss) the old anchored or windowed read. `dev/docs/plans/id-index-2026-10-10.md`.
+yet ready, or a miss) the old anchored or windowed read. Ready means the index holds its marker row
+on that ClickHouse target, written by the fill or, over an empty source, by the first check; never a
+feature flag (Alex, 2026-10-11). `dev/docs/plans/id-index-2026-10-10.md`.
 Parked: a default retention-period bound on every ClickHouse read.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,

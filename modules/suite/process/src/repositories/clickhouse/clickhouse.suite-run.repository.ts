@@ -30,7 +30,7 @@ type SuiteRunClickHouseRepositoryOptions = {
   clickhouse: ClickHouseQueryClient;
   /** Read at write time: the owner answers only once the process is running. */
   defaultRetentionDays: () => number;
-  /** The module's id-index flags; absent reads a run with no time bound, as before. */
+  /** The module's id-index readiness; absent reads a run with no time bound, as before. */
   idIndex?: IdIndexFlags | undefined;
 };
 

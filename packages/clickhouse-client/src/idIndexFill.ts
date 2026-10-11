@@ -4,6 +4,7 @@
  * tenant range) batch, a cursor saved after each. Knows nothing of the upgrade system.
  */
 import { assertIdentifier, SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
+import { writeIdIndexMarker } from "./idIndexReadiness.ts";
 import type { QueryRequest, QueryResult } from "./query.ts";
 
 /**
@@ -21,14 +22,12 @@ export type IdIndexDeclaration = Readonly<{
   filter?: string | undefined;
 }>;
 
-/** A ClickHouse server the fill visits: one per URL, flagged for every organisation on it. */
+/** A ClickHouse server the fill visits: one per URL; its markers serve each organisation on it. */
 export type IdIndexFillTarget = Readonly<{
   /** `"shared"`, or the first organisation on the URL; never the URL, which may hold a secret. */
   key: string;
   /** Routes the statements; absent for the shared target. */
   organizationId?: string | undefined;
-  /** The flag targets this server answers for: `"shared"`, or each organisation on it. */
-  flagTargets: readonly string[];
 }>;
 
 /** Where the fill sends its statements: the routed client, under `SKIP_TENANT_CHECK`. */
@@ -75,10 +74,8 @@ export type FillIdIndexesOptions = {
   dryRun?: boolean | undefined;
   /** Source rows per batch; a larger partition is split by tenant range. */
   batchRows?: number | undefined;
-  /** Runs once a target is filled, before its flags: the retention raise. */
-  beforeFlag: (input: { target: IdIndexFillTarget }) => Promise<void>;
-  /** Sets the owner's flag for one flag target. */
-  setFlag: (input: { target: string }) => Promise<void>;
+  /** Runs once a target is filled, before its marker rows: the retention raise. */
+  beforeMarker: (input: { target: IdIndexFillTarget }) => Promise<void>;
   /** The pause between retries; a timer by default. */
   sleep?: ((ms: number) => Promise<void>) | undefined;
 };
@@ -113,13 +110,9 @@ export function idIndexFillTargets({
   }
   const routed = [...byUrl.values()]
     .map((organizations) => organizations.toSorted())
-    .flatMap(([first, ...rest]) =>
-      first === undefined
-        ? []
-        : [{ key: first, organizationId: first, flagTargets: [first, ...rest] }],
-    )
+    .flatMap(([first]) => (first === undefined ? [] : [{ key: first, organizationId: first }]))
     .toSorted((left, right) => left.key.localeCompare(right.key));
-  return [{ key: SHARED_CLICKHOUSE_TARGET, flagTargets: [SHARED_CLICKHOUSE_TARGET] }, ...routed];
+  return [{ key: SHARED_CLICKHOUSE_TARGET }, ...routed];
 }
 
 /** Packs a partition's tenants, in order, into ranges of about `batchRows` source rows. */
@@ -315,7 +308,7 @@ export class IdIndexFillIncompleteError extends Error {
 }
 
 /**
- * Fills every declared index on every target, then raises its retention and sets its flags.
+ * Fills every declared index on every target, then raises its retention and writes its markers.
  * Level-triggered: re-running changes no range (`min`/`max` merge), and a restart resumes at
  * the cursor. A failed target is recorded, the others carry on, and the walk throws at the end.
  */
@@ -343,9 +336,14 @@ class IdIndexFill {
       try {
         const finished = await this.fillTarget(target);
         if (!finished) return this.report;
-        await this.options.beforeFlag({ target });
-        for (const flagTarget of target.flagTargets)
-          await this.options.setFlag({ target: flagTarget });
+        await this.options.beforeMarker({ target });
+        for (const table of this.options.indexes) {
+          await writeIdIndexMarker({
+            statements: this.options.statements,
+            route: this.route(target),
+            table,
+          });
+        }
         this.report.targetsDone.push(target.key);
         this.report.cursor = null;
         await this.save();
@@ -360,7 +358,7 @@ class IdIndexFill {
     return this.report;
   }
 
-  /** Partitions and rows the fill would read, with nothing written or flagged. */
+  /** Partitions and rows the fill would read, with nothing written or marked. */
   private async estimate(): Promise<IdIndexFillReport> {
     let partitions = 0;
     let rows = 0;
@@ -568,4 +566,47 @@ class IdIndexFill {
   private save(): Promise<void> {
     return this.options.checkpoint.save({ report: this.report });
   }
+}
+
+/** Raises one target's index rows to each tenant's retention: data-retention's operation. */
+export type IdIndexRetentionRaise = (input: {
+  organizationId?: string;
+  indexes: string[];
+}) => Promise<unknown>;
+
+/** What an owner's fill takes from its step; the owner's repository supplies the rest. */
+export type IdIndexOwnerFill = Pick<FillIdIndexesOptions, "checkpoint" | "signal" | "dryRun"> & {
+  /** Runs per target once it is filled, before its marker rows, over the indexes that copy it. */
+  raiseRetention: IdIndexRetentionRaise;
+};
+
+/** The routed client an owner fills through: its statements, and the private routes it visits. */
+export type IdIndexFillClient = IdIndexStatements & {
+  privateRoutes(): ReadonlyMap<string, string>;
+};
+
+/** One owner's fill over its declared indexes on every target, retention raised before markers. */
+export function fillOwnerIdIndexes({
+  clickhouse,
+  indexes,
+  raiseRetention,
+  ...run
+}: IdIndexOwnerFill & {
+  clickhouse: IdIndexFillClient;
+  indexes: readonly IdIndexDeclaration[];
+}): Promise<IdIndexFillReport> {
+  const copied = indexes.filter((each) => each.retention === "copied").map((each) => each.index);
+  return fillIdIndexes({
+    ...run,
+    statements: clickhouse,
+    indexes,
+    targets: idIndexFillTargets({ privateRoutes: clickhouse.privateRoutes() }),
+    beforeMarker: async ({ target }) => {
+      if (copied.length === 0) return;
+      await raiseRetention({
+        ...(target.organizationId === undefined ? {} : { organizationId: target.organizationId }),
+        indexes: copied,
+      });
+    },
+  });
 }

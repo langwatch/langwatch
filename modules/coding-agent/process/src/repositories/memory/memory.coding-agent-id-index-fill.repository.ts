@@ -1,4 +1,8 @@
-import type { FillIdIndexesOptions, IdIndexFillReport } from "@langwatch/clickhouse-client";
+import type {
+  IdIndexFillReport,
+  IdIndexFlags,
+  IdIndexOwnerFill,
+} from "@langwatch/clickhouse-client";
 
 import { CodingAgentIdIndexFillRepository } from "../coding-agent-id-index-fill.repository.ts";
 
@@ -8,17 +12,13 @@ export class MemoryCodingAgentIdIndexFillRepository extends CodingAgentIdIndexFi
     return new MemoryCodingAgentIdIndexFillRepository();
   }
 
+  readonly readiness: IdIndexFlags = { isOn: () => false };
+
   private constructor() {
     super();
   }
 
-  indexesWithCopiedRetention(): string[] {
-    return [];
-  }
-
-  fill(
-    _input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport> {
+  fill(_input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     return Promise.resolve({
       targetsDone: [],
       targetsFailed: [],

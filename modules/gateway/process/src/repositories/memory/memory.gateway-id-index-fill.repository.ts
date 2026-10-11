@@ -1,4 +1,8 @@
-import type { FillIdIndexesOptions, IdIndexFillReport } from "@langwatch/clickhouse-client";
+import type {
+  IdIndexFillReport,
+  IdIndexFlags,
+  IdIndexOwnerFill,
+} from "@langwatch/clickhouse-client";
 
 import { GatewayIdIndexFillRepository } from "../gateway-id-index-fill.repository.ts";
 
@@ -8,13 +12,13 @@ export class MemoryGatewayIdIndexFillRepository extends GatewayIdIndexFillReposi
     return new MemoryGatewayIdIndexFillRepository();
   }
 
+  readonly readiness: IdIndexFlags = { isOn: () => false };
+
   private constructor() {
     super();
   }
 
-  fill(
-    _input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport> {
+  fill(_input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     return Promise.resolve({
       targetsDone: [],
       targetsFailed: [],

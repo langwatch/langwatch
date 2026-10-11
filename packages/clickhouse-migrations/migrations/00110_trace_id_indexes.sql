@@ -15,7 +15,7 @@
 -- raise-only through RETENTION_ID_INDEX_TABLES.
 --
 -- Rows older than the views are filled by the background step
--- `trace:fill-id-indexes`, which then sets `clickhouse_id_index_trace_<target>`.
+-- `trace:fill-id-indexes`, which then writes each index's ready marker row.
 -- New tables and views only: no mutation and no rewrite at deploy.
 -- ============================================================================
 

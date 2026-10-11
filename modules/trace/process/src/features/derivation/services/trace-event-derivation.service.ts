@@ -34,7 +34,7 @@ export class TraceEventDerivationService {
   static create(options: {
     spans: TraceDerivationSpanReaderRepository;
     authorize: FoldReadAuthorizer;
-    /** Trace's id-index flags and their reads: with no time, the index names the window. */
+    /** Trace's id-index readiness and its reads: with no time, the index names the window. */
     idIndex?: IdIndexFlags | undefined;
     idIndexReads?: TraceIdIndexReadRepository | undefined;
   }): TraceEventDerivationService {

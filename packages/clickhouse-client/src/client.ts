@@ -113,7 +113,7 @@ export class ClickHouseQueryClient {
 
   /**
    * The target a tenant's statements land on: `"shared"`, with no I/O while no private route
-   * exists, else its organisation when that has a route. Keys an owner's id-index flag.
+   * exists, else its organisation when that has a route. Keys an owner's id-index readiness.
    */
   async targetOf({ tenantId }: { tenantId: string }): Promise<string> {
     if (this.routes.size === 0) return SHARED_CLICKHOUSE_TARGET;

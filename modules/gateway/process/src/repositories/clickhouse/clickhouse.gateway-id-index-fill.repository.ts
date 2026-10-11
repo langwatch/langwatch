@@ -1,10 +1,11 @@
 import {
   type ClickHouseQueryClient,
-  type FillIdIndexesOptions,
-  fillIdIndexes,
+  fillOwnerIdIndexes,
   type IdIndexDeclaration,
   type IdIndexFillReport,
-  idIndexFillTargets,
+  type IdIndexOwnerFill,
+  IdIndexReadiness,
+  idIndexReadinessTargets,
 } from "@langwatch/clickhouse-client";
 
 import { GatewayIdIndexFillRepository } from "../gateway-id-index-fill.repository.ts";
@@ -39,18 +40,22 @@ export class GatewayIdIndexFillClickHouseRepository extends GatewayIdIndexFillRe
     return new GatewayIdIndexFillClickHouseRepository(clickhouse);
   }
 
+  readonly readiness: IdIndexReadiness;
+
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
     super();
+    this.readiness = IdIndexReadiness.create({
+      statements: clickhouse,
+      indexes: GATEWAY_ID_INDEXES,
+      watch: () => idIndexReadinessTargets({ privateRoutes: clickhouse.privateRoutes() }),
+    });
   }
 
-  fill(
-    input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport> {
-    return fillIdIndexes({
+  fill(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
+    return fillOwnerIdIndexes({
       ...input,
+      clickhouse: this.clickhouse,
       indexes: GATEWAY_ID_INDEXES,
-      statements: this.clickhouse,
-      targets: idIndexFillTargets({ privateRoutes: this.clickhouse.privateRoutes() }),
     });
   }
 }

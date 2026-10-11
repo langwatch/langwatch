@@ -1,10 +1,11 @@
 import {
   type ClickHouseQueryClient,
-  type FillIdIndexesOptions,
-  fillIdIndexes,
+  fillOwnerIdIndexes,
   type IdIndexDeclaration,
   type IdIndexFillReport,
-  idIndexFillTargets,
+  type IdIndexOwnerFill,
+  IdIndexReadiness,
+  idIndexReadinessTargets,
 } from "@langwatch/clickhouse-client";
 
 import { ScenarioIdIndexFillRepository } from "../scenario-id-index-fill.repository.ts";
@@ -34,20 +35,22 @@ export class ScenarioIdIndexFillClickHouseRepository extends ScenarioIdIndexFill
     return new ScenarioIdIndexFillClickHouseRepository(clickhouse);
   }
 
-  readonly indexes = SCENARIO_ID_INDEXES;
+  readonly readiness: IdIndexReadiness;
 
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
     super();
+    this.readiness = IdIndexReadiness.create({
+      statements: clickhouse,
+      indexes: SCENARIO_ID_INDEXES,
+      watch: () => idIndexReadinessTargets({ privateRoutes: clickhouse.privateRoutes() }),
+    });
   }
 
-  fill(
-    input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport> {
-    return fillIdIndexes({
+  fill(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
+    return fillOwnerIdIndexes({
       ...input,
-      indexes: this.indexes,
-      statements: this.clickhouse,
-      targets: idIndexFillTargets({ privateRoutes: this.clickhouse.privateRoutes() }),
+      clickhouse: this.clickhouse,
+      indexes: SCENARIO_ID_INDEXES,
     });
   }
 }

@@ -2,17 +2,18 @@ import type { Authorization } from "@langwatch/authorization";
 import {
   AuthorizedClickHouse,
   type ClickHouseClientResolver,
-  fillIdIndexes,
+  fillOwnerIdIndexes,
   type IdIndexDeclaration,
   type IdIndexFillReport,
   type IdIndexFlags,
-  idIndexFillTargets,
+  type IdIndexOwnerFill,
+  IdIndexReadiness,
+  idIndexReadinessTargets,
 } from "@langwatch/clickhouse-client";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 
 import {
   EvaluationRunRepository,
-  type EvaluationIdIndexFill,
   type EvaluationInputsRead,
   type EvaluationRunFloorLookup,
 } from "../evaluation.repository.ts";
@@ -47,6 +48,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
 
   private readonly reader: EvaluationRunClickHouseReadRepository;
   private readonly writer: EvaluationRunClickHouseWriteRepository;
+  readonly readiness: IdIndexReadiness;
 
   private constructor(
     private readonly options: {
@@ -60,6 +62,17 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     });
     this.writer = EvaluationRunClickHouseWriteRepository.create({
       resolveClient: options.resolveClient,
+    });
+    // The routed client is one per process; the marker statements route by target themselves.
+    const routed = () => options.resolveQueryClient("");
+    this.readiness = IdIndexReadiness.create({
+      statements: {
+        query: async (request) => (await routed()).query(request),
+        command: async (request) => (await routed()).command(request),
+      },
+      indexes: EVALUATION_ID_INDEXES,
+      watch: async () =>
+        idIndexReadinessTargets({ privateRoutes: (await routed()).privateRoutes() }),
     });
   }
 
@@ -100,21 +113,9 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     return this.reader.findInputs(input);
   }
 
-  async fillIdIndexes(input: EvaluationIdIndexFill): Promise<IdIndexFillReport> {
+  async fillIdIndexes(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     // The routed client is one per process and the fill visits every target itself.
     const clickhouse = await this.options.resolveQueryClient("");
-    return fillIdIndexes({
-      ...input,
-      indexes: EVALUATION_ID_INDEXES,
-      beforeFlag: ({ target }) =>
-        input.beforeFlag({
-          target,
-          indexes: EVALUATION_ID_INDEXES.filter((each) => each.retention === "copied").map(
-            (each) => each.index,
-          ),
-        }),
-      statements: clickhouse,
-      targets: idIndexFillTargets({ privateRoutes: clickhouse.privateRoutes() }),
-    });
+    return fillOwnerIdIndexes({ ...input, clickhouse, indexes: EVALUATION_ID_INDEXES });
   }
 }

@@ -1,10 +1,14 @@
-import type { FillIdIndexesOptions, IdIndexFillReport } from "@langwatch/clickhouse-client";
+import type {
+  IdIndexFillReport,
+  IdIndexFlags,
+  IdIndexOwnerFill,
+} from "@langwatch/clickhouse-client";
 
 import { ExperimentIdIndexFillRepository } from "../experiment-id-index-fill.repository.ts";
 
 /** Nothing to fill in memory: no view fills an index, and no read consults one. */
 export class MemoryExperimentIdIndexFillRepository extends ExperimentIdIndexFillRepository {
-  readonly indexes = [];
+  readonly readiness: IdIndexFlags = { isOn: () => false };
 
   static create(): MemoryExperimentIdIndexFillRepository {
     return new MemoryExperimentIdIndexFillRepository();
@@ -14,9 +18,7 @@ export class MemoryExperimentIdIndexFillRepository extends ExperimentIdIndexFill
     super();
   }
 
-  fill(
-    _input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport> {
+  fill(_input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     return Promise.resolve({
       targetsDone: [],
       targetsFailed: [],

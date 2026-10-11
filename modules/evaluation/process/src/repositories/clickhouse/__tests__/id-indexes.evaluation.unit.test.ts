@@ -5,7 +5,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { idIndexFlagKey } from "@langwatch/feature-flag-contract";
 import { describe, expect, it } from "vitest";
 
 import { EVALUATION_ID_INDEXES } from "../evaluation.repository.ts";
@@ -63,13 +62,6 @@ describe("Evaluation's id-index declaration", () => {
         expect(declaration.retention).toBe("copied");
         expect(migration).toContain("max(if(_retention_days = 0, 65535, _retention_days))");
       }
-    });
-
-    it("spells its flag under the owner word the step and the latch share", () => {
-      expect(idIndexFlagKey({ owner: "evaluation", target: "shared" })).toBe(
-        "clickhouse_id_index_evaluation_shared",
-      );
-      expect(migration).toContain("clickhouse_id_index_evaluation_<target>");
     });
   });
 });

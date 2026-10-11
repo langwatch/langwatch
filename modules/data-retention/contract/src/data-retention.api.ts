@@ -55,7 +55,7 @@ export interface DataRetentionApi {
   ): Promise<RetroactiveMutationProgress[]>;
   /**
    * Raises one ClickHouse target's id index rows to each tenant's current retention, never
-   * lowering one; run per target after its index is filled and before its flag is set, so a
+   * lowering one; run per target after its index is filled and before its marker is written, so a
    * retention lengthened mid-fill leaves no short-lived row (Q4, id-index-2026-10-10.md).
    */
   raiseIdIndexRetention(input: IdIndexRetentionRaiseInput): Promise<{ tables: string[] }>;

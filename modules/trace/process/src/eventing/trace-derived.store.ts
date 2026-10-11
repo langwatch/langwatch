@@ -51,7 +51,7 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
     storage: TraceAnalyticsProjectionRepository;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
-    /** Trace's id-index flags: a read with no window is bounded by the index when on. */
+    /** Trace's id-index readiness: a read with no window is bounded by the index once ready. */
     idIndex?: IdIndexFlags | undefined;
   }): TraceAnalyticsStore {
     return new TraceAnalyticsStore(options);

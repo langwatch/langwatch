@@ -83,9 +83,9 @@ async function lookUp({
 }
 
 describe("indexedRead", () => {
-  describe("given the owner's id index flag is on for this ClickHouse target and off for another", () => {
-    /** @scenario "readers trust the index only once its flag is on" */
-    it("reads through the index only for the tenant on the flagged target", async () => {
+  describe("given the owner's id index is ready on this ClickHouse target and not on another", () => {
+    /** @scenario "readers trust the index only once its marker row is written" */
+    it("reads through the index only for the tenant on the ready target", async () => {
       const recorded = { fromMs: NOW - 56 * DAY, toMs: NOW - 54 * DAY };
       const { client, sent } = clientWith({ index: { n: 2, ...recorded } });
 

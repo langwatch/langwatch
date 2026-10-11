@@ -57,8 +57,8 @@ export class ClickHouseTraceIdIndexReadRepository extends TraceIdIndexReadReposi
   }
 
   /**
-   * One fenced read of a trace by id through a trace id index (id-index plan §4). Flag off, the
-   * caller's own resolver may name a time first, as today; flag on, the index names the bound.
+   * One fenced read of a trace by id through a trace id index (id-index plan §4). Not ready, the
+   * caller's own resolver may name a time first, as today; ready, the index names the bound.
    */
   async read<T>({
     authorization,

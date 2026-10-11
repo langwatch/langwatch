@@ -1276,7 +1276,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     isEmpty: (result: T) => boolean,
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
-    // Flag off, the summary's OccurredAt names the window as today; flag on, the span index does,
+    // Not ready, the summary's OccurredAt names the window as today; ready, the span index does,
     // so spans stored before their summary is projected are found too.
     return TRACE_ID_INDEX_READS.read<T>({
       authorization,

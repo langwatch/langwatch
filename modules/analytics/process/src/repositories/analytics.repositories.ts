@@ -1,5 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
-
 import type { AnalyticsEvaluationRepository } from "./analytics-persistence.repository.ts";
 import type { AnalyticsRateLimitRepository } from "./analytics-rate-limit.repository.ts";
 import type { AnalyticsRecencyRepository } from "./analytics-recency.repository.ts";
@@ -46,11 +44,7 @@ export interface AnalyticsRepositories {
   readonly analytics: AnalyticsRepository;
   /** The evaluation tables, opened with the retention peer's default, which no registry reads. */
   readonly evaluations: Readonly<{
-    open(input: {
-      defaultRetentionDays: () => number;
-      /** Whether the evaluation id index bounds a lookup with no window; absent reads as off. */
-      idIndex?: IdIndexFlags;
-    }): AnalyticsEvaluationRepository;
+    open(input: { defaultRetentionDays: () => number }): AnalyticsEvaluationRepository;
   }>;
   /** Where the server would keep the app functions, for the checkup's provisioning probe. */
   readonly appFunctionStore: LangWatchQLAppFunctionStoreRepository;

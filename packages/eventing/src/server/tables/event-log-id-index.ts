@@ -3,23 +3,20 @@
  * aggregate, its events' occurred-time span. Ops hosts its fill (`ops:fill-event-log-id-index`).
  */
 import {
-  type FillIdIndexesOptions,
-  fillIdIndexes,
+  fillOwnerIdIndexes,
   type IdIndexDeclaration,
+  type IdIndexFillClient,
   type IdIndexFillReport,
-  idIndexFillTargets,
-  type IdIndexFlags,
+  type IdIndexOwnerFill,
   type IdIndexReader,
-  type IdIndexStatements,
+  IdIndexReadiness,
+  idIndexReadinessTargets,
 } from "@langwatch/clickhouse-client";
 
 import { incrementEventLogIndexRead } from "../../metrics.ts";
 import type { EventTable } from "./event-table-declarations.ts";
 
 const EVENT_LOG_ID_INDEX_TABLE = "event_log_id_index" satisfies EventTable["table"];
-
-/** The owner its flags are keyed by: `clickhouse_id_index_eventing_<target>`. */
-export const EVENT_LOG_ID_INDEX_OWNER = "eventing";
 
 /** What the fill walks: rows with no occurred time (0) stay out, as in the view. */
 export const EVENT_LOG_ID_INDEX: IdIndexDeclaration = {
@@ -33,21 +30,31 @@ export const EVENT_LOG_ID_INDEX: IdIndexDeclaration = {
 };
 
 /**
- * Whether the index is filled for an aggregate type on a ClickHouse target, answered from memory.
- * One port the composition supplies, whatever answers it; none supplied reads as not ready.
+ * Whether the index is filled on a ClickHouse target, answered from memory: one port the
+ * composition supplies; none supplied reads as not ready.
  */
 export interface EventLogIndexReadiness {
-  isReady(input: { target: string; aggregateType: string }): boolean;
+  isReady(input: { target: string }): boolean;
 }
 
-/** Readiness from flags each pipeline declared with `.withEventLogIndex`; none reads as off. */
-export function pipelineFlagReadiness({
-  flagsFor,
+/**
+ * The index's readiness from its marker row (id-index plan §2), every aggregate type at once:
+ * the fill writes it, or the first check writes it over an empty event log. Each target the
+ * routed client answers for is checked at boot.
+ */
+export function eventLogIdIndexReadiness({
+  clickhouse,
 }: {
-  flagsFor: (aggregateType: string) => IdIndexFlags | undefined;
-}): EventLogIndexReadiness {
+  clickhouse: IdIndexFillClient;
+}): EventLogIndexReadiness & Pick<IdIndexReadiness, "check"> {
+  const readiness = IdIndexReadiness.create({
+    statements: clickhouse,
+    indexes: [EVENT_LOG_ID_INDEX],
+    watch: () => idIndexReadinessTargets({ privateRoutes: clickhouse.privateRoutes() }),
+  });
   return {
-    isReady: ({ target, aggregateType }) => flagsFor(aggregateType)?.isOn({ target }) === true,
+    isReady: ({ target }) => readiness.isOn({ target }),
+    check: ({ target }) => readiness.check({ target }),
   };
 }
 
@@ -65,7 +72,7 @@ export type EventLogIndexRead = "aggregate" | "event" | "replay";
 
 /**
  * The span to bound a read of these aggregates by, or null for today's unbounded read: no index,
- * a type whose flag is off on the tenant's target, or an aggregate the index has not seen.
+ * an index not ready on the tenant's target, or an aggregate the index has not seen.
  */
 export async function eventLogOccurredRange({
   index,
@@ -83,7 +90,7 @@ export async function eventLogOccurredRange({
   const types = [...new Set(aggregateTypes)];
   if (index === undefined || types.length === 0 || aggregateIds.length === 0) return null;
   const target = await index.reader.targetOf({ tenantId });
-  if (!types.every((aggregateType) => index.readiness.isReady({ target, aggregateType }))) {
+  if (!index.readiness.isReady({ target })) {
     incrementEventLogIndexRead({ read, outcome: "unindexed" });
     return null;
   }
@@ -98,9 +105,7 @@ export async function eventLogOccurredRange({
 }
 
 /** The statements and routes the fill runs over: the routed ClickHouse member. */
-export type EventLogIdIndexFillClient = IdIndexStatements & {
-  privateRoutes(): ReadonlyMap<string, string>;
-};
+export type EventLogIdIndexFillClient = IdIndexFillClient;
 
 /** Fills the index on the shared server and every private one from rows older than its view. */
 export class EventingClickHouseEventLogIdIndexFill {
@@ -114,19 +119,12 @@ export class EventingClickHouseEventLogIdIndexFill {
 
   private constructor(private readonly clickhouse: EventLogIdIndexFillClient) {}
 
-  /** The index whose rows copy `_retention_days`, raised by data-retention before each flag. */
-  indexesWithCopiedRetention(): string[] {
-    return [EVENT_LOG_ID_INDEX.index];
-  }
-
-  fill(
-    input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport> {
-    return fillIdIndexes({
+  /** Fills the index on every target, raises its retention there, then writes its marker. */
+  fill(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
+    return fillOwnerIdIndexes({
       ...input,
+      clickhouse: this.clickhouse,
       indexes: [EVENT_LOG_ID_INDEX],
-      statements: this.clickhouse,
-      targets: idIndexFillTargets({ privateRoutes: this.clickhouse.privateRoutes() }),
     });
   }
 }

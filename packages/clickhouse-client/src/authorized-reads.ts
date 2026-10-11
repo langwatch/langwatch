@@ -343,7 +343,7 @@ export class TenantScopedReader {
     return { json: async () => result.rows };
   }
 
-  /** The ClickHouse target this reader's statements land on, which keys an id-index flag. */
+  /** The ClickHouse target this reader's statements land on, which keys an id index's readiness. */
   async targetOf(): Promise<string> {
     return (await this.resolvedClient()).targetOf({ tenantId: this.deps.tenantId });
   }

@@ -4,7 +4,7 @@ import type { TraceExistenceRepository } from "../repositories/trace-existence.r
 import type { TraceIdIndexReadRepository } from "../repositories/trace-id-index-read.repository.ts";
 
 /**
- * Which candidate trace ids a project holds. With trace's id-index flag on, the index names the
+ * Which candidate trace ids a project holds. With trace's id index ready, the index names the
  * range the read is bounded to, but existence is always confirmed on `trace_summaries`: an index
  * row can outlive expired data by a week or more (id-index plan §4).
  */

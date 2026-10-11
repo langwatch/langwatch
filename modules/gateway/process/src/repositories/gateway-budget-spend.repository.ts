@@ -89,7 +89,7 @@ export type PulledUsageTotals = {
 export type IdIndexReadOptions = { idIndex?: IdIndexFlags | undefined };
 
 export interface GatewayBudgetSpendRepository {
-  /** The id index (flag on) answers whether the request is already in the ledger. */
+  /** The id index (once ready) answers whether the request is already in the ledger. */
   insertDebit(rows: BudgetDebitRow[], options?: IdIndexReadOptions): Promise<void>;
   insertPulledUsageRows(rows: PulledUsageRow[]): Promise<void>;
   readPulledUsageTotals(input: {

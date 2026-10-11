@@ -23,7 +23,7 @@ function isRow(value: unknown): value is ClickHouseRow {
   return typeof value === "object" && value !== null;
 }
 
-/** Never asked: a read through it carries no flags, so `indexedRead` takes today's path. */
+/** Never asked: a read through it carries no readiness, so `indexedRead` takes today's path. */
 const NO_ID_INDEX: IdIndexReader = {
   targetOf: () => Promise.reject(new Error("This client cannot name a ClickHouse target")),
   indexBounds: () => Promise.reject(new Error("This client cannot read an id index")),
@@ -86,7 +86,7 @@ export class ClickHouseExperimentSession implements ExperimentEventingClickHouse
     return { json: async <T>() => (await this.clickhouse.query<T>(request)).rows };
   }
 
-  /** The target this session's tenant lands on, which keys the module's id-index flag. */
+  /** The target this session's tenant lands on, which keys the module's id-index readiness. */
   targetOf(_input: { tenantId: string }): Promise<string> {
     return this.clickhouse.targetOf({ tenantId: this.tenantId });
   }

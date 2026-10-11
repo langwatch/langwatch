@@ -1,10 +1,11 @@
 import {
   type ClickHouseQueryClient,
-  type FillIdIndexesOptions,
-  fillIdIndexes,
+  fillOwnerIdIndexes,
   type IdIndexDeclaration,
   type IdIndexFillReport,
-  idIndexFillTargets,
+  type IdIndexOwnerFill,
+  IdIndexReadiness,
+  idIndexReadinessTargets,
 } from "@langwatch/clickhouse-client";
 
 import { CodingAgentIdIndexFillRepository } from "../coding-agent-id-index-fill.repository.ts";
@@ -47,24 +48,22 @@ export class CodingAgentIdIndexFillClickHouseRepository extends CodingAgentIdInd
     return new CodingAgentIdIndexFillClickHouseRepository(clickhouse);
   }
 
+  readonly readiness: IdIndexReadiness;
+
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
     super();
-  }
-
-  indexesWithCopiedRetention(): string[] {
-    return CODING_AGENT_ID_INDEXES.filter((each) => each.retention === "copied").map(
-      (each) => each.index,
-    );
-  }
-
-  fill(
-    input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport> {
-    return fillIdIndexes({
-      ...input,
+    this.readiness = IdIndexReadiness.create({
+      statements: clickhouse,
       indexes: CODING_AGENT_ID_INDEXES,
-      statements: this.clickhouse,
-      targets: idIndexFillTargets({ privateRoutes: this.clickhouse.privateRoutes() }),
+      watch: () => idIndexReadinessTargets({ privateRoutes: clickhouse.privateRoutes() }),
+    });
+  }
+
+  fill(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
+    return fillOwnerIdIndexes({
+      ...input,
+      clickhouse: this.clickhouse,
+      indexes: CODING_AGENT_ID_INDEXES,
     });
   }
 }

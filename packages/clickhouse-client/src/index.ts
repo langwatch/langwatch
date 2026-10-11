@@ -215,8 +215,8 @@ export type {
   WindowedReadOutcome,
 } from "./windowedRead.ts";
 
-/** Id indexes (dev/docs/plans/id-index-2026-10-10.md): the flag seam, the bounded lookup by id,
- * and the background fill each owner's step drives. */
+/** Id indexes (dev/docs/plans/id-index-2026-10-10.md): the readiness seam, the bounded lookup by
+ * id, and the background fill each owner's step drives. */
 export type {
   IdIndexBounds,
   IdIndexFlags,
@@ -226,6 +226,17 @@ export type {
   IdIndexTimeFormat,
 } from "./idIndexFlags.ts";
 export { SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
+export type { IdIndexMarkerStatements, IdIndexMarkerTable } from "./idIndexReadiness.ts";
+export {
+  hasIdIndexMarker,
+  ID_INDEX_FILL_MARKER,
+  ID_INDEX_READINESS_RECHECK_MS,
+  IdIndexReadiness,
+  idIndexReadinessTargets,
+  idIndexTargetRoute,
+  isIdIndexReadinessStatement,
+  writeIdIndexMarker,
+} from "./idIndexReadiness.ts";
 export type { IndexedReadOptions } from "./indexedRead.ts";
 export { ID_INDEX_MISS_PROBE, ID_INDEX_WIDEN_MS, indexedRead, indexWindow } from "./indexedRead.ts";
 export type {
@@ -234,12 +245,16 @@ export type {
   IdIndexFillCheckpoint,
   IdIndexFillCursor,
   IdIndexFillReport,
+  IdIndexFillClient,
   IdIndexFillTarget,
+  IdIndexOwnerFill,
+  IdIndexRetentionRaise,
   IdIndexStatements,
 } from "./idIndexFill.ts";
 export {
   DEFAULT_ID_INDEX_BATCH_ROWS,
   fillIdIndexes,
+  fillOwnerIdIndexes,
   fillStatement,
   IdIndexFillIncompleteError,
   idIndexFillTargets,

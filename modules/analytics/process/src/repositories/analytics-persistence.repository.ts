@@ -5,19 +5,7 @@ import type {
   AnalyticsEvaluationRow,
   AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
-import type { FillIdIndexesOptions, IdIndexFillReport } from "@langwatch/clickhouse-client";
-
-/** What a fill of Analytics' id indexes takes; the repository supplies its own statements. */
-export type AnalyticsIdIndexFill = Omit<
-  FillIdIndexesOptions,
-  "statements" | "targets" | "indexes" | "beforeFlag"
-> & {
-  /** Runs once a target is filled, before its flags, with the index tables retention copies to. */
-  beforeFlag: (input: {
-    target: Parameters<FillIdIndexesOptions["beforeFlag"]>[0]["target"];
-    indexes: readonly string[];
-  }) => Promise<void>;
-};
+import type { IdIndexFillReport, IdIndexOwnerFill } from "@langwatch/clickhouse-client";
 
 /** Private Analytics persistence boundary for the evaluation analytics tables. */
 export abstract class AnalyticsEvaluationRepository {
@@ -29,7 +17,7 @@ export abstract class AnalyticsEvaluationRepository {
   abstract appendRollup(input: AnalyticsEvaluationRollupAppendInput): Promise<void>;
   abstract appendRollupBatch(input: AnalyticsEvaluationRollupAppendBatchInput): Promise<void>;
   /** Fills the evaluation id index from rows older than its view, on every ClickHouse target. */
-  abstract fillIdIndexes(input: AnalyticsIdIndexFill): Promise<IdIndexFillReport>;
+  abstract fillIdIndexes(input: IdIndexOwnerFill): Promise<IdIndexFillReport>;
 }
 
 /** What a fill reports where there is no ClickHouse to fill: nothing visited, nothing owed. */
@@ -67,7 +55,7 @@ export class NullAnalyticsEvaluationRepository extends AnalyticsEvaluationReposi
 
   async appendRollupBatch(_input: AnalyticsEvaluationRollupAppendBatchInput): Promise<void> {}
 
-  async fillIdIndexes(_input: AnalyticsIdIndexFill): Promise<IdIndexFillReport> {
+  async fillIdIndexes(_input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     return { ...EMPTY_ID_INDEX_FILL_REPORT };
   }
 }

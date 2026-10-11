@@ -47,9 +47,6 @@ export interface FeatureFlagFamily {
   family: string;
 }
 
-/** The id-index flag family's prefix; a key is `clickhouse_id_index_<owner>_<target>`. */
-export const ID_INDEX_FLAG_PREFIX = "clickhouse_id_index_";
-
 export const FEATURE_FLAGS = [
   // ----- SYSTEM -----
   {
@@ -356,16 +353,6 @@ export const FEATURE_FLAG_FAMILIES: readonly FeatureFlagFamily[] = [
       "Per-component kill switch for an event-sourcing projection, map projection, command or subscriber. Setting it to true stops that component for the tenants the rules name, cluster-wide.",
     family: "Event sourcing",
   },
-  // `clickhouse_id_index_<owner>_<target>`, set by each owner's fill step once that target's
-  // id indexes are filled (dev/docs/plans/id-index-2026-10-10.md §2). Default false: today's reads.
-  {
-    keyPrefix: ID_INDEX_FLAG_PREFIX,
-    scope: "SYSTEM",
-    defaultValue: false,
-    description:
-      "Lets one module's lookups by id trust its ClickHouse id indexes on one ClickHouse target, once its background fill has completed there. Set by the fill step; turning it off returns that module's reads on that target to the windowed fallback.",
-    family: "ClickHouse",
-  },
 ];
 
 /**
@@ -379,23 +366,7 @@ export type RegisteredFeatureFlagKey = (typeof FEATURE_FLAGS)[number]["key"];
  * family, so the key union has to admit the shape the generator produces.
  */
 export type EsKillSwitchKey = `es-${string}-${string}-${string}-killswitch`;
-/** One owner's id-index flag on one ClickHouse target (`shared` or a private organisation). */
-export type IdIndexFlagKey = `clickhouse_id_index_${string}_${string}`;
-export type FeatureFlagKey = RegisteredFeatureFlagKey | EsKillSwitchKey | IdIndexFlagKey;
-
-/**
- * The id-index flag of `owner` (a module name, `-` written `_`) on `target`, spelt one way for
- * the step that sets it and the latch that reads it.
- */
-export function idIndexFlagKey({
-  owner,
-  target,
-}: {
-  owner: string;
-  target: string;
-}): IdIndexFlagKey {
-  return `${ID_INDEX_FLAG_PREFIX}${owner.replaceAll("-", "_")}_${target}`;
-}
+export type FeatureFlagKey = RegisteredFeatureFlagKey | EsKillSwitchKey;
 
 const FLAGS_BY_KEY: Map<string, FeatureFlagDefinition> = new Map(
   FEATURE_FLAGS.map((f) => [f.key, f]),

@@ -266,7 +266,6 @@ import {
 import { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
 import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
 import { GatewayIdIndexFillService } from "../services/gateway-id-index-fill.service.ts";
-import { GatewayIdIndexFlagsService } from "../services/gateway-id-index-flags.service.ts";
 import { GatewayInternalDoorService } from "../services/gateway-internal-door.service.ts";
 import { GatewayInternalIdentityService } from "../services/gateway-internal-identity.service.ts";
 import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
@@ -1185,9 +1184,7 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       projects: setup.dependencies.projects,
     });
     const { repositories } = setup;
-    const idIndex = GatewayIdIndexFlagsService.create({
-      featureFlags: setup.dependencies.featureFlags,
-    });
+    const idIndex = repositories.idIndexFill.readiness;
     const controlPlane = gatewayControlPlane({
       repositories,
       idIndex,
@@ -1335,7 +1332,6 @@ export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, Gatewa
       idIndex,
       idIndexFill: GatewayIdIndexFillService.create({
         fills: repositories.idIndexFill,
-        featureFlags: setup.dependencies.featureFlags,
       }),
       spend: {
         spendScope: repositories.spendScope,

@@ -85,7 +85,6 @@ import {
   type SuiteRunEvaluatorsResolver,
 } from "../services/suite-execution.service.ts";
 import { SuiteIdIndexFillService } from "../services/suite-id-index-fill.service.ts";
-import { SuiteIdIndexFlagsService } from "../services/suite-id-index-flags.service.ts";
 import { SuitePlatformLinkService } from "../services/suite-platform-link.service.ts";
 import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
 import {
@@ -190,12 +189,11 @@ export class SuiteModule implements SuiteApi {
       idIndexFill: SuiteIdIndexFillService.create({
         fills: repositories.idIndexFill,
         retention: dependencies.retention,
-        featureFlags: dependencies.featureFlags,
       }),
       pipeline: SuiteModule.buildEventingPipeline({
         suiteRunStateFoldStore: repositories.runProcessing.openRunStateFoldStore({
           defaultRetentionDays,
-          idIndex: SuiteIdIndexFlagsService.create({ featureFlags: dependencies.featureFlags }),
+          idIndex: repositories.idIndexFill.readiness,
         }),
         retention: {
           resolve: (tenantId) =>
@@ -329,7 +327,7 @@ export class SuiteModule implements SuiteApi {
     });
   }
 
-  /** The `suite:fill-id-indexes` step's body: the id index, then each target's flag. */
+  /** The `suite:fill-id-indexes` step's body: the id index, then each target's marker. */
   fillIdIndexes(input: {
     checkpoint: IdIndexFillCheckpoint;
     dryRun: boolean;

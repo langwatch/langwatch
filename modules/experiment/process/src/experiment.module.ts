@@ -94,7 +94,7 @@ export const experimentProcessModule: PublishedProcessModule<
       kind: "data",
       mode: "background",
       description:
-        "Fills the id indexes of experiment runs and DSPy steps from older rows, then turns each ClickHouse target's index flag on.",
+        "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
       needsOldWritersGone: false,
       // Level-triggered: a rerun merges the same ranges and resumes at the saved cursor.
       run: ({ checkpoint, dryRun, signal }) => app.fillIdIndexes({ checkpoint, dryRun, signal }),

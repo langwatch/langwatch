@@ -37,7 +37,7 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
     storage: TraceSummaryProjectionRepository;
     defaultRetentionDays: () => number;
     authorize: FoldReadAuthorizer;
-    /** Trace's id-index flags: a read with no window is bounded by the index when on. */
+    /** Trace's id-index readiness: a read with no window is bounded by the index once ready. */
     idIndex?: IdIndexFlags | undefined;
   }): TraceSummaryStore {
     return new TraceSummaryStore(options);

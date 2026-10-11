@@ -69,7 +69,7 @@ type TraceComposition = {
   fullRecords: TraceFullRecordRepository;
   /** Mints the own-only proof for the reads whose `*Api` names a tenant, not a proof. */
   authorize: FoldReadAuthorizer;
-  /** Trace's id-index flags, handed to every span read by trace id. */
+  /** Trace's id-index readiness, handed to every span read by trace id. */
   idIndex?: IdIndexFlags | undefined;
   /** The id index's range for reads on a plain client (the full record). */
   idIndexReads?: TraceIdIndexReadRepository | undefined;

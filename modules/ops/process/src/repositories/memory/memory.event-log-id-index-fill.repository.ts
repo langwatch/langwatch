@@ -1,4 +1,4 @@
-import type { FillIdIndexesOptions, IdIndexFillReport } from "@langwatch/clickhouse-client";
+import type { IdIndexFillReport, IdIndexOwnerFill } from "@langwatch/clickhouse-client";
 
 import { EventLogIdIndexFillRepository } from "../event-log-id-index-fill.repository.ts";
 
@@ -12,13 +12,7 @@ export class MemoryEventLogIdIndexFillRepository extends EventLogIdIndexFillRepo
     super();
   }
 
-  indexesWithCopiedRetention(): string[] {
-    return [];
-  }
-
-  fill(
-    _input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport> {
+  fill(_input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     return Promise.resolve({
       targetsDone: [],
       targetsFailed: [],

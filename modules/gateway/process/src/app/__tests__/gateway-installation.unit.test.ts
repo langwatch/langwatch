@@ -1,8 +1,11 @@
 import { BearerIdentity, RestHost, type RestCredentialBinding } from "@langwatch/api/rest";
-import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import {
+  type ClickHouseQueryClient,
+  isIdIndexReadinessStatement,
+  type QueryRequest,
+} from "@langwatch/clickhouse-client";
 import { EvaluationApi, type GuardrailCheckOutcome } from "@langwatch/evaluation-contract";
 import { createTenantId, type EventingCommandSender, type ProcessStore } from "@langwatch/eventing";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { type TokenIdentity } from "@langwatch/module";
@@ -130,6 +133,8 @@ function routedClickHouse(answer: (request: QueryRequest) => Promise<OpenAdmissi
       ]),
     targetOf: async () => "shared",
     query: vi.fn().mockImplementation(async (request: QueryRequest) => {
+      // The id indexes' boot check finds no marker, so every read here takes today's path.
+      if (isIdIndexReadinessStatement(request)) return { rows: [] };
       reads.push(request);
       return { rows: await answer(request) };
     }),
@@ -206,13 +211,7 @@ async function installGateway({
       },
       role: "api",
       secrets,
-      resolve: (token) => {
-        if (peers.has(token)) return peers.get(token);
-        // The id-index latch asks for its flags on every spend read; here none is on.
-        if (token === FeatureFlagApi)
-          return createApiFixture<FeatureFlagApi>({ isEnabled: async () => false });
-        return peer("gateway dependency");
-      },
+      resolve: (token) => (peers.has(token) ? peers.get(token) : peer("gateway dependency")),
     });
 
     return { state, resources };

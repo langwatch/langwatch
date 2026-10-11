@@ -85,7 +85,7 @@ export class SimulationRunStateStore implements ProjectionStore {
           type: "clickhouse";
           resolveClient: SimulationEventingClickHouseResolver;
           defaultRetentionDays: () => number;
-          /** The module's id-index flags; absent reads the run with no time bound. */
+          /** The module's id-index readiness; absent reads the run with no time bound. */
           idIndex?: IdIndexFlags | undefined;
         }
       | { type: "memory"; runs?: MemorySimulationRunStateRepository<SimulationRunState> },

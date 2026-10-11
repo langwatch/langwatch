@@ -1,16 +1,14 @@
-/** Private persistence port for filling the id indexes from rows older than their views. */
+/** Private persistence port for the module's id indexes: their fill, and whether they are ready. */
 import type {
-  FillIdIndexesOptions,
-  IdIndexDeclaration,
   IdIndexFillReport,
+  IdIndexFlags,
+  IdIndexOwnerFill,
 } from "@langwatch/clickhouse-client";
 
 export abstract class ExperimentIdIndexFillRepository {
-  /** The id indexes this module fills, in the order the fill visits them. */
-  abstract readonly indexes: readonly IdIndexDeclaration[];
+  /** Fills every declared index on every target, raises its retention, then writes its markers. */
+  abstract fill(input: IdIndexOwnerFill): Promise<IdIndexFillReport>;
 
-  /** Fills every declared index on every target, then runs `beforeFlag` and `setFlag` on each. */
-  abstract fill(
-    input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport>;
+  /** Whether the module's id indexes are ready on a target, answered from memory. */
+  abstract readonly readiness: IdIndexFlags;
 }

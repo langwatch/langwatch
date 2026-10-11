@@ -88,7 +88,7 @@ export class SpanStorageService {
   }: {
     repository: SpanStorageRepository;
     blobResolutionDeps?: SpanReadBlobResolutionDeps;
-    /** Trace's id-index flags, handed to every read by trace id. */
+    /** Trace's id-index readiness, handed to every read by trace id. */
     idIndex?: IdIndexFlags | undefined;
   }): SpanStorageService {
     return new SpanStorageService(repository, blobResolutionDeps, idIndex);

@@ -125,7 +125,7 @@ export class ClickHouseSimulationRunStateRepository<
   static create<ProjectionType extends Projection = Projection>(options: {
     resolveClient: SimulationClickHouseClientResolver;
     defaultRetentionDays: () => number;
-    /** The module's id-index flags; absent reads the run with no time bound, as before. */
+    /** The module's id-index readiness; absent reads the run with no time bound, as before. */
     idIndex?: IdIndexFlags | undefined;
   }): ClickHouseSimulationRunStateRepository<ProjectionType> {
     return new ClickHouseSimulationRunStateRepository(options);

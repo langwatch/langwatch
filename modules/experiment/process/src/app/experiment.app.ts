@@ -89,7 +89,6 @@ import {
   type ExperimentWizardSaveInput,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
@@ -147,7 +146,6 @@ import { ExperimentDatasetEvaluationService } from "../services/experiment-datas
 import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentIdIndexFillService } from "../services/experiment-id-index-fill.service.ts";
-import { ExperimentIdIndexFlagsService } from "../services/experiment-id-index-flags.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
 import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
 import {
@@ -237,8 +235,6 @@ export class ExperimentModule implements ExperimentApi {
     storedObjects: StoredObjectApi,
     /** A settled experiment trace's fold, and the summary costs a run's unpriced rows take. */
     traces: TraceApi,
-    /** Whether this module's id indexes are filled, and the step that turns that on. */
-    featureFlags: FeatureFlagApi,
   };
   static readonly config = experimentConfig;
 
@@ -247,9 +243,7 @@ export class ExperimentModule implements ExperimentApi {
     const logger = createLogger("langwatch:experiment");
     const { workflows, dataset, agents, evaluators, prompts, retention } = dependencies;
     const commands = ExperimentRunCommandDispatcherService.create();
-    const idIndex = ExperimentIdIndexFlagsService.create({
-      featureFlags: dependencies.featureFlags,
-    });
+    const idIndex = repositories.idIndexFill.readiness;
     const senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> } = {};
     const experiments = ExperimentService.create({
       repository: repositories.experiments,
@@ -301,7 +295,6 @@ export class ExperimentModule implements ExperimentApi {
       idIndexFill: ExperimentIdIndexFillService.create({
         fills: repositories.idIndexFill,
         retention,
-        featureFlags: dependencies.featureFlags,
       }),
       batchLog: ExperimentBatchLogService.create({
         runLookup,
@@ -499,7 +492,7 @@ export class ExperimentModule implements ExperimentApi {
   }
 
   /** One run of one experiment. A missing run reads as null. */
-  /** The `experiment:fill-id-indexes` step's body: the id indexes, then each target's flag. */
+  /** The `experiment:fill-id-indexes` step's body: the id indexes, then each target's marker. */
   fillIdIndexes(input: {
     checkpoint: IdIndexFillCheckpoint;
     dryRun: boolean;

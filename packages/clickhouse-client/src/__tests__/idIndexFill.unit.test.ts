@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ClickHouseQueryClient } from "../client.ts";
 import {
   fillIdIndexes,
+  fillOwnerIdIndexes,
   fillStatement,
   type IdIndexDeclaration,
   type IdIndexFillReport,
@@ -52,13 +53,20 @@ function serverWith({ failFirstBatches }: { failFirstBatches: number }) {
     driver: { execute, insert: async () => {}, command },
     tenantGuard: new TenantGuard(),
   });
+  const requests = (): QueryRequest[] => command.mock.calls.map(([request]) => request);
   const batches = (): Record<string, unknown>[] =>
-    command.mock.calls.map(([request]: [QueryRequest]) => ({
-      partition: request.params?.partition,
-      afterTenantId: request.params?.afterTenantId,
-      throughTenantId: request.params?.throughTenantId,
-    }));
-  return { client, batches };
+    requests()
+      .filter((request) => request.params?.marker === undefined)
+      .map((request) => ({
+        partition: request.params?.partition,
+        afterTenantId: request.params?.afterTenantId,
+        throughTenantId: request.params?.throughTenantId,
+      }));
+  const markers = (): string[] =>
+    requests()
+      .filter((request) => request.params?.marker !== undefined)
+      .map((request) => request.organizationId ?? "shared");
+  return { client, batches, markers };
 }
 
 /** The ledger's checkpoint, in memory: the last saved report and every save. */
@@ -83,15 +91,11 @@ describe("fillIdIndexes", () => {
       const firstRun = checkpointFrom(null);
       const pauses: number[] = [];
       const stop = new AbortController();
-      const flagged: string[] = [];
       const options = {
         targets: idIndexFillTargets({ privateRoutes: new Map() }),
         indexes: [SPANS],
         batchRows: 20,
-        beforeFlag: async () => {},
-        setFlag: async ({ target }: { target: string }) => {
-          flagged.push(target);
-        },
+        beforeMarker: async () => {},
         sleep: async (ms: number) => {
           pauses.push(ms);
         },
@@ -118,7 +122,7 @@ describe("fillIdIndexes", () => {
         { partition: "202641", afterTenantId: "", throughTenantId: undefined },
         { partition: "202640", afterTenantId: "", throughTenantId: "tenant_a" },
       ]);
-      expect(flagged).toEqual([]);
+      expect(first.markers()).toEqual([]);
 
       const second = serverWith({ failFirstBatches: 0 });
       const resumed = checkpointFrom(firstRun.saved.at(-1) ?? null);
@@ -132,7 +136,7 @@ describe("fillIdIndexes", () => {
       expect(second.batches()).toEqual([
         { partition: "202640", afterTenantId: "tenant_a", throughTenantId: "tenant_c" },
       ]);
-      expect(flagged).toEqual(["shared"]);
+      expect(second.markers()).toEqual(["shared"]);
       expect(report).toMatchObject({
         targetsDone: ["shared"],
         cursor: null,
@@ -154,12 +158,46 @@ describe("fillIdIndexes", () => {
           indexes: [SPANS],
           checkpoint,
           signal: new AbortController().signal,
-          beforeFlag: async () => {},
-          setFlag: async () => {},
+          beforeMarker: async () => {},
           sleep: async () => {},
         }),
       ).rejects.toMatchObject({ name: "IdIndexFillIncompleteError" });
       expect(saved.at(-1)?.targetsFailed.map((each) => each.target)).toEqual(["shared"]);
+    });
+  });
+
+  describe("given an owner's fill over the shared target and a private one", () => {
+    it("raises each target's copied-retention indexes before it writes that target's markers", async () => {
+      const order: string[] = [];
+      const statements = {
+        query: async <Row>(request: QueryRequest) => {
+          if (request.table === "system.parts") return { rows: [] as Row[] };
+          return { rows: [] as Row[] };
+        },
+        command: async (request: QueryRequest) => {
+          order.push(`marker ${request.table} ${request.organizationId ?? "shared"}`);
+        },
+        privateRoutes: () => new Map([["org_private", "http://private"]]),
+      };
+
+      await fillOwnerIdIndexes({
+        clickhouse: statements,
+        indexes: [SPANS, { ...SPANS, index: "spans_forever_id_index", retention: "none" }],
+        checkpoint: checkpointFrom(null).checkpoint,
+        signal: new AbortController().signal,
+        raiseRetention: async (input) => {
+          order.push(`raise ${JSON.stringify(input)}`);
+        },
+      });
+
+      expect(order).toEqual([
+        'raise {"indexes":["stored_spans_id_index"]}',
+        "marker stored_spans_id_index shared",
+        "marker spans_forever_id_index shared",
+        'raise {"organizationId":"org_private","indexes":["stored_spans_id_index"]}',
+        "marker stored_spans_id_index org_private",
+        "marker spans_forever_id_index org_private",
+      ]);
     });
   });
 
@@ -196,7 +234,7 @@ describe("fillIdIndexes", () => {
       );
     });
 
-    it("visits each private URL once, flagging every organisation on it", () => {
+    it("visits each private URL once, routed by its first organisation", () => {
       expect(
         idIndexFillTargets({
           privateRoutes: new Map([
@@ -206,9 +244,9 @@ describe("fillIdIndexes", () => {
           ]),
         }),
       ).toEqual([
-        { key: "shared", flagTargets: ["shared"] },
-        { key: "org_a", organizationId: "org_a", flagTargets: ["org_a", "org_b"] },
-        { key: "org_c", organizationId: "org_c", flagTargets: ["org_c"] },
+        { key: "shared" },
+        { key: "org_a", organizationId: "org_a" },
+        { key: "org_c", organizationId: "org_c" },
       ]);
     });
   });

@@ -16,7 +16,7 @@ export abstract class CodingAgentSessionEventRepository {
     occurredAt?: { fromMs: number; toMs: number };
     cursor?: CodingAgentSessionCursor;
     limit: number;
-    /** Without `occurredAt`, the id index (when its flag is on) bounds the read. */
+    /** Without `occurredAt`, the id index (once ready) bounds the read. */
     idIndex?: IdIndexFlags | undefined;
   }): Promise<{
     events: CodingAgentSessionEvent[];

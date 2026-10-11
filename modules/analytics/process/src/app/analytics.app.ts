@@ -100,7 +100,6 @@ import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.
 import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { AnalyticsIdIndexFillService } from "../services/analytics-id-index-fill.service.ts";
-import { AnalyticsIdIndexFlagsService } from "../services/analytics-id-index-flags.service.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
 import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
@@ -414,7 +413,6 @@ export class AnalyticsModule
     // Data retention owns the default retention days; a second claim refuses the process.
     const evaluationRepository = evaluations.open({
       defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
-      idIndex: AnalyticsIdIndexFlagsService.create({ flags: setup.dependencies.featureFlags }),
     });
     const analytics = AnalyticsServiceClass.create({
       repository: setup.repositories.analytics,
@@ -502,7 +500,6 @@ export class AnalyticsModule
         projects: setup.dependencies.projects,
         idIndexFill: AnalyticsIdIndexFillService.create({
           repository: evaluationRepository,
-          flags: setup.dependencies.featureFlags,
           retention: setup.dependencies.retention,
         }),
         lwqlBounds: LangWatchQLBoundsService.create({
@@ -569,7 +566,7 @@ export class AnalyticsModule
     return this.#dependencies.lwqlProvisioning.convergeAppOwned(drift);
   }
 
-  /** The `analytics:fill-id-indexes` step's body: the evaluation id index, then each flag. */
+  /** The `analytics:fill-id-indexes` step's body: the evaluation id index, then its markers. */
   fillIdIndexes(input: {
     checkpoint: IdIndexFillCheckpoint;
     dryRun: boolean;

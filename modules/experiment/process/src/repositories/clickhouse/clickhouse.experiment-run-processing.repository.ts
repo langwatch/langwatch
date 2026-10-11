@@ -28,7 +28,7 @@ export class ClickHouseExperimentRunProcessingRepository {
   static create(input: {
     resolveClient: ExperimentEventingClickHouseResolver;
     clickhouseEnabled: boolean;
-    /** The module's id-index flags; absent reads runs with no time bound, as before. */
+    /** The module's id-index readiness; absent reads runs with no time bound, as before. */
     idIndex?: IdIndexFlags | undefined;
   }): ClickHouseExperimentRunProcessingRepository {
     return new ClickHouseExperimentRunProcessingRepository(

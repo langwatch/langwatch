@@ -43,7 +43,7 @@ export class TraceSummaryService {
   }: {
     repository: TraceSummaryRepository;
     fullResolutionDeps?: TraceSummaryFullResolutionDeps;
-    /** Trace's id-index flags, handed to every read by trace id. */
+    /** Trace's id-index readiness, handed to every read by trace id. */
     idIndex?: IdIndexFlags | undefined;
   }): TraceSummaryService {
     return new TraceSummaryService(repository, fullResolutionDeps, idIndex);

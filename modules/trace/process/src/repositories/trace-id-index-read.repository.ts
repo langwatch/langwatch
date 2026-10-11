@@ -8,7 +8,7 @@ export type TraceIdIndexSource = "trace_summaries" | "stored_spans" | "trace_ana
 
 /**
  * The time range trace's id indexes name for some traces, for a read whose client cannot ask the
- * index itself. Empty when the flag is off on the tenant's target or the index has no row.
+ * index itself. Empty when the index is not ready on the tenant's target or the index has no row.
  */
 export abstract class TraceIdIndexReadRepository {
   abstract findWindows(input: {

@@ -1,6 +1,6 @@
 /**
  * A lookup by id bounded by its id index (dev/docs/plans/id-index-2026-10-10.md §4): with the
- * owner's flag on for the tenant's target, one point read of the index names the time range,
+ * owner's index ready on the tenant's target, one point read of the index names the time range,
  * and the source read runs with exactly that bound. With it off, the read is `queryWindowed`.
  */
 import type { IdIndexFlags, IdIndexKey, IdIndexReader, IdIndexTimeFormat } from "./idIndexFlags.ts";
@@ -24,9 +24,9 @@ export const ID_INDEX_MISS_PROBE: WindowFallback = { lookbackMs: RESOLVER_RECENT
 export interface IndexedReadOptions<T> {
   /** Asks the target and the index: the routed client, or the fence's reader. */
   client: IdIndexReader;
-  /** The owner's flags; absent reads as off, so call sites move one at a time. */
+  /** The owner's readiness; absent reads as not ready, so call sites move one at a time. */
   idIndex?: IdIndexFlags | undefined;
-  /** The project whose target decides the flag: its own, never a shared grant's. */
+  /** The project whose target decides readiness: its own, never a shared grant's. */
   tenantId: string;
   /** Source table label for `clickhouse_windowed_read_total`. */
   table: string;
@@ -54,8 +54,8 @@ export function indexWindow({ fromMs, toMs }: { fromMs: number; toMs: number }):
 }
 
 /**
- * Reads by id: a given time first; then, flag on, the index's range (`index_hit`) or, for an
- * unseen id, the miss probe (`index_miss`); flag off, today's windowed read unchanged. Every
+ * Reads by id: a given time first; then, once ready, the index's range (`index_hit`) or, for an
+ * unseen id, the miss probe (`index_miss`); not ready, today's windowed read unchanged. Every
  * path counts exactly one outcome.
  */
 export async function indexedRead<T>(options: IndexedReadOptions<T>): Promise<T> {

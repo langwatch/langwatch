@@ -36,7 +36,6 @@ import {
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -69,7 +68,6 @@ import { CodingAgentCommandDispatcherService } from "../services/coding-agent-co
 import { GovernanceCodingAgentBillingService } from "../services/coding-agent-cost-attribution.service.ts";
 import { OtelCodingAgentCostMetricsService } from "../services/coding-agent-cost-metrics.service.ts";
 import { CodingAgentIdIndexFillService } from "../services/coding-agent-id-index-fill.service.ts";
-import { CodingAgentIdIndexFlagsService } from "../services/coding-agent-id-index-flags.service.ts";
 import { CodingAgentProjectionPersistenceService } from "../services/coding-agent-projection-persistence.service.ts";
 import { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
 import { CodingAgentScopeDirectoryService } from "../services/coding-agent-scope-directory.service.ts";
@@ -136,7 +134,6 @@ type CodingAgentDependencies = {
   users: typeof UserApi;
   auditLog: typeof AuditLogApi;
   governance: typeof GovernanceRestApi;
-  featureFlags: typeof FeatureFlagApi;
 };
 type CodingAgentSetup = FeatureSetup<
   CodingAgentDependencies,
@@ -164,8 +161,6 @@ export class CodingAgentModule implements CodingAgentApi {
     auditLog: AuditLogApi,
     /** Decides which coding-assistant sources a bundled plan covers. */
     governance: GovernanceRestApi,
-    /** Whether the id indexes are filled; a step turns it on once they are. */
-    featureFlags: FeatureFlagApi,
   };
 
   static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentModule {
@@ -178,7 +173,7 @@ export class CodingAgentModule implements CodingAgentApi {
       projects: dependencies.projects,
       billing: GovernanceCodingAgentBillingService.create({ governance: dependencies.governance }),
       clock: SystemCodingAgentClockService.create(),
-      idIndex: CodingAgentIdIndexFlagsService.create({ featureFlags: dependencies.featureFlags }),
+      idIndex: repositories.idIndexFill.readiness,
     });
     const scopeService = CodingAgentCallerScopeService.create({
       directory: CodingAgentScopeDirectoryService.create({
@@ -237,7 +232,6 @@ export class CodingAgentModule implements CodingAgentApi {
       idIndexFill: CodingAgentIdIndexFillService.create({
         fills: repositories.idIndexFill,
         retention: dependencies.retention,
-        featureFlags: dependencies.featureFlags,
       }),
     });
   }

@@ -5,7 +5,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { idIndexFlagKey } from "@langwatch/feature-flag-contract";
 import { describe, expect, it } from "vitest";
 
 import { ANALYTICS_ID_INDEXES } from "../clickhouse.analytics-persistence.repository.ts";
@@ -62,13 +61,6 @@ describe("Analytics' id-index declaration", () => {
         expect(declaration.retention).toBe("copied");
         expect(migration).toContain("max(if(_retention_days = 0, 65535, _retention_days))");
       }
-    });
-
-    it("spells its flag under the owner word the step and the latch share", () => {
-      expect(idIndexFlagKey({ owner: "analytics", target: "shared" })).toBe(
-        "clickhouse_id_index_analytics_shared",
-      );
-      expect(migration).toContain("clickhouse_id_index_analytics_<target>");
     });
   });
 });

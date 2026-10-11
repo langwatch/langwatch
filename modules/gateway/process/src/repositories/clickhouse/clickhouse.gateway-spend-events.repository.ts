@@ -195,7 +195,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
   }
 
   /**
-   * One request's rows, bounded by the id index when its flag is on for the tenant's target and
+   * One request's rows, bounded by the id index once it is ready on the tenant's target and
    * unbounded as before otherwise. `run` splices the window it is given into its statement.
    */
   private readByRequestId<T>({

@@ -1,7 +1,5 @@
 import { ClientAddress } from "@langwatch/api/policy";
 import { bindRestCredential, browserSessionOfRequest } from "@langwatch/api/rest";
-import { EVENT_LOG_ID_INDEX_OWNER } from "@langwatch/eventing/server";
-import { idIndexFlagKey } from "@langwatch/feature-flag-contract";
 import type { OpsApi, OpsServerConfig } from "@langwatch/ops-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 import { type CodeStepId, defineMigrationStep } from "@langwatch/upgrade/step";
@@ -19,6 +17,7 @@ import { CheckupCanaryProjectService } from "#features/checkup/services/checkup-
 import { upgradeAlertsEventing } from "#features/upgrades/eventing/ops-upgrade-alerts.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { MOVED_TO_OWNERS } from "#rules/system-migration-support.rules";
+import { EventLogIdIndexFillService } from "#services/event-log-id-index-fill.service";
 import { CredentialsResealTask, credentialsResealCiphers } from "#tasks/credentials-reseal.task";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
@@ -197,27 +196,12 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
         kind: "data",
         mode: "background",
         description:
-          "Fills the event log's aggregate index from older events, then turns each ClickHouse target's event log index flag on.",
+          "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
         needsOldWritersGone: false,
         run: ({ checkpoint, dryRun, signal }) =>
-          repositories.eventLogIdIndexFill.fill({
-            checkpoint,
-            dryRun,
-            signal,
-            beforeFlag: async ({ target }) => {
-              await dependencies.retention.raiseIdIndexRetention({
-                ...(target.organizationId === undefined
-                  ? {}
-                  : { organizationId: target.organizationId }),
-                indexes: repositories.eventLogIdIndexFill.indexesWithCopiedRetention(),
-              });
-            },
-            setFlag: ({ target }) =>
-              dependencies.featureFlags.setEnabled({
-                key: idIndexFlagKey({ owner: EVENT_LOG_ID_INDEX_OWNER, target }),
-                lastEditedBy: null,
-                enabled: true,
-              }),
-          }),
+          EventLogIdIndexFillService.create({
+            fills: repositories.eventLogIdIndexFill,
+            retention: dependencies.retention,
+          }).fill({ checkpoint, dryRun, signal }),
       }),
     ]);

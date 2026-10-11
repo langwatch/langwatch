@@ -121,14 +121,13 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
         kind: "data",
         mode: "background",
         description:
-          "Fills the trace id indexes from rows older than their views, then turns their flag on.",
+          "Fills the trace id indexes from rows older than their views, then marks them ready.",
         // Old releases fire the server-side views too, so no writer has to be gone.
         needsOldWritersGone: false,
         run: ({ checkpoint, dryRun, signal }) =>
           TraceIdIndexFillService.create({
             indexes: repositories.idIndexFill,
             dataRetention: dependencies.dataRetention,
-            featureFlags: dependencies.featureFlags,
           }).fill({ checkpoint, dryRun, signal }),
       }),
     ]);

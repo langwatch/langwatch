@@ -49,7 +49,7 @@ type MappingInputs = {
   resolveTraceSpansBatch?: ResolveTraceSpansBatchFn | undefined;
   /** The tenant's retention policy; absent, the span read floors at the platform default. */
   retentionDays?: RetentionDaysProvider | undefined;
-  /** Trace's id-index flags and their reads: with no time, the index names the range. */
+  /** Trace's id-index readiness and its reads: with no time, the index names the range. */
   idIndex?: IdIndexFlags | undefined;
   idIndexReads?: TraceIdIndexReadRepository | undefined;
 };

@@ -1,12 +1,7 @@
 /** Private persistence port for filling the event log's aggregate index from older events. */
-import type { FillIdIndexesOptions, IdIndexFillReport } from "@langwatch/clickhouse-client";
+import type { IdIndexFillReport, IdIndexOwnerFill } from "@langwatch/clickhouse-client";
 
 export abstract class EventLogIdIndexFillRepository {
-  /** Fills the index on every target, then runs `beforeFlag` and `setFlag` on each. */
-  abstract fill(
-    input: Omit<FillIdIndexesOptions, "statements" | "targets" | "indexes">,
-  ): Promise<IdIndexFillReport>;
-
-  /** The indexes whose rows copy the event log's retention, which data-retention raises. */
-  abstract indexesWithCopiedRetention(): string[];
+  /** Fills the index on every target, raises its retention there, then writes its marker. */
+  abstract fill(input: IdIndexOwnerFill): Promise<IdIndexFillReport>;
 }

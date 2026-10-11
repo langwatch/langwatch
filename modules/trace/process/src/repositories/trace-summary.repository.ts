@@ -20,7 +20,7 @@ export interface FindByTraceIdOptions {
    */
   window?: { fromMs: number; toMs: number };
 
-  /** Trace's id-index flags; with no time and the flag on, the index bounds the read. */
+  /** Trace's id-index readiness; with no time and the index ready, the index bounds the read. */
   idIndex?: IdIndexFlags | undefined;
 }
 

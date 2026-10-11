@@ -19,6 +19,7 @@ export interface EventLogRetentionClient {
     kind: "write";
     sql: string;
     params?: Record<string, unknown>;
+    settings?: Record<string, string | number>;
     SKIP_TENANT_CHECK?: true;
   }): Promise<void>;
   /** Asked only of `system.tables`, whether the routed server holds the id index yet. */
@@ -206,8 +207,9 @@ export class EventLogRetention {
   }
 
   /**
-   * Raises the index rows of every aggregate type mapped to no category to kept forever. The index
-   * has no event type, so a never-expiring event type's rows keep what the view wrote for them.
+   * Raises to kept forever the index rows of every aggregate type mapped to no category, and of
+   * every aggregate holding a never-expiring event type: its rows were re-stamped to 0 after the
+   * view wrote their finite retention, and a TTL merge would otherwise drop the aggregate's range.
    */
   private async keepIndefiniteIndexRows({
     organizationId,
@@ -217,6 +219,17 @@ export class EventLogRetention {
     const finite = this.aggregateTypesWhere((candidate) =>
       this.classification.categories.includes(candidate),
     );
+    const indefiniteEvents = this.indefiniteEventTypeTerms();
+    const kept = [
+      ...(finite.length === 0 ? ["1"] : [`AggregateType NOT IN (${sqlList(finite)})`]),
+      ...(indefiniteEvents.length === 0 || finite.length === 0
+        ? []
+        : [
+            "(TenantId, AggregateType, AggregateId) IN (" +
+              `SELECT TenantId, AggregateType, AggregateId FROM ${EVENT_LOG_TABLE} ` +
+              `WHERE AggregateType IN (${sqlList(finite)}) AND (${indefiniteEvents.join(" OR ")}))`,
+          ]),
+    ];
     await this.client.command({
       tenantId: "",
       ...(organizationId === undefined ? {} : { organizationId }),
@@ -226,8 +239,10 @@ export class EventLogRetention {
         `ALTER TABLE ${EVENT_LOG_ID_INDEX_TABLE} ` +
         `UPDATE _retention_days = ${INDEX_KEPT_FOREVER_DAYS} ` +
         `WHERE _retention_days < ${INDEX_KEPT_FOREVER_DAYS}` +
-        (finite.length === 0 ? "" : ` AND AggregateType NOT IN (${sqlList(finite)})`) +
+        ` AND (${kept.join(" OR ")})` +
         ` AND length(${sqlString(markerOf(this.classification.indefiniteClass))}) > 0`,
+      // A replicated table refuses a mutation's subquery unless allowed; a raise is safe to repeat.
+      settings: { allow_nondeterministic_mutations: 1 },
       // Keeping never-expiring rows forever is one rewrite per ClickHouse target, across every
       // tenant on it.
       SKIP_TENANT_CHECK: true,

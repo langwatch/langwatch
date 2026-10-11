@@ -26,7 +26,12 @@ import type { ReplayEvent } from "../../../replay/replayEventSource.ts";
 import { EventingClickHouseEventRepository } from "../../adapters/clickhouse/event-repository.clickhouse.ts";
 import { EventingClickHouseReplayEventSource } from "../../adapters/clickhouse/replay-event-source.clickhouse.ts";
 import type { EventingClickHouseClientResolver } from "../../clickhouse-client-resolver.ts";
-import { type EventLogIdIndex, eventLogOccurredRange } from "../event-log-id-index.ts";
+import {
+  EventingClickHouseEventLogIdIndexFill,
+  type EventLogIdIndex,
+  eventLogIdIndexReadiness,
+  eventLogOccurredRange,
+} from "../event-log-id-index.ts";
 
 const clickHouseConfigured = Boolean(nativeClickHouseBaseUrl(process.env));
 const DAY_MS = 86_400_000;
@@ -346,7 +351,34 @@ describe.skipIf(!clickHouseConfigured)("the event log's aggregate index", () => 
     });
   });
 
-  describe("given the flag on and an aggregate whose only events have no occurred time", () => {
+  describe("given an event log holding rows and an index with no marker row", () => {
+    /** @scenario "readers trust the index only once its marker row is written" */
+    it("reads unbounded until the fill writes the marker, then bounded by the index", async () => {
+      const readiness = eventLogIdIndexReadiness({ clickhouse });
+      const rangeOf = () =>
+        eventLogOccurredRange({
+          index: { reader: clickhouse, readiness },
+          read: "aggregate",
+          tenantId,
+          aggregateTypes: ["thing"],
+          aggregateIds: ["last-month"],
+        });
+
+      expect(await readiness.check({ target: "shared" })).toBe(false);
+      expect(await rangeOf()).toBeNull();
+
+      await EventingClickHouseEventLogIdIndexFill.create({ clickhouse }).fill({
+        checkpoint: { resumeFrom: null, save: async () => undefined },
+        signal: new AbortController().signal,
+        raiseRetention: async () => undefined,
+      });
+
+      expect(await readiness.check({ target: "shared" })).toBe(true);
+      expect(await rangeOf()).toEqual({ fromMs: daysAgo(40), toMs: daysAgo(33) });
+    });
+  });
+
+  describe("given the index ready and an aggregate whose only events have no occurred time", () => {
     /** @scenario "an aggregate the index has not seen reads its whole history" */
     it("misses the index and replays every event through the unbounded path", async () => {
       const source = new EventingClickHouseReplayEventSource({

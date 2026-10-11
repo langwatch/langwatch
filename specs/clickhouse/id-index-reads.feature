@@ -97,7 +97,7 @@ Feature: A lookup by id reads only the partitions its id index names
 
   @integration
   Scenario: an aggregate the index has not seen reads its whole history
-    Given the event log index's flag is on
+    Given the event log index is ready
     And an aggregate whose only events have no occurred time
     When its events are read for replay
     Then the read takes the existing unbounded path and returns every event
@@ -127,12 +127,21 @@ Feature: A lookup by id reads only the partitions its id index names
     Then the first read finds nothing and the lookup falls back to the existing path
     And the fallback is recorded
 
-  @unit
-  Scenario: readers trust the index only once its flag is on
-    Given the owner's id index flag is on for this ClickHouse target and off for another
+  @unit @integration
+  Scenario: readers trust the index only once its marker row is written
+    Given the owner's id index holds its marker row on this ClickHouse target
+    And another target's index has no marker row while its source table has rows
     When tenants on each target are looked up by id alone
-    Then only the tenant on the flagged target reads through the index
-    And no lookup waits on reading the flag
+    Then only the tenant on the marked target reads through the index
+    And the other target is checked again in the background until the fill writes its marker
+    And no lookup waits on reading the marker
+
+  @unit @integration
+  Scenario: a fresh install with an empty table is ready at once
+    Given an id index with no marker row over a source table with no rows
+    When the owner's readiness is checked at boot
+    Then it writes the marker row itself
+    And lookups read through the index from then on
 
   @unit
   Scenario: a failed batch backs off and resumes from its cursor
@@ -143,7 +152,7 @@ Feature: A lookup by id reads only the partitions its id index names
 
   @integration
   Scenario: a trace opens with no time
-    Given a trace stored eight weeks ago and its owner's id index flag on
+    Given a trace stored eight weeks ago and its owner's id index ready
     When its summary and spans are read with no time given
     Then each read is bounded to the partitions the index names
 

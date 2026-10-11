@@ -40,7 +40,7 @@ export class ScenarioRoleMetricsDerivationService {
      */
     spanCosts: SpanCostService;
     now?: () => number;
-    /** Trace's id-index flags and their reads: with no time, the index names the window. */
+    /** Trace's id-index readiness and its reads: with no time, the index names the window. */
     idIndex?: IdIndexFlags | undefined;
     idIndexReads?: TraceIdIndexReadRepository | undefined;
   }): ScenarioRoleMetricsDerivationService {

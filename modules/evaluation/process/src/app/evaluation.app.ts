@@ -98,7 +98,6 @@ import { findUnavailability } from "../rules/evaluator-availability-service.rule
 import { EvaluationCommandDispatcherService } from "../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationDatasetLookupService } from "../services/evaluation-dataset-lookup.service.ts";
 import { EvaluationIdIndexFillService } from "../services/evaluation-id-index-fill.service.ts";
-import { EvaluationIdIndexFlagsService } from "../services/evaluation-id-index-flags.service.ts";
 import { EvaluationLifecycleService } from "../services/evaluation-lifecycle.service.ts";
 import { EvaluationRetentionDaysService } from "../services/evaluation-retention-days.service.ts";
 import { EvaluationRunProjectionService } from "../services/evaluation-run-projection.service.ts";
@@ -399,7 +398,7 @@ export class EvaluationModule implements EvaluationApiContract {
     environment: EvaluatorEnvironmentService,
   ): EvaluationModule {
     const commands = EvaluationCommandDispatcherService.create();
-    const idIndex = EvaluationIdIndexFlagsService.create({ flags: dependencies.featureFlags });
+    const idIndex = repositories.runs.readiness;
     const lifecycle = EvaluationLifecycleService.create({
       retention: {
         resolve: (tenantId) =>
@@ -497,7 +496,6 @@ export class EvaluationModule implements EvaluationApiContract {
       idIndex,
       idIndexFill: EvaluationIdIndexFillService.create({
         repository: repositories.runs,
-        flags: dependencies.featureFlags,
         retention: dependencies.retention,
       }),
       clustering: LangevalsClusteringService.create({
@@ -602,7 +600,7 @@ export class EvaluationModule implements EvaluationApiContract {
     });
   }
 
-  /** The `evaluation:fill-id-indexes` step's body: the run id index, then each target's flag. */
+  /** The `evaluation:fill-id-indexes` step's body: the run id index, then each target's marker. */
   fillIdIndexes(input: {
     checkpoint: IdIndexFillCheckpoint;
     dryRun: boolean;

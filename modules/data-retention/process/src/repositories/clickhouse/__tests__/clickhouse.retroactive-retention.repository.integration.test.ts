@@ -82,7 +82,8 @@ describe.skipIf(!clickHouseUrl)(
       await scoped.command({
         query:
           "CREATE TABLE event_log (TenantId String, AggregateType LowCardinality(String), " +
-          "EventType LowCardinality(String), _retention_days UInt16 DEFAULT 308) " +
+          "AggregateId String DEFAULT '', EventType LowCardinality(String), " +
+          "_retention_days UInt16 DEFAULT 308) " +
           "ENGINE = MergeTree ORDER BY (TenantId, AggregateType)",
       });
       for (const table of Object.keys(RETENTION_TABLE_CATEGORY_MAP)) {
@@ -208,7 +209,7 @@ describe.skipIf(!clickHouseUrl)("Id index retention on live ClickHouse", () => {
     await indexScoped.command({
       query:
         "CREATE TABLE event_log (TenantId String, AggregateType LowCardinality(String), " +
-        "EventType LowCardinality(String), _retention_days UInt16) " +
+        "AggregateId String DEFAULT '', EventType LowCardinality(String), _retention_days UInt16) " +
         "ENGINE = MergeTree ORDER BY (TenantId, AggregateType)",
     });
     for (const table of Object.keys(RETENTION_TABLE_CATEGORY_MAP)) {

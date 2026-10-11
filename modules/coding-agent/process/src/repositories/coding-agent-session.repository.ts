@@ -37,7 +37,7 @@ export abstract class CodingAgentSessionRepository {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-    /** Without a window, the id index (when its flag is on) bounds the read. */
+    /** Without a window, the id index (once ready) bounds the read. */
     idIndex?: IdIndexFlags | undefined;
   }): Promise<CodingAgentSession | null>;
 
@@ -45,7 +45,7 @@ export abstract class CodingAgentSessionRepository {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
-    /** Without a window, the id index (when its flag is on) bounds the read. */
+    /** Without a window, the id index (once ready) bounds the read. */
     idIndex?: IdIndexFlags | undefined;
   }): Promise<{
     row: CodingAgentSession;

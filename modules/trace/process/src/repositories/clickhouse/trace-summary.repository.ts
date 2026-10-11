@@ -424,7 +424,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       return this.#findInExplicitWindow({ authorization, traceId, window: options.window });
     }
 
-    // Hinted window first; then the index's range when its flag is on, else today's ladder.
+    // Hinted window first; then the index's range once it is ready, else today's ladder.
     const hasHint = options.occurredAtMs !== undefined;
 
     try {

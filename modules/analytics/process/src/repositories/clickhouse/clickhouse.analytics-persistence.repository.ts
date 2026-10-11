@@ -16,11 +16,13 @@ import {
 } from "@langwatch/analytics-contract";
 import {
   type ClickHouseQueryClient,
-  fillIdIndexes,
+  fillOwnerIdIndexes,
   type IdIndexDeclaration,
   type IdIndexFillReport,
   type IdIndexFlags,
-  idIndexFillTargets,
+  type IdIndexOwnerFill,
+  IdIndexReadiness,
+  idIndexReadinessTargets,
   indexedRead,
   queryWindowed,
   type WindowFragment,
@@ -29,10 +31,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import {
-  AnalyticsEvaluationRepository,
-  type AnalyticsIdIndexFill,
-} from "../analytics-persistence.repository.ts";
+import { AnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
 
 const SLIM_TABLE = "evaluation_analytics";
 const ROLLUP_TABLE = "evaluation_analytics_rollup";
@@ -93,9 +92,18 @@ type AnalyticsEvaluationRepositoryOptions = {
   readMetrics?: AnalyticsEvaluationReadMetrics;
   /** The routed client the id index is read and filled through; absent means no index. */
   clickhouse?: ClickHouseQueryClient;
-  /** Whether the evaluation id index may bound a lookup with no window; absent reads as off. */
+  /** Whether the evaluation id index may bound a lookup with no window; absent, its markers say. */
   idIndex?: IdIndexFlags;
 };
+
+/** The evaluation id index's readiness over the routed client, every target checked at boot. */
+function readinessOver(clickhouse: ClickHouseQueryClient): IdIndexReadiness {
+  return IdIndexReadiness.create({
+    statements: clickhouse,
+    indexes: ANALYTICS_ID_INDEXES,
+    watch: () => idIndexReadinessTargets({ privateRoutes: clickhouse.privateRoutes() }),
+  });
+}
 
 export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluationRepository {
   static create(
@@ -116,7 +124,9 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     this.defaultRetentionDays = options.defaultRetentionDays;
     this.readMetrics = options.readMetrics;
     this.clickhouse = options.clickhouse;
-    this.idIndex = options.idIndex;
+    this.idIndex =
+      options.idIndex ??
+      (options.clickhouse === undefined ? undefined : readinessOver(options.clickhouse));
   }
 
   async upsert(input: AnalyticsEvaluationUpsertInput): Promise<void> {
@@ -279,24 +289,12 @@ export class ClickHouseAnalyticsEvaluationRepository extends AnalyticsEvaluation
     return result.json();
   }
 
-  async fillIdIndexes(input: AnalyticsIdIndexFill): Promise<IdIndexFillReport> {
+  async fillIdIndexes(input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     const { clickhouse } = this;
     if (clickhouse === undefined) {
       throw new Error("This analytics repository was composed without a routed ClickHouse client");
     }
-    return fillIdIndexes({
-      ...input,
-      indexes: ANALYTICS_ID_INDEXES,
-      beforeFlag: ({ target }) =>
-        input.beforeFlag({
-          target,
-          indexes: ANALYTICS_ID_INDEXES.filter((each) => each.retention === "copied").map(
-            (each) => each.index,
-          ),
-        }),
-      statements: clickhouse,
-      targets: idIndexFillTargets({ privateRoutes: clickhouse.privateRoutes() }),
-    });
+    return fillOwnerIdIndexes({ ...input, clickhouse, indexes: ANALYTICS_ID_INDEXES });
   }
 
   async appendRollup(input: AnalyticsEvaluationRollupAppendInput): Promise<void> {

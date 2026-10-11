@@ -32,7 +32,7 @@ type ClickHouseExperimentRunProcessingAdapterOptions = {
    * The cache's consistency TTL, as the process resolved it.
    */
   foldCacheTtlSeconds?: number;
-  /** The module's id-index flags; absent reads a run's state with no time bound, as before. */
+  /** The module's id-index readiness; absent reads a run's state with no time bound, as before. */
   idIndex?: IdIndexFlags | undefined;
 };
 

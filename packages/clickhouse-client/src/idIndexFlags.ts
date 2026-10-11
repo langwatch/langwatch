@@ -9,7 +9,7 @@ export const SHARED_CLICKHOUSE_TARGET = "shared";
 
 /**
  * Whether an owner's id indexes are filled on a target, answered from memory. Built by the owner
- * from its own feature flags; an absent `IdIndexFlags` reads as off everywhere.
+ * as an `IdIndexReadiness` over its own indexes; an absent `IdIndexFlags` reads as off everywhere.
  */
 export interface IdIndexFlags {
   isOn(input: { target: string }): boolean;

@@ -10,12 +10,11 @@ import {
   type AnalyticsEvaluationRow,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
-import type { IdIndexFillReport } from "@langwatch/clickhouse-client";
+import type { IdIndexFillReport, IdIndexOwnerFill } from "@langwatch/clickhouse-client";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 
 import {
   AnalyticsEvaluationRepository,
-  type AnalyticsIdIndexFill,
   EMPTY_ID_INDEX_FILL_REPORT,
 } from "../analytics-persistence.repository.ts";
 
@@ -102,7 +101,7 @@ export class MemoryAnalyticsEvaluationRepository extends AnalyticsEvaluationRepo
   }
 
   /** A map has no partitions to index, so there is nothing to fill. */
-  async fillIdIndexes(_input: AnalyticsIdIndexFill): Promise<IdIndexFillReport> {
+  async fillIdIndexes(_input: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     return { ...EMPTY_ID_INDEX_FILL_REPORT };
   }
 

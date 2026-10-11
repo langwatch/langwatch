@@ -1,21 +1,24 @@
-import type { IdIndexFillReport } from "@langwatch/clickhouse-client";
+import type {
+  IdIndexFillReport,
+  IdIndexFlags,
+  IdIndexOwnerFill,
+} from "@langwatch/clickhouse-client";
 
-import {
-  TraceIdIndexFillRepository,
-  type TraceIdIndexFillInput,
-} from "../trace-id-index-fill.repository.ts";
+import { TraceIdIndexFillRepository } from "../trace-id-index-fill.repository.ts";
 
-/** No ClickHouse, so no index and no retention to raise: the shared target is flagged at once. */
+/** No ClickHouse, so no index and no retention to raise, and no index is ever ready to read. */
 export class MemoryTraceIdIndexFillRepository extends TraceIdIndexFillRepository {
   static create(): MemoryTraceIdIndexFillRepository {
     return new MemoryTraceIdIndexFillRepository();
   }
 
+  readonly readiness: IdIndexFlags = { isOn: () => false };
+
   private constructor() {
     super();
   }
 
-  async fill({ dryRun, setFlag }: TraceIdIndexFillInput): Promise<IdIndexFillReport> {
+  async fill({ dryRun }: IdIndexOwnerFill): Promise<IdIndexFillReport> {
     const report: IdIndexFillReport = {
       targetsDone: [],
       targetsFailed: [],
@@ -26,7 +29,6 @@ export class MemoryTraceIdIndexFillRepository extends TraceIdIndexFillRepository
       retries: 0,
     };
     if (dryRun) return { ...report, dryRun: { partitions: 0, rows: 0 } };
-    await setFlag({ target: "shared" });
     return { ...report, targetsDone: ["shared"] };
   }
 }

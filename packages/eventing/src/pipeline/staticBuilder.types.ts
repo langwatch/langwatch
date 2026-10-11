@@ -1,4 +1,3 @@
-import type { IdIndexFlags } from "@langwatch/clickhouse-client";
 import type { ExhaustedOutcome } from "@langwatch/group-queue";
 
 import type { SealedCommand } from "../commands/sealedCommand.ts";
@@ -122,12 +121,6 @@ export interface StaticPipelineDefinition<
    * the owning module's data-retention dependency. Registration prefers it to the runtime's (§9).
    */
   retentionPolicyResolver?: RetentionPolicyResolver;
-
-  /**
-   * Whether the event log's aggregate index is filled on a ClickHouse target, declared from the
-   * owning module's feature flags; absent, this aggregate's reads stay unbounded by it.
-   */
-  eventLogIndexFlags?: IdIndexFlags;
 
   /** Stored event types read as current ones, declared with `.withUpcasts` (§9). */
   upcasts?: PipelineUpcasts;

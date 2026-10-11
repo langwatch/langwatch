@@ -236,7 +236,7 @@ describe("EventLogRetention", () => {
       expect(statements[1]!.params).toEqual({ tenantId: "project-1", retentionDays: 65_535 });
     });
 
-    it("raises the index rows of unclassified aggregate types to kept forever", async () => {
+    it("raises to kept forever unclassified aggregate types and aggregates holding a kept-forever event", async () => {
       const { retention, statements } = retentionOver({ holdsIdIndex: true });
 
       await retention.keepIndefiniteRows({ organizationId: "org-private" });
@@ -249,8 +249,13 @@ describe("EventLogRetention", () => {
         sql:
           "ALTER TABLE event_log_id_index UPDATE _retention_days = 65535 " +
           "WHERE _retention_days < 65535" +
-          " AND AggregateType NOT IN ('experiment_run', 'simulation_run', 'suite_run', 'trace')" +
+          " AND (AggregateType NOT IN ('experiment_run', 'simulation_run', 'suite_run', 'trace')" +
+          " OR (TenantId, AggregateType, AggregateId) IN (SELECT TenantId, AggregateType, AggregateId" +
+          " FROM event_log WHERE AggregateType IN ('experiment_run', 'simulation_run', 'suite_run', 'trace')" +
+          " AND (startsWith(EventType, 'lw.identity.') OR startsWith(EventType, 'lw.authz.') OR" +
+          " EventType IN ('lw.governance.vk_lifecycle'))))" +
           " AND length('langwatch:event-log-retention-category:indefinite') > 0",
+        settings: { allow_nondeterministic_mutations: 1 },
         // The index's keep-forever raise is one rewrite per target, across every tenant on it.
         SKIP_TENANT_CHECK: true,
       });

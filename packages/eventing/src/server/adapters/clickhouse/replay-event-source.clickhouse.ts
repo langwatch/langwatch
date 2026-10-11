@@ -540,7 +540,7 @@ export class EventingClickHouseReplayEventSource implements ReplayEventSource {
   constructor(deps: {
     clickhouse: EventingClickHouseReplayClient;
     lean: ReplayEventLean;
-    /** Bounds each batch by the aggregate index once its types' flags are on. */
+    /** Bounds each batch by the aggregate index once it is ready on the tenant's target. */
     eventLogIndex?: EventLogIdIndex;
   }) {
     this.clickhouse = deps.clickhouse;

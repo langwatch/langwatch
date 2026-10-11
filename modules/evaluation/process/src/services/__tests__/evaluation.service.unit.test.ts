@@ -1,5 +1,5 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { IdIndexFillReport } from "@langwatch/clickhouse-client";
+import type { IdIndexFillReport, IdIndexFlags } from "@langwatch/clickhouse-client";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -45,6 +45,7 @@ const run: EvaluationRunData = {
 };
 
 class FakeRepository extends EvaluationRunRepository {
+  readonly readiness: IdIndexFlags = { isOn: () => false };
   private value: EvaluationRunData | null = null;
   async upsert(input: { data: EvaluationRunData }): Promise<void> {
     this.value = input.data;

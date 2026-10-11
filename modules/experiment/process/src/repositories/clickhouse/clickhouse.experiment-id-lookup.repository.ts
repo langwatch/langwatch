@@ -21,7 +21,7 @@ export class ClickHouseExperimentIdLookupRepository extends ExperimentIdLookupRe
 
   static create(options: {
     clickhouse: ExperimentClickHouseRepository;
-    /** The module's id-index flags; absent reads the run with no time bound, as before. */
+    /** The module's id-index readiness; absent reads the run with no time bound, as before. */
     idIndex?: IdIndexFlags | undefined;
   }): ClickHouseExperimentIdLookupRepository {
     return new ClickHouseExperimentIdLookupRepository(options.clickhouse, options.idIndex);

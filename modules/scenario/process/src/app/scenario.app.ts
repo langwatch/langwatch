@@ -180,7 +180,6 @@ import { ScenarioFailureHandlerService } from "../services/scenario-failure-hand
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import { ScenarioGenerationService } from "../services/scenario-generation.service.ts";
 import { ScenarioIdIndexFillService } from "../services/scenario-id-index-fill.service.ts";
-import { ScenarioIdIndexFlagsService } from "../services/scenario-id-index-flags.service.ts";
 import { ScenarioPlatformLinkService } from "../services/scenario-platform-link.service.ts";
 import { ScenarioRunAttachmentsService } from "../services/scenario-run-attachments.service.ts";
 import { ScenarioRunLaunchService } from "../services/scenario-run-launch.service.ts";
@@ -314,9 +313,7 @@ export class ScenarioModule implements ScenarioApi {
     const clock = { now: nowInstant };
     // The live repository seals and opens run secrets; the memory twin holds them in plaintext.
     const runSecretSeal = repositories.scenarios;
-    const idIndex = ScenarioIdIndexFlagsService.create({
-      featureFlags: setup.dependencies.featureFlags,
-    });
+    const idIndex = repositories.idIndexFill.readiness;
     const simulations = SimulationService.create(repositories.simulations, simulationCommands, {
       idIndex,
     });
@@ -454,7 +451,6 @@ export class ScenarioModule implements ScenarioApi {
       idIndexFill: ScenarioIdIndexFillService.create({
         fills: repositories.idIndexFill,
         retention: setup.dependencies.retention,
-        featureFlags: setup.dependencies.featureFlags,
       }),
       lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,
@@ -529,7 +525,7 @@ export class ScenarioModule implements ScenarioApi {
     this.#runLaunch = ScenarioRunLaunchService.create(this);
   }
 
-  /** The `scenario:fill-id-indexes` step's body: the id index, then each target's flag. */
+  /** The `scenario:fill-id-indexes` step's body: the id index, then each target's marker. */
   fillIdIndexes(input: {
     checkpoint: IdIndexFillCheckpoint;
     dryRun: boolean;

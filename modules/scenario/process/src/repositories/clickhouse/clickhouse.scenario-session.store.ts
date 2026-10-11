@@ -48,7 +48,7 @@ export class ClickHouseScenarioSession implements SimulationClickHouseClient {
     return { json: async <Result>() => (await this.clickhouse.query<Result>(request)).rows };
   }
 
-  /** The target this session's tenant lands on, which keys the module's id-index flag. */
+  /** The target this session's tenant lands on, which keys the module's id-index readiness. */
   targetOf(_input: { tenantId: string }): Promise<string> {
     return this.clickhouse.targetOf({ tenantId: this.tenantId });
   }

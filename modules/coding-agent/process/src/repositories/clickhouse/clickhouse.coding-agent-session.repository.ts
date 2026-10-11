@@ -478,7 +478,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   /**
    * Reads the latest raw session record without `FINAL`: late signals can move `StartedAt`.
    * A caller's window bounds the outer scan only, since a newer version may sit outside it;
-   * with none, the id index (flag on) bounds both scans to the range all versions span.
+   * with none, the id index (once ready) bounds both scans to the range all versions span.
    */
   private async findLatestRecord({
     tenantId,

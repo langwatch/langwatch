@@ -231,7 +231,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
   ) {}
 
   /**
-   * What the ledger's id index holds for one request, or undefined while its flag is off for the
+   * What the ledger's id index holds for one request, or undefined while it is not ready for the
    * tenant's target (or no reader was given). The ledger has no TTL, so the index is exact.
    */
   private async ledgerIndexBounds({
@@ -283,7 +283,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
     await this.insertRows(rows);
   }
 
-  /** The unbounded probe the id index replaces while its flag is off. */
+  /** The unbounded probe the id index replaces while it is not ready. */
   private async requestInLedger({
     tenantId,
     gatewayRequestId,

@@ -105,7 +105,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "coding-agent",
-    "description": "Fills the id indexes of coding-agent sessions, events and trace mappings from older rows, then turns each ClickHouse target's index flag on.",
+    "description": "Fills the id indexes of coding-agent sessions, events and trace mappings from older rows, then marks them ready on each ClickHouse target.",
     "needsOldWritersGone": false
   },
   {
@@ -137,7 +137,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "experiment",
-    "description": "Fills the id indexes of experiment runs and DSPy steps from older rows, then turns each ClickHouse target's index flag on.",
+    "description": "Fills the id indexes of experiment runs and DSPy steps from older rows, then marks them ready on each ClickHouse target.",
     "needsOldWritersGone": false
   },
   {
@@ -145,7 +145,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "gateway",
-    "description": "Fills the id indexes of gateway spend and the budget ledger from older rows, then turns each ClickHouse target's index flag on.",
+    "description": "Fills the id indexes of gateway spend and the budget ledger from older rows, then marks them ready on each ClickHouse target.",
     "needsOldWritersGone": false
   },
   {
@@ -285,7 +285,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "ops",
-    "description": "Fills the event log's aggregate index from older events, then turns each ClickHouse target's event log index flag on.",
+    "description": "Fills the event log's aggregate index from older events, then marks it ready on each ClickHouse target.",
     "needsOldWritersGone": false
   },
   {
@@ -324,7 +324,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "scenario",
-    "description": "Fills the id index of simulation runs from older rows, then turns each ClickHouse target's index flag on.",
+    "description": "Fills the id index of simulation runs from older rows, then marks them ready on each ClickHouse target.",
     "needsOldWritersGone": false
   },
   {
@@ -356,7 +356,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "suite",
-    "description": "Fills the id index of suite runs from older rows, then turns each ClickHouse target's index flag on.",
+    "description": "Fills the id index of suite runs from older rows, then marks them ready on each ClickHouse target.",
     "needsOldWritersGone": false
   },
   {
@@ -396,7 +396,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "trace",
-    "description": "Fills the trace id indexes from rows older than their views, then turns their flag on.",
+    "description": "Fills the trace id indexes from rows older than their views, then marks them ready.",
     "needsOldWritersGone": false
   },
   {

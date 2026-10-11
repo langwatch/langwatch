@@ -4,7 +4,6 @@ import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp } from "@langwatch/process";
@@ -108,7 +107,6 @@ function installation() {
       }),
       user: createApiFixture<UserApi>(),
       governance: createApiFixture<GovernanceRestApi>({ isSourceBilled: async () => false }),
-      "feature-flag": createApiFixture<FeatureFlagApi>(),
       "audit-log": createApiFixture<AuditLogApi>({
         record: async (command) => {
           audits.push(command);

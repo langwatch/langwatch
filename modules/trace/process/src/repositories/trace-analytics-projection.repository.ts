@@ -27,7 +27,7 @@ export abstract class TraceAnalyticsProjectionRepository {
     authorization: Authorization;
     traceId: string;
     window?: { fromMs: number; toMs: number };
-    /** Trace's id-index flags: with no window and the flag on, the index bounds the read. */
+    /** Trace's id-index readiness: with no window and the index ready, it bounds the read. */
     idIndex?: IdIndexFlags | undefined;
   }): Promise<TraceAnalyticsProjectionRead | null>;
 }

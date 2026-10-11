@@ -1,8 +1,8 @@
 import type { Authorization } from "@langwatch/authorization";
 import type {
-  FillIdIndexesOptions,
   IdIndexFillReport,
   IdIndexFlags,
+  IdIndexOwnerFill,
   RetentionDaysProvider,
 } from "@langwatch/clickhouse-client";
 import type { EvaluationRunData, EvaluationRunLookup } from "@langwatch/evaluation-contract";
@@ -18,18 +18,6 @@ export type EvaluationRunFloorLookup = EvaluationRunProofLookup &
     /** Whether the run id index may bound a lookup with no time; absent reads as off. */
     idIndex?: IdIndexFlags | undefined;
   }>;
-
-/** What a fill of Evaluation's id indexes takes; the repository supplies its own statements. */
-export type EvaluationIdIndexFill = Omit<
-  FillIdIndexesOptions,
-  "statements" | "targets" | "indexes" | "beforeFlag"
-> & {
-  /** Runs once a target is filled, before its flags, with the index tables retention copies to. */
-  beforeFlag: (input: {
-    target: Parameters<FillIdIndexesOptions["beforeFlag"]>[0]["target"];
-    indexes: readonly string[];
-  }) => Promise<void>;
-};
 
 /** Private persistence port for the Evaluation server package. */
 export abstract class EvaluationRunRepository {
@@ -54,7 +42,9 @@ export abstract class EvaluationRunRepository {
     idIndex?: IdIndexFlags | undefined;
   }): Promise<EvaluationInputsRead | null>;
   /** Fills the run id index from rows older than its view, on every ClickHouse target. */
-  abstract fillIdIndexes(input: EvaluationIdIndexFill): Promise<IdIndexFillReport>;
+  abstract fillIdIndexes(input: IdIndexOwnerFill): Promise<IdIndexFillReport>;
+  /** Whether the run id index is ready on a target, answered from its marker rows in memory. */
+  abstract readonly readiness: IdIndexFlags;
 }
 
 /** One run's inputs and the project its row was read from (the member, on an aggregate). */

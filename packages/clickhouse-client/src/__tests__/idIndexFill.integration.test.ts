@@ -18,6 +18,7 @@ import {
   ClickHouseConnection,
 } from "../connection.ts";
 import { fillIdIndexes, type IdIndexFillReport, idIndexFillTargets } from "../idIndexFill.ts";
+import { hasIdIndexMarker, IdIndexReadiness } from "../idIndexReadiness.ts";
 import { READ_BACK_FOLD_INSERT_SETTINGS } from "../managed-client.ts";
 import { routingDriver } from "../routingDriver.ts";
 import { createTenantRouter } from "../tenancy.ts";
@@ -96,7 +97,7 @@ type IndexRow = {
   retention: number;
 };
 
-/** The index merged per id, as a reader sees it. */
+/** The index merged per id, as a reader sees it: every tenant's rows, the marker row aside. */
 async function indexOf({
   probe,
   source,
@@ -107,7 +108,7 @@ async function indexOf({
   const result = await probe.query({
     query: `SELECT TenantId, TraceId, toUnixTimestamp64Milli(min(FromAt)) AS fromMs,
         toUnixTimestamp64Milli(max(ToAt)) AS toMs, max(_retention_days) AS retention
-      FROM ${source}_id_index GROUP BY TenantId, TraceId ORDER BY TenantId, TraceId`,
+      FROM ${source}_id_index WHERE TenantId != '' GROUP BY TenantId, TraceId ORDER BY TenantId, TraceId`,
     format: "JSONEachRow",
   });
   // A server may quote 64-bit integers in JSON or not; read every number as a number.
@@ -153,6 +154,17 @@ function at({ daysAgo, hour }: { daysAgo: number; hour: number }): string {
   return new Date(
     Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - daysAgo, hour),
   ).toISOString();
+}
+
+/** The fixture's index as a readiness check reads it. */
+const fixtureTable = (source: string) => ({
+  source,
+  index: `${source}_id_index`,
+  key: ["TraceId"],
+});
+
+async function markerOn({ source }: { source: string }): Promise<boolean> {
+  return hasIdIndexMarker({ statements, route: { tenantId: "" }, table: fixtureTable(source) });
 }
 
 let probe: ClickHouseClient;
@@ -302,7 +314,6 @@ describe("an id index on a time-partitioned source", () => {
       await createIndex({ probe, source });
       expect(await indexOf({ probe, source })).toEqual([]);
 
-      const flagged: string[] = [];
       const options = {
         statements,
         targets: idIndexFillTargets({ privateRoutes: new Map() }),
@@ -318,10 +329,7 @@ describe("an id index on a time-partitioned source", () => {
         ],
         // Small enough that the busiest week splits by tenant.
         batchRows: 1,
-        beforeFlag: async () => {},
-        setFlag: async ({ target }: { target: string }) => {
-          flagged.push(target);
-        },
+        beforeMarker: async () => {},
         sleep: async () => {},
       };
       let saved: IdIndexFillReport | null = null;
@@ -337,7 +345,7 @@ describe("an id index on a time-partitioned source", () => {
         },
         signal: interrupted.signal,
       });
-      expect(flagged).toEqual([]);
+      expect(await markerOn({ source })).toBe(false);
 
       await fillIdIndexes({
         ...options,
@@ -386,7 +394,67 @@ describe("an id index on a time-partitioned source", () => {
         ),
       );
       expect(await indexOf({ probe, source })).toEqual(filled);
-      expect(flagged).toEqual(["shared", "shared"]);
+      expect(await markerOn({ source })).toBe(true);
+    });
+  });
+
+  describe("when a reader asks whether an index is ready", () => {
+    /** @scenario "a fresh install with an empty table is ready at once" */
+    it("writes the marker itself over an empty source and is ready", async () => {
+      const source = `fixture_fresh_${RUN}`;
+      await createFixture({ probe, source, withIndex: true });
+      const readiness = IdIndexReadiness.create({
+        statements,
+        indexes: [fixtureTable(source)],
+        watch: () => ["shared"],
+      });
+
+      expect(await readiness.check({ target: "shared" })).toBe(true);
+      expect(readiness.isOn({ target: "shared" })).toBe(true);
+      expect(await markerOn({ source })).toBe(true);
+      expect(await indexOf({ probe, source })).toEqual([]);
+    });
+
+    /** @scenario "readers trust the index only once its marker row is written" */
+    it("stays not ready over rows older than the view, and is ready once the fill marks it", async () => {
+      const source = `fixture_unfilled_${RUN}`;
+      await createFixture({ probe, source, withIndex: false });
+      await insertSpans({
+        probe,
+        source,
+        spans: [
+          {
+            TenantId: TENANT,
+            TraceId: "u1",
+            StartTime: at({ daysAgo: 4, hour: 9 }),
+            _retention_days: 30,
+          },
+        ],
+      });
+      await createIndex({ probe, source });
+      const readiness = IdIndexReadiness.create({ statements, indexes: [fixtureTable(source)] });
+
+      expect(await readiness.check({ target: "shared" })).toBe(false);
+      expect(await markerOn({ source })).toBe(false);
+
+      await fillIdIndexes({
+        statements,
+        targets: idIndexFillTargets({ privateRoutes: new Map() }),
+        indexes: [
+          {
+            ...fixtureTable(source),
+            time: "StartTime",
+            retentionAnchor: "StartTime",
+            retention: "copied",
+          },
+        ],
+        checkpoint: { resumeFrom: null, save: async () => {} },
+        signal: new AbortController().signal,
+        beforeMarker: async () => {},
+      });
+
+      expect(await readiness.check({ target: "shared" })).toBe(true);
+      expect(readiness.isOn({ target: "shared" })).toBe(true);
     });
   });
 

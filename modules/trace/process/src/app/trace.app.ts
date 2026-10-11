@@ -369,7 +369,6 @@ import { buildTrackedEventSpan } from "../rules/tracked-event-span.rules.ts";
 import { PreconditionTraceDataService } from "../services/precondition-trace-data.service.ts";
 import { ScenarioRoleMetricsDerivationService } from "../services/scenario-role-metrics-derivation.service.ts";
 import { TraceExistenceService } from "../services/trace-existence.service.ts";
-import { TraceIdIndexFlagsService } from "../services/trace-id-index-flags.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
 import {
   TraceMetadataWriteService,
@@ -1026,10 +1025,8 @@ export class TraceModule implements TraceApi, CollectorApp {
     const ioExtractionService = TraceIOExtractionService.create(options.canonicalisation);
     const blobResolutionDeps = { blobStore: options.blobStore, ioExtractionService };
     const spanStorageRepository = options.repositories.spanStorage;
-    // Trace's id-index flags, read through a latch so no lookup waits on a flag (id-index §2).
-    const idIndex = options.featureFlags
-      ? TraceIdIndexFlagsService.create({ featureFlags: options.featureFlags })
-      : undefined;
+    // Trace's id-index readiness, answered from memory so no lookup waits on it (id-index §2).
+    const idIndex = options.repositories.idIndexFill.readiness;
     const editOverlay = TraceEditOverlayService.create(options.repositories.editOverlay);
     const ingestSourceBilling = TraceIngestSourceBillingService.create({
       repository: options.repositories.ingestSourceBilling,

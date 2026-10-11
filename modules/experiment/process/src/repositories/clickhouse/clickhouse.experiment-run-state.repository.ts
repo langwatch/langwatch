@@ -107,7 +107,7 @@ export class ClickHouseExperimentRunStateRepository<
   static create<ProjectionType extends Projection = Projection>(options: {
     clickhouse: ExperimentClickHouseRepository;
     defaultRetentionDays: () => number;
-    /** The module's id-index flags; absent reads the run with no time bound, as before. */
+    /** The module's id-index readiness; absent reads the run with no time bound, as before. */
     idIndex?: IdIndexFlags | undefined;
   }): ClickHouseExperimentRunStateRepository<ProjectionType> {
     return new ClickHouseExperimentRunStateRepository<ProjectionType>(

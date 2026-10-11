@@ -233,7 +233,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     idIndex?: IdIndexFlags | undefined;
   }): Promise<TraceAnalyticsProjectionRead | null> {
     try {
-      // No window: the index's range (flag on) bounds the inner dedup too, since it covers every
+      // No window: the index's range (once ready) bounds the inner dedup too, since it covers every
       // version's OccurredAt; flag off, this is today's unbounded read.
       if (window === undefined) {
         return await TRACE_ID_INDEX_READS.read<TraceAnalyticsProjectionRead | null>({
