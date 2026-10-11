@@ -1,0 +1,101 @@
+diff --git a/bin/oxlint b/bin/oxlint
+index 874f6269b88f6c16718b9286209f8cb86cfcffab..60b222b9618acad0d677ccd509645ec6a118120d 100755
+--- a/bin/oxlint
++++ b/bin/oxlint
+@@ -1,3 +1,95 @@
+ #!/usr/bin/env node
++import { accessSync, constants, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
++import { homedir } from "node:os";
++import { delimiter, join } from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+-import "../dist/cli.js";
++// LangWatch: a lint run takes a `lint` slot of haven's machine budget for its whole life
++// (dev/docs/plans/haven-exec-policy.md section 4); --lsp, --init and the listing flags take
++// none. Without haven a run waits for one of LANGWATCH_LINT_SLOTS (default 2) lock folders.
++const args = process.argv.slice(2);
++const flag = (...names) => args.some((arg) => names.includes(arg));
++const exempt = flag("-V", "--version", "-h", "--help", "--lsp", "--init", "--rules", "--print-config");
++const held = process.env.CHECK_QUEUE_HELD || process.env.LANGWATCH_LINT_SLOT;
++
++function findHaven() {
++  const candidates = [process.env.HAVEN_BIN, ...(process.env.PATH ?? "").split(delimiter).filter(Boolean).map((dir) => join(dir, "haven"))];
++  for (const candidate of candidates) {
++    try {
++      if (candidate && statSync(candidate).isFile()) {
++        accessSync(candidate, constants.X_OK);
++        return candidate;
++      }
++    } catch {}
++  }
++}
++
++if (!exempt && !held && process.platform !== "win32" && typeof process.execve === "function") {
++  const haven = findHaven();
++  const bin = fileURLToPath(import.meta.url);
++  try {
++    if (haven) process.execve(haven, [haven, "machine", "slot", "run", "--class", "lint", "--label", "oxlint", "--", process.execPath, ...process.execArgv, bin, ...args]);
++  } catch {
++    // execve refused: fall back to the lock folder below
++  }
++}
++
++function ownerAlive(lock) {
++  let pid;
++  try {
++    pid = Number(readFileSync(join(lock, "pid"), "utf8"));
++  } catch {
++    return Date.now() - statSync(lock).mtimeMs < 10_000;
++  }
++  try {
++    process.kill(pid, 0);
++    return true;
++  } catch (error) {
++    return error.code === "EPERM";
++  }
++}
++
++function tryTake(lock) {
++  try {
++    mkdirSync(lock);
++    writeFileSync(join(lock, "pid"), String(process.pid));
++    return true;
++  } catch {
++    try {
++      if (!ownerAlive(lock)) rmSync(lock, { recursive: true, force: true });
++    } catch {}
++    return false;
++  }
++}
++
++function acquire(slots) {
++  const slotDir = join(homedir(), ".cache", "langwatch", "lint-slots");
++  mkdirSync(slotDir, { recursive: true });
++  const pause = new Int32Array(new SharedArrayBuffer(4));
++  let told = false;
++  for (;;) {
++    for (let index = 0; index < slots; index++) {
++      const lock = join(slotDir, `slot-${index}`);
++      if (tryTake(lock)) return lock;
++    }
++    if (!told) {
++      process.stderr.write(`oxlint: waiting for a machine-wide slot (${slots} in use; LANGWATCH_LINT_SLOTS)\n`);
++      told = true;
++    }
++    Atomics.wait(pause, 0, 0, 500);
++  }
++}
++
++const slots = Number(process.env.LANGWATCH_LINT_SLOTS ?? "2");
++if (!exempt && !held && slots > 0) {
++  const lock = acquire(slots);
++  process.env.LANGWATCH_LINT_SLOT = lock;
++  process.on("exit", () => rmSync(lock, { recursive: true, force: true }));
++}
++// The slot is two units: oxlint's own threads and tsgolint's GOMAXPROCS stay within it.
++if (!exempt && !args.some((arg) => arg === "--threads" || arg.startsWith("--threads="))) {
++  process.argv.push(`--threads=${process.env.GOMAXPROCS || "2"}`);
++}
++process.env.GOMAXPROCS ??= "2";
++
++await import("../dist/cli.js");

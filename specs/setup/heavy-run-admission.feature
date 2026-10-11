@@ -265,8 +265,9 @@ Feature: Heavy runs are admitted, queued, or refused
 
   # The tsc and vitest launchers take their own slot per run (plan
   # dev/docs/plans/haven-exec-policy.md, D4), so a gate prediction for them
-  # would count one Nx run of many tasks as one slot. Lint and builds stay
-  # gated until they have launchers of their own.
+  # would count one Nx run of many tasks as one slot. oxlint has its launcher
+  # too (phase 8); the vite and build:types builds take a build slot in their
+  # scripts and were never gated. Every other lint, format or build stays gated.
   @unit
   Scenario: The gate leaves compile and test runs to their launchers
     Given pressure is not red, or a slot is free
@@ -281,9 +282,16 @@ Feature: Heavy runs are admitted, queued, or refused
     Then the gate refuses it with the pressure and the queue depth, as for any heavy run
 
   @unit
+  Scenario: The gate leaves oxlint runs to their launcher
+    Given pressure is not red, or a slot is free
+    When an agent runs oxlint directly, through pnpm exec or node_modules/.bin, or pnpm lint:fix
+    Then the gate answers with no decision and no message
+    And the command runs as asked, taking a lint slot in the oxlint launcher
+
+  @unit
   Scenario: Lint and builds keep the gate until they have launchers
     Given the machine is full
-    When an agent runs pnpm lint, or a command that chains a typecheck with a lint
+    When an agent runs pnpm lint, a filtered package lint, oxfmt, eslint, golangci-lint, go build, docker build or next build, alone or chained after an oxlint run
     Then the gate still describes the queue it expects
     Because one segment without a launcher keeps the whole command gated
 

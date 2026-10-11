@@ -441,8 +441,9 @@ func TestBackgroundDescriptionSaysItIsNotAResult(t *testing.T) {
 }
 
 // @scenario "The gate leaves compile and test runs to their launchers"
+// @scenario "The gate leaves oxlint runs to their launcher"
 // @scenario "Lint and builds keep the gate until they have launchers"
-func TestLauncherOwnedCoversOnlyCompileAndTestRuns(t *testing.T) {
+func TestLauncherOwnedCoversOnlyLauncherRuns(t *testing.T) {
 	owned := []string{
 		"tsc --noEmit --ignoreConfig f.ts",
 		"pnpm exec tsc -b",
@@ -454,6 +455,11 @@ func TestLauncherOwnedCoversOnlyCompileAndTestRuns(t *testing.T) {
 		"VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/time test",
 		"pnpm test:unit run src/x",
 		"cd modules/x && pnpm typecheck",
+		"oxlint --quiet src",
+		"pnpm exec oxlint --quiet --type-aware --config .oxlintrc.jsonc f.ts",
+		"./node_modules/.bin/oxlint -c .oxlintrc.native.jsonc .",
+		"pnpm lint:fix",
+		"pnpm exec tsc -b && pnpm exec oxlint src",
 	}
 	for _, command := range owned {
 		if !LauncherOwned(command) {
@@ -462,8 +468,11 @@ func TestLauncherOwnedCoversOnlyCompileAndTestRuns(t *testing.T) {
 	}
 	gated := []string{
 		"pnpm lint",
-		"oxlint --quiet src",
+		"pnpm --filter @langwatch/architecture-enforcer lint",
+		"pnpm exec oxlint src && pnpm exec oxfmt --check src",
 		"pnpm exec oxfmt --write f.ts",
+		"eslint .",
+		"next build",
 		"golangci-lint run",
 		"go build ./...",
 		"docker build .",

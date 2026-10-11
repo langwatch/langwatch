@@ -16,8 +16,8 @@
   "scripts": {
     "predev": "pnpm -w run ensure:built",
     "dev": "vite --configLoader runner",
-    "build": "NODE_ENV=production vite build --configLoader runner",
-    "build:local": "NODE_ENV=production LANGWATCH_UI_LOCAL_BUILD=1 vite build --configLoader runner --outDir dist/client.local",
+    "build": "NODE_ENV=production sh ../../dev/scripts/with-build-slot.sh vite vite build --configLoader runner",
+    "build:local": "NODE_ENV=production LANGWATCH_UI_LOCAL_BUILD=1 sh ../../dev/scripts/with-build-slot.sh vite vite build --configLoader runner --outDir dist/client.local",
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },

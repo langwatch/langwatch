@@ -120,16 +120,18 @@ func classifyDetail(command string) (kind RunKind, heavy bool, bucket string) {
 }
 
 // launcherBuckets are the heavy buckets whose runs take their own slot in the
-// tsc and vitest launchers (plan haven-exec-policy D4): the gate only refuses
-// them at red, it no longer predicts a queue or a width for them.
+// tsc, vitest and oxlint launchers (plan haven-exec-policy D4, phase 8): the
+// gate only refuses them at red. `lint` stays out: a package's lint script may
+// be eslint or the architecture enforcer, which have no launcher.
 var launcherBuckets = []string{
-	TypeScriptCompilerClass, "vitest",
+	TypeScriptCompilerClass, "vitest", "oxlint",
 	"typecheck", "typecheck:one", "typecheck:all",
-	"test", "test:unit", "test:integration",
+	"test", "test:unit", "test:integration", "lint:fix",
 }
 
 // LauncherOwned reports whether every heavy segment of a command is one the
-// launchers count themselves; one lint or build segment keeps the whole gate.
+// launchers count themselves; one segment without a launcher (oxfmt, eslint,
+// golangci-lint, `pnpm lint`, go/docker/next build) keeps the whole gate.
 func LauncherOwned(command string) bool {
 	owned := false
 	for _, segment := range commandSegments(command) {
