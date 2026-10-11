@@ -1,0 +1,20 @@
+[
+  {
+    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-drawer-shell.tsx",
+    "rule": "*",
+    "reason": "Approved raw drawer: resize rail, pinned modality, compact full width, external overflow and pane scroll owners (astra review, call-site 23).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/trace/browser/src/ui/blocks/markdown/components.tsx",
+    "rule": "*",
+    "reason": "Approved Markdown renderer escape: rendered documents own their headings and tables (astra review, headings row).",
+    "owner": "trace"
+  },
+  {
+    "path": "modules/project/browser/src/ui/sections/home/components/welcome-header.tsx",
+    "rule": "page-title-h1",
+    "reason": "Approved home escape: the Langy home greeting is the page title (astra review, headings row).",
+    "owner": "project"
+  }
+]

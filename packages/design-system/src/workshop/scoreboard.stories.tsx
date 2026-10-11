@@ -17,42 +17,46 @@ const DEBT: { key: keyof NonNullable<typeof adoption>["debt"]; label: string; ru
   { key: "handRolledTable", label: "Table.Root outside a List table", rule: "list-table.md" },
   {
     key: "shapeDrift",
-    label: "Restyled or hand-built tables, cards, pages, drawers and dialogs",
+    label: "Violations, candidates and unknowns in tables, cards, pages, drawers and dialogs",
     rule: "design system first",
   },
   { key: "pixelSpacing", label: "Pixel paddings, margins and gaps", rule: "spacing tokens" },
   { key: "literalFontSize", label: "Literal font sizes", rule: "text styles" },
 ];
 
-/** Per family: shared sites, restyled elements, look-alikes and distinct restyles. */
+/** Per family: distinct roots, affected roots, violating parts, candidates and adoption. */
 function CensusTable({ census }: { census: Census }) {
   return (
     <Table.Root size="sm" variant="line">
       <Table.Header>
         <Table.Row>
           <Table.ColumnHeader>Family</Table.ColumnHeader>
-          <Table.ColumnHeader textAlign="end">Design-system sites</Table.ColumnHeader>
-          <Table.ColumnHeader textAlign="end">Restyled</Table.ColumnHeader>
-          <Table.ColumnHeader textAlign="end">Look-alikes</Table.ColumnHeader>
-          <Table.ColumnHeader textAlign="end">Variants</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Roots</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Affected roots</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Parts</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Candidates</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Adopted roots</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Unknown</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Signatures</Table.ColumnHeader>
         </Table.Row>
       </Table.Header>
       <Table.Body>
-        {Object.entries(census.families).map(
-          ([family, { ds, overridden, lookalike, variants }]) => {
-            return (
-              <Table.Row key={family}>
-                <Table.Cell>
-                  <Code fontSize="xs">{family}</Code>
-                </Table.Cell>
-                <Table.Cell textAlign="end">{ds}</Table.Cell>
-                <Table.Cell textAlign="end">{overridden}</Table.Cell>
-                <Table.Cell textAlign="end">{lookalike}</Table.Cell>
-                <Table.Cell textAlign="end">{variants}</Table.Cell>
-              </Table.Row>
-            );
-          },
-        )}
+        {Object.entries(census.families).map(([family, entry]) => {
+          return (
+            <Table.Row key={family}>
+              <Table.Cell>
+                <Code fontSize="xs">{family}</Code>
+              </Table.Cell>
+              <Table.Cell textAlign="end">{entry.roots}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.affectedRoots}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.parts}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.candidates}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.adoptedRoots}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.unknown}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.variants}</Table.Cell>
+            </Table.Row>
+          );
+        })}
       </Table.Body>
     </Table.Root>
   );
@@ -121,10 +125,14 @@ function Scoreboard() {
       </Stack>
 
       <Stack gap={2}>
-        <Heading textStyle="cardTitle">Shapes: shared, restyled, or built by hand</Heading>
+        <Heading textStyle="cardTitle">Shapes: adopted, violating, or still to classify</Heading>
         <Text color="fg.muted">
-          The variant clusters, the worst files and the totals per module are in the report written
-          by <Code>{"node packages/design-system/.storybook/adoption.ts --report <path>"}</Code>.
+          Roots are distinct shapes, parts are the violating pieces attributed to their root, and
+          candidates are heuristic findings a person must classify. Scores rank the work and are not
+          migration counts. The signature clusters and the totals per module are in the report
+          written by{" "}
+          <Code>{"node packages/design-system/.storybook/adoption.ts --report <path>"}</Code>; a
+          wave is judged by <Code>{"adoption.ts --check --paths <globs>"}</Code>.
         </Text>
         <CensusTable census={adoption.census} />
       </Stack>

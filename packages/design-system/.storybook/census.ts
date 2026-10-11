@@ -1,9 +1,10 @@
 /**
- * The shape census: per family (tables, cards, drawers...), the sites using the design
- * system, those restyling it, the hand-built look-alikes and the distinct restyles. Read
- * from the AST of every browser source, so a prop on its own line counts like one inline.
+ * The shape census: per family, the roots using the design system, the parts restyling it,
+ * the hand-built look-alikes and the candidates a person must classify. Read from the AST
+ * of every browser source. Scores prioritise work; they are not migration counts.
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
@@ -12,6 +13,8 @@ import { parseSync } from "oxc-parser";
 import { isBrowserColourSource } from "./raw-colours.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "../../..");
+const PACKAGE_JSON = path.resolve(import.meta.dirname, "../package.json");
+const ESCAPES_FILE = path.resolve(import.meta.dirname, "census-escapes.json");
 
 export const FAMILIES = [
   "tables",
@@ -27,26 +30,69 @@ export const FAMILIES = [
 ] as const;
 export type Family = (typeof FAMILIES)[number];
 
+/** `violation` and `unknown` fail a wave; `candidate` needs a disposition; the rest pass. */
+export type Disposition = "adopted" | "clean" | "violation" | "candidate" | "unknown";
+
 export type CensusSite = {
   family: Family;
   kind: "ds" | "lookalike";
   /** `Drawer.Content`, `card-box`, `page-title Heading`... */
   what: string;
-  /** The design-system element is the family's site, not one of its parts. */
+  /** The element is a root of its family, not one of its parts. */
   site: boolean;
   file: string;
   line: number;
   /** Override props on a design-system element; the drawn look on a look-alike. */
   props: Record<string, string>;
+  /** The root this finding belongs to; parts share their owning root's id. */
+  root: string;
+  /** Which migration rule the finding falls under (`legacy-overlay-part`, `card-box`...). */
+  rule: string;
+  disposition: Disposition;
+  /** Whoever owns the file when it is not this rollout (`upgrade`). */
+  owner?: string;
+  /** The element is the target API, whatever props it carries. */
+  adopted?: boolean;
+  /** The source the target API was imported from. */
+  source?: string;
+  /** Semantic props the shape allows (Card padding, Drawer size), apart from the restyles. */
+  choices?: Record<string, string>;
+  /** Found by inference, not by name; never a mandatory conversion. */
+  heuristic?: boolean;
+  /** For a card-box: the family it most likely belongs to. */
+  destination?: string;
+  /** Why the census could not classify it. */
+  reason?: string;
+  /** The heading's owning surface. */
+  surface?: string;
+  /** A use of a module's own copy of a shape, not a second hand-built root. */
+  wrapper?: "caller";
 };
 export type LiteralSite = { kind: "pixelSpacing" | "fontSize"; file: string; line: number };
 
 export type Cluster = { signature: string; count: number; examples: string[] };
 export type FamilyCensus = {
+  /** Design-system roots (legacy, target API or otherwise); kept for the workshop pages. */
   ds: number;
   overridden: number;
   lookalike: number;
   variants: number;
+  /** Distinct roots of the family, wrapper callers left out. */
+  roots: number;
+  /** Roots with at least one violation or unknown part. */
+  affectedRoots: number;
+  /** Violating or unknown sites, parts and roots alike. */
+  parts: number;
+  /** Heuristic findings a person must classify. */
+  candidates: number;
+  adoptedRoots: number;
+  unknown: number;
+  /** Uses of a module's own copy of a design-system shape. */
+  callers: number;
+  cosmeticParts: number;
+  geometryParts: number;
+  opaqueParts: number;
+  violationsByRule: Record<string, number>;
   overriddenProps: Record<string, number>;
   lookalikeKinds: Record<string, number>;
   distinctValues: Record<string, number>;
@@ -64,6 +110,7 @@ export type Census = {
   families: Record<Family, FamilyCensus>;
   literals: { pixelSpacing: number; fontSize: number };
   worstFiles: FileScore[];
+  owners: Record<string, { violations: number; candidates: number; unknown: number }>;
   modules: Record<
     string,
     Omit<FileScore, "file"> & { files: number; families: Record<string, number> }
@@ -71,25 +118,37 @@ export type Census = {
 };
 
 type AstNode = { type: string; start: number; end: number; [key: string]: unknown };
-type Binding = { source: string; imported: string };
+type Binding = { source: string; imported: string; members: string[] };
 
 function isNode(value: unknown): value is AstNode {
   return (
     typeof value === "object" && value !== null && typeof Reflect.get(value, "type") === "string"
   );
 }
-const child = (node: AstNode, key: string): AstNode | undefined => {
-  const value = node[key];
+const child = (node: AstNode | undefined, key: string): AstNode | undefined => {
+  const value = node?.[key];
   return isNode(value) ? value : undefined;
 };
-const children = (node: AstNode, key: string): AstNode[] => {
-  const value = node[key];
+const children = (node: AstNode | undefined, key: string): AstNode[] => {
+  const value = node?.[key];
   return Array.isArray(value) ? value.filter(isNode) : [];
 };
 const text = (node: AstNode | undefined, key: string): string | undefined => {
   const value = node?.[key];
   return typeof value === "string" ? value : undefined;
 };
+
+const WRAPPERS = new Set([
+  "TSAsExpression",
+  "TSNonNullExpression",
+  "TSSatisfiesExpression",
+  "ParenthesizedExpression",
+]);
+function stripWrappers(node: AstNode | undefined): AstNode | undefined {
+  let cursor = node;
+  while (cursor && WRAPPERS.has(cursor.type)) cursor = child(cursor, "expression");
+  return cursor;
+}
 
 const ALIASES: Record<string, string> = {
   p: "padding",
@@ -132,15 +191,28 @@ const canonical = (prop: string) => ALIASES[prop] ?? prop;
 const SPACING = /^(padding|margin|gap$|rowGap$|columnGap$)/;
 const LOOK = /^(padding|bg$|border|boxShadow$)/;
 const SIZING_PROPS = new Set(["width", "minWidth", "maxWidth", "size"]);
+const STYLE_PROPS = /^(bg|boxShadow|fontSize|height|minHeight|maxHeight|style|css)$/;
+const TYPE_PROPS = /^(color|textStyle|fontWeight)$/;
+const CONDITION = /^_[a-zA-Z]/;
+const GEOMETRY =
+  /^(padding|margin|gap$|rowGap$|columnGap$|width$|minWidth$|maxWidth$|height$|minHeight$|maxHeight$|size$)/;
 
 /** The props that restyle a design-system element; width and size only on overlay content. */
 function isOverride({ prop, sizing }: { prop: string; sizing: boolean }): boolean {
   if (sizing && SIZING_PROPS.has(prop)) return true;
   return (
     SPACING.test(prop) ||
-    /^(bg|boxShadow|fontSize|height|minHeight|maxHeight|style|css)$/.test(prop) ||
+    STYLE_PROPS.test(prop) ||
+    TYPE_PROPS.test(prop) ||
     /^border([A-Z]\w*)?$/.test(prop)
   );
+}
+
+/** Whether a restyle changes how a shape looks, how much room it takes, or cannot be read. */
+export function driftKind({ prop }: { prop: string }): "cosmetic" | "geometry" | "opaque" {
+  const key = CONDITION.test(prop) && prop.includes(".") ? prop.slice(prop.indexOf(".") + 1) : prop;
+  if (/^(style|css)$/.test(key)) return "opaque";
+  return GEOMETRY.test(key) ? "geometry" : "cosmetic";
 }
 
 const isDsSource = (source: string) => source.startsWith("@langwatch/design-system");
@@ -148,23 +220,44 @@ const isChakraSource = (source: string) =>
   source === "@chakra-ui/react" || source === "@langwatch/design-system/primitives";
 const isLocalSource = (source: string) => /^(\.|~\/|@\/)/.test(source);
 
-type Shape = { family: Family; site: boolean };
+type Role = "adopted" | "legacy" | "ds" | "unknown";
+type ShapeInfo = {
+  family: Family;
+  site: boolean;
+  role: Role;
+  rule: string;
+  allowed: string[];
+  source?: string;
+  reason?: string;
+};
+
+type TargetEntry = { family: Family; subpath?: string; allowed: string[] };
+/** The target API by export; `subpath` pins the source where the shape is new. */
+const TARGET: Record<string, TargetEntry> = {
+  Drawer: { family: "drawers", subpath: "drawer", allowed: ["size"] },
+  Dialog: { family: "dialogs", subpath: "dialog", allowed: ["size"] },
+  ActionRow: { family: "drawers", subpath: "action-row", allowed: [] },
+  Card: { family: "cards", subpath: "card", allowed: ["padding", "variant"] },
+  CardGrid: { family: "cards", subpath: "card", allowed: [] },
+  ResourceTile: { family: "cards", subpath: "resource-tile", allowed: [] },
+  LoadMore: { family: "pagination", subpath: "load-more", allowed: [] },
+  ListPage: { family: "listPages", subpath: "list-page", allowed: [] },
+  Pagination: { family: "pagination", allowed: [] },
+  ListTable: { family: "tables", allowed: [] },
+  ConfirmDialog: { family: "dialogs", allowed: [] },
+  DeleteConfirmationDialog: { family: "dialogs", allowed: [] },
+  NoDataInfoBlock: { family: "emptyStates", allowed: [] },
+  ChartEmptyState: { family: "emptyStates", allowed: [] },
+};
 const NAMED_SITES: Record<string, Family> = {
-  ListTable: "tables",
   SettingsCard: "cards",
   OverviewCard: "cards",
   WorkflowCardBase: "cards",
   WorkflowCardDisplay: "cards",
   StatTile: "cards",
   BrandedCard: "cards",
-  ListPage: "listPages",
-  Pagination: "pagination",
-  ConfirmDialog: "dialogs",
-  DeleteConfirmationDialog: "dialogs",
-  NoDataInfoBlock: "emptyStates",
-  ChartEmptyState: "emptyStates",
 };
-const PAGE_LAYOUT: Record<string, Shape> = {
+const PAGE_LAYOUT: Record<string, { family: Family; site: boolean }> = {
   Header: { family: "pageHeaders", site: true },
   Heading: { family: "pageHeaders", site: false },
   Subtitle: { family: "pageHeaders", site: false },
@@ -174,42 +267,132 @@ const PAGE_LAYOUT: Record<string, Shape> = {
   Tabs: { family: "tabs", site: true },
   TabMenu: { family: "tabs", site: true },
 };
-const NAMESPACES: Record<string, Family> = {
-  Card: "cards",
-  Drawer: "drawers",
-  Dialog: "dialogs",
-  EmptyState: "emptyStates",
-  Tabs: "tabs",
+const LEGACY: Record<string, { family: Family; rule: string }> = {
+  Drawer: { family: "drawers", rule: "legacy-overlay-part" },
+  Dialog: { family: "dialogs", rule: "legacy-overlay-part" },
+  EmptyState: { family: "emptyStates", rule: "legacy-empty-state" },
+  Card: { family: "cards", rule: "legacy-card-part" },
 };
-
-/** Which family a design-system element belongs to, and whether it is the site or a part. */
-function dsShape({ ref }: { ref: string }): Shape | undefined {
-  const [head = "", member] = ref.split(".");
-  const named = NAMED_SITES[head];
-  if (named) return { family: named, site: member === undefined };
-  if (head === "PageLayout") return member ? PAGE_LAYOUT[member] : undefined;
-  const namespace = NAMESPACES[head];
-  if (namespace && member) return { family: namespace, site: member === "Root" };
-  const flat = /^(Drawer|Dialog)(\w+)$/.exec(head);
-  if (flat?.[1] && !member) {
-    return { family: flat[1] === "Drawer" ? "drawers" : "dialogs", site: flat[2] === "Root" };
-  }
-  return undefined;
-}
-
-const LOCAL_COPIES: Record<string, Family> = {
-  ...NAMED_SITES,
-  Drawer: "drawers",
-  Dialog: "dialogs",
-  EmptyState: "emptyStates",
-  PageLayout: "pageHeaders",
-  Card: "cards",
-  Tabs: "tabs",
-};
+const OVERLAY_PARTS = new Set([
+  "Root",
+  "Content",
+  "Header",
+  "Body",
+  "Footer",
+  "Title",
+  "Description",
+  "CloseTrigger",
+  "ActionTrigger",
+  "Actions",
+  "Trigger",
+  "Backdrop",
+  "Positioner",
+]);
 const RAW_EXPORTS: Record<string, Family> = {
   RawDrawer: "drawers",
   RawDialog: "dialogs",
   RawPagination: "pagination",
+};
+const TABS_ROOT = "Tabs";
+
+const sourceMatches = ({ source, subpath }: { source: string; subpath?: string }) =>
+  subpath === undefined ||
+  source === "@langwatch/design-system" ||
+  source === `@langwatch/design-system/${subpath}`;
+
+const shapeInfo = (found: Pick<ShapeInfo, "family" | "site" | "role" | "rule">): ShapeInfo => ({
+  ...found,
+  allowed: [],
+});
+
+function targetInfo({ head, source }: { head: string; source: string }): ShapeInfo | undefined {
+  const target = TARGET[head];
+  if (!target) return undefined;
+  const matched = sourceMatches({ source, subpath: target.subpath });
+  const base = {
+    ...shapeInfo({ family: target.family, site: true, role: "adopted", rule: "adopted" }),
+    allowed: target.allowed,
+    source,
+  };
+  if (matched) return base;
+  const reason = `${head} imported from ${source}, not the registered subpath`;
+  return { ...base, role: "unknown", rule: "unregistered-source", reason };
+}
+
+function legacyShape({
+  head,
+  member,
+  ds,
+}: {
+  head: string;
+  member?: string;
+  ds: boolean;
+}): ShapeInfo | undefined {
+  const raw = ds ? RAW_EXPORTS[head] : undefined;
+  if (raw) {
+    return shapeInfo({
+      family: raw,
+      site: !member || member === "Root",
+      role: "legacy",
+      rule: "raw-export",
+    });
+  }
+  const old = LEGACY[head];
+  if (old && member) {
+    return shapeInfo({
+      family: old.family,
+      site: member === "Root",
+      role: "legacy",
+      rule: old.rule,
+    });
+  }
+  const flat = ds && !member ? /^(Drawer|Dialog)(\w+)$/.exec(head) : undefined;
+  if (!flat?.[2] || !OVERLAY_PARTS.has(flat[2])) return undefined;
+  const family = flat[1] === "Drawer" ? "drawers" : "dialogs";
+  return shapeInfo({
+    family,
+    site: flat[2] === "Root",
+    role: "legacy",
+    rule: "legacy-overlay-part",
+  });
+}
+
+function plainShape({
+  head,
+  member,
+  ds,
+}: {
+  head: string;
+  member?: string;
+  ds: boolean;
+}): ShapeInfo | undefined {
+  if (head === TABS_ROOT && member) {
+    return shapeInfo({ family: "tabs", site: member === "Root", role: "ds", rule: "clean" });
+  }
+  if (!ds) return undefined;
+  const named = NAMED_SITES[head];
+  if (named)
+    return shapeInfo({ family: named, site: member === undefined, role: "ds", rule: "clean" });
+  const layout = head === "PageLayout" && member ? PAGE_LAYOUT[member] : undefined;
+  return layout ? shapeInfo({ ...layout, role: "ds", rule: "clean" }) : undefined;
+}
+
+/** Which family a reference belongs to, and whether it is target API, legacy part or neither. */
+function classifyRef({ ref, source }: { ref: string; source: string }): ShapeInfo | undefined {
+  const chakra = isChakraSource(source);
+  const ds = isDsSource(source) && !chakra;
+  if (!ds && !chakra) return undefined;
+  const [head = "", member] = ref.split(".");
+  const target = ds && member === undefined ? targetInfo({ head, source }) : undefined;
+  return target ?? legacyShape({ head, member, ds }) ?? plainShape({ head, member, ds });
+}
+
+const LOCAL_COPIES: Record<string, Family> = {
+  ...Object.fromEntries(Object.entries(TARGET).map(([name, { family }]) => [name, family])),
+  ...NAMED_SITES,
+  EmptyState: "emptyStates",
+  PageLayout: "pageHeaders",
+  Tabs: "tabs",
 };
 const LAYOUT = new Set([
   "Box",
@@ -226,38 +409,55 @@ const LAYOUT = new Set([
 ]);
 const CARD_BG = /^bg\.(panel|card)$/;
 const PILL_RADIUS = /^(full|50%|9999(px)?|none|0)$/;
+const NO_BORDER = /^(none|hidden|0|0px|0rem|0 .*|none .*)$/;
 const TITLE_SIZE = /^(lg|xl|[2-6]xl)$/;
 const TITLE_STYLE = /^(pageTitle|xl|[2-6]xl)$/;
 const EMPTY_TEXT = /^(no|nothing)\b.*\b(yet|found|to show|here)\b/i;
 const PIXELS = /\d(px)\b/;
 const LITERAL_FONT = /^[\d.]+(px|rem|em|pt|%)?$/;
+const PREVIOUS = /^(prev|previous)( page)?$/i;
+const NEXT = /^next( page)?$/i;
+const LOAD_LABEL = /^load\s+(more|earlier|older|next)\b/i;
+const SHOW_LABEL = /^(show|view|see)\s+(earlier|older|newer|previous)\b/i;
+const MORE_LABEL = /^(show|view|see)\s+more\b/i;
+const FETCHES = /\b(fetchNext\w*|fetchPrevious\w*|fetchMore|loadMore\w*|nextPage)\b/;
+const NOT_A_CARD = new Set(["icon-tile", "tooltip", "skeleton", "input", "expressive-exception"]);
+const UPGRADE_PATH = /(^|\/)upgrades?\//;
 
+type Hop = { line: number; hops: number };
 type Frame = {
   ref: string;
   ds: boolean;
-  footer?: number;
-  actions?: boolean;
+  family?: Family;
+  rootId?: string;
   danger?: number;
+  prev?: Hop;
+  next?: Hop;
+  pager?: boolean;
 };
 type Props = Map<string, AstNode | undefined>;
+type Loc = { line: number; col: number };
+type ComponentState = { headerLine?: number; table: boolean; listPage: boolean };
 type Scan = {
   file: string;
   source: string;
   lineStarts: number[];
   bindings: Map<string, Binding>;
+  imported: Set<string>;
+  constObjects: Map<string, AstNode>;
+  unknownLocals: Map<string, { family: Family; reason: string }>;
+  shadow: Set<string>[];
+  components: string[];
+  componentState: Map<string, ComponentState>;
+  attrs: { name: string; depth: number }[];
   sites: CensusSite[];
   literals: LiteralSite[];
   stack: Frame[];
   mapDepth: number;
   styleDepth: number;
-  headerLine?: number;
-  tableSeen: boolean;
-  listPageSeen: boolean;
-  previousLine?: number;
-  nextSeen: boolean;
 };
 
-function lineOf({ scan, offset }: { scan: Scan; offset: number }): number {
+function locOf({ scan, offset }: { scan: Scan; offset: number }): Loc {
   let low = 0;
   let high = scan.lineStarts.length - 1;
   while (low < high) {
@@ -265,8 +465,14 @@ function lineOf({ scan, offset }: { scan: Scan; offset: number }): number {
     if ((scan.lineStarts[mid] ?? 0) <= offset) low = mid;
     else high = mid - 1;
   }
-  return low + 1;
+  return { line: low + 1, col: offset - (scan.lineStarts[low] ?? 0) };
 }
+const lineOf = ({ scan, offset }: { scan: Scan; offset: number }) => locOf({ scan, offset }).line;
+
+const SPECIAL_IMPORTS: Record<string, string> = {
+  ImportNamespaceSpecifier: "*",
+  ImportDefaultSpecifier: "default",
+};
 
 function importBindings({ program }: { program: AstNode }): Map<string, Binding> {
   const bindings = new Map<string, Binding>();
@@ -277,11 +483,168 @@ function importBindings({ program }: { program: AstNode }): Map<string, Binding>
       const local = text(child(specifier, "local"), "name");
       if (!local) continue;
       const imported = child(specifier, "imported");
-      const name = text(imported, "name") ?? text(imported, "value") ?? local;
-      bindings.set(local, { source, imported: name });
+      const name =
+        SPECIAL_IMPORTS[specifier.type] ??
+        text(imported, "name") ??
+        text(imported, "value") ??
+        local;
+      bindings.set(local, { source, imported: name, members: [] });
     }
   }
   return bindings;
+}
+
+/** A binding reached through more members: `DS.Card` is `Card`, `Drawer.Root` adds Root. */
+function extend({ base, members }: { base: Binding; members: string[] }): Binding {
+  if (base.imported === "*" && members.length) {
+    return { source: base.source, imported: members[0] ?? "*", members: members.slice(1) };
+  }
+  return { ...base, members: [...base.members, ...members] };
+}
+
+/** What an expression is when it is an alias of an imported name or a member of one. */
+function aliasTarget({
+  bindings,
+  node,
+}: {
+  bindings: Map<string, Binding>;
+  node: AstNode | undefined;
+}): Binding | undefined {
+  const members: string[] = [];
+  let cursor = stripWrappers(node);
+  while (cursor?.type === "MemberExpression" && cursor.computed !== true) {
+    members.unshift(text(child(cursor, "property"), "name") ?? "");
+    cursor = stripWrappers(child(cursor, "object"));
+  }
+  const local = cursor?.type === "Identifier" ? text(cursor, "name") : undefined;
+  const base = local ? bindings.get(local) : undefined;
+  return base ? extend({ base, members }) : undefined;
+}
+
+function familyOfBinding({ binding }: { binding: Binding }): Family | undefined {
+  const ref = [binding.imported, ...binding.members].join(".");
+  return classifyRef({ ref, source: binding.source })?.family;
+}
+
+function mentionedFamily({
+  bindings,
+  node,
+}: {
+  bindings: Map<string, Binding>;
+  node: AstNode | undefined;
+}): Family | undefined {
+  if (!node) return undefined;
+  const named = node.type === "Identifier" || node.type === "MemberExpression";
+  const target = named ? aliasTarget({ bindings, node }) : undefined;
+  return target ? familyOfBinding({ binding: target }) : nestedMention({ bindings, node });
+}
+
+function nestedMention({
+  bindings,
+  node,
+}: {
+  bindings: Map<string, Binding>;
+  node: AstNode;
+}): Family | undefined {
+  const skip = node.type === "MemberExpression" && node.computed !== true ? "property" : "";
+  for (const [key, value] of Object.entries(node)) {
+    const kids = key === skip ? [] : [value].flat();
+    for (const kid of kids) {
+      const found = isNode(kid) ? mentionedFamily({ bindings, node: kid }) : undefined;
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+const MAYBE_COMPONENT = new Set(["ConditionalExpression", "LogicalExpression", "CallExpression"]);
+
+function declareIdentifier({
+  scan,
+  name,
+  init,
+  target,
+}: {
+  scan: Scan;
+  name: string;
+  init: AstNode;
+  target?: Binding;
+}) {
+  if (scan.imported.has(name)) return;
+  if (target) scan.bindings.set(name, target);
+  else if (init.type === "ObjectExpression") scan.constObjects.set(name, init);
+  else if (MAYBE_COMPONENT.has(init.type)) {
+    const family = mentionedFamily({ bindings: scan.bindings, node: init });
+    if (family) scan.unknownLocals.set(name, { family, reason: `${name} wraps a shape` });
+  }
+}
+
+function declarePattern({
+  scan,
+  pattern,
+  target,
+}: {
+  scan: Scan;
+  pattern: AstNode;
+  target: Binding;
+}) {
+  for (const property of children(pattern, "properties")) {
+    const key = text(child(property, "key"), "name");
+    const value = child(property, "value");
+    const local = text(value?.type === "AssignmentPattern" ? child(value, "left") : value, "name");
+    if (key && local) scan.bindings.set(local, extend({ base: target, members: [key] }));
+  }
+}
+
+function declareAlias({ scan, declarator }: { scan: Scan; declarator: AstNode }) {
+  const id = child(declarator, "id");
+  const init = stripWrappers(child(declarator, "init"));
+  if (!id || !init) return;
+  const target = aliasTarget({ bindings: scan.bindings, node: init });
+  if (id.type === "Identifier") {
+    declareIdentifier({ scan, name: text(id, "name") ?? "", init, ...(target ? { target } : {}) });
+  } else if (id.type === "ObjectPattern" && target) declarePattern({ scan, pattern: id, target });
+}
+
+function collectAliases({ scan, node }: { scan: Scan; node: AstNode }) {
+  if (node.type === "VariableDeclarator") declareAlias({ scan, declarator: node });
+  for (const value of Object.values(node)) {
+    if (isNode(value)) collectAliases({ scan, node: value });
+    else if (Array.isArray(value)) {
+      for (const item of value) if (isNode(item)) collectAliases({ scan, node: item });
+    }
+  }
+}
+
+function patternNames({ node, out }: { node: AstNode | undefined; out: Set<string> }) {
+  if (!node) return;
+  if (node.type === "Identifier") out.add(text(node, "name") ?? "");
+  else if (node.type === "AssignmentPattern") patternNames({ node: child(node, "left"), out });
+  else if (node.type === "RestElement") patternNames({ node: child(node, "argument"), out });
+  else if (node.type === "ObjectPattern") {
+    for (const property of children(node, "properties")) {
+      patternNames({ node: child(property, "value") ?? child(property, "argument"), out });
+    }
+  } else if (node.type === "ArrayPattern") {
+    for (const element of children(node, "elements")) patternNames({ node: element, out });
+  }
+}
+
+/** Names a function declares (parameters and top-level locals) that hide an outer binding. */
+function declaredNames({ scan, node }: { scan: Scan; node: AstNode }): Set<string> {
+  const names = new Set<string>();
+  for (const param of children(node, "params")) patternNames({ node: param, out: names });
+  const body = child(node, "body");
+  for (const statement of body?.type === "BlockStatement" ? children(body, "body") : []) {
+    if (statement.type === "VariableDeclaration") {
+      for (const declarator of children(statement, "declarations")) {
+        patternNames({ node: child(declarator, "id"), out: names });
+      }
+    } else if (statement.type === "FunctionDeclaration") {
+      patternNames({ node: child(statement, "id"), out: names });
+    }
+  }
+  return new Set([...names].filter((name) => scan.imported.has(name)));
 }
 
 const unwrap = (node: AstNode | undefined) =>
@@ -295,14 +658,14 @@ function literalText(node: AstNode | undefined): string | undefined {
   return typeof value === "string" || typeof value === "number" ? String(value) : undefined;
 }
 
-/** An attribute value for a signature: the literal, else the expression's source. */
+/** An attribute value for a signature: the literal, else the expression's full source. */
 function valueOf({ scan, node }: { scan: Scan; node: AstNode | undefined }): string {
   if (!node) return "true";
   const literal = literalText(node);
   if (literal !== undefined) return literal;
   const inner = unwrap(node);
   if (!inner) return "";
-  return scan.source.slice(inner.start, inner.end).replace(/\s+/g, " ").slice(0, 48);
+  return scan.source.slice(inner.start, inner.end).replace(/\s+/g, " ");
 }
 
 function checkLiteral({
@@ -339,25 +702,71 @@ function resolve({ scan, name }: { scan: Scan; name: AstNode | undefined }) {
   }
   const local = text(cursor, "name");
   if (!local) return undefined;
-  const binding = scan.bindings.get(local);
-  return { ref: [binding?.imported ?? local, ...members].join("."), binding };
+  const hidden = scan.shadow.some((names) => names.has(local));
+  const base = hidden ? undefined : scan.bindings.get(local);
+  const binding = base ? extend({ base, members }) : undefined;
+  const ref = binding
+    ? [binding.imported, ...binding.members].join(".")
+    : [local, ...members].join(".");
+  const unknown = hidden || binding ? undefined : scan.unknownLocals.get(local);
+  return { ref, binding, unknown };
 }
 
-function propsOf({ opening }: { opening: AstNode }): Props {
-  const props: Props = new Map();
-  for (const attribute of children(opening, "attributes")) {
-    const raw = text(child(attribute, "name"), "name");
-    if (raw) props.set(canonical(raw), child(attribute, "value"));
+type Resolved = { props: Props; unresolved: string[] };
+
+function addObject({ object, into }: { object: AstNode; into: Resolved }) {
+  for (const member of children(object, "properties")) {
+    const key = child(member, "key");
+    const name = member.computed === true ? undefined : (text(key, "name") ?? text(key, "value"));
+    if (member.type === "Property" && name) into.props.set(canonical(name), child(member, "value"));
+    else into.unresolved.push(member.type === "Property" ? "computed key" : "nested spread");
   }
-  return props;
 }
 
-const textOf = (element: AstNode) =>
-  children(element, "children")
-    .filter((node) => node.type === "JSXText")
-    .map((node) => text(node, "value") ?? "")
-    .join(" ")
-    .trim();
+/** Every attribute, with literal object spreads (inline or a const in the file) read in place. */
+function propsOf({ scan, opening }: { scan: Scan; opening: AstNode }): Resolved {
+  const into: Resolved = { props: new Map(), unresolved: [] };
+  for (const attribute of children(opening, "attributes")) {
+    if (attribute.type === "JSXSpreadAttribute") {
+      const argument = stripWrappers(child(attribute, "argument"));
+      const named = argument?.type === "Identifier" ? text(argument, "name") : undefined;
+      const object =
+        argument?.type === "ObjectExpression" ? argument : scan.constObjects.get(named ?? "");
+      if (object) addObject({ object, into });
+      else into.unresolved.push("spread");
+      continue;
+    }
+    const raw = text(child(attribute, "name"), "name");
+    if (raw) into.props.set(canonical(raw), child(attribute, "value"));
+  }
+  return into;
+}
+
+function labelOf({ element, deep }: { element: AstNode; deep: boolean }) {
+  let out = "";
+  let dynamic = false;
+  const read = (node: AstNode) => {
+    for (const kid of children(node, "children")) {
+      if (kid.type === "JSXText") out += ` ${text(kid, "value") ?? ""}`;
+      else if (kid.type === "JSXElement" && deep) read(kid);
+      else if (kid.type === "JSXExpressionContainer") {
+        const expression = child(kid, "expression");
+        const literal = literalText(expression) ?? templateText(expression);
+        if (literal !== undefined) out += ` ${literal}`;
+        else if (expression && expression.type !== "JSXEmptyExpression") dynamic = true;
+      }
+    }
+  };
+  read(element);
+  return { text: out.replace(/\s+/g, " ").trim(), dynamic };
+}
+
+function templateText(node: AstNode | undefined): string | undefined {
+  if (node?.type !== "TemplateLiteral" || children(node, "expressions").length) return undefined;
+  return children(node, "quasis")
+    .map((quasi) => text(child(quasi, "value"), "cooked") ?? "")
+    .join("");
+}
 
 const nearest = ({ scan, pattern }: { scan: Scan; pattern: RegExp }) =>
   scan.stack.findLast((frame) => frame.ds && pattern.test(frame.ref));
@@ -370,75 +779,221 @@ type Visit = {
   binding?: Binding;
   ds: boolean;
   chakra: boolean;
+  loc: Loc;
   line: number;
   props: Props;
+  unresolved: string[];
+  info?: ShapeInfo;
 };
 
-function record({
-  visit,
-  ...site
-}: Omit<CensusSite, "file" | "kind" | "line" | "props" | "site"> & {
-  visit: Visit;
-  kind?: CensusSite["kind"];
-  line?: number;
-  props?: Record<string, string>;
-  site?: boolean;
-}) {
-  visit.scan.sites.push({
+type Emit = Pick<CensusSite, "family" | "what" | "rule" | "disposition"> &
+  Partial<Omit<CensusSite, "family" | "what" | "rule" | "disposition" | "file" | "line">>;
+
+function rootFor({
+  scan,
+  family,
+  site,
+  loc,
+}: {
+  scan: Scan;
+  family: Family;
+  site: boolean;
+  loc: Loc;
+}): string {
+  if (site) return `${scan.file}:${loc.line}:${loc.col}`;
+  const frame = scan.stack.findLast((entry) => entry.family === family && entry.rootId);
+  return frame?.rootId ?? `${scan.file}::${scan.components.at(-1) ?? "module"}`;
+}
+
+function emit({ scan, loc, ...fields }: { scan: Scan; loc: Loc } & Emit): CensusSite {
+  const site = fields.site ?? true;
+  const created: CensusSite = {
     kind: "lookalike",
-    site: true,
-    line: visit.line,
     props: {},
-    ...site,
-    file: visit.scan.file,
+    ...fields,
+    site,
+    root: fields.root ?? rootFor({ scan, family: fields.family, site, loc }),
+    file: scan.file,
+    line: loc.line,
+  };
+  scan.sites.push(created);
+  return created;
+}
+
+const record = ({ visit, ...fields }: { visit: Visit } & Emit) =>
+  emit({ scan: visit.scan, loc: visit.loc, ...fields });
+
+const stateOf = ({ scan }: { scan: Scan }): ComponentState => {
+  const key = scan.components.at(-1) ?? "<module>";
+  const state = scan.componentState.get(key) ?? { table: false, listPage: false };
+  scan.componentState.set(key, state);
+  return state;
+};
+
+/** The condition objects (`_hover={{ bg }}`) read one level down, key by key. */
+function conditionEntries({
+  scan,
+  prop,
+  node,
+  sink,
+}: {
+  scan: Scan;
+  prop: string;
+  node: AstNode | undefined;
+  sink: { overrides: Record<string, string>; unresolved: string[] };
+}) {
+  const object = stripWrappers(unwrap(node));
+  if (object?.type !== "ObjectExpression") {
+    sink.overrides[prop] = valueOf({ scan, node });
+    return;
+  }
+  for (const member of children(object, "properties")) {
+    const key = child(member, "key");
+    const name = member.computed === true ? undefined : (text(key, "name") ?? text(key, "value"));
+    if (member.type !== "Property" || !name) {
+      sink.unresolved.push(`${prop} spread`);
+      continue;
+    }
+    const style = canonical(name);
+    if (isOverride({ prop: style, sizing: true }) || CONDITION.test(style)) {
+      sink.overrides[`${prop}.${style}`] = valueOf({ scan, node: child(member, "value") });
+    }
+  }
+}
+
+function overridesOf({ visit, info, sizing }: { visit: Visit; info: ShapeInfo; sizing: boolean }) {
+  const sink = { overrides: {} as Record<string, string>, unresolved: [...visit.unresolved] };
+  const choices: Record<string, string> = {};
+  for (const [prop, node] of visit.props) {
+    if (info.allowed.includes(prop)) choices[prop] = valueOf({ scan: visit.scan, node });
+    else if (CONDITION.test(prop)) {
+      conditionEntries({ scan: visit.scan, prop, node, sink });
+    } else if (isOverride({ prop, sizing })) {
+      sink.overrides[prop] = valueOf({ scan: visit.scan, node });
+    }
+  }
+  if (/^(Drawer|Dialog)\.?Root$/.test(visit.ref) && visit.props.has("size")) {
+    sink.overrides["Root.size"] = valueOf({ scan: visit.scan, node: visit.props.get("size") });
+  }
+  return { overrides: sink.overrides, unresolved: sink.unresolved, choices };
+}
+
+function judge({
+  info,
+  drifted,
+  unresolved,
+}: {
+  info: ShapeInfo;
+  drifted: boolean;
+  unresolved: string[];
+}): { disposition: Disposition; rule: string } {
+  if (info.role === "legacy") return { disposition: "violation", rule: info.rule };
+  if (drifted) return { disposition: "violation", rule: "restyle" };
+  if (info.role === "unknown") return { disposition: "unknown", rule: info.rule };
+  if (unresolved.length) return { disposition: "unknown", rule: "unresolved-props" };
+  return { disposition: info.role === "adopted" ? "adopted" : "clean", rule: info.rule };
+}
+
+/** A design-system component or part: root or part, its restyles, whether it is target API. */
+function recordShape({ visit }: { visit: Visit }): Pick<Frame, "family" | "rootId"> {
+  const { binding, scan } = visit;
+  const info = binding ? classifyRef({ ref: visit.ref, source: binding.source }) : undefined;
+  if (!info) return {};
+  visit.info = info;
+  const wide =
+    /^(Drawer|Dialog)\.?Content$/.test(visit.ref) ||
+    (info.role === "adopted" && /^(Drawer|Dialog|Card|ResourceTile)$/.test(visit.head));
+  const { overrides, unresolved, choices } = overridesOf({ visit, info, sizing: wide });
+  const drifted = Object.keys(overrides).some((prop) => prop !== "Root.size");
+  const reason = info.reason ?? (unresolved.length ? `unresolved ${unresolved.join(", ")}` : "");
+  const created = record({
+    visit,
+    family: info.family,
+    site: info.site,
+    kind: "ds",
+    what: visit.ref,
+    props: overrides,
+    ...judge({ info, drifted, unresolved }),
+    adopted: info.role === "adopted",
+    ...(info.source ? { source: info.source } : {}),
+    ...(Object.keys(choices).length ? { choices } : {}),
+    ...(reason ? { reason } : {}),
+  });
+  const state = stateOf({ scan });
+  if (info.family === "pageHeaders" && info.site) state.headerLine ??= visit.line;
+  if (info.family === "tables") state.table = true;
+  if (info.family === "listPages") state.listPage = true;
+  return { family: info.family, rootId: created.root };
+}
+
+/** A name that resolves to a wrapper of a shape we cannot see through. */
+function recordUnknown({
+  visit,
+  unknown,
+}: {
+  visit: Visit;
+  unknown?: { family: Family; reason: string };
+}) {
+  if (!unknown) return;
+  record({
+    visit,
+    family: unknown.family,
+    what: visit.ref,
+    rule: "unresolved-wrapper",
+    disposition: "unknown",
+    reason: unknown.reason,
   });
 }
 
-/** A design-system component or part: the site, its override props, the Root size. */
-function recordShape({ visit }: { visit: Visit }) {
-  const { ref, ds, chakra, props, scan } = visit;
-  const shape = chakra ? chakraShape({ ref }) : undefined;
-  const found = shape ?? (ds ? dsShape({ ref }) : undefined);
-  if (!found) return;
-  const sizing = /^(Drawer|Dialog)\.?Content$/.test(ref);
-  const overrides: Record<string, string> = {};
-  for (const [prop, value] of props) {
-    if (isOverride({ prop, sizing })) overrides[prop] = valueOf({ scan, node: value });
-  }
-  if (/^(Drawer|Dialog)\.?Root$/.test(ref) && props.has("size")) {
-    overrides["Root.size"] = valueOf({ scan, node: props.get("size") });
-  }
-  record({ visit, ...found, kind: "ds", what: ref, props: overrides });
-  if (found.family === "pageHeaders" && found.site) scan.headerLine ??= visit.line;
-  if (found.family === "tables") scan.tableSeen = true;
-  if (found.family === "listPages") scan.listPageSeen = true;
-}
-
-/** `RawDrawer` and friends, and a module's own `Drawer`, `ConfirmDialog`, `Pagination`... */
+/** A module's own `Drawer`, `ConfirmDialog`, `Pagination`...: its callers, not new roots. */
 function recordCopies({ visit }: { visit: Visit }) {
-  const { binding, head, ref } = visit;
-  const raw = visit.ds ? RAW_EXPORTS[head] : undefined;
-  if (raw) record({ visit, family: raw, what: `${head} (raw Chakra part)` });
+  const { binding, ref } = visit;
   if (!binding || !isLocalSource(binding.source)) return;
   const family = LOCAL_COPIES[binding.imported];
   const member = ref.split(".")[1];
   if (family && (member === undefined || member === "Root")) {
-    record({ visit, family, what: `local ${binding.imported}` });
+    record({
+      visit,
+      family,
+      what: `local ${binding.imported}`,
+      rule: "local-copy",
+      disposition: "violation",
+      wrapper: "caller",
+    });
   }
 }
 
 function recordRoles({ visit }: { visit: Visit }) {
   const { ref, scan, chakra } = visit;
   if (chakra && ref === "Table.Root" && !nearest({ scan, pattern: /^ListTable$/ })) {
-    scan.tableSeen = true;
-    record({ visit, family: "tables", what: "Table.Root outside ListTable" });
+    stateOf({ scan }).table = true;
+    record({
+      visit,
+      family: "tables",
+      what: "Table.Root outside ListTable",
+      rule: "hand-table",
+      disposition: "violation",
+    });
   }
   const role = literalText(visit.props.get("role"));
   if (!role || visit.head.startsWith("Table")) return;
   if (/^(table|row|grid|rowgroup)$/.test(role)) {
-    record({ visit, family: "tables", what: `role="${role}" div table` });
+    stateOf({ scan }).table = true;
+    record({
+      visit,
+      family: "tables",
+      what: `role="${role}" div table`,
+      rule: "hand-table",
+      disposition: "violation",
+    });
   } else if (/^(tab|tablist)$/.test(role)) {
-    record({ visit, family: "tabs", what: `role="${role}" hand tabs` });
+    record({
+      visit,
+      family: "tabs",
+      what: `role="${role}" hand tabs`,
+      rule: "hand-tabs",
+      disposition: "violation",
+    });
   }
 }
 
@@ -451,6 +1006,38 @@ function recordLayout({ visit }: { visit: Visit }) {
   recordGridRow({ visit });
 }
 
+/** Whether a literal border exists: `borderWidth={0}` and `border="none"` are no border. */
+function borderOf({ visit }: { visit: Visit }): "yes" | "no" | "unknown" {
+  const states = ["border", "borderWidth"]
+    .filter((prop) => visit.props.has(prop))
+    .map((prop) => {
+      const literal = literalText(visit.props.get(prop));
+      if (literal === undefined) return "unknown";
+      return NO_BORDER.test(literal.trim()) ? "no" : "yes";
+    });
+  if (states.includes("yes")) return "yes";
+  return states.includes("unknown") ? "unknown" : "no";
+}
+
+function destinationOf({ visit }: { visit: Visit }): string {
+  const { scan, props } = visit;
+  const role = literalText(props.get("role")) ?? "";
+  const size = literalText(props.get("boxSize"));
+  const small =
+    size !== undefined &&
+    (/^\d+$/.test(size) ? Number(size) <= 16 : /^\d+px$/.test(size) && parseInt(size, 10) <= 64);
+  if (nearest({ scan, pattern: /^Tooltip(\.|$)/ })) return "tooltip";
+  if (nearest({ scan, pattern: /^Skeleton/ })) return "skeleton";
+  if (nearest({ scan, pattern: /^(Banner|Alert)(\.|$)/ })) return "Banner";
+  if (small) return "icon-tile";
+  const focusable = [...props.keys()].some((prop) => prop.startsWith("_focus"));
+  if (focusable) return "input";
+  if (/^(radio|option|checkbox|radiogroup)$/.test(role) || props.has("_checked"))
+    return "RadioCard";
+  if (/(front-door|\/langy\/|expressive)/.test(scan.file)) return "expressive-exception";
+  return "card";
+}
+
 function recordCardBox({ visit }: { visit: Visit }) {
   const { props, scan } = visit;
   const look: Record<string, string> = {};
@@ -458,12 +1045,21 @@ function recordCardBox({ visit }: { visit: Visit }) {
     if (LOOK.test(prop)) look[prop] = valueOf({ scan, node: value });
   }
   const rounded = look.borderRadius !== undefined && !PILL_RADIUS.test(look.borderRadius);
-  const bordered = look.border !== undefined || look.borderWidth !== undefined;
+  const border = borderOf({ visit });
   const panel = CARD_BG.test(look.bg ?? "");
-  const exempt = literalText(props.get("role")) === "alert" || props.has("boxSize");
-  if (rounded && (bordered || panel) && !exempt) {
-    record({ visit, family: "cards", what: "card-box", props: look });
-  }
+  const exempt = literalText(props.get("role")) === "alert";
+  if (!rounded || (border === "no" && !panel) || exempt) return;
+  record({
+    visit,
+    family: "cards",
+    what: "card-box",
+    props: look,
+    rule: "card-box",
+    disposition: "candidate",
+    destination: destinationOf({ visit }),
+    heuristic: border === "unknown",
+    ...(border === "unknown" ? { reason: "border is not a literal" } : {}),
+  });
 }
 
 function recordGridRow({ visit }: { visit: Visit }) {
@@ -478,48 +1074,172 @@ function recordGridRow({ visit }: { visit: Visit }) {
       family: "tables",
       what: "div-grid table row",
       props: { gridTemplateColumns: columns },
+      rule: "grid-row",
+      disposition: "candidate",
+      heuristic: true,
     });
   }
 }
 
+/** The semantic level an element renders at: native `h1`, `chakra.h1`, `as="h1"`, Heading's h2. */
+function headingLevel({ visit }: { visit: Visit }): number | undefined {
+  const { ref, binding, chakra } = visit;
+  const native = /^h([1-6])$/.exec(ref);
+  if (native && !binding) return Number(native[1]);
+  const factory = chakra ? /^chakra\.h([1-6])$/.exec(ref) : undefined;
+  if (factory) return Number(factory[1]);
+  const asLevel = /^h([1-6])$/.exec(literalText(visit.props.get("as")) ?? "");
+  if (asLevel && (chakra || visit.ds)) return Number(asLevel[1]);
+  return chakra && ref === "Heading" ? 2 : undefined;
+}
+
 function recordHeading({ visit }: { visit: Visit }) {
   const { scan, props } = visit;
-  if (!visit.chakra || visit.ref !== "Heading") return;
+  const level = headingLevel({ visit });
+  if (level === undefined) return;
   if (nearest({ scan, pattern: /^(PageLayout\.Header|ListPage)$/ })) return;
-  if (nearest({ scan, pattern: /^(Drawer\.Header|DrawerHeader)$/ })) {
-    record({ visit, family: "drawers", what: "Heading in Drawer.Header", site: false });
+  const surface = scan.stack.findLast((frame) => frame.family)?.family ?? "page";
+  if (visit.chakra && visit.ref === "Heading") {
+    const inDrawer = nearest({ scan, pattern: /^(Drawer\.Header|DrawerHeader)$/ });
+    if (inDrawer) {
+      record({
+        visit,
+        family: "drawers",
+        what: "Heading in Drawer.Header",
+        site: false,
+        rule: "heading-in-drawer-header",
+        disposition: "violation",
+        surface,
+      });
+      return;
+    }
+  }
+  if (level === 1) {
+    stateOf({ scan }).headerLine ??= visit.line;
+    record({
+      visit,
+      family: "pageHeaders",
+      what: "page-title Heading",
+      rule: "page-title-h1",
+      disposition: "violation",
+      surface,
+    });
     return;
   }
   const title =
-    literalText(props.get("as")) === "h1" ||
     TITLE_SIZE.test(literalText(props.get("size")) ?? "") ||
     TITLE_STYLE.test(literalText(props.get("textStyle")) ?? "");
-  if (!title) return;
-  scan.headerLine ??= visit.line;
-  record({ visit, family: "pageHeaders", what: "page-title Heading" });
+  if (!visit.chakra || visit.ref !== "Heading" || !title) return;
+  record({
+    visit,
+    family: "pageHeaders",
+    what: "page-title Heading",
+    rule: "page-title-size",
+    disposition: "candidate",
+    heuristic: true,
+    surface,
+  });
 }
 
-/** Marks what a drawer or dialog holds, judged when it closes (see `closeFrame`). */
-function trackParts({ visit }: { visit: Visit }) {
-  const { scan, ref, props } = visit;
-  const drawer = visit.ds ? nearest({ scan, pattern: /^(Drawer\.Root|DrawerRoot)$/ }) : undefined;
-  if (drawer && /^(Drawer\.Footer|DrawerFooter)$/.test(ref)) drawer.footer ??= visit.line;
-  if (drawer && /^(Drawer\.Actions|DrawerActions)$/.test(ref)) drawer.actions = true;
-  if (!/^(Button|IconButton)$/.test(visit.head)) return;
-  const label = literalText(props.get("aria-label")) ?? textOf(visit.element);
+/** A raw Button in PageLayout.Header or ListPage `actions`, where HeaderButton belongs. */
+function recordHeaderButton({ visit }: { visit: Visit }) {
+  const { scan } = visit;
+  if (!/^(Button|IconButton)$/.test(visit.head) || !(visit.ds || visit.chakra)) return;
+  const attr = scan.attrs.at(-1);
+  const inActions = attr?.name === "actions" && scan.stack[attr.depth - 1]?.ref === "ListPage";
+  if (!inActions && !nearest({ scan, pattern: /^PageLayout\.Header$/ })) return;
+  record({
+    visit,
+    family: "pageHeaders",
+    what: "raw header Button",
+    site: false,
+    rule: "raw-header-button",
+    disposition: "violation",
+  });
+}
+
+/** A button that appends rows by hand: a real label is a violation, a guess a candidate. */
+function recordAppend({
+  visit,
+  label,
+  dynamic,
+}: {
+  visit: Visit;
+  label: string;
+  dynamic: boolean;
+}) {
+  const click = visit.props.has("onClick")
+    ? valueOf({ scan: visit.scan, node: visit.props.get("onClick") })
+    : "";
+  const fetches = FETCHES.test(click);
+  const definite = LOAD_LABEL.test(label) || SHOW_LABEL.test(label);
+  const more = MORE_LABEL.test(label);
+  const guessed = (dynamic || label === "") && fetches;
+  if (!definite && !more && !guessed) return;
+  record({
+    visit,
+    family: "pagination",
+    what: label ? `hand append "${label}"` : "hand append (dynamic label)",
+    rule: "hand-append",
+    disposition: definite || (more && fetches) ? "violation" : "candidate",
+    heuristic: !definite,
+  });
+}
+
+/** What the buttons say: a Prev/Next of one pager, an append action, a destructive confirm. */
+function trackButtons({ visit }: { visit: Visit }): Partial<Frame> {
+  const { scan, props } = visit;
+  if (!/^(Button|IconButton)$/.test(visit.head)) return {};
+  const body = labelOf({ element: visit.element, deep: true });
+  const label = literalText(props.get("aria-label")) ?? body.text;
+  const marks: Partial<Frame> = {};
   const danger =
     literalText(props.get("colorPalette")) === "red" || /^(delete|remove|revoke)\b/i.test(label);
   const dialog = danger ? nearest({ scan, pattern: /^(Dialog\.Root|DialogRoot)$/ }) : undefined;
   if (dialog) dialog.danger ??= visit.line;
-  if (/^(prev|previous)( page)?$/i.test(label)) scan.previousLine ??= visit.line;
-  if (/^next( page)?$/i.test(label)) scan.nextSeen = true;
+  if (PREVIOUS.test(label)) marks.prev = { line: visit.line, hops: 0 };
+  if (NEXT.test(label)) marks.next = { line: visit.line, hops: 0 };
+  recordAppend({ visit, label, dynamic: body.dynamic });
+  return marks;
 }
 
+/** Marks that bubble to the nearest two parents; both seen under one parent is one pager. */
+function settlePager({ scan, frame }: { scan: Scan; frame: Frame }) {
+  if (frame.prev && frame.next && !frame.pager) {
+    emit({
+      scan,
+      loc: { line: frame.prev.line, col: 0 },
+      family: "pagination",
+      what: "hand Prev/Next buttons",
+      rule: "hand-pagination",
+      disposition: "violation",
+    });
+    frame.pager = true;
+  }
+  const parent = scan.stack.at(-1);
+  if (!parent) return;
+  if (frame.pager) parent.pager = true;
+  else {
+    if (frame.prev && frame.prev.hops < 2)
+      parent.prev ??= { ...frame.prev, hops: frame.prev.hops + 1 };
+    if (frame.next && frame.next.hops < 2)
+      parent.next ??= { ...frame.next, hops: frame.next.hops + 1 };
+  }
+}
+
+/** Hand empty-state text is a reviewed candidate, never a count that can read zero. */
 function recordEmptyText({ visit }: { visit: Visit }) {
-  if (!EMPTY_TEXT.test(textOf(visit.element))) return;
+  if (!EMPTY_TEXT.test(labelOf({ element: visit.element, deep: false }).text)) return;
   const pattern = /^(NoDataInfoBlock|ChartEmptyState|EmptyState\.)/;
   if (nearest({ scan: visit.scan, pattern })) return;
-  record({ visit, family: "emptyStates", what: "hand empty-state text" });
+  record({
+    visit,
+    family: "emptyStates",
+    what: "hand empty-state text",
+    rule: "empty-text",
+    disposition: "candidate",
+    heuristic: true,
+  });
 }
 
 function visitElement({ scan, element }: { scan: Scan; element: AstNode }): Frame | undefined {
@@ -528,37 +1248,48 @@ function visitElement({ scan, element }: { scan: Scan; element: AstNode }): Fram
   if (!opening || !resolved) return undefined;
   const { ref, binding } = resolved;
   const chakra = binding !== undefined && isChakraSource(binding.source);
+  const { props, unresolved } = propsOf({ scan, opening });
+  const loc = locOf({ scan, offset: opening.start });
   const visit: Visit = {
     scan,
     element,
     ref,
     head: ref.split(".")[0] ?? "",
-    binding,
     ds: binding !== undefined && isDsSource(binding.source) && !chakra,
     chakra,
-    line: lineOf({ scan, offset: opening.start }),
-    props: propsOf({ opening }),
+    loc,
+    line: loc.line,
+    props,
+    unresolved,
+    ...(binding ? { binding } : {}),
   };
-  recordShape({ visit });
+  const shape = recordShape({ visit });
+  recordUnknown({ visit, ...(resolved.unknown ? { unknown: resolved.unknown } : {}) });
   recordCopies({ visit });
   recordRoles({ visit });
   recordLayout({ visit });
   recordHeading({ visit });
-  trackParts({ visit });
+  recordHeaderButton({ visit });
+  const marks = trackButtons({ visit });
   recordEmptyText({ visit });
-  return { ref, ds: visit.ds || chakra };
+  return { ref, ds: visit.ds || chakra, ...shape, ...marks };
 }
 
 function closeFrame({ scan, frame }: { scan: Scan; frame: Frame }) {
-  const push = (site: Omit<CensusSite, "file" | "kind" | "site" | "props">) =>
-    scan.sites.push({ ...site, kind: "lookalike", site: false, props: {}, file: scan.file });
-  const drawer = /^(Drawer\.Root|DrawerRoot)$/.test(frame.ref);
-  if (drawer && frame.footer && !frame.actions) {
-    push({ family: "drawers", what: "Drawer.Footer, not Drawer.Actions", line: frame.footer });
-  }
   if (/^(Dialog\.Root|DialogRoot)$/.test(frame.ref) && frame.danger) {
-    push({ family: "dialogs", what: "hand-built confirm Dialog", line: frame.danger });
+    emit({
+      scan,
+      loc: { line: frame.danger, col: 0 },
+      family: "dialogs",
+      what: "hand-built confirm Dialog",
+      site: false,
+      rule: "hand-confirm",
+      disposition: "candidate",
+      heuristic: true,
+      ...(frame.rootId ? { root: frame.rootId } : {}),
+    });
   }
+  settlePager({ scan, frame });
 }
 
 function walkAttribute({ scan, node }: { scan: Scan; node: AstNode }) {
@@ -573,7 +1304,9 @@ function walkAttribute({ scan, node }: { scan: Scan; node: AstNode }) {
   });
   const style = raw === "style";
   if (style) scan.styleDepth++;
+  scan.attrs.push({ name: raw, depth: scan.stack.length });
   walkChildren({ scan, node });
+  scan.attrs.pop();
   if (style) scan.styleDepth--;
 }
 
@@ -588,9 +1321,34 @@ function walkProperty({ scan, node }: { scan: Scan; node: AstNode }) {
   walkChildren({ scan, node });
 }
 
+const FUNCTIONS = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
+
+/** A function's parameters and locals can hide an import; a Capitalised one is a component. */
+function walkFunction({ scan, node }: { scan: Scan; node: AstNode }) {
+  const name = node.type === "FunctionDeclaration" ? text(child(node, "id"), "name") : undefined;
+  const component = name !== undefined && /^[A-Z]/.test(name);
+  if (component) scan.components.push(name);
+  scan.shadow.push(declaredNames({ scan, node }));
+  walkChildren({ scan, node });
+  scan.shadow.pop();
+  if (component) scan.components.pop();
+}
+
+function walkDeclarator({ scan, node }: { scan: Scan; node: AstNode }) {
+  const name = text(child(node, "id"), "name");
+  const init = stripWrappers(child(node, "init"));
+  const wraps = init !== undefined && (FUNCTIONS.has(init.type) || init.type === "CallExpression");
+  const component = name !== undefined && /^[A-Z]/.test(name) && wraps;
+  if (component) scan.components.push(name);
+  walkChildren({ scan, node });
+  if (component) scan.components.pop();
+}
+
 function walk({ scan, node }: { scan: Scan; node: AstNode }) {
   if (node.type === "JSXAttribute") return walkAttribute({ scan, node });
   if (node.type === "Property") return walkProperty({ scan, node });
+  if (FUNCTIONS.has(node.type)) return walkFunction({ scan, node });
+  if (node.type === "VariableDeclarator") return walkDeclarator({ scan, node });
   if (node.type === "JSXElement") {
     const frame = visitElement({ scan, element: node });
     if (frame) scan.stack.push(frame);
@@ -613,17 +1371,26 @@ function walkChildren({ scan, node }: { scan: Scan; node: AstNode }) {
   }
 }
 
-/** File-level look-alikes: hand Prev/Next paging, and a list page built from parts. */
+/** A header and a table inside one component without ListPage: a heuristic, never mandatory. */
 function finishFile({ scan }: { scan: Scan }) {
-  const push = (site: Omit<CensusSite, "file" | "kind" | "site" | "props">) =>
-    scan.sites.push({ ...site, kind: "lookalike", site: true, props: {}, file: scan.file });
-  const paging = /\b(page|offset|cursor)/i.test(scan.source);
-  if (scan.previousLine !== undefined && scan.nextSeen && paging) {
-    push({ family: "pagination", what: "hand Prev/Next buttons", line: scan.previousLine });
+  for (const [name, state] of scan.componentState) {
+    if (state.headerLine === undefined || !state.table || state.listPage) continue;
+    emit({
+      scan,
+      loc: { line: state.headerLine, col: 0 },
+      family: "listPages",
+      what: "header + table in one component, not ListPage",
+      rule: "list-page-inference",
+      disposition: "candidate",
+      heuristic: true,
+      root: `${scan.file}::${name}`,
+    });
   }
-  if (scan.headerLine !== undefined && scan.tableSeen && !scan.listPageSeen) {
-    push({ family: "listPages", what: "header + table, not ListPage", line: scan.headerLine });
-  }
+}
+
+/** Who owns a file when it is not part of this rollout. */
+export function ownerOf({ file }: { file: string }): string | undefined {
+  return UPGRADE_PATH.test(file) ? "upgrade" : undefined;
 }
 
 /** Each site in one source file: design-system uses, look-alikes, literal spacing and type. */
@@ -644,25 +1411,26 @@ export function censusSites({ file, source }: { file: string; source: string }):
     source,
     lineStarts,
     bindings: importBindings({ program: root }),
+    imported: new Set(),
+    constObjects: new Map(),
+    unknownLocals: new Map(),
+    shadow: [],
+    components: [],
+    componentState: new Map(),
+    attrs: [],
     sites: [],
     literals: [],
     stack: [],
     mapDepth: 0,
     styleDepth: 0,
-    tableSeen: false,
-    listPageSeen: false,
-    nextSeen: false,
   };
+  for (const name of scan.bindings.keys()) scan.imported.add(name);
+  collectAliases({ scan, node: root });
   walk({ scan, node: root });
   finishFile({ scan });
-  return { sites: scan.sites, literals: scan.literals };
-}
-
-/** The Chakra primitives that are themselves a family's design-system component. */
-function chakraShape({ ref }: { ref: string }): Shape | undefined {
-  const [head = "", member] = ref.split(".");
-  if (!member || !["Card", "EmptyState", "Tabs"].includes(head)) return undefined;
-  return { family: NAMESPACES[head] ?? "cards", site: member === "Root" };
+  const owner = ownerOf({ file });
+  const sites = owner ? scan.sites.map((site) => ({ ...site, owner })) : scan.sites;
+  return { sites, literals: scan.literals };
 }
 
 const signatureOf = (site: CensusSite) => {
@@ -674,6 +1442,9 @@ const signatureOf = (site: CensusSite) => {
 const bump = (counts: Record<string, number>, key: string, by = 1) => {
   counts[key] = (counts[key] ?? 0) + by;
 };
+const finding = (site: CensusSite) =>
+  site.disposition === "violation" || site.disposition === "unknown";
+const hasDrift = (site: CensusSite) => Object.keys(site.props).some((prop) => prop !== "Root.size");
 
 /** `modules/trace/browser/src/x.tsx` -> `modules/trace`; `apps/ui/src/x.tsx` -> `apps/ui`. */
 export function moduleOf({ file }: { file: string }): string {
@@ -681,23 +1452,31 @@ export function moduleOf({ file }: { file: string }): string {
   return parts.slice(0, parts[0] === "enterprise" ? 3 : 2).join("/");
 }
 
-/** One family's totals, the props it is restyled with and its most common shapes. */
+/** One family's measurements, each kept apart: roots, affected roots, parts and candidates. */
 function familyCensus({ family, sites }: { family: Family; sites: CensusSite[] }): FamilyCensus {
   const own = sites.filter((site) => site.family === family);
-  const overridden = own.filter(
-    (site) => site.kind === "ds" && Object.keys(site.props).some((prop) => prop !== "Root.size"),
-  );
+  const rooted = own.filter((site) => site.wrapper === undefined);
+  const overridden = own.filter((site) => site.kind === "ds" && hasDrift(site));
   const lookalikes = own.filter((site) => site.kind === "lookalike");
   const overriddenProps: Record<string, number> = {};
   const values = new Map<string, Set<string>>();
+  const kinds = { cosmetic: 0, geometry: 0, opaque: 0 };
   for (const site of own.filter((s) => s.kind === "ds")) {
     for (const [prop, value] of Object.entries(site.props)) {
       if (prop !== "Root.size") bump(overriddenProps, prop);
       values.set(prop, (values.get(prop) ?? new Set()).add(value));
     }
+    const present = new Set(
+      Object.keys(site.props)
+        .filter((prop) => prop !== "Root.size")
+        .map((prop) => driftKind({ prop })),
+    );
+    for (const kind of present) kinds[kind]++;
   }
   const lookalikeKinds: Record<string, number> = {};
   for (const site of lookalikes) bump(lookalikeKinds, site.what);
+  const violationsByRule: Record<string, number> = {};
+  for (const site of rooted.filter(finding)) bump(violationsByRule, site.rule);
   const groups = new Map<string, CensusSite[]>();
   for (const site of [...overridden, ...lookalikes]) {
     const signature = signatureOf(site);
@@ -716,6 +1495,17 @@ function familyCensus({ family, sites }: { family: Family; sites: CensusSite[] }
     overridden: overridden.length,
     lookalike: lookalikes.length,
     variants: new Set(overridden.map(signatureOf)).size,
+    roots: new Set(rooted.map((site) => site.root)).size,
+    affectedRoots: new Set(rooted.filter(finding).map((site) => site.root)).size,
+    parts: rooted.filter(finding).length,
+    candidates: own.filter((site) => site.disposition === "candidate").length,
+    adoptedRoots: new Set(rooted.filter((s) => s.adopted && s.site).map((s) => s.root)).size,
+    unknown: own.filter((site) => site.disposition === "unknown").length,
+    callers: own.length - rooted.length,
+    cosmeticParts: kinds.cosmetic,
+    geometryParts: kinds.geometry,
+    opaqueParts: kinds.opaque,
+    violationsByRule,
     overriddenProps: Object.fromEntries(
       Object.entries(overriddenProps).toSorted((a, b) => b[1] - a[1]),
     ),
@@ -725,6 +1515,33 @@ function familyCensus({ family, sites }: { family: Family; sites: CensusSite[] }
     ),
     clusters,
   };
+}
+
+/** Adds one site to its file's score, its module's families and its owner's tally. */
+function tallySite({
+  site,
+  score,
+  moduleFamilies,
+  owners,
+}: {
+  site: CensusSite;
+  score: FileScore;
+  moduleFamilies: Map<string, Record<string, number>>;
+  owners: Census["owners"];
+}) {
+  const drift = site.disposition !== "adopted" && site.disposition !== "clean";
+  if (site.kind === "ds" && site.site) score.ds++;
+  if (site.kind === "lookalike") score.lookalike++;
+  else if (drift) score.overridden++;
+  if (!drift) return;
+  if (site.owner) {
+    const entry = (owners[site.owner] ??= { violations: 0, candidates: 0, unknown: 0 });
+    entry[tallyKey(site)]++;
+  }
+  score.score++;
+  const counts = moduleFamilies.get(moduleOf({ file: site.file })) ?? {};
+  bump(counts, site.family);
+  moduleFamilies.set(moduleOf({ file: site.file }), counts);
 }
 
 /** Totals, variants and rankings from the sites of every file. */
@@ -763,19 +1580,9 @@ export function summariseCensus({
     return score;
   };
   const moduleFamilies = new Map<string, Record<string, number>>();
+  const owners: Census["owners"] = {};
   for (const site of sites) {
-    const score = scoreOf(site.file);
-    const drift =
-      site.kind === "lookalike" || Object.keys(site.props).some((prop) => prop !== "Root.size");
-    if (site.kind === "ds" && site.site) score.ds++;
-    if (site.kind === "lookalike") score.lookalike++;
-    else if (drift) score.overridden++;
-    if (drift) {
-      score.score++;
-      const counts = moduleFamilies.get(moduleOf({ file: site.file })) ?? {};
-      bump(counts, site.family);
-      moduleFamilies.set(moduleOf({ file: site.file }), counts);
-    }
+    tallySite({ site, score: scoreOf(site.file), moduleFamilies, owners });
   }
   for (const literal of literals) {
     const score = scoreOf(literal.file);
@@ -811,6 +1618,7 @@ export function summariseCensus({
       fontSize: literals.filter((literal) => literal.kind === "fontSize").length,
     },
     worstFiles: scores.toSorted((a, b) => b.score - a.score).slice(0, 30),
+    owners,
     modules: Object.fromEntries(
       Object.entries(modules).toSorted((a, b) => b[1].score - a[1].score),
     ),
@@ -839,16 +1647,236 @@ export function browserSources(): string[] {
     .filter((file) => existsSync(path.join(ROOT, file)));
 }
 
-export function collectCensus(): { census: Census; sites: CensusSite[]; literals: LiteralSite[] } {
+const GLOB_TOKENS: [RegExp, string][] = [
+  [/[.+^${}()|[\]\\]/g, "\\$&"],
+  [/\*\*\//g, "\uE000"],
+  [/\*\*/g, "\uE001"],
+  [/\*/g, "[^/]*"],
+  [/\?/g, "[^/]"],
+  [/\uE000/g, "(?:.*/)?"],
+  [/\uE001/g, ".*"],
+];
+
+/** A path against a glob (`*`, `**`, `?`) or a plain directory or file prefix. */
+export function matchesPath({ file, glob }: { file: string; glob: string }): boolean {
+  if (!/[*?]/.test(glob)) return file === glob || file.startsWith(`${glob.replace(/\/+$/, "")}/`);
+  const source = GLOB_TOKENS.reduce((acc, [pattern, to]) => acc.replace(pattern, to), glob);
+  return new RegExp(`^${source}$`).test(file);
+}
+
+export function collectCensus({ paths }: { paths?: string[] } = {}): {
+  census: Census;
+  sites: CensusSite[];
+  literals: LiteralSite[];
+  files: string[];
+  sources: Map<string, string>;
+} {
   const sites: CensusSite[] = [];
   const literals: LiteralSite[] = [];
-  for (const file of browserSources()) {
-    const found = censusSites({ file, source: readFileSync(path.join(ROOT, file), "utf8") });
+  const sources = new Map<string, string>();
+  const files = browserSources().filter(
+    (file) => !paths?.length || paths.some((glob) => matchesPath({ file, glob })),
+  );
+  for (const file of files) {
+    const source = readFileSync(path.join(ROOT, file), "utf8");
+    sources.set(file, source);
+    const found = censusSites({ file, source });
     sites.push(...found.sites);
     literals.push(...found.literals);
   }
-  return { census: summariseCensus({ sites, literals }), sites, literals };
+  return { census: summariseCensus({ sites, literals }), sites, literals, files, sources };
 }
+
+export type Escape = {
+  path: string;
+  rule: string;
+  reason: string;
+  owner: string;
+  /** `escape` approves a violation; `reviewed` gives a candidate or unknown its disposition. */
+  disposition?: "escape" | "reviewed";
+};
+
+/** The approved escapes and reviewed candidates, read from `census-escapes.json`. */
+export function loadEscapes({ file = ESCAPES_FILE }: { file?: string } = {}): Escape[] {
+  if (!existsSync(file)) return [];
+  const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+  if (!Array.isArray(parsed)) throw new Error(`${file} must hold an array of escapes`);
+  return parsed.map((entry: unknown, index) => {
+    const read = (key: string) => {
+      const value = isRecord(entry) ? entry[key] : undefined;
+      if (typeof value === "string" && value.trim()) return value;
+      throw new Error(`${file} entry ${index} needs a non-empty "${key}"`);
+    };
+    const disposition = isRecord(entry) ? entry.disposition : undefined;
+    return {
+      path: read("path"),
+      rule: read("rule"),
+      reason: read("reason"),
+      owner: read("owner"),
+      ...(disposition === "reviewed" || disposition === "escape" ? { disposition } : {}),
+    };
+  });
+}
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+export type Finding = {
+  file: string;
+  line: number;
+  root: string;
+  family: Family;
+  rule: string;
+  what: string;
+  owner?: string;
+  destination?: string;
+  reason?: string;
+  escape?: Pick<Escape, "reason" | "owner">;
+};
+export type CheckResult = {
+  violations: Finding[];
+  approvedEscapes: Finding[];
+  unclassifiedCandidates: Finding[];
+  classifiedCandidates: Finding[];
+  unknown: Finding[];
+  adoptedRoots: (Finding & { source?: string; planned: boolean })[];
+  ownedElsewhere: Record<string, { violations: number; candidates: number; unknown: number }>;
+};
+
+function plannedSubpaths(): Set<string> {
+  const manifest: unknown = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
+  const exports = isRecord(manifest) && isRecord(manifest.exports) ? manifest.exports : {};
+  const exported = new Set(Object.keys(exports));
+  return new Set(
+    Object.values(TARGET)
+      .map((entry) => entry.subpath)
+      .filter(
+        (subpath): subpath is string => subpath !== undefined && !exported.has(`./${subpath}`),
+      ),
+  );
+}
+
+/** The registered target API: export, source and whether the subpath is exported yet. */
+export function targetApi(): {
+  export: string;
+  source: string;
+  family: Family;
+  planned: boolean;
+}[] {
+  const planned = plannedSubpaths();
+  return Object.entries(TARGET).map(([name, entry]) => ({
+    export: name,
+    source: entry.subpath
+      ? `@langwatch/design-system/${entry.subpath}`
+      : "@langwatch/design-system",
+    family: entry.family,
+    planned: entry.subpath !== undefined && planned.has(entry.subpath),
+  }));
+}
+
+const findingOf = (site: CensusSite): Finding => ({
+  file: site.file,
+  line: site.line,
+  root: site.root,
+  family: site.family,
+  rule: site.rule,
+  what: site.what,
+  ...(site.owner ? { owner: site.owner } : {}),
+  ...(site.destination ? { destination: site.destination } : {}),
+  ...(site.reason ? { reason: site.reason } : {}),
+});
+
+function sortSite({
+  site,
+  escapes,
+  result,
+}: {
+  site: CensusSite;
+  escapes: Escape[];
+  result: CheckResult;
+}) {
+  const base = findingOf(site);
+  if (site.owner) {
+    const entry = (result.ownedElsewhere[site.owner] ??= {
+      violations: 0,
+      candidates: 0,
+      unknown: 0,
+    });
+    entry[tallyKey(site)]++;
+    return;
+  }
+  const escape = escapes.find(
+    (entry) =>
+      matchesPath({ file: site.file, glob: entry.path }) &&
+      (entry.rule === "*" || entry.rule === site.rule),
+  );
+  if (escape) {
+    result.approvedEscapes.push({
+      ...base,
+      escape: { reason: escape.reason, owner: escape.owner },
+    });
+  } else if (site.disposition === "violation") result.violations.push(base);
+  else if (site.disposition === "unknown") result.unknown.push(base);
+  else if (site.destination && NOT_A_CARD.has(site.destination)) {
+    result.classifiedCandidates.push(base);
+  } else result.unclassifiedCandidates.push(base);
+}
+
+function tallyKey(site: CensusSite): "violations" | "candidates" | "unknown" {
+  if (site.disposition === "violation") return "violations";
+  return site.disposition === "candidate" ? "candidates" : "unknown";
+}
+
+/** Sorts sites into the four lists a wave is judged by; owned-elsewhere files stay visible. */
+export function evaluateCheck({
+  sites,
+  escapes,
+}: {
+  sites: CensusSite[];
+  escapes: Escape[];
+}): CheckResult {
+  const planned = plannedSubpaths();
+  const result: CheckResult = {
+    violations: [],
+    approvedEscapes: [],
+    unclassifiedCandidates: [],
+    classifiedCandidates: [],
+    unknown: [],
+    adoptedRoots: [],
+    ownedElsewhere: {},
+  };
+  for (const site of sites) {
+    if (site.adopted && site.site) {
+      const subpath = site.source?.split("/")[2];
+      const planning = subpath !== undefined && planned.has(subpath);
+      result.adoptedRoots.push({
+        ...findingOf(site),
+        ...(site.source ? { source: site.source } : {}),
+        planned: planning,
+      });
+    }
+    if (site.disposition !== "adopted" && site.disposition !== "clean") {
+      sortSite({ site, escapes, result });
+    }
+  }
+  return result;
+}
+
+/** 1 for an unsuppressed violation; 2 for an unclassified candidate or unknown; 0 passes. */
+export function exitCodeOf({ result }: { result: CheckResult }): 0 | 1 | 2 {
+  if (result.violations.length) return 1;
+  return result.unclassifiedCandidates.length || result.unknown.length ? 2 : 0;
+}
+
+/** The commit and a hash of the scanned sources: what the verdict is true of. */
+export function revisionOf({ sources }: { sources: Map<string, string> }) {
+  const hash = createHash("sha256");
+  for (const file of [...sources.keys()].toSorted()) hash.update(`${file}\0${sources.get(file)}\0`);
+  const commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  return { commit, contentHash: hash.digest("hex").slice(0, 16), files: sources.size };
+}
+
+const display = (value: string, max = 96) =>
+  value.length > max ? `${value.slice(0, max - 1)}...` : value;
 
 function familySection({ family, entry }: { family: Family; entry: FamilyCensus }): string[] {
   const out = [`## ${family}`, ""];
@@ -856,13 +1884,20 @@ function familySection({ family, entry }: { family: Family; entry: FamilyCensus 
     Object.entries(counts)
       .map(([key, count]) => `${key} ${count}`)
       .join(", ");
+  out.push(
+    `Roots ${entry.roots}, affected ${entry.affectedRoots}, parts ${entry.parts}, candidates ${entry.candidates}, adopted ${entry.adoptedRoots}, unknown ${entry.unknown}, wrapper callers ${entry.callers}.`,
+    "",
+  );
+  if (Object.keys(entry.violationsByRule).length) {
+    out.push(`Findings by rule: ${tally(entry.violationsByRule)}.`, "");
+  }
   if (entry.overridden) out.push(`Restyled props: ${tally(entry.overriddenProps)}.`, "");
   if (entry.overridden) out.push(`Distinct values per prop: ${tally(entry.distinctValues)}.`, "");
-  if (entry.lookalike) out.push(`Look-alikes: ${tally(entry.lookalikeKinds)}.`, "");
+  if (entry.lookalike) out.push(`Look-alikes and candidates: ${tally(entry.lookalikeKinds)}.`, "");
   if (!entry.clusters.length) return out;
-  out.push("| Count | Shape | Examples |", "| ---: | --- | --- |");
+  out.push("| Count | Signature | Examples |", "| ---: | --- | --- |");
   for (const cluster of entry.clusters) {
-    const signature = cluster.signature.replaceAll("|", "\\|");
+    const signature = display(cluster.signature).replaceAll("|", "\\|");
     out.push(`| ${cluster.count} | \`${signature}\` | ${cluster.examples.join("<br>")} |`);
   }
   out.push("");
@@ -887,24 +1922,37 @@ export function renderCensusMarkdown({ census }: { census: Census }): string {
   const out: string[] = ["# Design-system shape census", ""];
   out.push(
     "Counted by `node packages/design-system/.storybook/adoption.ts --report <path>` from the AST of every browser source (no tests, no stories).",
-    "`Restyled` counts design-system elements (the component or one of its parts) given a style or layout prop. `Variants` counts distinct restyles.",
+    "`Roots` are distinct roots; `Affected` roots carry at least one violation or unknown part (parts are attributed to their owning root); `Parts` are the violating sites; `Candidates` are heuristic findings a person must classify.",
+    "Scores rank work and are not migration counts. Signatures are distinct expressions, not validated designs. Upgrade-owned files are counted and listed under their owner.",
     "",
-    "| Family | DS sites | Restyled | Look-alikes | Variants |",
-    "| --- | ---: | ---: | ---: | ---: |",
+    "| Family | Roots | Affected | Parts | Candidates | Adopted | Unknown | Cosmetic | Geometry | Signatures |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
   );
   for (const family of FAMILIES) {
-    const { ds, overridden, lookalike, variants } = census.families[family];
-    out.push(`| ${family} | ${ds} | ${overridden} | ${lookalike} | ${variants} |`);
+    const entry = census.families[family];
+    out.push(
+      `| ${family} | ${entry.roots} | ${entry.affectedRoots} | ${entry.parts} | ${entry.candidates} | ${entry.adoptedRoots} | ${entry.unknown} | ${entry.cosmeticParts} | ${entry.geometryParts} | ${entry.variants} |`,
+    );
   }
   out.push(
     "",
     `Literal spacing and type in browser code: ${census.literals.pixelSpacing} pixel paddings, margins or gaps; ${census.literals.fontSize} literal font sizes.`,
     "",
   );
+  const owners = Object.entries(census.owners);
+  if (owners.length) {
+    out.push("Owned elsewhere (counted, outside our waves):", "");
+    for (const [owner, tally] of owners) {
+      out.push(
+        `- ${owner}: ${tally.violations} violations, ${tally.candidates} candidates, ${tally.unknown} unknown`,
+      );
+    }
+    out.push("");
+  }
   for (const family of FAMILIES)
     out.push(...familySection({ family, entry: census.families[family] }));
   out.push(
-    "## The 30 worst files",
+    "## The 30 highest-scoring files",
     "",
     "| Score | File | Restyled | Look-alikes | Literals |",
     "| ---: | --- | ---: | ---: | ---: |",

@@ -1,14 +1,23 @@
 /**
- * Adoption numbers for the workshop, read at build time: who imports each entry point
- * (and each name), the debt and shape census the Consistency pages count. `node
- * .storybook/adoption.ts` prints it; `--report <path>` also writes the census as markdown.
+ * Adoption numbers for the workshop, read at build time: who imports each entry point,
+ * the debt and the shape census. `node .storybook/adoption.ts` prints it; `--report <path>`
+ * also writes the census as markdown; `--check --paths <globs...>` is the wave gate.
  */
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { PACKAGE_ROOT, publishedEntries, storyExists, storyFor } from "./catalogue.ts";
-import { type Census, collectCensus, renderCensusMarkdown } from "./census.ts";
+import {
+  type Census,
+  collectCensus,
+  evaluateCheck,
+  exitCodeOf,
+  loadEscapes,
+  renderCensusMarkdown,
+  revisionOf,
+  targetApi,
+} from "./census.ts";
 import { collectRawColours } from "./raw-colours.ts";
 
 const ROOT = path.resolve(PACKAGE_ROOT, "../..");
@@ -154,8 +163,7 @@ export function collectAdoption(): Adoption {
   const listTableFiles = new Set(filesBySubpath.get("./list-table") ?? []);
   const { census, sites, literals } = collectCensus();
   const drift = sites.filter(
-    (site) =>
-      site.kind === "lookalike" || Object.keys(site.props).some((prop) => prop !== "Root.size"),
+    (site) => site.disposition !== "adopted" && site.disposition !== "clean",
   );
   const literalLines = ({ kind }: { kind: string }) =>
     literals.filter((literal) => literal.kind === kind).map(({ file, line }) => `${file}:${line}`);
@@ -192,7 +200,61 @@ export function collectAdoption(): Adoption {
   };
 }
 
-if (import.meta.main) {
+/** The values after a flag, up to the next flag. */
+function valuesAfter({ flag }: { flag: string }): string[] {
+  const start = process.argv.indexOf(flag);
+  if (start === -1) return [];
+  const rest = process.argv.slice(start + 1);
+  const end = rest.findIndex((arg) => arg.startsWith("--"));
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/** The wave gate: 1 on an unsuppressed violation, 2 on an unclassified candidate or unknown. */
+function runCheck() {
+  const paths = valuesAfter({ flag: "--paths" });
+  if (!paths.length) {
+    process.stderr.write("--check needs --paths <globs...>\n");
+    process.exitCode = 3;
+    return;
+  }
+  const { sites, sources } = collectCensus({ paths });
+  if (!sources.size) {
+    process.stderr.write(`No browser source matches ${paths.join(" ")}\n`);
+    process.exitCode = 3;
+    return;
+  }
+  const result = evaluateCheck({ sites, escapes: loadEscapes() });
+  const code = exitCodeOf({ result });
+  const report = {
+    revision: revisionOf({ sources }),
+    scope: paths,
+    violations: result.violations,
+    approvedEscapes: result.approvedEscapes,
+    unclassifiedCandidates: result.unclassifiedCandidates,
+    adoptedRoots: result.adoptedRoots,
+    unknown: result.unknown,
+    classifiedCandidates: result.classifiedCandidates,
+    counts: {
+      violationParts: result.violations.length,
+      violationRoots: new Set(result.violations.map((found) => found.root)).size,
+      approvedEscapes: result.approvedEscapes.length,
+      unclassifiedCandidates: result.unclassifiedCandidates.length,
+      unknown: result.unknown.length,
+      adoptedRoots: result.adoptedRoots.length,
+    },
+    ownedElsewhere: result.ownedElsewhere,
+    targetApi: targetApi(),
+  };
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  process.stderr.write(
+    `census check: ${result.violations.length} violations, ${result.unclassifiedCandidates.length} unclassified candidates, ${result.unknown.length} unknown, ${result.adoptedRoots.length} adopted roots in ${sources.size} files\n`,
+  );
+  process.exitCode = code;
+}
+
+if (import.meta.main && process.argv.includes("--check")) {
+  runCheck();
+} else if (import.meta.main) {
   const adoption = collectAdoption();
   const report = process.argv.indexOf("--report");
   const target = report === -1 ? undefined : process.argv[report + 1];

@@ -1,9 +1,29 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import { censusSites, summariseCensus } from "../.storybook/census.ts";
+import {
+  type CensusSite,
+  type Escape,
+  censusSites,
+  driftKind,
+  evaluateCheck,
+  exitCodeOf,
+  loadEscapes,
+  matchesPath,
+  summariseCensus,
+  targetApi,
+} from "../.storybook/census.ts";
 
 const file = "modules/example/browser/src/ui/example.tsx";
-const sitesOf = (source: string) => censusSites({ file, source }).sites;
+const sitesOf = (source: string, at = file) => censusSites({ file: at, source }).sites;
+const imports = {
+  primitives: (names: string) => `import { ${names} } from "@langwatch/design-system/primitives";`,
+  drawer: 'import { Drawer } from "@langwatch/design-system/drawer";',
+};
+const where = (sites: CensusSite[], rule: string) => sites.filter((site) => site.rule === rule);
 
 describe("shape census classifier", () => {
   it("counts a bordered, rounded Box as a hand-built card", () => {
@@ -117,5 +137,508 @@ describe("shape census classifier", () => {
     const { families } = summariseCensus({ sites, literals: [] });
     expect(families.drawers).toMatchObject({ overridden: 3, variants: 2 });
     expect(families.drawers.clusters[0]).toMatchObject({ count: 2 });
+  });
+
+  /** @scenario "The target API counts as adopted roots, matched by exact source and export" */
+  it("recognises the callable target API by source and export as adopted roots", () => {
+    const sites = sitesOf(`
+      import { Drawer } from "@langwatch/design-system/drawer";
+      import { Dialog } from "@langwatch/design-system/dialog";
+      import { Card, CardGrid } from "@langwatch/design-system/card";
+      import { ResourceTile } from "@langwatch/design-system/resource-tile";
+      import { LoadMore } from "@langwatch/design-system/load-more";
+      import { ListPage } from "@langwatch/design-system/list-page";
+      import { ActionRow } from "@langwatch/design-system/action-row";
+      export const All = () => (
+        <>
+          <Drawer title="Edit" size="md" onClose={close} />
+          <Dialog title="Sure" size="sm" />
+          <CardGrid columns={2}>
+            <Card padding="sm" variant="nested" title="Policy" />
+          </CardGrid>
+          <ResourceTile title="Flow" />
+          <LoadMore hasMore />
+          <ListPage title="Runs" />
+          <ActionRow />
+        </>
+      );
+    `);
+    expect(sites.map((site) => site.what)).toEqual([
+      "Drawer",
+      "Dialog",
+      "CardGrid",
+      "Card",
+      "ResourceTile",
+      "LoadMore",
+      "ListPage",
+      "ActionRow",
+    ]);
+    expect(sites.every((site) => site.adopted && site.disposition === "adopted")).toBe(true);
+    const card = sites.find((site) => site.what === "Card");
+    expect(card).toMatchObject({ props: {}, choices: { padding: "sm", variant: "nested" } });
+    const { families } = summariseCensus({ sites, literals: [] });
+    expect(families.cards).toMatchObject({ adoptedRoots: 3, parts: 0, overridden: 0 });
+    expect(families.pagination).toMatchObject({ adoptedRoots: 1, roots: 1 });
+  });
+
+  /** @scenario "The target API counts as adopted roots, matched by exact source and export" */
+  it("flags a style prop on the target API and an export from an unregistered source", () => {
+    const sites = sitesOf(`
+      import { Card } from "@langwatch/design-system/card";
+      import { Drawer } from "@langwatch/design-system/drawer";
+      import { LoadMore } from "@langwatch/design-system/settings-card";
+      export const A = () => <Card padding="sm" bg="red.500" />;
+      export const B = () => <Drawer size="md" width="40rem" />;
+      export const C = () => <LoadMore />;
+    `);
+    expect(sites).toEqual([
+      expect.objectContaining({ what: "Card", disposition: "violation", rule: "restyle" }),
+      expect.objectContaining({ what: "Drawer", props: { width: "40rem" } }),
+      expect.objectContaining({ what: "LoadMore", disposition: "unknown" }),
+    ]);
+    expect(sites[0]?.props).toEqual({ bg: "red.500" });
+  });
+
+  /** @scenario "Legacy raw parts are violations even when they carry no style props" */
+  it("counts style-free legacy parts as violations sharing one owning root", () => {
+    const sites = sitesOf(`
+      ${imports.drawer}
+      import { RawDialog } from "@langwatch/design-system/dialog";
+      import { RawPagination } from "@langwatch/design-system/pagination";
+      ${imports.primitives("EmptyState, Card")}
+      export const D = () => (
+        <Drawer.Root>
+          <Drawer.Content>
+            <Drawer.Header>
+              <Drawer.Title />
+            </Drawer.Header>
+          </Drawer.Content>
+        </Drawer.Root>
+      );
+      export const E = () => <EmptyState.Root><EmptyState.Title /></EmptyState.Root>;
+      export const C = () => <Card.Root><Card.Body /></Card.Root>;
+      export const R = () => <RawDialog.Root><RawDialog.Backdrop /><RawDialog.Content /></RawDialog.Root>;
+      export const P = () => (
+        <RawPagination.Root>
+          <RawPagination.PrevTrigger />
+          <RawPagination.NextTrigger />
+          <RawPagination.Items />
+        </RawPagination.Root>
+      );
+    `);
+    expect(sites.every((site) => site.disposition === "violation")).toBe(true);
+    expect(new Set(where(sites, "legacy-overlay-part").map((site) => site.family))).toEqual(
+      new Set(["drawers"]),
+    );
+    expect(new Set(where(sites, "raw-export").map((site) => site.family))).toEqual(
+      new Set(["dialogs", "pagination"]),
+    );
+    expect(where(sites, "legacy-empty-state")).toHaveLength(2);
+    expect(where(sites, "legacy-card-part")).toHaveLength(2);
+    const roots = (family: string) =>
+      new Set(sites.filter((s) => s.family === family).map((s) => s.root));
+    expect(roots("drawers").size).toBe(1);
+    expect(roots("pagination").size).toBe(1);
+    const { families } = summariseCensus({ sites, literals: [] });
+    expect(families.pagination).toMatchObject({ roots: 1, affectedRoots: 1, parts: 4 });
+    expect(families.drawers).toMatchObject({ roots: 1, parts: 4 });
+  });
+
+  /** @scenario "Namespace imports, aliases and destructuring resolve; shadowed names do not" */
+  it("resolves namespace imports, const aliases and destructuring like direct imports", () => {
+    const sites = sitesOf(`
+      import * as DS from "@langwatch/design-system";
+      import * as Overlay from "@langwatch/design-system/drawer";
+      ${imports.drawer}
+      const Panel = Drawer.Root;
+      const { Content, Header: Top } = Drawer;
+      export const A = () => <Overlay.Drawer.Root />;
+      export const B = () => <Panel />;
+      export const C = () => <Content />;
+      export const D = () => <Top />;
+      export const E = () => <DS.Drawer title="Edit" />;
+    `);
+    expect(sites.map((site) => [site.what, site.disposition])).toEqual([
+      ["Drawer.Root", "violation"],
+      ["Drawer.Root", "violation"],
+      ["Drawer.Content", "violation"],
+      ["Drawer.Header", "violation"],
+      ["Drawer", "adopted"],
+    ]);
+  });
+
+  /** @scenario "Namespace imports, aliases and destructuring resolve; shadowed names do not" */
+  it("does not count a local or shadowing name as the design system", () => {
+    const sites = sitesOf(`
+      ${imports.primitives("Card")}
+      ${imports.drawer}
+      export const Param = ({ Card }) => <Card.Root padding={4} />;
+      export function Inner() {
+        const Drawer = makeDrawer();
+        return <Drawer.Root padding={4} />;
+      }
+      export const Real = () => <Card.Root />;
+    `);
+    expect(sites).toEqual([expect.objectContaining({ what: "Card.Root", line: 9 })]);
+    const local = sitesOf(`
+      function Card() { return null; }
+      export const X = () => <Card.Root padding={4} />;
+      export const Y = () => <SomethingElse.Root padding={4} />;
+    `);
+    expect(local).toEqual([]);
+  });
+
+  /** @scenario "Namespace imports, aliases and destructuring resolve; shadowed names do not" */
+  it("marks a wrapper it cannot see through as unknown, and a module copy as a caller", () => {
+    const sites = sitesOf(`
+      import styled from "@emotion/styled";
+      import { Dialog } from "@langwatch/design-system/dialog";
+      ${imports.drawer}
+      import { Drawer as OwnDrawer } from "./own-drawer";
+      const Pick = wide ? Drawer.Root : Dialog.Root;
+      const Styled = styled(Drawer.Content);
+      export const A = () => <Pick />;
+      export const B = () => <Styled />;
+      export const C = () => <OwnDrawer />;
+    `);
+    expect(sites.map((site) => [site.rule, site.disposition, site.family])).toEqual([
+      ["unresolved-wrapper", "unknown", "drawers"],
+      ["unresolved-wrapper", "unknown", "drawers"],
+      ["local-copy", "violation", "drawers"],
+    ]);
+    expect(sites[2]?.wrapper).toBe("caller");
+    const { families } = summariseCensus({ sites, literals: [] });
+    expect(families.drawers).toMatchObject({ roots: 2, callers: 1, unknown: 2 });
+  });
+
+  /** @scenario "Literal spreads and style conditions count as restyles, split by kind" */
+  it("reads literal spreads, const spreads and style-condition objects", () => {
+    const sites = sitesOf(`
+      ${imports.primitives("Card")}
+      const tight = { p: 2, _hover: { bg: "red.50" } };
+      export const A = () => <Card.Root {...{ p: 9 }} />;
+      export const B = () => <Card.Root {...tight} />;
+      export const D = () => (
+        <Card.Root
+          _hover={{ bg: "gray.100", cursor: "pointer" }}
+          _selected={{ borderColor: "blue.500" }}
+          color="fg.muted"
+          textStyle="sm"
+          fontWeight="bold"
+        />
+      );
+    `);
+    expect(sites[0]?.props).toEqual({ padding: "9" });
+    expect(sites[1]?.props).toEqual({ padding: "2", "_hover.bg": "red.50" });
+    expect(sites[2]?.props).toEqual({
+      "_hover.bg": "gray.100",
+      "_selected.borderColor": "blue.500",
+      color: "fg.muted",
+      textStyle: "sm",
+      fontWeight: "bold",
+    });
+    const { families } = summariseCensus({ sites, literals: [] });
+    expect(families.cards).toMatchObject({ geometryParts: 2, cosmeticParts: 2, opaqueParts: 0 });
+    expect(driftKind({ prop: "_hover.padding" })).toBe("geometry");
+    expect(driftKind({ prop: "css" })).toBe("opaque");
+    expect(driftKind({ prop: "boxShadow" })).toBe("cosmetic");
+  });
+
+  /** @scenario "Literal spreads and style conditions count as restyles, split by kind" */
+  it("marks a spread it cannot read as unknown, never clean", () => {
+    const sites = sitesOf(`
+      import { ListTable } from "@langwatch/design-system/list-table";
+      export const A = (props) => <ListTable {...props} />;
+      export const B = () => <ListTable {...{ p: 2 }} />;
+    `);
+    expect(sites).toEqual([
+      expect.objectContaining({ disposition: "unknown", rule: "unresolved-props" }),
+      expect.objectContaining({ disposition: "violation", rule: "restyle" }),
+    ]);
+  });
+
+  /** @scenario "A card box needs a real border and carries a destination" */
+  it("draws no card from a zero border, and gives a real one a destination", () => {
+    const box = (attrs: string) =>
+      sitesOf(`${imports.primitives("Box")} export const X = () => <Box ${attrs} />;`);
+    expect(box('borderWidth={0} borderRadius="md"')).toEqual([]);
+    expect(box('border="none" borderRadius="md"')).toEqual([]);
+    expect(box('borderWidth="0px" borderRadius="md"')).toEqual([]);
+    const real = box('border="1px solid" borderRadius="md"');
+    expect(real).toEqual([
+      expect.objectContaining({ rule: "card-box", disposition: "candidate", destination: "card" }),
+    ]);
+    expect(real[0]?.heuristic).toBe(false);
+    expect(box('borderWidth={active ? 1 : 0} borderRadius="md"')[0]).toMatchObject({
+      heuristic: true,
+      reason: "border is not a literal",
+    });
+    expect(box('bg="bg.panel" borderRadius="md" borderWidth={0}')).toHaveLength(1);
+  });
+
+  /** @scenario "A card box needs a real border and carries a destination" */
+  it("keeps a real square card and classifies other destinations", () => {
+    const box = (attrs: string) =>
+      sitesOf(`${imports.primitives("Box, Flex")} export const X = () => <Box ${attrs} />;`);
+    const square = 'borderWidth="1px" borderRadius="md"';
+    expect(box(`boxSize="200px" ${square}`)[0]).toMatchObject({ destination: "card" });
+    expect(box(`boxSize="8" ${square}`)[0]).toMatchObject({ destination: "icon-tile" });
+    expect(box(`${square} _focusWithin={{ borderColor: "blue.500" }}`)[0]).toMatchObject({
+      destination: "input",
+    });
+    expect(box(`${square} role="radio"`)[0]).toMatchObject({ destination: "RadioCard" });
+    const tooltip = sitesOf(`
+      ${imports.primitives("Box")}
+      import { Tooltip } from "@langwatch/design-system/tooltip";
+      export const T = () => <Tooltip content={<Box borderWidth="1px" borderRadius="md" />} />;
+    `);
+    expect(tooltip[0]).toMatchObject({ destination: "tooltip" });
+    expect(box(`role="alert" ${square}`)).toEqual([]);
+  });
+
+  /** @scenario "Pagination finds append actions and scopes Previous and Next to one pager" */
+  it("finds append actions by their real labels", () => {
+    const sites = sitesOf(`
+      ${imports.primitives("Button")}
+      export const A = () => <Button onClick={more}>Load More...</Button>;
+      export const B = () => <Button>Show earlier</Button>;
+      export const C = () => <Button onClick={() => query.fetchNextPage()}>{label}</Button>;
+      export const D = () => <Button onClick={toggle}>Show more</Button>;
+      export const E = () => <Button onClick={() => fetchMore()}>Show more</Button>;
+      export const F = () => <Button>Save</Button>;
+    `);
+    expect(sites.map((site) => [site.rule, site.disposition])).toEqual([
+      ["hand-append", "violation"],
+      ["hand-append", "violation"],
+      ["hand-append", "candidate"],
+      ["hand-append", "candidate"],
+      ["hand-append", "violation"],
+    ]);
+    expect(sites[0]?.what).toBe('hand append "Load More..."');
+  });
+
+  /** @scenario "Pagination finds append actions and scopes Previous and Next to one pager" */
+  it("counts Previous and Next in one container as one pager, not across a file", () => {
+    const one = sitesOf(`
+      ${imports.primitives("Button, HStack")}
+      export const P = () => (
+        <HStack>
+          <Button aria-label="Previous page" />
+          <Button>Next</Button>
+        </HStack>
+      );
+    `);
+    expect(where(one, "hand-pagination")).toHaveLength(1);
+    const apart = sitesOf(`
+      ${imports.primitives("Button, Box, Stack")}
+      export const P = () => (
+        <Stack>
+          <Box><Box><Box><Button>Previous</Button></Box></Box></Box>
+          <Box><Box><Box><Button>Next</Button></Box></Box></Box>
+        </Stack>
+      );
+    `);
+    expect(where(apart, "hand-pagination")).toEqual([]);
+  });
+
+  /** @scenario "A list page is inferred per component and labelled heuristic" */
+  it("infers a list page per component, as a heuristic candidate", () => {
+    const sites = sitesOf(`
+      import { PageLayout } from "@langwatch/design-system/page-layout";
+      import { ListPage } from "@langwatch/design-system/list-page";
+      ${imports.primitives("Table")}
+      export const Old = () => <PageLayout.Header><Table.Root /></PageLayout.Header>;
+      export const Header = () => <PageLayout.Header />;
+      export const Rows = () => <Table.Root />;
+      export const Both = () => <><PageLayout.Header /><ListPage /><Table.Root /></>;
+    `);
+    expect(where(sites, "list-page-inference")).toEqual([
+      expect.objectContaining({ disposition: "candidate", heuristic: true, family: "listPages" }),
+    ]);
+  });
+
+  /** @scenario "Headings carry a semantic level and an owning surface" */
+  it("reads the semantic heading level and the owning surface", () => {
+    const sites = sitesOf(`
+      ${imports.primitives("Heading, Text, Card")}
+      export const A = () => <h1>Title</h1>;
+      export const B = () => <Text as="h1">Title</Text>;
+      export const C = () => <Heading as="h2" size="lg">Title</Heading>;
+      export const D = () => <Heading size="md">Section</Heading>;
+      export const E = () => <Card.Root><Heading as="h1">In a card</Heading></Card.Root>;
+    `);
+    const titles = where(sites, "page-title-h1");
+    expect(titles.map((site) => site.surface)).toEqual(["page", "page", "cards"]);
+    expect(titles.every((site) => site.disposition === "violation")).toBe(true);
+    expect(where(sites, "page-title-size")).toEqual([
+      expect.objectContaining({ disposition: "candidate", heuristic: true, line: 5 }),
+    ]);
+  });
+
+  /** @scenario "Headings carry a semantic level and an owning surface" */
+  it("counts a raw Button in the page header or ListPage actions", () => {
+    const sites = sitesOf(`
+      import { PageLayout } from "@langwatch/design-system/page-layout";
+      import { ListPage } from "@langwatch/design-system/list-page";
+      ${imports.primitives("Button, Heading")}
+      export const A = () => (
+        <PageLayout.Header>
+          <Heading as="h1">Runs</Heading>
+          <Button>New</Button>
+        </PageLayout.Header>
+      );
+      export const B = () => <ListPage actions={<Button>New</Button>} />;
+      export const C = () => <ListPage><Button>Row</Button></ListPage>;
+    `);
+    expect(where(sites, "raw-header-button").map((site) => site.line)).toEqual([8, 11]);
+    expect(where(sites, "page-title-h1")).toEqual([]);
+  });
+
+  /** @scenario "Hand empty-state text is a candidate and EmptyState parts are legacy" */
+  it("reads empty-state text as heuristic candidates, expressions included", () => {
+    const sites = sitesOf(`
+      ${imports.primitives("Text")}
+      import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+      export const A = () => <Text>No runs found yet</Text>;
+      export const B = () => <Text>{"No datasets to show"}</Text>;
+      export const C = () => <NoDataInfoBlock><Text>No runs found yet</Text></NoDataInfoBlock>;
+    `);
+    const empty = where(sites, "empty-text");
+    expect(empty).toHaveLength(2);
+    expect(empty.every((site) => site.disposition === "candidate" && site.heuristic)).toBe(true);
+    expect(sites.filter((site) => site.disposition === "violation")).toEqual([]);
+    expect(sites.find((site) => site.what === "NoDataInfoBlock")?.adopted).toBe(true);
+  });
+
+  /** @scenario "Roots, affected roots, parts and candidates are reported separately" */
+  it("attributes parts to their owning root and keeps signatures in full", () => {
+    const sites = sitesOf(`
+      ${imports.drawer}
+      ${imports.primitives("Card")}
+      export const Edit = () => (
+        <Drawer.Root>
+          <Drawer.Content bg="bg">
+            <Drawer.Header />
+            <Drawer.Footer />
+          </Drawer.Content>
+        </Drawer.Root>
+      );
+      export const Extracted = () => <Drawer.Footer padding={4} />;
+    `);
+    const { families } = summariseCensus({ sites, literals: [] });
+    expect(families.drawers).toMatchObject({
+      roots: 2,
+      affectedRoots: 2,
+      parts: 5,
+      candidates: 0,
+      adoptedRoots: 0,
+    });
+    expect(sites[4]?.root).toMatch(/::Extracted$/);
+    expect(sites[2]?.root).toBe(sites[0]?.root);
+    const long = (tail: string) =>
+      sitesOf(`
+        ${imports.primitives("Card")}
+        export const C = () => <Card.Root bg={isActive ? "bg.panel/60" : isHovered ? "bg.panel/80" : "${tail}"} />;
+      `);
+    const cards = summariseCensus({
+      sites: [...long("bg.subtle"), ...long("bg.muted")],
+      literals: [],
+    });
+    expect(cards.families.cards.variants).toBe(2);
+    expect(cards.families.cards.clusters.map((cluster) => cluster.signature).join()).toContain(
+      '"bg.subtle"',
+    );
+  });
+
+  /** @scenario "Upgrade files are counted but marked as owned elsewhere" */
+  it("marks upgrade files as owned by upgrade and lists them without failing the wave", () => {
+    const upgrade = "modules/ops/browser/src/features/upgrades/ui/sections/step.tsx";
+    const billing = "enterprise/modules/billing/browser/src/ui/blocks/upgrade-plan-block.tsx";
+    const source = `${imports.drawer} export const D = () => <Drawer.Root />;`;
+    const owned = sitesOf(source, upgrade);
+    expect(owned[0]?.owner).toBe("upgrade");
+    expect(sitesOf(source, billing)[0]?.owner).toBeUndefined();
+    const result = evaluateCheck({ sites: owned, escapes: [] });
+    expect(result.violations).toEqual([]);
+    expect(result.ownedElsewhere).toEqual({
+      upgrade: { violations: 1, candidates: 0, unknown: 0 },
+    });
+    expect(exitCodeOf({ result })).toBe(0);
+    expect(summariseCensus({ sites: owned, literals: [] }).owners.upgrade?.violations).toBe(1);
+  });
+
+  /** @scenario "The check gate sorts sites into violations, approved escapes and candidates" */
+  it("fails on an unsuppressed violation and passes it once an escape approves it", () => {
+    const source = `${imports.drawer} export const D = () => <Drawer.Root />;`;
+    const a = "modules/a/browser/src/a.tsx";
+    const b = "modules/b/browser/src/b.tsx";
+    const sites = [...sitesOf(source, a), ...sitesOf(source, b)];
+    const escape: Escape = {
+      path: b,
+      rule: "legacy-overlay-part",
+      reason: "resize rail",
+      owner: "trace",
+    };
+    const result = evaluateCheck({ sites, escapes: [escape] });
+    expect(result.violations.map((finding) => finding.file)).toEqual([a]);
+    expect(result.approvedEscapes).toEqual([
+      expect.objectContaining({ file: b, escape: { reason: "resize rail", owner: "trace" } }),
+    ]);
+    expect(exitCodeOf({ result })).toBe(1);
+    const approved = evaluateCheck({
+      sites,
+      escapes: [escape, { ...escape, path: "modules/a/browser/src/**" }],
+    });
+    expect(exitCodeOf({ result: approved })).toBe(0);
+  });
+
+  /** @scenario "The check gate sorts sites into violations, approved escapes and candidates" */
+  it("fails on an unclassified candidate or unknown until it has a disposition", () => {
+    const box = (attrs: string, at: string) =>
+      sitesOf(`${imports.primitives("Box")} export const X = () => <Box ${attrs} />;`, at);
+    const card = 'borderWidth="1px" borderRadius="md"';
+    const path1 = "modules/a/browser/src/a.tsx";
+    const open = evaluateCheck({ sites: box(card, path1), escapes: [] });
+    expect(open.unclassifiedCandidates).toHaveLength(1);
+    expect(exitCodeOf({ result: open })).toBe(2);
+    const reviewed: Escape = {
+      path: path1,
+      rule: "card-box",
+      reason: "the diagram frame",
+      owner: "x",
+      disposition: "reviewed",
+    };
+    expect(
+      exitCodeOf({ result: evaluateCheck({ sites: box(card, path1), escapes: [reviewed] }) }),
+    ).toBe(0);
+    const icon = evaluateCheck({ sites: box(`boxSize="8" ${card}`, path1), escapes: [] });
+    expect(icon.classifiedCandidates).toHaveLength(1);
+    expect(exitCodeOf({ result: icon })).toBe(0);
+    const unknown = sitesOf(
+      'import { ListTable } from "@langwatch/design-system/list-table"; export const T = (p) => <ListTable {...p} />;',
+      path1,
+    );
+    expect(exitCodeOf({ result: evaluateCheck({ sites: unknown, escapes: [] }) })).toBe(2);
+    expect(evaluateCheck({ sites: unknown, escapes: [] }).adoptedRoots).toHaveLength(1);
+  });
+
+  /** @scenario "The check gate sorts sites into violations, approved escapes and candidates" */
+  it("refuses an escape without a reason, and matches paths by glob or directory", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "census-escapes-"));
+    const bad = path.join(dir, "bad.json");
+    writeFileSync(bad, JSON.stringify([{ path: "a", rule: "card-box", owner: "x", reason: " " }]));
+    expect(() => loadEscapes({ file: bad })).toThrow(/needs a non-empty "reason"/);
+    const good = path.join(dir, "good.json");
+    writeFileSync(good, JSON.stringify([{ path: "a/**", rule: "*", owner: "x", reason: "why" }]));
+    expect(loadEscapes({ file: good })).toHaveLength(1);
+    expect(matchesPath({ file: "modules/a/browser/src/x/y.tsx", glob: "modules/a/**" })).toBe(true);
+    expect(matchesPath({ file: "modules/a/browser/src/x/y.tsx", glob: "modules/a/*" })).toBe(false);
+    expect(matchesPath({ file: "modules/a/browser/src/y.tsx", glob: "modules/a/browser" })).toBe(
+      true,
+    );
+    expect(matchesPath({ file: "modules/ab/browser/src/y.tsx", glob: "modules/a" })).toBe(false);
+    const registry = targetApi().find((entry) => entry.export === "Card");
+    expect(registry).toMatchObject({ source: "@langwatch/design-system/card", family: "cards" });
+    expect(typeof registry?.planned).toBe("boolean");
   });
 });
