@@ -1,8 +1,12 @@
 -- CreateEnum
-CREATE TYPE "FeatureFlagExperimentSubjectType" AS ENUM ('USER', 'ORGANIZATION', 'PROJECT');
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'FeatureFlagExperimentSubjectType') THEN
+        CREATE TYPE "FeatureFlagExperimentSubjectType" AS ENUM ('USER', 'ORGANIZATION', 'PROJECT');
+    END IF;
+END $$;
 
 -- CreateTable
-CREATE TABLE "FeatureFlagExperimentSetting" (
+CREATE TABLE IF NOT EXISTS "FeatureFlagExperimentSetting" (
     "flagKey" TEXT NOT NULL,
     "subjectType" "FeatureFlagExperimentSubjectType" NOT NULL,
     "subjectId" TEXT NOT NULL,
@@ -15,4 +19,4 @@ CREATE TABLE "FeatureFlagExperimentSetting" (
 );
 
 -- CreateIndex
-CREATE INDEX "FeatureFlagExperimentSetting_subjectType_subjectId_idx" ON "FeatureFlagExperimentSetting"("subjectType", "subjectId");
+CREATE INDEX IF NOT EXISTS "FeatureFlagExperimentSetting_subjectType_subjectId_idx" ON "FeatureFlagExperimentSetting"("subjectType", "subjectId");

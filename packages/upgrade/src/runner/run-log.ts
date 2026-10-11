@@ -225,9 +225,17 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
   }
 
   /** A failed row an earlier run left for a re-runnable migration, resolved at preflight. */
-  resolvedBeforeApply({ migration, resolveMs }: { migration: string; resolveMs: number }): void {
+  resolvedBeforeApply({
+    migration,
+    resolveMs,
+    because = "is re-runnable",
+  }: {
+    migration: string;
+    resolveMs: number;
+    because?: string;
+  }): void {
     this.info(
-      `Prisma migration ${migration} failed in an earlier run and is re-runnable: marked it ` +
+      `Prisma migration ${migration} failed in an earlier run and ${because}: marked it ` +
         `rolled back (${resolveCommand(migration)}) in ${resolveMs} ms; this run applies it again`,
       {
         phase: "preflight",
@@ -247,6 +255,7 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
     waitMs,
     resolveMs,
     error,
+    because = "is re-runnable",
   }: {
     migration: string;
     attempt: number;
@@ -254,10 +263,11 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
     waitMs: number;
     resolveMs: number;
     error: string | null;
+    because?: string;
   }): void {
     this.warn(
-      `Prisma migration ${migration} failed on attempt ${attempt} of ${attempts} and is ` +
-        `re-runnable: marked it rolled back (${resolveCommand(migration)}) in ${resolveMs} ms; ` +
+      `Prisma migration ${migration} failed on attempt ${attempt} of ${attempts} and ` +
+        `${because}: marked it rolled back (${resolveCommand(migration)}) in ${resolveMs} ms; ` +
         `applying it again in ${waitMs} ms. Error: ${error ?? "none given"}`,
       {
         phase: "postgres-schema",

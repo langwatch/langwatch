@@ -6,7 +6,7 @@
 -- application before it writes, and relies on none of these indexes by name.
 
 -- Role: the name index moves to live rows.
-CREATE UNIQUE INDEX "Role_organizationId_name_live_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "Role_organizationId_name_live_key"
   ON "Role"("organizationId", "name")
   WHERE "deletedAt" IS NULL;
 DROP INDEX IF EXISTS "Role_organizationId_name_key";

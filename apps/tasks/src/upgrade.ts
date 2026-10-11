@@ -282,13 +282,35 @@ async function migrateClickHouse({
 }
 
 /**
- * Unreleased migrations rewritten in place (Alex, 2026-10-09). A local dev database that applied
- * the old text gets the new checksum so `prisma migrate dev` does not ask for a reset.
+ * Unreleased migrations rewritten in place (Alex, 2026-10-09; guarded 2026-10-11). A local dev
+ * database that applied the old text gets the new checksum, so `prisma migrate dev` asks no reset.
  * ponytail: delete this list once the next release ships; never extend it to a released migration.
  */
 const REWRITTEN_UNRELEASED_MIGRATIONS = [
+  "20261006150001_authz_user_standing",
+  "20261006150002_gateway_trace_export_key",
+  "20261006150003_api_key_system_managed",
+  "20261006160000_organization_dataset_attachment_max_mb",
+  "20261006170501_web_push",
+  "20261006170502_stored_objects",
+  "20261006170503_feature_flag_experiment_settings",
+  "20261006170504_sso_authentication_activity_provider_account_id",
+  "20261006170505_project_active_day",
+  "20261006170506_virtual_key_connect_services",
   "20261006170507_virtual_key_license_facts",
+  "20261006170508_gateway_connect_upstream",
+  "20261006170509_dataset_source_stored_object",
+  "20261006170510_issued_license_seats_raised_from",
   "20261006170511_connected_seat_change_not_onboarded",
+  "20261006170512_role_name_live_unique_bindings_not_unique",
+  "20261006170513_slack_connection_claim",
+  "20261006170514_nurturing_read_model",
+  "20261006170515_nurturing_simulation_run_count",
+  "20261006170516_billing_checkpoint_counted_event_id",
+  "20261006170517_user_notification_preferences",
+  "20261006170518_trace_ingest_source_billing",
+  "20261006170527_data_privacy_project_scope",
+  "20261006180001_gateway_realtime_session_metering",
 ] as const;
 
 /** Development only: production never rewrites a recorded checksum. */

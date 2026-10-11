@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "SsoAuthenticationActivity" ADD COLUMN "providerAccountId" TEXT;
+ALTER TABLE "SsoAuthenticationActivity" ADD COLUMN IF NOT EXISTS "providerAccountId" TEXT;

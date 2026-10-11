@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
+import { OPERATOR_RETRY_KEY, UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 import type { SchemaTargetReport, UpgradeSchemaApplier } from "../runner/schema-applier.ts";
 import { createUpgradeRunner, type UpgradeRunnerOptions } from "../runner/upgrade-runner.ts";
 import { applyRelease } from "../stepping/apply-release.ts";
@@ -93,12 +94,12 @@ async function writeFolder({ name, sql }: { name: string; sql: string }): Promis
 }
 
 /** The real applier over the scratch folders; records what each attempt left behind. */
-async function realApplier({ next }: { next: string }) {
+async function realApplier({ next, sql = NOTE_SQL }: { next: string; sql?: string }) {
   const folders = {
     "3.20.1": [
       await writeFolder({ name: BASE, sql: 'CREATE TABLE "Alpha" ("id" TEXT PRIMARY KEY);' }),
     ],
-    "3.21.0": [await writeFolder({ name: next, sql: NOTE_SQL })],
+    "3.21.0": [await writeFolder({ name: next, sql })],
   };
   const upTo = (release: string | null) =>
     release === "3.20.1" ? folders["3.20.1"] : [...folders["3.20.1"], ...folders["3.21.0"]];
@@ -404,3 +405,126 @@ describe.skipIf(!DB_URL)(
     });
   },
 );
+
+describe.skipIf(!DB_URL)("re-running a migration below the marker", () => {
+  const HALF = "20261001120001_organization_instant_evals_opt_in";
+  const ledgerStep = async (id: string) =>
+    (await UpgradeLedgerRepository.create({ postgres: scratch.postgres }).findSteps()).find(
+      (each) => each.id === id,
+    );
+  const pressRetry = (id: string) =>
+    UpgradeRunnerRepository.create({ postgres: scratch.postgres }).retryFailedStep({ id });
+
+  /** A table outside Prisma's schema (deploy refuses a non-empty one), held under a lock. */
+  async function lockedHold() {
+    await scratch.postgres.query('CREATE SCHEMA "held"');
+    await scratch.postgres.query('CREATE TABLE "held"."Hold" ("id" TEXT PRIMARY KEY)');
+    const holder: PoolClient = await scratch.postgres.connect();
+    await holder.query("BEGIN");
+    await holder.query('LOCK TABLE "held"."Hold" IN ACCESS EXCLUSIVE MODE');
+    let released: Promise<unknown> | null = null;
+    return () => {
+      released ??= holder.query("COMMIT").finally(() => holder.release());
+      return released;
+    };
+  }
+
+  /** @scenario "A first install retries a failed migration whatever the marker" */
+  it("marks the failed folder rolled back and retries it on a first install", async () => {
+    const release = await lockedHold();
+    const sql = 'ALTER TABLE "held"."Hold" ADD COLUMN "note" TEXT;';
+    const { applier, attempts, resolves } = await realApplier({ next: OLDER, sql });
+    const lines: Line[] = [];
+    const log = {
+      info: (message: string, fields: Record<string, unknown> = {}) =>
+        void lines.push({ level: "info", message, fields }),
+      warn: (message: string, fields: Record<string, unknown> = {}) => {
+        lines.push({ level: "warn", message, fields });
+        if (message.includes("this is a first install")) void release();
+      },
+    };
+    const outcome = await run(runnerFor({ release: "3.21.0", next: OLDER, applier, log }));
+    await release();
+
+    expect(outcome, outcome.message).toMatchObject({ exitCode: 0, code: "done" });
+    expect(attempts[0]?.failed).toEqual([OLDER]);
+    expect(resolves).toEqual([OLDER]);
+    expect(await statusOf(`prisma:${OLDER}`)).toBe("done");
+    const hold = await scratch.postgres.query('SELECT count(*) AS count FROM "held"."Hold"');
+    expect(hold.rows).toEqual([{ count: "0" }]);
+  });
+
+  /** @scenario "Retry on Ops Upgrades is the operator's consent to re-run a failed migration" */
+  it("re-runs a folder below the marker once the operator presses Retry", async () => {
+    const lock = await atBaseWithLockedAlpha({ next: OLDER });
+    const first = await realApplier({ next: OLDER });
+    const refused = await run(
+      runnerFor({ release: "3.21.0", next: OLDER, applier: first.applier }),
+    );
+    await lock.release();
+    expect(refused.code).toBe("failed_prisma_migration");
+    expect(refused.message).toContain("press Retry on its step in Ops > Upgrades");
+
+    expect(await pressRetry(`prisma:${OLDER}`)).toBe(true);
+    expect((await ledgerStep(`prisma:${OLDER}`))?.report).toHaveProperty(OPERATOR_RETRY_KEY);
+    const { applier, resolves } = await realApplier({ next: OLDER });
+    const lines: Line[] = [];
+    const outcome = await run(runnerFor({ release: "3.21.0", next: OLDER, applier, lines }));
+
+    expect(outcome, outcome.message).toMatchObject({ exitCode: 0, code: "done" });
+    expect(resolves).toEqual([OLDER]);
+    expect(lines.map((line) => line.message)).toContainEqual(
+      expect.stringContaining(`${OLDER} failed in an earlier run and an operator pressed Retry`),
+    );
+    const step = await ledgerStep(`prisma:${OLDER}`);
+    expect(step?.status).toBe("done");
+    expect(step?.report ?? {}).not.toHaveProperty(OPERATOR_RETRY_KEY);
+  });
+
+  /** @scenario "A consented re-run that fails again needs a new Retry" */
+  it("spends the Retry, so the run after a failed re-run stops by name", async () => {
+    const lock = await atBaseWithLockedAlpha({ next: OLDER });
+    const first = await realApplier({ next: OLDER });
+    await run(runnerFor({ release: "3.21.0", next: OLDER, applier: first.applier }));
+    await pressRetry(`prisma:${OLDER}`);
+    const second = await realApplier({ next: OLDER });
+    const retried = await run(
+      runnerFor({ release: "3.21.0", next: OLDER, applier: second.applier }),
+    );
+    expect(retried.code).toBe("rerunnable_migration_failed");
+    expect(retried.message).toContain("press Retry on its step in Ops > Upgrades again");
+    await lock.release();
+
+    const { applier, attempts } = await realApplier({ next: OLDER });
+    const outcome = await run(runnerFor({ release: "3.21.0", next: OLDER, applier }));
+    expect(outcome).toMatchObject({ exitCode: 1, code: "failed_prisma_migration" });
+    expect(attempts).toEqual([]);
+    expect(await statusOf(`prisma:${OLDER}`)).toBe("failed");
+  });
+
+  /** @scenario "A two-statement main folder that may be half applied stops with the SQL to run" */
+  it("refuses a half-apply-risk folder even after a Retry, giving the SQL to run", async () => {
+    const base = await realApplier({ next: HALF });
+    await run(runnerFor({ release: "3.20.1", next: HALF, applier: base.applier }));
+    await scratch.postgres.query(
+      `INSERT INTO _prisma_migrations (id, checksum, migration_name, logs)
+       VALUES (gen_random_uuid()::text, 'x', $1, 'cancelled')`,
+      [HALF],
+    );
+    const first = await realApplier({ next: HALF });
+    await run(runnerFor({ release: "3.21.0", next: HALF, applier: first.applier }));
+    expect(await pressRetry(`prisma:${HALF}`)).toBe(true);
+
+    const { applier, attempts, resolves } = await realApplier({ next: HALF });
+    const outcome = await run(runnerFor({ release: "3.21.0", next: HALF, applier }));
+    expect(outcome).toMatchObject({ exitCode: 1, code: "failed_prisma_migration" });
+    expect(outcome.message).toContain(
+      `ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "instantEvalsEnabledAt" TIMESTAMP(3);`,
+    );
+    expect(outcome.message).toContain(
+      `UPDATE "_prisma_migrations" SET "finished_at" = now(), "applied_steps_count" = 1`,
+    );
+    expect([attempts, resolves]).toEqual([[], []]);
+    expect(await statusOf(`prisma:${HALF}`)).toBe("failed");
+  });
+});

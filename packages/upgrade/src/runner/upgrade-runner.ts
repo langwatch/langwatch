@@ -22,7 +22,10 @@ import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
-import { isRerunnablePrismaMigration } from "../stepping/rerunnable-migrations.ts";
+import {
+  findHandAppliedSql,
+  isRerunnablePrismaMigration,
+} from "../stepping/rerunnable-migrations.ts";
 import { ContractArchiveRepository } from "./contract-archive/contract-archive.repository.ts";
 import {
   ContractArchiveError,
@@ -33,7 +36,11 @@ import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.
 import { redactSecrets, resolveCommand, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
 import { DEFAULT_LEASE_TIMING, holdUpgradeLease, type UpgradeLeaseTiming } from "./runner-lease.ts";
-import { type RegisteredStep, UpgradeRunnerRepository } from "./runner-ledger.repository.ts";
+import {
+  OPERATOR_RETRY_KEY,
+  type RegisteredStep,
+  UpgradeRunnerRepository,
+} from "./runner-ledger.repository.ts";
 import type {
   SchemaTargetReport,
   UpgradeReconciler,
@@ -162,11 +169,18 @@ function schemaFailure({
 }
 
 /** Why the runner did not resolve a failed migration itself; null when it was never asked to. */
-type NotResolvedReason = "below-marker" | "not-shipped" | "no-resolver" | { resolveError: string };
+type NotResolvedReason =
+  | "below-marker"
+  | "not-shipped"
+  | "no-resolver"
+  | { resolveError: string }
+  | { handApplied: string };
 
 const NOT_RESOLVED: Record<Exclude<NotResolvedReason, object>, string> = {
   "below-marker":
-    "It is not newer than the re-runnable marker, so the upgrade does not re-run it. ",
+    "It is not newer than the re-runnable marker, so the upgrade does not re-run it unasked. " +
+    "If nothing of it remains, press Retry on its step in Ops > Upgrades and the next upgrade " +
+    "marks it rolled back and applies it again. ",
   "not-shipped": "This image does not ship it, so the upgrade cannot re-run it. ",
   "no-resolver": "",
 };
@@ -178,6 +192,8 @@ function prismaFailure({
   names: readonly string[];
   reason: NotResolvedReason;
 }): UpgradeRunFailure {
+  if (typeof reason === "object" && "handApplied" in reason)
+    return handAppliedFailure({ name: reason.handApplied });
   const command = resolveCommand(names[0]!);
   const why =
     typeof reason === "object"
@@ -193,24 +209,69 @@ function prismaFailure({
   );
 }
 
-/** A re-runnable migration that failed on every attempt; the next upgrade resolves it itself. */
+/** A two-statement main folder that may be half applied: the SQL a person runs, then upgrade. */
+function handAppliedFailure({ name }: { name: string }): UpgradeRunFailure {
+  const sql = findHandAppliedSql({ name });
+  return new UpgradeRunFailure(
+    "failed_prisma_migration",
+    `Prisma migration ${name} failed and is recorded as failed in _prisma_migrations. It runs ` +
+      `two statements and may have stopped between them, so the upgrade never re-runs it. Run ` +
+      `this SQL on the database; it completes the migration whatever it left behind and records ` +
+      `it applied. Then upgrade again: ${sql.join(" ")}`,
+    { migrations: [name], sql },
+  );
+}
+
+/** A resolved migration that failed on every attempt; `again` when the next upgrade re-runs it. */
 function rerunnableFailure({
   names,
   attempts,
   error,
+  again,
 }: {
   names: readonly string[];
   attempts: number;
   error: string | null;
+  again: boolean;
 }): UpgradeRunFailure {
   const detail = redactSecrets(error ?? "no error given");
+  const next = again
+    ? `It is re-runnable, so the next upgrade marks it rolled back and applies it again; no ` +
+      `prisma migrate resolve is needed. Fix the cause first.`
+    : `It was re-run on an operator's Retry, which this run spent. Fix the cause, then press ` +
+      `Retry on its step in Ops > Upgrades again.`;
   return new UpgradeRunFailure(
     "rerunnable_migration_failed",
-    `Prisma migration ${names.join(", ")} failed on all ${attempts} attempts: ${detail}. It is ` +
-      `re-runnable, so the next upgrade marks it rolled back and applies it again; no ` +
-      `prisma migrate resolve is needed. Fix the cause first.`,
+    `Prisma migration ${names.join(", ")} failed on all ${attempts} attempts: ${detail}. ${next}`,
     { migrations: names, attempts, error: detail },
   );
+}
+
+/** What lets a run re-run a migration below the marker: a first install, or an operator Retry. */
+type RerunPermit = { firstInstall: boolean; retried: ReadonlySet<string> };
+
+/**
+ * A first install is a run planned fresh while no upgrade ever succeeded: every Prisma row is this
+ * installation's own, so a failed folder re-runs whatever the marker. A Retry is read from the
+ * step's report (`OPERATOR_RETRY_KEY`). specs/upgrade/rerunnable-migrations.feature.
+ */
+function permitOf({
+  plan,
+  steps,
+  runs,
+}: {
+  plan: UpgradePlan;
+  steps: readonly UpgradeStep[];
+  runs: readonly UpgradeRun[];
+}): RerunPermit {
+  const succeeded = runs.some((run) => run.kind === "upgrade" && run.outcome === "succeeded");
+  const retried = steps.filter(
+    (step) => isPrisma(step.id) && step.report?.[OPERATOR_RETRY_KEY] !== undefined,
+  );
+  return {
+    firstInstall: plan.outcome === "planned" && plan.fresh && !succeeded,
+    retried: new Set(retried.map((step) => step.id.slice("prisma:".length))),
+  };
 }
 
 /**
@@ -228,6 +289,7 @@ export class UpgradeRunnerService {
   private readonly shippedIds: ReadonlySet<string>;
   private readonly archiver: ContractArchiveService;
   private resolved: { migration: string; attempt: number }[] = [];
+  private permit: RerunPermit = { firstInstall: false, retried: new Set() };
 
   private constructor(private readonly options: UpgradeRunnerOptions) {
     this.ledger = UpgradeLedgerRepository.create({ postgres: options.postgres });
@@ -400,6 +462,7 @@ export class UpgradeRunnerService {
     await this.seedOrReinfer();
     const before = { steps: await this.ledger.findSteps(), runs: await this.ledger.findRuns() };
     const { installed, plan } = this.planFrom({ ...before, fresh });
+    this.permit = permitOf({ plan, ...before });
     const run = await this.ledger.startRun({ kind: "upgrade" });
     await this.runner.recordRunPlan({ runId: run.id, release: this.options.image.release, plan });
     this.narrate.planned({ runId: run.id, installed, plan });
@@ -495,8 +558,10 @@ export class UpgradeRunnerService {
   }): Promise<Record<string, unknown>> {
     await phases.start({ name: "preflight" });
     this.resolved = [];
-    await this.resolveLeftFailures({ signal });
+    const retried = [...this.permit.retried].map((name) => `prisma:${name}`);
+    await this.runner.clearOperatorRetry({ ids: retried });
     await this.runner.registerSteps({ steps: this.shipped });
+    await this.resolveLeftFailures({ signal, runId });
     await this.retryFailedBackgroundSteps({ runId });
     const reopened = await this.reopenAfterRollback({ ...before });
     await this.runner.setStatus({ ids: plan.notNeeded, status: "not-needed", runId });
@@ -576,10 +641,23 @@ export class UpgradeRunnerService {
 
   /** Round 21, S3-RETRY: the failed rows the runner may resolve, or why it may not. */
   private resolvable({ names }: { names: readonly string[] }): NotResolvedReason | null {
-    if (!names.every((name) => isRerunnablePrismaMigration({ name }))) return "below-marker";
+    const handApplied = names.find((name) => findHandAppliedSql({ name }).length > 0);
+    if (handApplied !== undefined) return { handApplied };
+    if (!names.every((name) => this.mayRerun({ name }))) return "below-marker";
     if (!names.every((name) => this.shippedIds.has(`prisma:${name}`))) return "not-shipped";
     if (!this.options.applier.resolveRolledBack) return "no-resolver";
     return null;
+  }
+
+  /** Re-runnable, a first install (UD12-F2) or an operator's Retry (Alex, 2026-10-11). */
+  private mayRerun({ name }: { name: string }): boolean {
+    const { firstInstall, retried } = this.permit;
+    return isRerunnablePrismaMigration({ name }) || firstInstall || retried.has(name);
+  }
+
+  private whyRerun({ name }: { name: string }): string {
+    if (isRerunnablePrismaMigration({ name })) return "is re-runnable";
+    return this.permit.firstInstall ? "this is a first install" : "an operator pressed Retry on it";
   }
 
   /** Marks each failed migration rolled back; refuses by name when one cannot be. */
@@ -606,14 +684,31 @@ export class UpgradeRunnerService {
     return elapsed;
   }
 
-  /** A failed row an earlier run left: resolved when re-runnable, else the run stops naming it. */
-  private async resolveLeftFailures({ signal }: { signal: AbortSignal }): Promise<void> {
+  /**
+   * A failed row an earlier run left: resolved when it may re-run, else the run stops naming it
+   * and its step reads failed again, so Ops > Upgrades shows it and the worker does not spin.
+   */
+  private async resolveLeftFailures({
+    signal,
+    runId,
+  }: {
+    signal: AbortSignal;
+    runId: string;
+  }): Promise<void> {
     const failed = await this.failedPrismaMigrations();
     if (failed.length === 0) return;
-    const elapsed = await this.resolveRolledBack({ names: failed, signal });
-    for (const [migration, resolveMs] of elapsed) {
-      this.resolved.push({ migration, attempt: 0 });
-      this.narrate.resolvedBeforeApply({ migration, resolveMs });
+    try {
+      const elapsed = await this.resolveRolledBack({ names: failed, signal });
+      for (const [migration, resolveMs] of elapsed) {
+        this.resolved.push({ migration, attempt: 0 });
+        const because = this.whyRerun({ name: migration });
+        this.narrate.resolvedBeforeApply({ migration, resolveMs, because });
+      }
+    } catch (error) {
+      if (!(error instanceof UpgradeRunFailure)) throw error;
+      const ids = failed.map((name) => `prisma:${name}`).filter((id) => this.shippedIds.has(id));
+      await this.runner.setStatus({ ids, status: "failed", runId, lastError: error.message });
+      throw error;
     }
   }
 
@@ -662,7 +757,10 @@ export class UpgradeRunnerService {
       const reason = this.resolvable({ names: failedPrisma });
       if (reason !== null) throw prismaFailure({ names: failedPrisma, reason });
       const error = reports.find((report) => report.engine === "postgres" && !report.ok)?.error;
-      throw rerunnableFailure({ names: failedPrisma, attempts, error: error ?? null });
+      const again = failedPrisma.every(
+        (name) => isRerunnablePrismaMigration({ name }) || this.permit.firstInstall,
+      );
+      throw rerunnableFailure({ names: failedPrisma, attempts, error: error ?? null, again });
     }
     const failure = schemaFailure({ reports, unfinished });
     if (failure) throw failure;
@@ -746,7 +844,14 @@ export class UpgradeRunnerService {
     const elapsed = await this.resolveRolledBack({ names: failed, signal });
     for (const [migration, resolveMs] of elapsed) {
       this.resolved.push({ migration, attempt: retrying.attempt });
-      this.narrate.resolvedForRetry({ migration, ...retrying, resolveMs, error: error ?? null });
+      const because = this.whyRerun({ name: migration });
+      this.narrate.resolvedForRetry({
+        migration,
+        ...retrying,
+        resolveMs,
+        error: error ?? null,
+        because,
+      });
     }
   }
 

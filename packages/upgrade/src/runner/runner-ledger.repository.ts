@@ -7,6 +7,9 @@ import { PROJECTION_REPLAY_CURSOR } from "../step/projection-replay-step.ts";
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed", "failed"]);
 
+/** The key a Prisma step's report holds while an operator's Retry waits to be spent. */
+export const OPERATOR_RETRY_KEY = "operatorRetryAt";
+
 /** A step the runner registers: a manifest step with the release that shipped it. */
 export type RegisteredStep = ManifestStep & { release: string | null };
 
@@ -266,18 +269,32 @@ export class UpgradeRunnerRepository {
 
   /**
    * Sets one failed step pending in a single conditional write, error cleared and checkpoint kept.
+   * A Prisma step's report records the retry: the operator's consent to re-run the folder.
    * Answers false when the step is not failed, so of two concurrent retries only one wins.
    */
   async retryFailedStep({ id }: { id: string }): Promise<boolean> {
     const { rows } = await this.query<{ id: string }>(
       (t) => `UPDATE ${t.step}
           SET "status" = 'pending', "last_error" = NULL, "inferred" = false, "finished_at" = NULL,
+              "report" = CASE WHEN "id" LIKE 'prisma:%'
+                THEN COALESCE("report", '{}'::jsonb) || jsonb_build_object($2::text, ${NOW_UTC})
+                ELSE "report" END,
               "updated_at" = ${NOW_UTC}
         WHERE "id" = $1 AND "status" = 'failed'
        RETURNING "id"`,
-      [id],
+      [id, OPERATOR_RETRY_KEY],
     );
     return rows.length > 0;
+  }
+
+  /** Spends the operator's retry on these steps, so a later failure needs a new one. */
+  async clearOperatorRetry({ ids }: { ids: readonly string[] }): Promise<void> {
+    if (ids.length === 0) return;
+    await this.query(
+      (t) => `UPDATE ${t.step} SET "report" = NULLIF("report" - $2::text, '{}'::jsonb)
+        WHERE "id" = ANY($1::text[]) AND "report" ? $2::text`,
+      [ids, OPERATOR_RETRY_KEY],
+    );
   }
 
   /** Sets failed steps of one mode pending again, error and checkpoint kept; answers their ids. */
