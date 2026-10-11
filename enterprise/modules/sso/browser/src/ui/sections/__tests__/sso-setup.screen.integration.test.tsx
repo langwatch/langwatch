@@ -4,7 +4,8 @@
  * read, and each press landing on the command it names.
  */
 
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Call = { name: string; input: unknown };
@@ -21,6 +22,7 @@ const { state } = vi.hoisted(() => ({
     grants: [] as unknown[],
     candidates: [] as unknown[],
     polls: [] as ({ enabled?: boolean } | undefined)[],
+    listeners: new Set<() => void>(),
   },
 }));
 
@@ -57,8 +59,15 @@ vi.mock("../../../behavior/sso-api.ts", () => {
         getSetup: {
           useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
             state.polls.push(options);
+            const view = useSyncExternalStore(
+              (listener) => {
+                state.listeners.add(listener);
+                return () => void state.listeners.delete(listener);
+              },
+              () => state.view,
+            );
             return {
-              data: state.view,
+              data: view,
               isLoading: state.isLoading,
               isError: state.isError,
               error: state.error,
@@ -484,7 +493,7 @@ describe("the single sign-on setup page", () => {
         activated: false,
       };
       state.view = setupView({ goLive: ready });
-      const { rerenderWithSsoHost } = renderWithSsoHost(<SsoSetupScreen />);
+      renderWithSsoHost(<SsoSetupScreen />);
 
       fireEvent.click(screen.getByTestId("connection-go-live-activate"));
 
@@ -496,7 +505,7 @@ describe("the single sign-on setup page", () => {
         connection: connectionView({ state: "ACTIVE" }),
         goLive: { ...ready, activated: true },
       });
-      rerenderWithSsoHost(<SsoSetupScreen />);
+      act(() => state.listeners.forEach((listener) => listener()));
 
       expect(state.polls.at(-1)).toEqual({ enabled: false });
       expect(screen.queryByText(/Activation accepted/)).toBeNull();
