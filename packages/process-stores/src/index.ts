@@ -42,6 +42,7 @@ export {
   ConsumerPipelines,
 } from "./pipeline-selection.ts";
 export { openStores } from "./open-stores.ts";
+export { runAsUpgradeStepWork, upgradeStepGroupsKey } from "./upgrade-step-dispatch.ts";
 export { clickhouseRoutesOf } from "./clickhouse-routes.ts";
 export { OverloadedRefusal, StatementBoundTelemetry } from "./clickhouse-member.ts";
 export { memoryObjectStorage } from "./object-storage-memory.ts";

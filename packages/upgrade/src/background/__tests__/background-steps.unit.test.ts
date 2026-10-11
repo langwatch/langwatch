@@ -243,11 +243,13 @@ function serviceOver({
   run,
   log = () => undefined,
   clock = { now: 0 },
+  runStepWork,
 }: {
   ledger: MemoryBackgroundLedger;
   run: MigrationStepRun;
   log?: BackgroundStepsLog;
   clock?: { now: number };
+  runStepWork?: <Result>(work: () => Promise<Result>) => Promise<Result>;
 }) {
   return BackgroundStepsService.create({
     ledger,
@@ -267,6 +269,7 @@ function serviceOver({
     renewEveryMs: 1_000,
     retry: { attempts: 3, firstBackoffMs: 60_000, maxBackoffMs: 600_000 },
     now: () => clock.now,
+    ...(runStepWork === undefined ? {} : { runStepWork }),
   });
 }
 
@@ -813,6 +816,39 @@ describe("BackgroundStepsService one copy at a time", () => {
         lastError: expect.stringContaining("older image"),
       });
       expect(ledger.leaseOwner).toBeNull();
+    });
+  });
+});
+
+describe("BackgroundStepsService queue work", () => {
+  describe("given a worker that runs step work ahead of the queue backlog", () => {
+    /** @scenario "Queue work an upgrade step sends is listed for the upgrade-step consumer" */
+    it("runs the whole step inside that work and records it done", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      let listing = false;
+      const sentWhileListing: boolean[] = [];
+      const service = serviceOver({
+        ledger,
+        runStepWork: async (work) => {
+          listing = true;
+          try {
+            return await work();
+          } finally {
+            listing = false;
+          }
+        },
+        run: async ({ checkpoint }) => {
+          sentWhileListing.push(listing);
+          await checkpoint.save({ report: { sent: 1 } });
+          sentWhileListing.push(listing);
+          return { sent: 2 };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+
+      expect(sentWhileListing).toEqual([true, true]);
+      expect(ledger.row).toMatchObject({ status: "done", report: { sent: 2 } });
     });
   });
 });

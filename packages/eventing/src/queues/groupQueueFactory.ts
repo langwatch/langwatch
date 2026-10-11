@@ -16,6 +16,8 @@ import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./
 export interface EventingGroupQueueFactoryOptions {
   dependencies: GroupQueueDependencies<Record<string, unknown>>;
   consumersEnabled?: boolean;
+  /** A second consumer runs only the groups listed under this key, ahead of any backlog. */
+  allowListKeyFor?: (queueName: string) => string;
 }
 
 /** A schema refusal is deterministic: retrying the same value would only fail 25 times. */
@@ -78,6 +80,18 @@ export async function backOffWhenOverloaded<T>({
   }
 }
 
+/** The queue's own consumer, and one that runs only listed groups when a key names them. */
+function consumerDependencies({
+  dependencies,
+  listedKey,
+}: {
+  dependencies: GroupQueueDependencies<Record<string, unknown>>;
+  listedKey: string | undefined;
+}): GroupQueueDependencies<Record<string, unknown>>[] {
+  if (listedKey === undefined) return [dependencies];
+  return [dependencies, { ...dependencies, dispatchGroupAllowListKey: listedKey }];
+}
+
 /**
  * Adapts the capability-split Group Queue API to Eventing's shared runtime
  * queue port. Application composition owns the Redis and storage dependencies;
@@ -86,6 +100,7 @@ export async function backOffWhenOverloaded<T>({
 export function createEventingGroupQueueFactory({
   dependencies,
   consumersEnabled = true,
+  allowListKeyFor,
 }: EventingGroupQueueFactoryOptions): (
   definition: EventSourcedQueueDefinition<Record<string, unknown>>,
 ) => EventSourcedQueueProcessor<Record<string, unknown>> {
@@ -118,11 +133,13 @@ export function createEventingGroupQueueFactory({
     const refuse = <T>(run: () => Promise<T>) =>
       refuseInvalidValueOnce({ queueName: eventingDefinition.name, run });
     const producer = new GroupQueueProducer(queueDefinition, dependencies);
-    let consumer: RunningGroupQueueConsumer<Record<string, unknown>> | undefined;
+    let consumers: RunningGroupQueueConsumer<Record<string, unknown>>[] = [];
     // Claiming starts on `start()`, never at construction: a job claimed before
     // every pipeline registered its handler has nowhere to go.
-    const startConsuming = (): RunningGroupQueueConsumer<Record<string, unknown>> => {
-      const configuredConsumer = new GroupQueueConsumer(queueDefinition, dependencies);
+    const startConsuming = (
+      consumerDependencies: GroupQueueDependencies<Record<string, unknown>>,
+    ): RunningGroupQueueConsumer<Record<string, unknown>> => {
+      const configuredConsumer = new GroupQueueConsumer(queueDefinition, consumerDependencies);
       return eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
             each: (payload, context) => refuse(() => eventingDefinition.process(payload, context)),
@@ -141,16 +158,23 @@ export function createEventingGroupQueueFactory({
       send: (payload, options) => producer.send(payload, options),
       sendBatch: (payloads, options) => producer.sendBatch(payloads, options),
       start() {
-        if (consumersEnabled) consumer ??= startConsuming();
+        if (!consumersEnabled || consumers.length > 0) return;
+        consumers = consumerDependencies({
+          dependencies,
+          listedKey: allowListKeyFor?.(eventingDefinition.name),
+        }).map(startConsuming);
       },
-      pause: () => consumer?.pause(),
-      resume: () => consumer?.resume(),
+      pause: () => consumers.forEach((each) => each.pause()),
+      resume: () => consumers.forEach((each) => each.resume()),
       async waitUntilReady() {
-        await Promise.all([producer.waitUntilReady(), consumer?.waitUntilReady()]);
+        await Promise.all([
+          producer.waitUntilReady(),
+          ...consumers.map((each) => each.waitUntilReady()),
+        ]);
       },
       async close() {
         await producer.close();
-        await consumer?.close();
+        await Promise.all(consumers.map((each) => each.close()));
       },
     };
   };

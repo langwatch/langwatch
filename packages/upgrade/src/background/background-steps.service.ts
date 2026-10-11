@@ -88,6 +88,8 @@ export interface BackgroundStepsOptions {
   deadlineMs?: number;
   /** A monotonic clock in milliseconds, for the retry backoff and the lease's last renewal. */
   now?: () => number;
+  /** Runs a step so the queue work it sends runs ahead of any backlog (Alex, 2026-10-11). */
+  runStepWork?: <Result>(work: () => Promise<Result>) => Promise<Result>;
 }
 
 type StepOutcome = "done" | "failed" | "retrying" | "held" | "waiting" | "skipped";
@@ -198,20 +200,23 @@ export class BackgroundStepsService {
       const resumeFrom = current.report ?? null;
       await ledger.markRunning({ id: step.id, runId });
       log("info", "background step started", { step: step.id, module, resumed: !!resumeFrom });
-      run = step.run({
-        checkpoint: {
-          resumeFrom,
-          save: async ({ report: saved }) => {
-            if (held.lost())
-              throw new Error(`the lease of ${step.id} was lost; checkpoint refused`);
-            if (held.expired())
-              throw new Error(`${step.id} passed its deadline; checkpoint refused`);
-            await ledger.saveReport({ id: step.id, report: saved });
+      const runStepWork = this.options.runStepWork ?? ((work) => work());
+      run = runStepWork(() =>
+        step.run({
+          checkpoint: {
+            resumeFrom,
+            save: async ({ report: saved }) => {
+              if (held.lost())
+                throw new Error(`the lease of ${step.id} was lost; checkpoint refused`);
+              if (held.expired())
+                throw new Error(`${step.id} passed its deadline; checkpoint refused`);
+              await ledger.saveReport({ id: step.id, report: saved });
+            },
           },
-        },
-        dryRun: false,
-        signal: held.signal,
-      });
+          dryRun: false,
+          signal: held.signal,
+        }),
+      );
       const report = await Promise.race([run, held.deadline]);
       if (held.signal.aborted) return await this.suspend({ step, runId, held });
       if (!forced && (await this.reopenedByRollback({ step }))) return "waiting";

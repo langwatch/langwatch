@@ -22,7 +22,7 @@ export class GroupQueueDispatcher {
   private shutdownRequested = false;
   private running = false;
   private paused = false;
-  /** Ends the loop's wait for a resume; set only while the loop is paused. */
+  /** Ends the loop's wait: for a resume, or a listed-group dispatcher's poll. */
   private wake: (() => void) | null = null;
 
   constructor(
@@ -105,6 +105,7 @@ export class GroupQueueDispatcher {
 
     // Drain signals that arrived during dispatch to prevent
     // immediate re-wake from stale notifications
+    if (this.params.dispatchGroupAllowListKey) return;
     const signalKey = this.params.scripts.getSignalKey();
     await this.params.blockingConnection.del(signalKey);
   }
@@ -145,11 +146,27 @@ export class GroupQueueDispatcher {
   }
 
   private async waitForSignal(): Promise<void> {
+    if (this.params.dispatchGroupAllowListKey) return this.pollListedGroups();
     const signalKey = this.params.scripts.getSignalKey();
     await this.params.blockingConnection.brpop(signalKey, await this.nextWakeTimeoutSec());
     // Drain remaining buffered signals — the upcoming dispatchBatch
     // handles multiple jobs in one Lua call, so N signals = 1 cycle.
     await this.params.blockingConnection.del(signalKey);
+  }
+
+  /**
+   * A listed-group dispatcher beside the queue's own polls instead: the signal list
+   * is the whole queue's, and taking from it leaves the other dispatcher asleep.
+   */
+  private pollListedGroups(): Promise<void> {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => this.wake?.(), this.params.signalTimeoutSec * 1000);
+      this.wake = () => {
+        clearTimeout(timer);
+        this.wake = null;
+        resolve();
+      };
+    });
   }
 
   /**

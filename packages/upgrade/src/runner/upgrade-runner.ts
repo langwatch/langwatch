@@ -1,6 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { generate } from "@langwatch/ksuid";
+import { runAsUpgradeStepWork } from "@langwatch/process-stores";
 
 import { BackgroundStepsService } from "../background/background-steps.service.ts";
 import { BLOCKING_STEP_DEADLINE_MS, stepDeadline } from "../background/step-deadline.ts";
@@ -1068,6 +1069,7 @@ export class UpgradeRunnerService {
       log: (level, message, fields) =>
         level === "warn" ? this.narrate.warn(message, fields) : undefined,
       retry: { attempts: 1, firstBackoffMs: 0, maxBackoffMs: 0 },
+      runStepWork: runAsUpgradeStepWork,
     });
     const description = this.codeSteps.get(id)?.description ?? id;
     this.narrate.stepStarted({ id, description, resuming: false });

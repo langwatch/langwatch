@@ -160,3 +160,27 @@ Feature: The worker runs declared background steps
     When the run finishes
     Then the step is not recorded done
     And it is pending again with its checkpoint cleared, naming why
+
+  # Queue work from upgrade steps runs ahead of bulk work (Alex, 2026-10-11): the worker runs a
+  # second consumer that takes only the groups an upgrade step's sends listed. Permission changes
+  # stay in the normal queue.
+  @integration
+  Scenario: Queue work an upgrade step sends runs ahead of a backlog
+    Given a job queue holding a large backlog of older work
+    And an upgrade step sent a command whose handling sends one more job
+    When the worker's upgrade-step consumer runs
+    Then it runs the command and then the job the command caused
+    And it takes no job from the backlog
+
+  @unit
+  Scenario: Queue work an upgrade step sends is listed for the upgrade-step consumer
+    Given a worker running a pending background step
+    When the step sends queue work
+    Then the work names the upgrade-step list of the job queue
+    And the step is recorded done with its report
+
+  @unit
+  Scenario: The upgrade-step consumer leaves the queue's wake-up signal to the main consumer
+    Given the worker runs the upgrade-step consumer beside its main consumer
+    When the upgrade-step consumer waits for listed work
+    Then it polls, and never takes or clears the queue's shared wake-up signal

@@ -1,6 +1,7 @@
 import { hostname } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
+import { runAsUpgradeStepWork } from "@langwatch/process-stores";
 import { storesOwner } from "@langwatch/process-stores/config";
 import type { ScopedSecrets } from "@langwatch/secrets";
 import pg from "pg";
@@ -537,6 +538,7 @@ function backgroundStepsOver({
         oldWritersGoneFor: (input) => roster.oldWritersGoneFor(input),
         identity: { owner: processId, image: release ?? "unreleased", host: hostname() },
         log,
+        runStepWork: runAsUpgradeStepWork,
       });
       const sweeping = startBackgroundSteps({ service, log });
       const catchingUp = startTargetCatchUp({

@@ -64,6 +64,9 @@ import { upcastEventStore } from "./upcast/upcastEventStore.ts";
 
 const logger = createLogger("langwatch:event-sourcing");
 
+/** The one queue eventing runs on, unless a composition names another. */
+export const EVENTING_QUEUE_NAME = "event-sourcing/jobs";
+
 /**
  * Options for constructing an EventSourcing instance.
  */
@@ -190,7 +193,7 @@ export class EventSourcing {
     this._eventStore = options.eventStore;
     this._eventReadSeat = options.eventReadSeat;
     this._queueFactory = options.queueFactory;
-    this._queueName = options.queueName ?? "event-sourcing/jobs";
+    this._queueName = options.queueName ?? EVENTING_QUEUE_NAME;
     this._consumersEnabled = options.consumersEnabled ?? true;
     this._executionTarget = options.executionTarget;
     this._replayMarkerChecker = options.replayMarkerChecker;
