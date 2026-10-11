@@ -100,6 +100,17 @@ drawers and dialogs on 2026-09-29 therefore did not keep them the same.
       X and Escape keep their `dismissible` and `busy` rules. It is not `dismissible={false}`.
     - `Dialog cancelLabel={null}` (DS-cap2): drops the default Cancel when one primary action
       finishes the job; the X and Escape stay under `dismissible` and `busy`, default unchanged.
+    - Held-site additions (2026-10-11), all finite and optional: `Card tone` (teal, blue, yellow,
+      red, purple, green, neutral) on `nested`, a tinted well in the tone's muted border, subtle
+      fill and foreground heading, neutral being a plain inset; `Card variant="accent-row"`, a
+      compact row whose 2px left edge alone carries the tone; `Card variant="emphasized"` (border
+      `border.emphasized`, `bg.panel`, radius 2xl); `Card padding` `xl` (24px) and `inline-lg`
+      (24px across, 20px down). A toned card or an accent row is a surface, never an opener.
+    - `FrameLinkAction` joins `FrameAction`: a real anchor (`href`, `target`, `rel`, `onNavigate`,
+      `onActivate`) in the action look. Only a plain primary click runs `onActivate` and
+      `onNavigate`; modified, middle and `_blank` activations stay native. Busy, loading or
+      unavailable, it loses its `href` and says `aria-disabled`. `Dialog secondaryActions` and a
+      toned `secondaryAction` reach the same ActionRow the Drawer uses.
 
 ## Consequences
 

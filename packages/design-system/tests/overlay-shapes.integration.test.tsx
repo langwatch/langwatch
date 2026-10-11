@@ -2,7 +2,7 @@
 /** The drawer and dialog shapes (ADR-002): slots, close requests, forms, states, portals, focus. */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Select } from "../src/components/forms/select.tsx";
@@ -1043,5 +1043,220 @@ describe("a routed drawer opened from a modal dialog", () => {
       await user.tab();
       expect(dialog.contains(document.activeElement)).toBe(true);
     }
+  });
+});
+
+describe("a footer link", () => {
+  function linkDialog(action: Record<string, unknown>) {
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={vi.fn()}
+        title="Trace limit"
+        primaryAction={{ label: "Compare plans", href: "#plans", ...action }}
+      />,
+    );
+    return screen.findByRole("link", { name: "Compare plans" });
+  }
+
+  /** @scenario "A footer link is a real anchor that routes in-app only on a plain click" */
+  it("is an anchor with the href; a plain click activates, then navigates once in-app", async () => {
+    const onActivate = vi.fn();
+    const onNavigate = vi.fn();
+    const link = await linkDialog({ href: "/settings/subscription", onActivate, onNavigate });
+
+    expect(link.getAttribute("href")).toBe("/settings/subscription");
+    const notPrevented = fireEvent.click(link);
+
+    expect(notPrevented).toBe(false);
+    expect(onActivate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith({ href: "/settings/subscription" });
+  });
+
+  /** @scenario "A footer link is a real anchor that routes in-app only on a plain click" */
+  it("leaves native navigation alone when no onNavigate is given", async () => {
+    const onActivate = vi.fn();
+    const link = await linkDialog({ onActivate });
+
+    expect(fireEvent.click(link)).toBe(true);
+    expect(onActivate).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A footer link is a real anchor that routes in-app only on a plain click" */
+  it("stays native for a modified click, a middle click and a _blank link", async () => {
+    const onActivate = vi.fn();
+    const onNavigate = vi.fn();
+    const link = await linkDialog({ onActivate, onNavigate });
+
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }]) {
+      expect(fireEvent.click(link, modifier)).toBe(true);
+    }
+    expect(fireEvent.click(link, { button: 1 })).toBe(true);
+    cleanup();
+    const blank = await linkDialog({ target: "_blank", onActivate, onNavigate });
+    expect(fireEvent.click(blank)).toBe(true);
+
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A footer link is a real anchor that routes in-app only on a plain click" */
+  it("keeps the supplied rel tokens and adds noopener to a _blank link", async () => {
+    const link = await linkDialog({ target: "_blank", rel: "external" });
+
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")?.split(" ").toSorted()).toEqual(["external", "noopener"]);
+  });
+
+  /** @scenario "A busy or unavailable footer link cannot be followed" */
+  it.each([
+    ["loading", { loading: true }],
+    ["unavailable", { disabledReason: "Only admins can compare plans" }],
+  ])("cannot be followed while %s", async (_name, extra) => {
+    const onActivate = vi.fn();
+    const onNavigate = vi.fn();
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={vi.fn()}
+        title="Trace limit"
+        primaryAction={{ label: "Compare plans", href: "#plans", onActivate, onNavigate, ...extra }}
+      />,
+    );
+    const link = await screen.findByRole("link", { name: "Compare plans" });
+
+    expect(link.hasAttribute("href")).toBe(false);
+    expect(link.getAttribute("aria-disabled")).toBe("true");
+    expect(fireEvent.click(link)).toBe(false);
+    expect(fireEvent(link, new MouseEvent("auxclick", { bubbles: true, cancelable: true }))).toBe(
+      false,
+    );
+    expect(fireEvent.keyDown(link, { key: "Enter" })).toBe(false);
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A footer link is a real anchor that routes in-app only on a plain click" */
+  it("is drawn by a drawer footer too, and a busy shape blocks it", async () => {
+    renderWithDesignSystem(
+      <Drawer
+        onClose={vi.fn()}
+        title="Instance"
+        busy
+        footer={{ secondaryActions: [{ label: "Open full page", href: "#full" }] }}
+      />,
+    );
+
+    const link = await screen.findByRole("link", { name: "Open full page" });
+    expect(link.hasAttribute("href")).toBe(false);
+    expect(link.getAttribute("aria-disabled")).toBe("true");
+  });
+});
+
+describe("a dialog's secondary actions", () => {
+  /** @scenario "A dialog draws several secondary actions and each carries a tone" */
+  it("draws them in order before the primary, with no Cancel, and runs the one chosen", async () => {
+    const onRemove = vi.fn();
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={vi.fn()}
+        title="Secure your account"
+        secondaryAction={{ label: "Not now", onClick: vi.fn() }}
+        secondaryActions={[{ label: "Remove", tone: "danger", onClick: onRemove }]}
+        primaryAction={{ label: "Create a passkey", onClick: vi.fn() }}
+      />,
+    );
+
+    const names = (await screen.findAllByRole("button"))
+      .map((button) => button.textContent)
+      .filter((name) => ["Not now", "Remove", "Create a passkey", "Cancel"].includes(name ?? ""));
+    expect(names).toEqual(["Not now", "Remove", "Create a passkey"]);
+    const remove = screen.getByRole("button", { name: "Remove" });
+    expect(rulesOf(remove)).toContain("--chakra-colors-red-muted");
+    await userEvent.setup().click(remove);
+    expect(onRemove).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A dialog draws several secondary actions and each carries a tone" */
+  it("tones the singular secondary action", async () => {
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={vi.fn()}
+        title="Profile photo"
+        cancelLabel={null}
+        secondaryAction={{ label: "Remove", tone: "danger", onClick: vi.fn() }}
+      />,
+    );
+
+    const remove = await screen.findByRole("button", { name: "Remove" });
+    expect(rulesOf(remove)).toContain("--chakra-colors-red-muted");
+  });
+});
+
+describe("a dialog opened from a menu", () => {
+  beforeEach(stubLayout);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function Impersonate() {
+    const [open, setOpen] = useState(false);
+    const reason = useRef<HTMLInputElement>(null);
+    const trigger = useRef<HTMLButtonElement>(null);
+    return (
+      <>
+        <Menu.Root onSelect={() => setOpen(true)}>
+          <Menu.Trigger asChild>
+            <button type="button" ref={trigger}>
+              Row actions
+            </button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item value="impersonate">Impersonate</Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+        <Dialog
+          open={open}
+          onClose={() => setOpen(false)}
+          title="Impersonate user"
+          initialFocusEl={() => reason.current}
+          finalFocusEl={() => trigger.current}
+          primaryAction={{ label: "Start", onClick: vi.fn() }}
+        >
+          <input ref={reason} aria-label="Reason" />
+        </Dialog>
+      </>
+    );
+  }
+
+  /** @scenario "A dialog opened from a menu focuses the requested field and returns focus to the trigger" */
+  it("focuses the reason at once, types into it, contains Tab and returns to the trigger", async () => {
+    const user = userEvent.setup();
+    renderWithDesignSystem(<Impersonate />);
+    const trigger = screen.getByRole("button", { name: "Row actions" });
+
+    await user.click(trigger);
+    await user.click(await screen.findByRole("menuitem", { name: "Impersonate" }));
+    const dialog = await screen.findByRole("dialog", { name: "Impersonate user" });
+    const reason = within(dialog).getByRole("textbox", { name: "Reason" });
+    await waitFor(() => expect(document.activeElement).toBe(reason));
+
+    await user.keyboard("support ticket");
+    expect((reason as HTMLInputElement).value).toBe("support ticket");
+    for (let step = 0; step < 6; step += 1) {
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+    for (let step = 0; step < 6; step += 1) {
+      await user.tab({ shift: true });
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 });

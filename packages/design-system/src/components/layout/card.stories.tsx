@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { BarChart3, KeyRound } from "lucide-react";
+import { BarChart3, KeyRound, ShieldAlert } from "lucide-react";
 import { createElement } from "react";
 
 import { Badge, Box, Button, HStack, Text, VStack } from "../../primitives.ts";
@@ -24,9 +24,18 @@ const meta = {
   argTypes: {
     variant: {
       control: "select",
-      options: ["panel", "nested", "frame", "frame-fill", "elevated", "showcase"],
+      options: [
+        "panel",
+        "nested",
+        "frame",
+        "frame-fill",
+        "elevated",
+        "showcase",
+        "emphasized",
+        "accent-row",
+      ],
     },
-    padding: { control: "inline-radio", options: ["md", "sm", "none"] },
+    padding: { control: "inline-radio", options: ["xl", "inline-lg", "lg", "md", "sm", "none"] },
   },
 } satisfies Meta<typeof Card>;
 
@@ -99,6 +108,140 @@ export const Padding: Story = {
       {(["md", "sm", "none"] as const).map((padding) => (
         <Card key={padding} padding={padding} title={`padding ${padding}`}>
           <Text textStyle="sm">Body</Text>
+        </Card>
+      ))}
+    </CardGrid>
+  ),
+};
+
+export const InsetScale: Story = {
+  render: () => (
+    <CardGrid columns={3}>
+      {(["xl", "inline-lg", "lg"] as const).map((padding) => (
+        <Card
+          key={padding}
+          padding={padding}
+          title={`padding ${padding}`}
+          data-testid={`inset-${padding}`}
+        >
+          <Text textStyle="sm">xl is 24px all round; inline-lg 24px across and 20px down.</Text>
+        </Card>
+      ))}
+    </CardGrid>
+  ),
+};
+
+const TONES = ["teal", "blue", "yellow", "red", "purple", "green", "neutral"] as const;
+
+/**
+ * A nested card with a tone is a tinted well: a muted border, a subtle fill and a heading in the
+ * tone's foreground. Neutral is an inset in the border and subtle fill. Body text is unchanged.
+ */
+export const ToneWells: Story = {
+  render: () => (
+    <CardGrid columns={3}>
+      {TONES.map((tone) => (
+        <Card
+          key={tone}
+          variant="nested"
+          tone={tone}
+          padding="md"
+          title={`${tone} well`}
+          icon={<KeyRound size={16} />}
+          data-testid={`well-${tone}`}
+        >
+          <Text textStyle="sm">Body text keeps its normal colour.</Text>
+        </Card>
+      ))}
+    </CardGrid>
+  ),
+};
+
+/** A neutral inset inside a teal well, as the RAG contexts sit in their panel. */
+export const NeutralInsetInWell: Story = {
+  render: () => (
+    <Card variant="nested" tone="teal" padding="md" title="RAG Contexts">
+      <VStack align="stretch" gap={2}>
+        {[1, 2].map((n) => (
+          <Card key={n} variant="nested" tone="neutral" padding="sm" data-testid={`context-${n}`}>
+            <Text textStyle="sm">
+              Context {n}: a retrieved passage that may run to a second line.
+            </Text>
+          </Card>
+        ))}
+      </VStack>
+    </Card>
+  ),
+};
+
+/** The one-line role edges: only the left edge carries the colour. */
+export const AccentRows: Story = {
+  render: () => (
+    <VStack align="stretch" gap={2} maxWidth="28rem">
+      {(
+        [
+          ["system", "purple"],
+          ["user", "green"],
+          ["assistant", "blue"],
+          ["tool", "yellow"],
+          ["unknown", "neutral"],
+        ] as const
+      ).map(([role, tone]) => (
+        <Card key={role} variant="accent-row" tone={tone} data-testid={`row-${role}`}>
+          <HStack gap={2}>
+            <Text textStyle="sm" fontWeight="medium">
+              {role}
+            </Text>
+            <Text textStyle="sm" color="fg.muted" truncate>
+              A message long enough to be cut off at the end of a narrow row.
+            </Text>
+          </HStack>
+        </Card>
+      ))}
+    </VStack>
+  ),
+};
+
+/** The red danger well: the caller lays its own header and content out inside a flush card. */
+export const DangerWell: Story = {
+  render: () => (
+    <Card variant="nested" tone="red" padding="none" data-testid="danger-well">
+      <VStack align="stretch" gap={2} paddingX={4} paddingY={3.5}>
+        <HStack gap={2} color="red.fg">
+          <ShieldAlert size={14} aria-hidden />
+          <Text textStyle="sm" fontWeight="semibold">
+            Danger zone
+          </Text>
+        </HStack>
+        <Text textStyle="sm">Removing the connection signs everyone out of it.</Text>
+        <Box>
+          <Button size="sm" variant="outline" colorPalette="red">
+            Remove connection
+          </Button>
+        </Box>
+      </VStack>
+    </Card>
+  ),
+};
+
+/** The plan row: an explicit edge, an opaque panel and a 2xl radius, still not a hero. */
+export const Emphasized: Story = {
+  render: () => (
+    <CardGrid columns={2}>
+      {["Free", "Growth"].map((plan) => (
+        <Card
+          key={plan}
+          variant="emphasized"
+          padding="xl"
+          bodyLayout="stack"
+          data-testid={`plan-${plan}`}
+        >
+          <Text as="h2" textStyle="sectionTitle">
+            {plan}
+          </Text>
+          <Text textStyle="sm" color="fg.muted">
+            Everything you need to start.
+          </Text>
         </Card>
       ))}
     </CardGrid>

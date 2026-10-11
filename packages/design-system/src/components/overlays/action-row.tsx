@@ -5,7 +5,7 @@
  */
 import { Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import type { ReactNode } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
 
 import { Button } from "../forms/button.tsx";
 import { useProductAccent } from "../scope/use-product-accent.ts";
@@ -33,6 +33,11 @@ export interface FrameButtonAction extends FrameActionLook {
   onClick: () => void;
   type?: never;
   items?: never;
+  href?: never;
+  target?: never;
+  rel?: never;
+  onNavigate?: never;
+  onActivate?: never;
 }
 
 /** Submits a form: the overlay's own (`onSubmit`), or a child's by its id (`form`). */
@@ -42,6 +47,11 @@ export interface FrameSubmitAction extends FrameActionLook {
   form?: string;
   onClick?: never;
   items?: never;
+  href?: never;
+  target?: never;
+  rel?: never;
+  onNavigate?: never;
+  onActivate?: never;
 }
 
 export interface FrameMenuItem {
@@ -57,10 +67,34 @@ export interface FrameMenuAction extends FrameActionLook {
   items: FrameMenuItem[];
   onClick?: never;
   type?: never;
+  href?: never;
+  target?: never;
+  rel?: never;
+  onNavigate?: never;
+  onActivate?: never;
+}
+
+/**
+ * A real anchor in the button's look. A plain click may close the overlay (`onActivate`) and route
+ * in-app (`onNavigate`); a modified click, middle click or `_blank` stays native.
+ */
+export interface FrameLinkAction extends FrameActionLook {
+  href: string;
+  /** `_blank` adds `noopener` to the supplied `rel`. */
+  target?: string;
+  rel?: string;
+  /** Called once on a plain click with the href, which then does not navigate natively. */
+  onNavigate?: (args: { href: string }) => void;
+  /** Called on a plain click, before `onNavigate`: close the overlay. */
+  onActivate?: () => void;
+  onClick?: never;
+  type?: never;
+  form?: never;
+  items?: never;
 }
 
 /** One button the shape draws. The caller never picks variant, colour, size or `type`. */
-export type FrameAction = FrameButtonAction | FrameSubmitAction | FrameMenuAction;
+export type FrameAction = FrameButtonAction | FrameSubmitAction | FrameMenuAction | FrameLinkAction;
 
 /** The colour meaning of a secondary outline action; omitted is neutral. */
 export type FrameSecondaryTone = "neutral" | "danger" | "success" | "info";
@@ -115,6 +149,76 @@ function toneStyle(tone: FrameSecondaryTone | undefined) {
   } as const;
 }
 
+function relFor({ rel, target }: { rel?: string; target?: string }) {
+  if (target !== "_blank") return rel;
+  const tokens = (rel ?? "").split(/\s+/).filter(Boolean);
+  return [...new Set([...tokens, "noopener"])].join(" ");
+}
+
+/** An unprevented primary click with no modifier, aimed at this window: the app may route it. */
+function isPlainActivation({ event, target }: { event: ReactMouseEvent; target?: string }) {
+  const modified = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+  const sameWindow = target === undefined || target === "_self";
+  return !event.defaultPrevented && event.button === 0 && !modified && sameWindow;
+}
+
+interface LinkStyle {
+  palette: string | undefined;
+  size: "sm" | undefined;
+  toned: ReturnType<typeof toneStyle>;
+}
+
+/** A link action drawn as an anchor in the button look; unavailable, it loses its href. */
+function FrameLink({
+  action,
+  kind,
+  unavailable,
+  style,
+}: {
+  action: FrameLinkAction;
+  kind: FrameActionKind;
+  unavailable: boolean;
+  style: LinkStyle;
+}) {
+  const { href, target } = action;
+  return (
+    <Button
+      asChild
+      variant={LOOK[kind].variant}
+      colorPalette={style.palette}
+      {...style.toned}
+      size={style.size}
+      aria-busy={action.loading ? true : undefined}
+      opacity={unavailable ? 0.6 : undefined}
+      cursor={unavailable ? "not-allowed" : undefined}
+      data-frame-action={kind}
+      data-testid={action["data-testid"]}
+      data-tour={action["data-tour"]}
+    >
+      <a
+        href={unavailable ? undefined : href}
+        target={target}
+        rel={relFor({ rel: action.rel, target })}
+        role={unavailable ? "link" : undefined}
+        aria-disabled={unavailable ? true : undefined}
+        onClick={(event) => {
+          if (unavailable) return event.preventDefault();
+          if (!isPlainActivation({ event, target })) return;
+          action.onActivate?.();
+          if (!action.onNavigate) return;
+          event.preventDefault();
+          action.onNavigate({ href });
+        }}
+        onAuxClick={(event) => unavailable && event.preventDefault()}
+        onKeyDown={(event) => unavailable && event.key === "Enter" && event.preventDefault()}
+      >
+        {action.icon}
+        {action.label}
+      </a>
+    </Button>
+  );
+}
+
 /** One descriptor drawn as a button; the shapes use it for their header action too. */
 export function FrameActionButton({
   action,
@@ -136,32 +240,41 @@ export function FrameActionButton({
   const toned = kind === "secondary" ? toneStyle(tone) : undefined;
   const submits = action.type === "submit";
   const blocked = busy || action.loading === true;
-  const button = (
-    <Button
-      type={submits ? "submit" : "button"}
-      form={submits ? action.form : undefined}
-      variant={look.variant}
-      colorPalette={palette}
-      {...toned}
-      size={size}
-      loading={action.loading}
-      disabled={busy || action.disabledReason !== undefined}
-      onClick={
-        action.items
-          ? undefined
-          : () => {
-              if (!blocked) action.onClick?.();
-            }
-      }
-      data-frame-action={kind}
-      data-testid={action["data-testid"]}
-      data-tour={action["data-tour"]}
-    >
-      {action.icon}
-      {action.label}
-      {action.items && <ChevronDown size={14} aria-hidden />}
-    </Button>
-  );
+  const unavailable = blocked || action.disabledReason !== undefined;
+  const button =
+    action.href !== undefined ? (
+      <FrameLink
+        action={action}
+        kind={kind}
+        unavailable={unavailable}
+        style={{ palette, size, toned }}
+      />
+    ) : (
+      <Button
+        type={submits ? "submit" : "button"}
+        form={submits ? action.form : undefined}
+        variant={look.variant}
+        colorPalette={palette}
+        {...toned}
+        size={size}
+        loading={action.loading}
+        disabled={busy || action.disabledReason !== undefined}
+        onClick={
+          action.items
+            ? undefined
+            : () => {
+                if (!blocked) action.onClick?.();
+              }
+        }
+        data-frame-action={kind}
+        data-testid={action["data-testid"]}
+        data-tour={action["data-tour"]}
+      >
+        {action.icon}
+        {action.label}
+        {action.items && <ChevronDown size={14} aria-hidden />}
+      </Button>
+    );
   const menu = action.items ? (
     <Menu.Root
       onSelect={({ value }) => {

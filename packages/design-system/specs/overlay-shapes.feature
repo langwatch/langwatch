@@ -243,3 +243,29 @@ Feature: Drawer and dialog shapes
     And the X requests one close and Escape requests one close
     And the default dialog still closes on an outside click
     And a busy or non-dismissible dialog ignores the outside click either way
+
+  @integration
+  Scenario: A footer link is a real anchor that routes in-app only on a plain click
+    Given a dialog and a drawer whose action is a link with onActivate and onNavigate
+    Then the action is an anchor with the href, and a plain click runs onActivate then onNavigate once
+    And native navigation is prevented only when onNavigate is given
+    And a modified click, a middle click and a _blank link run neither and stay native
+    And a _blank link keeps its rel tokens and adds noopener
+
+  @integration
+  Scenario: A busy or unavailable footer link cannot be followed
+    Given a link action that is loading, busy or has a disabled reason
+    Then it has no href, says aria-disabled and ignores click, middle click and Enter
+
+  @integration
+  Scenario: A dialog draws several secondary actions and each carries a tone
+    Given a dialog with a secondary action, more secondary actions and a primary action
+    Then all are drawn in order before the primary and Cancel is not drawn
+    And a toned secondary action draws in its tone's colour
+
+  @integration
+  Scenario: A dialog opened from a menu focuses the requested field and returns focus to the trigger
+    Given a menu item opens a dialog with initialFocusEl on a reason input and finalFocusEl on the trigger
+    Then the reason input has focus at once and typing lands in it
+    And Tab stays inside the dialog
+    And closing returns focus to the trigger

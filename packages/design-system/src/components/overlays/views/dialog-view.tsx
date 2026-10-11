@@ -16,7 +16,7 @@ import { BOUNDED_BODY, OverlayBodyState } from "../../../overlays/overlay-body.t
 import { OverlayPortalTargetProvider } from "../../../overlays/portal-target.ts";
 import { FieldLayoutProvider } from "../../forms/field-layout.ts";
 import { StudioIsolatedErrorBoundary } from "../../states/studio-error-boundary.tsx";
-import { ActionRow, type FrameAction } from "../action-row.tsx";
+import { ActionRow, type FrameAction, type FrameSecondaryAction } from "../action-row.tsx";
 import { CloseButton } from "../close-button.tsx";
 
 export type { ActionRowProps, FrameAction } from "../action-row.tsx";
@@ -169,7 +169,9 @@ export interface DialogProps {
   /** `danger` for a destroying act. */
   primaryAction?: FrameAction;
   /** Takes Cancel's place: "Keep links paused", "Later", "Stay here". */
-  secondaryAction?: FrameAction;
+  secondaryAction?: FrameSecondaryAction;
+  /** More outline actions after `secondaryAction`, in order, each with an optional tone. */
+  secondaryActions?: FrameSecondaryAction[];
   /**
    * Default "Cancel"; "Close" for a read-only dialog. `null` drops the footer button when one
    * primary action finishes the job; the X and Escape still close it under `dismissible`.
@@ -220,6 +222,7 @@ export function Dialog({
   children,
   primaryAction,
   secondaryAction,
+  secondaryActions,
   cancelLabel = "Cancel",
   note,
   dismissible = true,
@@ -245,7 +248,8 @@ export function Dialog({
     dismissible && !secondaryAction && cancelLabel !== null
       ? { label: cancelLabel, onClick: onClose }
       : undefined;
-  const hasFooter = primaryAction ?? secondaryAction ?? cancel ?? note;
+  const hasFooter =
+    primaryAction ?? secondaryAction ?? (secondaryActions?.length ? true : null) ?? cancel ?? note;
   const pickInitialFocus = () => {
     const usable = (selector: string) => firstFocusable(ownRef.current, selector);
     const requested = initialFocus ? usable(`[data-frame-action="${initialFocus}"]`) : null;
@@ -299,6 +303,7 @@ export function Dialog({
             <ActionRow
               primaryAction={primaryAction}
               secondaryAction={secondaryAction}
+              secondaryActions={secondaryActions}
               cancel={cancel}
               note={note}
               busy={busy}

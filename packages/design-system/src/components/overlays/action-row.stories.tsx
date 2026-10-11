@@ -84,6 +84,47 @@ export const SemanticOutlineActions: Story = {
   ),
 };
 
+const NEW_TAB = { href: "/settings/license", target: "_blank", rel: "external" } as const;
+
+/** A real anchor in the button look: a plain click routes in-app; others stay native. */
+export const LinkActions: Story = {
+  args: {
+    cancel: { onClick: noop },
+    primaryAction: {
+      label: "Compare plans",
+      href: "/settings/subscription",
+      onActivate: noop,
+      onNavigate: noop,
+    },
+    secondaryActions: [{ label: "Read the licence terms", ...NEW_TAB }],
+  },
+};
+
+export const LinkBusy: Story = {
+  args: {
+    primaryAction: { label: "Manage license", href: "/settings/license", loading: true },
+    secondaryActions: [
+      { label: "Docs", href: "/docs", disabledReason: "Only admins can open the docs" },
+    ],
+  },
+};
+
+export const LongLinkLabel: Story = {
+  decorators: [
+    (Story) => (
+      <Box maxWidth="320px">
+        <Story />
+      </Box>
+    ),
+  ],
+  args: {
+    primaryAction: {
+      label: "Compare every plan and what each one includes",
+      href: "/settings/subscription",
+    },
+  },
+};
+
 export const MenuAction: Story = {
   args: {
     primaryAction: {

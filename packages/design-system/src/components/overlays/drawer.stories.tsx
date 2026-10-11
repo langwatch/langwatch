@@ -142,6 +142,24 @@ export const Empty: Story = {
   },
 };
 
+/** A footer link: a real anchor in the outline look; a modified click leaves the drawer open. */
+export const FooterLink: Story = {
+  args: {
+    title: "Instance",
+    footer: {
+      secondaryActions: [
+        {
+          label: "Open full page",
+          href: "/ops/instances/1",
+          onActivate: noop,
+          onNavigate: noop,
+        },
+        { label: "Docs", href: "https://langwatch.ai/docs", target: "_blank" },
+      ],
+    },
+  },
+};
+
 export const Loading: Story = { args: { loading: true } };
 
 export const Failed: Story = {

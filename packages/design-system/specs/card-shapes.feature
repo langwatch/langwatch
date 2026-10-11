@@ -81,3 +81,22 @@ Feature: Card, resource tile, load more and the one-line empty state
     Given a panel, nested, frame and showcase card with no opener and no fill
     Then each draws the border, radius, ground and content inset it drew before
     And none carries an opener, a hover response or a focus ring of its own
+
+  @integration @browser
+  Scenario: A nested card with a tone is a tinted well and an accent row colours only its edge
+    Given nested cards with each tone and accent rows for each role
+    Then a toned nested card draws the tone's muted border, subtle fill and foreground heading
+    And a neutral nested card draws the plain border and subtle fill, with no tint
+    And an accent row draws a 2px left edge in the tone and leaves its fill and fields plain
+    And an untoned card draws exactly what it drew before
+
+  @integration
+  Scenario: A card names the larger insets and the emphasized variant
+    Given cards with padding xl and inline-lg and an emphasized card
+    Then xl insets 24px on every side and inline-lg 24px across and 20px down
+    And an emphasized card draws the emphasized border, the panel ground and the 2xl radius
+
+  @integration
+  Scenario: A toned card is a surface and never an opener
+    Given a toned nested card or an accent row given an opener
+    Then the card is refused

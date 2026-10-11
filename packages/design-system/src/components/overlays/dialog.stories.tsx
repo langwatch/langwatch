@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ExternalLink } from "lucide-react";
+import { useRef, useState } from "react";
 
-import { Input, Stack, Text } from "../../primitives.ts";
+import { Button, Input, Stack, Text } from "../../primitives.ts";
 import { Checkbox } from "../forms/checkbox.tsx";
 import { Dialog } from "./dialog.tsx";
+import { Menu } from "./menu.tsx";
 
 const noop = () => undefined;
 
@@ -119,6 +121,71 @@ export const Failed: Story = {
 export const Busy: Story = {
   args: { busy: true, primaryAction: { label: "Copy", onClick: noop, loading: true } },
 };
+
+/** The primary is a real link: a plain click closes and routes in-app; ctrl-click is native. */
+export const LinkPrimary: Story = {
+  args: {
+    title: "You have reached the trace limit",
+    description: "New traces are still collected; compare plans to raise the limit.",
+    primaryAction: {
+      label: "Compare plans",
+      href: "/settings/subscription",
+      onActivate: noop,
+      onNavigate: noop,
+    },
+  },
+};
+
+export const LinkPrimaryBusy: Story = {
+  args: {
+    busy: true,
+    primaryAction: { label: "Manage license", href: "/settings/license", loading: true },
+  },
+};
+
+/** Three footer actions: Not now replaces Cancel; the others are outline `secondaryActions`. */
+export const SecondaryActions: Story = {
+  args: {
+    title: "Secure your account",
+    description: "Add a second step so a stolen password is not enough.",
+    secondaryAction: { label: "Not now", onClick: noop },
+    secondaryActions: [{ label: "Set up two-step verification", onClick: noop }],
+    primaryAction: { label: "Create a passkey", onClick: noop },
+  },
+};
+
+function MenuFocusDemo() {
+  const [open, setOpen] = useState(false);
+  const reasonRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  return (
+    <Stack gap={3} align="start">
+      <Menu.Root onSelect={() => setOpen(true)}>
+        <Menu.Trigger asChild>
+          <Button ref={triggerRef} variant="outline">
+            Row actions
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content>
+          <Menu.Item value="impersonate">Impersonate</Menu.Item>
+        </Menu.Content>
+      </Menu.Root>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Impersonate user"
+        initialFocusEl={() => reasonRef.current}
+        finalFocusEl={() => triggerRef.current}
+        primaryAction={{ label: "Impersonate", onClick: () => setOpen(false) }}
+      >
+        <Input ref={reasonRef} aria-label="Reason" placeholder="Why do you need access?" />
+      </Dialog>
+    </Stack>
+  );
+}
+
+/** Opened from a menu: the reason input takes focus at once; closing returns to the trigger. */
+export const OpenedFromMenu: Story = { render: () => <MenuFocusDemo /> };
 
 export const Narrow: Story = { parameters: { viewport: { defaultViewport: "mobile1" } } };
 

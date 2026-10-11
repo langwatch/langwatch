@@ -13,14 +13,31 @@ import { type ProductAccent, useProductAccent } from "../scope/use-product-accen
  * editor, an image or a canvas, no fill. frame-fill: that frame filling its parent's room, the
  * editor scrolling inside. elevated: lifts off the page. showcase: hero figures (ruling "Cards").
  */
-export type CardVariant = "panel" | "nested" | "frame" | "frame-fill" | "elevated" | "showcase";
+export type CardVariant =
+  | "panel"
+  | "nested"
+  | "frame"
+  | "frame-fill"
+  | "elevated"
+  | "showcase"
+  | "emphasized"
+  | "accent-row";
+
+/** The palette roles a nested card or an accent row may carry; omitted, nothing is coloured. */
+export type CardTone = "neutral" | "teal" | "blue" | "yellow" | "red" | "purple" | "green";
+
+/**
+ * Tone belongs to `nested` (a tinted well: border, fill and heading) and `accent-row` (only the
+ * left edge); any other variant takes none.
+ */
+type ToneProps =
+  | { variant: "nested" | "accent-row"; tone?: CardTone }
+  | { variant?: CardVariant; tone?: never };
 
 /** Where the card's subject stands: the dot before the title, always beside `badge` words. */
 export type CardStatus = "ok" | "warning" | "bad" | "neutral";
 
 interface CardBaseProps {
-  /** Default "panel". */
-  variant?: CardVariant;
   /** With a title it is a section card. */
   title?: ReactNode;
   /** h2 on a page (default), h3 inside a section. */
@@ -34,10 +51,10 @@ interface CardBaseProps {
   badge?: ReactNode;
   /**
    * md 16px, sm 12px; none: an embedded ListTable, a code block or an editor fills it. lg 20px
-   * is the old Chakra card's own space, kept for a surface whose screenshots show it. Default md;
-   * frame-fill has none.
+   * is the old Chakra card's own space, kept for a surface whose screenshots show it. xl 24px all
+   * round; inline-lg 24px across, 20px down. Default md; frame-fill has none; accent-row 8px.
    */
-  padding?: "lg" | "md" | "sm" | "none";
+  padding?: "xl" | "inline-lg" | "lg" | "md" | "sm" | "none";
   /**
    * How the content slot lays its children out. flow (default): block flow. stack: a stretching
    * column with no gap. spaced: the same column with 12px between children.
@@ -78,7 +95,7 @@ interface LinkedCardProps {
   footer?: never;
 }
 
-export type CardProps = CardBaseProps & (PlainCardProps | LinkedCardProps);
+export type CardProps = CardBaseProps & ToneProps & (PlainCardProps | LinkedCardProps);
 
 export type BodyLayout = "flow" | "stack" | "spaced";
 
@@ -91,6 +108,8 @@ const RECIPE_VARIANT = {
   "frame-fill": "outline",
   elevated: "elevated",
   showcase: "outline",
+  emphasized: "outline",
+  "accent-row": "subtle",
 } as const;
 
 /** frame keeps the panel's border and drops its fill, shadow and blur. */
@@ -113,12 +132,62 @@ const FRAME_FILL = {
 /** The recipe's `showcase` look (Chakra's Card type lacks product variants): outline plus these. */
 export const SHOWCASE = { borderRadius: "showcase", boxShadow: "showcase" } as const;
 
-const OVERRIDES: Partial<Record<CardVariant, typeof FRAME | typeof FRAME_FILL | typeof SHOWCASE>> =
-  {
-    frame: FRAME,
-    "frame-fill": FRAME_FILL,
-    showcase: SHOWCASE,
-  };
+/** emphasized: a panel with an explicit edge and opaque ground; keeps the outline shadow. */
+const EMPHASIZED = {
+  borderColor: "border.emphasized",
+  background: "bg.panel",
+  borderRadius: "2xl",
+} as const;
+
+/** accent-row: a compact editable row; the tone colours only the left edge. */
+const ACCENT_ROW = {
+  background: "bg.subtle",
+  borderColor: "border",
+  borderRadius: "md",
+  boxShadow: "none",
+  backdropFilter: "none",
+} as const;
+
+const OVERRIDES: Partial<
+  Record<
+    CardVariant,
+    typeof FRAME | typeof FRAME_FILL | typeof SHOWCASE | typeof EMPHASIZED | typeof ACCENT_ROW
+  >
+> = {
+  frame: FRAME,
+  "frame-fill": FRAME_FILL,
+  showcase: SHOWCASE,
+  emphasized: EMPHASIZED,
+  "accent-row": ACCENT_ROW,
+};
+
+const NO_LIFT = { boxShadow: "none", backdropFilter: "none" } as const;
+
+/** A nested card's tinted well; neutral is an inset in the border and subtle fill. */
+function wellPaint({ tone }: { tone: CardTone }) {
+  if (tone === "neutral") {
+    return {
+      ...NO_LIFT,
+      borderColor: "border",
+      background: "bg.subtle",
+      borderRadius: "md",
+    } as const;
+  }
+  return {
+    ...NO_LIFT,
+    borderColor: `${tone}.muted`,
+    background: `${tone}.subtle`,
+    borderRadius: "lg",
+  } as const;
+}
+
+/** The 2px left edge of an accent row. */
+function edgePaint({ tone }: { tone: CardTone }) {
+  return {
+    borderLeftWidth: "2px",
+    borderLeftColor: `${tone === "neutral" ? "gray" : tone}.fg`,
+  } as const;
+}
 
 /** What a frame-fill card adds to its body, content and bands so a bounded parent can size it. */
 const FILLS = {
@@ -138,7 +207,18 @@ const OPENER_CSS = {
   },
 } as const;
 
-const PADDING = { lg: 5, md: 4, sm: 3, none: 0 } as const;
+/** Spacing steps across (x) and down (y). */
+const INSET = {
+  xl: { x: 6, y: 6 },
+  "inline-lg": { x: 6, y: 5 },
+  lg: { x: 5, y: 5 },
+  md: { x: 4, y: 4 },
+  sm: { x: 3, y: 3 },
+  none: { x: 0, y: 0 },
+} as const;
+
+/** An accent row's own 8px, when no padding is named. */
+const ROW_INSET = { x: 2, y: 2 } as const;
 
 const DOT_COLOR: Record<CardStatus, string> = {
   ok: "green.solid",
@@ -209,8 +289,90 @@ function OpenerLayer({ opener, title }: { opener: ReactElement<OpenerProps>; tit
   );
 }
 
+type HeaderParts = Pick<CardBaseProps, "title" | "status" | "icon" | "badge" | "description"> & {
+  actions?: ReactNode;
+};
+
+/** The header band: dot, icon, title, badge and actions on one row, the description under it. */
+function CardHeader({
+  inset,
+  band,
+  headTone,
+  titleLevel,
+  parts: { title, status, icon, badge, actions, description },
+}: {
+  inset: { x: number; y: number };
+  band: typeof FILLS.band | typeof NO_FILLS.band;
+  headTone: string | undefined;
+  titleLevel: 2 | 3;
+  parts: HeaderParts;
+}) {
+  return (
+    <VStack
+      align="stretch"
+      gap={0.5}
+      {...band}
+      paddingX={inset.x || 4}
+      paddingTop={inset.y || 3}
+      paddingBottom={inset.y === 0 ? 3 : 2}
+    >
+      <HStack width="full" gap={2} align="center" minWidth={0}>
+        {status && <StatusDot tone={status} />}
+        {icon != null && (
+          <Box color={headTone ?? "fg.muted"} display="flex" flexShrink={0}>
+            {icon}
+          </Box>
+        )}
+        {title != null && (
+          <Text
+            as={titleLevel === 3 ? "h3" : "h2"}
+            textStyle="cardTitle"
+            color={headTone}
+            minWidth={0}
+          >
+            {title}
+          </Text>
+        )}
+        <Spacer />
+        {badge}
+        {actions != null && (
+          <HStack gap={1} flexShrink={0}>
+            {actions}
+          </HStack>
+        )}
+      </HStack>
+      {description != null && (
+        <Text textStyle="caption" color="fg.muted">
+          {description}
+        </Text>
+      )}
+    </VStack>
+  );
+}
+
+/** The surface a variant, its tone and an opener paint, merged in the order that wins. */
+function surfacePaint({
+  variant,
+  tone,
+  opener,
+  accent,
+}: {
+  variant: CardVariant;
+  tone: CardTone | undefined;
+  opener: boolean;
+  accent: ProductAccent;
+}) {
+  return {
+    ...OVERRIDES[variant],
+    ...(variant === "nested" && tone !== undefined ? wellPaint({ tone }) : {}),
+    ...(variant === "accent-row" ? edgePaint({ tone: tone ?? "neutral" }) : {}),
+    ...(opener ? openerPaint({ accent }) : {}),
+  };
+}
+
 export function Card({
   variant = "panel",
+  tone,
   title,
   titleLevel = 2,
   description,
@@ -230,7 +392,11 @@ export function Card({
   const accent = useProductAccent();
   const fills = variant === "frame-fill";
   const fit = fills ? FILLS : NO_FILLS;
+  const rowDefault = variant === "accent-row" && paddingProp === undefined;
   const padding = paddingProp ?? (fills ? "none" : "md");
+  if (opener && (variant === "accent-row" || tone !== undefined)) {
+    throw new Error("Card: an accent row or a toned card is a surface, not an opener");
+  }
   const hasHeader =
     title != null ||
     badge != null ||
@@ -238,63 +404,37 @@ export function Card({
     description != null ||
     icon != null ||
     status != null;
-  const inset = PADDING[padding];
+  const { x: insetX, y: insetY } = rowDefault ? ROW_INSET : INSET[padding];
+  const headTone = tone !== undefined && tone !== "neutral" ? `${tone}.fg` : undefined;
   const layout = fills && bodyLayout === "flow" ? "stack" : bodyLayout;
   return (
     <ChakraCard.Root
       variant={RECIPE_VARIANT[variant]}
       width="full"
-      {...OVERRIDES[variant]}
-      {...(opener ? openerPaint({ accent }) : {})}
+      {...surfacePaint({ variant, tone, opener: opener !== undefined, accent })}
       borderStyle={placeholder ? "dashed" : undefined}
       data-card-variant={variant}
-      data-card-padding={padding}
+      data-card-padding={rowDefault ? "row" : padding}
+      data-card-tone={tone}
       data-testid={testId}
       data-tour={tourId}
     >
       {opener && <OpenerLayer opener={opener} title={title} />}
       <ChakraCard.Body padding={0} gap={0} {...fit.body}>
         {hasHeader && (
-          <VStack
-            align="stretch"
-            gap={0.5}
-            {...fit.band}
-            paddingX={inset || 4}
-            paddingTop={inset || 3}
-            paddingBottom={inset === 0 ? 3 : 2}
-          >
-            <HStack width="full" gap={2} align="center" minWidth={0}>
-              {status && <StatusDot tone={status} />}
-              {icon != null && (
-                <Box color="fg.muted" display="flex" flexShrink={0}>
-                  {icon}
-                </Box>
-              )}
-              {title != null && (
-                <Text as={titleLevel === 3 ? "h3" : "h2"} textStyle="cardTitle" minWidth={0}>
-                  {title}
-                </Text>
-              )}
-              <Spacer />
-              {badge}
-              {actions != null && (
-                <HStack gap={1} flexShrink={0}>
-                  {actions}
-                </HStack>
-              )}
-            </HStack>
-            {description != null && (
-              <Text textStyle="caption" color="fg.muted">
-                {description}
-              </Text>
-            )}
-          </VStack>
+          <CardHeader
+            inset={{ x: insetX, y: insetY }}
+            band={fit.band}
+            headTone={headTone}
+            titleLevel={titleLevel}
+            parts={{ title, status, icon, badge, actions, description }}
+          />
         )}
         {children != null && (
           <Box
-            paddingX={inset}
-            paddingTop={hasHeader ? 0 : inset}
-            paddingBottom={footer != null ? 0 : inset}
+            paddingX={insetX}
+            paddingTop={hasHeader ? 0 : insetY}
+            paddingBottom={footer != null ? 0 : insetY}
             flex={1}
             minWidth={0}
             {...fit.content}
@@ -315,9 +455,9 @@ export function Card({
             gap={2}
             flexWrap="wrap"
             {...fit.band}
-            paddingX={inset || 4}
+            paddingX={insetX || 4}
             paddingTop={2}
-            paddingBottom={inset || 3}
+            paddingBottom={insetY || 3}
           >
             {footer}
           </HStack>

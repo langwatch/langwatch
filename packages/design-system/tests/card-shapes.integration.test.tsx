@@ -100,6 +100,112 @@ describe("Card", () => {
     });
   });
 
+  describe("given a tone", () => {
+    /** @scenario "A nested card with a tone is a tinted well and an accent row colours only its edge" */
+    it("tints a nested card's border and fill and its heading, and leaves body text plain", () => {
+      renderWithDesignSystem(
+        <Card variant="nested" tone="teal" title="RAG Contexts" data-testid="well">
+          <p>Body</p>
+        </Card>,
+      );
+
+      const well = screen.getByTestId("well");
+      expect(well.dataset.cardTone).toBe("teal");
+      const rules = rulesOf(well);
+      expect(rules).toContain("--chakra-colors-teal-muted");
+      expect(rules).toContain("--chakra-colors-teal-subtle");
+      const heading = screen.getByRole("heading", { name: "RAG Contexts" });
+      expect(rulesOf(heading)).toContain("--chakra-colors-teal-fg");
+      expect(rulesOf(screen.getByText("Body"))).not.toContain("teal");
+    });
+
+    /** @scenario "A nested card with a tone is a tinted well and an accent row colours only its edge" */
+    it("draws a neutral nested card in the plain border and subtle fill", () => {
+      renderWithDesignSystem(
+        <Card variant="nested" tone="neutral" padding="sm" data-testid="inset">
+          <p>Context</p>
+        </Card>,
+      );
+
+      const rules = rulesOf(screen.getByTestId("inset"));
+      expect(rules).toContain("--chakra-colors-bg-subtle");
+      expect(rules).not.toMatch(/-(red|teal|blue|yellow)-/);
+    });
+
+    /** @scenario "A nested card with a tone is a tinted well and an accent row colours only its edge" */
+    it("colours only the 2px left edge of an accent row, with a gray fallback", () => {
+      renderWithDesignSystem(
+        <>
+          <Card variant="accent-row" tone="purple" data-testid="system">
+            <input aria-label="Role" />
+          </Card>
+          <Card variant="accent-row" data-testid="unknown" />
+        </>,
+      );
+
+      const system = rulesOf(screen.getByTestId("system"));
+      expect(system).toContain("border-left-width:2px");
+      expect(system).toContain("border-left-color:var(--chakra-colors-purple-fg)");
+      expect(system).not.toContain("purple-subtle");
+      expect(rulesOf(screen.getByTestId("unknown"))).toContain("--chakra-colors-gray-fg");
+      expect(screen.getByRole("textbox", { name: "Role" })).toBeTruthy();
+    });
+
+    /** @scenario "A nested card with a tone is a tinted well and an accent row colours only its edge" */
+    it("draws a card with no tone as it did", () => {
+      renderWithDesignSystem(<Card data-testid="plain" />);
+
+      const plain = screen.getByTestId("plain");
+      expect(plain.dataset.cardTone).toBeUndefined();
+      expect(rulesOf(plain)).not.toContain("border-left-width");
+    });
+
+    /** @scenario "A toned card is a surface and never an opener" */
+    it("refuses an opener on an accent row or a toned card", () => {
+      const quiet = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      expect(() =>
+        renderWithDesignSystem(
+          <Card variant="accent-row" opener={<a href="#x">Open</a>}>
+            <p>Row</p>
+          </Card>,
+        ),
+      ).toThrow("not an opener");
+      quiet.mockRestore();
+    });
+  });
+
+  describe("given the larger insets and the emphasized variant", () => {
+    /** @scenario "A card names the larger insets and the emphasized variant" */
+    it("insets xl 24px all round and inline-lg 24px across and 20px down", () => {
+      renderWithDesignSystem(
+        <>
+          <Card padding="xl" data-testid="xl">
+            <p>Xl body</p>
+          </Card>
+          <Card padding="inline-lg" data-testid="inline">
+            <p>Inline body</p>
+          </Card>
+        </>,
+      );
+
+      const body = (text: string) => getComputedStyle(found(screen.getByText(text).parentElement));
+      expect(body("Xl body").paddingInline).toBe("var(--chakra-spacing-6)");
+      expect(body("Xl body").paddingTop).toBe("var(--chakra-spacing-6)");
+      expect(body("Inline body").paddingInline).toBe("var(--chakra-spacing-6)");
+      expect(body("Inline body").paddingTop).toBe("var(--chakra-spacing-5)");
+    });
+
+    /** @scenario "A card names the larger insets and the emphasized variant" */
+    it("draws emphasized with the emphasized border, the panel ground and the 2xl radius", () => {
+      renderWithDesignSystem(<Card variant="emphasized" data-testid="plan" />);
+
+      const rules = rulesOf(screen.getByTestId("plan"));
+      expect(rules).toContain("--chakra-colors-border-emphasized");
+      expect(rules).toContain("--chakra-colors-bg-panel");
+      expect(rules).toContain("--chakra-radii-2xl");
+    });
+  });
+
   describe("given a body layout, a placeholder and a tour target", () => {
     /** @scenario "A card lays its content out as a stack and marks a placeholder" */
     it("stacks children with no gap or 12px between them, flow leaving them in block flow", () => {
