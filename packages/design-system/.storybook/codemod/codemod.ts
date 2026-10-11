@@ -9,11 +9,24 @@ import { parseArgs } from "node:util";
 
 import { browserSources } from "../census.ts";
 import { type FileOutcome, type Transform, applyEdits } from "./ast.ts";
+import { drawerGroundTransform } from "./transforms/drawer-ground.ts";
 import { opsConfirmDialogTransform } from "./transforms/ops-confirm-dialog.ts";
+import { overlayCosmeticsTransform } from "./transforms/overlay-cosmetics.ts";
 import { pixelSpacingTransform } from "./transforms/pixel-spacing.ts";
+import { plainConfirmTransform } from "./transforms/plain-confirm.ts";
+import { simpleDialogTransform } from "./transforms/simple-dialog.ts";
+import { simpleDrawerTransform } from "./transforms/simple-drawer.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "../../../..");
-export const TRANSFORMS: Transform[] = [pixelSpacingTransform, opsConfirmDialogTransform];
+export const TRANSFORMS: Transform[] = [
+  pixelSpacingTransform,
+  opsConfirmDialogTransform,
+  overlayCosmeticsTransform,
+  drawerGroundTransform,
+  simpleDrawerTransform,
+  simpleDialogTransform,
+  plainConfirmTransform,
+];
 
 export type FileRun = FileOutcome & { file: string };
 

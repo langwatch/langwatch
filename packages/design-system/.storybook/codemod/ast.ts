@@ -133,3 +133,73 @@ export function applyEdits({ source, edits }: { source: string; edits: Edit[] })
   }
   return out;
 }
+
+/** Every JSX element under `node`, outermost first. */
+export function jsxElements({ node }: { node: AstNode }): AstNode[] {
+  const own = node.type === "JSXElement" ? [node] : [];
+  return own.concat(childNodes({ node }).flatMap((next) => jsxElements({ node: next })));
+}
+
+/** The source text of a node. */
+export const sourceOf = ({ parsed, node }: { parsed: Parsed; node: AstNode }) =>
+  parsed.source.slice(node.start, node.end);
+
+/**
+ * Removes the import specifiers a transform left unused, naming only locals in `names`
+ * (so an import that was already unused is left to the linter). Returns the new text.
+ */
+export function pruneImports({
+  file,
+  before,
+  after,
+  names,
+}: {
+  file: string;
+  before: string;
+  after: string;
+  names: string[];
+}): string {
+  const parsed = parse({ file, source: after });
+  const declarations = children(parsed.program, "body").filter(
+    (node) => node.type === "ImportDeclaration",
+  );
+  const rest = withoutImports({ file, source: after });
+  const used = (name: string) => new RegExp(`(?<![\\w$.])${name}(?![\\w$])`).test(rest);
+  const wasUsed = (name: string) =>
+    new RegExp(`(?<![\\w$.])${name}(?![\\w$])`).test(withoutImports({ file, source: before }));
+  const edits: Edit[] = [];
+  for (const declaration of declarations) {
+    const specifiers = children(declaration, "specifiers");
+    const drop = specifiers.filter((specifier) => {
+      const local = text(child(specifier, "local"), "name") ?? "";
+      return names.includes(local) && wasUsed(local) && !used(local);
+    });
+    if (!drop.length) continue;
+    const keep = specifiers.filter((specifier) => !drop.includes(specifier));
+    if (!keep.length) {
+      const end = after[declaration.end] === "\n" ? declaration.end + 1 : declaration.end;
+      edits.push({ start: declaration.start, end, text: "" });
+      continue;
+    }
+    const sourceNode = child(declaration, "source");
+    const from = sourceNode ? after.slice(sourceNode.start, sourceNode.end) : "";
+    const kind = text(declaration, "importKind") === "type" ? "import type" : "import";
+    const list = keep.map((node) => after.slice(node.start, node.end)).join(", ");
+    edits.push({
+      start: declaration.start,
+      end: declaration.end,
+      text: `${kind} { ${list} } from ${from};`,
+    });
+  }
+  return applyEdits({ source: after, edits });
+}
+
+function withoutImports({ file, source }: { file: string; source: string }): string {
+  const parsed = parse({ file, source });
+  let out = source;
+  for (const node of children(parsed.program, "body")) {
+    if (node.type !== "ImportDeclaration") continue;
+    out = out.slice(0, node.start) + " ".repeat(node.end - node.start) + out.slice(node.end);
+  }
+  return out;
+}
