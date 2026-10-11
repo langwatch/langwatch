@@ -36,7 +36,7 @@ Feature: A lookup by id reads only the partitions its id index names
     When its spans are looked up by trace id
     Then the read is bounded by the trace index and returns the spans
 
-  @integration @unimplemented
+  @unit @unimplemented
   Scenario: an id the index has never seen probes recent data once and stops
     Given the index's backfill has completed
     And no record exists for the id
@@ -64,7 +64,7 @@ Feature: A lookup by id reads only the partitions its id index names
     Then every existing id has an index row covering all of its rows
     And running it again changes no index range
 
-  @integration @unimplemented
+  @unit @unimplemented
   Scenario: until the backfill completes, a lookup keeps today's fallback
     Given the index's backfill step has not completed
     When a record is looked up by its id alone
@@ -84,10 +84,23 @@ Feature: A lookup by id reads only the partitions its id index names
     Then the trace's index range still covers Monday to Thursday
 
   @integration @unimplemented
-  Scenario: a retention change reaches the index as well as the data
-    Given a project whose traces are kept for 365 days
+  Scenario: a lengthened retention reaches the index
+    Given a project whose traces are kept for 30 days
+    When the project's trace retention is changed to 365 days
+    Then the trace id index rows for that project carry 365 days as well
+
+  @integration @unimplemented
+  Scenario: a shortened retention never shortens the index
+    Given an aggregate with some events kept forever and others kept for 365 days
     When the project's trace retention is changed to 30 days
-    Then the trace id index rows for that project carry 30 days as well
+    Then the aggregate's index row is still kept forever
+
+  @integration @unimplemented
+  Scenario: an aggregate the index has not seen reads its whole history
+    Given the event log index's flag is on
+    And an aggregate whose only events have no occurred time
+    When its events are read for replay
+    Then the read takes the existing unbounded path and returns every event
 
   @integration @unimplemented
   Scenario: an id kept forever is not expired by a finite-retention row
@@ -101,13 +114,13 @@ Feature: A lookup by id reads only the partitions its id index names
     When its index range is read
     Then the range covers last month only
 
-  @integration @unimplemented
+  @unit @unimplemented
   Scenario: an event is found first in the window its id's time names
     Given an event stored eight weeks ago whose occurred time is close to when its id was made
     When it is looked up by tenant and event id
     Then the first read touches only the partitions within seven days of the id's time
 
-  @integration @unimplemented
+  @unit @unimplemented
   Scenario: an event whose occurred time drifted far from its id falls back
     Given a span exported today whose occurred time is three months ago
     When its event is looked up by tenant and event id
