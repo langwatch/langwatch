@@ -252,3 +252,47 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       Given the stack runs without +outbound
       When an agent runs "haven sim outbound list"
       Then haven exits non-zero and says to run "haven up +outbound"
+
+  Rule: Governance pull vendors (Databricks Genie and usage feeds)
+    # The product's pull sources read these paths; see services/outboundsim/databricks.go.
+    # A word in the token (or a service principal's client id) picks the workspace:
+    # empty, revoked, noscope, ratelimited, down, malformed or cycle; anything else is the seed.
+
+    @unit
+    Scenario: A Genie workspace lists its spaces, conversations and messages to a good token
+      Given outboundsim is running
+      When a pull source reads /api/2.0/genie/spaces, a space's conversations and a conversation's messages with a bearer token naming no tenant word
+      Then outboundsim answers each in Databricks' shape from a seeded workspace of three spaces
+      And a second read of a message reports the same message id and timestamp
+      And each call is a databricks record with the token redacted
+
+    @unit
+    Scenario: Each refusal a pull source names has a credential that triggers it
+      When a pull source reads the spaces with no token, or a token holding revoked, noscope, ratelimited or down
+      Then outboundsim answers 401, 401, 403, 429 with Retry-After, or 503 in Databricks' error shape
+      And a token holding malformed is answered 200 with an HTML sign-in page
+      And a token holding empty is answered an empty list, and one holding cycle repeats its page token
+
+    @unit
+    Scenario: A scripted fault overrides a good token on one Databricks path
+      Given a fault on channel databricks for target /api/2.0/genie/spaces with status 403, once
+      When a pull source reads the spaces with a good token twice
+      Then the first read is refused 403 and the second is served
+
+    @unit
+    Scenario: A service principal signs in and its client id picks the workspace
+      When a pull source posts client credentials to /oidc/v1/token
+      Then outboundsim answers an access token naming the client id
+      And a client id holding revoked is refused 401 invalid_client
+
+    @unit
+    Scenario: The SCIM directory pages by startIndex and can be replaced
+      When a pull source reads /api/2.0/preview/scim/v2/Users with startIndex and count
+      Then outboundsim answers a SCIM list response with the total and that page
+      And PUT /_sim/api/databricks/users replaces the directory, refusing a user without an id or userName with 422
+
+    @unit
+    Scenario: A usage feed serves events after a cursor for a custom HTTP pull
+      When a custom HTTP pull source reads /feeds/<name>?cursor=<n> with a bearer token
+      Then outboundsim answers the events after n and next_cursor
+      And a token holding revoked is refused 401
