@@ -24,6 +24,14 @@ Feature: Card, resource tile, load more and the one-line empty state
     And a card with no padding hosts a bounded preview and its footer
 
   @integration
+  Scenario: A card lays its content out as a stack and marks a placeholder
+    Given cards with the stack, spaced and flow body layouts
+    Then stack and spaced stretch their children in a column with no gap and a 12px gap
+    And flow leaves them in block flow
+    And a placeholder card draws a dashed border and a plain card does not
+    And a tour target lands on the same element as the test id
+
+  @integration
   Scenario: A resource tile accepts only a native opener and keeps its controls reachable
     Given a resource tile whose opener is a div
     Then it refuses the opener

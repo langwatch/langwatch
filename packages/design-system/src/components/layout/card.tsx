@@ -39,9 +39,22 @@ export interface CardProps {
    * is the old Chakra card's own space, kept for a surface whose screenshots show it.
    */
   padding?: "lg" | "md" | "sm" | "none";
+  /**
+   * How the content slot lays its children out. flow (default): block flow. stack: a stretching
+   * column with no gap. spaced: the same column with 12px between children.
+   */
+  bodyLayout?: BodyLayout;
+  /** A card standing in for something not there yet: its border is dashed. */
+  placeholder?: boolean;
   children?: ReactNode;
   "data-testid"?: string;
+  /** The guided tour's spotlight target; lands on the painted outer root. */
+  "data-tour"?: string;
 }
+
+export type BodyLayout = "flow" | "stack" | "spaced";
+
+const BODY_GAP = { stack: 0, spaced: 3 } as const;
 
 const RECIPE_VARIANT = {
   panel: "outline",
@@ -103,8 +116,11 @@ export function Card({
   actions,
   footer,
   padding = "md",
+  bodyLayout = "flow",
+  placeholder = false,
   children,
   "data-testid": testId,
+  "data-tour": tourId,
 }: CardProps) {
   const hasHeader =
     title != null ||
@@ -119,9 +135,11 @@ export function Card({
       variant={RECIPE_VARIANT[variant]}
       width="full"
       {...OVERRIDES[variant]}
+      borderStyle={placeholder ? "dashed" : undefined}
       data-card-variant={variant}
       data-card-padding={padding}
       data-testid={testId}
+      data-tour={tourId}
     >
       <ChakraCard.Body padding={0} gap={0}>
         {hasHeader && (
@@ -166,6 +184,14 @@ export function Card({
             paddingBottom={footer != null ? 0 : inset}
             flex={1}
             minWidth={0}
+            {...(bodyLayout === "flow"
+              ? {}
+              : {
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                  gap: BODY_GAP[bodyLayout],
+                })}
           >
             {children}
           </Box>

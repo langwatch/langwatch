@@ -70,6 +70,25 @@ export const Showcase: Story = {
   },
 };
 
+/** A column body (stack, or spaced for 12px between children) and a dashed placeholder. */
+export const BodyLayout: Story = {
+  render: () => (
+    <CardGrid columns={3}>
+      <Card bodyLayout="stack" title="stack">
+        <Text textStyle="sm">First</Text>
+        <Text textStyle="sm">Second</Text>
+      </Card>
+      <Card bodyLayout="spaced" title="spaced">
+        <Text textStyle="sm">First</Text>
+        <Text textStyle="sm">Second</Text>
+      </Card>
+      <Card placeholder title="placeholder">
+        <Text textStyle="sm">Not reported yet</Text>
+      </Card>
+    </CardGrid>
+  ),
+};
+
 export const Padding: Story = {
   render: () => (
     <CardGrid columns={3}>

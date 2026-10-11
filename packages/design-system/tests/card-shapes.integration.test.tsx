@@ -85,6 +85,58 @@ describe("Card", () => {
     });
   });
 
+  describe("given a body layout, a placeholder and a tour target", () => {
+    /** @scenario "A card lays its content out as a stack and marks a placeholder" */
+    it("stacks children with no gap or 12px between them, flow leaving them in block flow", () => {
+      renderWithDesignSystem(
+        <CardGrid columns={3}>
+          <Card bodyLayout="stack" data-testid="stack">
+            <p>One</p>
+          </Card>
+          <Card bodyLayout="spaced" data-testid="spaced">
+            <p>One</p>
+          </Card>
+          <Card data-testid="flow">
+            <p>One</p>
+          </Card>
+        </CardGrid>,
+      );
+
+      const body = (testId: string) =>
+        getComputedStyle(within(screen.getByTestId(testId)).getByText("One").parentElement!);
+      const stack = body("stack");
+      expect([stack.display, stack.flexDirection]).toEqual(["flex", "column"]);
+      expect(["", "normal", "0", "0px", "var(--chakra-spacing-0)"]).toContain(stack.gap);
+      const spaced = body("spaced");
+      expect([spaced.display, spaced.flexDirection, spaced.gap]).toEqual([
+        "flex",
+        "column",
+        "var(--chakra-spacing-3)",
+      ]);
+      expect(body("flow").display).not.toBe("flex");
+    });
+
+    /** @scenario "A card lays its content out as a stack and marks a placeholder" */
+    it("draws only a placeholder's border dashed", () => {
+      renderWithDesignSystem(
+        <CardGrid columns={2}>
+          <Card placeholder data-testid="pending" />
+          <Card data-testid="reported" />
+        </CardGrid>,
+      );
+
+      expect(getComputedStyle(screen.getByTestId("pending")).borderStyle).toBe("dashed");
+      expect(getComputedStyle(screen.getByTestId("reported")).borderStyle).not.toBe("dashed");
+    });
+
+    /** @scenario "A card lays its content out as a stack and marks a placeholder" */
+    it("puts the tour target on the same painted element as the test id", () => {
+      renderWithDesignSystem(<Card data-testid="panel" data-tour="costs-panel" />);
+
+      expect(screen.getByTestId("panel").getAttribute("data-tour")).toBe("costs-panel");
+    });
+  });
+
   describe("given content that has no title", () => {
     /** @scenario "A card can keep the old 20px space and host content that has no title" */
     it("draws a description on its own without dropping it", () => {
