@@ -1,8 +1,6 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, HStack } from "@langwatch/design-system/primitives";
 import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
-import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useModelProvidersSettings } from "@langwatch/model-provider-client";
 import { modelProviders } from "@langwatch/model-provider-contract";
 import { useState } from "react";
@@ -65,60 +63,45 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
     isCollapsedRecordPending || (isEditingSpecificRow && isAllProvidersLoading);
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
+    <Drawer
+      onClose={closeDrawer}
       size="xl"
-      onOpenChange={({ open }) => {
-        if (!open) {
-          closeDrawer();
-        }
-      }}
-      modal={false}
-    >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.CloseTrigger />
-          <HStack gap={3}>
-            {provider && isProviderKey(provider.provider) && (
-              <ProviderIconGlyph provider={provider.provider} size="28px" />
-            )}
-            <Drawer.Title>{title}</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          {isFormDataLoading ? (
-            <SkeletonRows rows={4} />
-          ) : (
-            <EditModelProviderForm
-              projectId={projectId}
-              organizationId={organizationId}
-              modelProviderId={modelProviderId}
-              providerKey={providerKey}
-              formId="model-provider-form"
-              onSaveStateChange={setSaveState}
-            />
-          )}
-        </Drawer.Body>
-        {!isFormDataLoading && (
-          <Drawer.Actions
-            onCancel={closeDrawer}
-            busy={saveState.busy}
-            primary={
-              <Button
-                colorPalette="orange"
-                type="submit"
-                form="model-provider-form"
-                loading={saveState.busy}
-                disabled={!saveState.canSave}
-                data-testid="model-provider-save"
-              >
-                {saveState.label}
-              </Button>
+      title={title || "Model provider"}
+      icon={
+        provider && isProviderKey(provider.provider) ? (
+          <ProviderIconGlyph provider={provider.provider} size="28px" />
+        ) : (
+          void 0
+        )
+      }
+      loading={isFormDataLoading}
+      footer={
+        isFormDataLoading
+          ? void 0
+          : {
+              cancel: { onClick: closeDrawer },
+              busy: saveState.busy,
+              primaryAction: {
+                label: saveState.label,
+                type: "submit",
+                form: "model-provider-form",
+                loading: saveState.busy,
+                disabledReason: saveState.canSave
+                  ? void 0
+                  : "This provider configuration no longer exists",
+                "data-testid": "model-provider-save",
+              },
             }
-          />
-        )}
-      </Drawer.Content>
-    </Drawer.Root>
+      }
+    >
+      <EditModelProviderForm
+        projectId={projectId}
+        organizationId={organizationId}
+        modelProviderId={modelProviderId}
+        providerKey={providerKey}
+        formId="model-provider-form"
+        onSaveStateChange={setSaveState}
+      />
+    </Drawer>
   );
 };
