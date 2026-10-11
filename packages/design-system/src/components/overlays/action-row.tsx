@@ -24,6 +24,8 @@ interface FrameActionLook {
   /** Primary only: paints it red, for a destroying confirm. */
   danger?: boolean;
   "data-testid"?: string;
+  /** The guided tour's spotlight target. */
+  "data-tour"?: string;
 }
 
 /** An ordinary button: runs `onClick`, renders `type="button"`. */
@@ -126,6 +128,7 @@ export function FrameActionButton({
       }
       data-frame-action={kind}
       data-testid={action["data-testid"]}
+      data-tour={action["data-tour"]}
     >
       {action.icon}
       {action.label}
