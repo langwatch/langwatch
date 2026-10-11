@@ -27,7 +27,13 @@ import type {
   TriggerFirePage,
   TriggerLatestEvaluation,
 } from "./automation.trpc-schemas.ts";
-import type { EmailSuppression, EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
+import type {
+  EmailSuppression,
+  EmailSuppressionPage,
+  EmailSuppressionPageInput,
+  EmailSuppressionRow,
+  UnsubscribeView,
+} from "./automation.ts";
 import type { AutomationPersistCapCount } from "./persist-cap.ts";
 import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire.ts";
 import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";
@@ -210,6 +216,10 @@ export interface AutomationApi {
   }): Promise<void>;
   /** The operator-facing suppression list, audited because it reads addresses. */
   listSuppressions(input: { projectId: string; actorId: string }): Promise<EmailSuppressionRow[]>;
+  /** One audited page of the same list, newest first; `nextCursor` is null on the last page. */
+  listSuppressionsPage(
+    input: EmailSuppressionPageInput & { actorId: string },
+  ): Promise<EmailSuppressionPage>;
   removeSuppression(input: { id: string; projectId: string }): Promise<void>;
   /** Every suppression for a project, each carrying the trigger name it names. */
   getAllEnriched(input: {
