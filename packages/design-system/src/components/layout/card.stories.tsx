@@ -374,3 +374,41 @@ export const NestedMutedExtraSmall: Story = {
     children: createElement(Text, null, "Error detail"),
   },
 };
+
+export const BandedTones: StoryObj = {
+  render: () => (
+    <CardGrid columns={3}>
+      {(["blue", "purple", "teal", "amber", "pink", "gray"] as const).map((tone) => (
+        <Card key={tone} variant="banded" bandTone={tone} title={tone}>
+          <Text textStyle="sm">Informational group</Text>
+        </Card>
+      ))}
+    </CardGrid>
+  ),
+};
+
+export const PanelFill: StoryObj = {
+  render: () => (
+    <Box height="240px">
+      <Card variant="panel-fill" padding="lg" bodyLayout="stack" title="Chat">
+        <Box overflowY="auto" flex={1}>
+          <Box height="600px">Long inert transcript</Box>
+        </Box>
+      </Card>
+    </Box>
+  ),
+};
+
+export const ImageFrame: StoryObj = {
+  render: () => (
+    <Box maxWidth="360px">
+      <Card variant="image-frame">
+        <img
+          alt="Wide setup screenshot"
+          style={{ display: "block", maxWidth: "100%", maxHeight: "160px", objectFit: "contain" }}
+          src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='200'%3E%3Crect width='800' height='200' fill='%23ccc'/%3E%3C/svg%3E"
+        />
+      </Card>
+    </Box>
+  ),
+};

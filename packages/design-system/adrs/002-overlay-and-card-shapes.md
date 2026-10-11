@@ -136,3 +136,17 @@ Rulings: `.claude/tmp/ds-sweep/plan/RULINGS-DS3.md`. New options are opt-in; omi
   with `headerContent` is a transparent bounded frame whose children own header and scrolling; the frame
   draws the one X. `Drawer.topInset="studio-header"` keeps the studio's 56px top clearance.
 - **Card.** `invalid` (frame), `variant="joined-panel"` with `edge`, `padding="xs"`, `borderTone` (nested).
+
+## Amendment DS4 (2026-10-11): finite frame options for the trace and workflow dialogs
+
+Dialog gains `headerAppearance` (default, divided, muted, guide), `heightLimit` (reading),
+`footerAppearance` (note, for `footerContent` only), `surface="glass"` (card ground only; panel plus
+glass is refused), `showCloseButton`, `descriptionId` (with `headerContent`) and size `document`
+(64rem). Drawer gains size `workspace` (87.5rem), `closeOnEscape` as a yes/no guard read at Escape
+time, `preventScroll` and `footerAppearance="raised"`. Card gains `banded` (with `bandTone`),
+`panel-fill` and `image-frame`. Pagination gains `layout`, `ground`, `summaryTone` and, for a known
+total, `totalSummary`. Defaults keep every existing consumer unchanged.
+
+Compatibility exception: the trace raw-JSON, edit-diff, share and shortcut dialogs and the two lens
+dialogs pass `trapFocus={false}` and `preventScroll={false}` explicitly, as their local wrapper did.
+It is scoped to those dialogs and is not copied to others.

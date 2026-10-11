@@ -33,11 +33,33 @@ interface PaginationCommon {
    * the data ends; omitted or zero, a full page is assumed, capped by total.
    */
   visibleCount?: number;
+  /** `center` puts the navigation in the middle, the summary yielding first. Default "end". */
+  layout?: "end" | "center";
+  /** `card` paints the bar on the card ground. Default "transparent". */
+  ground?: "transparent" | "card";
+  /** `subtle` keeps the quieter summary colour of the trace table. Default "muted". */
+  summaryTone?: "muted" | "subtle";
+}
+
+const NARROW = "@media (max-width: 30rem)";
+
+function barLook({
+  layout = "end",
+  ground = "transparent",
+}: Pick<PaginationCommon, "layout" | "ground">) {
+  const center = layout === "center";
+  return {
+    templateColumns: center ? "minmax(max-content, 1fr) auto minmax(0, 1fr)" : "1fr auto",
+    ...(ground === "card" ? { background: "bg.card" } : {}),
+    ...(center ? { [NARROW]: { templateColumns: "minmax(0, 1fr)", justifyItems: "center" } } : {}),
+  } as const;
 }
 
 /** A source that knows its total: numbered pages, the count and the range. */
 export interface KnownTotalPaginationProps extends PaginationCommon {
   totalCount: number;
+  /** Replaces only the "<total> <unitLabel>" part of the summary; empty keeps the default. */
+  totalSummary?: string;
   hasMore?: never;
   /**
    * Whether a page number can be opened at all. A cursor-only data source can
@@ -102,6 +124,8 @@ function PageSizeField({
 function PageSummary({
   totalCount,
   unitLabel,
+  totalSummary,
+  tone = "muted",
   rangeStart,
   rangeEnd,
   pageSize,
@@ -111,6 +135,8 @@ function PageSummary({
 }: {
   totalCount: number;
   unitLabel?: string;
+  totalSummary?: string;
+  tone?: "muted" | "subtle";
   rangeStart: number;
   rangeEnd: number;
   pageSize: number;
@@ -118,13 +144,15 @@ function PageSummary({
   disabled: boolean;
   onPageSizeChange?: (size: number) => void;
 }) {
-  const segments = unitLabel ? [`${totalCount.toLocaleString()} ${unitLabel}`] : [];
+  const counted = unitLabel ? `${totalCount.toLocaleString()} ${unitLabel}` : null;
+  const total = totalSummary || counted;
+  const segments = total ? [total] : [];
   segments.push(`showing ${rangeStart}–${rangeEnd}`);
   if (onPageSizeChange) segments.push("per page");
 
   return (
     <HStack gap={1.5} justifySelf="start" data-testid="pagination-indicator">
-      <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+      <Text textStyle="xs" color={tone === "subtle" ? "fg.subtle" : "fg.muted"} flexShrink={0}>
         {segments.join(" · ")}
       </Text>
       {onPageSizeChange && (
@@ -271,6 +299,10 @@ function KnownTotalPagination({
   visibleCount,
   isPageReachable,
   canGoNext = true,
+  totalSummary,
+  layout,
+  ground,
+  summaryTone,
 }: KnownTotalPaginationProps) {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const currentPage = Math.min(Math.max(1, page), totalPages);
@@ -285,7 +317,7 @@ function KnownTotalPagination({
   return (
     // The count on the left, the pages on the right, on whatever ground the list sits on.
     <Grid
-      templateColumns="1fr auto"
+      {...barLook({ layout, ground })}
       alignItems="center"
       gap={3}
       paddingX={2}
@@ -306,6 +338,8 @@ function KnownTotalPagination({
         <PageSummary
           totalCount={totalCount}
           unitLabel={unitLabel}
+          totalSummary={totalSummary}
+          tone={summaryTone}
           rangeStart={rangeStart}
           rangeEnd={rangeEnd}
           pageSize={pageSize}
@@ -338,6 +372,9 @@ function OpenEndedPagination({
   isLoading = false,
   navDisabled = false,
   visibleCount,
+  layout,
+  ground,
+  summaryTone,
 }: OpenEndedPaginationProps) {
   const currentPage = Math.max(1, page);
   const rangeStart = (currentPage - 1) * pageSize + 1;
@@ -346,7 +383,7 @@ function OpenEndedPagination({
 
   return (
     <Grid
-      templateColumns="1fr auto"
+      {...barLook({ layout, ground })}
       alignItems="center"
       gap={3}
       paddingX={2}
@@ -366,7 +403,11 @@ function OpenEndedPagination({
       ) : (
         <HStack gap={1.5} justifySelf="start" data-testid="pagination-indicator">
           {visibleCount !== void 0 && visibleCount > 0 && (
-            <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+            <Text
+              textStyle="xs"
+              color={summaryTone === "subtle" ? "fg.subtle" : "fg.muted"}
+              flexShrink={0}
+            >
               {`showing ${rangeStart}–${rangeStart + visibleCount - 1}`}
               {onPageSizeChange ? " · per page" : ""}
             </Text>

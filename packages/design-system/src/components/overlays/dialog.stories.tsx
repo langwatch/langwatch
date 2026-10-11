@@ -250,3 +250,89 @@ export const AssistantSurface: Story = {
     footerContent: <Button onClick={noop}>Generate</Button>,
   },
 };
+
+const headerRows = (
+  <Stack gap={2}>
+    <Text fontWeight="semibold">A long raw payload title that can wrap on a narrow screen</Text>
+    <Input aria-label="Search raw payload" placeholder="Search" size="sm" />
+  </Stack>
+);
+
+export const HeaderControls: Story = {
+  render: () => (
+    <Dialog
+      open
+      onClose={noop}
+      title="Raw JSON"
+      size="document"
+      heightLimit="reading"
+      headerAppearance="divided"
+      body="flush"
+      cancelLabel={null}
+      headerContent={headerRows}
+    >
+      <Text padding={4}>Body</Text>
+    </Dialog>
+  ),
+};
+
+export const MutedExpandedText: Story = {
+  render: () => (
+    <Dialog
+      open
+      onClose={noop}
+      title="Expanded text"
+      size="document"
+      headerAppearance="muted"
+      cancelLabel={null}
+      headerContent={headerRows}
+    >
+      <Text>Body</Text>
+    </Dialog>
+  ),
+};
+
+export const GuideHeader: Story = {
+  render: () => (
+    <Dialog
+      open
+      onClose={noop}
+      title="Keyboard shortcuts"
+      size="lg"
+      heightLimit="reading"
+      headerAppearance="guide"
+      body="flush"
+      headerContent={<Text fontWeight="semibold">Keyboard shortcuts</Text>}
+      footerAppearance="note"
+      footerContent={<Text textStyle="xs">Press ? to open this guide</Text>}
+    >
+      <Text padding={4}>Groups</Text>
+    </Dialog>
+  ),
+};
+
+export const GlassSurface: Story = {
+  render: () => (
+    <Dialog
+      open
+      onClose={noop}
+      title="Share trace"
+      description="Anyone with the link can read this trace."
+      surface="glass"
+      cancelLabel={null}
+      primaryAction={{ label: "Copy link", onClick: noop }}
+    />
+  ),
+};
+
+export const HiddenClose: Story = {
+  render: () => (
+    <Dialog
+      open
+      onClose={noop}
+      title="Name this lens"
+      showCloseButton={false}
+      primaryAction={{ label: "Save", onClick: noop }}
+    />
+  ),
+};

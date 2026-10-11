@@ -138,7 +138,7 @@ export const DialogCloseTrigger = React.forwardRef<
 });
 
 /** The shared overlay width scale, as maxima capped by the viewport. */
-export type DialogSize = "sm" | "md" | "detail" | "lg" | "xl";
+export type DialogSize = "sm" | "md" | "detail" | "lg" | "xl" | "document";
 
 const DIALOG_WIDTH: Record<DialogSize, string> = {
   sm: "28rem",
@@ -146,6 +146,7 @@ const DIALOG_WIDTH: Record<DialogSize, string> = {
   detail: "38.5rem",
   lg: "42rem",
   xl: "56rem",
+  document: "64rem",
 };
 
 const FOOTER_DIVIDER = {
@@ -162,6 +163,44 @@ const ASSISTANT_SURFACE = {
   overflow: "hidden",
   boxShadow: "0 28px 90px -32px color-mix(in srgb, {colors.bg.scrim} 62%, transparent)",
 } as const;
+
+const GLASS_SURFACE = {
+  background: "color-mix(in srgb, {colors.bg.card} 80%, transparent)",
+  backdropFilter: "var(--lw-glass-blur, blur(25px))",
+  borderRadius: "lg",
+  "@media (prefers-reduced-transparency: reduce)": {
+    background: "bg.card",
+    backdropFilter: "none",
+  },
+  "@media (forced-colors: active)": { background: "bg.card", backdropFilter: "none" },
+} as const;
+
+const HEADER_LOOK = {
+  default: {},
+  divided: { borderBottomWidth: "1px", borderBottomStyle: "solid", borderColor: "border" },
+  muted: { background: "bg.muted", padding: 3, borderTopRadius: "inherit" },
+  guide: {
+    background: "linear-gradient(135deg, {colors.blue.subtle}, {colors.purple.subtle})",
+    paddingX: 5,
+    paddingY: 4,
+    borderTopRadius: "inherit",
+    borderBottomWidth: "1px",
+    borderBottomStyle: "solid",
+    borderColor: "border.muted",
+  },
+} as const;
+
+const NOTE_FOOTER = {
+  paddingX: 5,
+  paddingY: 2,
+  background: "bg.panel",
+  borderTopWidth: "1px",
+  borderTopStyle: "solid",
+  borderColor: "border.muted",
+} as const;
+
+/** The finite header band treatments: ordinary, rule below, muted strip, guide gradient. */
+export type DialogHeaderAppearance = keyof typeof HEADER_LOOK;
 
 /** The two places a dialog frame stands: near the top, or centred on the viewport. */
 export type DialogPlacement = "top" | "center";
@@ -186,7 +225,16 @@ interface DialogBaseProps {
   /** `padded` (default) or `flush`: the body draws no padding, its children own the spacing. */
   body?: "padded" | "flush";
   /** `assistant`: the card ground, muted border and deep shadow of the Langy assistant frame. */
-  surface?: "default" | "assistant";
+  surface?: "default" | "assistant" | "glass";
+  /** Paints the whole header band; `headerContent` supplies what is inside. Default "default". */
+  headerAppearance?: DialogHeaderAppearance;
+  /** `reading` caps the frame at 85vh (and the viewport safety cap). Default "default". */
+  heightLimit?: "default" | "reading";
+  /** `note` is the compact panel strip for `footerContent` only. Default "default". */
+  footerAppearance?: "default" | "note";
+  /** `false` draws no X; Escape, outside click and Cancel still follow `dismissible`. */
+  showCloseButton?: boolean;
+
   /** A rule above the footer. Default false. */
   footerDivider?: boolean;
   /** `false`: no X, no Cancel, no Escape, no outside click; only the actions close it. */
@@ -255,6 +303,7 @@ type DialogFooterChoice =
 type DialogHeaderChoice =
   | {
       headerContent?: never;
+      descriptionId?: never;
       /** Under the title, fg.muted; it describes the dialog (`aria-describedby`). */
       description?: React.ReactNode;
       /** 18px, before the title. */
@@ -265,6 +314,8 @@ type DialogHeaderChoice =
   | {
       /** Replaces the visible heading; the X is still the frame's. No Dialog parts inside. */
       headerContent: React.ReactNode;
+      /** The id of a caller-owned description inside `headerContent`, for `aria-describedby`. */
+      descriptionId?: string;
       description?: never;
       icon?: never;
       onBack?: never;
@@ -273,8 +324,17 @@ type DialogHeaderChoice =
 export type DialogProps = DialogBaseProps & DialogFooterChoice & DialogHeaderChoice;
 
 /** The frame's ground, and the assistant treatment with its scope class. */
-function frameLook({ ground, assistant }: { ground?: "card" | "panel"; assistant: boolean }) {
+function frameLook({
+  ground,
+  assistant,
+  glass = false,
+}: {
+  ground?: "card" | "panel";
+  assistant: boolean;
+  glass?: boolean;
+}) {
   if (assistant) return { ...ASSISTANT_SURFACE, className: "langy-root" };
+  if (glass) return GLASS_SURFACE;
   if (ground === "card") return { background: "bg.card" };
   return ground === "panel" ? { background: "bg.panel" } : {};
 }
@@ -307,6 +367,7 @@ function DialogHeading({
   assistant,
   busy,
   backTestId,
+  appearance = "default",
 }: {
   title: string;
   icon?: React.ReactNode;
@@ -316,6 +377,7 @@ function DialogHeading({
   assistant: boolean;
   busy: boolean;
   backTestId?: string;
+  appearance?: DialogHeaderAppearance;
 }) {
   const custom = headerContent !== undefined;
   return (
@@ -324,6 +386,8 @@ function DialogHeading({
       alignItems="stretch"
       paddingEnd={12}
       {...(assistant ? { paddingBottom: 3 } : {})}
+      {...HEADER_LOOK[appearance]}
+      data-header-appearance={appearance === "default" ? undefined : appearance}
     >
       {custom && <ChakraDialog.Title srOnly>{title}</ChakraDialog.Title>}
       {custom && headerContent}
@@ -360,6 +424,32 @@ function DialogHeading({
   );
 }
 
+type FooterActions = React.ComponentProps<typeof ActionRow>;
+
+function DialogFooterBand({
+  divider,
+  noteLook,
+  scope,
+  resetKeys,
+  footerContent,
+  actions,
+}: {
+  divider: boolean;
+  noteLook: boolean;
+  scope: string;
+  resetKeys: unknown[];
+  footerContent: React.ReactNode;
+  actions: FooterActions;
+}) {
+  return (
+    <ChakraDialog.Footer {...(divider ? FOOTER_DIVIDER : {})} {...(noteLook ? NOTE_FOOTER : {})}>
+      <StudioIsolatedErrorBoundary scope={scope} resetKeys={resetKeys}>
+        {footerContent !== undefined ? footerContent : <ActionRow {...actions} />}
+      </StudioIsolatedErrorBoundary>
+    </ChakraDialog.Footer>
+  );
+}
+
 /** The dialog shape: props in, one look out. The part statics are deprecated. */
 export function Dialog({
   open,
@@ -382,6 +472,11 @@ export function Dialog({
   ground,
   body = "padded",
   surface = "default",
+  headerAppearance = "default",
+  heightLimit = "default",
+  footerAppearance = "default",
+  showCloseButton = true,
+  descriptionId,
   footerDivider = false,
   note,
   dismissible = true,
@@ -415,6 +510,10 @@ export function Dialog({
       ? footerContent
       : footerOf({ primaryAction, secondaryAction, secondaryActions, cancel, note });
   const assistant = surface === "assistant";
+  const glass = surface === "glass";
+  if (glass && ground === "panel") {
+    throw new Error('Dialog surface="glass" stands on the card ground; drop ground="panel".');
+  }
   const pickInitialFocus = () => {
     const usable = (selector: string) => firstFocusable(ownRef.current, selector);
     const requested = initialFocus ? usable(`[data-frame-action="${initialFocus}"]`) : null;
@@ -433,6 +532,7 @@ export function Dialog({
           assistant={assistant}
           busy={busy}
           backTestId={slot("back")}
+          appearance={headerAppearance}
         />
         <ChakraDialog.Body
           {...(bodyScroll === "content" ? BOUNDED_BODY : { overflowY: "auto" as const })}
@@ -446,22 +546,14 @@ export function Dialog({
         </ChakraDialog.Body>
       </StudioIsolatedErrorBoundary>
       {hasFooter != null && (
-        <ChakraDialog.Footer {...(footerDivider ? FOOTER_DIVIDER : {})}>
-          <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
-            {footerContent !== undefined ? (
-              footerContent
-            ) : (
-              <ActionRow
-                primaryAction={primaryAction}
-                secondaryAction={secondaryAction}
-                secondaryActions={secondaryActions}
-                cancel={cancel}
-                note={note}
-                busy={busy}
-              />
-            )}
-          </StudioIsolatedErrorBoundary>
-        </ChakraDialog.Footer>
+        <DialogFooterBand
+          divider={footerDivider}
+          noteLook={footerAppearance === "note" && footerContent !== undefined}
+          scope={errorScope ?? title}
+          resetKeys={resetKeys}
+          footerContent={footerContent}
+          actions={{ primaryAction, secondaryAction, secondaryActions, cancel, note, busy }}
+        />
       )}
     </>
   );
@@ -485,14 +577,19 @@ export function Dialog({
         ref={mergeRefs(ownRef, contentRef)}
         maxWidth={`min(${DIALOG_WIDTH[size]}, calc(100vw - 2rem))`}
         width="full"
-        maxHeight="calc(100dvh - 4rem)"
+        maxHeight={
+          heightLimit === "reading" ? "min(85vh, calc(100dvh - 4rem))" : "calc(100dvh - 4rem)"
+        }
         withErrorBoundary={false}
         aria-label={title}
-        {...frameLook({ ground, assistant })}
+        aria-describedby={descriptionId}
+        {...frameLook({ ground, assistant, glass })}
         data-size={size}
         data-testid={testId}
       >
-        {dismissible && <DialogCloseTrigger disabled={busy} data-testid={slot("close")} />}
+        {dismissible && showCloseButton && (
+          <DialogCloseTrigger disabled={busy} data-testid={slot("close")} />
+        )}
         {onSubmit ? (
           <chakra.form
             id={formId}

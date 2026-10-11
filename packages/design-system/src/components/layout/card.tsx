@@ -22,7 +22,13 @@ export type CardVariant =
   | "showcase"
   | "emphasized"
   | "accent-row"
-  | "joined-panel";
+  | "joined-panel"
+  | "panel-fill"
+  | "image-frame"
+  | "banded";
+
+/** The fixed palette roles of a `banded` card's title band. */
+export type CardBandTone = "blue" | "purple" | "teal" | "amber" | "pink" | "gray";
 
 /** The palette roles a nested card or an accent row may carry; omitted, nothing is coloured. */
 export type CardTone = "neutral" | "teal" | "blue" | "yellow" | "red" | "purple" | "green";
@@ -31,7 +37,7 @@ export type CardTone = "neutral" | "teal" | "blue" | "yellow" | "red" | "purple"
  * Tone belongs to `nested` (a tinted well: border, fill and heading) and `accent-row` (only the
  * left edge); any other variant takes none.
  */
-type NoExtras = { invalid?: never; edge?: never; borderTone?: never };
+type NoExtras = { invalid?: never; edge?: never; borderTone?: never; bandTone?: never };
 
 /**
  * `invalid` belongs to `frame` (the whole border turns red). `joined-panel` needs its `edge`.
@@ -39,7 +45,8 @@ type NoExtras = { invalid?: never; edge?: never; borderTone?: never };
  */
 type ToneProps =
   | (NoExtras & { variant: "nested" | "accent-row"; tone?: CardTone })
-  | (NoExtras & { variant?: Exclude<CardVariant, "joined-panel">; tone?: never })
+  | (NoExtras & { variant?: Exclude<CardVariant, "joined-panel" | "banded">; tone?: never })
+  | (Omit<NoExtras, "bandTone"> & { variant: "banded"; tone?: never; bandTone: CardBandTone })
   | (Omit<NoExtras, "invalid"> & { variant: "frame"; tone?: never; invalid?: boolean })
   | (Omit<NoExtras, "borderTone"> & {
       variant: "nested";
@@ -125,10 +132,50 @@ const RECIPE_VARIANT = {
   emphasized: "outline",
   "accent-row": "subtle",
   "joined-panel": "outline",
+  "panel-fill": "outline",
+  "image-frame": "outline",
+  banded: "outline",
 } as const;
 
 /** frame keeps the panel's border and drops its fill, shadow and blur. */
 const FRAME = { background: "transparent", boxShadow: "none", backdropFilter: "none" } as const;
+
+/** panel-fill: the panel (border, radius, shadow, ground) filling a bounded parent. */
+const PANEL_FILL = {
+  display: "flex",
+  flexDirection: "column",
+  height: "full",
+  minWidth: 0,
+  minHeight: 0,
+  overflow: "hidden",
+} as const;
+
+/** image-frame: a bounded presentation frame round an image, letterboxed on the subtle ground. */
+const IMAGE_FRAME = {
+  boxShadow: "none",
+  backdropFilter: "none",
+  background: "bg.subtle",
+  borderWidth: "1px",
+  borderColor: "border",
+  borderRadius: "lg",
+  overflow: "hidden",
+} as const;
+
+/** banded: an informational group with a toned title band; hover colours the edge only. */
+function bandedPaint({ bandTone }: { bandTone: CardBandTone }) {
+  return {
+    background: "bg.panel",
+    borderRadius: "md",
+    borderWidth: "1px",
+    borderColor: "border.muted",
+    overflow: "hidden",
+    boxShadow: "none",
+    backdropFilter: "none",
+    transition: "border-color 150ms ease, box-shadow 150ms ease",
+    _hover: { borderColor: `${bandTone}.muted`, boxShadow: "sm" },
+    "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+  } as const;
+}
 
 /** frame-fill: the frame, filling a bounded parent; the editor inside owns the scrolling. */
 const FRAME_FILL = {
@@ -185,10 +232,18 @@ function joinedPaint({ edge }: { edge: "start" | "end" }) {
 const OVERRIDES: Partial<
   Record<
     CardVariant,
-    typeof FRAME | typeof FRAME_FILL | typeof SHOWCASE | typeof EMPHASIZED | typeof ACCENT_ROW
+    | typeof PANEL_FILL
+    | typeof IMAGE_FRAME
+    | typeof FRAME
+    | typeof FRAME_FILL
+    | typeof SHOWCASE
+    | typeof EMPHASIZED
+    | typeof ACCENT_ROW
   >
 > = {
   frame: FRAME,
+  "panel-fill": PANEL_FILL,
+  "image-frame": IMAGE_FRAME,
   "frame-fill": FRAME_FILL,
   showcase: SHOWCASE,
   emphasized: EMPHASIZED,
@@ -385,6 +440,49 @@ function CardHeader({
   );
 }
 
+/** The banded card's title band: 12px across, 8px down, small uppercase title, a muted rule. */
+function BandHeader({
+  bandTone,
+  titleLevel,
+  title,
+  icon,
+}: {
+  bandTone: CardBandTone;
+  titleLevel: 2 | 3;
+  title: ReactNode;
+  icon: ReactNode;
+}) {
+  return (
+    <HStack
+      gap={2}
+      paddingX={3}
+      paddingY={2}
+      flexShrink={0}
+      background={`${bandTone}.subtle`}
+      color={`${bandTone}.fg`}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      data-card-band=""
+    >
+      {icon != null && (
+        <Box display="flex" flexShrink={0}>
+          {icon}
+        </Box>
+      )}
+      <Text
+        as={titleLevel === 3 ? "h3" : "h2"}
+        fontSize="2xs"
+        fontWeight="semibold"
+        textTransform="uppercase"
+        letterSpacing="0.06em"
+        minWidth={0}
+      >
+        {title}
+      </Text>
+    </HStack>
+  );
+}
+
 /** The surface a variant, its tone and an opener paint, merged in the order that wins. */
 function surfacePaint({
   variant,
@@ -394,7 +492,9 @@ function surfacePaint({
   edge,
   invalid,
   borderTone,
+  bandTone,
 }: {
+  bandTone?: CardBandTone;
   variant: CardVariant;
   tone: CardTone | undefined;
   opener: boolean;
@@ -411,15 +511,51 @@ function surfacePaint({
     ...(variant === "nested" && borderTone === "muted" && (tone === undefined || tone === "neutral")
       ? { borderColor: "border.muted" }
       : {}),
+    ...(variant === "banded" && bandTone ? bandedPaint({ bandTone }) : {}),
     ...(variant === "accent-row" ? edgePaint({ tone: tone ?? "neutral" }) : {}),
     ...(opener ? openerPaint({ accent }) : {}),
   };
 }
 
 /** A joined panel has 24px, a frame-fill none (its content fills it), the rest 16px. */
-function defaultPadding({ joined, fills }: { joined: boolean; fills: boolean }) {
+function defaultPadding({
+  variant,
+  joined,
+  fills,
+}: {
+  variant: CardVariant;
+  joined: boolean;
+  fills: boolean;
+}) {
+  if (variant === "banded") return "sm";
   if (joined) return "xl";
-  return fills ? "none" : "md";
+  return fills || variant === "image-frame" ? "none" : "md";
+}
+
+function refuseUnsupportedShape({
+  variant,
+  tone,
+  opener,
+  title,
+  actions,
+  footer,
+}: {
+  variant: CardVariant;
+  tone?: string;
+  opener?: unknown;
+  title?: ReactNode;
+  actions?: ReactNode;
+  footer?: ReactNode;
+}) {
+  const presentation = variant === "banded" || variant === "image-frame";
+  if (opener && (variant === "accent-row" || tone !== undefined || presentation)) {
+    throw new Error(
+      "Card: an accent row, a toned or banded card or an image frame is not an opener",
+    );
+  }
+  if (variant === "image-frame" && (title != null || actions != null || footer != null)) {
+    throw new Error("Card: an image frame holds only its image, with no header or footer");
+  }
 }
 
 export function Card({
@@ -428,6 +564,7 @@ export function Card({
   invalid,
   edge,
   borderTone,
+  bandTone,
   title,
   titleLevel = 2,
   description,
@@ -446,13 +583,11 @@ export function Card({
 }: CardProps) {
   const accent = useProductAccent();
   const joined = variant === "joined-panel";
-  const fills = variant === "frame-fill" || joined;
+  const fills = variant === "frame-fill" || variant === "panel-fill" || joined;
   const fit = fills ? FILLS : NO_FILLS;
   const rowDefault = variant === "accent-row" && paddingProp === undefined;
-  const padding = paddingProp ?? defaultPadding({ joined, fills });
-  if (opener && (variant === "accent-row" || tone !== undefined)) {
-    throw new Error("Card: an accent row or a toned card is a surface, not an opener");
-  }
+  const padding = paddingProp ?? defaultPadding({ variant, joined, fills });
+  refuseUnsupportedShape({ variant, tone, opener, title, actions, footer });
   const hasHeader =
     title != null ||
     badge != null ||
@@ -475,6 +610,7 @@ export function Card({
         edge,
         invalid,
         borderTone,
+        bandTone,
       })}
       borderStyle={placeholder ? "dashed" : undefined}
       data-card-variant={variant}
@@ -483,12 +619,16 @@ export function Card({
       data-card-invalid={invalid ? "" : undefined}
       data-card-edge={edge}
       data-card-border-tone={borderTone}
+      data-card-band-tone={bandTone}
       data-testid={testId}
       data-tour={tourId}
     >
       {opener && <OpenerLayer opener={opener} title={title} />}
       <ChakraCard.Body padding={0} gap={0} {...fit.body}>
-        {hasHeader && (
+        {hasHeader && variant === "banded" && bandTone && (
+          <BandHeader bandTone={bandTone} titleLevel={titleLevel} title={title} icon={icon} />
+        )}
+        {hasHeader && variant !== "banded" && (
           <CardHeader
             inset={{ x: insetX, y: insetY }}
             band={fit.band}

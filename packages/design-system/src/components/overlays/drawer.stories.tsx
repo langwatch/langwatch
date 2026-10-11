@@ -333,3 +333,19 @@ export const WideContentDrawer: Story = {
 export const StudioHeaderInset: Story = {
   args: { title: "Properties", topInset: "studio-header" },
 };
+
+export const WorkspaceRaisedFooter: Story = {
+  render: () => (
+    <Drawer
+      onClose={() => undefined}
+      title="Add records"
+      size="workspace"
+      footerAppearance="raised"
+      preventScroll
+      closeOnEscape={() => true}
+      footerContent={<Button>Add records</Button>}
+    >
+      <Box height="1600px">Wide mapping content</Box>
+    </Drawer>
+  ),
+};

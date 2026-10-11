@@ -295,3 +295,19 @@ Feature: Drawer and dialog shapes
   Scenario: The detail and wide steps and the content frame are named
     Given a drawer of size detail, one of size wide and one with the content chrome
     Then they are 38.5rem, 59.375rem and a bounded frame with one X and a supplied header
+
+  @integration
+  Scenario: A dialog header band, reading height, document width and glass are named
+    Given a dialog with headerAppearance muted, heightLimit reading, size document and surface glass
+    Then the header band is painted whole, the frame is capped at 85vh, 64rem wide and translucent
+    And a glass dialog on the panel ground is refused
+
+  @integration
+  Scenario: A dialog can hide its X and name a caller-owned description
+    Given a dialog with showCloseButton false and a headerContent with a descriptionId
+    Then it draws no X, still closes on Escape and is described by that element
+
+  @integration
+  Scenario: A drawer has a workspace width, an Escape guard and a raised footer
+    Given a drawer of size workspace with an Escape guard answering false and a raised footer
+    Then it is 87.5rem wide, Escape leaves it open until the guard answers true and the footer is opaque

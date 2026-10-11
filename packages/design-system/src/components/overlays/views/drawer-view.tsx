@@ -245,9 +245,10 @@ export const DrawerRoot = function DrawerRoot({
 
 /**
  * The shared overlay width scale, as maxima: sm 28rem, md 32rem, detail 38.5rem, lg 42rem,
- * xl 56rem, wide 59.375rem, full. `detail` and `wide` are named steps, never arbitrary widths.
+ * xl 56rem, wide 59.375rem, workspace 87.5rem, full. `detail` and `wide` are named steps,
+ * never arbitrary widths.
  */
-export type DrawerSize = "sm" | "md" | "detail" | "lg" | "xl" | "wide" | "full";
+export type DrawerSize = "sm" | "md" | "detail" | "lg" | "xl" | "wide" | "workspace" | "full";
 
 const DRAWER_WIDTH: Record<DrawerSize, string> = {
   sm: "28rem",
@@ -256,6 +257,7 @@ const DRAWER_WIDTH: Record<DrawerSize, string> = {
   lg: "42rem",
   xl: "56rem",
   wide: "59.375rem",
+  workspace: "87.5rem",
   full: "100vw",
 };
 
@@ -349,6 +351,15 @@ interface DrawerBaseProps {
   topInset?: "default" | "studio-header";
   /** A save in flight: the X, back, Escape and every action wait. */
   busy?: boolean;
+  /**
+   * `false`, or a yes/no guard read when Escape is pressed: a floating editor that owns the key
+   * answers `false`. Never an event; busy always wins. Default true.
+   */
+  closeOnEscape?: boolean | (() => boolean);
+  /** `true` locks the document scroll while open. Default false. */
+  preventScroll?: boolean;
+  /** `raised`: an opaque panel footer whose shadow shows while content waits beneath it. */
+  footerAppearance?: "default" | "raised";
   /** The Back button's test id, when it is not `<data-testid>-back`. */
   backButtonTestId?: string;
   /** The error boundary's label; defaults to the title. */
@@ -391,7 +402,108 @@ type DrawerFrameProps = Pick<
   | "busy"
   | "errorScope"
   | "entityKey"
+  | "footerAppearance"
 > & { testId?: string };
+
+type DrawerHeaderRowProps = Pick<
+  DrawerFrameProps,
+  | "onBack"
+  | "title"
+  | "titleContent"
+  | "icon"
+  | "backButtonTestId"
+  | "eyebrow"
+  | "subtitle"
+  | "badges"
+  | "headerAction"
+  | "headerTools"
+  | "busy"
+>;
+
+/** The header row: back button, eyebrow, icon and title lines, subtitle, badges and tools. */
+function DrawerHeaderRow({
+  onBack,
+  title,
+  titleContent,
+  icon,
+  backButtonTestId,
+  eyebrow,
+  subtitle,
+  badges,
+  headerAction,
+  headerTools,
+  busy = false,
+}: DrawerHeaderRowProps) {
+  const titleLines = (
+    <>
+      <ChakraDrawer.Title overflowWrap="anywhere" srOnly={titleContent != null}>
+        {title}
+      </ChakraDrawer.Title>
+      {titleContent}
+    </>
+  );
+  return (
+    <HStack align="start" gap={2} width="full" flexWrap="wrap">
+      {onBack && (
+        <IconButton
+          type="button"
+          aria-label="Back"
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          disabled={busy}
+          marginStart={-2}
+          data-testid={backButtonTestId}
+        >
+          <ArrowLeft aria-hidden />
+        </IconButton>
+      )}
+      <VStack align="stretch" gap={1} flex="1 1 10rem" minWidth={0}>
+        {eyebrow && (
+          <HStack color="fg.muted" gap={2} textStyle="xs">
+            {eyebrow.icon}
+            <Text>{eyebrow.label}</Text>
+          </HStack>
+        )}
+        {icon != null ? (
+          <HStack align="flex-start" gap={2} minWidth={0}>
+            <chakra.span
+              display="inline-flex"
+              flexShrink={0}
+              alignItems="center"
+              justifyContent="center"
+              minWidth="24px"
+              minHeight="24px"
+              color="fg.muted"
+              aria-hidden
+            >
+              {icon}
+            </chakra.span>
+            <VStack align="stretch" gap={1} flex={1} minWidth={0}>
+              {titleLines}
+            </VStack>
+          </HStack>
+        ) : (
+          titleLines
+        )}
+        {subtitle != null && <ChakraDrawer.Description>{subtitle}</ChakraDrawer.Description>}
+        {badges != null && (
+          <HStack gap={2} flexWrap="wrap" paddingTop={1}>
+            {badges}
+          </HStack>
+        )}
+      </VStack>
+      {headerAction && (
+        <FrameActionButton action={headerAction} kind="secondary" busy={busy} size="sm" />
+      )}
+      {headerTools != null && (
+        <HStack gap={1} flexShrink={0} flexWrap="wrap" justify="flex-end">
+          {headerTools}
+        </HStack>
+      )}
+    </HStack>
+  );
+}
 
 /**
  * Header band, body and footer. With the glass switch on and a framed body the band and footer
@@ -422,22 +534,16 @@ function DrawerFrame({
   busy = false,
   errorScope,
   entityKey,
+  footerAppearance = "default",
   testId,
 }: DrawerFrameProps) {
   const contentMode = chromeMode === "content";
   const hasFooter = footer != null || (footerContent !== undefined && footerContent !== null);
   const glass = useDrawerGlass({ framed: bodyScroll === "frame" && !contentMode });
-  const chrome = useDrawerChrome({ enabled: glass, hasFooter });
+  const raised = footerAppearance === "raised" && hasFooter;
+  const chrome = useDrawerChrome({ enabled: glass || raised, hasFooter });
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
   const resetKeys = [title, entityKey];
-  const titleLines = (
-    <>
-      <ChakraDrawer.Title overflowWrap="anywhere" srOnly={titleContent != null}>
-        {title}
-      </ChakraDrawer.Title>
-      {titleContent}
-    </>
-  );
   if (contentMode) {
     return (
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
@@ -464,67 +570,19 @@ function DrawerFrame({
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
         <DrawerHeaderBand glass={glass} edge={chrome.edges.top} bandRef={chrome.headerRef}>
           <ChakraDrawer.Header borderBottomWidth={glass ? 0 : void 0}>
-            <HStack align="start" gap={2} width="full" flexWrap="wrap">
-              {onBack && (
-                <IconButton
-                  type="button"
-                  aria-label="Back"
-                  variant="ghost"
-                  size="sm"
-                  onClick={onBack}
-                  disabled={busy}
-                  marginStart={-2}
-                  data-testid={backButtonTestId ?? slot("back")}
-                >
-                  <ArrowLeft aria-hidden />
-                </IconButton>
-              )}
-              <VStack align="stretch" gap={1} flex="1 1 10rem" minWidth={0}>
-                {eyebrow && (
-                  <HStack color="fg.muted" gap={2} textStyle="xs">
-                    {eyebrow.icon}
-                    <Text>{eyebrow.label}</Text>
-                  </HStack>
-                )}
-                {icon != null ? (
-                  <HStack align="flex-start" gap={2} minWidth={0}>
-                    <chakra.span
-                      display="inline-flex"
-                      flexShrink={0}
-                      alignItems="center"
-                      justifyContent="center"
-                      minWidth="24px"
-                      minHeight="24px"
-                      color="fg.muted"
-                      aria-hidden
-                    >
-                      {icon}
-                    </chakra.span>
-                    <VStack align="stretch" gap={1} flex={1} minWidth={0}>
-                      {titleLines}
-                    </VStack>
-                  </HStack>
-                ) : (
-                  titleLines
-                )}
-                {subtitle != null && (
-                  <ChakraDrawer.Description>{subtitle}</ChakraDrawer.Description>
-                )}
-                {badges != null && (
-                  <HStack gap={2} flexWrap="wrap" paddingTop={1}>
-                    {badges}
-                  </HStack>
-                )}
-              </VStack>
-              {headerAction && (
-                <FrameActionButton action={headerAction} kind="secondary" busy={busy} size="sm" />
-              )}
-              {headerTools != null && (
-                <HStack gap={1} flexShrink={0} flexWrap="wrap" justify="flex-end">
-                  {headerTools}
-                </HStack>
-              )}
-            </HStack>
+            <DrawerHeaderRow
+              onBack={onBack}
+              title={title}
+              titleContent={titleContent}
+              icon={icon}
+              backButtonTestId={backButtonTestId ?? slot("back")}
+              eyebrow={eyebrow}
+              subtitle={subtitle}
+              badges={badges}
+              headerAction={headerAction}
+              headerTools={headerTools}
+              busy={busy}
+            />
           </ChakraDrawer.Header>
           {toolbar != null && (
             <Box
@@ -554,7 +612,8 @@ function DrawerFrame({
       </StudioIsolatedErrorBoundary>
       {hasFooter && (
         <DrawerFooterBand
-          glass={glass}
+          glass={glass && !raised}
+          raised={raised}
           edge={chrome.edges.bottom}
           bandRef={chrome.footerRef}
           paddingBottom={FOOTER_SAFE_AREA}
@@ -603,6 +662,9 @@ export function Drawer({
   finalFocusEl,
   onExitComplete,
   contentRef,
+  closeOnEscape = true,
+  preventScroll = false,
+  footerAppearance,
   "data-testid": testId,
 }: DrawerProps) {
   const inset = useDrawerEndInset();
@@ -632,6 +694,7 @@ export function Drawer({
       busy={busy}
       errorScope={errorScope}
       entityKey={entityKey}
+      footerAppearance={footerAppearance}
       testId={testId}
     >
       {children}
@@ -641,7 +704,11 @@ export function Drawer({
     <DrawerRoot
       open={open}
       size={size === "full" ? "full" : undefined}
-      closeOnEscape={!busy}
+      closeOnEscape={!busy && closeOnEscape !== false}
+      preventScroll={preventScroll}
+      onEscapeKeyDown={(event) => {
+        if (typeof closeOnEscape === "function" && !closeOnEscape()) event.preventDefault();
+      }}
       initialFocusEl={initialFocusEl}
       finalFocusEl={finalFocusEl}
       onExitComplete={onExitComplete}

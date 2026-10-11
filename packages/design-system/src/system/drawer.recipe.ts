@@ -72,6 +72,12 @@ export const drawerGlassHeader: SystemStyleObject = {
   "&::after": { ...glassEdgeGlint, bottom: "-1px" },
 };
 
+export const raisedFooter: SystemStyleObject = {
+  "&[data-edge='on']": {
+    boxShadow: "0 -2px 5px color-mix(in srgb, {colors.bg.scrim} 10%, transparent)",
+  },
+};
+
 export const drawerGlassFooter: SystemStyleObject = {
   ...glassBand,
   bottom: 0,

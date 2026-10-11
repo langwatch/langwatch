@@ -110,3 +110,9 @@ Feature: Card, resource tile, load more and the one-line empty state
   Scenario: A nested well takes the xs padding and a muted border
     Given a nested card with padding xs and borderTone muted
     Then it draws an 8px inset and the muted border
+
+  @integration
+  Scenario: A banded card, a panel-fill card and an image frame are named variants
+    Given a banded card per band tone, a panel-fill card and an image-frame card
+    Then each band carries its subtle fill and foreground, the panel fill keeps the panel ground and the image frame is bg.subtle with the lg radius
+    And a banded or image-frame card given an opener is refused
