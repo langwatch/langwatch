@@ -732,16 +732,15 @@ export class AnalyticsModule
     return this.#dependencies.langWatchQL.execute({ ...input, isInstantEvalsEnabled });
   }
 
-  /** One instant-eval read, its statement gated exactly as {@link executeLangWatchQL} gates it. */
-  async executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
-    const isInstantEvalsEnabled =
-      statementMightCallEvalFunction(input.sql) &&
-      (await this.#isInstantEvalsEnabled(input.project.id));
-
-    return this.#dependencies.langWatchQL.executePass({ ...input, isInstantEvalsEnabled });
+  /**
+   * One instant-eval read. The eval gate is the caller's answer, never this module's flag read:
+   * Instant Evals owns that rule. @see modules/instant-eval/specs/instant-eval-opt-in.feature
+   */
+  executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult> {
+    return this.#dependencies.langWatchQL.executePass(input);
   }
 
-  /** This project's eval-function rollout, the one answer both paths above read. */
+  /** This project's eval-function rollout, the answer a member's own statement reads. */
   #isInstantEvalsEnabled(projectId: string): Promise<boolean> {
     return instantEvalsEnabled({
       featureFlags: this.#dependencies.featureFlags,

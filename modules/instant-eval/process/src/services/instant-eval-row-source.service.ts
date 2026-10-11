@@ -45,6 +45,11 @@ export interface InstantEvalStatementRunner {
   executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
 }
 
+/** This module's own answer to whether the project may call an eval function. */
+export interface InstantEvalGate {
+  isEnabled(input: { projectId: string }): Promise<boolean>;
+}
+
 /** What one pass reads about its selection, whoever asked for it. */
 interface InstantEvalPassInput {
   readonly caller: LangWatchQLCaller;
@@ -82,14 +87,20 @@ function toRowKey(row: Record<string, unknown>): InstantEvalRowKey {
 }
 
 export class InstantEvalRowSourceService {
-  private constructor(private readonly analytics: InstantEvalStatementRunner) {}
+  private constructor(
+    private readonly analytics: InstantEvalStatementRunner,
+    private readonly access: InstantEvalGate,
+  ) {}
 
   static create({
     analytics,
+    access,
   }: {
     analytics: InstantEvalStatementRunner;
+    /** Asked on every pass, because Analytics takes the eval gate from its caller. */
+    access: InstantEvalGate;
   }): InstantEvalRowSourceService {
-    return new InstantEvalRowSourceService(analytics);
+    return new InstantEvalRowSourceService(analytics, access);
   }
 
   /** What the statement projects, without reading a row or judging anything. */
@@ -201,6 +212,7 @@ export class InstantEvalRowSourceService {
       sql,
       ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
       pass,
+      isInstantEvalsEnabled: await this.access.isEnabled({ projectId: caller.id }),
     });
     const isTruncated = execution.rows.length > maxRows;
     if (isTruncated && name !== undefined) throw new InstantEvalResultTruncatedError(name);

@@ -151,8 +151,8 @@ export interface AnalyticsApi {
   langWatchQLKeyCapFor(input: { appFunctions: readonly LangWatchQLAppFunctionCall[] }): number;
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
   /**
-   * Re-validates the statement with the full policy, eval gate resolved from the project's
-   * rollout, then runs it inside the fixed wrapper its pass names: an instant-eval read.
+   * Re-validates the statement with the full policy, eval gate taken from the caller's
+   * answer, then runs it inside the fixed wrapper its pass names: an instant-eval read.
    */
   executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
   /**

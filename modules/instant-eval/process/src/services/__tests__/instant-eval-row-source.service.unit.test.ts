@@ -14,6 +14,9 @@ import {
   type InstantEvalStatementRunner,
 } from "../instant-eval-row-source.service.ts";
 
+/** Instant Evals released for every project: the gate a pass states, open. */
+const OPEN_GATE = { isEnabled: () => Promise.resolve(true) };
+
 const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
 const PROTECTIONS = {
   catalogue: { permissions: [] },
@@ -51,7 +54,10 @@ function sourceOver(answer: LangWatchQLQueryResult): {
   analytics: RecordingRunner;
 } {
   const analytics = new RecordingRunner(answer);
-  return { source: InstantEvalRowSourceService.create({ analytics }), analytics };
+  return {
+    source: InstantEvalRowSourceService.create({ analytics, access: OPEN_GATE }),
+    analytics,
+  };
 }
 
 describe("given a statement a run is about to read", () => {
@@ -64,7 +70,13 @@ describe("given a statement a run is about to read", () => {
 
       expect(columns).toEqual([{ name: "TraceId", type: "String" }]);
       expect(analytics.asked).toEqual([
-        { project: CALLER, protections: PROTECTIONS, sql: SQL, pass: { kind: "probe" } },
+        {
+          project: CALLER,
+          protections: PROTECTIONS,
+          sql: SQL,
+          pass: { kind: "probe" },
+          isInstantEvalsEnabled: true,
+        },
       ]);
     });
   });
