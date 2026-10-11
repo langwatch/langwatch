@@ -173,8 +173,8 @@ function AgentBlock({
           justify="center"
           boxSize="24px"
           borderRadius="md"
-          background="blue.subtle"
-          color="blue.fg"
+          background={isActive ? "blue.subtle" : "bg.muted"}
+          color={isActive ? "blue.fg" : "fg.muted"}
         >
           <AgentIcon size={13} />
         </HStack>

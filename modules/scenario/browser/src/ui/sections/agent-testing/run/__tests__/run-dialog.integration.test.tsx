@@ -345,6 +345,28 @@ describe("<RunDialog/>", () => {
     expect(screen.queryByTestId("run-dialog-parameters")).not.toBeInTheDocument();
   });
 
+  /** @scenario "The only agent of a project is not chosen for a scenario with no saved agent" */
+  it("marks only the chosen card: border, tick and tinted icon tile", async () => {
+    const user = userEvent.setup();
+    renderDialog(suiteSubject());
+    const first = screen.getByTestId("run-dialog-agent-agent_1");
+    const second = screen.getByTestId("run-dialog-agent-agent_2");
+    const tile = (card: HTMLElement) => card.querySelector("svg")!.parentElement!;
+
+    expect(first).toHaveAttribute("aria-pressed", "false");
+    expect(first.querySelector("svg.lucide-check")).toBeNull();
+    const unchosenTile = styleRuleOf(tile(first));
+    expect(unchosenTile).not.toContain("blue");
+
+    await user.click(first);
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(first.querySelector("svg.lucide-check")).not.toBeNull();
+    expect(second).toHaveAttribute("aria-pressed", "false");
+    expect(second.querySelector("svg.lucide-check")).toBeNull();
+    expect(styleRuleOf(tile(first))).not.toEqual(unchosenTile);
+    expect(styleRuleOf(tile(second))).toEqual(unchosenTile);
+  });
+
   /** @scenario "The agent section offers a way to the agent setup page" */
   it("offers Configure, which opens the agents page in another tab", () => {
     renderDialog(suiteSubject());
