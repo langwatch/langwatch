@@ -1,0 +1,247 @@
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+html {
+  scroll-padding-top: calc(var(--docs-header-h, 108px) + 1.5rem);
+}
+
+body {
+  margin: 0;
+  font-size: 16px;
+}
+
+.docs-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.docs-skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  z-index: 2000;
+  padding: 8px 12px;
+  background: var(--chakra-colors-bg-panel);
+  color: var(--chakra-colors-fg);
+}
+
+.docs-skip-link:focus {
+  left: 8px;
+  top: 8px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--chakra-colors-blue-focus-ring);
+  outline-offset: 2px;
+}
+
+[id] {
+  scroll-margin-top: calc(var(--docs-header-h, 108px) + 1.5rem);
+}
+
+.docs-light-only {
+  display: block;
+}
+.dark .docs-light-only {
+  display: none;
+}
+.docs-dark-only {
+  display: none;
+}
+.dark .docs-dark-only {
+  display: block;
+}
+
+/* Article typography: body 16/28, headings per DESIGN.md section 5. */
+.docs-prose {
+  font-size: var(--docs-body-size, 16px);
+  line-height: var(--docs-body-line, 28px);
+  color: var(--chakra-colors-fg);
+  min-width: 0;
+}
+.docs-prose > :first-child {
+  margin-top: 0;
+}
+.docs-prose p {
+  margin: 0 0 16px;
+  max-width: 72ch;
+}
+.docs-prose ul,
+.docs-prose ol {
+  margin: 16px 0;
+  padding-inline-start: 24px;
+  max-width: 72ch;
+}
+.docs-prose li {
+  margin: 0 0 8px;
+}
+.docs-prose li > p {
+  margin-bottom: 8px;
+}
+.docs-prose strong {
+  font-weight: 600;
+}
+.docs-prose blockquote {
+  margin: 24px 0;
+  padding-inline-start: 16px;
+  border-inline-start: 2px solid var(--chakra-colors-border-emphasized);
+  color: var(--chakra-colors-fg-muted);
+}
+.docs-prose hr {
+  margin: 32px 0;
+  border: 0;
+  border-top: 1px solid var(--chakra-colors-border-muted);
+}
+.docs-heading {
+  position: relative;
+  font-family: var(--docs-font-heading, var(--chakra-fonts-heading));
+  font-weight: var(--docs-weight-heading, 600);
+  color: var(--chakra-colors-fg);
+  letter-spacing: var(--docs-heading-tracking, -0.01em);
+}
+.docs-prose h2.docs-heading {
+  margin: 48px 0 16px;
+  font-size: var(--docs-h2-size, 24px);
+  line-height: var(--docs-h2-line, 32px);
+}
+.docs-prose h3.docs-heading {
+  margin: 32px 0 12px;
+  font-size: var(--docs-h3-size, 20px);
+  line-height: var(--docs-h3-line, 28px);
+}
+.docs-prose h4.docs-heading,
+.docs-prose h5.docs-heading,
+.docs-prose h6.docs-heading {
+  margin: 24px 0 8px;
+  font-size: 16px;
+  line-height: 24px;
+}
+.docs-heading + .docs-heading {
+  margin-top: 12px;
+}
+.docs-anchor {
+  position: absolute;
+  inset-inline-start: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  padding: 4px;
+  color: var(--chakra-colors-fg-subtle);
+  opacity: 0;
+  text-decoration: none;
+}
+.docs-heading:hover .docs-anchor,
+.docs-anchor:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .docs-anchor {
+    opacity: 1;
+    position: static;
+    transform: none;
+    margin-inline-start: 6px;
+  }
+}
+.docs-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--docs-body-size);
+  line-height: var(--docs-body-line);
+}
+.docs-prose th,
+.docs-prose td {
+  padding: 12px;
+  text-align: start;
+  vertical-align: top;
+  border-bottom: 1px solid var(--chakra-colors-border-muted);
+}
+.docs-prose th {
+  background: var(--chakra-colors-bg-subtle);
+  font-weight: 600;
+}
+.docs-prose .docs-step-body > :last-child,
+.docs-prose .docs-card-body > :last-child {
+  margin-bottom: 0;
+}
+.docs-prose .docs-card-body p {
+  margin-bottom: 8px;
+}
+.docs-prose .docs-card-body ul {
+  margin: 8px 0;
+}
+.docs-prose .docs-callout p:last-child {
+  margin-bottom: 0;
+}
+.docs-prose .docs-img {
+  margin: 8px 0;
+  border-radius: var(--chakra-radii-lg);
+}
+
+/* Code: build-time highlighted lines carry both colour modes as variables. */
+.docs-code {
+  color: var(--chakra-colors-fg);
+}
+.docs-code code {
+  display: block;
+  min-width: max-content;
+}
+.docs-line {
+  display: block;
+  min-height: 22px;
+  padding-inline: 16px;
+  margin-inline: -16px;
+}
+.docs-line span {
+  color: var(--sl);
+}
+.dark .docs-line span {
+  color: var(--sd);
+}
+.docs-line[data-highlighted="true"] {
+  background: color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--chakra-colors-accent-solid);
+}
+.docs-code[data-numbered="true"] code {
+  counter-reset: docs-line;
+}
+.docs-code[data-numbered="true"] .docs-line::before {
+  counter-increment: docs-line;
+  content: counter(docs-line);
+  display: inline-block;
+  width: 2.5ch;
+  margin-inline-end: 16px;
+  text-align: end;
+  color: var(--chakra-colors-fg-subtle);
+  user-select: none;
+}
+
+/* The static home ground: the design system's floor, quieter, with a fade into the page. */
+.docs-ground {
+  opacity: 0.6;
+}
+.dark .docs-ground {
+  opacity: 0.45;
+}
+.docs-ground-protect {
+  background: radial-gradient(
+    circle 50vw at 20% 45%,
+    var(--chakra-colors-bg-surface) 0%,
+    var(--chakra-colors-bg-surface) 26%,
+    color-mix(in srgb, var(--chakra-colors-bg-surface) 68%, transparent) 54%,
+    transparent 90%
+  );
+}
+.docs-ground-cover {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 65%, var(--chakra-colors-bg-surface) 100%);
+}

@@ -3,15 +3,16 @@ import rehypeSlug from "rehype-slug";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
+import { rehypeDocsCode, rehypeDocsHeadings, rehypeDocsMedia } from "./docs-rehype.mjs";
 
-const FAILED_MODULE = "export const frontmatter = {};\nexport const failed = true;\nexport default function Failed() { return null; }\n";
+const FAILED_MODULE = "export const frontmatter = {};\nexport const headings = [];\nexport const failed = true;\nexport default function Failed() { return null; }\n";
 
 /** MDX compiler that turns a compile error into a logged skip instead of a failed build. */
 export function docsMdxPlugin({ failures }) {
   const inner = mdx({
     providerImportSource: "@mdx-js/react",
     remarkPlugins: [remarkFrontmatter, [remarkMdxFrontmatter, { name: "frontmatter" }], remarkGfm],
-    rehypePlugins: [rehypeSlug],
+    rehypePlugins: [rehypeSlug, rehypeDocsMedia, rehypeDocsCode, rehypeDocsHeadings],
   });
   const innerTransform = inner.transform;
   const handler = typeof innerTransform === "function" ? innerTransform : innerTransform.handler;

@@ -4,7 +4,9 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { docsMdxPlugin } from "./docs-mdx.mjs";
-import { docsNavPlugin } from "./docs-nav.mjs";
+import { lucideRoot } from "./ds-deps.mjs";
+import { docsNavPlugin, openapiPages } from "./docs-nav.mjs";
+import { docsOpenapiPlugin } from "./docs-openapi.mjs";
 
 const siteRoot = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -29,12 +31,15 @@ function serveDocsAssets() {
 }
 
 export function createViteConfig({ failures = new Map() } = {}) {
+  let operationSlugs;
+  const openapiBySlug = () => (operationSlugs ??= openapiPages({ docsRoot }));
   return {
     root: siteRoot,
     publicDir: false,
-    plugins: [docsNavPlugin({ docsRoot }), docsMdxPlugin({ failures }), react({ include: /\.(tsx|jsx|mdx)$/ }), serveDocsAssets()],
+    plugins: [docsNavPlugin({ docsRoot }), docsOpenapiPlugin({ docsRoot, openapiBySlug }), docsMdxPlugin({ failures }), react({ include: /\.(tsx|jsx|mdx)$/ }), serveDocsAssets()],
     resolve: {
       alias: [
+        { find: /^lucide-react$/, replacement: lucideRoot() },
         { find: /^\/snippets\//, replacement: `${docsRoot}/snippets/` },
         ...["react/jsx-runtime", "react/jsx-dev-runtime", "@mdx-js/react"].map((name) => ({
           find: new RegExp(`^${name}$`),

@@ -1,23 +1,17 @@
-import { Accordion } from "./accordion.tsx";
-import { AccordionGroup } from "./accordion-group.tsx";
-import { Card } from "./card.tsx";
-import { CardGroup } from "./card-group.tsx";
-import { Check } from "./check.tsx";
-import { CodeGroup } from "./code-group.tsx";
-import { Expandable } from "./expandable.tsx";
+import { Accordion, AccordionGroup } from "./accordion.tsx";
+import { Card, CardGroup } from "./cards.tsx";
+import { Check, Info, Note, Tip, Warning } from "./callouts.tsx";
+import { CodeGroup, CodeGroupItem } from "./code-group.tsx";
+import { DocsCodeBlock } from "../code/code-block.tsx";
+import { Expandable, ParamField, ResponseField } from "./fields.tsx";
 import { Frame } from "./frame.tsx";
 import { Icon } from "./icon.tsx";
-import { Info } from "./info.tsx";
-import { Note } from "./note.tsx";
-import { ParamField } from "./param-field.tsx";
-import { ResponseField } from "./response-field.tsx";
-import { Step } from "./step.tsx";
-import { Steps } from "./steps.tsx";
-import { Tab } from "./tab.tsx";
-import { Tabs } from "./tabs.tsx";
-import { Tip } from "./tip.tsx";
+import { DocsLink } from "./link.tsx";
+import { DocsIframe, DocsImage, DocsVideo } from "./media.tsx";
+import { DocsInlineCode, DocsTable, makeHeading } from "./prose.tsx";
+import { Step, Steps } from "./steps.tsx";
+import { Tab, Tabs } from "./tabs.tsx";
 import { Tooltip } from "./tooltip.tsx";
-import { Warning } from "./warning.tsx";
 
 export const mdxComponents = {
   Accordion,
@@ -26,6 +20,7 @@ export const mdxComponents = {
   CardGroup,
   Check,
   CodeGroup,
+  CodeGroupItem,
   Expandable,
   Frame,
   Icon,
@@ -40,4 +35,20 @@ export const mdxComponents = {
   Tip,
   Tooltip,
   Warning,
+  a: DocsLink,
+  code: DocsInlineCode,
+  h1: makeHeading({ level: 1 }),
+  h2: makeHeading({ level: 2 }),
+  h3: makeHeading({ level: 3 }),
+  h4: makeHeading({ level: 4 }),
+  h5: makeHeading({ level: 5 }),
+  h6: makeHeading({ level: 6 }),
+  DocsIframe,
+  DocsImg: DocsImage,
+  DocsVideo,
+  iframe: DocsIframe,
+  img: DocsImage,
+  pre: DocsCodeBlock,
+  table: DocsTable,
+  video: DocsVideo,
 };

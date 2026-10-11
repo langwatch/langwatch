@@ -21,13 +21,27 @@ await build({
   ...createViteConfig({ failures }),
   configFile: false,
   logLevel: "warn",
-  build: { ssr: "src/entry-server.tsx", outDir: ssrDir, emptyOutDir: true },
+  build: { ssr: "src/entry-server.tsx", outDir: ssrDir, emptyOutDir: true, rollupOptions: { external: (id) => id.endsWith("docs-highlight.mjs") } },
 });
 
 const template = await readFile(path.join(dist, "index.html"), "utf8");
 const { render } = await import(pathToFileURL(path.join(ssrDir, "entry-server.js")).href);
-const { pages } = buildNav({ docsRoot });
+const nav = buildNav({ docsRoot });
+const { pages } = nav;
 
+function sectionOf({ nav, slug }) {
+  const owns = (items) => items.some((item) => (item.type === "page" ? item.slug === slug : owns(item.children)));
+  return nav.anchors.find((anchor) => owns(anchor.children))?.title ?? "";
+}
+
+async function copyMarkdown({ slug }) {
+  const file = path.join(docsRoot, `${slug}.mdx`);
+  const source = existsSync(file) ? await readFile(file, "utf8") : `# ${pages[slug].title}\n\n${pages[slug].description}\n\n${pages[slug].openapi}\n`;
+  await mkdir(path.dirname(path.join(dist, slug)), { recursive: true });
+  await writeFile(path.join(dist, `${slug}.md`), source.replace(/^---[\s\S]*?---\n/, ""));
+}
+
+const searchIndex = [];
 let compiled = 0;
 const skipped = [];
 for (const slug of Object.keys(pages)) {
@@ -37,9 +51,11 @@ for (const slug of Object.keys(pages)) {
     continue;
   }
   try {
-    const { html, title, description } = await render({ slug });
+    const { html, title, description, examples, headings } = await render({ slug });
     const head = `<title>${escapeHtml(title)}</title>${description ? `<meta name="description" content="${escapeHtml(description)}" />` : ""}`;
-    const page = template.replace("<!--head-->", head).replace("<!--app-->", html).replace("</body>", `<script>window.__DOCS_SLUG__=${JSON.stringify(slug)}</script></body>`);
+    const page = template.replace("<!--head-->", head).replace("<!--app-->", html).replace("</body>", `<script>window.__DOCS_SLUG__=${JSON.stringify(slug)}${examples ? `;window.__DOCS_EXAMPLES__=${JSON.stringify(examples)}` : ""}</script></body>`);
+    searchIndex.push({ slug, title: pages[slug].title, description: pages[slug].description, section: sectionOf({ nav, slug }), headings: headings.map((heading) => ({ id: heading.id, text: heading.text })) });
+    await copyMarkdown({ slug });
     const targets = slug === "introduction" ? ["index.html", `${slug}/index.html`] : [`${slug}/index.html`];
     for (const target of targets) {
       await mkdir(path.dirname(path.join(dist, target)), { recursive: true });
@@ -50,6 +66,10 @@ for (const slug of Object.keys(pages)) {
     skipped.push({ slug, reason: `render: ${String(error?.message ?? error).split("\n")[0]}` });
   }
 }
+
+await writeFile(path.join(dist, "search-index.json"), JSON.stringify(searchIndex));
+await mkdir(path.join(dist, "fonts"), { recursive: true });
+await cp(path.join(docsRoot, "..", "apps/ui/public/fonts/Sentient-Regular.woff2"), path.join(dist, "fonts/Sentient-Regular.woff2"));
 
 const notFound = template.replace("<!--head-->", "<title>Not found</title>").replace("<!--app-->", "");
 await writeFile(path.join(dist, "404.html"), notFound);
