@@ -3066,5 +3066,108 @@
     "reason": "Protected or not a plain card: canvas controls, result chip, chart tooltip, rich output viewport, editor frame, icon tile or cell editor (R10w1 review).",
     "owner": "workflow",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 28,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 30,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 61,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 90,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/agent-testing-run-drawer.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 101,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/run-drawer-header-band.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 190,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/run-drawer-loading-body.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 52,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/drawers/run-drawer-loading-body.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 63,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/run-dialog-call-body.tsx",
+    "rule": "legacy-overlay-part",
+    "line": 19,
+    "reason": "Approved: the run drawer over the rich transcript (transparent ground, wide, own header band) and the run dialog body stay as today until the design system has a wide content-owned drawer and Dialog Escape control (R8s2 review).",
+    "owner": "scenario"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/suite/pickers/target-picker.tsx",
+    "rule": "card-box",
+    "line": 72,
+    "reason": "Not a plain card: an error-bordered picker, icon tile, table skeleton frame, selectable row or scrolling list (R8s2 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/elements/workflow/workflow-icons.tsx",
+    "rule": "card-box",
+    "line": 90,
+    "reason": "Not a plain card: an error-bordered picker, icon tile, table skeleton frame, selectable row or scrolling list (R8s2 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run-plan-results/run-plan-results-states.tsx",
+    "rule": "card-box",
+    "line": 48,
+    "reason": "Not a plain card: an error-bordered picker, icon tile, table skeleton frame, selectable row or scrolling list (R8s2 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/prompt-picker.tsx",
+    "rule": "card-box",
+    "line": 54,
+    "reason": "Not a plain card: an error-bordered picker, icon tile, table skeleton frame, selectable row or scrolling list (R8s2 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/scenario/browser/src/ui/sections/agent-testing/run/prompt-picker.tsx",
+    "rule": "card-box",
+    "line": 132,
+    "reason": "Not a plain card: an error-bordered picker, icon tile, table skeleton frame, selectable row or scrolling list (R8s2 review).",
+    "owner": "scenario",
+    "disposition": "reviewed"
   }
 ]

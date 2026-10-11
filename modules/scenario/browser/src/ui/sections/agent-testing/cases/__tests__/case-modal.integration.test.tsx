@@ -394,6 +394,26 @@ describe("the scenario dialog", () => {
       expect(screen.getByTestId("customize-chip-case-turns")).toBeInTheDocument();
     });
 
+    it("names what a save is missing, focuses the first gap and sends nothing", async () => {
+      const user = userEvent.setup();
+      openNew();
+      await screen.findByTestId("case-modal");
+
+      expect(screen.getByTestId("case-modal-save")).toBeEnabled();
+      await user.click(screen.getByTestId("case-modal-save"));
+
+      expect(await screen.findByText("A scenario needs a title.")).toBeInTheDocument();
+      expect(screen.getByText("A scenario needs at least one criterion.")).toBeInTheDocument();
+      expect(screen.getByLabelText("Title")).toHaveFocus();
+      expect(mockCreate).not.toHaveBeenCalled();
+
+      await user.type(screen.getByLabelText("Title"), "Angry customer");
+      expect(screen.queryByText("A scenario needs a title.")).not.toBeInTheDocument();
+      await user.click(screen.getByTestId("case-modal-save-and-run"));
+      expect(screen.getByLabelText("Criteria")).toHaveFocus();
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
     /** @scenario "Save and Run saves the scenario and then asks what to run it against" */
     it("saves first, then opens the run dialog for what it saved", async () => {
       const user = userEvent.setup();
