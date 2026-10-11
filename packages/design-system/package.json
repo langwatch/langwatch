@@ -443,6 +443,10 @@
       "types": "./dist/components/display/inline-code.d.ts",
       "default": "./src/components/display/inline-code.tsx"
     },
+    "./shortcut-hint": {
+      "types": "./dist/components/display/shortcut-hint.d.ts",
+      "default": "./src/components/display/shortcut-hint.tsx"
+    },
     "./kbd": {
       "types": "./dist/components/display/kbd.d.ts",
       "default": "./src/components/display/kbd.tsx"
