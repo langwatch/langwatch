@@ -4,7 +4,7 @@
  * rows arrive pre-masked and only the editor drawer accepts a key.
  */
 
-import { Dialog } from "@langwatch/design-system/dialog";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -487,67 +487,44 @@ export default function ModelProvidersScreen() {
           />
         )}
 
-        <Dialog.Root
-          placement="center"
+        <ConfirmDialog
           open={!!providerToDelete}
-          onOpenChange={(details) => {
-            if (!details.open) setProviderToDelete(null);
+          onClose={() => setProviderToDelete(null)}
+          title={`Delete ${providerToDelete?.name ?? "provider"}?`}
+          confirmLabel="Delete"
+          loading={deleteMutation.isPending}
+          description={
+            <VStack gap={3} align="start">
+              <Text>
+                This permanently deletes the provider and its stored API keys. This cannot be
+                undone.
+              </Text>
+              <Text textStyle="body" color="fg.muted">
+                Default models that use this provider will need a new provider.
+              </Text>
+            </VStack>
+          }
+          onConfirm={async () => {
+            if (!providerToDelete) return;
+            try {
+              await deleteMutation.mutateAsync({
+                id: providerToDelete.id,
+                projectId,
+                organizationId,
+                provider: providerToDelete.provider,
+              });
+            } catch (error) {
+              host.failed({ error, fallbackTitle: "Couldn't delete this provider" });
+              return;
+            }
+            setProviderToDelete(null);
+            await refetch();
+            // Invalidate every cross-page query that gates UI on "are there
+            // enabled providers?" so the prompts page and the evaluation
+            // wizard pick the deletion up without a window-focus refetch.
+            await utils.modelProvider.invalidate();
           }}
-        >
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title>Delete {providerToDelete?.name}?</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <VStack gap={3} align="start">
-                <Text>
-                  This permanently deletes the provider and its stored API keys. This cannot be
-                  undone.
-                </Text>
-                <Text textStyle="body" color="fg.muted">
-                  Default models that use this provider will need a new provider.
-                </Text>
-              </VStack>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Dialog.ActionTrigger asChild>
-                <Button variant="outline">Cancel</Button>
-              </Dialog.ActionTrigger>
-              <Button
-                colorPalette="red"
-                data-testid="model-provider-delete-confirm"
-                loading={deleteMutation.isPending}
-                onClick={async () => {
-                  if (!providerToDelete) return;
-                  try {
-                    await deleteMutation.mutateAsync({
-                      id: providerToDelete.id,
-                      projectId,
-                      organizationId,
-                      provider: providerToDelete.provider,
-                    });
-                  } catch (error) {
-                    // The application used to leave this to a global interceptor
-                    // that showed a modal; nothing above a package-served screen
-                    // holds one, so the refusal is reported here. The raw error
-                    // travels - the host resolves the words from its code.
-                    host.failed({ error, fallbackTitle: "Couldn't delete this provider" });
-                    return;
-                  }
-                  setProviderToDelete(null);
-                  await refetch();
-                  // Invalidate every cross-page query that gates UI on "are there
-                  // enabled providers?" so the prompts page and the evaluation
-                  // wizard pick the deletion up without a window-focus refetch.
-                  await utils.modelProvider.invalidate();
-                }}
-              >
-                Delete
-              </Button>
-            </Dialog.Footer>
-            <Dialog.CloseTrigger />
-          </Dialog.Content>
-        </Dialog.Root>
+        />
       </VStack>
     </>
   );

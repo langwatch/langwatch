@@ -128,25 +128,6 @@ vi.mock("@langwatch/design-system/menu", () => ({
   },
 }));
 
-// The confirm dialog renders inline, for the same reason the menu does: the
-// delete path has to be clickable end to end, so the assertion is on what the
-// mutation received rather than on the dialog having opened.
-vi.mock("@langwatch/design-system/dialog", () => ({
-  Dialog: {
-    Root: ({ children, open }: { children?: ReactNode; open?: boolean }) =>
-      open ? <div data-testid="dialog">{children}</div> : null,
-    Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Header: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Body: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Footer: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Title: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
-    Description: ({ children }: { children?: ReactNode }) => <p>{children}</p>,
-    Trigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
-    ActionTrigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
-    CloseTrigger: ({ children }: { children?: ReactNode }) => <>{children}</>,
-  },
-}));
-
 vi.mock("@langwatch/design-system/tooltip", () => ({
   Tooltip: ({
     children,
@@ -412,9 +393,9 @@ describe("given the Model Providers screen", () => {
         renderPage(hostWithoutProject());
 
         fireEvent.click(screen.getByText("Delete provider"));
-        expect(screen.getByText("Delete OpenAI?")).toBeTruthy();
+        const dialog = await screen.findByRole("alertdialog", { name: "Delete OpenAI?" });
 
-        fireEvent.click(screen.getByText("Delete"));
+        fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 
         await vi.waitFor(() => {
           expect(mockDeleteProvider).toHaveBeenCalledWith({
@@ -432,7 +413,8 @@ describe("given the Model Providers screen", () => {
         const { host } = renderPage(hostWithoutProject());
 
         fireEvent.click(screen.getByText("Delete provider"));
-        fireEvent.click(screen.getByText("Delete"));
+        const dialog = await screen.findByRole("alertdialog", { name: "Delete OpenAI?" });
+        fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 
         await vi.waitFor(() => {
           expect(host.failures).toEqual([
@@ -540,9 +522,9 @@ describe("given the Model Providers screen", () => {
         renderPage(hostWithProject());
 
         fireEvent.click(screen.getByText("Delete provider"));
-        expect(screen.getByText("Delete OpenAI?")).toBeTruthy();
+        const dialog = await screen.findByRole("alertdialog", { name: "Delete OpenAI?" });
 
-        fireEvent.click(screen.getByText("Delete"));
+        fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 
         await vi.waitFor(() => {
           expect(mockDeleteProvider).toHaveBeenCalledWith({

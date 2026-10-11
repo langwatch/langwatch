@@ -39,18 +39,6 @@ vi.mock("../../../behavior/use-all-model-providers-list.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/design-system/page-layout", () => ({
-  PageLayout: {
-    Heading: ({ children }: { children?: ReactNode }) => <h1>{children}</h1>,
-    Header: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    HeaderButton: ({ children, ...props }: { children?: ReactNode; disabled?: boolean }) => (
-      <button data-testid="add-model-cost" {...props}>
-        {children}
-      </button>
-    ),
-  },
-}));
-
 // Menu content renders inline so a pick is one click away.
 vi.mock("@langwatch/design-system/menu", () => ({
   Menu: {
@@ -373,7 +361,7 @@ describe("given the LLM Model Costs screen", () => {
 
       search("no-such-model");
 
-      expect(screen.getByText("No models match")).toBeTruthy();
+      expect(screen.getByText(/^No models match/)).toBeTruthy();
       expect(screen.getByText("Showing 0 of 3 models.")).toBeTruthy();
     });
 
