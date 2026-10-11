@@ -1,6 +1,7 @@
 import { Badge, Box, HStack, Spacer, Stack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import { Menu } from "../overlays/menu.tsx";
 import { PageHeaderSizeProvider, PageHeadingSizeProvider, PageLayout } from "./page-layout.tsx";
 import { SectionNavigationFrame } from "./section-navigation-frame.tsx";
 
@@ -64,6 +65,55 @@ export const HeaderActions: Story = {
           <PageLayout.HeaderButton loading>Importing</PageLayout.HeaderButton>
           <PageLayout.HeaderButton primary>New dataset</PageLayout.HeaderButton>
         </HStack>
+      </PageLayout.Header>
+    </Box>
+  ),
+};
+
+/** A link keeps its `href`, `target` and `rel`; the header paints it as a button. */
+export const HeaderLink: Story = {
+  render: () => (
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflow="hidden">
+      <PageLayout.Header
+        actions={
+          <>
+            <PageLayout.HeaderButton asChild>
+              <a href="/settings/billing">Billing</a>
+            </PageLayout.HeaderButton>
+            <PageLayout.HeaderButton asChild primary>
+              <a href="https://langwatch.ai/pricing" target="_blank" rel="noreferrer">
+                Talk to sales
+              </a>
+            </PageLayout.HeaderButton>
+          </>
+        }
+      >
+        <PageLayout.Heading>Subscription</PageLayout.Heading>
+      </PageLayout.Header>
+    </Box>
+  ),
+};
+
+/** A menu opens from the header button and the button reports `aria-expanded`. */
+export const HeaderMenu: Story = {
+  render: () => (
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflow="hidden">
+      <PageLayout.Header
+        actions={
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <PageLayout.HeaderButton primary data-testid="new-menu">
+                New
+              </PageLayout.HeaderButton>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item value="dataset">Dataset</Menu.Item>
+              <Menu.Item value="prompt">Prompt</Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        }
+      >
+        <PageLayout.Heading>Library</PageLayout.Heading>
       </PageLayout.Header>
     </Box>
   ),

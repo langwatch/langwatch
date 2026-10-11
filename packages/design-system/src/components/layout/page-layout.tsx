@@ -21,7 +21,9 @@ import {
   useEffect,
   useRef,
   useState,
+  type MouseEventHandler,
   type PropsWithChildren,
+  type ReactElement,
   type ReactNode,
   type Ref,
 } from "react";
@@ -78,13 +80,25 @@ export function PageHeaderSizeProvider({
   );
 }
 
-interface HeaderProps extends ChakraStackProps {
+/** The page header: a title, optional subtitle, and the actions at the right edge. */
+export interface PageHeaderProps {
+  /** `HeaderButton`s only; one of them `primary`. */
+  actions?: ReactNode;
+  children: ReactNode;
+  "data-testid"?: string;
+}
+
+/** @deprecated Open style props; the header's size, border and padding belong to the area. */
+export interface LegacyHeaderProps extends ChakraStackProps {
   size?: PageHeaderSize;
   ref?: Ref<HTMLDivElement>;
   withBorder?: boolean;
   actions?: ReactNode;
 }
 
+function Header(props: PageHeaderProps): ReactNode;
+/** @deprecated Pass only `actions`, `children` and `data-testid`. */
+function Header(props: PropsWithChildren<LegacyHeaderProps>): ReactNode;
 function Header({
   children,
   withBorder = true,
@@ -92,7 +106,7 @@ function Header({
   actions,
   ref,
   ...props
-}: PropsWithChildren<HeaderProps>) {
+}: PropsWithChildren<LegacyHeaderProps>): ReactNode {
   const size = useContext(PageHeaderAreaContext) ?? requestedSize;
   const headerRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -180,9 +194,14 @@ function Header({
 /** Kept for existing account-page wrappers; header sizing belongs to the area. */
 export const PageHeadingSizeProvider = PageHeaderSizeProvider;
 
-type HeadingProps = Omit<ChakraHeadingProps, "size" | "fontSize">;
+/** @deprecated Open style props; the heading's type is the header's. */
+type LegacyHeadingProps = Omit<ChakraHeadingProps, "size" | "fontSize">;
 
-function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
+/** The one h1 of the page. */
+function Heading(props: { children: ReactNode }): ReactNode;
+/** @deprecated Pass only `children`. */
+function Heading(props: PropsWithChildren<LegacyHeadingProps>): ReactNode;
+function Heading({ children, ...props }: PropsWithChildren<LegacyHeadingProps>): ReactNode {
   const size = useContext(HeaderSizeContext);
   return (
     <ChakraHeading
@@ -200,7 +219,11 @@ function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
   );
 }
 
-function Subtitle(props: ChakraTextProps) {
+/** The muted line under the title. */
+function Subtitle(props: { children: ReactNode }): ReactNode;
+/** @deprecated Pass only `children`; padding belongs to the header. */
+function Subtitle(props: ChakraTextProps): ReactNode;
+function Subtitle(props: ChakraTextProps): ReactNode {
   return <Text color="fg.muted" textStyle="caption" {...props} />;
 }
 
@@ -213,15 +236,54 @@ function Content({ children, ...props }: PropsWithChildren<CardRootProps>) {
   );
 }
 
-type HeaderButtonProps = ChakraButtonProps & { primary?: boolean };
+/** What every header button takes: appearance is the header's, so no style props. */
+interface HeaderButtonBase {
+  /** The page's one main act: solid orange. */
+  primary?: boolean;
+  disabled?: boolean;
+  loading?: boolean;
+  title?: string;
+  "aria-label"?: string;
+  /** With the next three, what `Menu.Trigger asChild` needs to name its menu. */
+  "aria-expanded"?: boolean | "true" | "false";
+  "aria-haspopup"?: boolean | "menu" | "dialog" | "listbox";
+  "aria-controls"?: string;
+  id?: string;
+  "data-testid"?: string;
+  ref?: Ref<HTMLButtonElement>;
+}
+
+/** A button: `onClick`, or a submit for a form (`form` names one elsewhere). */
+interface HeaderActionButtonProps extends HeaderButtonBase {
+  asChild?: false;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  type?: "button" | "submit";
+  form?: string;
+  children: ReactNode;
+}
+
+/** A link: one router-aware or external `<a>` the caller supplies; the header paints it. */
+interface HeaderLinkButtonProps extends HeaderButtonBase {
+  asChild: true;
+  /** One element carrying `href` (plus `target` and `rel` when external). */
+  children: ReactElement;
+}
+
+export type HeaderButtonProps = HeaderActionButtonProps | HeaderLinkButtonProps;
+
+/** @deprecated Open Chakra props; pass `HeaderButtonProps`. */
+export type LegacyHeaderButtonProps = ChakraButtonProps & { primary?: boolean };
 
 const PRIMARY_PROPS = { variant: "solid", colorPalette: "orange" } as const;
 
+function HeaderButton(props: HeaderButtonProps): ReactNode;
+/** @deprecated Style props; the header owns the button's look. */
+function HeaderButton(props: PropsWithChildren<LegacyHeaderButtonProps>): ReactNode;
 function HeaderButton({
   children,
   primary = false,
   ...props
-}: PropsWithChildren<HeaderButtonProps>) {
+}: PropsWithChildren<LegacyHeaderButtonProps>): ReactNode {
   const size = useContext(HeaderSizeContext);
   return (
     <Button
