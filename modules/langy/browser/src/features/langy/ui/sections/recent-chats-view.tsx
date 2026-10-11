@@ -1,12 +1,11 @@
+import { LoadMore } from "@langwatch/design-system/load-more";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
-  Button,
   chakra,
   HStack,
   IconButton,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -203,18 +202,15 @@ function OlderChats({
 }) {
   if (history.hasNextPage) {
     return (
-      <Box paddingX={pad} paddingY={2}>
-        <Button
-          width="full"
-          size="xs"
-          variant="ghost"
-          color="fg.muted"
-          disabled={history.isFetchingNextPage}
-          onClick={() => void history.fetchNextPage()}
+      <Box paddingX={pad}>
+        <LoadMore
+          hasMore
+          loading={history.isFetchingNextPage}
+          onLoadMore={() => void history.fetchNextPage()}
+          label="Load older chats"
           aria-label="Load older conversations"
-        >
-          {history.isFetchingNextPage ? <Spinner size="xs" /> : "Load older chats"}
-        </Button>
+          appearance="compact"
+        />
       </Box>
     );
   }

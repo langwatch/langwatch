@@ -55,7 +55,7 @@ export function IdentityLookupDrawer({
     <Drawer
       open={!!userId}
       onClose={onClose}
-      size="lg"
+      size="detail"
       title={held?.person.name ?? held?.person.email ?? "Person details"}
       eyebrow={{ label: "Person", icon: <UserRound size={20} /> }}
       subtitle={held?.person.email ?? address}

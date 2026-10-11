@@ -53,7 +53,7 @@ export function CaseModal({
     <Drawer
       open={open}
       onClose={onClose}
-      size="lg"
+      size="detail"
       title={scenarioId ? "Edit scenario" : "New scenario"}
       subtitle={CASE_MODAL_SUBTITLE}
       headerTools={

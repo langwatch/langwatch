@@ -4,7 +4,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
  * Connect an AI provider on the way into the product: one row of marks, one
  * focused connect panel, and a quiet "Skip Guided Tour" link that asks once.
  */
-import { Box, Button, chakra, Flex, Text } from "@langwatch/design-system/primitives";
+import { Box, chakra, Flex, Text } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
@@ -159,51 +159,38 @@ export function ProviderScreen({
         </Box>
       </Box>
 
-      <Dialog.Root
+      <Dialog
         open={confirmSkip}
-        onOpenChange={(details) => setConfirmSkip(details.open)}
+        onClose={() => setConfirmSkip(false)}
+        title={SKIP_TOUR_COPY.title}
         size="sm"
         placement="center"
+        ground="card"
+        footerDivider
+        cancelLabel={null}
+        secondaryAction={{
+          label: SKIP_TOUR_COPY.skip,
+          onClick: () => {
+            emit("confirmed", "skip_tour");
+            setConfirmSkip(false);
+            skip()
+              .then(onSkip)
+              .catch((error: unknown) => onSkipFailed?.(error));
+          },
+        }}
+        primaryAction={{
+          label: SKIP_TOUR_COPY.keep,
+          tone: "neutral",
+          onClick: () => {
+            emit("confirmed", "kept_guide");
+            setConfirmSkip(false);
+          },
+        }}
       >
-        <Dialog.Content>
-          <Dialog.Header pb={1}>
-            <Dialog.Title>{SKIP_TOUR_COPY.title}</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body pt={0}>
-            <Text textStyle="bodySm" color="fg.muted">
-              {SKIP_TOUR_COPY.body}
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer borderTop="1px solid" borderColor="border" gap={2}>
-            <Button
-              variant="outline"
-              size="sm"
-              color="fg.muted"
-              onClick={() => {
-                emit("confirmed", "skip_tour");
-                setConfirmSkip(false);
-                skip()
-                  .then(onSkip)
-                  .catch((error: unknown) => onSkipFailed?.(error));
-              }}
-            >
-              {SKIP_TOUR_COPY.skip}
-            </Button>
-            <Button
-              size="sm"
-              bg="fg"
-              color="bg.panel"
-              _hover={{ opacity: 0.9 }}
-              onClick={() => {
-                emit("confirmed", "kept_guide");
-                setConfirmSkip(false);
-              }}
-            >
-              {SKIP_TOUR_COPY.keep}
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+        <Text textStyle="bodySm" color="fg.muted">
+          {SKIP_TOUR_COPY.body}
+        </Text>
+      </Dialog>
     </TakeoverRow>
   );
 }

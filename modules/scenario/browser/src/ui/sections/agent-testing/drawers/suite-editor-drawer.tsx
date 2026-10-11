@@ -118,7 +118,7 @@ export function SuiteEditorDrawer(_props: SuiteEditorDrawerProps) {
     <Drawer
       open={isOpen}
       onClose={model.close}
-      size="lg"
+      size="detail"
       title="Edit test suite"
       subtitle={model.storedName || SUITE_EDITOR_SUBTITLE}
       footer={{

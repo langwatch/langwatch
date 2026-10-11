@@ -579,7 +579,7 @@ function ConnectionDrawer({
     <Drawer
       open={!!connectionId}
       onClose={onClose}
-      size="lg"
+      size="detail"
       title={held?.providerId ?? "SSO connection"}
       eyebrow={{ label: "SSO connection", icon: <ShieldCheck size={14} aria-hidden /> }}
       badges={held ? <ConnectionHeaderBadges connection={held} /> : void 0}

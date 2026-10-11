@@ -894,6 +894,7 @@ export function evaluatorEditorFooter({
           : []),
         {
           label: "Save",
+          tone: "success",
           onClick: handleSave,
           loading: isSaving,
           "data-testid": "evaluator-save-button",
@@ -913,6 +914,7 @@ export function evaluatorEditorFooter({
     cancel: { onClick: onCancel ?? handleClose },
     primaryAction: {
       label: saveButtonText ?? (evaluatorId ? "Save Changes" : "Create Evaluator"),
+      tone: "success",
       onClick: handleSave,
       loading: isSaving,
       "data-testid": "save-evaluator-button",

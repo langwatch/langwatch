@@ -294,22 +294,6 @@
     "disposition": "reviewed"
   },
   {
-    "path": "modules/ops/browser/src/ui/elements/ops-virtualized-table-rows.tsx",
-    "rule": "restyle",
-    "line": 68,
-    "reason": "False positive: height is ListTable.PaddingRow's required virtual-scroll spacer prop, not a style override (X4q review).",
-    "owner": "ops",
-    "disposition": "reviewed"
-  },
-  {
-    "path": "modules/ops/browser/src/ui/elements/ops-virtualized-table-rows.tsx",
-    "rule": "restyle",
-    "line": 72,
-    "reason": "False positive: height is ListTable.PaddingRow's required virtual-scroll spacer prop, not a style override (X4q review).",
-    "owner": "ops",
-    "disposition": "reviewed"
-  },
-  {
     "path": "modules/ops/browser/src/features/event-store/ui/elements/throughput-chart.tsx",
     "rule": "card-box",
     "line": 191,
@@ -1133,48 +1117,6 @@
     "owner": "onboarding"
   },
   {
-    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 162,
-    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
-    "owner": "onboarding"
-  },
-  {
-    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 168,
-    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
-    "owner": "onboarding"
-  },
-  {
-    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 169,
-    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
-    "owner": "onboarding"
-  },
-  {
-    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 170,
-    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
-    "owner": "onboarding"
-  },
-  {
-    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 172,
-    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
-    "owner": "onboarding"
-  },
-  {
-    "path": "modules/onboarding/browser/src/features/guided-onboarding/ui/takeover/provider-screen.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 177,
-    "reason": "Approved: The skip-tour confirm keeps its black Keep guide primary until a neutral primary tone exists. (R6f1 review)",
-    "owner": "onboarding"
-  },
-  {
     "path": "modules/auth/browser/src/ui/elements/inviting-organization.tsx",
     "rule": "card-box",
     "line": 18,
@@ -1870,55 +1812,6 @@
     "owner": "prompt"
   },
   {
-    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 61,
-    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 70,
-    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 71,
-    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 72,
-    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 74,
-    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 75,
-    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/elements/prompts/forms/save-version-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 99,
-    "reason": "Approved: the save version dialog keeps its green primary until a green tone exists (R9p1 review).",
-    "owner": "prompt"
-  },
-  {
     "path": "modules/prompt/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "card-box",
     "line": 171,
@@ -2416,55 +2309,6 @@
     "reason": "False positive: the view mode toggle (R7t review).",
     "owner": "scenario",
     "disposition": "reviewed"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 86,
-    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 95,
-    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 102,
-    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 103,
-    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 105,
-    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 106,
-    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
-    "owner": "prompt"
-  },
-  {
-    "path": "modules/prompt/browser/src/ui/sections/prompt-studio/dialogs/change-handle-dialog.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 142,
-    "reason": "Approved: the change-handle dialog keeps its green Save until a green primary tone exists (R9p2 review).",
-    "owner": "prompt"
   },
   {
     "path": "modules/prompt/browser/src/ui/sections/prompts/prompt-editor-drawer.tsx",

@@ -1301,13 +1301,7 @@ function EditorSelectionBar({
   return (
     <SelectionActionBar
       label={`${selectedRowCount} selected`}
-      onClear={() => {
-        onClear();
-        // The header cell is rebuilt as the selection changes, so focus lands after it has been.
-        requestAnimationFrame(() =>
-          document.querySelector<HTMLElement>("#" + GRID_ID + " [data-select-all]")?.focus(),
-        );
-      }}
+      onClear={onClear}
       placement={floating ? "floating" : "inline"}
       forTable={GRID_ID}
       testId="dataset-selection-bar"
