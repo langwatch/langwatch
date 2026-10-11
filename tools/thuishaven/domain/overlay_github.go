@@ -37,9 +37,10 @@ func githubSimPrivateKey() string {
 }
 
 // GithubAppEnv points the github module's App, API and install page at githubsim
-// at endpoint, or nil when the developer named a GitHub App of their own.
-func GithubAppEnv(resolved map[string]string, endpoint string) []string {
-	if resolved["GITHUB_LANGY_APP_ID"] != "" || githubSimPrivateKey() == "" {
+// at endpoint. +github is an explicit opt-in, so the whole set wins over an App
+// in .env: a half-real set sends the sim's signed webhooks to a real secret (401).
+func GithubAppEnv(endpoint string) []string {
+	if githubSimPrivateKey() == "" {
 		return nil
 	}
 	return []string{

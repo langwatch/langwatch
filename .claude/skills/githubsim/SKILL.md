@@ -17,8 +17,8 @@ installations, pull requests, fault count).
 - Opt-in: `haven up +github` (sticky; restarts the stack). Hosted in the `sims` lane.
 - The overlay sets `GITHUB_LANGY_APP_ID`, `_APP_SLUG`, `_PRIVATE_KEY` (a throwaway RSA key),
   `_WEBHOOK_SECRET`, and the two origin leaves `GITHUB_LANGY_API_BASE` and
-  `GITHUB_LANGY_WEB_BASE` (both the sim). A `GITHUB_LANGY_APP_ID` in `.env` wins; nothing is
-  pointed at the sim then.
+  `GITHUB_LANGY_WEB_BASE` (both the sim). With `+github` the whole set beats a
+  real `GITHUB_LANGY_*` App in `.env` (unlike Stripe, where `.env` wins); drop `+github` to use your own.
 - The sim is told the stack's `/api/github/webhook` and `/api/github/setup` and the same secret.
 - Seeded: installation `1001` on `langwatch-demo` with repos `langwatch-demo/app`,
   `langwatch-demo/docs`, and PR `#1` on `feat/demo`. User `octocat`.

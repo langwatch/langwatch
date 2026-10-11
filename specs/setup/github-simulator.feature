@@ -75,7 +75,12 @@ Feature: githubsim, a local stand-in for GitHub
     When the worktree selects github
     Then the product gets the App id, slug, key, webhook secret and the sim's API and web origins
     And the sim is told the stack's webhook and setup URLs and the same secret
-    And a developer's own GITHUB_LANGY_APP_ID is left alone
+
+  Scenario: +github wins over a real GitHub App in .env
+    Given the root .env names a real GITHUB_LANGY_APP_ID, key and webhook secret
+    When the stack starts with +github
+    Then the App id, slug, private key, webhook secret and both origins come from githubsim
+    And the sim's signed webhooks verify against the secret the stack holds
 
   Scenario: The github module honours stand-in origins
     Given GITHUB_LANGY_API_BASE and GITHUB_LANGY_WEB_BASE name a stand-in

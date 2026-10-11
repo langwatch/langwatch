@@ -249,7 +249,7 @@ func simulatorBaseEnv(sel domain.Selection, svc domain.Service, repoDir string) 
 	case svc.Name == domain.LambdaService && sel.Lambda && svc.Port != 0:
 		return domain.LambdaFleetEnv(resolvedDevEnv(repoDir), svc.Port)
 	case svc.Name == domain.GithubService && sel.Github && svc.Port != 0:
-		return domain.GithubAppEnv(resolvedDevEnv(repoDir), svc.URL)
+		return domain.GithubAppEnv(svc.URL)
 	}
 	return nil
 }

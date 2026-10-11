@@ -8,7 +8,7 @@ import (
 
 // @scenario "haven runs githubsim only when the worktree asks for it"
 func TestGithubAppEnvPointsTheModuleAtGithubsim(t *testing.T) {
-	env := GithubAppEnv(map[string]string{}, "https://github.s.langwatch.localhost")
+	env := GithubAppEnv("https://github.s.langwatch.localhost")
 	for _, want := range []string{
 		"GITHUB_LANGY_APP_ID=" + GithubSimAppID,
 		"GITHUB_LANGY_APP_SLUG=" + GithubSimAppSlug,
@@ -29,9 +29,6 @@ func TestGithubAppEnvPointsTheModuleAtGithubsim(t *testing.T) {
 	if !strings.HasPrefix(key, "-----BEGIN RSA PRIVATE KEY-----\\n") || strings.Contains(key, "\n") {
 		t.Errorf("the private key is not a single-line PEM: %.40q", key)
 	}
-	if env := GithubAppEnv(map[string]string{"GITHUB_LANGY_APP_ID": "99"}, "https://x"); env != nil {
-		t.Errorf("a developer's own GitHub App was overridden with %v", env)
-	}
 }
 
 // @scenario "haven runs githubsim only when the worktree asks for it"
@@ -42,5 +39,37 @@ func TestGithubIsOptIn(t *testing.T) {
 	}
 	if (Selection{}).Github {
 		t.Error("githubsim must be off by default")
+	}
+}
+
+// @scenario "+github wins over a real GitHub App in .env"
+func TestGithubAppEnvBeatsARealAppInDotenv(t *testing.T) {
+	root := map[string]string{
+		"GITHUB_LANGY_APP_ID": "123456", "GITHUB_LANGY_APP_SLUG": "real-app",
+		"GITHUB_LANGY_PRIVATE_KEY": "real-key", "GITHUB_LANGY_WEBHOOK_SECRET": "real-secret",
+		"GITHUB_LANGY_API_BASE": "https://api.github.com", "GITHUB_LANGY_WEB_BASE": "https://github.com",
+	}
+	child := map[string]string{}
+	for k, v := range root {
+		child[k] = v
+	}
+	for _, line := range GithubAppEnv("https://github.s.langwatch.localhost") {
+		if k, v, ok := strings.Cut(line, "="); ok {
+			child[k] = v
+		}
+	}
+	want := map[string]string{
+		"GITHUB_LANGY_APP_ID": GithubSimAppID, "GITHUB_LANGY_APP_SLUG": GithubSimAppSlug,
+		"GITHUB_LANGY_WEBHOOK_SECRET": GithubSimWebhookSecret,
+		"GITHUB_LANGY_API_BASE":       "https://github.s.langwatch.localhost",
+		"GITHUB_LANGY_WEB_BASE":       "https://github.s.langwatch.localhost",
+	}
+	for k, v := range want {
+		if child[k] != v {
+			t.Errorf("%s = %q, want the sim's %q", k, child[k], v)
+		}
+	}
+	if k := child["GITHUB_LANGY_PRIVATE_KEY"]; k == "real-key" || !strings.HasPrefix(k, "-----BEGIN RSA PRIVATE KEY-----") {
+		t.Errorf("the private key is not the sim's")
 	}
 }
