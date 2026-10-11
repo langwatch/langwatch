@@ -3103,41 +3103,6 @@
     "owner": "workflow"
   },
   {
-    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 58,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 59,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 60,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 75,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/hoverable-big-text.tsx",
-    "rule": "legacy-overlay-part",
-    "line": 76,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
-    "owner": "workflow"
-  },
-  {
     "path": "modules/workflow/browser/src/ui/sections/workflow-push-to-copies-dialog.tsx",
     "rule": "legacy-overlay-part",
     "line": 135,
@@ -3232,13 +3197,6 @@
     "path": "modules/workflow/browser/src/ui/sections/workflow-replicate-dialog.tsx",
     "rule": "legacy-overlay-part",
     "line": 129,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
-    "owner": "workflow"
-  },
-  {
-    "path": "modules/workflow/browser/src/ui/sections/workflows/workflow-chat-screen.tsx",
-    "rule": "legacy-card-part",
-    "line": 46,
     "reason": "Approved: kept as today until the design system has a Dialog header slot, a 64rem size, a full-height panel card, or the push/replicate dialogs move to checking on submit (R10w2 review).",
     "owner": "workflow"
   },
@@ -4508,27 +4466,6 @@
     "owner": "trace"
   },
   {
-    "path": "modules/trace/browser/src/ui/elements/onboarding/observability/flowise-setup.tsx",
-    "rule": "legacy-card-part",
-    "line": 28,
-    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/elements/onboarding/observability/flowise-setup.tsx",
-    "rule": "legacy-card-part",
-    "line": 58,
-    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/elements/onboarding/observability/flowise-setup.tsx",
-    "rule": "legacy-card-part",
-    "line": 87,
-    "reason": "Approved: a protected trace, conversation, annotation or session surface, or a false positive (progress box, select placeholder, status badge, error state) (trace review).",
-    "owner": "trace"
-  },
-  {
     "path": "modules/trace/browser/src/ui/blocks/dataset/dataset-preview-table.tsx",
     "rule": "card-box",
     "line": 171,
@@ -4681,48 +4618,6 @@
     "disposition": "reviewed"
   },
   {
-    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
-    "rule": "raw-export",
-    "line": 162,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
-    "rule": "raw-export",
-    "line": 199,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
-    "rule": "raw-export",
-    "line": 207,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
-    "rule": "raw-export",
-    "line": 220,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
-    "rule": "raw-export",
-    "line": 224,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/elements/pagination.tsx",
-    "rule": "raw-export",
-    "line": 247,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
     "path": "modules/trace/browser/src/ui/sections/datasets/add-dataset-record-drawer.tsx",
     "rule": "local-copy",
     "line": 255,
@@ -4779,41 +4674,6 @@
     "owner": "trace"
   },
   {
-    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/drawer-header/share-trace-dialog.tsx",
-    "rule": "local-copy",
-    "line": 55,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/keyboard-shortcuts-help.tsx",
-    "rule": "local-copy",
-    "line": 73,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/raw-json-dialog.tsx",
-    "rule": "local-copy",
-    "line": 91,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-edit-diff-dialog.tsx",
-    "rule": "local-copy",
-    "line": 52,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/pagination.tsx",
-    "rule": "local-copy",
-    "line": 102,
-    "reason": "Approved: kept as today until the design system has a Dialog header slot, glass ground, wider drawer, Pagination summary and the local trace dialog and drawer callers move (R11h review).",
-    "owner": "trace"
-  },
-  {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-table/trace-table-layout.tsx",
     "rule": "local-copy",
     "line": 97,
@@ -4823,15 +4683,7 @@
   {
     "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/keyboard-shortcuts-help.tsx",
     "rule": "card-box",
-    "line": 89,
-    "reason": "Kept as today: an illustration row or accent-banded shortcut tile (R11h review).",
-    "owner": "trace",
-    "disposition": "reviewed"
-  },
-  {
-    "path": "modules/trace/browser/src/ui/sections/explorer/trace-drawer/keyboard-shortcuts-help.tsx",
-    "rule": "card-box",
-    "line": 116,
+    "line": 86,
     "reason": "Kept as today: an illustration row or accent-banded shortcut tile (R11h review).",
     "owner": "trace",
     "disposition": "reviewed"

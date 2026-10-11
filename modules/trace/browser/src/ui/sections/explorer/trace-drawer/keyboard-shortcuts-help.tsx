@@ -1,3 +1,5 @@
+import { Card } from "@langwatch/design-system/card";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Kbd } from "@langwatch/design-system/kbd";
 import {
   Box,
@@ -21,7 +23,6 @@ import {
 } from "react-icons/lu";
 
 import { TRACE_DRAWER_HELP_GROUPS } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
-import { Dialog } from "../../dialog.tsx";
 
 type GroupAccent = "blue" | "purple" | "teal" | "amber" | "pink" | "gray";
 
@@ -70,127 +71,42 @@ export function KeyboardShortcutsHelp({
   groups = DRAWER_GROUPS,
 }: KeyboardShortcutsHelpProps) {
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(e) => {
-        if (!e.open) onClose();
-      }}
+      onClose={onClose}
+      title="Keyboard Shortcuts"
       size="lg"
-    >
-      <Dialog.Content maxHeight="85vh" overflow="hidden">
-        <Dialog.Header
-          paddingX={5}
-          paddingY={4}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-          background="linear-gradient(135deg, var(--chakra-colors-blue-subtle), var(--chakra-colors-purple-subtle))"
-        >
-          <HStack gap={3} align="center">
-            <Box
-              bg="bg.panel"
-              borderWidth="1px"
-              borderColor="border.muted"
-              rounded="md"
-              padding={2}
-              color="blue.fg"
-              boxShadow="sm"
-            >
-              <Icon as={LuKeyboard} boxSize="18px" />
-            </Box>
-            <VStack align="start" gap={0}>
-              <Heading textStyle="md" fontWeight="semibold" color="fg">
-                Keyboard Shortcuts
-              </Heading>
-              <Text textStyle="xs" color="fg.muted">
-                Press any key. Watch it light up below.
-              </Text>
-            </VStack>
-          </HStack>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body paddingX={5} paddingY={4} overflow="auto" bg="bg.subtle">
-          <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
-            {groups.map((group) => {
-              const { icon, accent } = resolveGroupVisuals(group);
-              return (
-                <Box
-                  key={group.title}
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  rounded="md"
-                  overflow="hidden"
-                  bg="bg.panel"
-                  transition="border-color 0.15s ease, box-shadow 0.15s ease"
-                  _hover={{
-                    borderColor: `${accent}.muted`,
-                    boxShadow: "sm",
-                  }}
-                >
-                  <HStack
-                    paddingX={3}
-                    paddingY={2}
-                    bg={`${accent}.subtle`}
-                    borderBottomWidth="1px"
-                    borderColor="border.muted"
-                    gap={2}
-                  >
-                    <Icon as={icon} boxSize="13px" color={`${accent}.fg`} />
-                    <Text
-                      textStyle="2xs"
-                      color={`${accent}.fg`}
-                      textTransform="uppercase"
-                      letterSpacing="0.08em"
-                      fontWeight="semibold"
-                    >
-                      {group.title}
-                    </Text>
-                  </HStack>
-                  <VStack align="stretch" gap={1.5} paddingX={3} paddingY={3}>
-                    {group.items.map((item) => (
-                      <HStack
-                        key={`${item.label}-${item.keys.join("+")}`}
-                        gap={3}
-                        justify="space-between"
-                        align="start"
-                      >
-                        <VStack align="start" gap={0} flex="1" minWidth={0}>
-                          <Text textStyle="xs" color="fg" lineHeight="1.4">
-                            {item.label}
-                          </Text>
-                          {item.detail ? (
-                            <Text textStyle="2xs" color="fg.muted" lineHeight="1.3">
-                              {item.detail}
-                            </Text>
-                          ) : null}
-                        </VStack>
-                        <HStack gap={1} flexShrink={0} paddingTop="1px">
-                          {item.keys.map((k, i) => (
-                            <HStack key={`${k}-${i}`} gap={1}>
-                              {i > 0 ? (
-                                <Text textStyle="2xs" color="fg.subtle" fontWeight="medium">
-                                  or
-                                </Text>
-                              ) : null}
-                              <Kbd>{k}</Kbd>
-                            </HStack>
-                          ))}
-                        </HStack>
-                      </HStack>
-                    ))}
-                  </VStack>
-                </Box>
-              );
-            })}
-          </SimpleGrid>
-        </Dialog.Body>
-        <HStack
-          paddingX={5}
-          paddingY={2}
-          borderTopWidth="1px"
-          borderColor="border.muted"
-          bg="bg.panel"
-          justify="space-between"
-        >
+      heightLimit="reading"
+      headerAppearance="guide"
+      body="flush"
+      trapFocus={false}
+      preventScroll={false}
+      headerContent={
+        <HStack gap={3} align="center">
+          <Box
+            bg="bg.panel"
+            borderWidth="1px"
+            borderColor="border.muted"
+            rounded="md"
+            padding={2}
+            color="blue.fg"
+            boxShadow="sm"
+          >
+            <Icon as={LuKeyboard} boxSize="18px" />
+          </Box>
+          <VStack align="start" gap={0}>
+            <Heading as="p" textStyle="md" fontWeight="semibold" color="fg">
+              Keyboard Shortcuts
+            </Heading>
+            <Text textStyle="xs" color="fg.muted">
+              Press any key. Watch it light up below.
+            </Text>
+          </VStack>
+        </HStack>
+      }
+      footerAppearance="note"
+      footerContent={
+        <HStack justify="space-between" width="full">
           <Text textStyle="2xs" color="fg.subtle">
             Shortcuts pause while you're typing in inputs.
           </Text>
@@ -201,7 +117,59 @@ export function KeyboardShortcutsHelp({
             <Kbd>Esc</Kbd>
           </HStack>
         </HStack>
-      </Dialog.Content>
-    </Dialog.Root>
+      }
+    >
+      <Box paddingX={5} paddingY={4} bg="bg.subtle">
+        <SimpleGrid columns={{ base: 1, md: 2 }} gap={3}>
+          {groups.map((group) => {
+            const { icon, accent } = resolveGroupVisuals(group);
+            return (
+              <Card
+                key={group.title}
+                variant="banded"
+                bandTone={accent}
+                titleLevel={3}
+                title={group.title}
+                icon={<Icon as={icon} boxSize="13px" />}
+              >
+                <VStack align="stretch" gap={1.5}>
+                  {group.items.map((item) => (
+                    <HStack
+                      key={`${item.label}-${item.keys.join("+")}`}
+                      gap={3}
+                      justify="space-between"
+                      align="start"
+                    >
+                      <VStack align="start" gap={0} flex="1" minWidth={0}>
+                        <Text textStyle="xs" color="fg" lineHeight="1.4">
+                          {item.label}
+                        </Text>
+                        {item.detail ? (
+                          <Text textStyle="2xs" color="fg.muted" lineHeight="1.3">
+                            {item.detail}
+                          </Text>
+                        ) : null}
+                      </VStack>
+                      <HStack gap={1} flexShrink={0} paddingTop="1px">
+                        {item.keys.map((k, i) => (
+                          <HStack key={`${k}-${i}`} gap={1}>
+                            {i > 0 ? (
+                              <Text textStyle="2xs" color="fg.subtle" fontWeight="medium">
+                                or
+                              </Text>
+                            ) : null}
+                            <Kbd>{k}</Kbd>
+                          </HStack>
+                        ))}
+                      </HStack>
+                    </HStack>
+                  ))}
+                </VStack>
+              </Card>
+            );
+          })}
+        </SimpleGrid>
+      </Box>
+    </Dialog>
   );
 }

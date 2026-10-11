@@ -1,11 +1,11 @@
-import { VStack } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Box } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useRef } from "react";
 
 import { copyShareLink } from "../../../../../behavior/share/share-links.ts";
 import { useShareTrace } from "../../../../../features/trace-drawer/behavior/use-share-trace.ts";
 import { ShareTraceDialogBody } from "../../../../blocks/share/share-trace-dialog-body.tsx";
-import { Dialog } from "../../../dialog.tsx";
 import { showErrorToast } from "../../../errors/index.ts";
 
 /**
@@ -52,46 +52,32 @@ export function ShareTraceDialog({
   };
 
   return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={(e) => !e.open && onClose()}
-      initialFocusEl={() => contentRef.current}
-    >
-      <Dialog.Content
-        ref={contentRef}
-        tabIndex={-1}
-        // Translucent glass surface, matching the drawer. A solid fill here
-        // would render the backdrop blur inert.
-        background="bg.card/80"
-        backdropFilter="blur(25px)"
-        borderRadius="lg"
-        _focusVisible={{ outline: "none" }}
-        onClick={(e) => e.stopPropagation()}
+    // An event boundary: portalled clicks bubble through React, so keep them off the drawer.
+    <Box display="contents" onClick={(e) => e.stopPropagation()}>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        title="Share trace"
+        description="Create a link to this trace. Revoke it at any time."
+        surface="glass"
+        cancelLabel={null}
+        trapFocus={false}
+        preventScroll={false}
+        contentRef={contentRef}
+        initialFocusEl={() => contentRef.current}
       >
-        <Dialog.CloseTrigger />
-        <Dialog.Header paddingBottom={0}>
-          <VStack align="start" gap={1}>
-            <Dialog.Title>Share trace</Dialog.Title>
-            <Dialog.Description color="fg.muted" fontSize="sm">
-              Create a link to this trace. Revoke it at any time.
-            </Dialog.Description>
-          </VStack>
-        </Dialog.Header>
-
-        <Dialog.Body paddingTop={5} paddingBottom={6}>
-          <ShareTraceDialogBody
-            links={links}
-            isLoading={isLoading}
-            isError={isError}
-            canCreate={!!projectId}
-            isCreating={isCreating}
-            revokingId={revokingId}
-            onCreate={createLink}
-            onCopy={handleCopy}
-            onRevoke={revokeLink}
-          />
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+        <ShareTraceDialogBody
+          links={links}
+          isLoading={isLoading}
+          isError={isError}
+          canCreate={!!projectId}
+          isCreating={isCreating}
+          revokingId={revokingId}
+          onCreate={createLink}
+          onCopy={handleCopy}
+          onRevoke={revokeLink}
+        />
+      </Dialog>
+    </Box>
   );
 }
