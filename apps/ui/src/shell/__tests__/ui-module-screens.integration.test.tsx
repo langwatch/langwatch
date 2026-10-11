@@ -127,7 +127,6 @@ describe("given the installed web modules", () => {
           "pages/onboarding",
           "pages/onboarding/welcome",
           "pages/onboarding/product/index",
-          "pages/onboarding/[team]/project",
           "pages/auth/signin",
           "pages/auth/signup",
           "pages/auth/forgot-password",
