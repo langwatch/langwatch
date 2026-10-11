@@ -219,7 +219,6 @@ describe("given a token has just been minted", () => {
     /** @scenario Closing the secret panel needs no confirmation */
     it.each([
       ["the X", () => screen.getByTestId("token-created-dialog-close")],
-      ["Close", () => screen.getByText("Close")],
       ["Done", () => screen.getByTestId("token-created-done")],
     ])(
       "closes at once through %s, with no checkbox or confirmation in the way",
@@ -235,6 +234,30 @@ describe("given a token has just been minted", () => {
         expect(screen.queryByRole("alertdialog")).toBeNull();
       },
     );
+
+    /** @scenario The secret panel's footer shows only Done */
+    it("draws Done alone in the footer, with Copy API key taking the focus", async () => {
+      // jsdom lays nothing out, so the focus trap would treat every element as hidden.
+      const rect = new DOMRect(0, 0, 10, 10);
+      const layout = vi.spyOn(Element.prototype, "getClientRects").mockReturnValue({
+        0: rect,
+        length: 1,
+        item: (index: number) => (index === 0 ? rect : null),
+        [Symbol.iterator]: () => [rect][Symbol.iterator](),
+      });
+      try {
+        renderDialog();
+
+        const dialog = screen.getByRole("dialog");
+        const footer = Array.from(dialog.querySelectorAll("[data-frame-action]"));
+        expect(footer.map((button) => button.textContent)).toEqual(["Done"]);
+        expect(within(dialog).queryByRole("button", { name: "Cancel" })).toBeNull();
+        expect(within(dialog).getAllByRole("button", { name: "Close" })).toHaveLength(1);
+        await vi.waitFor(() => expect(screen.getByTestId("token-created-copy-key")).toHaveFocus());
+      } finally {
+        layout.mockRestore();
+      }
+    });
 
     /** @scenario Closing the secret panel needs no confirmation */
     it("closes on Escape", async () => {

@@ -261,6 +261,13 @@ Feature: Token Created modal command snippets
   # ─────────────────────────────────────────────────────────────────────
 
   @integration
+  Scenario: The secret panel's footer shows only Done
+    Given a key has just been minted and the dialog is open
+    Then the footer shows Done and no Cancel or second Close button
+    And the X and Escape still close it
+    And Copy API key has the focus when it opens
+
+  @integration
   Scenario: Copy this token now — the reveal is one-time
     Given a key has just been minted and the dialog is open
     When I close the dialog

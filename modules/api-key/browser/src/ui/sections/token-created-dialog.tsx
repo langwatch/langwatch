@@ -593,7 +593,7 @@ export function TokenCreatedDialog({
       onClose={onClose}
       title="Token created"
       size="xl"
-      cancelLabel="Close"
+      cancelLabel={null}
       closeOnInteractOutside={false}
       initialFocusEl={() => copyKeyRef.current}
       primaryAction={{ label: "Done", onClick: onClose, "data-testid": "token-created-done" }}
