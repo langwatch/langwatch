@@ -3,7 +3,8 @@
  * account, and the one way to end one of them without ending them all.
  */
 
-import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant, toEpochMs } from "@langwatch/time";
@@ -52,13 +53,7 @@ export function BrowserSessionsSection() {
       )}
       {listed.length > 0 && (
         <VStack align="stretch" gap={2} width="full">
-          <Box
-            width="full"
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="md"
-            overflow="hidden"
-          >
+          <Card padding="none">
             {(showAll ? listed : listed.slice(0, COLLAPSED_ROWS)).map((session) => (
               <HStack
                 key={session.sessionId}
@@ -107,7 +102,7 @@ export function BrowserSessionsSection() {
                 )}
               </HStack>
             ))}
-          </Box>
+          </Card>
           {listed.length > COLLAPSED_ROWS && (
             <Button
               size="xs"
