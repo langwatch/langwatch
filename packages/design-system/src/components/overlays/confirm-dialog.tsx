@@ -25,6 +25,10 @@ export type ConfirmDialogProps = ConfirmClose &
     loading?: boolean;
     /** At most one extra field: a reason, a checkbox. */
     children?: ReactNode;
+    /** Where focus goes when it closes, asked at that moment; omitted, back to the opener. */
+    finalFocusEl?: () => HTMLElement | null;
+    /** Runs once, after the dialog has left the screen: clean up what it was about. */
+    onExitComplete?: () => void;
   };
 
 /** The one confirmation dialog for an action that needs a second thought. */
@@ -37,6 +41,8 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
     loading = false,
     onConfirm,
     children,
+    finalFocusEl,
+    onExitComplete,
   } = props;
   const onClose = props.onClose ?? (() => props.onOpenChange?.(false));
   return (
@@ -47,6 +53,8 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
       description={props.description ?? props.message}
       role={tone === "danger" ? "alertdialog" : "dialog"}
       busy={loading}
+      finalFocusEl={finalFocusEl}
+      onExitComplete={onExitComplete}
       primaryAction={{
         label: confirmLabel,
         onClick: onConfirm,

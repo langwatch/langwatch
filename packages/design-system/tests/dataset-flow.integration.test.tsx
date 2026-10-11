@@ -7,7 +7,11 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import previewAnnotations from "../.storybook/preview.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
-import { DatasetFlow, type SaveDataset } from "../src/workshop/dataset-flow.example.tsx";
+import {
+  DatasetFlow,
+  SEED_DATASETS,
+  type SaveDataset,
+} from "../src/workshop/dataset-flow.example.tsx";
 import { datasetFlowSource } from "../src/workshop/dataset-flow.source.ts";
 import * as datasetStories from "../src/workshop/dataset-flow.stories.tsx";
 
@@ -79,10 +83,10 @@ const visibleStates = {
   },
   Saving: async () => {
     const drawer = await screen.findByRole("dialog", { name: "Edit dataset" });
-    const save = drawer.querySelector<HTMLButtonElement>('[data-frame-action="primary"]');
-    expect(save?.disabled).toBe(true);
-    expect(save?.hasAttribute("data-loading")).toBe(true);
-    expect(save?.textContent).toBe("Save changes");
+    const save = within(drawer).getByRole<HTMLButtonElement>("button", { name: "Save changes" });
+    expect(save.disabled).toBe(true);
+    expect(save.hasAttribute("data-loading")).toBe(true);
+    expect(save.getAttribute("aria-busy")).toBe("true");
     expect(within(drawer).getByRole<HTMLInputElement>("textbox", { name: "Name" }).disabled).toBe(
       true,
     );
@@ -185,6 +189,17 @@ function rowOf(name: string) {
 }
 
 describe("given the dataset list", () => {
+  describe("when a row has its actions menu", () => {
+    /** @scenario The row menu trigger draws a decorative ellipsis icon */
+    it("draws the trigger glyph as a decorative icon and names the trigger by its row", () => {
+      renderWithDesignSystem(<DatasetFlow />);
+      const trigger = screen.getByRole("button", { name: "Actions for Refund questions" });
+
+      expect(trigger.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+      expect(trigger.textContent).toBe("");
+    });
+  });
+
   describe("when the reader creates, renames and deletes a dataset", () => {
     /** @scenario A new dataset joins the list */
     it("adds a row for the new name and closes the form", async () => {
@@ -244,6 +259,20 @@ describe("given the dataset list", () => {
         expect(document.activeElement).toBe(
           screen.getByRole("button", { name: "Refund questions" }),
         ),
+      );
+    });
+
+    /** @scenario Closing a confirmation hands focus to the element the caller names */
+    it("focuses New dataset when the last row is deleted", async () => {
+      const user = userEvent.setup();
+      renderWithDesignSystem(<DatasetFlow start={{ datasets: SEED_DATASETS.slice(0, 1) }} />);
+      await chooseRowAction({ user, dataset: "Refund questions", action: "Delete" });
+      const dialog = await screen.findByRole("alertdialog", { name: "Delete dataset?" });
+      await user.click(within(dialog).getByRole("button", { name: "Delete dataset" }));
+
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      await waitFor(() =>
+        expect(document.activeElement).toBe(screen.getByRole("button", { name: "New dataset" })),
       );
     });
 

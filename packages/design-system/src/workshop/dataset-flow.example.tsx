@@ -2,6 +2,7 @@ import { Banner } from "@langwatch/design-system/banner";
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListPage, type ListPageState } from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -278,6 +279,7 @@ export function DatasetFlow({
   const [deleteOpen, setDeleteOpen] = useState(start.confirmDelete !== undefined);
   const [focusRow, setFocusRow] = useState<FocusTarget>();
   const [opener, setOpener] = useState<FocusTarget>("new");
+  const afterDelete = useRef<FocusTarget>(start.confirmDelete ?? "new");
   const nextId = useRef(Math.max(0, ...SEED_DATASETS.map((dataset) => dataset.id)) + 1);
   const newButton = useRef<HTMLButtonElement>(null);
   const table = useRef<HTMLDivElement>(null);
@@ -293,18 +295,15 @@ export function DatasetFlow({
       ? newButton.current
       : table.current?.querySelector<HTMLElement>(`[data-dataset-id="${target}"] button`);
 
-  /**
-   * Once the dialog is gone, focus goes to the row it was about or to a neighbour, else New
-   * dataset: nothing hands it back by itself when the opener has left the page.
-   */
+  /** Undo has no dialog to hand focus back: once the restored row is drawn, focus it. */
   useEffect(() => {
-    if (focusRow === undefined || deleteOpen) return;
+    if (focusRow === undefined) return;
     const frame = requestAnimationFrame(() => {
       elementFor(focusRow)?.focus();
       setFocusRow(undefined);
     });
     return () => cancelAnimationFrame(frame);
-  }, [focusRow, deleteOpen]);
+  }, [focusRow]);
 
   useEffect(() => {
     const dataset = SEED_DATASETS.find((seeded) => seeded.id === start.deleted);
@@ -357,7 +356,7 @@ export function DatasetFlow({
     const index = datasets.findIndex((dataset) => dataset.id === toDelete.id);
     const neighbour = datasets[index + 1] ?? datasets[index - 1];
     setDatasets((current) => current.filter((dataset) => dataset.id !== toDelete.id));
-    setFocusRow(neighbour?.id ?? "new");
+    afterDelete.current = neighbour?.id ?? "new";
     setDeleteOpen(false);
     announceDeletion({ dataset: toDelete, index, setDatasets, setFocusRow });
   };
@@ -408,6 +407,7 @@ export function DatasetFlow({
             onOpen={openEdit}
             onDelete={(dataset) => {
               setToDelete(dataset);
+              afterDelete.current = dataset.id;
               setDeleteOpen(true);
             }}
           />
@@ -429,10 +429,9 @@ export function DatasetFlow({
 
       <ConfirmDialog
         open={deleteOpen}
-        onClose={() => {
-          setDeleteOpen(false);
-          setFocusRow(toDelete?.id);
-        }}
+        onClose={() => setDeleteOpen(false)}
+        finalFocusEl={() => elementFor(afterDelete.current) ?? null}
+        onExitComplete={() => setToDelete(undefined)}
         title="Delete dataset?"
         description={`"${toDelete?.name ?? "This dataset"}" and its ${toDelete?.entries ?? 0} entries leave the list. You can undo this for ten seconds.`}
         confirmLabel="Delete dataset"
@@ -509,7 +508,7 @@ function DatasetRow({
         <Menu.Root>
           <Menu.Trigger asChild>
             <Button size="xs" variant="ghost" aria-label={`Actions for ${dataset.name}`}>
-              <span aria-hidden>⋮</span>
+              <MoreVerticalIcon size={16} aria-hidden />
             </Button>
           </Menu.Trigger>
           <Menu.Content>
