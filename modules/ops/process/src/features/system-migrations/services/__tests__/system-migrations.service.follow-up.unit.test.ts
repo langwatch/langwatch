@@ -1,9 +1,14 @@
 /** Spec: specs/migration/system-migrations-runner.feature */
+import { SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
+import { intentAccessorOf } from "@langwatch/eventing/testing";
 import type { MigrationPassSummary } from "@langwatch/system-migrations";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER } from "../../../../eventing/ops-system-migrations.process.ts";
+import {
+  SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER,
+  systemMigrationPassRequested,
+} from "../../../../eventing/ops-system-migrations.process.ts";
 import type { SystemMigrationsServiceDependencies } from "../../../../rules/system-migration-support.rules.ts";
 import { SystemMigrationsService } from "../system-migrations.service.ts";
 
@@ -71,6 +76,32 @@ describe("SystemMigrationsService.executePass", () => {
         actorUserId: SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER,
         delayMs: 60_000,
       });
+    });
+
+    /** @scenario "A run that newly holds a tenant asks for one follow-up pass a minute later" */
+    it("asks under the scheduled singleton's tenant, which the event store can place", () => {
+      expect(SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER).toBe(SCHEDULED_SINGLETON_PROJECT_ID);
+    });
+
+    /** @scenario "A run that newly holds a tenant asks for one follow-up pass a minute later" */
+    it("marks the pass that request asks for as the follow-up", () => {
+      const asked = systemMigrationPassRequested(
+        { lastRequestedAt: null },
+        {},
+        {
+          at: 1,
+          now: 1,
+          key: "system_migration_pass_requests",
+          projectId: SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER,
+          intent: intentAccessorOf({
+            runPass: (messageKey, payload) => ({ messageKey, intentType: "runPass", payload }),
+          }),
+        },
+      );
+
+      expect(asked.intents).toEqual([
+        expect.objectContaining({ payload: expect.objectContaining({ followUp: true }) }),
+      ]);
     });
   });
 
