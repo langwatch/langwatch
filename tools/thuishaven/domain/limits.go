@@ -127,6 +127,9 @@ type LimitsReport struct {
 	TotalRAMBytes uint64       `json:"totalRamBytes"`
 	CPUs          int          `json:"cpus"`
 	Limits        []LimitValue `json:"limits"`
+	// NativeClickHouse: ClickHouse runs on the host, outside the colima VM, so
+	// its memory limit is not checked against the VM's size.
+	NativeClickHouse bool `json:"nativeClickHouse,omitempty"`
 }
 
 // LimitLookup answers one knob's raw text and the layer that supplied it
@@ -218,6 +221,9 @@ func (r LimitsReport) checkFits(name string, value int) error {
 	next[name] = value
 	vmMB := next[LimitColimaMemory] * 1024
 	for _, container := range []string{LimitClickHouseMemory, LimitObservability} {
+		if container == LimitClickHouseMemory && r.NativeClickHouse {
+			continue
+		}
 		if next[container] > vmMB && (name == container || name == LimitColimaMemory) {
 			return fmt.Errorf("%s (%d MB) would not fit the colima VM (%d GiB)", container, next[container], next[LimitColimaMemory])
 		}
