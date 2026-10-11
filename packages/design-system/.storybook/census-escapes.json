@@ -76,5 +76,85 @@
     "line": 75,
     "reason": "Approved home escape: the Langy home greeting is the page title (astra review, headings row).",
     "owner": "project"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/agents/agent-fleet-summary-strip.tsx",
+    "rule": "empty-text",
+    "line": 95,
+    "reason": "A caption inside a summary tile, not an empty state. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx",
+    "rule": "empty-text",
+    "line": 519,
+    "reason": "An inline form hint, not an empty state. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/ai-tools/ui/sections/ai-tool-entry-drawer.tsx",
+    "rule": "card-box",
+    "line": 590,
+    "reason": "A selectable radio option; Card has no selected state. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/costs/ui/blocks/cost-rank-list.tsx",
+    "rule": "card-box",
+    "line": 22,
+    "reason": "A bar track inside a rank row, not a card. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/ingestion-sources/anomaly-rules-tab.tsx",
+    "rule": "card-box",
+    "line": 585,
+    "reason": "A rule row inside the severity card. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/ingestion-sources/anomaly-rules-tab.tsx",
+    "rule": "card-box",
+    "line": 1019,
+    "reason": "The threshold preview note; today's quiet note look kept. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/ingestion-sources/environments/environments-tab.tsx",
+    "rule": "card-box",
+    "line": 114,
+    "reason": "A caveat note; today's quiet note look kept. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/insights/insights-setup-drawer.tsx",
+    "rule": "card-box",
+    "line": 306,
+    "reason": "A bordered list of learned preferences inside a drawer. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/ottl/ui/elements/ottl-editor.tsx",
+    "rule": "card-box",
+    "line": 275,
+    "reason": "An inline editor status note; today's look kept. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/ottl/ui/elements/ottl-editor.tsx",
+    "rule": "card-box",
+    "line": 310,
+    "reason": "An inline editor status note; today's look kept. (X2e1 review)",
+    "owner": "governance",
+    "disposition": "reviewed"
   }
 ]

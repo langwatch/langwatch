@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Badge, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { ToolCardFigure, ToolCardMark } from "./tool-card-figure";
@@ -64,23 +64,23 @@ export function ToolCatalogTable({
       data-layout="list"
       containerProps={{ overflowX: "auto", width: "full" }}
     >
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Tool</Table.ColumnHeader>
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Tool</ListTable.ColumnHeader>
           {TOOL_TABLE_COLUMNS.map((row) => (
-            <Table.ColumnHeader key={row} whiteSpace="nowrap">
+            <ListTable.ColumnHeader key={row}>
               {TOOL_CARD_ROW_META[row].label}
-            </Table.ColumnHeader>
+            </ListTable.ColumnHeader>
           ))}
           {/* The overflow menu's column carries no header: naming it would
               label a control rather than a figure. */}
-          <Table.ColumnHeader />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+          <ListTable.ColumnHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {cards.map((card) => (
-          <Table.Row key={card.id} data-testid={`tool-card-${card.id}`}>
-            <Table.Cell>
+          <ListTable.Row key={card.id} data-testid={`tool-card-${card.id}`}>
+            <ListTable.Cell>
               <HStack gap={2.5} align="center">
                 <ToolCardMark card={card} />
                 <VStack gap={0} align="start" minWidth={0}>
@@ -104,9 +104,9 @@ export function ToolCatalogTable({
                   </Text>
                 </VStack>
               </HStack>
-            </Table.Cell>
+            </ListTable.Cell>
             {TOOL_TABLE_COLUMNS.map((row) => (
-              <Table.Cell key={row} whiteSpace="nowrap">
+              <ListTable.Cell key={row} nowrap>
                 <ToolCardFigure
                   label={TOOL_CARD_ROW_META[row].label}
                   // A column the tool has no row for is empty here rather
@@ -116,12 +116,12 @@ export function ToolCatalogTable({
                   emptyReason={toolCardMissingReason(card, row)}
                   align="start"
                 />
-              </Table.Cell>
+              </ListTable.Cell>
             ))}
-            <Table.Cell textAlign="end">{renderActions?.(card)}</Table.Cell>
-          </Table.Row>
+            <ListTable.Cell align="end">{renderActions?.(card)}</ListTable.Cell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
