@@ -1,6 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
-  Card,
   ClientOnly,
   CodeBlock,
   IconButton,
@@ -198,7 +198,7 @@ func main() {
         <CodeBlock.AdapterProvider value={shikiAdapter}>
           <ClientOnly>
             {() => (
-              <Card.Root variant="showcase">
+              <Card variant="showcase" padding="none">
                 <CodeBlock.Root
                   code={activeTab.code}
                   language={activeTab.language}
@@ -251,7 +251,7 @@ func main() {
                     </Tabs.Content>
                   </CodeBlock.Content>
                 </CodeBlock.Root>
-              </Card.Root>
+              </Card>
             )}
           </ClientOnly>
         </CodeBlock.AdapterProvider>

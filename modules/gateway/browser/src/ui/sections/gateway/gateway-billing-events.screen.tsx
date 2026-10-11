@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -6,7 +7,6 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
-  Card,
   createListCollection,
   HStack,
   Input,
@@ -373,7 +373,7 @@ function BillingEventsTable({
   projectSlug: string | undefined;
 }) {
   return (
-    <Card.Root variant="showcase" width="full" overflowX="auto">
+    <Card variant="showcase" padding="none">
       <ListTable
         containerProps={{
           overflowX: "auto",
@@ -382,7 +382,6 @@ function BillingEventsTable({
           role: "region",
           "aria-label": "Billing events table",
         }}
-        variant="line"
         size="sm"
         width="full"
         minWidth="960px"
@@ -429,7 +428,7 @@ function BillingEventsTable({
           ))}
         </Table.Body>
       </ListTable>
-    </Card.Root>
+    </Card>
   );
 }
 

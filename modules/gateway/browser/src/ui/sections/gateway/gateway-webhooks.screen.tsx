@@ -1,5 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
 import { UpgradeRequired } from "@langwatch/design-system/access-state";
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -9,7 +10,6 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
-  Card,
   HStack,
   Spacer,
   Table,
@@ -311,13 +311,8 @@ function WebhookEndpointsTable({
   ...actions
 }: EndpointListActions & { endpoints: EndpointView[] }) {
   return (
-    <Card.Root variant="showcase" width="full" overflowX="auto">
-      <ListTable
-        containerProps={{ overflowX: "auto", maxWidth: "full" }}
-        variant="line"
-        size="md"
-        width="full"
-      >
+    <Card variant="showcase" padding="none">
+      <ListTable containerProps={{ overflowX: "auto", maxWidth: "full" }} size="md" width="full">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader>Destination</Table.ColumnHeader>
@@ -333,7 +328,7 @@ function WebhookEndpointsTable({
           ))}
         </Table.Body>
       </ListTable>
-    </Card.Root>
+    </Card>
   );
 }
 

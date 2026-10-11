@@ -1,4 +1,5 @@
 import { neutralizeRows } from "@langwatch/csv";
+import { Card } from "@langwatch/design-system/card";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -9,7 +10,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   chakra,
   Heading,
   HStack,
@@ -399,10 +399,9 @@ function UsageBreakdown({
       {showKeys && (
         <VStack align="stretch" gap={2}>
           <Heading textStyle="cardTitle">Top virtual keys</Heading>
-          <Card.Root variant="showcase" width="full" overflowX="auto">
+          <Card variant="showcase" padding="none">
             <ListTable
               containerProps={{ overflowX: "auto", maxWidth: "full" }}
-              variant="line"
               size="sm"
               width="full"
             >
@@ -433,7 +432,7 @@ function UsageBreakdown({
                 ))}
               </Table.Body>
             </ListTable>
-          </Card.Root>
+          </Card>
         </VStack>
       )}
 
@@ -449,10 +448,9 @@ function UsageBreakdown({
             </Link>
           )}
         </HStack>
-        <Card.Root variant="showcase" width="full" overflowX="auto">
+        <Card variant="showcase" padding="none">
           <ListTable
             containerProps={{ overflowX: "auto", maxWidth: "full" }}
-            variant="line"
             size="sm"
             width="full"
           >
@@ -477,7 +475,7 @@ function UsageBreakdown({
               ))}
             </Table.Body>
           </ListTable>
-        </Card.Root>
+        </Card>
       </VStack>
     </VStack>
   );

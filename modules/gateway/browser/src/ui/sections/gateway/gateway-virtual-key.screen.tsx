@@ -883,11 +883,7 @@ function UsageSection({
                 No requests on that model in the last 30 days.
               </Text>
             ) : (
-              <ListTable
-                containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                size="sm"
-                variant="line"
-              >
+              <ListTable containerProps={{ overflowX: "auto", maxWidth: "full" }} size="sm">
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader>When</Table.ColumnHeader>

@@ -1,4 +1,5 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -8,7 +9,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Code,
   Heading,
   HStack,
@@ -351,10 +351,9 @@ function BudgetDetailPage() {
                     icon={<Receipt size={24} />}
                   />
                 ) : (
-                  <Card.Root variant="showcase" width="full" overflow="hidden">
+                  <Card variant="showcase" padding="none">
                     <ListTable
                       containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                      variant="line"
                       size="sm"
                       width="full"
                     >
@@ -396,7 +395,7 @@ function BudgetDetailPage() {
                         ))}
                       </Table.Body>
                     </ListTable>
-                  </Card.Root>
+                  </Card>
                 )}
                 <Text fontSize="xs" color="fg.muted" mt={1}>
                   Most recent 20 requests. See Usage for aggregates over the full history.
