@@ -28,6 +28,24 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
 } as const satisfies Record<string, RetentionCategory>;
 
 /**
+ * Each id index retained with its source's category, index to source. Not in the map above: an
+ * index is in no TTL reconciliation and carries no size column, and a rewrite only ever raises it.
+ * Eventing's own index is retained through eventing. dev/docs/plans/id-index-2026-10-10.md.
+ */
+export const RETENTION_ID_INDEX_TABLES = {
+  trace_summaries_id_index: "trace_summaries",
+  stored_spans_id_index: "stored_spans",
+  trace_analytics_id_index: "trace_analytics",
+  evaluation_runs_id_index: "evaluation_runs",
+  evaluation_analytics_id_index: "evaluation_analytics",
+  experiment_runs_id_index: "experiment_runs",
+  experiment_run_items_id_index: "experiment_run_items",
+  dspy_steps_id_index: "dspy_steps",
+  simulation_runs_id_index: "simulation_runs",
+  suite_runs_id_index: "suite_runs",
+} as const satisfies Record<string, keyof typeof RETENTION_TABLE_CATEGORY_MAP>;
+
+/**
  * Durable authentication and authorization state is not customer telemetry.
  * These names cover the PostgreSQL projections/row-truth today and reserve
  * their ClickHouse-style spellings against accidental future TTL enrollment.

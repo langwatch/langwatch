@@ -1,9 +1,14 @@
 import {
   RetroactiveMutationInProgressError,
+  retentionCategories,
+  type ResolvedRetention,
   type RetentionCategory,
   type RetroactiveMutationProgress,
 } from "@langwatch/data-retention-contract";
-import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
+import {
+  RETENTION_ID_INDEX_TABLES,
+  RETENTION_TABLE_CATEGORY_MAP,
+} from "@langwatch/data-retention-contract/retention-tables";
 import { EventLogRetention } from "@langwatch/eventing/server";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
@@ -13,6 +18,14 @@ import type {
   KeepForeverRewrite,
   RetroactiveRetentionRepository,
 } from "../retroactive-retention.repository.ts";
+
+/** Each id index retention rewrites itself, with its source's category. */
+const ID_INDEX_CATEGORIES: ReadonlyMap<string, RetentionCategory> = new Map(
+  Object.entries(RETENTION_ID_INDEX_TABLES).map(([index, source]) => [
+    index,
+    RETENTION_TABLE_CATEGORY_MAP[source],
+  ]),
+);
 
 /**
  * A real twin, not a null object: mutations track in-progress rewrites and
@@ -28,9 +41,19 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
   #nextId = 1;
   /** Eventing's own check of a category, over a store this twin does not have. */
   readonly #eventLogRetention = EventLogRetention.create({
-    client: { command: async () => {} },
+    client: {
+      command: async () => {},
+      query: async ({ params }) => ({
+        rows: this.idIndexTenants.has(String(params?.table)) ? [{ name: params?.table }] : [],
+      }),
+    },
     classification: EVENT_LOG_RETENTION_CLASSIFICATION,
   });
+
+  /** The id indexes this twin's targets hold, with the tenants that have rows; tests set it. */
+  idIndexTenants: ReadonlyMap<string, readonly string[]> = new Map();
+  /** The retention each id index row was raised to, keyed `index/tenant/category`. */
+  readonly idIndexRetention = new Map<string, number>();
 
   /** Keep-forever rewrites by target (`""` is the shared one), newest first; done at once. */
   readonly #keepForever = new Map<string, KeepForeverRewrite[]>();
@@ -47,8 +70,11 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     const categoryTables = Object.entries(RETENTION_TABLE_CATEGORY_MAP)
       .filter(([, category]) => category === input.category)
       .map(([table]) => table);
+    const categoryIndexes = [...ID_INDEX_CATEGORIES]
+      .filter(([, category]) => category === input.category)
+      .map(([index]) => index);
     const eventingTables: readonly string[] = this.#eventLogRetention.tables;
-    const tables = [...new Set([...categoryTables, ...eventingTables])];
+    const tables = [...new Set([...categoryTables, ...categoryIndexes, ...eventingTables])];
 
     // Another category's eventing rewrite touches disjoint rows, so only this category's blocks.
     const active = (this.#mutations.get(input.projectId) ?? []).filter(
@@ -58,15 +84,28 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
         (!eventingTables.includes(mutation.table) || mutation.category === input.category),
     );
     if (active.length > 0) throw new RetroactiveMutationInProgressError(active);
-    await this.#eventLogRetention.retainCategory({
+    const eventingRewritten = await this.#eventLogRetention.retainCategory({
       tenantId: input.projectId,
       category: input.category,
       retentionDays: input.newRetentionDays,
     });
+    const heldIndexes = [
+      ...categoryIndexes.filter((index) => this.idIndexTenants.has(index)),
+      ...eventingRewritten.filter((table) => table === this.#eventLogRetention.idIndexTable),
+    ];
+    for (const index of heldIndexes) {
+      this.#raise({
+        index,
+        tenantId: input.projectId,
+        category: input.category,
+        retentionDays: input.newRetentionDays,
+      });
+    }
 
+    const rewritten = [...new Set([...categoryTables, ...heldIndexes, ...eventingRewritten])];
     const started = this.#mutations.get(input.projectId) ?? [];
     started.push(
-      ...tables.map((table) => ({
+      ...rewritten.map((table) => ({
         mutationId: `mutation_${this.#nextId++}`,
         table,
         isDone: false,
@@ -77,7 +116,7 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
     );
     this.#mutations.set(input.projectId, started);
 
-    return { tables };
+    return { tables: rewritten };
   }
 
   /** The unfinished mutations of one project, newest first. */
@@ -114,5 +153,64 @@ export class MemoryRetroactiveRetentionRepository implements RetroactiveRetentio
       latestFailReason: "",
     };
     this.#keepForever.set(key, [rewrite, ...(this.#keepForever.get(key) ?? [])]);
+  }
+
+  async findHeldIdIndexes(
+    input: ClickHouseTarget & { indexes: readonly string[] },
+  ): Promise<string[]> {
+    return this.#governedIdIndexes(input.indexes).filter((index) => this.idIndexTenants.has(index));
+  }
+
+  async findIdIndexTenantIds(
+    input: ClickHouseTarget & { indexes: readonly string[] },
+  ): Promise<string[]> {
+    const held = await this.findHeldIdIndexes(input);
+    return [...new Set(held.flatMap((index) => this.idIndexTenants.get(index) ?? []))].toSorted(
+      (left, right) => left.localeCompare(right),
+    );
+  }
+
+  async raiseIdIndexRetention(
+    input: ClickHouseTarget & {
+      indexes: readonly string[];
+      retentionByTenant: ReadonlyMap<string, ResolvedRetention>;
+    },
+  ): Promise<string[]> {
+    const held = await this.findHeldIdIndexes(input);
+    for (const index of held) {
+      const categories =
+        index === this.#eventLogRetention.idIndexTable
+          ? retentionCategories
+          : [ID_INDEX_CATEGORIES.get(index)].filter((category) => category !== undefined);
+      for (const [tenantId, retention] of input.retentionByTenant) {
+        for (const category of categories) {
+          this.#raise({ index, tenantId, category, retentionDays: retention[category] });
+        }
+      }
+    }
+    return held;
+  }
+
+  /** Raise-only, with a source's `0` (kept forever) written as the highest value. */
+  #raise({
+    index,
+    tenantId,
+    category,
+    retentionDays,
+  }: {
+    index: string;
+    tenantId: string;
+    category: RetentionCategory;
+    retentionDays: number;
+  }): void {
+    const key = `${index}/${tenantId}/${category}`;
+    const days = retentionDays === 0 ? 65_535 : retentionDays;
+    this.idIndexRetention.set(key, Math.max(this.idIndexRetention.get(key) ?? 0, days));
+  }
+
+  #governedIdIndexes(indexes: readonly string[]): string[] {
+    return [...new Set(indexes)].filter(
+      (index) => index === this.#eventLogRetention.idIndexTable || ID_INDEX_CATEGORIES.has(index),
+    );
   }
 }

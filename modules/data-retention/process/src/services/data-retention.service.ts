@@ -1,10 +1,12 @@
 import {
+  idIndexRetentionRaiseInputSchema,
   ScopeTargetNotFoundError,
   platformDefaultRetentionDaysSchema,
   resolveRetention,
   resolveScopeChain,
   retentionDaysInputSchema,
   retroactiveRetentionUpdateInputSchema,
+  type IdIndexRetentionRaiseInput,
   type KillRetroactiveMutationInput,
   type ResolvedRetention,
   type RetentionCategory,
@@ -249,6 +251,37 @@ export class DataRetentionService {
 
   async killRetroactiveMutation(input: KillRetroactiveMutationInput): Promise<void> {
     await this.options.retroactive.killMutation(input);
+  }
+
+  /**
+   * Raises one target's id indexes to each tenant's resolved retention, never lowering a row; a
+   * tenant whose project is gone keeps what it has. Answers the tables raised: none while the
+   * target holds no index yet.
+   */
+  async raiseIdIndexRetention(input: IdIndexRetentionRaiseInput): Promise<{ tables: string[] }> {
+    const { organizationId, indexes } = idIndexRetentionRaiseInputSchema.parse(input);
+    const target = organizationId === undefined ? {} : { organizationId };
+    const held = await this.options.retroactive.findHeldIdIndexes({ ...target, indexes });
+    if (held.length === 0) return { tables: [] };
+
+    const retentionByTenant = new Map<string, ResolvedRetention>();
+    const tenantIds = await this.options.retroactive.findIdIndexTenantIds({
+      ...target,
+      indexes: held,
+    });
+    for (const tenantId of tenantIds) {
+      try {
+        retentionByTenant.set(tenantId, await this.getResolvedForProject({ projectId: tenantId }));
+      } catch (error) {
+        if (!(error instanceof ProjectNotFoundError)) throw error;
+      }
+    }
+    const tables = await this.options.retroactive.raiseIdIndexRetention({
+      ...target,
+      indexes: held,
+      retentionByTenant,
+    });
+    return { tables };
   }
 
   getTotalStorageBytes(input: { tenantId: string }): Promise<number> {

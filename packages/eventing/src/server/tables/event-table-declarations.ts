@@ -6,11 +6,12 @@
 
 /**
  * Eventing's tables with their category (ET-2, Alex 2026-10-08): a module that meters, sizes or
- * retains storage builds its own map from this list and never names an event table itself.
- * `event-log` rows carry a per-row retention; `process-manager` rows are swept by eventing.
+ * retains storage builds its own map from this list, never naming an event table. `event-log`
+ * rows, its id index's too, carry a per-row retention; eventing sweeps `process-manager` rows.
  */
 export const EVENT_TABLES = [
   { table: "event_log", store: "clickhouse", category: "event-log" },
+  { table: "event_log_id_index", store: "clickhouse", category: "event-log" },
   { table: "ProcessManagerInstance", store: "postgres", category: "process-manager" },
   { table: "ProcessManagerInbox", store: "postgres", category: "process-manager" },
   { table: "ProcessManagerOutbox", store: "postgres", category: "process-manager" },

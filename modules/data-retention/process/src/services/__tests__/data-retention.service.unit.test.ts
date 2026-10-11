@@ -423,3 +423,61 @@ describe("given an aggregate project", () => {
     });
   });
 });
+
+describe("given a ClickHouse target whose id indexes were filled", () => {
+  async function serviceOverIndexes() {
+    const policies = MemoryDataRetentionRepository.create();
+    await policies.upsertForScope({
+      organizationId: ORGANIZATION,
+      scope: { scopeType: "ORGANIZATION", scopeId: ORGANIZATION },
+      category: "traces",
+      retentionDays: 63,
+    });
+    const retroactive = MemoryRetroactiveRetentionRepository.create();
+    retroactive.idIndexTenants = new Map([
+      ["stored_spans_id_index", [PROJECT, "project-gone"]],
+      ["event_log_id_index", [PROJECT]],
+    ]);
+    return { service: createService({ policies, retroactive }), retroactive };
+  }
+
+  describe("when its indexes are raised to each tenant's current retention", () => {
+    it("raises the held indexes to the resolved retention and leaves a gone project as it is", async () => {
+      const { service, retroactive } = await serviceOverIndexes();
+
+      const result = await service.raiseIdIndexRetention({
+        organizationId: "org-private",
+        indexes: [
+          "stored_spans_id_index",
+          "event_log_id_index",
+          "trace_summaries_id_index",
+          "gateway_spend_id_index",
+        ],
+      });
+
+      expect(result.tables).toEqual(["stored_spans_id_index", "event_log_id_index"]);
+      expect(retroactive.idIndexRetention.get(`stored_spans_id_index/${PROJECT}/traces`)).toBe(63);
+      expect(retroactive.idIndexRetention.get(`event_log_id_index/${PROJECT}/scenarios`)).toBe(
+        DEFAULT_DAYS,
+      );
+      expect(
+        [...retroactive.idIndexRetention.keys()].some((key) => key.includes("project-gone")),
+      ).toBe(false);
+    });
+
+    it("raises nothing on a target that holds none of the named indexes yet", async () => {
+      const { service, retroactive } = await serviceOverIndexes();
+
+      await expect(
+        service.raiseIdIndexRetention({ indexes: ["experiment_runs_id_index"] }),
+      ).resolves.toEqual({ tables: [] });
+      expect(retroactive.idIndexRetention.size).toBe(0);
+    });
+
+    it("refuses an empty list of indexes", async () => {
+      const { service } = await serviceOverIndexes();
+
+      await expect(service.raiseIdIndexRetention({ indexes: [] })).rejects.toThrow(/indexes/);
+    });
+  });
+});

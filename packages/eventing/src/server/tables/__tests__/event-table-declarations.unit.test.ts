@@ -101,9 +101,10 @@ describe("EVENT_TABLE_DECLARATIONS", () => {
 describe("EVENT_TABLES", () => {
   describe("when the list is read", () => {
     /** @scenario "The event-table list names every table eventing owns, by store and category" */
-    it("names the event log and the four process-manager tables by store and category", () => {
+    it("names the event log, its id index and the four process-manager tables by store and category", () => {
       expect(EVENT_TABLES).toEqual([
         { table: "event_log", store: "clickhouse", category: "event-log" },
+        { table: "event_log_id_index", store: "clickhouse", category: "event-log" },
         { table: "ProcessManagerInstance", store: "postgres", category: "process-manager" },
         { table: "ProcessManagerInbox", store: "postgres", category: "process-manager" },
         { table: "ProcessManagerOutbox", store: "postgres", category: "process-manager" },

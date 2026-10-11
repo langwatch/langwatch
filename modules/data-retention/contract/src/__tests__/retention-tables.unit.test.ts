@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  RETENTION_ID_INDEX_TABLES,
   RETENTION_TABLE_CATEGORY_MAP,
   SECURITY_RETENTION_EXEMPT_TABLES,
 } from "../retention-tables.ts";
@@ -44,5 +45,15 @@ describe("SECURITY_RETENTION_EXEMPT_TABLES", () => {
       exempt.has(table),
     );
     expect(overlapping).toEqual([]);
+  });
+});
+
+describe("RETENTION_ID_INDEX_TABLES", () => {
+  it("names each index after its retained source and keeps it out of the TTL-managed map", () => {
+    for (const [index, source] of Object.entries(RETENTION_ID_INDEX_TABLES)) {
+      expect(index).toBe(`${source}_id_index`);
+      expect(Object.keys(RETENTION_TABLE_CATEGORY_MAP)).toContain(source);
+      expect(Object.keys(RETENTION_TABLE_CATEGORY_MAP)).not.toContain(index);
+    }
   });
 });

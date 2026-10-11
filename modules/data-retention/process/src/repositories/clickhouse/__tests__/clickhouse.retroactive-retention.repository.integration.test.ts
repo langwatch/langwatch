@@ -176,3 +176,137 @@ describe.skipIf(!clickHouseUrl)(
     });
   },
 );
+
+/** @see specs/clickhouse/id-index-reads.feature */
+describe.skipIf(!clickHouseUrl)("Id index retention on live ClickHouse", () => {
+  const indexDatabase = `${database}_id_index`;
+  let indexAdmin: ClickHouseClient;
+  let indexScoped: ClickHouseClient;
+  let repository: ClickHouseRetroactiveRetentionRepository;
+
+  async function indexRetention(table: string, tenant: string): Promise<number[]> {
+    const result = await indexScoped.query({
+      query: `SELECT toUInt32(max(_retention_days)) AS days FROM ${table} WHERE TenantId = {tenant:String} GROUP BY TenantId`,
+      query_params: { tenant },
+      format: "JSONEachRow",
+    });
+    return (await result.json<{ days: number }>()).map(({ days }) => days);
+  }
+
+  async function seedIndex(table: string, rows: Record<string, unknown>[]): Promise<void> {
+    await indexScoped.insert({ table, values: rows, format: "JSONEachRow" });
+  }
+
+  beforeAll(async () => {
+    indexAdmin = createClient({ url: clickHouseUrl });
+    await indexAdmin.command({ query: `CREATE DATABASE ${indexDatabase}` });
+    indexScoped = createClient({
+      url: clickHouseUrl,
+      database: indexDatabase,
+      clickhouse_settings: { mutations_sync: "2" },
+    });
+    await indexScoped.command({
+      query:
+        "CREATE TABLE event_log (TenantId String, AggregateType LowCardinality(String), " +
+        "EventType LowCardinality(String), _retention_days UInt16) " +
+        "ENGINE = MergeTree ORDER BY (TenantId, AggregateType)",
+    });
+    for (const table of Object.keys(RETENTION_TABLE_CATEGORY_MAP)) {
+      if (table === "event_log") continue;
+      await indexScoped.command({
+        query: `CREATE TABLE ${table} (TenantId String, _retention_days UInt16) ENGINE = MergeTree ORDER BY TenantId`,
+      });
+    }
+    await indexScoped.command({
+      query:
+        "CREATE TABLE stored_spans_id_index (TenantId String, TraceId String, " +
+        "_retention_days SimpleAggregateFunction(max, UInt16)) " +
+        "ENGINE = AggregatingMergeTree ORDER BY (TenantId, TraceId)",
+    });
+    await indexScoped.command({
+      query:
+        "CREATE TABLE event_log_id_index (TenantId String, AggregateType LowCardinality(String), " +
+        "AggregateId String, _retention_days SimpleAggregateFunction(max, UInt16)) " +
+        "ENGINE = AggregatingMergeTree ORDER BY (TenantId, AggregateType, AggregateId)",
+    });
+    repository = ClickHouseRetroactiveRetentionRepository.create({
+      clickhouse: queryClient(indexScoped),
+    });
+  });
+
+  afterAll(async () => {
+    await indexAdmin?.command({ query: `DROP DATABASE IF EXISTS ${indexDatabase}` });
+    await Promise.all([indexAdmin?.close(), indexScoped?.close()]);
+  });
+
+  /** @scenario "a lengthened retention reaches the index" */
+  it("raises a project's trace index rows to its lengthened trace retention", async () => {
+    const project = `project-${generate("test").toString()}`;
+    const bystander = `project-${generate("test").toString()}`;
+    await seedIndex("stored_spans_id_index", [
+      { TenantId: project, TraceId: "trace-1", _retention_days: 30 },
+      { TenantId: bystander, TraceId: "trace-2", _retention_days: 30 },
+    ]);
+
+    const result = await repository.triggerUpdate({
+      projectId: project,
+      category: "traces",
+      newRetentionDays: 365,
+    });
+
+    expect(result.tables).toEqual(
+      expect.arrayContaining(["stored_spans_id_index", "event_log_id_index"]),
+    );
+    expect(await indexRetention("stored_spans_id_index", project)).toEqual([365]);
+    expect(await indexRetention("stored_spans_id_index", bystander)).toEqual([30]);
+  });
+
+  /** @scenario "a shortened retention never shortens the index" */
+  it("keeps an aggregate kept forever, and a longer-lived trace, when retention shortens", async () => {
+    const project = `project-${generate("test").toString()}`;
+    await seedIndex("event_log_id_index", [
+      {
+        TenantId: project,
+        AggregateType: "trace",
+        AggregateId: "trace-1",
+        _retention_days: 65_535,
+      },
+    ]);
+    await seedIndex("stored_spans_id_index", [
+      { TenantId: project, TraceId: "trace-1", _retention_days: 365 },
+    ]);
+
+    await repository.triggerUpdate({
+      projectId: project,
+      category: "traces",
+      newRetentionDays: 30,
+    });
+
+    expect(await indexRetention("event_log_id_index", project)).toEqual([65_535]);
+    expect(await indexRetention("stored_spans_id_index", project)).toEqual([365]);
+  });
+
+  /** @scenario "a retention change during the backfill does not leave stale index rows" */
+  it("raises index rows a fill wrote with the old retention to the project's current one", async () => {
+    const project = `project-${generate("test").toString()}`;
+    await seedIndex("stored_spans_id_index", [
+      { TenantId: project, TraceId: "trace-1", _retention_days: 30 },
+    ]);
+    await seedIndex("event_log_id_index", [
+      { TenantId: project, AggregateType: "trace", AggregateId: "trace-1", _retention_days: 30 },
+    ]);
+    const indexes = await repository.findHeldIdIndexes({
+      indexes: ["stored_spans_id_index", "event_log_id_index", "suite_runs_id_index"],
+    });
+    expect(indexes).toEqual(["stored_spans_id_index", "event_log_id_index"]);
+    expect(await repository.findIdIndexTenantIds({ indexes })).toContain(project);
+
+    await repository.raiseIdIndexRetention({
+      indexes,
+      retentionByTenant: new Map([[project, { traces: 365, scenarios: 49, experiments: 49 }]]),
+    });
+
+    expect(await indexRetention("stored_spans_id_index", project)).toEqual([365]);
+    expect(await indexRetention("event_log_id_index", project)).toEqual([365]);
+  });
+});
