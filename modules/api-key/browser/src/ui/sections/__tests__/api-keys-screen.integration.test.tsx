@@ -479,13 +479,10 @@ describe("given a reader who is not an organization admin", () => {
 
 describe("given a key is being created", () => {
   describe("when the form would send a key bound to nothing", () => {
-    // The reachable shape of this guard, and the reason it exists: the drawer's
-    // own Create button stays live while an ambient project exists, so a reader
-    // who empties the scope picker gets as far as submitting a key with no
-    // bindings at all. The mint would refuse it; the screen refuses it first,
-    // with a sentence naming what to do.
+    // A reader who empties the scope picker and submits gets a sentence naming
+    // what to do, and the key is never minted.
     /** @scenario A key needs at least one scope */
-    it("refuses with a sentence the reader can act on rather than the generic line", async () => {
+    it("refuses with a sentence the reader can act on and never mints the key", async () => {
       const user = userEvent.setup();
       const host = new FakeApiKeyHost();
       renderWithApiKeyHost(<ApiKeysScreen />, host);
@@ -501,14 +498,11 @@ describe("given a key is being created", () => {
       await user.click(screen.getByTestId("clear-scopes"));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
-      await waitFor(() => expect(host.failures).toHaveLength(1));
-      expect(host.failures[0]).toEqual({
-        error: void 0,
-        fallbackTitle: "No permissions to grant",
-        description:
-          "You have no role bindings in this organization, so there is nothing to grant to a key.",
-      });
-      // Nothing went out: a form the screen refused never reaches the mint.
+      // The form now names the missing scope itself, so the screen's own guard
+      // is behind it and no failure toast is raised.
+      expect(await screen.findByText("Choose where this key can be used.")).toBeInTheDocument();
+      expect(host.failures).toHaveLength(0);
+      // Nothing went out: a form that refuses never reaches the mint.
       expect(mutations.create).not.toHaveBeenCalled();
     });
   });
@@ -525,20 +519,22 @@ describe("given a key is being created", () => {
       await user.click(await screen.findByRole("option", { name: "No expiration" }));
       await user.click(screen.getByRole("button", { name: "Create secret key" }));
 
-      expect(await screen.findByText("Token Created")).toBeInTheDocument();
+      expect(await screen.findByText("Token created")).toBeInTheDocument();
+      // The dialog names the key just created, from the form the screen kept.
+      expect(within(screen.getByTestId("token-created-key")).getByText("CI")).toBeInTheDocument();
       expect(
         screen.getByText("Copy this token now. You won't be able to see it again."),
       ).toBeInTheDocument();
 
       await user.click(screen.getAllByRole("button", { name: /close/i })[0]!);
-      await waitFor(() => expect(screen.queryByText("Token Created")).toBeNull());
+      await waitFor(() => expect(screen.queryByText("Token created")).toBeNull());
       // Reopening the create flow shows a blank form, never the token that was
       // just minted: the value lives in state the close cleared.
       await user.click(screen.getByRole("button", { name: /Create new secret key/ }));
       expect(
         await screen.findByRole("heading", { name: "Create new secret key" }),
       ).toBeInTheDocument();
-      expect(screen.queryByText("Token Created")).toBeNull();
+      expect(screen.queryByText("Token created")).toBeNull();
     });
   });
 });

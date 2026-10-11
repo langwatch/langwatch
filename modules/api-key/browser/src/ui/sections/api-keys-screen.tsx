@@ -539,6 +539,7 @@ export default function ApiKeysScreen() {
 
         <TokenCreatedDialog
           newToken={newToken}
+          keyName={newKeyInput?.name}
           projectId={scope.projectId}
           endpoint={endpoint}
           orgProjects={(orgProjects.data ?? []).filter((project) =>
