@@ -303,6 +303,25 @@ func TestConversationsShareOneIDAcrossTheirTurns(t *testing.T) {
 }
 
 // @scenario "haven db seed gives a test stack a second, a Free and an Enterprise org"
+// A free Cloud org sells two seats and no Lite ones, so a tier org on it refuses its members.
+func TestTierOrgsSeedOnAPlanThatAdmitsTheirMembers(t *testing.T) {
+	for shape, want := range map[string]int{"saas": 6, "sh-licensed": 6, "sh-free": 0} {
+		plan := mustPlan(t, "--size", "small", "--shape", shape, "--admin", "admin@example.test")
+		licensed := map[string]int{}
+		for step := range plan.Steps() {
+			if a := step.Action; a != nil && a.Kind == KindLicenseIssue {
+				licensed[a.Org]++
+			}
+		}
+		if len(licensed) != want {
+			t.Errorf("--shape %s licenses %d tier orgs, want %d", shape, len(licensed), want)
+		}
+		if licensed["$org:private-1"] != 0 {
+			t.Errorf("--shape %s licenses the private org, which the plan never creates", shape)
+		}
+	}
+}
+
 func TestTestStackOrgsCarryTheirPlans(t *testing.T) {
 	plan := mustPlan(t, "--size", "tiny", "--admin", "admin@example.test",
 		"--org", "name=sso-test-org,plan=licence,owner=admin@acme1.test",
