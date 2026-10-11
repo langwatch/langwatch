@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Button, HStack, Input, Table, VStack } from "@langwatch/design-system/primitives";
@@ -9,7 +10,6 @@ import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { formatDateTime } from "../../../admin/ui/elements/admin-cells.tsx";
 
 /**
@@ -115,7 +115,7 @@ export function OperatorsContent() {
         }}
         title={`Revoke ${revoking?.email ?? "this operator"}`}
         description="They lose every operator page and action at once. An installation always keeps at least one operator."
-        isLoading={revoke.isPending}
+        loading={revoke.isPending}
       />
     </VStack>
   );

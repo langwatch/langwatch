@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Box,
@@ -14,7 +15,6 @@ import { useRef, useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
 const BLOCKED_VIEWPORT_HEIGHT = 360;
 const BLOCKED_ROW_HEIGHT = 49;
@@ -264,7 +264,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
         }}
         title="Unblock All"
         description={`Unblock all blocked groups in "${unblockAllTarget}". They will retry immediately.`}
-        isLoading={unblockAllMutation.isPending}
+        loading={unblockAllMutation.isPending}
       />
       <ConfirmDialog
         open={!!drainTarget}
@@ -274,7 +274,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
         }}
         title="Drain Group"
         description={`Permanently remove all jobs from "${drainTarget?.groupId}". Cannot be undone.`}
-        isLoading={drainGroupMutation.isPending}
+        loading={drainGroupMutation.isPending}
       />
       <ConfirmDialog
         open={!!moveToDlqTarget}
@@ -284,7 +284,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
         }}
         title="Move All to DLQ"
         description={`Move all blocked groups in "${moveToDlqTarget}" to DLQ. They can be replayed later.`}
-        isLoading={moveAllToDlqMutation.isPending}
+        loading={moveAllToDlqMutation.isPending}
       />
       <ConfirmDialog
         open={!!canaryQueueTarget}
@@ -298,7 +298,7 @@ export function BlockedCard({ queueNames: _queueNames }: { queueNames: string[] 
         }}
         title="Canary Unblock"
         description={`Unblock ${canaryCount} random groups in "${canaryQueueTarget}" as a canary test.`}
-        isLoading={canaryUnblockMutation.isPending}
+        loading={canaryUnblockMutation.isPending}
       />
     </>
   );

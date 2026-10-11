@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
@@ -16,7 +17,6 @@ import { useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
 import { type PendingDlqAction, useDlqActions } from "../../behavior/use-dlq-actions.ts";
 
@@ -495,7 +495,7 @@ function DlqConfirms({
         onConfirm={actions.confirmPending}
         title="Redrive from the dead-letter queue"
         description={`Return ${target} in "${pending?.queueDisplayName}" to the main queue for reprocessing.`}
-        isLoading={actions.redrive.isPending}
+        loading={actions.redrive.isPending}
       />
       <ConfirmDialog
         open={pending?.kind === "discard"}
@@ -503,7 +503,7 @@ function DlqConfirms({
         onConfirm={actions.confirmPending}
         title="Discard from the dead-letter queue"
         description={`Mark ${target} in "${pending?.queueDisplayName}" as never to be run. The act is recorded in the audit trail with the last error; the jobs will not run.`}
-        isLoading={actions.discard.isPending}
+        loading={actions.discard.isPending}
       />
       <ConfirmDialog
         open={!!canaryTarget}
@@ -518,7 +518,7 @@ function DlqConfirms({
         }}
         title="Canary Redrive"
         description={`Redrive ${canaryCount} random dead-letter groups from "${canaryTarget}" as a canary.`}
-        isLoading={actions.canaryRedrive.isPending}
+        loading={actions.canaryRedrive.isPending}
       />
     </>
   );

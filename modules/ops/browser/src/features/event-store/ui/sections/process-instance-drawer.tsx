@@ -1,4 +1,5 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, CodeBlock } from "@langwatch/design-system/primitives";
@@ -9,7 +10,6 @@ import { useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { useProcessInstanceActions } from "../../behavior/use-process-instance-actions.ts";
 import { ProcessInstanceContent } from "./process-instance-content.tsx";
 interface Props {
@@ -81,7 +81,7 @@ function InstanceActionConfirms({
         onConfirm={() => actions.wakeMutation.mutate(target)}
         title="Wake Process Now"
         description={`Schedule "${label}" to wake immediately. The process decides for itself what a wake at this moment means; the worst case is a wake that does nothing.`}
-        isLoading={actions.wakeMutation.isPending}
+        loading={actions.wakeMutation.isPending}
       />
       <ConfirmDialog
         open={actions.confirmAction === "redrive"}
@@ -89,7 +89,7 @@ function InstanceActionConfirms({
         onConfirm={() => actions.redriveInstanceMutation.mutate(target)}
         title="Redrive Dead Messages"
         description={`Return every dead outbox message of "${label}" to pending, due now, with a fresh attempt budget. Deliveries may reach customers; duplicates are absorbed by each message's key.`}
-        isLoading={actions.redriveInstanceMutation.isPending}
+        loading={actions.redriveInstanceMutation.isPending}
       />
       {/* Discard asks, because nothing un-discards: no redrive path selects a
           discarded row, so a mis-click is permanent. */}
@@ -106,7 +106,7 @@ function InstanceActionConfirms({
         }}
         title="Discard Dead Message"
         description={`Mark "${actions.discardTarget?.intentType}" on "${label}" as never to be sent. The row is kept as the audit record, and it cannot be redriven afterwards.`}
-        isLoading={actions.discardMessageMutation.isPending}
+        loading={actions.discardMessageMutation.isPending}
       />
     </>
   );

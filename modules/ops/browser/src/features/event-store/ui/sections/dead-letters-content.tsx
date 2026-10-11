@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
 import { Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
@@ -7,7 +8,6 @@ import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { useDeadLetterActions } from "../../behavior/use-dead-letter-actions.ts";
 import { DeadLetterSummary } from "../blocks/dead-letter-summary.tsx";
 import { DeadLettersTable } from "../blocks/dead-letter-table.tsx";
@@ -165,7 +165,7 @@ function BulkConfirms({
         onConfirm={actions.confirmDiscard}
         title="Discard dead letter"
         description={`Mark "${actions.discardTarget?.intentType}" on ${actions.discardTarget?.processName} as never to be sent. The row is kept as the audit record, and it cannot be redriven afterwards.`}
-        isLoading={actions.discardingId !== null}
+        loading={actions.discardingId !== null}
       />
       <ConfirmDialog
         open={actions.confirmBulk === "redrive"}
@@ -173,7 +173,7 @@ function BulkConfirms({
         onConfirm={() => actions.redriveAll.mutate({ processName })}
         title="Redrive dead letters"
         description={`Return all ${shownCount} dead ${plural} for ${shownScope} to pending with a fresh attempt budget. Their deliveries will run again.`}
-        isLoading={actions.redriveAll.isPending}
+        loading={actions.redriveAll.isPending}
       />
       {processName ? (
         <ConfirmDialog
@@ -182,7 +182,7 @@ function BulkConfirms({
           onConfirm={() => actions.discardAll.mutate({ processName })}
           title="Discard dead letters"
           description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record, the work will not run, and none of it can be redriven afterwards.`}
-          isLoading={actions.discardAll.isPending}
+          loading={actions.discardAll.isPending}
         />
       ) : (
         <DeleteConfirmationDialog

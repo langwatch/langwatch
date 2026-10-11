@@ -1,3 +1,4 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -29,7 +30,6 @@ import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedb
 import { readOverlayParts, useOpsOverlay } from "../../../../behavior/ops-overlays.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { VirtualizedTableRows } from "../../../../ui/elements/ops-virtualized-table-rows.tsx";
 import {
   classifyGroup,
@@ -783,7 +783,7 @@ function GroupConfirmDialogs({
         }}
         title="Drain Group"
         description={`Permanently remove all jobs from "${drainTarget?.groupId}". Cannot be undone.`}
-        isLoading={drainGroupMutation.isPending}
+        loading={drainGroupMutation.isPending}
       />
 
       <ConfirmDialog
@@ -794,7 +794,7 @@ function GroupConfirmDialogs({
         }}
         title="Move Group to Dead-Letter Queue"
         description={`Move all jobs from "${dlqTarget?.groupId}" to the dead-letter queue. They stop processing until replayed from the Dead Letter Queue card.`}
-        isLoading={moveToDlqMutation.isPending}
+        loading={moveToDlqMutation.isPending}
       />
 
       <ConfirmDialog
@@ -810,7 +810,7 @@ function GroupConfirmDialogs({
         }}
         title="Drain all tenant groups"
         description={`Permanently remove ALL pending groups for tenant "${drainTenantTarget}" across every pipeline. Cannot be undone. The event log in ClickHouse is preserved; you can replay later if needed.`}
-        isLoading={drainTenantMutation.isPending}
+        loading={drainTenantMutation.isPending}
       />
     </>
   );

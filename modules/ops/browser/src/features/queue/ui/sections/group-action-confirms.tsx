@@ -1,6 +1,6 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Button } from "@langwatch/design-system/primitives";
 
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import type { GroupTarget, useGroupActions } from "../../behavior/use-group-actions.ts";
 
 type GroupActions = ReturnType<typeof useGroupActions>;
@@ -20,7 +20,7 @@ export function GroupActionConfirms({
         onConfirm={() => actions.drainMutation.mutate(target)}
         title="Drain Group"
         description={`Permanently remove all jobs from "${target.groupId}". Cannot be undone.`}
-        isLoading={actions.drainMutation.isPending}
+        loading={actions.drainMutation.isPending}
       />
       <ConfirmDialog
         open={actions.confirmAction === "dlq"}
@@ -28,7 +28,7 @@ export function GroupActionConfirms({
         onConfirm={() => actions.moveToDlqMutation.mutate(target)}
         title="Move Group to Dead-Letter Queue"
         description={`Move all jobs from "${target.groupId}" to the dead-letter queue. They stop processing until replayed from the Dead Letter Queue card.`}
-        isLoading={actions.moveToDlqMutation.isPending}
+        loading={actions.moveToDlqMutation.isPending}
       />
     </>
   );
