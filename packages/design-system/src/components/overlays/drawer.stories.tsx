@@ -4,7 +4,7 @@ import { Copy, Database, Expand, Plus, Server, Trash2 } from "lucide-react";
 import { Badge, Box, IconButton, Input, Stack, Text } from "../../primitives.ts";
 import { SearchInput } from "../forms/search-input.tsx";
 import { NoDataInfoBlock } from "../states/no-data-info-block.tsx";
-import { Drawer } from "./drawer.tsx";
+import { Drawer, DrawerGlassProvider } from "./drawer.tsx";
 
 const noop = () => undefined;
 
@@ -12,7 +12,7 @@ const meta = {
   title: "Overlays/Drawer",
   parameters: {
     usage: {
-      use: "Details, editing a record, pickers and multi-step forms beside the page. Render `<Drawer title onClose footer={{ primaryAction }}>`: the shape draws the header, body and footer. Drawers are routed singletons; pass `onBack` when the stack can go back. The footer never has Cancel: the X and Escape close.",
+      use: "Details, editing a record, pickers and multi-step forms beside the page. Render `<Drawer title onClose footer={{ primaryAction }}>`: the shape draws the header, body and footer. Drawers are routed singletons; pass `onBack` when the stack can go back. A footer draws Cancel only when it is given one; the X and Escape close either way.",
       avoid:
         "A quick yes or no: use Dialog. Assembling `Drawer.Root`/`Drawer.Content` parts (deprecated; they go in W-final). A drawer inside a drawer: navigate instead. A primary disabled before input: say why with `disabledReason`, or validate on submit.",
     },
@@ -164,3 +164,62 @@ export const Narrow: Story = {
 };
 
 export const Closed: Story = { args: { open: false } };
+
+const FIELDS = Array.from({ length: 24 }, (_, index) => `Field ${index + 1}`);
+
+/** A long form with a toolbar and a footer, so content passes beneath both bands as it scrolls. */
+const longForm = {
+  title: "Production key",
+  subtitle: "Rotates every ninety days",
+  badges: <Badge>Active</Badge>,
+  toolbar: <SearchInput aria-label="Filter fields" placeholder="Filter fields" />,
+  footer: {
+    summary: <Text textStyle="sm">24 fields</Text>,
+    cancel: { label: "Cancel", onClick: noop },
+    primaryAction: { label: "Save", onClick: noop },
+  },
+  children: (
+    <Stack gap={3}>
+      {FIELDS.map((field) => (
+        <Input key={field} aria-label={field} defaultValue={`${field} value`} />
+      ))}
+    </Stack>
+  ),
+} satisfies Story["args"];
+
+const withGlass = (glass: boolean): NonNullable<Story["decorators"]> => [
+  (Story) => (
+    <DrawerGlassProvider value={glass}>
+      <Story />
+    </DrawerGlassProvider>
+  ),
+];
+
+/**
+ * Review pair for the glass header and footer: the same long form, solid (today) and glass
+ * (candidate), light and dark. Scroll the body to see content pass beneath the bands. The look
+ * ships off (`DRAWER_GLASS_DEFAULT`) until these are approved.
+ */
+export const SolidLight: Story = {
+  args: longForm,
+  decorators: withGlass(false),
+  globals: { colorMode: "light" },
+};
+
+export const GlassLight: Story = {
+  args: longForm,
+  decorators: withGlass(true),
+  globals: { colorMode: "light" },
+};
+
+export const SolidDark: Story = {
+  args: longForm,
+  decorators: withGlass(false),
+  globals: { colorMode: "dark" },
+};
+
+export const GlassDark: Story = {
+  args: longForm,
+  decorators: withGlass(true),
+  globals: { colorMode: "dark" },
+};

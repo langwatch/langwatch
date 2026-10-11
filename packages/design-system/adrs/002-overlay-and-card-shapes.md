@@ -36,9 +36,11 @@ drawers and dialogs on 2026-09-29 therefore did not keep them the same.
    draws Cancel only when its descriptor carries `cancel`; existing Cancels stay. Dialogs keep
    Cancel. Dialogs take `placement` "top" (default) or "center"; Card takes `padding="lg"` (20px). `dismissible={false}` drops the X, Cancel, Escape and
    outside click; `role` is separate.
-5. **Drawer ground** (Q3): the ruled ground is `bg.overlay`, but the shape keeps today's solid
-   `bg` until Alex has seen light and dark screenshots. The switch is one constant,
-   `DRAWER_GROUND` in `drawer.tsx`.
+5. **Drawer ground** (Q3, superseded by the late ruling, 2026-10-11): the body keeps today's
+   opaque `bg`; only the header band and footer turn partly translucent (card material, blur,
+   a scroll-dependent edge), over a body that scrolls beneath them. It ships off until Alex has
+   seen light and dark screenshots; the switch is `DRAWER_GLASS_DEFAULT`
+   (`overlays/drawer-chrome.rules.ts`). See [drawers](../../../dev/docs/best_practices/drawers.md).
 6. **Closing is a request.** `onClose` asks; the overlay stays until `open` turns false. `busy`
    holds the X, back, Escape, outside click and every action. The design system stays
    router-free: a routed drawer passes `closeDrawer` and `goBack`.

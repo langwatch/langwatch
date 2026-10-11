@@ -133,3 +133,25 @@ Feature: Drawer and dialog shapes
     Given an open modal dialog and a drawer opened from inside it
     Then the reader can type and tab inside the drawer
     And closing the drawer returns focus to the dialog's opener control and the dialog's trap holds again
+
+  @unit
+  Scenario: The translucent header and footer ship off until the screenshots are seen
+    Given a drawer rendered with no glass switch
+    Then its header, body and footer are flex siblings with the solid look
+    And the same drawer under the glass switch gets the translucent bands
+
+  @integration
+  Scenario: A glass drawer overlays its header band and footer on the one scrolling body
+    Given a drawer under the glass switch with a toolbar, a footer and a long body
+    Then the header band, body and footer keep that order and the body is the scrollport
+    And the body's padding follows the measured band heights
+    And a drawer whose body owns its scrolling keeps its bands as flex siblings
+    And the close control stays above the header band
+
+  @integration
+  Scenario: A glass drawer's header and footer edges follow what scrolls beneath them
+    Given a glass drawer whose body overflows
+    Then the header edge is off at the top and on once the body scrolls
+    And the footer edge is on until the body reaches its end
+    And nothing is on when the content fits
+    And the drawer's observers and listeners are released when it closes

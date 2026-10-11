@@ -579,6 +579,8 @@ export const designSystemConfig = defineConfig({
           // Dark is the user's chosen ink, not a Chakra step.
           card: { value: { _light: "{colors.bg.panel}", _dark: "#0f1116" } },
           overlay: { value: "{colors.bg.panel}" },
+          // The callable Drawer's header and footer, at card strength (drawer-chrome).
+          drawer: { chrome: { value: "{colors.bg.card}" } },
           nested: { value: "{colors.bg.muted}" },
           raised: { value: "{colors.bg.panel}" },
           // Light fields are white on the grey page, as main's were; grey read as disabled.
@@ -657,6 +659,16 @@ export const designSystemConfig = defineConfig({
         border: {
           // Branch-only roles alias the production main palette.
           card: { value: { _light: "{colors.border}", _dark: "#3a3a44" } },
+          // A drawer header or footer edge, and the faint highlight along it (drawer-chrome).
+          drawer: {
+            edge: { value: "{colors.border.card}" },
+            glint: {
+              value: {
+                _light: "color-mix(in srgb, {colors.white} 45%, transparent)",
+                _dark: "color-mix(in srgb, {colors.white} 18%, transparent)",
+              },
+            },
+          },
           nested: { value: "{colors.border.muted}" },
           control: { value: "{colors.border}" },
           strong: { value: "{colors.border.emphasized}" },

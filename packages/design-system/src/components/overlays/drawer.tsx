@@ -14,9 +14,12 @@ import {
 import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
+import { DrawerFooterBand, DrawerHeaderBand } from "../../overlays/drawer-chrome.tsx";
 import { useHasOpenModal } from "../../overlays/modal-stack.ts";
 import { BOUNDED_BODY, OverlayBodyState } from "../../overlays/overlay-body.tsx";
 import { OverlayPortalTargetProvider } from "../../overlays/portal-target.ts";
+import { useDrawerChrome, useDrawerGlass } from "../../overlays/use-drawer-chrome.ts";
+import { drawerGlassBodyInsets } from "../../system/drawer.recipe.ts";
 import { FieldLayoutProvider } from "../forms/field-layout.ts";
 import { StudioIsolatedErrorBoundary } from "../states/studio-error-boundary.tsx";
 import {
@@ -29,6 +32,7 @@ import { CloseButton } from "./close-button.tsx";
 
 export type { ActionRowProps, FrameAction } from "./action-row.tsx";
 export { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
+export { DrawerGlassProvider } from "../../overlays/use-drawer-chrome.ts";
 
 const DrawerOffsetContext = React.createContext<{ marginTop?: number }>({});
 export const DrawerOffsetProvider = DrawerOffsetContext.Provider;
@@ -320,6 +324,150 @@ export interface DrawerProps {
   "data-testid"?: string;
 }
 
+type DrawerFrameProps = Pick<
+  DrawerProps,
+  | "onBack"
+  | "title"
+  | "titleContent"
+  | "eyebrow"
+  | "subtitle"
+  | "badges"
+  | "headerAction"
+  | "headerTools"
+  | "toolbar"
+  | "body"
+  | "bodyScroll"
+  | "loading"
+  | "error"
+  | "children"
+  | "footer"
+  | "busy"
+  | "errorScope"
+  | "entityKey"
+> & { testId?: string };
+
+/**
+ * Header band, body and footer. With the glass switch on and a framed body the band and footer
+ * overlay the body's scrollport and its padding follows their measured heights; content-owned
+ * bodies and the solid look keep the bands as flex siblings.
+ */
+function DrawerFrame({
+  onBack,
+  title,
+  titleContent,
+  eyebrow,
+  subtitle,
+  badges,
+  headerAction,
+  headerTools,
+  toolbar,
+  body = "padded",
+  bodyScroll = "frame",
+  loading = false,
+  error,
+  children,
+  footer,
+  busy = false,
+  errorScope,
+  entityKey,
+  testId,
+}: DrawerFrameProps) {
+  const glass = useDrawerGlass({ framed: bodyScroll === "frame" });
+  const chrome = useDrawerChrome({ enabled: glass, hasFooter: footer != null });
+  const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
+  const resetKeys = [title, entityKey];
+  return (
+    <>
+      <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
+        <DrawerHeaderBand glass={glass} edge={chrome.edges.top} bandRef={chrome.headerRef}>
+          <ChakraDrawer.Header borderBottomWidth={glass ? 0 : void 0}>
+            <HStack align="start" gap={2} width="full" flexWrap="wrap">
+              {onBack && (
+                <IconButton
+                  type="button"
+                  aria-label="Back"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onBack}
+                  disabled={busy}
+                  marginStart={-2}
+                  data-testid={slot("back")}
+                >
+                  <ArrowLeft aria-hidden />
+                </IconButton>
+              )}
+              <VStack align="stretch" gap={1} flex="1 1 10rem" minWidth={0}>
+                {eyebrow && (
+                  <HStack color="fg.muted" gap={2} textStyle="xs">
+                    {eyebrow.icon}
+                    <Text>{eyebrow.label}</Text>
+                  </HStack>
+                )}
+                <ChakraDrawer.Title overflowWrap="anywhere" srOnly={titleContent != null}>
+                  {title}
+                </ChakraDrawer.Title>
+                {titleContent}
+                {subtitle != null && (
+                  <ChakraDrawer.Description>{subtitle}</ChakraDrawer.Description>
+                )}
+                {badges != null && (
+                  <HStack gap={2} flexWrap="wrap" paddingTop={1}>
+                    {badges}
+                  </HStack>
+                )}
+              </VStack>
+              {headerAction && (
+                <FrameActionButton action={headerAction} kind="secondary" busy={busy} size="sm" />
+              )}
+              {headerTools != null && (
+                <HStack gap={1} flexShrink={0} flexWrap="wrap" justify="flex-end">
+                  {headerTools}
+                </HStack>
+              )}
+            </HStack>
+          </ChakraDrawer.Header>
+          {toolbar != null && (
+            <Box
+              paddingX={6}
+              paddingY={3}
+              borderTopWidth={glass ? "1px" : 0}
+              borderBottomWidth={glass ? 0 : "1px"}
+              borderColor="border.card"
+              flexShrink={0}
+            >
+              {toolbar}
+            </Box>
+          )}
+        </DrawerHeaderBand>
+        <ChakraDrawer.Body
+          ref={chrome.bodyRef}
+          padding={body === "flush" ? 0 : void 0}
+          {...(bodyScroll === "content" ? BOUNDED_BODY : {})}
+          {...(glass ? drawerGlassBodyInsets({ flush: body === "flush" }) : {})}
+          data-body={body}
+          data-testid={slot("body")}
+        >
+          <OverlayBodyState loading={loading} error={error}>
+            {children}
+          </OverlayBodyState>
+        </ChakraDrawer.Body>
+      </StudioIsolatedErrorBoundary>
+      {footer && (
+        <DrawerFooterBand
+          glass={glass}
+          edge={chrome.edges.bottom}
+          bandRef={chrome.footerRef}
+          paddingBottom={FOOTER_SAFE_AREA}
+        >
+          <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
+            <ActionRow {...footer} busy={busy || footer.busy} />
+          </StudioIsolatedErrorBoundary>
+        </DrawerFooterBand>
+      )}
+    </>
+  );
+}
+
 /** The drawer shape: props in, one look out. The part statics are deprecated. */
 export function DrawerShape({
   open = true,
@@ -334,9 +482,9 @@ export function DrawerShape({
   headerAction,
   headerTools,
   toolbar,
-  body = "padded",
-  bodyScroll = "frame",
-  loading = false,
+  body,
+  bodyScroll,
+  loading,
   error,
   onSubmit,
   formId,
@@ -353,84 +501,30 @@ export function DrawerShape({
 }: DrawerProps) {
   const inset = useDrawerEndInset();
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
-  const resetKeys = [title, entityKey];
+  const glass = useDrawerGlass({ framed: bodyScroll !== "content" });
   const frame = (
-    <>
-      <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
-        <ChakraDrawer.Header>
-          <HStack align="start" gap={2} width="full" flexWrap="wrap">
-            {onBack && (
-              <IconButton
-                type="button"
-                aria-label="Back"
-                variant="ghost"
-                size="sm"
-                onClick={onBack}
-                disabled={busy}
-                marginStart={-2}
-                data-testid={slot("back")}
-              >
-                <ArrowLeft aria-hidden />
-              </IconButton>
-            )}
-            <VStack align="stretch" gap={1} flex="1 1 10rem" minWidth={0}>
-              {eyebrow && (
-                <HStack color="fg.muted" gap={2} textStyle="xs">
-                  {eyebrow.icon}
-                  <Text>{eyebrow.label}</Text>
-                </HStack>
-              )}
-              <ChakraDrawer.Title overflowWrap="anywhere" srOnly={titleContent != null}>
-                {title}
-              </ChakraDrawer.Title>
-              {titleContent}
-              {subtitle != null && <ChakraDrawer.Description>{subtitle}</ChakraDrawer.Description>}
-              {badges != null && (
-                <HStack gap={2} flexWrap="wrap" paddingTop={1}>
-                  {badges}
-                </HStack>
-              )}
-            </VStack>
-            {headerAction && (
-              <FrameActionButton action={headerAction} kind="secondary" busy={busy} size="sm" />
-            )}
-            {headerTools != null && (
-              <HStack gap={1} flexShrink={0} flexWrap="wrap" justify="flex-end">
-                {headerTools}
-              </HStack>
-            )}
-          </HStack>
-        </ChakraDrawer.Header>
-        {toolbar != null && (
-          <Box
-            paddingX={6}
-            paddingY={3}
-            borderBottomWidth="1px"
-            borderColor="border.card"
-            flexShrink={0}
-          >
-            {toolbar}
-          </Box>
-        )}
-        <ChakraDrawer.Body
-          padding={body === "flush" ? 0 : undefined}
-          {...(bodyScroll === "content" ? BOUNDED_BODY : {})}
-          data-body={body}
-          data-testid={slot("body")}
-        >
-          <OverlayBodyState loading={loading} error={error}>
-            {children}
-          </OverlayBodyState>
-        </ChakraDrawer.Body>
-      </StudioIsolatedErrorBoundary>
-      {footer && (
-        <ChakraDrawer.Footer paddingBottom={FOOTER_SAFE_AREA}>
-          <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
-            <ActionRow {...footer} busy={busy || footer.busy} />
-          </StudioIsolatedErrorBoundary>
-        </ChakraDrawer.Footer>
-      )}
-    </>
+    <DrawerFrame
+      onBack={onBack}
+      title={title}
+      titleContent={titleContent}
+      eyebrow={eyebrow}
+      subtitle={subtitle}
+      badges={badges}
+      headerAction={headerAction}
+      headerTools={headerTools}
+      toolbar={toolbar}
+      body={body}
+      bodyScroll={bodyScroll}
+      loading={loading}
+      error={error}
+      footer={footer}
+      busy={busy}
+      errorScope={errorScope}
+      entityKey={entityKey}
+      testId={testId}
+    >
+      {children}
+    </DrawerFrame>
   );
   return (
     <DrawerRoot
@@ -454,7 +548,11 @@ export function DrawerShape({
         data-size={size}
         data-testid={testId}
       >
-        <DrawerCloseTrigger disabled={busy} data-testid={slot("close")} />
+        <DrawerCloseTrigger
+          disabled={busy}
+          zIndex={glass ? 2 : void 0}
+          data-testid={slot("close")}
+        />
         {onSubmit ? (
           <chakra.form
             id={formId}
