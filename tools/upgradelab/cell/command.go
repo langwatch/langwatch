@@ -101,6 +101,9 @@ func cellFlags(name string, options *Options) *flag.FlagSet {
 	return flags
 }
 
+// apiEarlyUpgradeAllowance: head's api answers upgrade_in_progress until its worker, WorkerDelay later, has run the upgrade.
+const apiEarlyUpgradeAllowance = 120 * time.Second
+
 func withDrills(options Options, ledger, drills string) (Options, error) {
 	for _, id := range strings.Split(ledger, ",") {
 		if id = strings.TrimSpace(id); id != "" {
@@ -112,6 +115,7 @@ func withDrills(options Options, ledger, drills string) (Options, error) {
 		case "":
 		case DrillAPIEarly:
 			options.SwitchOn = "/healthz"
+			options.Hold = max(options.Hold, options.WorkerDelay+apiEarlyUpgradeAllowance)
 			options.Drills = append(options.Drills, drill)
 		case DrillWorkerRestart, DrillRetry, DrillPrivateDown, DrillRouteBroken:
 			options.Drills = append(options.Drills, drill)

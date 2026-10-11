@@ -125,8 +125,8 @@ func TestUpgradeInProgressIsRetriedAfterRetryAfter(t *testing.T) {
 	}
 }
 
-// @scenario "A stop-start install's starting api is waited out as downtime, a rolling deploy's is a non-2xx"
-func TestStartingAnswerIsDowntimeOnlyInStopStart(t *testing.T) {
+// @scenario "A starting api's 503 is waited out per Retry-After on every deployment"
+func TestStartingAnswerIsWaitedOutOnEveryDeployment(t *testing.T) {
 	for _, stopStart := range []bool{true, false} {
 		var answered atomic.Int32
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -141,12 +141,25 @@ func TestStartingAnswerIsDowntimeOnlyInStopStart(t *testing.T) {
 		traffic := &Traffic{Client: Client{URL: server.URL}, Hold: 5 * time.Second, Origin: time.Now(), http: server.Client(), RetryUnanswered: stopStart}
 		call := traffic.one(context.Background(), Kind{Name: "rest-read", Do: restRead}, 0)
 		server.Close()
-		if stopStart && (call.Status != http.StatusOK || call.Gap != 1 || call.NonOK != 0) {
-			t.Errorf("stop-start: call = %+v, want 200 after waiting out the start, no non-2xx", call)
+		if call.Status != http.StatusOK || call.Gap != 1 || call.NonOK != 0 || call.Retries != 1 {
+			t.Errorf("stopStart=%v: call = %+v, want 200 after waiting out the start, no non-2xx", stopStart, call)
 		}
-		if !stopStart && (call.Status != http.StatusServiceUnavailable || call.NonOK != 1) {
-			t.Errorf("rolling: call = %+v, want the 503 kept as a non-2xx", call)
-		}
+	}
+}
+
+// @scenario "The api-early drill holds client requests long enough for the worker delay and the upgrade"
+func TestAPIEarlyDrillRaisesTheClientHold(t *testing.T) {
+	options := Options{Hold: 60 * time.Second, WorkerDelay: 60 * time.Second, FromDir: ".", HeadDir: ".", Release: "r", RunDir: t.TempDir()}
+	got, err := withDrills(options, "", DrillAPIEarly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Hold != 180*time.Second {
+		t.Errorf("hold = %s, want 3m0s", got.Hold)
+	}
+	got, _ = withDrills(options, "", DrillRetry)
+	if got.Hold != 60*time.Second {
+		t.Errorf("hold = %s without api-early, want 1m0s", got.Hold)
 	}
 }
 

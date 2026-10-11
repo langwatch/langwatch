@@ -290,8 +290,8 @@ func (traffic *Traffic) attempt(ctx context.Context, kind Kind, call *Call) time
 		}
 		return 0
 	}
-	if traffic.RetryUnanswered && startingAnswer(response, call.Error) {
-		call.Gap++ // stop-start downtime: head's api listens before it serves (T4-F3); a client waits out Retry-After
+	if startingAnswer(response, call.Error) {
+		call.Gap++ // head's api listens before it serves (T4-F3, UD-F4): a transient refusal on any deployment; a client waits out Retry-After
 		return retryAfter(response.Header.Get("Retry-After"))
 	}
 	call.NonOK++

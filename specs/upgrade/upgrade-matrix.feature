@@ -111,11 +111,17 @@ Feature: Every deployment upgrades to head with the api serving and nothing drop
     And a call answered upgrade_in_progress is retried after Retry-After and counted with its retry window
 
   @unit
-  Scenario: A stop-start install's starting api is waited out as downtime, a rolling deploy's is a non-2xx
-    Given a self-hosted install stops its old release before head's api starts
-    When head's api answers 503 "is starting" with Retry-After while it boots
-    Then the call waits out Retry-After and counts the answer as downtime, not as a non-2xx
-    And on a rolling deploy the same answer stays a non-2xx
+  Scenario: A starting api's 503 is waited out per Retry-After on every deployment
+    Given head's api answers /healthz before its application is mounted
+    When it answers 503 "is starting" with Retry-After on any other route
+    Then the call waits out Retry-After on a self-hosted and on a rolling deploy alike
+    And the answer counts as downtime, not as a non-2xx
+
+  @unit
+  Scenario: The api-early drill holds client requests long enough for the worker delay and the upgrade
+    Given the api-early drill with a worker delay
+    When the client hold is shorter than the worker delay plus 120 seconds
+    Then the hold is raised to the worker delay plus 120 seconds
 
   @unit
   Scenario: A cell claims its ledger row and reports its verdict to it
