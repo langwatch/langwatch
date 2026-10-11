@@ -207,7 +207,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
       /** @scenario "Quick run failure shows toast with drawer link instead of page link" */
       it("renders the All Runs title", () => {
         renderWithRuns();
-        expect(screen.getByText("All Runs")).toBeInTheDocument();
+        expect(screen.getByText("All runs")).toBeInTheDocument();
       });
 
       it("displays aggregate passed and failed counts in the header area", () => {
@@ -404,8 +404,12 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
         await userEvent.click(screen.getByRole("button", { name: "Export CSV" }));
 
         const dialog = await screen.findByRole("dialog");
-        expect(within(dialog).getByText("Export Scenario Runs")).toBeInTheDocument();
-        expect(within(dialog).getByText(/2 runs/)).toBeInTheDocument();
+        expect(within(dialog).getByText("Export scenario runs")).toBeInTheDocument();
+        expect(
+          within(dialog).getByText(
+            (_, node) => (node?.textContent ?? "").startsWith("2 runs") && node?.tagName === "P",
+          ),
+        ).toBeInTheDocument();
         expect(within(dialog).getByRole("radio", { name: "Full" })).toBeChecked();
       });
     });

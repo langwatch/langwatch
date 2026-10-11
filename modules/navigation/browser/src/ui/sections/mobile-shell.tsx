@@ -14,7 +14,7 @@ import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";
 import { OrganizationSelect } from "./organization-select.tsx";
 import { ProductScopeControl } from "./product-scope-control.tsx";
-import { SidebarContent } from "./product-sidebar.tsx";
+import { detourSurface, SidebarContent } from "./product-sidebar.tsx";
 import { ProductSwitcherMenu } from "./product-switcher-menu.tsx";
 
 const LOGO_HEIGHT = 24;
@@ -120,9 +120,7 @@ function MobileTopBar({
         ) : (
           <HStack gap={2} paddingX={1} flexShrink={0}>
             <SettingsIcon size={14} color="var(--chakra-colors-fg-muted)" />
-            <Text fontSize="13px" fontWeight="medium">
-              Settings
-            </Text>
+            <Text textStyle="label">Settings</Text>
           </HStack>
         )}
         {showsOwnScope ? (
@@ -158,6 +156,7 @@ function MobileMenuOverlay({
 }) {
   const overlayRef = useRef<HTMLDialogElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const pathname = useNavigationHost().pathname();
 
   // The overlay is a modal: it takes focus on open, and Escape closes
   // it the way the close button does.
@@ -220,7 +219,11 @@ function MobileMenuOverlay({
       </HStack>
       <Box flex={1} minHeight={0}>
         <SideMenuDensityProvider density="compact">
-          <SidebarContent surface={state.activeProductId ?? "settings"} showExpanded isFullWidth />
+          <SidebarContent
+            surface={state.activeProductId ?? detourSurface(pathname)}
+            showExpanded
+            isFullWidth
+          />
         </SideMenuDensityProvider>
       </Box>
     </chakra.dialog>

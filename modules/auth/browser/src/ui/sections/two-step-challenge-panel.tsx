@@ -76,13 +76,13 @@ export function TwoStepChallengePanel({
   };
 
   return (
-    <VStack width="full" align="stretch" gap="14px">
-      <Text fontSize="13.5px" lineHeight="1.65" color="fg.muted">
+    <VStack width="full" align="stretch" gap="3.5">
+      <Text textStyle="bodySm" color="fg.muted">
         {introFor(factor)}
       </Text>
       <HandledErrorAlert error={refusal} fallbackTitle="Couldn't check that code" />
       <form onSubmit={(event) => void onSubmit(event)} style={{ width: "100%" }}>
-        <VStack width="full" align="stretch" gap="14px">
+        <VStack width="full" align="stretch" gap="3.5">
           <CodeField
             isBackupCode={isBackupCode}
             code={code}
@@ -95,7 +95,7 @@ export function TwoStepChallengePanel({
               if (tooShort) setTooShort(false);
             }}
           />
-          <VStack width="full" align="stretch" gap="14px" paddingTop="2px">
+          <VStack width="full" align="stretch" gap="3.5" paddingTop="0.5">
             <FrontDoorPrimaryButton type="submit" isBusy={isSubmitting}>
               Continue
             </FrontDoorPrimaryButton>
@@ -168,7 +168,7 @@ function CodeField({
           value={code}
           onChange={(event) => onChange(event.target.value)}
           // 16px on a phone, or iOS zooms in on focus and never zooms out.
-          fontSize={{ base: "16px", md: "15px" }}
+          fontSize={{ base: "md", md: "sm" }}
           minHeight="44px"
           borderRadius={SHAPE.field}
           // A code is read one character at a time off another screen.
@@ -215,7 +215,7 @@ function QuietAction({
   children: ReactNode;
 }) {
   return (
-    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
+    <Text textStyle="bodySm" width="full" textAlign="center" color="fg.muted">
       <Box
         asChild
         color="fg"

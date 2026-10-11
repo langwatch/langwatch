@@ -33,10 +33,8 @@ function SelectableIconBadge({ badge }: { badge?: string }): React.ReactElement 
       top="-8px"
       left="50%"
       transform="translateX(-50%)"
-      fontSize="9px"
-      fontWeight="600"
-      letterSpacing="0.02em"
-      lineHeight="1"
+      textStyle="micro"
+      fontWeight="semibold"
       paddingX={1.5}
       paddingY="3px"
       borderRadius="full"

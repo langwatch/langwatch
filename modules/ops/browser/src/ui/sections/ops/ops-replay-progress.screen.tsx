@@ -12,7 +12,7 @@ export default function OpsReplayProgressScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Replay progress</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container paddingY={5} maxWidth="full">
+      <PageLayout.Container width="fill">
         <ReplayProgressContent runId={runId} />
       </PageLayout.Container>
     </>

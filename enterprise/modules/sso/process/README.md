@@ -397,8 +397,8 @@ interface Input {
 // Output: ssoSetupMigrationSchema.nullable() (inline, ../contract/src/sso-connection.trpc.ts:49)
 
 // ssoConnections.startLegacyMigration
-type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:553
-// Output: ssoSetupRegisteredSchema, ../contract/src/sso-setup.contract.ts:423
+type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:556
+// Output: ssoSetupRegisteredSchema, ../contract/src/sso-setup.contract.ts:426
 interface Output {
   connectionId: string;
 }
@@ -525,10 +525,10 @@ Contract `../contract/src/sso-setup.trpc.ts:40`, router `src/transport/sso-setup
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof ssoSetupPageViewSchema>; // ../contract/src/sso-setup.contract.ts:252
+type Output = z.infer<typeof ssoSetupPageViewSchema>; // ../contract/src/sso-setup.contract.ts:255
 
 // ssoSetup.getMigrationProgress
-// Input: ssoSetupMigrationProgressSchema, ../contract/src/sso-setup.contract.ts:534
+// Input: ssoSetupMigrationProgressSchema, ../contract/src/sso-setup.contract.ts:537
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -554,19 +554,19 @@ type Output = {
 
 // ssoSetup.onHistoryActivity
 type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:23
-// Output: ssoHistoryActivitySchema, ../contract/src/sso-setup.contract.ts:288
+// Output: ssoHistoryActivitySchema, ../contract/src/sso-setup.contract.ts:291
 interface Output {
   connectionId: string;
 }
 
 // ssoSetup.claimDomain
-// Input: ssoSetupDomainSchema, ../contract/src/sso-setup.contract.ts:299
+// Input: ssoSetupDomainSchema, ../contract/src/sso-setup.contract.ts:302
 interface Input {
   organizationId: string;
   connectionId: string;
   domain: string;
 }
-// Output: ssoDomainClaimOutcomeSchema, ../contract/src/sso-setup.contract.ts:315
+// Output: ssoDomainClaimOutcomeSchema, ../contract/src/sso-setup.contract.ts:318
 interface Output {
   waitsForReview: boolean;
   disputed: boolean;
@@ -574,35 +574,35 @@ interface Output {
 }
 
 // ssoSetup.proveDomain
-type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:299
-type Output = z.infer<typeof ssoDomainProofSchema>; // ../contract/src/sso-setup.contract.ts:346
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:302
+type Output = z.infer<typeof ssoDomainProofSchema>; // ../contract/src/sso-setup.contract.ts:349
 
 // ssoSetup.removeDomain
-type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:299
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:302
 // Output: inline, ../contract/src/sso-setup.trpc.ts:86
 type Output = unknown;
 
 // ssoSetup.checkDomainRecord
-type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:299
-// Output: ssoDomainProvedSchema, ../contract/src/sso-setup.contract.ts:353
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:302
+// Output: ssoDomainProvedSchema, ../contract/src/sso-setup.contract.ts:356
 interface Output {
   proved: true;
 }
 
 // ssoSetup.checkDomainFile
-type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:299
-type Output = z.infer<typeof ssoDomainProvedSchema>; // ../contract/src/sso-setup.contract.ts:353
+type Input = z.infer<typeof ssoSetupDomainSchema>; // ../contract/src/sso-setup.contract.ts:302
+type Output = z.infer<typeof ssoDomainProvedSchema>; // ../contract/src/sso-setup.contract.ts:356
 
 // ssoSetup.register
-type Input = z.infer<typeof ssoSetupRegisterSchema>; // ../contract/src/sso-setup.contract.ts:413
-type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:423
+type Input = z.infer<typeof ssoSetupRegisterSchema>; // ../contract/src/sso-setup.contract.ts:416
+type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:426
 
 // ssoSetup.startLegacyMigration
-type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:553
-type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:423
+type Input = z.infer<typeof ssoSetupStartMigrationSchema>; // ../contract/src/sso-setup.contract.ts:556
+type Output = z.infer<typeof ssoSetupRegisteredSchema>; // ../contract/src/sso-setup.contract.ts:426
 
 // ssoSetup.selectMigrationRoute
-// Input: ssoSetupMigrationRouteSchema, ../contract/src/sso-setup.contract.ts:566
+// Input: ssoSetupMigrationRouteSchema, ../contract/src/sso-setup.contract.ts:569
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -617,7 +617,7 @@ type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-se
 type Output = unknown;
 
 // ssoSetup.rename
-// Input: ssoSetupRenameSchema, ../contract/src/sso-setup.contract.ts:576
+// Input: ssoSetupRenameSchema, ../contract/src/sso-setup.contract.ts:579
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -631,12 +631,12 @@ type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-se
 // Output: ssoSetupIdentityProviderViewSchema.nullable() (inline, ../contract/src/sso-setup.trpc.ts:148)
 
 // ssoSetup.updateIdentityProvider
-type Input = z.infer<typeof ssoSetupUpdateIdentityProviderSchema>; // ../contract/src/sso-setup.contract.ts:463
+type Input = z.infer<typeof ssoSetupUpdateIdentityProviderSchema>; // ../contract/src/sso-setup.contract.ts:466
 // Output: inline, ../contract/src/sso-setup.trpc.ts:157
 type Output = unknown;
 
 // ssoSetup.setArrivals
-// Input: ssoSetupArrivalsSchema, ../contract/src/sso-setup.contract.ts:508
+// Input: ssoSetupArrivalsSchema, ../contract/src/sso-setup.contract.ts:511
 interface Input {
   organizationId: string;
   connectionId: string;
@@ -664,13 +664,13 @@ type Output = {
 }[];
 
 // ssoSetup.grantBreakGlass
-// Input: ssoBreakGlassGrantInputSchema, ../contract/src/sso-setup.contract.ts:664
+// Input: ssoBreakGlassGrantInputSchema, ../contract/src/sso-setup.contract.ts:667
 interface Input {
   organizationId: string;
   userId: string;
   expiresAtMs: number;
 }
-// Output: ssoBreakGlassBindingSchema, ../contract/src/sso-setup.contract.ts:649
+// Output: ssoBreakGlassBindingSchema, ../contract/src/sso-setup.contract.ts:652
 interface Output {
   bindingId: string;
   organizationId: string;
@@ -684,21 +684,21 @@ interface Output {
 }
 
 // ssoSetup.renewBreakGlass
-// Input: ssoBreakGlassRenewalInputSchema, ../contract/src/sso-setup.contract.ts:678
+// Input: ssoBreakGlassRenewalInputSchema, ../contract/src/sso-setup.contract.ts:681
 interface Input {
   organizationId: string;
   bindingId: string;
   expiresAtMs: number;
 }
-type Output = z.infer<typeof ssoBreakGlassRenewalSchema>; // ../contract/src/sso-setup.contract.ts:706
+type Output = z.infer<typeof ssoBreakGlassRenewalSchema>; // ../contract/src/sso-setup.contract.ts:709
 
 // ssoSetup.revokeBreakGlass
-// Input: ssoBreakGlassBindingInputSchema, ../contract/src/sso-setup.contract.ts:691
+// Input: ssoBreakGlassBindingInputSchema, ../contract/src/sso-setup.contract.ts:694
 interface Input {
   organizationId: string;
   bindingId: string;
 }
-type Output = z.infer<typeof ssoBreakGlassBindingSchema>; // ../contract/src/sso-setup.contract.ts:649
+type Output = z.infer<typeof ssoBreakGlassBindingSchema>; // ../contract/src/sso-setup.contract.ts:652
 
 // ssoSetup.discardConnection
 type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-setup.contract.ts:23
@@ -706,7 +706,7 @@ type Input = z.infer<typeof ssoSetupConnectionSchema>; // ../contract/src/sso-se
 type Output = unknown;
 
 // ssoSetup.removeConnection
-// Input: ssoSetupRemovalSchema, ../contract/src/sso-setup.contract.ts:519
+// Input: ssoSetupRemovalSchema, ../contract/src/sso-setup.contract.ts:522
 interface Input {
   organizationId: string;
   connectionId: string;

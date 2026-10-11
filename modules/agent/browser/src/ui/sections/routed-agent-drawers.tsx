@@ -150,7 +150,7 @@ const CodeEditorModalHost: WorkflowCodeEditorModalHost = ({ open, onRequestClose
     closeOnEscape={false}
   >
     <Dialog.Content
-      margin="32px"
+      margin="8"
       minWidth="calc(100vw - 64px)"
       height="calc(100vh - 64px)"
       display="flex"
@@ -229,7 +229,7 @@ export function RoutedAgentWorkflowTargetEditorDrawer({ agentId }: { agentId?: s
       icon={linked.icon}
       updatedAtLabel={formatTimeAgo(toEpochMs(linked.updatedAt))}
       width="300px"
-      {...(workflow.editorHref ? { action: <ExternalLink size={16} /> } : {})}
+      action={workflow.editorHref ? <ExternalLink size={16} /> : void 0}
     />
   );
   return (

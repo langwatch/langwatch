@@ -14,3 +14,9 @@ Feature: The Foundry trace playground
     Given an operator opens the Foundry
     When the page builds its exporter for this deployment
     Then the exporter is built rather than the page failing to load
+
+  @integration
+  Scenario: The JSON editor shows no pinned scope rows over the first scrolled line
+    Given the Foundry JSON editor holding a nested trace
+    When I scroll into the nested messages
+    Then no scope header is pinned over the editor and the first visible line reads in full

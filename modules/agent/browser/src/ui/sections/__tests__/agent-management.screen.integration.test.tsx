@@ -14,7 +14,7 @@ import type {
   RelatedAgentEntities,
 } from "@langwatch/agent-contract";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -412,7 +412,11 @@ describe("given the agents page", () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { host } = await mountScreen();
 
-      await user.click(screen.getByTestId("agent-card-agent_1"));
+      await user.click(
+        within(screen.getByTestId("agent-card-agent_1")).getByRole("button", {
+          name: "HTTP agent",
+        }),
+      );
 
       expect(host.editorsOpened).toEqual([{ drawer: "agentHttpEditor", agentId: "agent_1" }]);
     });
@@ -495,7 +499,8 @@ describe("given the agents page", () => {
       await user.click(screen.getByRole("menuitem", { name: /replicate/i }));
 
       expect(screen.getByText("(no permission)")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Replicate" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Replicate" }));
+      expect(screen.getByText("Choose a project you can create agents in.")).toBeInTheDocument();
 
       await user.click(screen.getByRole("combobox"));
       const refused = await screen.findAllByRole("option", {
@@ -504,7 +509,8 @@ describe("given the agents page", () => {
       });
       await user.click(refused.find((option) => option.tagName === "DIV")!);
 
-      expect(screen.getByRole("button", { name: "Replicate" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Replicate" }));
+      expect(browser.copied).toEqual([]);
 
       await user.click(screen.getByRole("button", { name: "Cancel" }));
       expect(browser.copied).toEqual([]);
@@ -598,11 +604,11 @@ describe("given the agents page", () => {
       await openAgentActions(user);
       await user.click(screen.getByRole("menuitem", { name: /delete/i }));
 
-      const confirm = await screen.findByTestId("cascade-archive-confirm-button");
-      expect(confirm).toBeDisabled();
+      expect(await screen.findByTestId("cascade-archive-confirm-button")).toBeDisabled();
 
       await user.type(screen.getByTestId("cascade-archive-confirm-input"), "delete");
-      await user.click(confirm);
+      // The enabled button replaces the disabled one (its reason wrapper goes), so ask again.
+      await user.click(screen.getByTestId("cascade-archive-confirm-button"));
 
       await waitFor(() => {
         expect(browser.archived).toEqual([{ id: "agent_1", projectId: "project_1" }]);

@@ -1,4 +1,10 @@
-import { Box, HStack, Skeleton, VStack } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  HStack,
+  Skeleton,
+  useBreakpointValue,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import cloneDeep from "lodash-es/cloneDeep";
 import debounce from "lodash-es/debounce";
@@ -31,7 +37,8 @@ export function PromptBrowserWindowContent() {
     () => windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
     [windows, tabId],
   );
-  const isSingleWindow = windows.length === 1;
+  const isCompact = useBreakpointValue({ base: true, md: false }, { fallback: "md" }) === true;
+  const isSingleWindow = windows.length === 1 && !isCompact;
 
   // All hooks must run on every render - `useMemo` below used to sit
   // after an early-return for `tab?.data.loading`, which crashed React
@@ -42,7 +49,7 @@ export function PromptBrowserWindowContent() {
   const versionNumber = tab?.data.meta.versionNumber;
   const initialConfigValues = useMemo(() => cloneDeep(currentValues), [currentValues]);
 
-  // Use horizontal layout when there's only one window
+  // Side-by-side only for one window on a screen wide enough to hold it
   const layoutMode: LayoutMode = isSingleWindow ? "horizontal" : "vertical";
 
   // Show loading skeleton while tab data is being fetched - no form initialization
@@ -244,7 +251,6 @@ function PromptBrowserWindowInner(props: {
               borderRight="1px solid"
               borderColor="border.muted"
               overflow="hidden"
-              boxShadow="md"
             >
               <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
                 <Box width="full" paddingX={3}>

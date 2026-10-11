@@ -1,4 +1,6 @@
-import { Box, Center, Link, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import type { EmptyNext } from "@langwatch/design-system/no-data-info-block";
+import { Box, Center, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal } from "@langwatch/time";
 import { ExternalLink } from "react-feather";
@@ -8,6 +10,14 @@ import { useRetryFailedAnalytics } from "../../behavior/use-retry-failed-analyti
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { traceDetailsAddress } from "../../model/analytics-overlay-address.ts";
 import { ChartErrorState } from "../elements/chart-error-state.tsx";
+
+const FEEDBACK_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How to collect feedback",
+    href: "https://docs.langwatch.ai/user-events/thumbs-up-down",
+  },
+];
 
 function voteGlyph(vote: number | null | undefined): string {
   if (vote === 1) return "👍";
@@ -36,32 +46,26 @@ export const FeedbacksTable = () => {
 
   return (
     <VStack align="start" gap={4}>
-      <Table.Root variant="line" padding={0} margin={0}>
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader width="48px" paddingLeft={0}></Table.ColumnHeader>
-            <Table.ColumnHeader>Feedback</Table.ColumnHeader>
-            <Table.ColumnHeader width="250px">Date</Table.ColumnHeader>
-            <Table.ColumnHeader width="180px" textAlign="center">
+      <ListTable variant="embedded">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader width="48px" label="Vote" />
+            <ListTable.ColumnHeader>Feedback</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="250px">Date</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="180px" align="center">
               Open Message
-            </Table.ColumnHeader>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+            </ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {feedbacks.data?.events.length === 0 && (
-            <Table.Row>
-              <Table.Cell colSpan={4}>
-                No written feedbacks received yet, check out our{" "}
-                <a
-                  href="https://docs.langwatch.ai/docs/user-events/thumbs-up-down"
-                  target="_blank"
-                  style={{ textDecoration: "underline" }}
-                >
-                  docs
-                </a>{" "}
-                on how to integrate
-              </Table.Cell>
-            </Table.Row>
+            <ListTable.EmptyRow
+              columns={4}
+              state="empty"
+              title="No written feedbacks received yet"
+              description="Thumbs up and down with a comment show up here."
+              next={FEEDBACK_NEXT}
+            />
           )}
 
           {feedbacks.data?.events.map((event, index) => {
@@ -71,48 +75,46 @@ export const FeedbacksTable = () => {
             )?.value;
 
             return (
-              <Table.Row
+              <ListTable.Row
                 key={index}
-                onClick={() => {
+                onActivate={() => {
                   openTrace(event.trace_id);
                 }}
-                cursor="pointer"
               >
-                <Table.Cell paddingLeft={0} textAlign="center" paddingRight="0">
-                  {voteGlyph(vote)}
-                </Table.Cell>
-                <Table.Cell>
+                <ListTable.Cell align="center">{voteGlyph(vote)}</ListTable.Cell>
+                <ListTable.Cell>
                   <Tooltip content={feedback}>
                     <Text lineClamp={1} wordBreak="break-all" display="block">
                       {feedback}
                     </Text>
                   </Tooltip>
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   {Temporal.Instant.fromEpochMilliseconds(
                     event.timestamps.started_at ?? event.timestamps.inserted_at,
                   )
                     .toZonedDateTimeISO(Temporal.Now.timeZoneId())
                     .toLocaleString()}
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <Center>
                     {event.trace_id && (
-                      <Link
-                        onClick={() => {
+                      <ListTable.RowAction
+                        label="Open trace"
+                        onActivate={() => {
                           openTrace(event.trace_id);
                         }}
                       >
                         <ExternalLink />
-                      </Link>
+                      </ListTable.RowAction>
                     )}
                   </Center>
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             );
           })}
-        </Table.Body>
-      </Table.Root>
+        </ListTable.Body>
+      </ListTable>
     </VStack>
   );
 };

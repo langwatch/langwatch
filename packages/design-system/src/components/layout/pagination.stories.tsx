@@ -88,3 +88,17 @@ export const NarrowWidth: Story = {
     </Box>
   ),
 };
+
+export const CenteredCard: Story = {
+  args: {
+    page: 2,
+    pageSize: 25,
+    totalCount: 1200,
+    onPageChange: () => undefined,
+    unitLabel: "traces",
+    totalSummary: "About 1,200 traces",
+    layout: "center",
+    ground: "card",
+    summaryTone: "subtle",
+  },
+};

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Box } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { type ReactNode, useMemo } from "react";
 import {
   Area,
@@ -143,7 +144,7 @@ export function CostForecastArea({
               label={{
                 value: "projected",
                 position: "insideTopRight",
-                fontSize: 10,
+                fontSize: TYPE_SCALE_PX.micro,
                 fill: PROJECTION_INK,
               }}
             />

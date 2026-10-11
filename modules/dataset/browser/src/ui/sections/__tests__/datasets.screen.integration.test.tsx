@@ -16,6 +16,7 @@ const { datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
     current: { data: undefined, isLoading: false, refetch: vi.fn() } as {
       data: unknown;
       isLoading: boolean;
+      isError?: boolean;
       refetch: () => void;
     },
   },
@@ -111,8 +112,8 @@ describe("Datasets list screen", () => {
       expect(screen.getByText("12")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
       // Last update uses updatedAt, not createdAt.
-      const expected = new Date("2026-02-02T10:00:00Z").toLocaleString();
-      expect(screen.getAllByText(expected)).toHaveLength(2);
+      expect(screen.getAllByText(/Feb/)).toHaveLength(2);
+      expect(screen.queryByText(/Jan/)).not.toBeInTheDocument();
     });
 
     describe("when the reader searches", () => {
@@ -129,13 +130,31 @@ describe("Datasets list screen", () => {
         expect(screen.getByText("offline evals")).toBeInTheDocument();
       });
 
-      it("shows a no-results hint when the search matches nothing", async () => {
+      it("shows a no-results hint when the search matches nothing, and clears it", async () => {
         const user = userEvent.setup();
         renderWithDatasetHost(<DatasetsScreen />);
 
         await user.type(screen.getByTestId("datasets-search"), "zzz");
 
         expect(await screen.findByText(/No datasets match "zzz"/i)).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: /clear filters/i }));
+
+        expect(await screen.findByText("offline evals")).toBeInTheDocument();
+        expect(screen.getByTestId("datasets-search")).toHaveValue("");
+      });
+    });
+
+    describe("when a dataset's name is chosen with the keyboard", () => {
+      it("opens it from the name, which is a real link", async () => {
+        const user = userEvent.setup();
+        const { host } = renderWithDatasetHost(<DatasetsScreen />);
+
+        const link = screen.getByRole("link", { name: "offline evals" });
+        expect(link).toHaveAttribute("href", "/test-project/datasets/ds-1");
+        link.focus();
+        await user.keyboard("{Enter}");
+
+        expect(host.navigations).toEqual(["/test-project/datasets/ds-1"]);
       });
     });
 
@@ -162,10 +181,40 @@ describe("Datasets list screen", () => {
       const { container } = renderWithDatasetHost(<DatasetsScreen />);
 
       expect(container.querySelectorAll("[class*='chakra-skeleton']").length).toBeGreaterThan(0);
+      expect(container.querySelector("[aria-busy='true']")).not.toBeNull();
       expect(screen.queryByText("No datasets yet")).not.toBeInTheDocument();
-      // The table's own scaffolding is up, so the page does not jump when the
-      // rows land.
-      expect(screen.getByText("Entries")).toBeInTheDocument();
+      // The header action stays, so the reader can start a dataset while the list loads.
+      expect(screen.getByTestId("upload-or-create-dataset")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the datasets could not be loaded", () => {
+    it("explains the failure with a retry and a next step", async () => {
+      const refetch = vi.fn();
+      datasetsQuery.current = { data: undefined, isLoading: false, isError: true, refetch };
+      const user = userEvent.setup();
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(screen.getByText("Couldn't load the datasets")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /read about datasets/i })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /try again/i }));
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given a refresh fails after the datasets loaded", () => {
+    /** @scenario A failed refresh keeps the datasets I already see */
+    it("keeps the rows with the error as a notice over them", () => {
+      datasetsQuery.current = {
+        data: [makeDataset("ds-1", "offline evals", 12)],
+        isLoading: false,
+        isError: true,
+        refetch: vi.fn(),
+      };
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(screen.getByText("offline evals")).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load the datasets")).toBeInTheDocument();
     });
   });
 
@@ -175,23 +224,27 @@ describe("Datasets list screen", () => {
     });
 
     /** @scenario Empty project shows a helpful empty state */
-    it("shows the empty state with an upload-or-create CTA", async () => {
+    it("shows the empty state, with upload-or-create in the header", async () => {
       const user = userEvent.setup();
       renderWithDatasetHost(<DatasetsScreen />);
 
       expect(screen.getByText("No datasets yet")).toBeInTheDocument();
-      await user.click(screen.getByTestId("empty-state-create-dataset"));
+      expect(screen.getByRole("link", { name: /read about datasets/i })).toHaveAttribute(
+        "href",
+        "https://docs.langwatch.ai/datasets/overview",
+      );
+      await user.click(screen.getByTestId("upload-or-create-dataset"));
       // The CTA is a dropdown: "Create empty dataset" opens the create drawer.
       await user.click(await screen.findByText("Create empty dataset"));
       expect(await screen.findByTestId("add-edit-dataset-drawer")).toBeInTheDocument();
     });
 
     /** @scenario Empty-state CTA can launch the bulk upload flow */
-    it("opens the bulk upload drawer from the empty-state CTA", async () => {
+    it("opens the bulk upload drawer from the header action", async () => {
       const user = userEvent.setup();
       renderWithDatasetHost(<DatasetsScreen />);
 
-      await user.click(screen.getByTestId("empty-state-create-dataset"));
+      await user.click(screen.getByTestId("upload-or-create-dataset"));
       await user.click(await screen.findByText("Upload datasets"));
       expect(await screen.findByTestId("bulk-upload-drawer")).toBeInTheDocument();
     });

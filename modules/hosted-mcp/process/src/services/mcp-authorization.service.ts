@@ -5,6 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 
+import { AggregateProjectHasNoCredentialError } from "@langwatch/api-key-contract";
 import { isAggregateProjectKind, NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 import { nowInstant, type TimeInput } from "@langwatch/time";
 
@@ -161,9 +162,13 @@ export class McpAuthorizationService {
 
     // ADR-177 decision 7: the code carries the project's base key, and these kinds hold none.
     if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
-      return isAggregateProjectKind(project.kind)
-        ? { kind: "aggregate-project-has-no-credential" }
-        : { kind: "denied" };
+      if (!isAggregateProjectKind(project.kind)) return { kind: "denied" };
+      const refusal = new AggregateProjectHasNoCredentialError();
+      return {
+        kind: "aggregate-project-has-no-credential",
+        message: refusal.message,
+        code: refusal.code,
+      };
     }
 
     if (!this.#collaborators.codes.isAvailable()) return { kind: "unavailable" };

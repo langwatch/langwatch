@@ -1,4 +1,5 @@
-import { Alert, Button, HStack, Link, Text } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Button, HStack, Link, Text } from "@langwatch/design-system/primitives";
 import {
   OverviewCard,
   OverviewDetail,
@@ -56,30 +57,20 @@ function statusSentenceOf({ isValid, isExpired }: { isValid: boolean; isExpired:
  */
 function LapsedLicenseNotice({ maxMembers }: { maxMembers: number }) {
   return (
-    <Alert.Root status="warning">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>
-          Your license reached its end date. Nothing was switched off: everyone keeps their access
-          and your {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities
-          stay as they are. Renew to add members again.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="warning">
+      Your license reached its end date. Nothing was switched off: everyone keeps their access and
+      your {maxMembers} {maxMembers === 1 ? "seat" : "seats"} and enterprise capabilities stay as
+      they are. Renew to add members again.
+    </Banner>
   );
 }
 
 /** A license whose signature does not check out. Its numbers mean nothing. */
 function InvalidLicenseNotice() {
   return (
-    <Alert.Root status="error">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>
-          Your license is invalid. Please contact support or upload a valid license.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="error">
+      Your license is invalid. Please contact support or upload a valid license.
+    </Banner>
   );
 }
 
@@ -129,15 +120,10 @@ export function LicenseDetailsCard({
   if (isCorruptedLicense(status)) {
     return (
       <>
-        <Alert.Root status="error">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>
-              Your license file is corrupted and cannot be read. Please upload a valid license or
-              contact support.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="error">
+          Your license file is corrupted and cannot be read. Please upload a valid license or
+          contact support.
+        </Banner>
         <OverviewCard
           title="License"
           chip={{ label: "Corrupted", tone: "bad", title: "The license file cannot be read" }}

@@ -1,22 +1,12 @@
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Box,
-  Button,
   Field,
   HStack,
   Input,
-  Table,
   Text,
   Textarea,
   VStack,
@@ -86,65 +76,49 @@ export function AddEnvironmentDialog({
   };
 
   return (
-    <DialogRoot open={isOpen} onOpenChange={(e) => !e.open && close()}>
-      <DialogContent maxWidth="lg">
-        <DialogHeader>
-          <DialogTitle>Add environment</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <VStack align="stretch" gap={4}>
-            <Field.Root required>
-              <Field.Label>Name</Field.Label>
-              <Input
-                size="sm"
-                value={name}
-                placeholder="Production"
-                onChange={(e) => setName(e.target.value)}
-              />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea
-                size="sm"
-                rows={3}
-                value={description}
-                placeholder="What runs here, and who it is for."
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </Field.Root>
-            <Box
-              role="note"
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="md"
-              padding={3}
-            >
-              <Text fontSize="xs" color="fg.muted">
-                Environments are not stored yet. This one stays on screen for as long as you have
-                the page open and is gone when you reload.
-              </Text>
-            </Box>
-          </VStack>
-        </DialogBody>
-        <DialogFooter>
-          <Button size="sm" variant="outline" onClick={close}>
-            Cancel
-          </Button>
-          <Button
+    <Dialog
+      open={isOpen}
+      onClose={close}
+      size="md"
+      title="Add environment"
+      onSubmit={() => {
+        onAdd({ name: name.trim(), description: description.trim() });
+        close();
+      }}
+      primaryAction={{
+        label: "Add environment",
+        type: "submit",
+        disabledReason: name.trim() === "" ? "Enter a name" : void 0,
+      }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Field.Root required>
+          <Field.Label>Name</Field.Label>
+          <Input
             size="sm"
-            colorPalette="orange"
-            disabled={name.trim() === ""}
-            onClick={() => {
-              onAdd({ name: name.trim(), description: description.trim() });
-              close();
-            }}
-          >
-            Add environment
-          </Button>
-        </DialogFooter>
-        <DialogCloseTrigger />
-      </DialogContent>
-    </DialogRoot>
+            value={name}
+            placeholder="Production"
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Description</Field.Label>
+          <Textarea
+            size="sm"
+            rows={3}
+            value={description}
+            placeholder="What runs here, and who it is for."
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </Field.Root>
+        <Box role="note" borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+          <Text fontSize="xs" color="fg.muted">
+            Environments are not stored yet. This one stays on screen for as long as you have the
+            page open and is gone when you reload.
+          </Text>
+        </Box>
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -226,18 +200,18 @@ export function EnvironmentsTab({
 
   return (
     <ListTable size="sm" data-testid="environments-table" containerProps={{ overflowX: "auto" }}>
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Name</Table.ColumnHeader>
-          <Table.ColumnHeader>Description</Table.ColumnHeader>
-          <Table.ColumnHeader>Created</Table.ColumnHeader>
-          <Table.ColumnHeader>Created by</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Description</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Created by</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {rows.map((row) => (
-          <Table.Row key={row.id}>
-            <Table.Cell>
+          <ListTable.Row key={row.id}>
+            <ListTable.Cell>
               <HStack gap={2}>
                 <Text fontWeight="medium">{row.name}</Text>
                 {row.discoveredFrom && (
@@ -251,13 +225,13 @@ export function EnvironmentsTab({
                   </Badge>
                 )}
               </HStack>
-            </Table.Cell>
-            <Table.Cell color="fg.muted">{row.description}</Table.Cell>
-            <Table.Cell color="fg.muted">{formatCreated(row.createdIso)}</Table.Cell>
-            <Table.Cell color="fg.muted">{row.createdBy}</Table.Cell>
-          </Table.Row>
+            </ListTable.Cell>
+            <ListTable.Cell tone="muted">{row.description}</ListTable.Cell>
+            <ListTable.Cell tone="muted">{formatCreated(row.createdIso)}</ListTable.Cell>
+            <ListTable.Cell tone="muted">{row.createdBy}</ListTable.Cell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }

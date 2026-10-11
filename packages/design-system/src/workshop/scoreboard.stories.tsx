@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { adoption } from "../../.storybook/adoption-data.ts";
 import type { Debt } from "../../.storybook/adoption.ts";
+import type { Census } from "../../.storybook/census.ts";
 import { StatTile, StatTileFigure } from "../components/values/stat-tile.tsx";
 
 const DEBT: { key: keyof NonNullable<typeof adoption>["debt"]; label: string; rule: string }[] = [
@@ -14,7 +15,52 @@ const DEBT: { key: keyof NonNullable<typeof adoption>["debt"]; label: string; ru
   { key: "rawColour", label: "Hex or rgb() literals in browser code", rule: "no-raw-color" },
   { key: "paletteStep", label: "Palette steps named as a colour prop", rule: "no-raw-color" },
   { key: "handRolledTable", label: "Table.Root outside a List table", rule: "list-table.md" },
+  {
+    key: "shapeDrift",
+    label: "Violations, candidates and unknowns in tables, cards, pages, drawers and dialogs",
+    rule: "design system first",
+  },
+  { key: "pixelSpacing", label: "Pixel paddings, margins and gaps", rule: "spacing tokens" },
+  { key: "literalFontSize", label: "Literal font sizes", rule: "text styles" },
 ];
+
+/** Per family: distinct roots, affected roots, violating parts, candidates and adoption. */
+function CensusTable({ census }: { census: Census }) {
+  return (
+    <Table.Root size="sm" variant="line">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Family</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Roots</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Affected roots</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Parts</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Candidates</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Adopted roots</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Unknown</Table.ColumnHeader>
+          <Table.ColumnHeader textAlign="end">Signatures</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {Object.entries(census.families).map(([family, entry]) => {
+          return (
+            <Table.Row key={family}>
+              <Table.Cell>
+                <Code fontSize="xs">{family}</Code>
+              </Table.Cell>
+              <Table.Cell textAlign="end">{entry.roots}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.affectedRoots}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.parts}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.candidates}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.adoptedRoots}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.unknown}</Table.Cell>
+              <Table.Cell textAlign="end">{entry.variants}</Table.Cell>
+            </Table.Row>
+          );
+        })}
+      </Table.Body>
+    </Table.Root>
+  );
+}
 
 function DebtTable({ debt }: { debt: Debt }) {
   return (
@@ -62,7 +108,7 @@ function Scoreboard() {
       </Grid>
 
       <Stack gap={3}>
-        <Heading size="md">Most adopted</Heading>
+        <Heading size="sm">Most adopted</Heading>
         <Table.Root size="sm" variant="line">
           <Table.Body>
             {top.map(([subpath, entry]) => (
@@ -78,10 +124,23 @@ function Scoreboard() {
         </Table.Root>
       </Stack>
 
+      <Stack gap={2}>
+        <Heading textStyle="cardTitle">Shapes: adopted, violating, or still to classify</Heading>
+        <Text color="fg.muted">
+          Roots are distinct shapes, parts are the violating pieces attributed to their root, and
+          candidates are heuristic findings a person must classify. Scores rank the work and are not
+          migration counts. The signature clusters and the totals per module are in the report
+          written by{" "}
+          <Code>{"node packages/design-system/.storybook/adoption.ts --report <path>"}</Code>; a
+          wave is judged by <Code>{"adoption.ts --check --paths <globs>"}</Code>.
+        </Text>
+        <CensusTable census={adoption.census} />
+      </Stack>
+
       {DEBT.map(({ key, label, rule }) => (
         <Stack key={key} gap={2}>
           <HStack gap={2}>
-            <Heading size="sm">{label}</Heading>
+            <Heading textStyle="cardTitle">{label}</Heading>
             <Badge variant="outline">{rule}</Badge>
           </HStack>
           <Text color="fg.muted">The files with the most, to move first.</Text>
@@ -90,7 +149,7 @@ function Scoreboard() {
       ))}
 
       <Stack gap={2}>
-        <Heading size="sm">Published but imported nowhere</Heading>
+        <Heading textStyle="cardTitle">Published but imported nowhere</Heading>
         <Text color="fg.muted">
           Candidates to retire, or to adopt where a screen hand-rolls the same thing.
         </Text>

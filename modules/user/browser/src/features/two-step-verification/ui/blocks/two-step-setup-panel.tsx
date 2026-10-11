@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { InputGroup } from "@langwatch/design-system/input-group";
 /**
  * The scannable code, the same value written out to type in, and the first
@@ -13,8 +14,9 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { Copy } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { usePersonalWorkspaceHost } from "../../../../model/personal-workspace-host.ts";
 import { extractSetupKey, groupSetupKey } from "../../model/setup-key.ts";
@@ -39,7 +41,7 @@ function SetupKeyField({ setupKey }: { setupKey: string }) {
   return (
     <InputGroup
       width="full"
-      fontFamily="monospace"
+      fontFamily="mono"
       cursor="pointer"
       onClick={() => void copy()}
       endElement={<Copy size={16} aria-label="Copy the setup key" />}
@@ -62,6 +64,9 @@ export function TwoStepSetupPanel({
   onCancel: () => void;
 }) {
   const [code, setCode] = useState("");
+  const accent = useProductAccent();
+  const [attempted, setAttempted] = useState(false);
+  const codeRef = useRef<HTMLInputElement>(null);
   const setupKey = extractSetupKey(setupUri);
 
   return (
@@ -72,15 +77,10 @@ export function TwoStepSetupPanel({
       </Text>
 
       <HStack justify="center">
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="xl"
-          padding={4}
-          background="bg.card"
-          data-testid="two-factor-scannable-code"
-        >
-          <SetupQrCode value={setupUri} />
+        <Box width="fit-content">
+          <Card data-testid="two-factor-scannable-code">
+            <SetupQrCode value={setupUri} />
+          </Card>
         </Box>
       </HStack>
 
@@ -88,7 +88,7 @@ export function TwoStepSetupPanel({
         <VStack align="stretch" gap={1}>
           <Text fontSize="sm">If you cannot scan it, type this into the app instead:</Text>
           <SetupKeyField setupKey={setupKey} />
-          <Text fontSize="xs" color="fg.muted" fontFamily="monospace">
+          <Text fontSize="xs" color="fg.muted" fontFamily="mono">
             {groupSetupKey(setupKey)}
           </Text>
         </VStack>
@@ -99,9 +99,10 @@ export function TwoStepSetupPanel({
         you need it on another device later, you will start the setup again.
       </Text>
 
-      <Field.Root>
+      <Field.Root invalid={attempted && code.length === 0}>
         <Field.Label>Enter the code from your app</Field.Label>
         <Input
+          ref={codeRef}
           value={code}
           inputMode="numeric"
           autoComplete="one-time-code"
@@ -109,6 +110,7 @@ export function TwoStepSetupPanel({
           onChange={(event) => setCode(event.target.value.trim())}
           data-testid="two-factor-code"
         />
+        <Field.ErrorText>Enter the code from your app.</Field.ErrorText>
       </Field.Root>
 
       <HStack gap={3} justify="end">
@@ -116,10 +118,16 @@ export function TwoStepSetupPanel({
           Cancel
         </Button>
         <Button
-          colorPalette="orange"
+          colorPalette={accent.colorPalette}
           loading={isConfirming}
-          disabled={code.length === 0}
-          onClick={() => onConfirm(code)}
+          onClick={() => {
+            setAttempted(true);
+            if (code.length === 0) {
+              codeRef.current?.focus();
+              return;
+            }
+            onConfirm(code);
+          }}
           data-testid="confirm-two-factor"
         >
           Finish setting up

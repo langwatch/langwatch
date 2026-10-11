@@ -71,6 +71,7 @@ type DSPyStepQuery = UseTRPCQueryResult<
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { LLMIcon } from "@langwatch/design-system/icons";
 import { Switch } from "@langwatch/design-system/switch";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 
 import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { RenderInputOutput } from "../../../behavior/lent-trace.tsx";
@@ -183,7 +184,7 @@ export function DSPyExperiment({
             <>
               <Card.Root width="100%">
                 <Card.Header>
-                  <Heading as="h2" size="md">
+                  <Heading as="h2" size="sm">
                     {optimizerHeading(optimizerNames)}
                   </Heading>
                 </Card.Header>
@@ -471,7 +472,7 @@ export function DSPyExperimentRunList({
       paddingY={size === "sm" ? 0 : 4}
       borderRightWidth="1px"
       borderColor="border.emphasized"
-      fontSize="14px"
+      textStyle="body"
       minWidth={size === "sm" ? "250px" : "300px"}
       maxWidth={size === "sm" ? "250px" : "300px"}
       height="full"
@@ -479,7 +480,7 @@ export function DSPyExperimentRunList({
       overflowY="auto"
     >
       {size !== "sm" && (
-        <Heading as="h2" size="md" paddingX={6} paddingY={4}>
+        <Heading as="h2" size="sm" paddingX={6} paddingY={4}>
           DSPy Optimizer Runs
         </Heading>
       )}
@@ -594,7 +595,7 @@ function LoadedRunSummary({
               backgroundColor={getColorForString("colors", run.runId).color}
             />
           )}
-          <Text fontSize={size === "sm" ? "13px" : "14px"}>{runName}</Text>
+          <Text textStyle={size === "sm" ? "bodySm" : "body"}>{runName}</Text>
           {(incomingRunIds ?? []).includes(run.runId) && (
             <>
               <Spacer />
@@ -603,7 +604,7 @@ function LoadedRunSummary({
           )}
         </HStack>
 
-        <HStack color="fg.subtle" fontSize={size === "sm" ? "12px" : "13px"}>
+        <HStack color="fg.subtle" textStyle={size === "sm" ? "caption" : "bodySm"}>
           <Text>
             {run.created_at
               ? formatTimeAgo(run.created_at, "yyyy-MM-dd HH:mm", 5)
@@ -819,7 +820,7 @@ const RunDetailsHeader = ({
     <HStack width="full" gap={8} padding={4}>
       <HStack gap={3}>
         <RunColorMark runId={dspyStepSummary.run_id} workflowVersion={workflowVersion} />
-        <Heading as="h2" size="md" marginTop="-1px">
+        <Heading as="h2" size="sm" marginTop="-1px">
           {runName} (step {dspyStepSummary.index})
         </Heading>
       </HStack>
@@ -839,7 +840,7 @@ const RunDetailsHeader = ({
 const StepSummaryInline = ({ dspyStepSummary }: { dspyStepSummary: DSPyStepSummary }) => (
   <>
     <Spacer />
-    <HStack paddingX={4} color="fg.muted" fontSize="12px" textTransform="uppercase">
+    <HStack paddingX={4} color="fg.muted" textStyle="eyebrow">
       <Text>Step Cost: {stepCostOf(dspyStepSummary)}</Text>
       <Separator orientation="vertical" />
       <Text>Step Tokens: {stepTokensOf(dspyStepSummary)}</Text>
@@ -925,25 +926,38 @@ export const RunDetails = React.memo(
           lazyMount
           unmountOnExit
         >
-          <Tabs.List position="relative" overflowX="auto" overflowY="hidden" whiteSpace="nowrap">
-            {size === "sm" && (
-              <Center
-                minHeight="31px"
-                marginBottom="-2px"
-                paddingX={4}
-                fontWeight={500}
-                color="fg.muted"
-                background="bg.muted"
-              >
-                <Text>Step {dspyStepSummary.index}</Text>
-              </Center>
-            )}
+          <Box position="relative" display="flex" flexDirection="column">
+            <Tabs.List position="relative" overflowX="auto" overflowY="hidden" whiteSpace="nowrap">
+              {size === "sm" && (
+                <Center
+                  minHeight="31px"
+                  marginBottom="-0.5"
+                  paddingX={4}
+                  fontWeight={500}
+                  color="fg.muted"
+                  background="bg.muted"
+                >
+                  <Text>Step {dspyStepSummary.index}</Text>
+                </Center>
+              )}
+              <Tabs.Trigger value="0">
+                Predictors {dspyStep.data && `(${dspyStep.data.predictors.length})`}
+              </Tabs.Trigger>
+              <Tabs.Trigger value="1">
+                Evaluations {dspyStep.data && `(${dspyStep.data.examples.length})`}
+              </Tabs.Trigger>
+              <Tabs.Trigger value="2">
+                LLM Calls {dspyStep.data && `(${dspyStep.data.llm_calls.length})`}
+              </Tabs.Trigger>
+              {size === "sm" && <StepSummaryInline dspyStepSummary={dspyStepSummary} />}
+            </Tabs.List>
             {tabIndex === 0 && size !== "sm" && (
               <Box position="absolute" top={0} right={4}>
                 <HStack>
                   <Text>Raw</Text>
                   <Field.Root>
                     <Switch
+                      inputProps={{ "aria-label": "Raw" }}
                       checked={displayRawParams}
                       onCheckedChange={() => setDisplayRawParams(!displayRawParams)}
                     />
@@ -951,17 +965,7 @@ export const RunDetails = React.memo(
                 </HStack>
               </Box>
             )}
-            <Tabs.Trigger value="0">
-              Predictors {dspyStep.data && `(${dspyStep.data.predictors.length})`}
-            </Tabs.Trigger>
-            <Tabs.Trigger value="1">
-              Evaluations {dspyStep.data && `(${dspyStep.data.examples.length})`}
-            </Tabs.Trigger>
-            <Tabs.Trigger value="2">
-              LLM Calls {dspyStep.data && `(${dspyStep.data.llm_calls.length})`}
-            </Tabs.Trigger>
-            {size === "sm" && <StepSummaryInline dspyStepSummary={dspyStepSummary} />}
-          </Tabs.List>
+          </Box>
 
           <Tabs.Content
             value="0"
@@ -1071,7 +1075,11 @@ export const RunDetails = React.memo(
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  <QueryStatusRows view={examplesView} skeletonCells={3} colSpan={4} />
+                  <QueryStatusRows
+                    view={examplesView}
+                    skeletonCells={hasTrace ? 4 : 3}
+                    colSpan={hasTrace ? 5 : 4}
+                  />
                   {examplesView === "ready" &&
                     dspyStep.data &&
                     dspyStep.data.examples.map((example, index) => (
@@ -1126,7 +1134,7 @@ export const RunDetails = React.memo(
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                <QueryStatusRows view={llmCallsView} skeletonCells={4} colSpan={6} />
+                <QueryStatusRows view={llmCallsView} skeletonCells={4} colSpan={5} />
                 {llmCallsView === "ready" &&
                   dspyStep.data &&
                   dspyStep.data.llm_calls.map((llmCall, index) => (
@@ -1160,7 +1168,7 @@ function CollapsableSignature({
       <HStack>
         <Button
           size="sm"
-          fontSize="14px"
+          textStyle="body"
           fontWeight="normal"
           variant="ghost"
           onClick={() => setIsOpen(!isOpen)}
@@ -1366,7 +1374,7 @@ export function DSPyRunsScoresChart({
                 position="top"
                 offset={10}
                 fill={getRawColorValue("fg.muted")}
-                fontSize="12px"
+                fontSize={TYPE_SCALE_PX.caption}
               />
             </ReferenceDot>
           )}

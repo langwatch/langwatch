@@ -53,6 +53,14 @@ function GovernanceOverviewPage() {
 
   return (
     <GovernanceLayout pageTitle="AI Governance · LangWatch">
+      <PageLayout.Header>
+        <PageLayout.Heading>AI Governance</PageLayout.Heading>
+        <Badge colorPalette="purple" size="sm" variant="surface">
+          Preview
+        </Badge>
+        <Spacer />
+        <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
+      </PageLayout.Header>
       <PageLayout.Container>
         {/* zIndex 1 is load-bearing: the stacking context the hero's zIndex -1 light sits in. */}
         <VStack
@@ -60,18 +68,9 @@ function GovernanceOverviewPage() {
           gap={8}
           width="full"
           maxW={HOME_MEASURE}
-          marginX="auto"
           position="relative"
           zIndex={1}
         >
-          <PageLayout.Header>
-            <PageLayout.Heading>AI Governance</PageLayout.Heading>
-            <Badge colorPalette="purple" size="sm" variant="surface">
-              Preview
-            </Badge>
-            <Spacer />
-            <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
-          </PageLayout.Header>
           <VStack align="stretch" gap={6}>
             {orgId && !sample.active && <QuarantineFillAlert organizationId={orgId} />}
 

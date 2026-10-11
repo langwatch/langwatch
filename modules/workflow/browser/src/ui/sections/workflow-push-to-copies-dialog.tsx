@@ -5,11 +5,15 @@
 
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { workflowApi } from "../../behavior/workflow-api.ts";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
+
+const REPLICATE_DOCS = "https://docs.langwatch.ai/workflows/building-a-workflow";
 
 /** One replica, as the picker lists it. */
 type WorkflowCopy = { id: string; name: string; fullPath: string };
@@ -30,10 +34,13 @@ function ReplicaPicker({
 
   if (rows.length === 0) {
     return (
-      <Text color="fg.muted">
-        No replicas found. This may be because you don&apos;t have workflows:update permission on
-        the replica projects, or the replicas have been archived.
-      </Text>
+      <NoDataInfoBlock
+        size="inline"
+        icon={<Copy size={24} />}
+        title="No replicas found"
+        description="You may not have workflows:update permission on the replica projects, or the replicas have been archived."
+        next={[{ kind: "docs", label: "Read about replicating workflows", href: REPLICATE_DOCS }]}
+      />
     );
   }
 

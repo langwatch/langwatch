@@ -6,8 +6,8 @@
 
 import { dashboardNameSchema } from "@langwatch/dashboard-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, HStack, Input, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
-import { useEffect, useState } from "react";
+import { Field, Input, Text, VStack } from "@langwatch/design-system/primitives";
+import { useEffect, useRef, useState } from "react";
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { useDashboards } from "../../behavior/use-dashboards.ts";
@@ -32,14 +32,27 @@ export function DashboardNameDialog({
   const defaultName = `Dashboard ${dashboards.length + 1}`;
 
   const [dashboardName, setDashboardName] = useState(defaultName);
+  const [attempted, setAttempted] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const nameMissing = attempted && !dashboardName.trim();
 
   useEffect(() => {
     if (!open) return;
     setDashboardName((current) => (current.trim() ? current : defaultName));
   }, [defaultName, open]);
 
+  const close = () => {
+    setAttempted(false);
+    onOpenChange(false);
+  };
+
   const handleConfirm = () => {
-    if (!dashboardName.trim()) return;
+    if (createDashboard.isPending) return;
+    if (!dashboardName.trim()) {
+      setAttempted(true);
+      inputRef.current?.focus();
+      return;
+    }
 
     createDashboard.mutate(
       { projectId, name: dashboardName.trim() },
@@ -47,7 +60,7 @@ export function DashboardNameDialog({
         onSuccess: (newDashboard) => {
           void dashboardsQuery.refetch();
           host.navigate(`/${projectSlug}/analytics/reports?dashboard=${newDashboard.id}`);
-          onOpenChange(false);
+          close();
         },
         // The words a reader sees come from the host's code-keyed registry, so
         // the raw error travels and this only names what was being attempted.
@@ -57,45 +70,37 @@ export function DashboardNameDialog({
   };
 
   return (
-    <Dialog.Root open={open} size="sm" onOpenChange={({ open: isOpen }) => onOpenChange(isOpen)}>
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Create Dashboard</Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={2}>
-            <Text textStyle="sm" color="fg.muted">
-              Give it a name that identifies what this dashboard will focus on.
-            </Text>
-            <Input
-              aria-label="Dashboard name"
-              data-testid="analytics-dashboard-name-input"
-              placeholder="Dashboard name"
-              maxLength={dashboardNameSchema.maxLength ?? undefined}
-              value={dashboardName}
-              onChange={(event) => setDashboardName(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") handleConfirm();
-              }}
-            />
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button
-              colorPalette="orange"
-              data-testid="analytics-dashboard-create-confirm"
-              onClick={handleConfirm}
-              disabled={!dashboardName.trim()}
-              loading={createDashboard.isPending}
-            >
-              Create Dashboard
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      size="sm"
+      onClose={close}
+      title="Create dashboard"
+      busy={createDashboard.isPending}
+      onSubmit={handleConfirm}
+      primaryAction={{
+        label: "Create Dashboard",
+        type: "submit",
+        loading: createDashboard.isPending,
+        "data-testid": "analytics-dashboard-create-confirm",
+      }}
+    >
+      <VStack align="stretch" gap={2}>
+        <Text textStyle="sm" color="fg.muted">
+          Give it a name that identifies what this dashboard will focus on.
+        </Text>
+        <Field.Root invalid={nameMissing}>
+          <Input
+            ref={inputRef}
+            aria-label="Dashboard name"
+            data-testid="analytics-dashboard-name-input"
+            placeholder="Dashboard name"
+            maxLength={dashboardNameSchema.maxLength ?? undefined}
+            value={dashboardName}
+            onChange={(event) => setDashboardName(event.target.value)}
+          />
+          <Field.ErrorText>Enter a dashboard name.</Field.ErrorText>
+        </Field.Root>
+      </VStack>
+    </Dialog>
   );
 }

@@ -8,7 +8,11 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { HandledError } from "@langwatch/handled-error";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { trpcTestMembers } from "@langwatch/test-harness/trpc-members";
-import type { TopicApi, TopicClusteringStatus } from "@langwatch/topic-contract";
+import type {
+  TopicApi,
+  TopicClusteringRunHistoryEntry,
+  TopicClusteringStatus,
+} from "@langwatch/topic-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -39,14 +43,25 @@ function statusOf(isRunInFlight: boolean): TopicClusteringStatus {
 function mount({
   isRunInFlight = false,
   requestClustering = async () => undefined,
+  permits = () => true,
+  getClusteringRunHistory = async () => [],
+  getClusteringRunHistoryPage = async () => ({ outcome: "cursor_expired" }),
 }: {
   isRunInFlight?: boolean;
   requestClustering?: TopicApi["requestClustering"];
+  permits?: (permission: string) => boolean;
+  getClusteringRunHistory?: TopicApi["getClusteringRunHistory"];
+  getClusteringRunHistoryPage?: TopicApi["getClusteringRunHistoryPage"];
 } = {}) {
   const reportFailure = vi.fn();
   const request = vi.fn(requestClustering);
   const application = createApiFixture<TopicApi>(
-    { getClusteringStatus: async () => statusOf(isRunInFlight), requestClustering: request },
+    {
+      getClusteringStatus: async () => statusOf(isRunInFlight),
+      requestClustering: request,
+      getClusteringRunHistory,
+      getClusteringRunHistoryPage,
+    },
     "TopicApi",
   );
   const trigger = TopicClusteringTriggerService.create({
@@ -66,7 +81,7 @@ function mount({
   const router = createTrpcRuntime<TopicTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    members: trpcTestMembers<TopicTrpcTestContext>({ permits: () => true }),
+    members: trpcTestMembers<TopicTrpcTestContext>({ permits }),
   }).mount(topicTrpcTransport, () => browser);
 
   return { request, reportFailure, caller: router.createCaller({ actor: { id: ACTOR_ID } }) };
@@ -168,6 +183,88 @@ describe("topics.getTopicCounts", () => {
         topicCounts: [{ id: "t1", name: "Billing", count: 2 }],
         subtopicCounts: [],
       });
+    });
+  });
+});
+
+const finishedRun: TopicClusteringRunHistoryEntry = {
+  runId: "run_1",
+  trigger: "manual",
+  startedAt: 1,
+  finishedAt: 2,
+  outcome: "completed",
+  mode: "batch",
+  skippedReason: null,
+  errorCode: null,
+  isErrorUserActionable: false,
+  tracesProcessed: 1,
+  topicsCount: 1,
+  subtopicsCount: 0,
+  pages: 1,
+};
+
+describe("topics.getClusteringRunHistoryPage", () => {
+  describe("when the caller lacks the project view permission", () => {
+    /** @scenario "Reading the run history by page is a project view, like reading it whole" */
+    it("refuses them and reads no history", async () => {
+      const getClusteringRunHistoryPage = vi.fn(async () => ({
+        outcome: "cursor_expired" as const,
+      }));
+      const { caller } = mount({
+        permits: (permission) => permission !== "project:view",
+        getClusteringRunHistoryPage,
+      });
+
+      await expect(
+        caller.getClusteringRunHistoryPage({ projectId: "project_123" }),
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
+      expect(getClusteringRunHistoryPage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a member who may view asks", () => {
+    it("hands the parsed cursor and the default limit on and returns the page", async () => {
+      const asked: Parameters<TopicApi["getClusteringRunHistoryPage"]>[0][] = [];
+      const { caller } = mount({
+        getClusteringRunHistoryPage: async (input) => {
+          asked.push(input);
+
+          return { outcome: "page", entries: [finishedRun], hasMore: true, nextCursor: "run_1" };
+        },
+      });
+
+      await expect(
+        caller.getClusteringRunHistoryPage({ projectId: "project_123", cursor: "run_2" }),
+      ).resolves.toEqual({
+        outcome: "page",
+        entries: [finishedRun],
+        hasMore: true,
+        nextCursor: "run_1",
+      });
+      expect(asked).toEqual([{ projectId: "project_123", cursor: "run_2", limit: 20 }]);
+    });
+
+    it("refuses a limit past the retained history before the application is asked", async () => {
+      const getClusteringRunHistoryPage = vi.fn(async () => ({
+        outcome: "cursor_expired" as const,
+      }));
+      const { caller } = mount({ getClusteringRunHistoryPage });
+
+      await expect(
+        caller.getClusteringRunHistoryPage({ projectId: "project_123", limit: 500 }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(getClusteringRunHistoryPage).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The whole-history read keeps answering the array it always did" */
+    it("keeps answering the whole history as an array on the old procedure", async () => {
+      const { caller } = mount({ getClusteringRunHistory: async () => [finishedRun] });
+
+      await expect(caller.getClusteringRunHistory({ projectId: "project_123" })).resolves.toEqual([
+        finishedRun,
+      ]);
     });
   });
 });

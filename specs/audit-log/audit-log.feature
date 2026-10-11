@@ -215,12 +215,45 @@ Feature: Unified Audit Log
     Then she is told what organisation-wide audit logs cover and how to obtain them
     And no table is rendered at all
 
+  # The trail shows every member's actions, so reading it is an administrator's by
+  # default. The menu entry, the page and the read all ask the one grant, "auditLog:view".
+
+  @integration
+  Scenario: A reader without the organization-wide grant is told who can see the audit log
+    Given grace is a team Admin, so her project grant offers her the audit log entry and page
+    And she holds no "auditLog:view" for the whole organization
+    When she opens `/settings/audit-log` and the read is refused
+    Then the page keeps its "Audit log" header
+    And says "Only organization admins can see the audit log" in one sentence
+    And shows neither an error nor an empty table
+
   @unit
-  Scenario: Only an organization administrator may open the audit trail
-    Given bob holds "organization:view" and not "organization:manage"
+  Scenario: Only a reader holding the audit-log grant may open the audit trail
+    Given bob holds "organization:manage" and not "auditLog:view"
     When he opens `/settings/audit-log`
-    Then he is refused, and told which grant the page needs
+    Then he is refused, and told the page needs "auditLog:view"
     And the refusal is framed in the settings chrome he navigated into
+    And a reader holding "auditLog:view" opens the page
+
+  @unit
+  Scenario: The built-in Viewer and Member roles do not read the audit trail
+    Given carol is a Viewer and dave is a Member of the organization's team
+    When either reads the organization's audit trail, with or without a project filter
+    Then the read is refused
+
+  @unit
+  Scenario: An administrator reads the audit trail by default
+    Given erin is an organization administrator
+    When she reads the organization's audit trail, with or without a project filter
+    Then the read is allowed
+    And a team Admin also holds "auditLog:view" on that team's projects
+
+  @unit
+  Scenario: A custom role can grant the audit trail
+    Given frank holds an organization-wide custom role that lists "auditLog:view"
+    When he reads the organization's audit trail
+    Then the read is allowed
+    And a custom role that does not list it is refused
 
   # ──────────────────────────────────────────────────────────────────────────
   # Filtering and paging — all of it in the address, because a compliance
@@ -397,6 +430,13 @@ Feature: Unified Audit Log
     When that project belongs to organization "bravo"
     Then no audit rows are returned at all
     And the audit table is never read for that filter
+
+  @unit
+  Scenario: A project-filtered read holds only that project's events
+    Given an "acme" administrator filters the audit trail by one of "acme"'s projects
+    When the audit trail is read
+    Then only rows recorded against that project are returned
+    And organization-wide events, such as membership, billing and sign-on changes, are not
 
   @integration @unimplemented
   Scenario: Audit log respects org/project boundaries

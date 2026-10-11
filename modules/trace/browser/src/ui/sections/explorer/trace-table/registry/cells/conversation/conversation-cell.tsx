@@ -159,7 +159,7 @@ export const ConversationCell: CellDef<ConversationGroup> = {
 };
 
 const ConversationSummaryChips: React.FC<{ group: ConversationGroup }> = ({ group }) => (
-  <HStack gap={2} flexShrink={0} textStyle="2xs" color="fg.subtle" marginTop="2px">
+  <HStack gap={2} flexShrink={0} textStyle="2xs" color="fg.subtle" marginTop="0.5">
     {group.errorCount > 0 && (
       <HStack gap={0.5}>
         <Icon boxSize="10px" color="red.fg">

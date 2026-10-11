@@ -42,7 +42,7 @@ export default function Authorize() {
         intro="Create a LangWatch personal access token and paste it into your command line or notebook to authorize it."
       >
         <HStack width="full" justify="space-between">
-          <Text fontSize="sm" color="fg.muted">
+          <Text textStyle="body" color="fg.muted">
             Project
           </Text>
           {host.projectSwitcher()}
@@ -50,7 +50,7 @@ export default function Authorize() {
         <VStack align="stretch" gap={2}>
           <APIKeyCopyInput onCopied={() => setCopied(true)} />
           {copied ? (
-            <Text fontSize="sm" color="fg.muted" textAlign="center">
+            <Text textStyle="body" color="fg.muted" textAlign="center">
               You can close this tab once you have pasted it.
             </Text>
           ) : null}
@@ -110,7 +110,7 @@ export function APIKeyCopyInput({ onCopied }: { onCopied?: () => void }) {
   return (
     <VStack align="stretch" gap={2}>
       <VStack align="stretch" gap={1}>
-        <Text fontSize="sm" color="fg.muted">
+        <Text textStyle="body" color="fg.muted">
           Expiration
         </Text>
         <Select.Root
@@ -143,7 +143,7 @@ export function APIKeyCopyInput({ onCopied }: { onCopied?: () => void }) {
           />
         )}
         {!expirationChosen && (
-          <Text fontSize="xs" color="fg.muted" data-testid="authorize-expiration-hint">
+          <Text textStyle="caption" color="fg.muted" data-testid="authorize-expiration-hint">
             Choose when this token expires, or select No expiration.
           </Text>
         )}

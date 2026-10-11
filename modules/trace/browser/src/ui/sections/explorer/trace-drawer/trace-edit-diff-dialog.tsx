@@ -1,3 +1,4 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { useMemo, useState } from "react";
@@ -14,7 +15,6 @@ import {
 } from "../../../../model/coding-agent/trace/terminal-line-diff.ts";
 import { applyOverlayToTraceHeader } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import { SegmentedToggle } from "../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
-import { Dialog } from "../../dialog.tsx";
 
 type DiffTab = "trace" | "spans";
 
@@ -49,46 +49,44 @@ export function TraceEditDiffDialog({ open, onClose, patch }: TraceEditDiffDialo
   const stat = tab === "trace" ? traceStat : spansStat;
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(e) => {
-        if (!e.open) {
-          // The pick belongs to one reading of the difference. The dialog stays
-          // mounted between openings, so keeping it would land the next one on
-          // a side that may have nothing to read this time.
-          setPickedTab(null);
-          onClose();
-        }
+      onClose={() => {
+        // The pick belongs to one reading of the difference. The dialog stays
+        // mounted between openings, so keeping it would land the next one on
+        // a side that may have nothing to read this time.
+        setPickedTab(null);
+        onClose();
       }}
+      title="Trace edits"
       size="xl"
       placement="center"
+      headerAppearance="divided"
+      heightLimit="reading"
+      body="flush"
+      cancelLabel={null}
+      trapFocus={false}
+      preventScroll={false}
+      headerContent={
+        <HStack gap={3} align="center">
+          <Text textStyle="md" fontWeight="semibold">
+            Trace edits
+          </Text>
+          {/* Each tab carries its own counts, so the reader can see which
+              part of the trace changed without opening both. */}
+          <SegmentedToggle
+            value={tab}
+            onChange={(next) => setPickedTab(next as DiffTab)}
+            options={[
+              { value: "trace", label: tabLabel("trace", traceStat) },
+              { value: "spans", label: tabLabel("spans", spansStat) },
+            ]}
+          />
+        </HStack>
+      }
     >
-      <Dialog.Content maxHeight="85vh" display="flex" flexDirection="column">
-        <Dialog.Header borderBottomWidth="1px" borderColor="border">
-          <HStack gap={3} align="center">
-            <Dialog.Title>
-              <Text textStyle="md" fontWeight="semibold">
-                Trace edits
-              </Text>
-            </Dialog.Title>
-            {/* Each tab carries its own counts, so the reader can see which
-                part of the trace changed without opening both. */}
-            <SegmentedToggle
-              value={tab}
-              onChange={(next) => setPickedTab(next as DiffTab)}
-              options={[
-                { value: "trace", label: tabLabel("trace", traceStat) },
-                { value: "spans", label: tabLabel("spans", spansStat) },
-              ]}
-            />
-          </HStack>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body padding={0} overflow="auto" flex={1}>
-          <DiffHunks lines={lines} stat={stat} />
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+      <DiffHunks lines={lines} stat={stat} />
+    </Dialog>
   );
 }
 

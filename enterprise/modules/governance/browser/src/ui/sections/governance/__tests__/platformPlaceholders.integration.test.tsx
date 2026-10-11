@@ -200,6 +200,20 @@ describe("the Analytics screen on first open", () => {
       screen.getByText("usage | summarize sum(cost) by department, bin(1w)"),
     ).toBeInTheDocument();
   });
+
+  /** @scenario "The empty Dashboards tab points at the Explore builder" */
+  it("selects Explore with its chart and leaves focus on the Explore tab when the empty tab's button is pressed", async () => {
+    open(<AnalyticsScreen />);
+    await userEvent.click(screen.getByRole("tab", { name: /^Dashboards/ }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Build a query in Explore" }));
+
+    const exploreTab = screen.getByRole("tab", { name: "Explore" });
+    expect(exploreTab).toHaveAttribute("aria-selected", "true");
+    expect(exploreTab).toHaveFocus();
+    expect(screen.getByText("Cost by department · weekly")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Build a query in Explore" })).toBeNull();
+  });
 });
 
 describe("the copy on the Platform screens", () => {

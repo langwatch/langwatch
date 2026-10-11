@@ -105,7 +105,7 @@ function DirectoryReadFailure({ error }: { error: unknown }) {
     );
   }
   return (
-    <Text fontSize="13px" color="fg.muted" data-testid="directory-card-failure">
+    <Text textStyle="bodySm" color="fg.muted" data-testid="directory-card-failure">
       Couldn&apos;t read your directory. Try again in a moment.
     </Text>
   );
@@ -176,10 +176,10 @@ function DirectoryCardWaiting({
 }) {
   return (
     <VStack align="start" gap={1} paddingY={1}>
-      <Text fontSize="13px" fontWeight="500">
+      <Text textStyle="label">
         {waiting ? "Waiting for the first push" : "Nothing has arrived yet"}
       </Text>
-      <Text fontSize="11.5px" lineHeight="1.55" color="fg.muted" maxWidth="46ch">
+      <Text textStyle="caption" lineHeight="1.55" color="fg.muted" maxWidth="46ch">
         {waitingWords({ waiting, attention })}
       </Text>
     </VStack>
@@ -229,7 +229,7 @@ function DirectoryCardFacts({
 
       <VStack align="start" gap={1.5} paddingTop={1} width="full">
         <Text
-          fontSize="10.5px"
+          textStyle="micro"
           fontWeight="600"
           letterSpacing="0.06em"
           textTransform="uppercase"
@@ -239,7 +239,7 @@ function DirectoryCardFacts({
         </Text>
         <FactUnavailable canRead={canReadMembership} read={facts.groups}>
           {facts.directoryGroups.length === 0 ? (
-            <Text fontSize="11.5px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               None yet
             </Text>
           ) : (
@@ -252,7 +252,7 @@ function DirectoryCardFacts({
                 />
               ))}
               {restGroups > 0 && (
-                <Text fontSize="11.5px" color="fg.subtle">
+                <Text textStyle="caption" color="fg.subtle">
                   {`+${restGroups} more`}
                 </Text>
               )}
@@ -264,7 +264,7 @@ function DirectoryCardFacts({
       {department.show && (
         <VStack align="start" gap={1.5} paddingTop={1} width="full">
           <Text
-            fontSize="10.5px"
+            textStyle="micro"
             fontWeight="600"
             letterSpacing="0.06em"
             textTransform="uppercase"
@@ -281,7 +281,7 @@ function DirectoryCardFacts({
               />
             ))}
             {department.departments.length > GROUPS_SHOWN && (
-              <Text fontSize="11.5px" color="fg.subtle">
+              <Text textStyle="caption" color="fg.subtle">
                 {`+${department.departments.length - GROUPS_SHOWN} more`}
               </Text>
             )}

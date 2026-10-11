@@ -14,7 +14,7 @@ import { useDensityStore } from "../../../../features/explorer/behavior/density.
 import { tryParseChat } from "../../../../model/explorer/trace-table/chat-content.ts";
 import { useDensityTokens } from "../hooks/use-density-tokens.ts";
 
-const COMFORTABLE_LABEL_WIDTH = "60px";
+const COMFORTABLE_LABEL_WIDTH = "68px";
 
 interface IOPreviewProps {
   input: string | null;
@@ -432,7 +432,7 @@ const CompactMissingRow: React.FC<{
   fontSize: string;
 }> = ({ direction, fontSize }) => (
   <HStack gap={1} width="full" overflow="hidden" align="flex-start">
-    <Flex align="center" gap={1} flexShrink={0} paddingTop="2px">
+    <Flex align="center" gap={1} flexShrink={0} paddingTop="0.5">
       <Icon boxSize="10px" color="fg.subtle">
         {direction === "input" ? <ArrowUp /> : <ArrowDown />}
       </Icon>
@@ -470,7 +470,7 @@ const CompactRow: React.FC<CompactRowProps> = ({ row, fontSize, direction }) => 
       {/* Removed the dashed vertical bar that used to sit before the
           arrow icon — it read as visual noise and didn't add an
           alignment cue the row tint isn't already providing. */}
-      <Flex align="center" gap={1} flexShrink={0} paddingTop="2px">
+      <Flex align="center" gap={1} flexShrink={0} paddingTop="0.5">
         <Icon boxSize="10px" color={accent}>
           {isInput ? <ArrowUp /> : <ArrowDown />}
         </Icon>
@@ -487,7 +487,7 @@ const CompactRow: React.FC<CompactRowProps> = ({ row, fontSize, direction }) => 
           fontSize={fontSize}
           color={textColor}
           fontStyle="italic"
-          fontWeight="400"
+          fontWeight="normal"
         />
         {row.media.imageSrc && <RowThumbnail src={row.media.imageSrc} height="36px" />}
       </VStack>
@@ -548,11 +548,10 @@ const ComfortableIOPreview: React.FC<
     [output, outputMediaRefs],
   );
   return (
-    <VStack align="stretch" gap={2} fontFamily="mono">
+    <VStack align="stretch" gap={2}>
       {inputRow && (
         <ComfortableRow
-          label="Input"
-          labelColor={{ base: "blue.fg", _dark: "blue.fg" }}
+          direction="input"
           textColor="fg.muted"
           text={inputRow.text}
           media={inputRow.media}
@@ -561,8 +560,7 @@ const ComfortableIOPreview: React.FC<
       {placeholders.input && <ComfortableMissingRow direction="input" />}
       {outputRow && (
         <ComfortableRow
-          label="Output"
-          labelColor={{ base: "green.solid", _dark: "green.fg" }}
+          direction="output"
           textColor="fg"
           text={outputRow.text}
           media={outputRow.media}
@@ -573,17 +571,32 @@ const ComfortableIOPreview: React.FC<
   );
 };
 
+/**
+ * "Input" / "Output" as a neutral label with the same up / down arrow the compact rows use,
+ * so the two sides tell apart by word and shape in both themes, never by a palette colour.
+ */
+const ComfortableLabel: React.FC<{ direction: "input" | "output"; muted?: boolean }> = ({
+  direction,
+  muted = false,
+}) => (
+  <HStack
+    gap={1}
+    flexShrink={0}
+    width={COMFORTABLE_LABEL_WIDTH}
+    height="20px"
+    color={muted ? "fg.subtle" : "fg"}
+    data-testid={`io-preview-label-${direction}`}
+  >
+    <Icon boxSize="12px" color={muted ? "fg.subtle" : "fg.muted"}>
+      {direction === "input" ? <ArrowUp /> : <ArrowDown />}
+    </Icon>
+    <Text textStyle="groupLabel">{direction === "input" ? "Input" : "Output"}</Text>
+  </HStack>
+);
+
 const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ direction }) => (
   <HStack align="flex-start" gap={2}>
-    <Text
-      textStyle="sm"
-      fontWeight="600"
-      color="fg.subtle"
-      flexShrink={0}
-      width={COMFORTABLE_LABEL_WIDTH}
-    >
-      {direction === "input" ? "Input" : "Output"}
-    </Text>
+    <ComfortableLabel direction={direction} muted />
     <Text
       data-testid={`io-preview-missing-${direction}`}
       textStyle="sm"
@@ -596,22 +609,13 @@ const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ di
 );
 
 const ComfortableRow: React.FC<{
-  label: string;
-  labelColor: string | { base: string; _dark: string };
+  direction: "input" | "output";
   textColor: string;
   text: string;
   media: RowMedia;
-}> = ({ label, labelColor, textColor, text, media }) => (
+}> = ({ direction, textColor, text, media }) => (
   <HStack align="flex-start" gap={2}>
-    <Text
-      textStyle="sm"
-      fontWeight="600"
-      color={labelColor}
-      flexShrink={0}
-      width={COMFORTABLE_LABEL_WIDTH}
-    >
-      {label}
-    </Text>
+    <ComfortableLabel direction={direction} />
     <VStack align="start" gap={1.5} flex={1} minWidth={0}>
       <HStack width="full" gap={1} align="flex-start">
         <RowMediaIndicators media={media} />

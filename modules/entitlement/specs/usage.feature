@@ -73,6 +73,7 @@ Feature: Entitlement's meters, decisions and who learns them
     When trace's upgrade sends the month's trace ids and new traces arrive live
     Then each project's trace count equals its traces first seen in the month
 
+  @unit @usage
   Scenario: The trace count decides a limit as the live trace count did, over the same traces
     Given an organization metered in traces whose projects' traces this month are on the trace count
     When the limit is checked and the month is counted per project

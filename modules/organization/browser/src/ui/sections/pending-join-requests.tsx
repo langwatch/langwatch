@@ -4,14 +4,15 @@ import { Link } from "@langwatch/browser-host/link";
  * anybody who cannot approve, and nothing while nobody waits.
  * Spec: specs/identity/domain-auto-join.feature
  */
+import { Card } from "@langwatch/design-system/card";
 import {
   Box,
   Button,
-  Card,
   Heading,
   HStack,
   Spacer,
   Text,
+  VStack,
 } from "@langwatch/design-system/primitives";
 import { ArrowRight, UserPlus } from "lucide-react";
 
@@ -32,20 +33,13 @@ export function PendingJoinRequests() {
 
   return (
     <Box width="full" data-testid="home-pending-join-requests">
-      <Card.Root
-        bg="bg.card/50"
-        backdropBlur="md"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="14px"
-        boxShadow="none"
-      >
-        <Card.Body padding={4} gap={3}>
+      <Card bodyLayout="spaced">
+        <VStack align="stretch" gap={3}>
           <HStack gap={2}>
             <Box color="fg.muted" display="flex" alignItems="center">
               <UserPlus size={16} aria-hidden />
             </Box>
-            <Heading as="h3" size="sm">
+            <Heading as="h3" textStyle="cardTitle">
               Waiting to join
             </Heading>
             <Text fontSize="sm" color="fg.muted">
@@ -68,8 +62,8 @@ export function PendingJoinRequests() {
             onApprove={join.approve}
             onReject={join.reject}
           />
-        </Card.Body>
-      </Card.Root>
+        </VStack>
+      </Card>
     </Box>
   );
 }

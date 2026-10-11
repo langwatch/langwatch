@@ -92,9 +92,7 @@ export function EvaluatorListItem({
           <EvaluatorKindIcon kind={evaluator.type} />
         </Box>
         <VStack align="start" gap={0} flex={1}>
-          <Text fontWeight="medium" fontSize="13px">
-            {evaluator.name}
-          </Text>
+          <Text textStyle="label">{evaluator.name}</Text>
           <Text fontSize="xs" color="fg.muted" lineClamp={1}>
             {displayName && (
               <>

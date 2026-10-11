@@ -415,7 +415,7 @@ export const TargetHeader = memo(function TargetHeader({
               // Align icon with text for evaluators.
               marginTop={target.type === "evaluator" ? "-2px" : undefined}
             />
-            <Text fontSize="13px" fontWeight="medium" truncate>
+            <Text textStyle="label" truncate>
               {headerName}
             </Text>
             {didWin && (
@@ -430,7 +430,7 @@ export const TargetHeader = memo(function TargetHeader({
                 data-testid="target-header-won-badge"
               >
                 <Trophy size={10} />
-                <Text fontSize="11px" fontWeight="semibold">
+                <Text textStyle="micro" fontWeight="semibold">
                   Won
                 </Text>
               </HStack>

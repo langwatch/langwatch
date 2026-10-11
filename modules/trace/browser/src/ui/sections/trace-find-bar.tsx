@@ -1,5 +1,15 @@
 import { Kbd } from "@langwatch/design-system/kbd";
-import { Box, Flex, Icon, IconButton, Input, Text } from "@langwatch/design-system/primitives";
+import {
+  Box,
+  Flex,
+  Icon,
+  IconButton,
+  Input,
+  Text,
+  VisuallyHidden,
+} from "@langwatch/design-system/primitives";
+import { shortcutAriaKeys, type ShortcutDefinition } from "@langwatch/design-system/shortcut-hint";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useDeferredValue, useState } from "react";
 
@@ -24,6 +34,19 @@ type TraceFindBarProps = {
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 const MOD_KEY_SYMBOL = IS_MAC ? "⌘" : "Ctrl";
 const ICON_SIZE = 14;
+const FIND_FIELD_SCOPE = "While the find field is focused";
+const NEXT_MATCH: ShortcutDefinition = {
+  alternatives: [{ keys: ["Enter"] }, { keys: ["ArrowDown"] }],
+  scopeLabel: FIND_FIELD_SCOPE,
+};
+const PREVIOUS_MATCH: ShortcutDefinition = {
+  alternatives: [{ keys: ["Shift", "Enter"] }, { keys: ["ArrowUp"] }],
+  scopeLabel: FIND_FIELD_SCOPE,
+};
+const CLOSE_FIND: ShortcutDefinition = {
+  alternatives: [{ keys: ["Escape"] }],
+  scopeLabel: FIND_FIELD_SCOPE,
+};
 
 export function TraceFindBar({ traces, renderShortcutKey }: TraceFindBarProps) {
   const isOpen = useFindStore((state) => state.isOpen);
@@ -104,7 +127,12 @@ export function TraceFindBar({ traces, renderShortcutKey }: TraceFindBarProps) {
             _focus={{ borderColor: "transparent", boxShadow: "none" }}
             textStyle="xs"
             aria-label="Find query"
+            aria-describedby="trace-find-instructions"
           />
+          <VisuallyHidden id="trace-find-instructions">
+            Enter or Down arrow for the next match. Shift plus Enter or Up arrow for the previous
+            match. Escape closes find.
+          </VisuallyHidden>
           {hasQuery && (
             <FindMatchCounter
               isSearching={isSearching}
@@ -112,27 +140,45 @@ export function TraceFindBar({ traces, renderShortcutKey }: TraceFindBarProps) {
               currentIndex={currentIndex}
             />
           )}
-          <IconButton
-            size="2xs"
-            variant="ghost"
-            aria-label="Previous match"
-            disabled={noMatches}
-            onClick={previous}
+          <Tooltip
+            content="Previous match"
+            shortcut={PREVIOUS_MATCH}
+            positioning={{ placement: "bottom" }}
           >
-            <ChevronUp size={ICON_SIZE} />
-          </IconButton>
-          <IconButton
-            size="2xs"
-            variant="ghost"
-            aria-label="Next match"
-            disabled={noMatches}
-            onClick={next}
-          >
-            <ChevronDown size={ICON_SIZE} />
-          </IconButton>
-          <IconButton size="2xs" variant="ghost" aria-label="Close find" onClick={close}>
-            <X size={ICON_SIZE} />
-          </IconButton>
+            <IconButton
+              size="2xs"
+              variant="ghost"
+              aria-label="Previous match"
+              aria-keyshortcuts={shortcutAriaKeys(PREVIOUS_MATCH)}
+              disabled={noMatches}
+              onClick={previous}
+            >
+              <ChevronUp size={ICON_SIZE} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip content="Next match" shortcut={NEXT_MATCH} positioning={{ placement: "bottom" }}>
+            <IconButton
+              size="2xs"
+              variant="ghost"
+              aria-label="Next match"
+              aria-keyshortcuts={shortcutAriaKeys(NEXT_MATCH)}
+              disabled={noMatches}
+              onClick={next}
+            >
+              <ChevronDown size={ICON_SIZE} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip content="Close find" shortcut={CLOSE_FIND} positioning={{ placement: "bottom" }}>
+            <IconButton
+              size="2xs"
+              variant="ghost"
+              aria-label="Close find"
+              aria-keyshortcuts={shortcutAriaKeys(CLOSE_FIND)}
+              onClick={close}
+            >
+              <X size={ICON_SIZE} />
+            </IconButton>
+          </Tooltip>
         </Flex>
       </Box>
       <Box

@@ -238,7 +238,7 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
       hasActive={isActive}
       activeIndicator={
         summary ? (
-          <Text textStyle="2xs" color="blue.fg" fontWeight="500">
+          <Text textStyle="2xs" color="blue.fg" fontWeight="medium">
             {summary}
           </Text>
         ) : undefined

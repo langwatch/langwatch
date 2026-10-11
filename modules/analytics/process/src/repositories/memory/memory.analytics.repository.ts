@@ -6,7 +6,7 @@ import type {
   AnalyticsTopDocumentsResult,
 } from "@langwatch/analytics-contract";
 
-import { AnalyticsRepository } from "../analytics.repository.ts";
+import { AnalyticsRepository, type AnalyticsFeedbackPageRead } from "../analytics.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
 
 /**
@@ -32,6 +32,10 @@ export class MemoryAnalyticsRepository extends AnalyticsRepository {
 
   findFeedbackEvents(): Promise<AnalyticsFeedbacksResult> {
     return Promise.resolve({ events: [] });
+  }
+
+  findFeedbackEventsPage(): Promise<AnalyticsFeedbackPageRead> {
+    return Promise.resolve({ rows: [], hasMore: false });
   }
 
   findTopDocuments(): Promise<AnalyticsTopDocumentsResult> {

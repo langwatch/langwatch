@@ -25,7 +25,7 @@ export const optionItemRecipe = defineRecipe({
     _pressed: { background: "bg.emphasized" },
     _focusVisible: {
       outline: "2px solid",
-      outlineColor: "border.emphasized",
+      outlineColor: "colorPalette.focusRing",
       outlineOffset: "-2px",
     },
     _disabled: { opacity: 0.5, cursor: "not-allowed" },

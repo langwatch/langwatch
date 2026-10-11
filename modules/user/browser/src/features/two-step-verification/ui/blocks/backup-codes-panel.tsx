@@ -3,7 +3,9 @@
  * never held one: what they are FOR comes before how they behave, and no
  * word is shortened, because these are the last way back into an account.
  */
-import { Box, Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 
 import { usePersonalWorkspaceHost } from "../../../../model/personal-workspace-host.ts";
 
@@ -17,6 +19,7 @@ export function BackupCodesPanel({
   doneLabel?: string;
 }) {
   const host = usePersonalWorkspaceHost();
+  const accent = useProductAccent();
 
   const copyAll = async () => {
     try {
@@ -44,21 +47,21 @@ export function BackupCodesPanel({
         </Text>
       </VStack>
 
-      <Box borderWidth="1px" borderRadius="md" padding={4} fontFamily="monospace" overflow="hidden">
-        <SimpleGrid columns={{ base: 1, sm: 2 }} gap={2}>
+      <Card variant="frame">
+        <SimpleGrid columns={{ base: 1, sm: 2 }} gap={2} fontFamily="mono">
           {codes.map((code) => (
             <Text key={code} fontSize="sm" data-testid="two-factor-backup-code">
               {code}
             </Text>
           ))}
         </SimpleGrid>
-      </Box>
+      </Card>
 
       <HStack gap={3} justify="end">
         <Button variant="outline" onClick={() => void copyAll()} data-testid="copy-backup-codes">
           Copy all
         </Button>
-        <Button colorPalette="orange" onClick={onDone} data-testid="backup-codes-done">
+        <Button colorPalette={accent.colorPalette} onClick={onDone} data-testid="backup-codes-done">
           {doneLabel}
         </Button>
       </HStack>

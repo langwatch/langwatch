@@ -65,8 +65,8 @@ afterEach(() => {
 });
 
 describe("TraceTableShell", () => {
-  /** @scenario "Switching between two groupings relabels the group column" */
   describe("given a grouped table switched from By Model to By Service", () => {
+    /** @scenario "Switching between two groupings relabels the group column" */
     it("relabels the group column header", () => {
       const { rerender } = render(<Harness groupLabel="Model" />);
       expect(headerCell("Model")).toBeInTheDocument();

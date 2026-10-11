@@ -3,7 +3,7 @@
 /** The vendor marks and the wrapper that renders them. Every mark is a plain inline SVG, so what is
  * worth pinning is that each one draws something of its own — a copy-paste slip during a move
  * shows up as two names drawing the same artwork. */
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -16,6 +16,7 @@ import {
   IconGlyph,
   LLMIcon,
   MicrosoftIcon,
+  MoreVerticalIcon,
   OpenAIIcon,
   OpenTelemetryIcon,
   WeaviateIcon,
@@ -75,6 +76,28 @@ describe("icons", () => {
 
       expect(svg?.getAttribute("width")).toBe("48");
       expect(svg?.getAttribute("height")).toBe("48");
+    });
+  });
+});
+
+describe("MoreVerticalIcon", () => {
+  describe("given a row menu trigger that carries its own label", () => {
+    /** @scenario The row menu trigger draws a decorative ellipsis icon */
+    it("draws a 16px decorative glyph that inherits the text colour and takes no focus", () => {
+      const { container } = render(
+        <button type="button" aria-label="Actions for Support cases">
+          <MoreVerticalIcon size={16} />
+        </button>,
+      );
+      const svg = container.querySelector("svg");
+
+      expect(svg?.getAttribute("width")).toBe("16");
+      expect(svg?.getAttribute("height")).toBe("16");
+      expect(svg?.getAttribute("aria-hidden")).toBe("true");
+      expect(svg?.getAttribute("stroke")).toBe("currentColor");
+      expect(svg?.hasAttribute("tabindex")).toBe(false);
+      expect(svg?.querySelectorAll("circle")).toHaveLength(3);
+      expect(screen.getByRole("button", { name: "Actions for Support cases" })).toBeTruthy();
     });
   });
 });

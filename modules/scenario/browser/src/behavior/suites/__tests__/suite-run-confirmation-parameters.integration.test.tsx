@@ -193,7 +193,7 @@ describe("suite run confirmation parameters", () => {
         const user = await openConfirmation();
         await user.clear(screen.getByTestId("suite-run-parameter-region"));
         await user.type(screen.getByTestId("suite-run-parameter-region"), "us-east");
-        await user.click(screen.getByText("Run 1 Job"));
+        await user.click(screen.getByText("Run 1 job"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -214,7 +214,7 @@ describe("suite run confirmation parameters", () => {
         const user = await openConfirmation();
         await user.type(screen.getByTestId("suite-run-parameter-seats"), "12");
         await user.type(screen.getByTestId("suite-run-parameter-trial"), "false");
-        await user.click(screen.getByText("Run 1 Job"));
+        await user.click(screen.getByText("Run 1 job"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -232,7 +232,7 @@ describe("suite run confirmation parameters", () => {
         ];
 
         const user = await openConfirmation();
-        await user.click(screen.getByText("Run 1 Job"));
+        await user.click(screen.getByText("Run 1 job"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
           expect.objectContaining({ parameters: { region: "eu-central" } }),
@@ -275,19 +275,25 @@ describe("suite run confirmation parameters", () => {
       });
 
       /** @scenario "The run dialog requires a value for every secret parameter" */
-      it("holds the run until the secret has a value", async () => {
+      it("holds the run and focuses the secret until it has a value", async () => {
         mocks.scenarios = scenariosDeclaringASecret;
 
         const user = await openConfirmation();
 
-        const runButton = screen.getByText("Run 2 Jobs").closest("button");
-        expect(runButton).toBeDisabled();
+        const runButton = screen.getByText("Run 2 jobs").closest("button");
+        expect(runButton).toBeEnabled();
         expect(screen.getByTestId("suite-run-parameter-error-api_token")).toBeInTheDocument();
+
+        await user.click(screen.getByText("Run 2 jobs"));
+
+        expect(mocks.mutate).not.toHaveBeenCalled();
+        expect(screen.getByTestId("suite-run-parameter-api_token")).toHaveFocus();
 
         await user.type(screen.getByTestId("suite-run-parameter-api_token"), "tok-live-1");
 
-        expect(runButton).not.toBeDisabled();
         expect(screen.queryByTestId("suite-run-parameter-error-api_token")).toBeNull();
+        await user.click(screen.getByText("Run 2 jobs"));
+        expect(mocks.mutate).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -298,7 +304,7 @@ describe("suite run confirmation parameters", () => {
 
         const user = await openConfirmation();
         await user.type(screen.getByTestId("suite-run-parameter-api_token"), "tok-live-1");
-        await user.click(screen.getByText("Run 2 Jobs"));
+        await user.click(screen.getByText("Run 2 jobs"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -317,7 +323,7 @@ describe("suite run confirmation parameters", () => {
 
         const user = await openConfirmation();
         await user.type(screen.getByTestId("suite-run-parameter-api_token"), "12345");
-        await user.click(screen.getByText("Run 1 Job"));
+        await user.click(screen.getByText("Run 1 job"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
           expect.objectContaining({ parameters: { api_token: "12345" } }),
@@ -332,7 +338,7 @@ describe("suite run confirmation parameters", () => {
         mocks.scenarios = [{ id: "scenario_1", parameters: null }];
 
         const user = await openConfirmation();
-        await user.click(screen.getByText("Run 1 Job"));
+        await user.click(screen.getByText("Run 1 job"));
 
         expect(mocks.mutate).toHaveBeenCalledWith(
           expect.objectContaining({ parameters: undefined }),

@@ -4,35 +4,45 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { runHasEvaluators } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { anyRunHasCaller } from "./caller-display.ts";
+import { type ResultsColumn, ResultsTable, ResultsTableHead } from "./results-table-chrome.tsx";
 import { RunResultRow } from "./run-result-row.tsx";
 
+/** The narrowest the scenario name, and the evaluators beside it, are drawn. */
+const NAME_FLOOR_PX = 184;
+
 /**
- * The columns of the table, composed from what's actually shown: the last always holds the row
- * menu (grows to fit a Stop control); Evaluators and Caller (AC24) appear only when a run in
- * the table has one, and a narrow table wraps pills rather than cutting the scenario name.
+ * The columns of the table, composed from what's shown: the last holds the row menu (wider
+ * for a Stop control); Evaluators and Caller (AC24) appear only when a run has one. With
+ * evaluators the table keeps a floor under the names and scrolls rather than cutting them.
  */
-function resultColumns({
+export function resultColumns({
   hasEvaluators,
   hasCaller,
+  hasStoppable,
 }: {
   hasEvaluators: boolean;
   hasCaller: boolean;
-}): string {
-  return [
-    "120px", // Result
-    hasEvaluators ? "minmax(160px,1fr)" : "minmax(0,1fr)", // Scenario
-    ...(hasEvaluators ? ["minmax(0,1fr)"] : []), // Evaluators
-    ...(hasCaller ? ["90px"] : []), // Caller
-    "130px", // Time · cost
-    "auto", // row menu
-  ].join(" ");
+  hasStoppable: boolean;
+}): { columns: ResultsColumn[]; minWidth?: string } {
+  const columns: ResultsColumn[] = [
+    { key: "result", text: "Result", width: "148px" },
+    { key: "scenario", text: "Scenario" },
+    ...(hasEvaluators ? [{ key: "evaluators", text: "Evaluators" }] : []),
+    ...(hasCaller
+      ? [{ key: "caller", text: "Caller", width: "114px" } satisfies ResultsColumn]
+      : []),
+    { key: "metrics", text: "Time · cost", width: "154px", align: "end" as const },
+    { key: "menu", text: "", width: hasStoppable ? "116px" : "52px", action: true },
+  ];
+  if (!hasEvaluators) return { columns };
+  const fixed = columns.reduce((sum, column) => sum + (parseInt(column.width ?? "0", 10) || 0), 0);
+  return { columns, minWidth: `${fixed + 2 * NAME_FLOOR_PX}px` };
 }
 
 export type RunResultsTableProps = {
@@ -63,57 +73,17 @@ export function RunResultsTable({
     !!onCancelRun && scenarioRuns.some((scenarioRun) => isCancellableStatus(scenarioRun.status));
   const hasEvaluators = scenarioRuns.some(runHasEvaluators);
   const hasCaller = anyRunHasCaller(scenarioRuns);
-  const templateColumns = resultColumns({ hasEvaluators, hasCaller });
+  const { columns, minWidth } = resultColumns({ hasEvaluators, hasCaller, hasStoppable });
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      overflowX="auto"
-      data-testid="run-results-table"
-    >
-      <Box
-        display="grid"
-        gridTemplateColumns={templateColumns}
-        columnGap={3}
-        alignItems="center"
-        paddingX={4}
-        paddingY={2}
-        background={TABLE_HEADER_BG}
-        borderBottomWidth="1px"
-        borderBottomColor="border"
-        fontSize="10.5px"
-        fontWeight="semibold"
-        textTransform="uppercase"
-        letterSpacing="0.025em"
-        color={FG_MUTED}
-        data-testid="run-results-table-header"
-      >
-        <Text as="span">Result</Text>
-        <Text as="span">Scenario</Text>
-        {hasEvaluators ? <Text as="span">Evaluators</Text> : null}
-        {hasCaller ? <Text as="span">Caller</Text> : null}
-        <Text as="span" textAlign="right">
-          Time · cost
-        </Text>
-        <Text as="span" />
-      </Box>
+    <ResultsTable columns={columns} minWidth={minWidth} testId="run-results-table">
+      <ResultsTableHead columns={columns} testId="run-results-table-header" />
 
-      <Box
-        css={{
-          "& > * + *": {
-            borderTopWidth: "1px",
-            borderTopColor: "var(--chakra-colors-border-muted)",
-          },
-        }}
-      >
+      <ListTable.Body>
         {scenarioRuns.map((scenarioRun) => (
           <RunResultRow
             key={scenarioRun.scenarioRunId}
             scenarioRun={scenarioRun}
-            templateColumns={templateColumns}
-            hasStoppable={hasStoppable}
             hasEvaluators={hasEvaluators}
             hasCaller={hasCaller}
             resolveTargetName={resolveTargetName}
@@ -125,7 +95,7 @@ export function RunResultsTable({
             onRerunCase={onRerunCase}
           />
         ))}
-      </Box>
-    </Box>
+      </ListTable.Body>
+    </ResultsTable>
   );
 }

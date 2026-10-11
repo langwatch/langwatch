@@ -1,8 +1,7 @@
+import { Card } from "@langwatch/design-system/card";
 import {
-  Box,
   Button,
   Code,
-  Heading,
   HStack,
   IconButton,
   Text,
@@ -50,62 +49,51 @@ export function InstallCliCard({
 
   const loginCommand = isSaas ? "langwatch login" : `langwatch login --endpoint ${baseHost}`;
 
-  return (
-    <Box
-      borderWidth={compact ? 0 : "1px"}
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={compact ? 0 : 5}
-      backgroundColor={compact ? undefined : "bg"}
-      boxShadow={compact ? undefined : "sm"}
-      width="full"
-    >
-      <VStack align="stretch" gap={compact ? 3 : 4}>
-        {!compact && (
-          <>
-            <HStack gap={2}>
-              <Box color="fg.muted">
-                <Terminal size={18} />
-              </Box>
-              <Heading as="h3" size="sm">
-                {heading}
-              </Heading>
-            </HStack>
-            <Text fontSize="sm" color="fg.muted">
-              {subline}
-            </Text>
-          </>
-        )}
+  const steps = (
+    <VStack align="stretch" gap={compact ? 3 : 4}>
+      <Text fontSize="xs" color="fg.muted">
+        Requires Node.js 18 or newer (the <Code fontSize="xs">npm</Code> command ships with it). Get
+        it at <Code fontSize="xs">nodejs.org</Code>.
+      </Text>
 
+      <CommandRow label="1. Install" command={installCommand} ariaLabel="Copy install command" />
+      <CommandRow label="2. Authenticate" command={loginCommand} ariaLabel="Copy login command" />
+
+      {!isSaas && (
         <Text fontSize="xs" color="fg.muted">
-          Requires Node.js 18 or newer (the <Code fontSize="xs">npm</Code> command ships with it).
-          Get it at <Code fontSize="xs">nodejs.org</Code>.
+          Self-hosted detected. The login flag targets <Code fontSize="xs">{baseHost}</Code>; the
+          endpoint is persisted after that first login, so subsequent commands don&apos;t need it.
         </Text>
+      )}
 
-        <CommandRow label="1. Install" command={installCommand} ariaLabel="Copy install command" />
-        <CommandRow label="2. Authenticate" command={loginCommand} ariaLabel="Copy login command" />
+      <HStack gap={2}>
+        <Button size="xs" variant="outline" asChild>
+          <Link href={docsUrl("/integration/cli#install")} isExternal gap={1}>
+            Install guide <ExternalLink size={12} />
+          </Link>
+        </Button>
+        <Button size="xs" variant="ghost" asChild>
+          <Link href={docsUrl("/integration/cli")} isExternal gap={1}>
+            CLI reference <ExternalLink size={12} />
+          </Link>
+        </Button>
+      </HStack>
+    </VStack>
+  );
 
-        {!isSaas && (
-          <Text fontSize="xs" color="fg.muted">
-            Self-hosted detected. The login flag targets <Code fontSize="xs">{baseHost}</Code>; the
-            endpoint is persisted after that first login, so subsequent commands don&apos;t need it.
-          </Text>
-        )}
+  if (compact) return steps;
 
-        <HStack gap={2}>
-          <Button size="xs" variant="outline" asChild>
-            <Link href={docsUrl("/integration/cli#install")} isExternal gap={1}>
-              Install guide <ExternalLink size={12} />
-            </Link>
-          </Button>
-          <Button size="xs" variant="ghost" asChild>
-            <Link href={docsUrl("/integration/cli")} isExternal gap={1}>
-              CLI reference <ExternalLink size={12} />
-            </Link>
-          </Button>
-        </HStack>
-      </VStack>
-    </Box>
+  return (
+    <Card
+      variant="elevated"
+      padding="lg"
+      titleLevel={3}
+      icon={<Terminal size={18} />}
+      title={heading}
+      description={subline}
+    >
+      {steps}
+    </Card>
   );
 }
 
@@ -129,46 +117,41 @@ function CommandRow({
       <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
         {label}
       </Text>
-      <HStack
-        gap={2}
-        padding={2}
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="sm"
-        backgroundColor="bg.subtle"
-      >
-        {/* "$" is a separate, non-selectable, lighter element so copying the
-            command by hand never picks up the prompt. */}
-        <Text
-          as="span"
-          fontFamily="mono"
-          fontSize="sm"
-          color="fg.muted"
-          userSelect="none"
-          flexShrink={0}
-          aria-hidden="true"
-        >
-          $
-        </Text>
-        <Code
-          flex={1}
-          minWidth={0}
-          backgroundColor="transparent"
-          fontSize="sm"
-          overflowX="auto"
-          whiteSpace="nowrap"
-        >
-          {command}
-        </Code>
-        <IconButton
-          size="xs"
-          variant="ghost"
-          aria-label={copied ? "Copied" : ariaLabel}
-          onClick={onCopy}
-        >
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-        </IconButton>
-      </HStack>
+      <Card variant="nested" padding="sm">
+        <HStack gap={2}>
+          {/* "$" is a separate, non-selectable, lighter element so copying the
+              command by hand never picks up the prompt. */}
+          <Text
+            as="span"
+            fontFamily="mono"
+            fontSize="sm"
+            color="fg.muted"
+            userSelect="none"
+            flexShrink={0}
+            aria-hidden="true"
+          >
+            $
+          </Text>
+          <Code
+            flex={1}
+            minWidth={0}
+            backgroundColor="transparent"
+            fontSize="sm"
+            overflowX="auto"
+            whiteSpace="nowrap"
+          >
+            {command}
+          </Code>
+          <IconButton
+            size="xs"
+            variant="ghost"
+            aria-label={copied ? "Copied" : ariaLabel}
+            onClick={onCopy}
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+          </IconButton>
+        </HStack>
+      </Card>
     </VStack>
   );
 }

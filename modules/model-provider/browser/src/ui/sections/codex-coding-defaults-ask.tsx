@@ -1,13 +1,6 @@
-import {
-  DialogBody,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { Button, Text } from "@langwatch/design-system/primitives";
+import { Text } from "@langwatch/design-system/primitives";
 import { isCodexModel, LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { useEffect } from "react";
 
@@ -118,45 +111,34 @@ export function CodexCodingDefaultsDialog({
   const host = useModelProviderHost();
 
   return (
-    <DialogRoot open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Set Codex as your coding default?</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <Text fontSize="sm">
-            Langy and the fast AI assists
-            <FieldInfoTooltip
-              description="The fast assists are the small AI helpers across the product: search, chat titles, autocomplete, and translations."
-              testId="codex-fast-assists-info"
-            />{" "}
-            across LangWatch will run on this OpenAI account's plan. The playground, evaluations and
-            workflows keep their current models.
-          </Text>
-        </DialogBody>
-        <DialogFooter>
-          <Button size="sm" variant="ghost" onClick={onClose}>
-            Not now
-          </Button>
-          <Button
-            size="sm"
-            colorPalette="orange"
-            loading={apply.isPending}
-            onClick={() =>
-              void acceptCodexCodingDefaults({
-                applyDefaults: apply.mutateAsync,
-                utils,
-                host,
-                projectId,
-                scopes,
-                onClose,
-              })
-            }
-          >
-            Set as default
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Set Codex as your coding default?"
+      secondaryAction={{ label: "Not now", onClick: onClose }}
+      primaryAction={{
+        label: "Set as default",
+        loading: apply.isPending,
+        onClick: () =>
+          void acceptCodexCodingDefaults({
+            applyDefaults: apply.mutateAsync,
+            utils,
+            host,
+            projectId,
+            scopes,
+            onClose,
+          }),
+      }}
+    >
+      <Text fontSize="sm">
+        Langy and the fast AI assists
+        <FieldInfoTooltip
+          description="The fast assists are the small AI helpers across the product: search, chat titles, autocomplete, and translations."
+          testId="codex-fast-assists-info"
+        />{" "}
+        across LangWatch will run on this OpenAI account's plan. The playground, evaluations and
+        workflows keep their current models.
+      </Text>
+    </Dialog>
   );
 }

@@ -112,6 +112,8 @@ import {
   type ProcessWakeRow,
   type ProjectionStateAtEvent,
   type ReplayHistoryEntry,
+  type ReplayHistoryPage,
+  type ReplayHistoryPageInput,
   type ReplayStatus,
   type RunAdminOperationInput,
   type StartAdminImpersonationInput,
@@ -497,6 +499,7 @@ export type OpsProcessExplorer = {
  */
 export type OpsReplayRunner = {
   getHistory(): Promise<ReplayHistoryEntry[]>;
+  getHistoryPage(input: ReplayHistoryPageInput): Promise<ReplayHistoryPage>;
   findHistoryEntry(input: { runId: string }): Promise<ReplayHistoryEntry | null>;
   startReplay(input: {
     projectionNames: string[];
@@ -1193,6 +1196,9 @@ export class OpsModule implements OpsApi {
   }
   getHistory(): Promise<ReplayHistoryEntry[]> {
     return this.#dependencies.ops.replay.getHistory();
+  }
+  getHistoryPage(input: ReplayHistoryPageInput): Promise<ReplayHistoryPage> {
+    return this.#dependencies.ops.replay.getHistoryPage(input);
   }
   findHistoryEntry(input: FindHistoryEntryInput): Promise<ReplayHistoryEntry | null> {
     return this.#dependencies.ops.replay.findHistoryEntry(input);

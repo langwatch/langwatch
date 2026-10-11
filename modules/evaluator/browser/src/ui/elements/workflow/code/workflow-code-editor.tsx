@@ -1,5 +1,6 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type * as MonacoApi from "monaco-editor";
 import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
@@ -181,9 +182,7 @@ export function WorkflowCodeEditorModal({
             }}
           >
             <LuFileCode size={14} />
-            <Text fontSize="13px" fontFamily="mono">
-              Code.py
-            </Text>
+            <Text textStyle="mono">Code.py</Text>
           </HStack>
           <Box flex={1} />
           {renderSecretControls?.({ onInsertSecret: handleInsertSecret })}
@@ -511,7 +510,7 @@ export function WorkflowCodeEditor({
         }}
         options={{
           minimap: { enabled: false },
-          fontSize: 14,
+          fontSize: TYPE_SCALE_PX.body,
           wordWrap: "on",
           automaticLayout: true,
           formatOnPaste: true,

@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import {
   Box,
   Button,
@@ -185,13 +186,7 @@ export function NoLicenseCard({
               onChange={handleFileInputChange}
             />
             {uploadedFile ? (
-              <Box
-                borderWidth="1px"
-                borderRadius="lg"
-                padding={4}
-                width="full"
-                backgroundColor="bg.subtle"
-              >
+              <Card variant="nested">
                 <HStack justify="space-between" width="full">
                   <HStack gap={3}>
                     <Upload size={20} />
@@ -214,7 +209,7 @@ export function NoLicenseCard({
                     <X size={16} />
                   </Button>
                 </HStack>
-              </Box>
+              </Card>
             ) : (
               <Box
                 borderWidth="2px"

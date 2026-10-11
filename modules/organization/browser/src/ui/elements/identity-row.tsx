@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { KeyboardEvent, ReactNode } from "react";
@@ -140,14 +141,7 @@ export function IdentityRowList({
   const isEmpty = rows === undefined || rows === null || (Array.isArray(rows) && rows.length === 0);
 
   return (
-    <Box
-      width="full"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      overflow="hidden"
-      data-testid={testId}
-    >
+    <Card padding="none" data-testid={testId}>
       {isEmpty ? (
         <Box paddingX={4} paddingY={6}>
           <Text fontSize="sm" color="fg.muted">
@@ -159,7 +153,7 @@ export function IdentityRowList({
           {rows}
         </VStack>
       )}
-    </Box>
+    </Card>
   );
 }
 

@@ -1,19 +1,19 @@
 import { neutralizeRows } from "@langwatch/csv";
+import { Card } from "@langwatch/design-system/card";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { Money } from "@langwatch/design-system/money";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
   Button,
-  Card,
   chakra,
   Heading,
   HStack,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -24,8 +24,8 @@ import {
   StatTileSkeleton,
 } from "@langwatch/design-system/stat-tile";
 import { Tooltip as UITooltip } from "@langwatch/design-system/tooltip";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import {
-  formatBudgetUsd,
   type GatewayUsageSummary,
   type GatewayVirtualKeyUsageSummary,
 } from "@langwatch/gateway-contract";
@@ -372,15 +372,19 @@ function UsageBreakdown({
     <VStack align="stretch" gap={6}>
       <StatTileGrid columns={4}>
         <StatTile variant="showcase" label="Total spend">
-          <StatTileFigure>{formatBudgetUsd(data.totalUsd)}</StatTileFigure>
+          <StatTileFigure>
+            <Money amount={Number(data.totalUsd)} currency="USD" />
+          </StatTileFigure>
         </StatTile>
         <StatTile variant="showcase" label="Requests">
           <UITooltip content="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review.">
             <StatTileFigure>{data.totalRequests.toLocaleString()}</StatTileFigure>
           </UITooltip>
         </StatTile>
-        <StatTile variant="showcase" label="Avg $/request">
-          <StatTileFigure>{formatAvgCost(data.avgUsdPerRequest)}</StatTileFigure>
+        <StatTile variant="showcase" label="Average cost per request">
+          <StatTileFigure>
+            <Money amount={Number(data.avgUsdPerRequest)} currency="USD" />
+          </StatTileFigure>
         </StatTile>
         <StatTile variant="showcase" label="Blocked by guardrail">
           <Box color={data.blockedRequests > 0 ? "fg.error" : undefined}>
@@ -393,46 +397,43 @@ function UsageBreakdown({
 
       {showKeys && (
         <VStack align="stretch" gap={2}>
-          <Heading size="sm">Top virtual keys</Heading>
-          <Card.Root variant="showcase" width="full" overflowX="auto">
-            <ListTable
-              containerProps={{ overflowX: "auto", maxWidth: "full" }}
-              variant="line"
-              size="sm"
-              width="full"
-            >
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Key</Table.ColumnHeader>
-                  <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                  <Table.ColumnHeader>Spend</Table.ColumnHeader>
-                  <Table.ColumnHeader>Requests</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
+          <Heading textStyle="cardTitle">Top virtual keys</Heading>
+          <Card variant="showcase" padding="none">
+            <ListTable variant="embedded" scroll="x" scrollLabel="Top virtual keys table">
+              <ListTable.Header>
+                <ListTable.Row>
+                  <ListTable.ColumnHeader>Key</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Prefix</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Spend</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Requests</ListTable.ColumnHeader>
+                </ListTable.Row>
+              </ListTable.Header>
+              <ListTable.Body>
                 {data.byVirtualKey.map((row) => (
-                  <Table.Row key={row.virtualKeyId}>
-                    <Table.Cell>
+                  <ListTable.Row key={row.virtualKeyId}>
+                    <ListTable.Cell>
                       <Link href={`/gateway/virtual-keys/${row.virtualKeyId}`}>{row.name}</Link>
-                    </Table.Cell>
-                    <Table.Cell>
+                    </ListTable.Cell>
+                    <ListTable.Cell>
                       <Text fontFamily="mono" fontSize="xs">
                         {row.displayPrefix}…
                       </Text>
-                    </Table.Cell>
-                    <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
-                    <Table.Cell>{row.requests}</Table.Cell>
-                  </Table.Row>
+                    </ListTable.Cell>
+                    <ListTable.Cell>
+                      <Money amount={Number(row.totalUsd)} currency="USD" plain />
+                    </ListTable.Cell>
+                    <ListTable.Cell>{row.requests}</ListTable.Cell>
+                  </ListTable.Row>
                 ))}
-              </Table.Body>
+              </ListTable.Body>
             </ListTable>
-          </Card.Root>
+          </Card>
         </VStack>
       )}
 
       <VStack align="stretch" gap={2}>
         <HStack>
-          <Heading size="sm">Top models</Heading>
+          <Heading textStyle="cardTitle">Top models</Heading>
           <Spacer />
           {viewTracesHref && (
             <Link href={viewTracesHref}>
@@ -442,33 +443,30 @@ function UsageBreakdown({
             </Link>
           )}
         </HStack>
-        <Card.Root variant="showcase" width="full" overflowX="auto">
-          <ListTable
-            containerProps={{ overflowX: "auto", maxWidth: "full" }}
-            variant="line"
-            size="sm"
-            width="full"
-          >
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Model</Table.ColumnHeader>
-                <Table.ColumnHeader>Spend</Table.ColumnHeader>
-                <Table.ColumnHeader>Requests</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
+        <Card variant="showcase" padding="none">
+          <ListTable variant="embedded" scroll="x" scrollLabel="Spend by model table">
+            <ListTable.Header>
+              <ListTable.Row>
+                <ListTable.ColumnHeader>Model</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Spend</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Requests</ListTable.ColumnHeader>
+              </ListTable.Row>
+            </ListTable.Header>
+            <ListTable.Body>
               {data.byModel.map((row) => (
-                <Table.Row key={row.model}>
-                  <Table.Cell>
+                <ListTable.Row key={row.model}>
+                  <ListTable.Cell>
                     <InlineCode>{row.model}</InlineCode>
-                  </Table.Cell>
-                  <Table.Cell>{formatBudgetUsd(row.totalUsd)}</Table.Cell>
-                  <Table.Cell>{row.requests}</Table.Cell>
-                </Table.Row>
+                  </ListTable.Cell>
+                  <ListTable.Cell>
+                    <Money amount={Number(row.totalUsd)} currency="USD" plain />
+                  </ListTable.Cell>
+                  <ListTable.Cell>{row.requests}</ListTable.Cell>
+                </ListTable.Row>
               ))}
-            </Table.Body>
+            </ListTable.Body>
           </ListTable>
-        </Card.Root>
+        </Card>
       </VStack>
     </VStack>
   );
@@ -487,7 +485,7 @@ function SpendSparkline({
   return (
     <VStack align="stretch" gap={2}>
       <HStack>
-        <Heading size="sm">Spend over time</Heading>
+        <Heading textStyle="cardTitle">Spend over time</Heading>
         <Spacer />
         <Text fontSize="xs" color="fg.muted">
           day-bucketed UTC
@@ -519,12 +517,12 @@ function SpendSparkline({
             />
             <XAxis
               dataKey="day"
-              tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
+              tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
               tickFormatter={formatDayTick}
               minTickGap={24}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
+              tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
               tickFormatter={(v: number) => `$${v.toFixed(2)}`}
               width={56}
             />
@@ -533,7 +531,7 @@ function SpendSparkline({
                 name === "spendUsd" ? [`$${Number(value).toFixed(4)}`, "Spend"] : [value, name]
               }
               labelFormatter={(label) => String(label ?? "")}
-              contentStyle={{ fontSize: 12 }}
+              contentStyle={{ fontSize: TYPE_SCALE_PX.caption }}
             />
             <Area
               type="monotone"
@@ -554,17 +552,6 @@ function formatDayTick(day: string): string {
   const [, mm, dd] = day.split("-");
   if (!mm || !dd) return day;
   return `${mm}/${dd}`;
-}
-
-// Avg-cost often sits in $0.001–$0.1; 2 decimals rounds to $0.00 and
-// 6 decimals is noisy. Match the same logic as the ledger-line
-// formatter on budget detail.
-function formatAvgCost(raw: string | number): string {
-  const n = typeof raw === "number" ? raw : Number(raw);
-  if (!Number.isFinite(n)) return "—";
-  if (n >= 1) return `$${n.toFixed(4)}`;
-  if (n >= 0.01) return `$${n.toFixed(5)}`;
-  return `$${n.toFixed(6)}`;
 }
 
 export default GatewayUsagePage;

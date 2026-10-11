@@ -114,7 +114,7 @@ export function WorkflowNodeSelectionPanel({
       borderColor="border"
       zIndex={100}
       height="calc(100vh - 49px)"
-      fontSize="14px"
+      textStyle="body"
       width="300px"
       minWidth="300px"
     >
@@ -126,7 +126,7 @@ export function WorkflowNodeSelectionPanel({
           align="start"
           overflowY="auto"
           padding={3}
-          paddingBottom="56px"
+          paddingBottom="14"
         >
           <Text fontWeight="500" padding={1}>
             Components

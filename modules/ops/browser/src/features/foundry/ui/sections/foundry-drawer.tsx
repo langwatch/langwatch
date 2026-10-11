@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Box,
@@ -5,7 +6,6 @@ import {
   Flex,
   HStack,
   Input,
-  Spacer,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -76,86 +76,78 @@ export function FoundryDrawer({ onClose }: UiFoundryDrawerProps) {
   const selectedSpan = selectedSpanId ? findSpan(spans, selectedSpanId) : null;
 
   return (
-    <Drawer.Root open={true} placement="end" size="md" onOpenChange={() => onClose()}>
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <HStack width="full">
-            <Drawer.Title>The Foundry</Drawer.Title>
-            <Spacer />
-            <Button size="xs" variant="ghost" onClick={resetTrace}>
-              <RotateCcw size={14} />
-            </Button>
-          </HStack>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body padding={0}>
-          <VStack align="stretch" gap={0} h="full">
-            {showPresets ? (
-              <PresetPicker
-                presets={builtIn.slice(0, 8)}
-                onPick={(config) => {
-                  setTrace(structuredClone(config));
-                  setShowPresets(false);
-                }}
-              />
-            ) : (
-              <>
-                <Box flex={1} overflow="auto" p={3}>
-                  <HStack justify="space-between" mb={2}>
-                    <Text
-                      fontSize="xs"
-                      fontWeight="medium"
-                      textTransform="uppercase"
-                      color="fg.muted"
-                    >
-                      Spans ({countSpans(spans)})
-                    </Text>
-                    <Button size="2xs" variant="ghost" onClick={() => setShowPresets(true)}>
-                      Change preset
-                    </Button>
-                  </HStack>
-                  {spans.map((span) => (
-                    <CompactSpanNode
-                      key={span.id}
-                      span={span}
-                      depth={0}
-                      selectedId={selectedSpanId}
-                      onSelect={selectSpan}
-                    />
-                  ))}
+    <Drawer
+      onClose={onClose}
+      size="md"
+      title="The Foundry"
+      body="flush"
+      bodyScroll="content"
+      headerTools={
+        <Button size="xs" variant="ghost" aria-label="Reset trace" onClick={resetTrace}>
+          <RotateCcw size={14} />
+        </Button>
+      }
+    >
+      <VStack align="stretch" gap={0} h="full">
+        {showPresets ? (
+          <PresetPicker
+            presets={builtIn.slice(0, 8)}
+            onPick={(config) => {
+              setTrace(structuredClone(config));
+              setShowPresets(false);
+            }}
+          />
+        ) : (
+          <>
+            <Box flex={1} overflow="auto" p={3}>
+              <HStack justify="space-between" mb={2}>
+                <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" color="fg.muted">
+                  Spans ({countSpans(spans)})
+                </Text>
+                <Button size="2xs" variant="ghost" onClick={() => setShowPresets(true)}>
+                  Change preset
+                </Button>
+              </HStack>
+              {spans.map((span) => (
+                <CompactSpanNode
+                  key={span.id}
+                  span={span}
+                  depth={0}
+                  selectedId={selectedSpanId}
+                  onSelect={selectSpan}
+                />
+              ))}
 
-                  {selectedSpan && <SelectedSpanEditor span={selectedSpan} onUpdate={updateSpan} />}
-                </Box>
+              {selectedSpan && <SelectedSpanEditor span={selectedSpan} onUpdate={updateSpan} />}
+            </Box>
 
-                <Box p={3} borderTop="1px solid" borderColor="border" bg="bg.subtle">
-                  <HStack gap={2}>
-                    <Button
-                      ref={sendRef}
-                      flex={1}
-                      size="sm"
-                      colorPalette="orange"
-                      onClick={handleSend}
-                      disabled={running || !project}
-                      loading={running}
-                      loadingText="Sending..."
-                    >
-                      <Play size={14} /> Send Trace
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={resetTrace} title="Reset (R)">
-                      <RotateCcw size={14} />
-                    </Button>
-                  </HStack>
-                  {lastTraceId && <SentTraceNotice traceId={lastTraceId} />}
-                  <Text fontSize="10px" color="fg.muted" mt={1} textAlign="center">
-                    ⌘Enter to send · R to reset
-                  </Text>
-                </Box>
-              </>
-            )}
-          </VStack>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+            <Box p={3} borderTop="1px solid" borderColor="border" bg="bg.subtle">
+              <HStack gap={2}>
+                <Button
+                  ref={sendRef}
+                  flex={1}
+                  size="sm"
+                  colorPalette="orange"
+                  onClick={handleSend}
+                  disabled={running || !project}
+                  loading={running}
+                  loadingText="Sending..."
+                >
+                  <Play size={14} /> Send Trace
+                </Button>
+                <Button size="sm" variant="outline" onClick={resetTrace} title="Reset (R)">
+                  <RotateCcw size={14} />
+                </Button>
+              </HStack>
+              {lastTraceId && <SentTraceNotice traceId={lastTraceId} />}
+              <Text textStyle="micro" color="fg.muted" mt={1} textAlign="center">
+                ⌘Enter to send · R to reset
+              </Text>
+            </Box>
+          </>
+        )}
+      </VStack>
+    </Drawer>
   );
 }
 
@@ -189,7 +181,7 @@ function CompactSpanNode({
       >
         <Text flexShrink={0}>{SPAN_TYPE_ICONS[span.type]}</Text>
         <Text truncate>{span.name}</Text>
-        <Text flexShrink={0} fontSize="10px" color="fg.muted">
+        <Text flexShrink={0} textStyle="micro" color="fg.muted">
           {span.durationMs}ms
         </Text>
       </Flex>
@@ -228,46 +220,48 @@ function SelectedSpanEditor({
   onUpdate: (id: string, partial: Partial<SpanConfig>) => void;
 }) {
   return (
-    <Box mt={3} p={3} rounded="md" border="1px solid" borderColor="border" bg="bg.subtle">
-      <Text fontSize="xs" fontWeight="medium" color="fg.muted" mb={2}>
-        {SPAN_TYPE_ICONS[span.type]} {span.name}
-      </Text>
-      {span.type === "llm" &&
-        span.llm?.messages?.map((msg, i) => (
-          <Box key={i} mb={1}>
-            <Text fontSize="10px" color="fg.muted" mb={0.5}>
-              {msg.role}
-            </Text>
-            <Input
-              size="sm"
-              fontSize="xs"
-              value={msg.content}
-              onChange={(e) => {
-                const msgs = [...(span.llm?.messages ?? [])];
-                msgs[i] = {
-                  ...msgs[i]!,
-                  content: e.target.value,
-                };
-                onUpdate(span.id, {
-                  llm: { ...span.llm, messages: msgs },
-                });
-              }}
-            />
-          </Box>
-        ))}
-      {span.type !== "llm" && (
-        <Input
-          size="sm"
-          fontSize="xs"
-          placeholder="Input..."
-          value={span.input?.type === "text" ? (span.input.value as string) : ""}
-          onChange={(e) =>
-            onUpdate(span.id, {
-              input: { type: "text", value: e.target.value },
-            })
-          }
-        />
-      )}
+    <Box mt={3}>
+      <Card variant="nested" padding="sm">
+        <Text fontSize="xs" fontWeight="medium" color="fg.muted" mb={2}>
+          {SPAN_TYPE_ICONS[span.type]} {span.name}
+        </Text>
+        {span.type === "llm" &&
+          span.llm?.messages?.map((msg, i) => (
+            <Box key={i} mb={1}>
+              <Text textStyle="micro" color="fg.muted" mb={0.5}>
+                {msg.role}
+              </Text>
+              <Input
+                size="sm"
+                fontSize="xs"
+                value={msg.content}
+                onChange={(e) => {
+                  const msgs = [...(span.llm?.messages ?? [])];
+                  msgs[i] = {
+                    ...msgs[i]!,
+                    content: e.target.value,
+                  };
+                  onUpdate(span.id, {
+                    llm: { ...span.llm, messages: msgs },
+                  });
+                }}
+              />
+            </Box>
+          ))}
+        {span.type !== "llm" && (
+          <Input
+            size="sm"
+            fontSize="xs"
+            placeholder="Input..."
+            value={span.input?.type === "text" ? (span.input.value as string) : ""}
+            onChange={(e) =>
+              onUpdate(span.id, {
+                input: { type: "text", value: e.target.value },
+              })
+            }
+          />
+        )}
+      </Card>
     </Box>
   );
 }
@@ -298,7 +292,7 @@ function SentTraceNotice({ traceId }: { traceId: string }) {
       <Text fontSize="xs" color={copied ? "green.fg" : "fg.default"} fontWeight="medium" mb={0.5}>
         {copied ? "Trace ID copied!" : "Trace sent: click to copy ID"}
       </Text>
-      <Text fontSize="11px" fontFamily="mono" color="fg.muted" truncate>
+      <Text textStyle="monoSm" color="fg.muted" truncate>
         {traceId}
       </Text>
     </Box>
@@ -319,31 +313,21 @@ function PresetPicker({
         Pick a preset to start
       </Text>
       {presets.map((preset) => (
-        <Flex
+        <Card
           key={preset.id}
-          as="button"
-          align="center"
-          justify="space-between"
-          rounded="md"
-          border="1px solid"
-          borderColor="border"
-          px={3}
-          py={2}
-          _hover={{ bg: "bg.subtle" }}
-          onClick={() => onPick(preset.config)}
-        >
-          <VStack align="start" gap={0}>
-            <Text fontSize="sm" fontWeight="medium">
-              {preset.name}
+          padding="sm"
+          title={preset.name}
+          titleLevel={3}
+          description={preset.description}
+          badge={
+            <Text fontSize="xs" color="fg.muted">
+              {countSpans(preset.config.spans)} spans
             </Text>
-            <Text fontSize="xs" color="fg.muted" lineClamp={1}>
-              {preset.description}
-            </Text>
-          </VStack>
-          <Text fontSize="xs" color="fg.muted">
-            {countSpans(preset.config.spans)} spans
-          </Text>
-        </Flex>
+          }
+          opener={
+            <button type="button" aria-label={preset.name} onClick={() => onPick(preset.config)} />
+          }
+        />
       ))}
     </VStack>
   );

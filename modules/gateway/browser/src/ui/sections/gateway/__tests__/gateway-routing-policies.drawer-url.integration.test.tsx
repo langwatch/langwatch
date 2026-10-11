@@ -250,6 +250,6 @@ describe("given a shared link that carries a policy", () => {
     await waitFor(() => {
       expect(screen.getByText(/is a model tier/)).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 });

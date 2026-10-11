@@ -1,12 +1,5 @@
-import {
-  Badge,
-  Card,
-  HStack,
-  Spacer,
-  Status,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Badge, HStack, Spacer, Status, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 export interface OpsReplayStatus {
@@ -30,7 +23,7 @@ export function ActiveOperationsSection({
   if (!isReplayRunning && !hasPaused) return null;
 
   return (
-    <Card.Root overflow="hidden">
+    <Card padding="none">
       <Text
         textStyle="xs"
         fontWeight="medium"
@@ -79,6 +72,6 @@ export function ActiveOperationsSection({
           </VStack>
         )}
       </VStack>
-    </Card.Root>
+    </Card>
   );
 }

@@ -98,7 +98,7 @@ export function ComparisonWinnerCell({
 
   if (!verdict) {
     return (
-      <Text fontSize="13px" color="fg.subtle" data-testid="comparison-winner-none">
+      <Text textStyle="bodySm" color="fg.subtle" data-testid="comparison-winner-none">
         -
       </Text>
     );
@@ -148,7 +148,7 @@ export function ComparisonWinnerCell({
           maxWidth="100%"
         >
           <Text
-            fontSize="12px"
+            textStyle="caption"
             color="fg"
             whiteSpace="pre-wrap"
             wordBreak="break-word"
@@ -160,7 +160,7 @@ export function ComparisonWinnerCell({
       )}
       {reasoning && (
         <Text
-          fontSize="12px"
+          textStyle="caption"
           color="fg.muted"
           whiteSpace="pre-wrap"
           wordBreak="break-word"
@@ -170,7 +170,7 @@ export function ComparisonWinnerCell({
         </Text>
       )}
       {expanded && (
-        <Text fontSize="11px" color="fg.subtle" alignSelf="end">
+        <Text textStyle="micro" color="fg.subtle" alignSelf="end">
           click outside or press Escape to close
         </Text>
       )}

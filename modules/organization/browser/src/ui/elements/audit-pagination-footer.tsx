@@ -25,7 +25,7 @@ export function AuditPaginationFooter({
   const last = Math.min(pageOffset + pageSize, totalHits);
 
   return (
-    <HStack width="full" justify="space-between" gap={4} paddingY={2} fontSize="13px">
+    <HStack textStyle="bodySm" width="full" justify="space-between" gap={4} paddingY={2}>
       <Text color="fg.muted" fontVariantNumeric="tabular-nums">
         {`${first}–${last} of ${totalHits} ${totalHits === 1 ? "event" : "events"}`}
       </Text>

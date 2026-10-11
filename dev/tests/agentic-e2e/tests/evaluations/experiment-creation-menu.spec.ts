@@ -11,7 +11,7 @@ test("experiment creation keeps the SDK workflow discoverable", async ({ page },
   await expect(newExperiment).toHaveCSS("background-color", "rgb(237, 137, 38)");
   await newExperiment.click();
   const sdkExperiment = page.getByRole("menuitem", {
-    name: /New Experiment via SDK/,
+    name: /With the SDK/,
   });
   await expect(sdkExperiment).toHaveAttribute(
     "href",

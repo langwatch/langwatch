@@ -123,7 +123,7 @@ export function SaveAndRunMenu({
       positioning={{ placement: "bottom-end" }}
     >
       <Popover.Trigger asChild>
-        <Button colorPalette="blue" size="sm" loading={isLoading}>
+        <Button colorPalette="orange" variant="solid" size="sm" loading={isLoading}>
           <Play size={14} />
           Save and Run
           <ChevronDown size={14} />
@@ -200,7 +200,7 @@ export function SaveAndRunMenu({
                 onClick={handleCreateAgent}
               >
                 <Plus size={14} />
-                <Text fontSize="sm">Add New Agent</Text>
+                <Text fontSize="sm">Add new agent</Text>
               </HStack>
             </Box>
 
@@ -259,7 +259,7 @@ export function SaveAndRunMenu({
                 onClick={handleCreatePrompt}
               >
                 <Plus size={14} />
-                <Text fontSize="sm">Add New Prompt</Text>
+                <Text fontSize="sm">Add new prompt</Text>
               </HStack>
             </Box>
           </Box>

@@ -1,4 +1,5 @@
-import { Card, Heading, HStack, IconButton } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ArrowUpRight } from "lucide-react";
 
@@ -17,7 +18,7 @@ export const LLMSummary = () => {
     graphType: "summary",
     series: [
       {
-        name: "Mean Tokens per Message",
+        name: "Mean tokens per message",
         metric: "performance.total_tokens",
         aggregation: "avg",
         colorSet: analyticsMetrics.performance.total_tokens.colorSet,
@@ -25,7 +26,7 @@ export const LLMSummary = () => {
       ...(hasPermission("cost:view")
         ? ([
             {
-              name: "Mean Cost per Message",
+              name: "Mean cost per message",
               metric: "performance.total_cost",
               aggregation: "avg",
               colorSet: analyticsMetrics.performance.total_cost.colorSet,
@@ -33,13 +34,13 @@ export const LLMSummary = () => {
           ] as CustomGraphInput["series"])
         : []),
       {
-        name: "90th Percentile Time to First Token",
+        name: "P90 time to first token",
         metric: "performance.first_token",
         aggregation: "p90",
         colorSet: analyticsMetrics.performance.first_token.colorSet,
       },
       {
-        name: "90th Percentile Completion Time",
+        name: "P90 completion time",
         metric: "performance.completion_time",
         aggregation: "p90",
         colorSet: analyticsMetrics.performance.completion_time.colorSet,
@@ -51,29 +52,27 @@ export const LLMSummary = () => {
   };
 
   return (
-    <Card.Root>
-      <Card.Header>
-        <HStack gap={1}>
-          <Heading size="sm">Summary</Heading>
-          {project?.slug && (
-            <Tooltip content="View LLM Metrics">
-              <Link href={`/${project.slug}/analytics/metrics`}>
-                <IconButton
-                  aria-label="View LLM Metrics"
-                  variant="ghost"
-                  size="2xs"
-                  color="fg.subtle"
-                >
-                  <ArrowUpRight size={14} />
-                </IconButton>
-              </Link>
-            </Tooltip>
-          )}
-        </HStack>
-      </Card.Header>
-      <Card.Body>
-        <CustomGraph input={llmSummary} />
-      </Card.Body>
-    </Card.Root>
+    <Card
+      padding="lg"
+      title="Summary"
+      actions={
+        project?.slug && (
+          <Tooltip content="View LLM metrics">
+            <Link href={`/${project.slug}/analytics/metrics`}>
+              <IconButton
+                aria-label="View LLM metrics"
+                variant="ghost"
+                size="2xs"
+                color="fg.subtle"
+              >
+                <ArrowUpRight size={14} />
+              </IconButton>
+            </Link>
+          </Tooltip>
+        )
+      }
+    >
+      <CustomGraph input={llmSummary} />
+    </Card>
   );
 };

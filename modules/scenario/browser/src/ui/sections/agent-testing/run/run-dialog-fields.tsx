@@ -151,7 +151,7 @@ function RunDialogNotices({ form }: { form: RunDialogForm }) {
             <chakra.button
               type="button"
               marginTop={1}
-              fontSize="12px"
+              textStyle="caption"
               fontWeight="medium"
               color="blue.fg"
               cursor="pointer"

@@ -1,5 +1,7 @@
-import { Badge, Box, Card, HStack, Text } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/time";
+import { Card } from "@langwatch/design-system/card";
+import { EmptyValue } from "@langwatch/design-system/empty-value";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { Badge, Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -25,7 +27,7 @@ export function ReplayHistorySection({
   renderRunLink: (runId: string, content: ReactNode) => ReactNode;
 }) {
   return (
-    <Card.Root overflow="hidden">
+    <Card padding="none">
       <HStack
         paddingX={4}
         paddingTop={3}
@@ -55,14 +57,11 @@ export function ReplayHistorySection({
                 {formatDuration(latestEntry.startedAt, latestEntry.completedAt)}
               </Text>
               <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
-                {latestEntry.completedAt
-                  ? readableDate(latestEntry.completedAt).toLocaleString([], {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "—"}
+                {latestEntry.completedAt ? (
+                  <FormattedDate value={latestEntry.completedAt} display="datetime" />
+                ) : (
+                  <EmptyValue />
+                )}
               </Text>
             </HStack>,
           )
@@ -72,6 +71,6 @@ export function ReplayHistorySection({
           </Text>
         )}
       </Box>
-    </Card.Root>
+    </Card>
   );
 }

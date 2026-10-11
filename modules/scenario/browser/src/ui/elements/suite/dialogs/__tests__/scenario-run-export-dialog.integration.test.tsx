@@ -46,7 +46,12 @@ describe("<ScenarioRunExportDialog/>", () => {
         />,
       );
 
-      expect(screen.getByText(/12 runs matching your filters/)).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          (_, node) =>
+            node?.textContent === "12 runs matching your filters" && node.tagName === "P",
+        ),
+      ).toBeInTheDocument();
       expect(screen.getByRole("radio", { name: "Full" })).toBeChecked();
 
       await userEvent.setup().click(screen.getByRole("button", { name: /Export/ }));

@@ -871,9 +871,9 @@ function PanelHeader({
           Spec: platform/app/specs/langy/langy-panel-header.feature */}
       <HStack
         paddingTop="13px"
-        paddingBottom="10px"
-        paddingLeft="12px"
-        paddingRight="10px"
+        paddingBottom="2.5"
+        paddingLeft="3"
+        paddingRight="2.5"
         gap={1}
         flexShrink={0}
       >
@@ -960,7 +960,7 @@ function PanelHeader({
 
           {/* Says "minimise" since the panel stays mounted and sinks to a header sliver. */}
           <>
-            <Box width="1px" alignSelf="stretch" marginY="4px" marginX="3px" background="border" />
+            <Box width="1px" alignSelf="stretch" marginY="1" marginX="3px" background="border" />
 
             <Tooltip
               content={

@@ -24,7 +24,6 @@ import type {
   ExternalSetEntry,
   TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import type { SuiteLastRun } from "../cases/use-test-cases-data.ts";
@@ -35,7 +34,7 @@ import { SuiteRailMenu } from "./suite-rail-menu.tsx";
 export const SUITE_RAIL_WIDTH = SECTION_RAIL_WIDTH;
 
 /** What the section of the sets a code run writes into is called. */
-export const FROM_CODE_HEADING = "From Code";
+export const FROM_CODE_HEADING = "From code";
 
 /** What the archive dialog of a test suite says. */
 export const SUITE_ARCHIVE_TITLE = "Archive test suite?";
@@ -91,7 +90,7 @@ export function SuiteRail(props: SuiteRailProps) {
       query: {},
     });
   const iconOf = (as: typeof Folder, label?: string) => (
-    <Icon as={as} boxSize="14px" color={FG_MUTED} flexShrink={0} aria-label={label} />
+    <Icon as={as} boxSize="14px" color="fg.muted" flexShrink={0} aria-label={label} />
   );
 
   const suiteEntries: RailEntry[] = props.isLoading
@@ -151,16 +150,16 @@ export function SuiteRail(props: SuiteRailProps) {
     </VStack>
   ) : undefined;
   const newSuite = canManage
-    ? { label: "New Test Suite", onClick: props.onNewSuite, testId: "agent-testing-rail-new-suite" }
+    ? { label: "New test suite", onClick: props.onNewSuite, testId: "agent-testing-rail-new-suite" }
     : undefined;
 
   return (
     <Box data-testid="agent-testing-suite-rail" display="flex" flexShrink={0}>
       <SectionNavigationRail
-        label="Agent Testing"
+        label="Agent testing"
         groups={[
           {
-            label: "Test Suites",
+            label: "Test suites",
             links: suiteEntries.map((entry) => entry.link),
             extra: loadingRows,
             add: newSuite,

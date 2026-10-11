@@ -13,7 +13,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { passRateColor } from "../shared/pass-rate-color.ts";
 import { PassRateText } from "../shared/pass-rate-text.tsx";
 
@@ -63,7 +62,7 @@ function ComparisonResult({
       {targetRates.map((target, index) => (
         <HStack key={target.key} gap={1}>
           {index > 0 ? (
-            <Text fontSize="10.5px" color={FG_MUTED}>
+            <Text textStyle="micro" color="fg.muted">
               vs
             </Text>
           ) : null}
@@ -75,10 +74,10 @@ function ComparisonResult({
             data-testid={`${testId}-target-dot-${target.key}`}
           />
           <VisuallyHidden>{`${target.label}: `}</VisuallyHidden>
-          <PassRateText passRate={target.passRate} fontSize="10.5px" />
+          <PassRateText passRate={target.passRate} textStyle="micro" />
         </HStack>
       ))}
-      <Text fontSize="10.5px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         · {targetRates.length} targets
       </Text>
     </HStack>
@@ -90,7 +89,7 @@ function EntryNote({ note, testId }: Pick<RunsSidebarEntryProps, "note" | "testI
   if (!note) return null;
 
   return (
-    <Text fontSize="10.5px" color={FG_MUTED} truncate title={note} data-testid={`${testId}-note`}>
+    <Text textStyle="micro" color="fg.muted" truncate title={note} data-testid={`${testId}-note`}>
       {note}
     </Text>
   );
@@ -113,7 +112,7 @@ function EntryResult({
 >) {
   if (isRunning && typeof totalCount === "number") {
     return (
-      <Text fontSize="10.5px" color={FG_MUTED} data-testid={`${testId}-result`}>
+      <Text textStyle="micro" color="fg.muted" data-testid={`${testId}-result`}>
         {judgedCount ?? 0}/{totalCount} judged
       </Text>
     );
@@ -134,9 +133,9 @@ function EntryResult({
         backgroundColor={passRateColor(passRate)}
         data-testid={`${testId}-result-dot`}
       />
-      <PassRateText passRate={passRate} fontSize="10.5px" />
+      <PassRateText passRate={passRate} textStyle="micro" />
       {passedCount !== null ? (
-        <Text fontSize="10.5px" color={FG_MUTED}>
+        <Text textStyle="micro" color="fg.muted">
           · {passedCount} passed
         </Text>
       ) : null}
@@ -155,11 +154,11 @@ function EntryTitleLine({
   return (
     <HStack gap={1.5} width="full" data-testid={`${testId}-title`}>
       {isPending || isRunning ? <Spinner size="xs" boxSize="11px" /> : null}
-      <Text fontSize="12px" fontWeight="semibold" truncate>
+      <Text textStyle="caption" fontWeight="semibold" truncate>
         {title}
       </Text>
       <Box flex={1} />
-      <Text fontSize="10px" color={FG_MUTED} whiteSpace="nowrap">
+      <Text textStyle="micro" color="fg.muted" whiteSpace="nowrap">
         {timeAgo}
       </Text>
     </HStack>

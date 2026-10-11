@@ -1,5 +1,6 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Download } from "lucide-react";
 import { useState } from "react";
@@ -39,57 +40,47 @@ export function ScenarioRunExportDialog({
   const [mode, setMode] = useState<ScenarioRunExportMode>("full");
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Export Scenario Runs</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={5}>
-            <Text color="fg.muted" fontSize="sm">
-              {runCount.toLocaleString()} {runCount === 1 ? "run" : "runs"}
-              {hasFiltersApplied ? " matching your filters" : ""}
-            </Text>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      title="Export scenario runs"
+      primaryAction={{
+        label: "Export",
+        icon: <Download size={14} />,
+        onClick: () => onExport({ mode }),
+      }}
+    >
+      <VStack align="stretch" gap={5}>
+        <Text color="fg.muted" fontSize="sm">
+          <FormattedNumber value={runCount} /> {runCount === 1 ? "run" : "runs"}
+          {hasFiltersApplied ? " matching your filters" : ""}
+        </Text>
 
+        <VStack align="stretch" gap={2}>
+          <Text fontWeight="medium" fontSize="sm">
+            Mode
+          </Text>
+          <RadioGroup
+            value={mode}
+            onValueChange={({ value }) => {
+              if (value === "full" || value === "criteria") {
+                setMode(value);
+              }
+            }}
+          >
             <VStack align="stretch" gap={2}>
-              <Text fontWeight="medium" fontSize="sm">
-                Mode
-              </Text>
-              <RadioGroup
-                value={mode}
-                onValueChange={({ value }) => {
-                  if (value === "full" || value === "criteria") {
-                    setMode(value);
-                  }
-                }}
-              >
-                <VStack align="stretch" gap={2}>
-                  {MODES.map((option) => (
-                    <HStack key={option.value} gap={2}>
-                      <Radio value={option.value}>{option.label}</Radio>
-                      <Text color="fg.muted" fontSize="xs">
-                        {option.hint}
-                      </Text>
-                    </HStack>
-                  ))}
-                </VStack>
-              </RadioGroup>
+              {MODES.map((option) => (
+                <HStack key={option.value} gap={2}>
+                  <Radio value={option.value}>{option.label}</Radio>
+                  <Text color="fg.muted" fontSize="xs">
+                    {option.hint}
+                  </Text>
+                </HStack>
+              ))}
             </VStack>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={3}>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button colorPalette="orange" onClick={() => onExport({ mode })}>
-              <Download size={16} />
-              Export
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+          </RadioGroup>
+        </VStack>
+      </VStack>
+    </Dialog>
   );
 }

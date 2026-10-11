@@ -1,6 +1,5 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
-
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 
 export function DeletePayloadDialog({
   target,
@@ -23,7 +22,7 @@ export function DeletePayloadDialog({
       }}
       title="Delete this payload"
       description="The job that referenced it will finish without running. This cannot be undone, and it will be refused if anything still references it."
-      isLoading={isLoading}
+      loading={isLoading}
     />
   );
 }

@@ -55,18 +55,16 @@ export function PromptEditorHeader({
   const acceptsWrites = !isAggregateProjectKind(project?.kind);
 
   return (
-    <Box
-      width="full"
-      display="flex"
-      flexWrap="wrap"
-      columnGap={4}
-      rowGap={2}
-      justifyContent="space-between"
-    >
-      <ModelSelectFieldMini />
-      {/* When squeezed the buttons wrap (as a group, then one by one), never the model name. */}
+    <Box width="full" display="flex" flexWrap="wrap" columnGap={2} rowGap={2} alignItems="center">
+      <Box
+        flex={variant === "full" ? "1 1 64px" : "none"}
+        minWidth={variant === "full" ? 0 : "180px"}
+      >
+        <ModelSelectFieldMini />
+      </Box>
+      {/* The model name shrinks first; the buttons wrap below it only on a very narrow panel. */}
       {variant === "full" && (
-        <HStack gap={2} flexWrap="wrap" justifyContent="flex-end" marginLeft="auto">
+        <HStack gap={1} flexWrap="nowrap" flexShrink={0}>
           {configId && onVersionRestore && (
             <VersionHistoryButton
               configId={configId}

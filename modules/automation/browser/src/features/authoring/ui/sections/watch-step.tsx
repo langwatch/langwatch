@@ -1,4 +1,5 @@
 import { AlertType } from "@langwatch/automation-contract";
+import { Card } from "@langwatch/design-system/card";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Lock, TrendingUp, Zap } from "lucide-react";
 
@@ -87,26 +88,20 @@ export function WatchStep({
 /** The lock said once in prose, with the one action that resolves it. */
 function SubjectLockedNotice({ onCreateNew }: { onCreateNew?: () => void }) {
   return (
-    <HStack
-      gap={2}
-      align="center"
-      padding={2.5}
-      borderRadius="md"
-      borderWidth="1px"
-      borderColor="border"
-      bg="bg.subtle"
-    >
-      <Box color="fg.muted" flexShrink={0} display="inline-flex">
-        <Lock size={13} aria-hidden="true" />
-      </Box>
-      <Text textStyle="xs" color="fg.muted" flex="1" minWidth="0">
-        {WATCH_LOCKED_EXPLANATION}
-      </Text>
-      {onCreateNew ? (
-        <Button size="xs" variant="outline" flexShrink={0} onClick={onCreateNew}>
-          New automation
-        </Button>
-      ) : null}
-    </HStack>
+    <Card variant="nested" tone="neutral" padding="sm">
+      <HStack gap={2} align="center">
+        <Box color="fg.muted" flexShrink={0} display="inline-flex">
+          <Lock size={13} aria-hidden="true" />
+        </Box>
+        <Text textStyle="xs" color="fg.muted" flex="1" minWidth="0">
+          {WATCH_LOCKED_EXPLANATION}
+        </Text>
+        {onCreateNew ? (
+          <Button size="xs" variant="outline" flexShrink={0} onClick={onCreateNew}>
+            New automation
+          </Button>
+        ) : null}
+      </HStack>
+    </Card>
   );
 }

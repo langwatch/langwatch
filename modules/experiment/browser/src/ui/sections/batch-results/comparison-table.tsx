@@ -142,7 +142,7 @@ const buildComparisonColumns = ({
       header: "",
       size: 32,
       cell: ({ row }) => (
-        <Text fontSize="12px" color="fg.muted" textAlign="right" paddingRight={1}>
+        <Text textStyle="caption" color="fg.muted" textAlign="right" paddingRight={1}>
           {row.original.index + 1}
         </Text>
       ),
@@ -159,9 +159,7 @@ const buildComparisonColumns = ({
         header: () => (
           <HStack gap={1}>
             <ColumnTypeIcon type="string" />
-            <Text fontSize="13px" fontWeight="medium">
-              {colName}
-            </Text>
+            <Text textStyle="label">{colName}</Text>
           </HStack>
         ),
         size: 210,
@@ -208,11 +206,7 @@ const buildComparisonColumns = ({
     columns.push(
       comparisonColumnHelper.accessor((row) => row.targetsByRun, {
         id: `target_${targetId}`,
-        header: () => (
-          <Text fontSize="13px" fontWeight="medium">
-            {targetCol.displayName ?? targetCol.name}
-          </Text>
-        ),
+        header: () => <Text textStyle="label">{targetCol.displayName ?? targetCol.name}</Text>,
         size: 300,
         minSize: 200,
         cell: ({ row }) => {
@@ -240,7 +234,7 @@ const buildComparisonColumns = ({
                     onOpenTrace={onOpenTrace}
                   />
                 ) : (
-                  <Text fontSize="13px" color="fg.subtle">
+                  <Text textStyle="bodySm" color="fg.subtle">
                     -
                   </Text>
                 ),
@@ -421,7 +415,7 @@ const GroupMeanBadges = ({
       return (
         <VStack key={run.runId} gap={0} align="end">
           {entries.map(([evId, stats]) => (
-            <HStack key={evId} gap={1} fontSize="11px" color="fg.muted">
+            <HStack key={evId} gap={1} textStyle="micro" color="fg.muted">
               <Box width="6px" height="6px" borderRadius="full" bg={run.color} />
               <Text>{stats.evaluatorName}</Text>
               <Text
@@ -473,7 +467,7 @@ const GroupHeaderRow = ({
           aria-label={collapsed ? "Expand" : "Collapse"}
           onClick={() => onToggleCollapse(value)}
           data-testid={`group-header-toggle-${value}`}
-          fontSize="12px"
+          textStyle="caption"
           color="fg.muted"
           paddingX={1}
           cursor="pointer"
@@ -490,10 +484,10 @@ const GroupHeaderRow = ({
             }}
           />
         </Box>
-        <Text fontSize="13px" fontWeight="semibold">
+        <Text textStyle="bodySm" fontWeight="semibold">
           {value}
         </Text>
-        <Text fontSize="12px" color="fg.muted" data-testid={`group-count-${value}`}>
+        <Text textStyle="caption" color="fg.muted" data-testid={`group-count-${value}`}>
           {rowCount}
           {rowCount === 1 ? " row" : " rows"}
         </Text>

@@ -308,15 +308,12 @@ describe("AutomationDrawer", () => {
         });
       });
 
-      it("explains why saving is blocked on hover", async () => {
-        await user.hover(createButton);
+      it("explains why saving is blocked in the footer", async () => {
+        const footer = await screen.findByText(
+          /choose which traces to act on.*pick a delivery channel/i,
+        );
 
-        // Facet-ordered todo copy: name, then the trace subject, then delivery.
-        await waitFor(() => {
-          expect(
-            screen.getByText(/choose which traces to act on.*pick a delivery channel/i),
-          ).toBeInTheDocument();
-        });
+        expect(footer).toBeInTheDocument();
       });
     });
 
@@ -1034,14 +1031,20 @@ describe("AutomationDrawer", () => {
         expect(screen.getByText(/Severity/)).toBeInTheDocument();
       });
 
-      it("holds Continue on the watch step until a graph is picked", async () => {
+      it("keeps the wizard on the watch step and names the missing graph until one is picked", async () => {
+        const user = userEvent.setup();
         renderDrawer({ initialSource: "customGraph" });
 
         await waitFor(() => {
           expect(useAutomationStore.getState().draft.source).toBe("customGraph");
         });
+        const continueButton = await screen.findByRole("button", { name: "Continue" });
+        expect(continueButton).toBeEnabled();
 
-        expect(await screen.findByRole("button", { name: "Continue" })).toBeDisabled();
+        await user.click(continueButton);
+
+        expect(useAutomationStore.getState().step).toBe("watch");
+        expect(screen.getByText("Pick a custom graph to continue.")).toBeInTheDocument();
       });
     });
 

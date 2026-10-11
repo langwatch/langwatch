@@ -32,6 +32,6 @@ None: licensing declares no peers.
 
 ## Who depends on licensing
 
-[auth](../../../modules/auth/README.md), [billing](../billing/README.md), [connect](../connect/README.md), [enterprise-ops](../enterprise-ops/README.md), [entitlement](../../../modules/entitlement/README.md), [gateway](../../../modules/gateway/README.md), [identity](../../../modules/identity/README.md), [ops](../../../modules/ops/README.md), [saas](../saas/README.md), [sso](../sso/README.md) (as a peer).
+[billing](../billing/README.md), [connect](../connect/README.md), [enterprise-ops](../enterprise-ops/README.md), [entitlement](../../../modules/entitlement/README.md), [gateway](../../../modules/gateway/README.md), [identity](../../../modules/identity/README.md), [ops](../../../modules/ops/README.md), [saas](../saas/README.md), [sso](../sso/README.md) (as a peer).
 
 <!-- readme:generated:end -->

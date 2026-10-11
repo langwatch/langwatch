@@ -1,6 +1,7 @@
 import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, Card, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box } from "@langwatch/design-system/primitives";
+import { ResourceTile } from "@langwatch/design-system/resource-tile";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import {
   ArrowUp,
@@ -63,95 +64,71 @@ export function EvaluatorCard({
   };
 
   return (
-    <Card.Root
-      variant="elevated"
-      onClick={onClick}
-      cursor="pointer"
-      _hover={{ boxShadow: "lg" }}
-      height="142px"
-      transition="all 0.2s ease-in-out"
-      data-testid={`evaluator-card-${evaluator.id}`}
-    >
-      <Card.Body padding={4}>
-        <VStack align="start" gap={2} height="full">
-          <HStack width="full">
-            <Box bg="green.subtle" padding={1} borderRadius="md">
-              <Icon size={18} color="var(--chakra-colors-green-fg)" />
-            </Box>
-            <Spacer />
-            <Menu.Root>
-              <Menu.Trigger
-                className="js-inner-menu"
-                // The trigger's only child is an icon, so without this the row
-                // actions have no accessible name at all: a screen reader
-                // announces "button" and nothing else, and with a grid of them
-                // there is no way to tell which card one belongs to. The online
-                // evaluations table's trigger has always carried the same label.
-                aria-label={`Actions for ${evaluator.name}`}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <MoreVertical size={16} />
-              </Menu.Trigger>
-              <Menu.Content className="js-inner-menu">
-                {onEdit && (
-                  <Menu.Item value="edit" onClick={stop(onEdit)}>
-                    <LuPencil size={14} /> Edit
-                  </Menu.Item>
-                )}
-                {onUseFromApi && (
-                  <Menu.Item
-                    value="use-from-api"
-                    onClick={stop(onUseFromApi)}
-                    data-testid={`evaluator-use-api-${evaluator.id}`}
-                  >
-                    <Code size={14} /> Use via API
-                  </Menu.Item>
-                )}
-                {isCopiedEvaluator && onSyncFromSource && (
-                  <Menu.Item value="sync" onClick={stop(onSyncFromSource)}>
-                    <RefreshCw size={16} /> Update from source
-                  </Menu.Item>
-                )}
-                {hasCopies && onPushToCopies && (
-                  <Menu.Item value="push" onClick={stop(onPushToCopies)}>
-                    <ArrowUp size={16} /> Push to replicas
-                  </Menu.Item>
-                )}
-                {onReplicate && (
-                  <Menu.Item value="replicate" onClick={stop(onReplicate)}>
-                    <Copy size={16} /> Replicate to another project
-                  </Menu.Item>
-                )}
-                {onViewHistory && (
-                  <Menu.Item value="history" onClick={stop(onViewHistory)}>
-                    <Clock size={14} /> View history
-                  </Menu.Item>
-                )}
-                {onDelete && (
-                  <Menu.Item value="delete" color="red.fg" onClick={stop(onDelete)}>
-                    <LuTrash2 size={14} /> Delete
-                  </Menu.Item>
-                )}
-              </Menu.Content>
-            </Menu.Root>
-          </HStack>
-          <Spacer />
-          <Text
-            color="fg"
-            fontSize="sm"
-            fontWeight={500}
-            lineClamp={2}
-            width="full"
-            wordBreak="break-word"
+    <ResourceTile
+      opener={<button type="button" aria-label={evaluator.name} onClick={onClick} />}
+      icon={
+        <Box bg="green.subtle" padding={1} borderRadius="md">
+          <Icon size={18} color="var(--chakra-colors-green-fg)" />
+        </Box>
+      }
+      title={evaluator.name}
+      meta={`${typeLabel}${evaluatorType ? ` • ${evaluatorType}` : ""} • ${updatedAtLabel}`}
+      menu={
+        <Menu.Root>
+          <Menu.Trigger
+            // The trigger's only child is an icon, so without this the row
+            // actions have no accessible name at all: a screen reader
+            // announces "button" and nothing else, and with a grid of them
+            // there is no way to tell which card one belongs to. The online
+            // evaluations table's trigger has always carried the same label.
+            aria-label={`Actions for ${evaluator.name}`}
           >
-            {evaluator.name}
-          </Text>
-          <Text color="fg.subtle" fontSize="12px" lineClamp={1} width="full">
-            {typeLabel}
-            {evaluatorType && ` • ${evaluatorType}`} • {updatedAtLabel}
-          </Text>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+            <MoreVertical size={16} />
+          </Menu.Trigger>
+          <Menu.Content>
+            {onEdit && (
+              <Menu.Item value="edit" onClick={stop(onEdit)}>
+                <LuPencil size={14} /> Edit
+              </Menu.Item>
+            )}
+            {onUseFromApi && (
+              <Menu.Item
+                value="use-from-api"
+                onClick={stop(onUseFromApi)}
+                data-testid={`evaluator-use-api-${evaluator.id}`}
+              >
+                <Code size={14} /> Use via API
+              </Menu.Item>
+            )}
+            {isCopiedEvaluator && onSyncFromSource && (
+              <Menu.Item value="sync" onClick={stop(onSyncFromSource)}>
+                <RefreshCw size={16} /> Update from source
+              </Menu.Item>
+            )}
+            {hasCopies && onPushToCopies && (
+              <Menu.Item value="push" onClick={stop(onPushToCopies)}>
+                <ArrowUp size={16} /> Push to replicas
+              </Menu.Item>
+            )}
+            {onReplicate && (
+              <Menu.Item value="replicate" onClick={stop(onReplicate)}>
+                <Copy size={16} /> Replicate to another project
+              </Menu.Item>
+            )}
+            {onViewHistory && (
+              <Menu.Item value="history" onClick={stop(onViewHistory)}>
+                <Clock size={14} /> View history
+              </Menu.Item>
+            )}
+            {onDelete && (
+              <Menu.Item value="delete" color="red.fg" onClick={stop(onDelete)}>
+                <LuTrash2 size={14} /> Delete
+              </Menu.Item>
+            )}
+          </Menu.Content>
+        </Menu.Root>
+      }
+      data-testid={`evaluator-card-${evaluator.id}`}
+    />
   );
 }

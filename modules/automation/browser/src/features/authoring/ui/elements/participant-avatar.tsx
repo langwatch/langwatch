@@ -14,8 +14,8 @@ export function ParticipantAvatar({ name }: { name: string }) {
       borderRadius="full"
       background={color.background}
       color={color.color}
-      fontSize="10px"
-      fontWeight="600"
+      textStyle="micro"
+      fontWeight="semibold"
       display="flex"
       alignItems="center"
       justifyContent="center"

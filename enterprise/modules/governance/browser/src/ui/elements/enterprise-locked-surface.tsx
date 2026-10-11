@@ -1,5 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
-import { Box, Button, Heading, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -17,6 +19,7 @@ interface Props {
  */
 export function EnterpriseLockedSurface({ children, featureName, description }: Props) {
   const { isEnterprise, isLoading } = useGovernanceHost().plan();
+  const accent = useProductAccent();
 
   if (isLoading) {
     return (
@@ -34,33 +37,20 @@ export function EnterpriseLockedSurface({ children, featureName, description }: 
 
   return (
     <Box padding={8}>
-      <Box
-        maxWidth="640px"
-        marginX="auto"
-        marginY={12}
-        padding={8}
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="lg"
-        backgroundColor="bg.subtle"
-      >
-        <VStack align="start" gap={4}>
-          <Box color="fg.muted">
-            <Lock size={32} />
-          </Box>
-          <Heading as="h2" size="lg">
-            {featureName}
-          </Heading>
-          <Text color="fg.muted" fontSize="sm">
-            {description ??
-              `${featureName} is available on Enterprise plans. Upgrade to unlock this surface for your organization.`}
-          </Text>
-          <Button asChild size="sm" colorPalette="orange">
-            <Link unstyled href="/settings/subscription">
-              Upgrade →
-            </Link>
-          </Button>
-        </VStack>
+      <Box maxWidth="640px" marginX="auto" marginY={12}>
+        <Card padding="lg" icon={<Lock size={16} />} title={featureName}>
+          <VStack align="start" gap={4}>
+            <Text color="fg.muted" fontSize="sm">
+              {description ??
+                `${featureName} is available on Enterprise plans. Upgrade to unlock this surface for your organization.`}
+            </Text>
+            <Button asChild size="sm" colorPalette={accent.colorPalette}>
+              <Link unstyled href="/settings/subscription">
+                Upgrade →
+              </Link>
+            </Button>
+          </VStack>
+        </Card>
       </Box>
     </Box>
   );

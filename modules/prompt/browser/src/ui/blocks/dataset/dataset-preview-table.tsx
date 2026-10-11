@@ -303,12 +303,12 @@ function buildPreviewColumns({
       columnHelper.display({
         id: "rowNumber",
         header: () => (
-          <Text fontSize="13px" color="fg.muted">
+          <Text textStyle="bodySm" color="fg.muted">
             #
           </Text>
         ),
         cell: (info) => (
-          <Text fontSize="13px" color="fg.muted">
+          <Text textStyle="bodySm" color="fg.muted">
             {info.row.index + 1}
           </Text>
         ),
@@ -325,9 +325,7 @@ function buildPreviewColumns({
         header: () => (
           <HStack gap={1}>
             <ColumnTypeIcon type={column.type} />
-            <Text fontSize="13px" fontWeight="medium">
-              {column.name}
-            </Text>
+            <Text textStyle="label">{column.name}</Text>
           </HStack>
         ),
         cell: (info) => info.getValue(),

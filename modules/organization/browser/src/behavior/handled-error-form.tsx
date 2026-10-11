@@ -1,5 +1,6 @@
 /** Server rejections placed where the reader is looking; field errors not toasts. */
 
+import { Banner } from "@langwatch/design-system/banner";
 import { Alert, List } from "@langwatch/design-system/primitives";
 import { ErrorActions } from "@langwatch/error-views";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
@@ -93,14 +94,7 @@ export function FormServerError({ form }: { form: MinimalForm }) {
   const message = root?.serverError?.message;
   if (!message) return null;
 
-  return (
-    <Alert.Root status="error" role="alert">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>{message}</Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
-  );
+  return <Banner status="error">{message}</Banner>;
 }
 
 export interface HandledErrorAlertProps {

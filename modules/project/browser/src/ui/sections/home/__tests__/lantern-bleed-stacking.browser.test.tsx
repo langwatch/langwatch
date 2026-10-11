@@ -26,10 +26,6 @@ vi.mock("../../../../behavior/langy/langy.store.ts", () => ({
 
 vi.mock("@langwatch/design-system/langy-mark", () => ({ LangyMark: () => null }));
 
-vi.mock("../../../../model/langy/asaplangy-tokens.ts", () => ({ SERIF: "serif" }));
-vi.mock("../components/use-home-composition.ts", () => ({
-  useHomeComposition: () => "langy",
-}));
 vi.mock("../components/use-project-reach.ts", () => ({
   useProjectReach: () => ({
     isLoading: false,

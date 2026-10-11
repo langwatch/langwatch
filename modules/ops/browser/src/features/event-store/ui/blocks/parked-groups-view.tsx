@@ -1,8 +1,8 @@
+import { IdText } from "@langwatch/design-system/id-text";
 import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { ParkedGroupInfo } from "@langwatch/ops-contract";
 
 import { formatCount, formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 
 export function ParkedGroupsView({
   isLoading,
@@ -55,9 +55,7 @@ export function ParkedGroupsView({
       )}
       {groups.map((group) => (
         <HStack key={group.groupId} gap={3} paddingY={1}>
-          <Text fontFamily="mono" textStyle="xs" title={group.groupId} flex="1" truncate>
-            {middleEllipsis(group.groupId, 64)}
-          </Text>
+          <IdText value={group.groupId} label="ID" />
           <Text textStyle="xs" color="fg.muted">
             {group.pipelineName ?? "—"}
           </Text>

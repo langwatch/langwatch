@@ -1,6 +1,8 @@
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Box, Flex, Grid, GridItem, Tabs, Button } from "@langwatch/design-system/primitives";
+import { Box, Flex, Grid, GridItem, Button } from "@langwatch/design-system/primitives";
 import { MousePointer2, Plus } from "lucide-react";
+import { useState } from "react";
 
 import { useTraceStore } from "../../behavior/trace.store.ts";
 import { ConnectionSettings } from "./connection-settings.tsx";
@@ -15,6 +17,7 @@ import { WaterfallView } from "./waterfall-view.tsx";
 export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
   const selectedSpanId = useTraceStore((s) => s.selectedSpanId);
   const addSpan = useTraceStore((s) => s.addSpan);
+  const [view, setView] = useState("editor");
   const sidebarW = compact ? "280px" : "340px";
 
   return (
@@ -43,67 +46,21 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
 
       {/* Right pane — minmax(0,1fr) prevents blowout */}
       <GridItem overflow="hidden" display="flex" flexDirection="column">
-        <Tabs.Root
-          defaultValue="editor"
-          variant="line"
-          colorPalette="accent"
-          size="sm"
-          display="flex"
-          flexDirection="column"
-          flex={1}
-          overflow="hidden"
-          // lazyMount only (no unmountOnExit): the Editor tab holds a draft
-          // in React, not the store. Most fields are controlled through to
-          // traceStore each keystroke and would survive a remount, but
-          // AttributeEditor's uncommitted `newKey` would not.
-          lazyMount
-        >
-          <Tabs.List borderBottom="1px solid" borderColor="border" px={3} gap={0} flexShrink={0}>
-            <Tabs.Trigger
-              value="editor"
-              fontSize="sm"
-              px={4}
-              py={3}
-              color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "accent.solid" }}
-            >
-              Editor
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="waterfall"
-              fontSize="sm"
-              px={4}
-              py={3}
-              color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "accent.solid" }}
-            >
-              Waterfall
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="graph"
-              fontSize="sm"
-              px={4}
-              py={3}
-              color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "accent.solid" }}
-            >
-              Graph
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="json"
-              fontSize="sm"
-              px={4}
-              py={3}
-              color="fg.muted"
-              _selected={{ color: "fg.default", borderColor: "accent.solid" }}
-            >
-              JSON
-            </Tabs.Trigger>
-          </Tabs.List>
-
-          <Box flex={1} overflow="auto" minH={0}>
-            <Tabs.Content value="editor" p={0}>
-              {selectedSpanId ? (
+        <ContentTabs
+          label="Trace view"
+          value={view}
+          onValueChange={({ value }) => setView(value)}
+          density="compact"
+          body="flush"
+          scroll="panel"
+          // Lazy mounting keeps a visited tab: the Editor tab holds a draft in React, not
+          // the store, and AttributeEditor's uncommitted `newKey` would not survive a remount.
+          mount="lazy"
+          items={[
+            {
+              value: "editor",
+              label: "Editor",
+              content: selectedSpanId ? (
                 <SpanEditorPanel />
               ) : (
                 <Box minHeight="360px" display="flex" alignItems="center" padding={6}>
@@ -117,19 +74,29 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
                     </Button>
                   </NoDataInfoBlock>
                 </Box>
-              )}
-            </Tabs.Content>
-            <Tabs.Content value="waterfall" p={0}>
-              <WaterfallView />
-            </Tabs.Content>
-            <Tabs.Content value="graph" p={0} h="full">
-              <GraphView />
-            </Tabs.Content>
-            <Tabs.Content value="json" p={0} h="full">
-              <JsonView />
-            </Tabs.Content>
-          </Box>
-        </Tabs.Root>
+              ),
+            },
+            { value: "waterfall", label: "Waterfall", content: <WaterfallView /> },
+            {
+              value: "graph",
+              label: "Graph",
+              content: (
+                <Box height="full">
+                  <GraphView />
+                </Box>
+              ),
+            },
+            {
+              value: "json",
+              label: "JSON",
+              content: (
+                <Box height="full">
+                  <JsonView />
+                </Box>
+              ),
+            },
+          ]}
+        />
       </GridItem>
     </Grid>
   );

@@ -142,6 +142,23 @@ function renderHeader(runs: ScenarioRunData[], note: string | null = null) {
   return renderWithDesignSystem(<RunPlanDetailHeader {...props} />);
 }
 
+/** The columns the table lays out, by key, in order. */
+function tableColumns(): HTMLElement[] {
+  return Array.from(
+    screen.getByTestId("run-results-table").querySelectorAll<HTMLElement>("col[data-column]"),
+  );
+}
+
+function columnKeys(): (string | undefined)[] {
+  return tableColumns().map((column) => column.dataset.column);
+}
+
+/** A column with no width of its own shares the free width of the table. */
+function columnWidth(key: string): string {
+  const column = tableColumns().find((candidate) => candidate.dataset.column === key);
+  return column ? getComputedStyle(column).width : "missing";
+}
+
 function renderTable(runs: ScenarioRunData[]) {
   return renderWithDesignSystem(
     <RunResultsTable
@@ -342,12 +359,11 @@ describe("<RunResultsTable/> evaluator cells", () => {
       expect(screen.queryByText("Evaluators")).not.toBeInTheDocument();
       expect(screen.queryByTestId("run-result-evaluators")).not.toBeInTheDocument();
       expect(screen.queryByTestId("run-result-evaluators-grading")).not.toBeInTheDocument();
-      expect(screen.getByTestId("run-results-table-header")).toHaveStyle({
-        gridTemplateColumns: "120px minmax(0,1fr) 130px auto",
-      });
-      expect(screen.getByTestId("run-result-row-run_1")).toHaveStyle({
-        gridTemplateColumns: "120px minmax(0,1fr) 130px auto",
-      });
+      expect(columnKeys()).toEqual(["result", "scenario", "metrics", "menu"]);
+      expect(columnWidth("scenario")).toBe("auto");
+      expect(within(screen.getByTestId("run-result-row-run_1")).getAllByRole("cell")).toHaveLength(
+        4,
+      );
     });
   });
 
@@ -395,13 +411,16 @@ describe("<RunResultsTable/> evaluator cells", () => {
     it("keeps a floor under the scenario column and lets the evaluators share the rest", () => {
       renderTable(threeScenarioRuns());
 
-      const columns = "120px minmax(160px,1fr) minmax(0,1fr) 130px auto";
-      expect(screen.getByTestId("run-results-table-header")).toHaveStyle({
-        gridTemplateColumns: columns,
-      });
-      expect(screen.getByTestId("run-result-row-run_a")).toHaveStyle({
-        gridTemplateColumns: columns,
-      });
+      expect(columnKeys()).toEqual(["result", "scenario", "evaluators", "metrics", "menu"]);
+      // Neither name column claims a width: they share what the fixed columns leave.
+      expect(columnWidth("scenario")).toBe("auto");
+      expect(columnWidth("evaluators")).toBe("auto");
+      // Under its minimum the table scrolls, leaving each name column at least 160px.
+      const fixed = ["result", "metrics", "menu"]
+        .map((key) => parseFloat(columnWidth(key)))
+        .reduce((sum, width) => sum + width, 0);
+      const floor = parseFloat(getComputedStyle(screen.getByTestId("run-results-table")).minWidth);
+      expect(floor - fixed).toBeGreaterThanOrEqual(2 * 160);
       // The pills wrap inside the cell rather than widening it.
       expect(screen.getAllByTestId("run-result-evaluators")[0]).toHaveStyle({
         flexWrap: "wrap",

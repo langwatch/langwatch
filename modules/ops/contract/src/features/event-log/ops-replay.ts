@@ -48,6 +48,38 @@ export const replayHistoryEntrySchema: ReplayHistoryEntrySchema =
   replayHistoryEntrySchemaDefinition;
 export type ReplayHistoryEntry = z.infer<typeof replayHistoryEntrySchema>;
 
+/**
+ * One page of the retained history, newest first. The cursor is the run id of the page's last
+ * entry, so a run prepended between two reads never shifts what the next page returns.
+ */
+const replayHistoryPageInputSchemaDefinition = z.object({
+  cursor: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(50).default(20),
+});
+export interface ReplayHistoryPageInputSchema extends Named<
+  typeof replayHistoryPageInputSchemaDefinition
+> {}
+export const replayHistoryPageInputSchema: ReplayHistoryPageInputSchema =
+  replayHistoryPageInputSchemaDefinition;
+export type ReplayHistoryPageInput = z.infer<typeof replayHistoryPageInputSchema>;
+
+/**
+ * `cursor_expired` means the run the cursor names has left the retained history (the list keeps
+ * only the newest runs): the reader restarts from the first page.
+ */
+const replayHistoryPageSchemaDefinition = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("page"),
+    entries: replayHistoryEntrySchema.array(),
+    hasMore: z.boolean(),
+    nextCursor: z.string().nullable(),
+  }),
+  z.object({ outcome: z.literal("cursor_expired") }),
+]);
+export interface ReplayHistoryPageSchema extends Named<typeof replayHistoryPageSchemaDefinition> {}
+export const replayHistoryPageSchema: ReplayHistoryPageSchema = replayHistoryPageSchemaDefinition;
+export type ReplayHistoryPage = z.infer<typeof replayHistoryPageSchema>;
+
 /** The answer when nothing has ever run, and the shape a lost status falls back to. */
 export const IDLE_STATUS: ReplayStatus = {
   state: "idle",

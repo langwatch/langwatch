@@ -1,10 +1,11 @@
 import { Link } from "@langwatch/browser-host/link";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 /**
  * The derived-block dispatcher — one stamped `langy-card` part in, the card it
  * validates as out (ADR-060 §3).
  */
-import { Box, Grid, Table, Text } from "@langwatch/design-system/primitives";
+import { Box, Grid, Text } from "@langwatch/design-system/primitives";
 import type {
   LangyCardHint,
   LangyChoiceSelection,
@@ -143,41 +144,34 @@ function DerivedTableBody({ card }: { card: LangyDerivedTableCard }) {
   const shown = card.rows.slice(0, MAX_TABLE_ROWS);
   const remaining = card.rows.length - shown.length;
   return (
-    <Box overflowX="auto">
-      <Table.Root size="sm" variant="line">
-        <Table.Header>
-          <Table.Row background="transparent">
+    <Box>
+      <ListTable
+        variant="embedded"
+        density="compact"
+        scroll="x"
+        scrollLabel={`${card.title} table`}
+      >
+        <ListTable.Header>
+          <ListTable.Row>
             {card.columns.map((column) => (
-              <Table.ColumnHeader
-                key={column}
-                textStyle="2xs"
-                color="fg.subtle"
-                textTransform="uppercase"
-                letterSpacing="0.03em"
-                fontWeight="500"
-              >
-                {column}
-              </Table.ColumnHeader>
+              <ListTable.ColumnHeader key={column}>{column}</ListTable.ColumnHeader>
             ))}
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {shown.map((row, rowIndex) => (
-            <Table.Row key={rowIndex} background="transparent">
+            <ListTable.Row key={rowIndex}>
               {card.columns.map((_, columnIndex) => (
-                <Table.Cell
-                  key={columnIndex}
-                  textStyle="xs"
-                  color="fg"
-                  fontVariantNumeric="tabular-nums"
-                >
-                  {formatCell(row[columnIndex])}
-                </Table.Cell>
+                <ListTable.Cell key={columnIndex}>
+                  <Text as="span" textStyle="xs" color="fg" fontVariantNumeric="tabular-nums">
+                    {formatCell(row[columnIndex])}
+                  </Text>
+                </ListTable.Cell>
               ))}
-            </Table.Row>
+            </ListTable.Row>
           ))}
-        </Table.Body>
-      </Table.Root>
+        </ListTable.Body>
+      </ListTable>
       {remaining > 0 ? (
         <Text textStyle="2xs" color="fg.subtle" paddingTop={1}>
           +{remaining.toLocaleString()} more rows in the reply

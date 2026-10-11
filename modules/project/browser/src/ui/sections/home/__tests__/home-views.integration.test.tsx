@@ -8,13 +8,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const gates = vi.hoisted(() => ({
-  composition: "classic" as "langy" | "classic",
   isNewProject: false,
 }));
 
-vi.mock("../components/use-home-composition.ts", () => ({
-  useHomeComposition: () => gates.composition,
-}));
 vi.mock("../components/use-project-reach.ts", () => ({
   useProjectReach: () => ({
     isLoading: false,
@@ -53,7 +49,6 @@ vi.mock("../components/traces-overview.tsx", () => ({
 }));
 vi.mock("../components/welcome-header.tsx", () => ({
   WelcomeHeader: () => null,
-  useTimeOfDay: () => "morning",
 }));
 
 import {
@@ -84,10 +79,10 @@ class StubProjectHomeHost extends ProjectHomeHost {
     return false;
   }
   langyVisibility(): ProjectHomeLangyVisibility {
-    return { show: gates.composition === "langy", isResolving: false };
+    return { show: true, isResolving: false };
   }
   canAskLangy(): boolean {
-    return gates.composition === "langy";
+    return true;
   }
   deployment(): ProjectHomeDeployment {
     return { isSaaS: false, isDevelopment: false };
@@ -107,21 +102,16 @@ const renderHome = () =>
     </DesignSystemProvider>,
   );
 
-const precedes = (a: Element, b: Element) =>
-  (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-
 afterEach(cleanup);
 
 describe("home views", () => {
   beforeEach(() => {
-    gates.composition = "classic";
     gates.isNewProject = false;
   });
 
   describe("given a project that has never received a trace, on the Langy home", () => {
     /** @scenario "The first-run view keeps the Langy home's lit block" */
     it("leads with the lit block, the checklist directly beneath, and no figures or recent items", () => {
-      gates.composition = "langy";
       gates.isNewProject = true;
       renderHome();
 
@@ -130,20 +120,6 @@ describe("home views", () => {
       expect(banners.nextElementSibling).toBe(screen.getByTestId("onboarding-checklist"));
       expect(screen.queryByTestId("traces-overview")).toBeNull();
       expect(screen.queryByTestId("recent-items")).toBeNull();
-    });
-  });
-
-  describe("given a project that has received traces", () => {
-    /** @scenario "An activated project gets the briefing view" */
-    it("shows banners, onboarding progress, the traces overview and recent items", () => {
-      renderHome();
-
-      const banners = screen.getByTestId("banners");
-      const overview = screen.getByTestId("traces-overview");
-      const recent = screen.getByTestId("recent-items");
-      expect(screen.getByTestId("onboarding-checklist")).toBeDefined();
-      expect(precedes(banners, overview)).toBe(true);
-      expect(precedes(overview, recent)).toBe(true);
     });
   });
 });

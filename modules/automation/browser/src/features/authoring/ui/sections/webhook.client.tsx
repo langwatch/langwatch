@@ -8,6 +8,7 @@ import {
   defaultsForSourceKind,
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
+import { Card } from "@langwatch/design-system/card";
 import {
   Box,
   Button,
@@ -494,12 +495,11 @@ function BodyEditor({ slice, onChange, ctx }: ConfigFormProps<WebhookSlice, Webh
 function BodyPreview({ preview, contentType }: { preview: WebhookPreview; contentType: string }) {
   const isJson = isJsonWebhookContentType(contentType);
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      bg="bg.subtle"
-      padding={3}
+    <Card
+      variant="nested"
+      tone="neutral"
+      borderTone="muted"
+      padding="sm"
       data-testid="webhook-preview"
     >
       <Text textStyle="xs" fontWeight="medium" color="fg.muted" mb={1}>
@@ -517,7 +517,7 @@ function BodyPreview({ preview, contentType }: { preview: WebhookPreview; conten
             : ": an empty body will be sent instead."}
         </Text>
       ) : null}
-    </Box>
+    </Card>
   );
 }
 

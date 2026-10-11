@@ -1,5 +1,5 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { SignInMethodRemovalTarget } from "../../behavior/use-sign-in-method-removal.ts";
 
@@ -27,56 +27,41 @@ export function RemoveSignInMethodDialog({
   const remaining = target ? staysBehind(target.accountId) : [];
 
   return (
-    <Dialog.Root
+    <Dialog
       open={target !== null}
-      onOpenChange={(details) => {
-        if (!details.open) onClose();
-      }}
+      onClose={onClose}
+      title={`Remove ${target?.name ?? "this sign-in method"}?`}
       placement="center"
+      busy={isRemoving}
+      data-testid="unlink-method-dialog"
+      primaryAction={{
+        label: "Remove",
+        danger: true,
+        loading: isRemoving,
+        onClick: () => {
+          if (target) onConfirm(target.accountId);
+        },
+        "data-testid": "confirm-unlink-method",
+      }}
     >
-      <Dialog.Content bg="bg" data-testid="unlink-method-dialog">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Remove {target?.name ?? "this sign-in method"}?
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="start" gap={3}>
-            <Text fontSize="sm" color="fg.muted">
-              {remaining.length > 0
-                ? `You will still be able to sign in with ${remaining.join(", ")}.`
-                : "You will still be able to sign in with the other methods on your account."}
-            </Text>
-            {target?.demotesFirst ? (
-              <Text fontSize="sm" color="fg.muted">
-                This is your primary sign-in method, so another confirmed one becomes primary first.
-              </Text>
-            ) : null}
-            {organizationEnforcesSso ? (
-              <Text fontSize="sm" color="fg.muted" data-testid="unlink-relinks-on-sso">
-                Your organization signs people in through single sign-on, so the next time you sign
-                in that way it will be linked again.
-              </Text>
-            ) : null}
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={3} justify="end" width="full">
-            <Button variant="outline" onClick={onClose} disabled={isRemoving}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              loading={isRemoving}
-              onClick={() => target && onConfirm(target.accountId)}
-              data-testid="confirm-unlink-method"
-            >
-              Remove
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack align="start" gap={3}>
+        <Text fontSize="sm" color="fg.muted">
+          {remaining.length > 0
+            ? `You will still be able to sign in with ${remaining.join(", ")}.`
+            : "You will still be able to sign in with the other methods on your account."}
+        </Text>
+        {target?.demotesFirst ? (
+          <Text fontSize="sm" color="fg.muted">
+            This is your primary sign-in method, so another confirmed one becomes primary first.
+          </Text>
+        ) : null}
+        {organizationEnforcesSso ? (
+          <Text fontSize="sm" color="fg.muted" data-testid="unlink-relinks-on-sso">
+            Your organization signs people in through single sign-on, so the next time you sign in
+            that way it will be linked again.
+          </Text>
+        ) : null}
+      </VStack>
+    </Dialog>
   );
 }

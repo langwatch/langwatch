@@ -108,12 +108,29 @@ describe("given sam has two-step verification on and no organization requires it
       expect(calls.invalidate).toHaveBeenCalled();
     });
 
-    it("cannot be sent without the code", async () => {
+    it("names what is missing and sends nothing when the code is left empty", async () => {
       renderSection();
       await openTurnOff();
       fireEvent.change(screen.getByTestId("turn-off-password"), { target: { value: "hunter2" } });
 
-      expect(screen.getByTestId("confirm-turn-off-two-factor")).toHaveProperty("disabled", true);
+      const turnOff = screen.getByTestId("confirm-turn-off-two-factor");
+      expect(turnOff).toHaveProperty("disabled", false);
+      fireEvent.click(turnOff);
+
+      expect(await screen.findByText("Enter the code from your app.")).toBeTruthy();
+      expect(document.activeElement).toBe(screen.getByTestId("turn-off-code"));
+      expect(calls.disable).not.toHaveBeenCalled();
+    });
+
+    it("asks for the password first when both are empty", async () => {
+      renderSection();
+      await openTurnOff();
+
+      fireEvent.click(screen.getByTestId("confirm-turn-off-two-factor"));
+
+      expect(await screen.findByText("Enter your password.")).toBeTruthy();
+      expect(document.activeElement).toBe(screen.getByTestId("turn-off-password"));
+      expect(calls.disable).not.toHaveBeenCalled();
     });
   });
 

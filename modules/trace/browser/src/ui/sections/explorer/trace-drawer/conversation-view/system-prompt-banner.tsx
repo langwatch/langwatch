@@ -43,7 +43,7 @@ export const SystemPromptBanner: React.FC<{ text: string }> = ({ text }) => {
         <Icon as={Settings2} boxSize="13px" color="fg.muted" />
         <Text
           textStyle="2xs"
-          fontWeight="600"
+          fontWeight="semibold"
           color="fg.muted"
           textTransform="uppercase"
           letterSpacing="0.06em"

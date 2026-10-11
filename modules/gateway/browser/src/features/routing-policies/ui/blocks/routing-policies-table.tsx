@@ -1,16 +1,9 @@
+import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Badge,
-  Card,
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
-import { Plus, Route } from "lucide-react";
+import { Fragment } from "react";
 
 import { isModelTier } from "../../model/model-tier-presets.ts";
 import { RoutingPolicyRowActions } from "../elements/routing-policy-row-actions.tsx";
@@ -40,12 +33,12 @@ const SCOPE_LEVELS: {
   },
   {
     level: "team",
-    label: "Teams",
+    label: "Team",
     subtitle: "Overrides the organization policy for one team",
   },
   {
     level: "project",
-    label: "Projects",
+    label: "Project",
     subtitle: "Overrides everything above for one project",
   },
 ];
@@ -66,93 +59,84 @@ export function RoutingPoliciesTable({
   onSetDefault: (policy: RoutingPolicyRow) => void;
   onDelete: (policy: RoutingPolicyRow) => void;
   /**
-   * Whether the viewer holds `routingPolicies:manage`. False hides the "New
-   * policy" buttons and the per-row overflow menu, since every action behind
+   * Whether the viewer holds `routingPolicies:manage`. False hides the add links
+   * and the per-row overflow menu, since every action behind
    * them is a write the server refuses without the grant.
    */
   canManage: boolean;
 }) {
   const { bucketed, unplaced } = bucketByScopeLevel(policies);
+  const renderRow = (policy: RoutingPolicyRow) => (
+    <ListTable.Row key={policy.id}>
+      <ListTable.Cell>
+        <PolicyRow
+          policy={policy}
+          resolveScopeNames={resolveScopeNames}
+          onEdit={() => onEdit(policy)}
+          onSetDefault={() => onSetDefault(policy)}
+          onDelete={() => onDelete(policy)}
+          canManage={canManage}
+        />
+      </ListTable.Cell>
+    </ListTable.Row>
+  );
 
   return (
-    <>
-      {SCOPE_LEVELS.map(({ level, label, subtitle }) => {
-        const rows = bucketed.get(level) ?? [];
-        return (
-          <Card.Root key={level} variant="showcase" padding={4}>
-            <HStack alignItems="start" marginBottom={3}>
-              <VStack align="start" gap={0}>
-                <Text fontSize="sm" fontWeight="semibold">
-                  {label}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  {subtitle}
-                </Text>
-              </VStack>
-              <Spacer />
-              {canManage && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  data-testid="gateway-routing-policy-new"
-                  onClick={() => onNew(level)}
-                >
-                  <Plus size={14} /> New policy
-                </Button>
-              )}
-            </HStack>
-
-            <VStack align="stretch" gap={0}>
+    <ListTable>
+      <ListTable.Body>
+        {SCOPE_LEVELS.map(({ level, label, subtitle }) => {
+          const rows = bucketed.get(level) ?? [];
+          return (
+            <Fragment key={level}>
+              <GroupHeadingRow label={label} subtitle={subtitle} />
+              {rows.map(renderRow)}
               {rows.length === 0 && (
-                <NoDataInfoBlock
-                  icon={<Route />}
-                  title="No policies here yet."
-                  description={subtitle}
-                />
+                <ListTable.SpanRow columns={1}>
+                  <HStack paddingX={4}>
+                    <NoDataInfoBlock
+                      size="line"
+                      title="No policies here yet."
+                      action={
+                        canManage
+                          ? {
+                              label: `Add ${label.toLowerCase()} policy`,
+                              onClick: () => onNew(level),
+                            }
+                          : void 0
+                      }
+                    />
+                  </HStack>
+                </ListTable.SpanRow>
               )}
-              {rows.map((policy) => (
-                <PolicyRow
-                  key={policy.id}
-                  policy={policy}
-                  resolveScopeNames={resolveScopeNames}
-                  onEdit={() => onEdit(policy)}
-                  onSetDefault={() => onSetDefault(policy)}
-                  onDelete={() => onDelete(policy)}
-                  canManage={canManage}
-                />
-              ))}
-            </VStack>
-          </Card.Root>
-        );
-      })}
+            </Fragment>
+          );
+        })}
+        {unplaced.length > 0 && (
+          <>
+            <GroupHeadingRow
+              label="Elsewhere"
+              subtitle="These policies apply somewhere this page does not have a section for. They still route traffic, so they are listed here rather than hidden."
+            />
+            {unplaced.map(renderRow)}
+          </>
+        )}
+      </ListTable.Body>
+    </ListTable>
+  );
+}
 
-      {unplaced.length > 0 && (
-        <Card.Root variant="showcase" padding={4}>
-          <VStack align="start" gap={0} marginBottom={3}>
-            <Text fontSize="sm" fontWeight="semibold">
-              Elsewhere
-            </Text>
-            <Text fontSize="xs" color="fg.muted">
-              These policies apply somewhere this page does not have a section for. They still route
-              traffic, so they are listed here rather than hidden.
-            </Text>
-          </VStack>
-          <VStack align="stretch" gap={0}>
-            {unplaced.map((policy) => (
-              <PolicyRow
-                key={policy.id}
-                policy={policy}
-                resolveScopeNames={resolveScopeNames}
-                onEdit={() => onEdit(policy)}
-                onSetDefault={() => onSetDefault(policy)}
-                onDelete={() => onDelete(policy)}
-                canManage={canManage}
-              />
-            ))}
-          </VStack>
-        </Card.Root>
-      )}
-    </>
+function GroupHeadingRow({ label, subtitle }: { label: string; subtitle: string }) {
+  return (
+    <ListTable.SpanRow columns={1} band>
+      <VStack align="start" gap={0} paddingX={4} paddingY={3}>
+        <Text textStyle="sm" fontWeight="semibold">
+          {label}
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          {subtitle}
+        </Text>
+      </VStack>
+    </ListTable.SpanRow>
   );
 }
 
@@ -199,13 +183,7 @@ function PolicyRow({
   const answeredTiers = policy.defaultModel ? "every tier" : describeTiers(tierCount);
 
   return (
-    <HStack
-      borderTopWidth="1px"
-      borderColor="border.muted"
-      paddingY={3}
-      gap={3}
-      data-testid="gateway-routing-policy-row"
-    >
+    <HStack paddingY={1} gap={3} data-testid="gateway-routing-policy-row">
       <VStack align="start" gap={1} flex={1} minWidth={0}>
         <HStack gap={2} flexWrap="wrap">
           <Text fontSize="sm" fontWeight="semibold">

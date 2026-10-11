@@ -1,7 +1,9 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 
 import { CodingAgentPullRequestsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
+import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
 import { usePersonalContext } from "../../../behavior/use-personal-context.ts";
 import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
 
@@ -11,6 +13,7 @@ import { PersonalWorkspaceLayout } from "../personal-workspace-layout.tsx";
  * may read. Routing and layout only, the table owns its own reads.
  */
 export function PersonalPullRequestsScreen() {
+  const router = usePersonalRouter();
   const { personalProjectId } = usePersonalContext();
 
   return (
@@ -31,9 +34,18 @@ export function PersonalPullRequestsScreen() {
           {personalProjectId ? (
             <CodingAgentPullRequestsTable projectId={personalProjectId} />
           ) : (
-            <Text fontSize="sm" color="fg.muted">
-              No pull requests yet
-            </Text>
+            <NoDataInfoBlock
+              size="line"
+              title="No pull requests yet"
+              next={[
+                {
+                  kind: "setting",
+                  label: "Connect your AI tools",
+                  href: "/me/configure",
+                  onNavigate: ({ href }) => router.push(href),
+                },
+              ]}
+            />
           )}
         </VStack>
       </PersonalWorkspaceLayout>

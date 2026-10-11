@@ -4,6 +4,7 @@
  * `computeParetoDominance` supplies the accompanying outright-loss verdict.
  */
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -321,14 +322,14 @@ function ParetoPlot({
           dataKey="x"
           name={axis.xLabel}
           tickFormatter={(v) => axis.formatX(v as number)}
-          style={{ fontSize: "11px" }}
+          style={{ fontSize: TYPE_SCALE_PX.micro }}
           tick={{ fill: "var(--chakra-colors-fg-muted)" }}
         />
         <YAxis
           type="number"
           dataKey="score"
           name="Score"
-          style={{ fontSize: "11px" }}
+          style={{ fontSize: TYPE_SCALE_PX.micro }}
           tick={{ fill: "var(--chakra-colors-fg-muted)" }}
           width={40}
         />

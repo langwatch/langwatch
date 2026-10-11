@@ -145,7 +145,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
       renderWithDesignSystem(<ScenarioFormDrawerFromUrl />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create Scenario")).toBeInTheDocument();
+        expect(screen.getByText("Create scenario")).toBeInTheDocument();
       });
     });
 
@@ -155,7 +155,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
       renderWithDesignSystem(<ScenarioFormDrawerFromUrl />);
 
       // The drawer heading should not appear
-      expect(screen.queryByText("Create Scenario")).not.toBeInTheDocument();
+      expect(screen.queryByText("Create scenario")).not.toBeInTheDocument();
     });
   });
 
@@ -166,7 +166,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
       renderWithDesignSystem(<ScenarioFormDrawerFromUrl />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create Scenario")).toBeInTheDocument();
+        expect(screen.getByText("Create scenario")).toBeInTheDocument();
       });
 
       const nameInput = screen.getByPlaceholderText("e.g., Angry refund request");
@@ -185,7 +185,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
       renderWithDesignSystem(<ScenarioFormDrawerFromUrl open={true} />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create Scenario")).toBeInTheDocument();
+        expect(screen.getByText("Create scenario")).toBeInTheDocument();
       });
     });
   });

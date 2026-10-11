@@ -45,7 +45,7 @@ function RunDetailLoadState({ error }: { error: { data?: { code: string } } | nu
     return (
       <VStack gap={2} align="start" w="100%" pt={4}>
         <Drawer.CloseTrigger />
-        <Heading size="md">Run details not available yet</Heading>
+        <Heading size="sm">Run details not available yet</Heading>
         <Text color="fg.muted" fontSize="sm">
           This run may be queued, in progress, or recently cancelled. Details will appear once
           available.

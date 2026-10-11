@@ -192,6 +192,22 @@ describe("given the edit drawer for an existing key", () => {
 
   afterEach(() => cleanup());
 
+  describe("when the name is cleared and Save changes is pressed", () => {
+    it("keeps Save enabled, names the problem, focuses the name and sends nothing", async () => {
+      renderDrawer();
+      const nameField = screen.getByDisplayValue("legacy-key");
+      await userEvent.clear(nameField);
+      const saveButton = screen.getByRole("button", { name: "Save changes" });
+      expect(saveButton).toHaveProperty("disabled", false);
+
+      await userEvent.click(saveButton);
+
+      expect(screen.getAllByText("Name is required.").length).toBeGreaterThan(0);
+      expect(document.activeElement).toBe(nameField);
+      expect(updateMutateAsync).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the key predates the routing choice and was pinned to fall back", () => {
     it("shows fallback-to-all selected and keeps it on an unrelated edit", async () => {
       renderDrawer({ routingMode: "FALLBACK_ALL", routingPolicyId: null });

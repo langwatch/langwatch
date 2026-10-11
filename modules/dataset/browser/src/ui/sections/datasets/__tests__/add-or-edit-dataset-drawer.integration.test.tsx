@@ -88,7 +88,7 @@ describe("given the dataset editor opened from a bare drawer address", () => {
       fireEvent.change(await screen.findByRole("textbox", { name: /name/i }), {
         target: { value: "Golden set" },
       });
-      fireEvent.click(screen.getByRole("button", { name: "Create Dataset" }));
+      fireEvent.click(screen.getByRole("button", { name: "Create dataset" }));
 
       await waitFor(() => expect(created).toHaveBeenCalled());
       expect(created.mock.calls[0]?.[0]).toMatchObject({ name: "Golden set" });

@@ -58,7 +58,7 @@ export function ActivityTimeline({
   return (
     <>
       <HStack justify="space-between" marginBottom={4}>
-        <Heading as="h3" size="sm">
+        <Heading as="h3" textStyle="cardTitle">
           {title}
         </Heading>
         <Text fontSize="xs" color="fg.muted">

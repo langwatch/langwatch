@@ -1,17 +1,17 @@
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Box,
   Button,
-  Card,
   createListCollection,
-  Field,
   Heading,
   HStack,
   Input,
   type ListCollection,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -41,8 +41,8 @@ import { ProjectAvatar } from "../elements/project-avatar.tsx";
  * serves a browser-shaped team (no accounting columns) plus its projects.
  */
 type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
-import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Select } from "@langwatch/design-system/select";
+import { SettingsField, SettingsFieldGroup } from "@langwatch/design-system/settings-field";
 
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
 import { memberLabel } from "../../model/member-label.ts";
@@ -63,17 +63,19 @@ function TeamProjectsBody({
   const { project } = useOrganizationTeamProject();
   const host = useOrganizationHost();
 
+  const { openDrawer } = useDrawer();
+
   return (
-    <Table.Body>
+    <ListTable.Body>
       {team.projects.map((teamProject) => (
-        <Table.Row key={teamProject.id}>
-          <Table.Cell>
+        <ListTable.Row key={teamProject.id}>
+          <ListTable.Cell>
             <HStack gap={2}>
               <ProjectAvatar name={teamProject.name} />
               <Link href={`/${teamProject.slug}`}>{teamProject.name}</Link>
             </HStack>
-          </Table.Cell>
-          <Table.Cell textAlign="right">
+          </ListTable.Cell>
+          <ListTable.ActionCell>
             {teamProject.id !== project?.id && host.hasPermission("project:delete") && (
               <Button
                 variant="ghost"
@@ -89,17 +91,24 @@ function TeamProjectsBody({
                 <Trash2 size={16} />
               </Button>
             )}
-          </Table.Cell>
-        </Table.Row>
+          </ListTable.ActionCell>
+        </ListTable.Row>
       ))}
       {team.projects.length === 0 && (
-        <Table.Row>
-          <Table.Cell colSpan={2}>
-            <Text>No projects on this team</Text>
-          </Table.Cell>
-        </Table.Row>
+        <ListTable.SpanRow columns={2}>
+          <HStack paddingX={4} paddingY={1}>
+            <NoDataInfoBlock
+              size="line"
+              title="No projects on this team yet."
+              action={{
+                label: "Add new project",
+                onClick: () => openDrawer(CreateProjectDrawerToken, { defaultTeamId: team.id }),
+              }}
+            />
+          </HStack>
+        </ListTable.SpanRow>
       )}
-    </Table.Body>
+    </ListTable.Body>
   );
 }
 
@@ -188,12 +197,15 @@ export const TeamForm = ({
   form,
   onSubmit,
   isLoading,
+  formId,
 }: {
   organizationId: string;
   team?: TeamWithProjectsAndMembers;
   form: UseFormReturn<TeamFormData, unknown, TeamFormData>;
   onSubmit: SubmitHandler<TeamFormData>;
   isLoading: boolean;
+  /** Set when the host draws Create (a drawer footer) and submits this form by id. */
+  formId?: string;
 }) => {
   const toaster = useOrganizationToaster();
   const { control, handleSubmit } = form;
@@ -259,13 +271,13 @@ export const TeamForm = ({
   }, [watchedMembers, userOptions]);
 
   return (
-    <form style={{ width: "100%" }} onSubmit={handleSubmit(onSubmit)}>
+    <form id={formId} style={{ width: "100%" }} onSubmit={handleSubmit(onSubmit)}>
       <VStack gap={4} width="full" align="start">
-        <VStack width="full" gap={0}>
-          <HorizontalFormControl
+        <SettingsFieldGroup>
+          <SettingsField
             label="Name"
-            helper="The name of your team"
-            invalid={!!errors.name}
+            hint="The name of your team."
+            error={errors.name ? errors.name.message || "Name is required" : undefined}
           >
             {/* A Controller, not register(): the React Compiler memoises register()
                 past form.reset, so typing never reached the form (WEB-5603). */}
@@ -277,16 +289,15 @@ export const TeamForm = ({
                 <Input width="full" type="text" data-testid="team-form-name" {...field} />
               )}
             />
-            <Field.ErrorText>{errors.name?.message || "Name is required"}</Field.ErrorText>
-          </HorizontalFormControl>
+          </SettingsField>
           {team && (
-            <HorizontalFormControl label="Slug" helper="The unique ID of your team">
+            <SettingsField label="Slug" hint="The unique ID of your team.">
               <Input width="full" disabled type="text" value={team.slug} />
-            </HorizontalFormControl>
+            </SettingsField>
           )}
-        </VStack>
+        </SettingsFieldGroup>
         <HStack width="full" marginTop={2}>
-          <Heading>Members</Heading>
+          <Heading size="sm">Members</Heading>
           <Spacer />
           {team && (
             <Link href={`/settings/members`}>
@@ -296,94 +307,92 @@ export const TeamForm = ({
             </Link>
           )}
         </HStack>
-        <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0}>
-            <Table.Root variant="line" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader width="48%">Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Team Role</Table.ColumnHeader>
-                  <Table.ColumnHeader width="60px" />
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {members.fields.map((member, index) => (
-                  <Table.Row key={member.id}>
-                    <Table.Cell>
-                      <HStack width="full">
-                        {member.saved ? (
-                          <>
-                            <Text>{member.userId?.label}</Text>
-                          </>
-                        ) : (
-                          <MemberUserPicker
-                            control={control}
-                            index={index}
-                            perRowCollection={perRowCollections[index]}
-                            userOptions={userOptions}
-                          />
-                        )}
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Controller
-                        control={control}
-                        name={`members.${index}.role`}
-                        rules={{ required: "User role is required" }}
-                        render={({ field }) =>
-                          canManageOrganization ? (
-                            <TeamRoleSelect
-                              organizationId={organizationId}
-                              organizationRole={OrganizationUserRole.ADMIN}
-                              value={field.value}
-                              onChange={field.onChange}
-                            />
-                          ) : (
-                            <Text>{field.value?.label ?? "—"}</Text>
-                          )
-                        }
-                      />
-                    </Table.Cell>
-                    <Table.Cell paddingLeft={0} paddingY={2}>
-                      {canManageOrganization && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          color="red.fg"
-                          disabled={members.fields.length === 1}
-                          onClick={() => members.remove(index)}
-                        >
-                          <Trash2 size={18} />
-                        </Button>
+        <Card padding="none">
+          <ListTable variant="embedded">
+            <ListTable.Header>
+              <ListTable.Row>
+                <ListTable.ColumnHeader width="48%">Name</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Team role</ListTable.ColumnHeader>
+                <ListTable.ActionHeader />
+              </ListTable.Row>
+            </ListTable.Header>
+            <ListTable.Body>
+              {members.fields.map((member, index) => (
+                <ListTable.Row key={member.id}>
+                  <ListTable.Cell>
+                    <HStack width="full">
+                      {member.saved ? (
+                        <>
+                          <Text>{member.userId?.label}</Text>
+                        </>
+                      ) : (
+                        <MemberUserPicker
+                          control={control}
+                          index={index}
+                          perRowCollection={perRowCollections[index]}
+                          userOptions={userOptions}
+                        />
                       )}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-                {canManageOrganization && (
-                  <Table.Row>
-                    <Table.Cell colSpan={4}>
+                    </HStack>
+                  </ListTable.Cell>
+                  <ListTable.Cell>
+                    <Controller
+                      control={control}
+                      name={`members.${index}.role`}
+                      rules={{ required: "User role is required" }}
+                      render={({ field }) =>
+                        canManageOrganization ? (
+                          <TeamRoleSelect
+                            organizationId={organizationId}
+                            organizationRole={OrganizationUserRole.ADMIN}
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
+                        ) : (
+                          <Text>{field.value?.label ?? "—"}</Text>
+                        )
+                      }
+                    />
+                  </ListTable.Cell>
+                  <ListTable.ActionCell>
+                    {canManageOrganization && (
                       <Button
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          members.append({
-                            userId: undefined,
-                            role: teamRolesOptions[TeamUserRole.MEMBER],
-                            saved: false,
-                          });
-                        }}
+                        variant="ghost"
+                        color="red.fg"
+                        disabled={members.fields.length === 1}
+                        onClick={() => members.remove(index)}
                       >
-                        <Plus size={18} /> Add Another
+                        <Trash2 size={18} />
                       </Button>
-                    </Table.Cell>
-                  </Table.Row>
-                )}
-              </Table.Body>
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
-        {!team && (
+                    )}
+                  </ListTable.ActionCell>
+                </ListTable.Row>
+              ))}
+              {canManageOrganization && (
+                <ListTable.SpanRow columns={3}>
+                  <Box paddingX={4} paddingY={3}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        members.append({
+                          userId: undefined,
+                          role: teamRolesOptions[TeamUserRole.MEMBER],
+                          saved: false,
+                        });
+                      }}
+                    >
+                      <Plus size={18} /> Add Another
+                    </Button>
+                  </Box>
+                </ListTable.SpanRow>
+              )}
+            </ListTable.Body>
+          </ListTable>
+        </Card>
+        {!team && formId === undefined && (
           <HStack width="full">
             <Spacer />
             <Button
@@ -399,19 +408,17 @@ export const TeamForm = ({
         {team && (
           <>
             <TeamFormProjects team={team} />
-            <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0}>
-                <Table.Root variant="line" width="full" size="md">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader>Name</Table.ColumnHeader>
-                      <Table.ColumnHeader width="60px"></Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <TeamProjectsBody team={team} onArchiveClick={setProjectToArchive} />
-                </Table.Root>
-              </Card.Body>
-            </Card.Root>
+            <Card padding="none">
+              <ListTable variant="embedded">
+                <ListTable.Header>
+                  <ListTable.Row>
+                    <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+                    <ListTable.ActionHeader />
+                  </ListTable.Row>
+                </ListTable.Header>
+                <TeamProjectsBody team={team} onArchiveClick={setProjectToArchive} />
+              </ListTable>
+            </Card>
             <ConfirmDialog
               open={!!projectToArchive}
               onOpenChange={(open) => {
@@ -442,7 +449,7 @@ function TeamFormProjects({ team }: { team: TeamWithProjectsAndMembers }): React
 
   return (
     <HStack width="full" marginTop={2}>
-      <Heading>Projects</Heading>
+      <Heading size="sm">Projects</Heading>
       <Spacer />
       <Button
         variant="outline"

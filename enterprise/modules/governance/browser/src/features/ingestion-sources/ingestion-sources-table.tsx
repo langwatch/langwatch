@@ -2,15 +2,7 @@
 
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant, toEpochMs, type TimeInput } from "@langwatch/time";
 import { MoreVertical, Pencil, RotateCw, Trash2 } from "lucide-react";
 
@@ -125,12 +117,12 @@ export function IngestionSourcesTable({
 }) {
   return (
     <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Source</Table.ColumnHeader>
-          <Table.ColumnHeader>Protocol</Table.ColumnHeader>
-          <Table.ColumnHeader>Delivery</Table.ColumnHeader>
-          <Table.ColumnHeader>Status</Table.ColumnHeader>
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Source</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Protocol</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Delivery</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
           {/* "Data last arrived", not "last event". `lastEventAt` is stamped
               when a pull DELIVERED something, so this answers "is anything
               still coming in" — the question a list of sources is read for.
@@ -138,11 +130,11 @@ export function IngestionSourcesTable({
               on the newest event, and the two are routinely hours apart
               because a daily report is stamped at the start of its day. One
               label for both was the whole confusion. */}
-          <Table.ColumnHeader>Data last arrived</Table.ColumnHeader>
-          {canManage && <Table.ColumnHeader width="1%" aria-label="Actions" />}
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+          <ListTable.ColumnHeader>Data last arrived</ListTable.ColumnHeader>
+          {canManage && <ListTable.ColumnHeader width="fit" label="Actions" />}
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {sortSourcesForTable(sources).map((source) => (
           <SourceTableRow
             key={source.id}
@@ -156,7 +148,7 @@ export function IngestionSourcesTable({
             onArchive={() => onArchive(source.id)}
           />
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
@@ -203,8 +195,8 @@ function SourceTableRow({
   const cadence = shortPullCadence(source.pullSchedule);
   const hasSecret = needsIngestSecret({ sourceType });
   return (
-    <Table.Row data-testid={`source-row-${source.id}`}>
-      <Table.Cell>
+    <ListTable.Row data-testid={`source-row-${source.id}`}>
+      <ListTable.Cell>
         <HStack gap={3} alignItems="center">
           <SourceTypeIconGlyph sourceType={sourceType} size="20px" />
           <VStack align="start" gap={0} minWidth={0}>
@@ -234,8 +226,8 @@ function SourceTableRow({
             )}
           </VStack>
         </HStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <VStack align="start" gap={1}>
           <Badge size="sm" variant="outline">
             {PROTOCOL_LABEL[mode]}
@@ -246,27 +238,27 @@ function SourceTableRow({
             </Text>
           )}
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge size="sm" variant="surface" colorPalette={delivery === "realtime" ? "blue" : "gray"}>
           {DELIVERY_LABEL[delivery]}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <HStack gap={1}>
           <Box color={status.color} display="flex">
             <StatusIcon size={14} />
           </Box>
           <Text fontSize="sm">{status.label}</Text>
         </HStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text fontSize="sm" color="fg.muted" whiteSpace="nowrap">
           {fmtRelative(source.lastEventAt ?? null)}
         </Text>
-      </Table.Cell>
+      </ListTable.Cell>
       {canManage && (
-        <Table.Cell>
+        <ListTable.Cell>
           <Menu.Root>
             <Menu.Trigger asChild>
               <Button
@@ -312,8 +304,8 @@ function SourceTableRow({
               </Menu.Item>
             </Menu.Content>
           </Menu.Root>
-        </Table.Cell>
+        </ListTable.Cell>
       )}
-    </Table.Row>
+    </ListTable.Row>
   );
 }

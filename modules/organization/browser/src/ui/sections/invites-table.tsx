@@ -1,7 +1,8 @@
 import { Link } from "@langwatch/browser-host/link";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Menu } from "@langwatch/design-system/menu";
 import { Badge, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
 import { Mail, MoreVertical, RefreshCw, Trash2 } from "lucide-react";
 
 import type { RouterOutputs } from "../../behavior/organization-api.ts";
@@ -89,7 +90,7 @@ export const InviteRow = ({
           <IdentityChip label={chip.label} tone={chip.tone} data-testid="invite-status" />
           {isOpen && invite.expiration ? (
             <Text fontSize="xs" color="fg.muted">
-              Lapses {readableDate(invite.expiration).toLocaleDateString()}
+              Lapses <FormattedDate value={toEpochMs(invite.expiration)} display="date" />
             </Text>
           ) : null}
         </>

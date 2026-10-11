@@ -36,7 +36,7 @@ export function turnHasGenieSteps(turn: { traceName?: string | null; spanCount: 
   return turn.traceName === GENIE_MESSAGE_SPAN && turn.spanCount > 1;
 }
 
-const CELL = { fontFamily: "mono", fontSize: "11px" } as const;
+const CELL = { textStyle: "monoSm" } as const;
 
 interface TurnStepsProps {
   traceId: string;

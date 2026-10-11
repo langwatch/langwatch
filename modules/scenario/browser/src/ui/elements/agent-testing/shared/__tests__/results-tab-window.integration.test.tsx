@@ -244,6 +244,6 @@ describe("the window the Results tab reads", () => {
     renderWithDesignSystem(<ResultsTab isSseConnected />);
 
     expect(screen.getByTestId("agent-testing-run-plans")).toBeInTheDocument();
-    expect(screen.getByText("Test Runs")).toBeInTheDocument();
+    expect(screen.getByText("Test runs")).toBeInTheDocument();
   });
 });

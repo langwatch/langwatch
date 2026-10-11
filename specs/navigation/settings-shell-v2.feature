@@ -5,16 +5,15 @@ Feature: Settings shell
 
   The settings pages render inside the navigation-v2 shell. The top bar shows a static "Settings" title in place of the
   product dropdown (the icon rail marks its Settings tile instead), and
-  the organization control stays. The sidebar opens with a back entry
-  that returns to the product the user came from, then Quick Search,
+  the organization control stays. The sidebar opens with Quick Search,
+  then a back entry that returns to the product the user came from,
   then the settings menu regrouped with icons: YOU, ORGANIZATION,
   PEOPLE & ACCESS, AI INFRASTRUCTURE, DATA CONTROLS, PROJECT, and the internal OPS and
-  BACKOFFICE groups with their current gates. Enterprise-plan entries
-  carry a quiet grey pill, since it marks a plan rather than asking to
-  be read first. Every visibility gate keeps its current condition. The
-  back entry and its rule sit above the scroll region, so a long
-  settings menu never scrolls the way out of the column, and the
-  entries are cut at that rule as they pass under it.
+  BACKOFFICE groups with their current gates. A plan without Enterprise
+  sees its entries with a quiet lock rather than not at all, and the page
+  opens on an upsell; a missing permission still hides an entry. The
+  search and back entries sit above the scroll region. No divider separates
+  them from the groups: the group labels provide that separation.
 
   YOU comes first and holds Profile and Security: the two pages that are
   about the person reading them rather than about the organization they
@@ -39,10 +38,10 @@ Feature: Settings shell
   how the reader themselves signs in is Security, under You.
 
   @integration
-  Scenario: The Settings sidebar opens with the way back
+  Scenario: Settings keeps search first and Back immediately below it
     Given I entered Settings from a Gateway page
-    Then the first sidebar entry goes back to that Gateway page
-    And Quick Search comes right after it
+    Then Quick Search is the first sidebar entry
+    And the next entry goes back to that Gateway page
 
   @integration
   Scenario: The settings menu is grouped with its gates kept
@@ -73,18 +72,44 @@ Feature: Settings shell
     And the old page addresses forward to the corresponding consolidated tabs
 
   @integration
-  Scenario: Enterprise entries carry a quiet grey pill
-    Given my plan shows the enterprise settings entries
+  Scenario: A plan with Enterprise sees its entries marked ENT, not locked
+    Given my plan includes Enterprise
     When the settings sidebar renders
-    Then the enterprise entries carry an "ENT" pill
-    And the pill is grey with a hairline border, not a coloured one
+    Then the Enterprise entries carry a quiet grey "ENT" chip
+    And no entry carries a lock
+
+  @integration
+  Scenario: A plan without Enterprise sees its entries locked
+    Given my organization's plan has answered and lacks Enterprise
+    When the settings sidebar renders
+    Then Audit log and Roles are offered with a small lock
+    And the lock reads "Included in Enterprise"
+    And an entry I lack the permission for stays hidden
+    And opening a locked entry shows its page title and an Enterprise upsell, never the feature
+
+  @unit @integration
+  Scenario: Authentication is offered unlocked on every plan
+    Given I may see single sign-on and my plan lacks Enterprise
+    When the settings sidebar renders
+    Then Authentication is offered without a lock, whether or not the plan has answered
+
+  @integration
+  Scenario: Settings groups read in sentence case
+    When the settings sidebar renders
+    Then each group label is 12px medium sentence case in a token at 4.5:1 in both modes
+    And the open entry reads stronger than a hovered one, by weight and ink
+
+  @integration
+  Scenario: A detail page keeps its owning entry lit
+    Given I open a team's own page under /settings/teams
+    Then the Directory entry is marked as the open one
 
   @unit
   Scenario: A still-loading plan hides the enterprise entries
     Given my organization's plan has not answered yet
     When the settings menu is built
     Then the enterprise entries are hidden
-    And they appear only once the plan answers Enterprise
+    And they appear once the plan answers, locked where it lacks Enterprise
 
   @integration
   Scenario: The settings groups fold, and start open
@@ -95,28 +120,17 @@ Feature: Settings shell
     And my choice is kept for the next time I open Settings
 
   @integration
-  Scenario: A rule separates the way back from the pages below it
-    Given I open Settings
-    Then a rule runs under the way back entry
-
-  @integration
-  Scenario: The way back stays in place while the menu scrolls
+  Scenario: Quick Search stays above the menu without a divider
     Given I open Settings
     When the settings menu scrolls
-    Then the way back entry stays where it is
-    And only the pages under the rule move
+    Then Quick Search and the back entry stay in place
+    And no divider separates them from the groups
 
   @integration
-  Scenario: The pages are cut at the rule as they scroll under the way back
+  Scenario: API keys sits under General
     Given I open Settings
-    Then the part that scrolls starts at the rule under the way back
-    And the space under that rule scrolls with the pages
-
-  @integration
-  Scenario: API Keys sits under General
-    Given I open Settings
-    Then API Keys comes right after General in the ORGANIZATION group
-    And the ACCESS group does not hold it
+    Then API keys comes right after General in the Organization group
+    And the People & access group does not hold it
 
   @integration
   Scenario: The menu marks the page that is open
@@ -131,7 +145,7 @@ Feature: Settings shell
     Then there is no API Keys entry and no Secrets entry
 
   @integration
-  Scenario: The top bar shows a static Settings title
+  Scenario: The top bar keeps a static Settings label
     Given I open Settings in the product-switcher mode
     Then the top bar shows "Settings" with no product dropdown
     And the organization control stays in the top bar

@@ -4,21 +4,10 @@
  * `model/analytics-period.ts` and bound in `behavior/use-analytics-period.ts`.
  */
 
-import { Popover, type PopoverRootProps } from "@langwatch/design-system/popover";
+import { DateRangePicker } from "@langwatch/design-system/date-range-picker";
+import type { PopoverRootProps } from "@langwatch/design-system/popover";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@langwatch/design-system/primitives";
 import { format, nowInstant, type Instant } from "@langwatch/time";
-import { ChevronDown } from "react-feather";
-import { LuCalendar } from "react-icons/lu";
 
 import {
   ANALYTICS_RELATIVE_PRESETS,
@@ -33,6 +22,8 @@ import {
 export type AnalyticsPeriodPickerPlacement = NonNullable<
   NonNullable<PopoverRootProps["positioning"]>["placement"]
 >;
+
+const INPUT_FORMAT = "yyyy-MM-dd'T'HH:mm";
 
 export function AnalyticsPeriodPicker({
   period: { startDate, endDate },
@@ -68,93 +59,34 @@ export function AnalyticsPeriodPicker({
   /** Where the range list opens. A control at the foot of a rail wants "top-start". */
   placement?: AnalyticsPeriodPickerPlacement;
 }) {
-  const { open, onOpen, onClose, setOpen } = useDisclosure();
+  const matchedPreset = () => {
+    if (mode !== "relative") return undefined;
+    const minutes = Math.round((endDate.epochMilliseconds - startDate.epochMilliseconds) / 60000);
+    const matchedByMinutes = ANALYTICS_RELATIVE_PRESETS.find(
+      (preset) => preset.minutes === minutes,
+    );
+    if (matchedByMinutes) return matchedByMinutes;
 
-  const handleQuickSelect = (presetKey: AnalyticsPresetKey) => {
-    setRelativePeriod(presetKey);
-    onClose();
+    return presetForRange(startDate, endDate, nowInstant());
   };
-
-  const getDateRangeLabel = () => {
-    if (mode === "relative") {
-      const matchedByDays = presetForRange(startDate, endDate, nowInstant());
-      if (matchedByDays) return matchedByDays.label;
-
-      const minutes = Math.round((endDate.epochMilliseconds - startDate.epochMilliseconds) / 60000);
-      const subDay = ANALYTICS_RELATIVE_PRESETS.find((preset) => preset.minutes === minutes);
-      if (subDay) return subDay.label;
-    }
-
-    return `${format(startDate.epochMilliseconds, "MMM d")} - ${format(endDate.epochMilliseconds, "MMM d")}`;
-  };
+  const preset = matchedPreset();
 
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={({ open }) => setOpen(open)}
-      positioning={{ placement }}
-      size="sm"
-    >
-      <Popover.Trigger asChild>
-        <Button variant="outline" size="sm" minWidth="fit-content" onClick={onOpen}>
-          <LuCalendar />
-          <Text>{label ?? getDateRangeLabel()}</Text>
-          <Box>
-            <ChevronDown />
-          </Box>
-        </Button>
-      </Popover.Trigger>
-      <Popover.Content width="fit-content">
-        <Popover.Arrow />
-        <Popover.CloseTrigger />
-        <Popover.Header>
-          <Popover.Title>Select Date Range</Popover.Title>
-        </Popover.Header>
-        <Popover.Body>
-          <HStack align="start" gap={6}>
-            <VStack gap={4}>
-              <Field.Root>
-                <Field.Label>Start Date</Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={format(startDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) =>
-                    setPeriod(instantFromText(e.target.value, nowInstant()), endDate)
-                  }
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>End Date</Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={format(endDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) =>
-                    setPeriod(startDate, instantFromText(e.target.value, nowInstant()))
-                  }
-                />
-              </Field.Root>
-            </VStack>
-            <VStack>
-              {clearPeriod && (
-                <Button
-                  width="full"
-                  onClick={() => {
-                    clearPeriod();
-                    onClose();
-                  }}
-                >
-                  All time
-                </Button>
-              )}
-              {ANALYTICS_RELATIVE_PRESETS.map((preset) => (
-                <Button width="full" key={preset.key} onClick={() => handleQuickSelect(preset.key)}>
-                  {preset.label}
-                </Button>
-              ))}
-            </VStack>
-          </HStack>
-        </Popover.Body>
-      </Popover.Content>
-    </Popover.Root>
+    <DateRangePicker
+      presets={ANALYTICS_RELATIVE_PRESETS}
+      activePresetKey={preset?.key}
+      startValue={format(startDate.epochMilliseconds, INPUT_FORMAT)}
+      endValue={format(endDate.epochMilliseconds, INPUT_FORMAT)}
+      triggerLabel={
+        label ??
+        preset?.label ??
+        `${format(startDate.epochMilliseconds, "MMM d")} - ${format(endDate.epochMilliseconds, "MMM d")}`
+      }
+      onStartChange={(text) => setPeriod(instantFromText(text, nowInstant()), endDate)}
+      onEndChange={(text) => setPeriod(startDate, instantFromText(text, nowInstant()))}
+      onPresetSelect={setRelativePeriod}
+      onClear={clearPeriod}
+      placement={placement}
+    />
   );
 }

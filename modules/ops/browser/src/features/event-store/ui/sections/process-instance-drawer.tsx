@@ -1,5 +1,5 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
@@ -9,7 +9,6 @@ import { useState } from "react";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { useProcessInstanceActions } from "../../behavior/use-process-instance-actions.ts";
 import { ProcessInstanceContent } from "./process-instance-content.tsx";
 interface Props {
@@ -20,49 +19,6 @@ interface Props {
 }
 
 const OUTBOX_PAGE_SIZE = 20;
-
-function InstanceDrawerTitle({ label, onCopyKey }: { label: string; onCopyKey: () => void }) {
-  return (
-    <DetailDrawerHeader kind="Process instance" title={label}>
-      <Button
-        size="2xs"
-        variant="ghost"
-        aria-label="Copy process key"
-        onClick={onCopyKey}
-        flexShrink={0}
-      >
-        <LuCopy size={12} />
-      </Button>
-    </DetailDrawerHeader>
-  );
-}
-
-function InstanceDrawerActions({
-  actions,
-}: {
-  actions: ReturnType<typeof useProcessInstanceActions>;
-}) {
-  return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        colorPalette="blue"
-        onClick={() => actions.setConfirmAction("wake")}
-      >
-        Wake now
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        colorPalette="green"
-        onClick={() => actions.setConfirmAction("redrive")}
-      >
-        Redrive dead messages
-      </Button>
-    </>
-  );
-}
 
 function InstanceActionConfirms({
   target,
@@ -81,7 +37,7 @@ function InstanceActionConfirms({
         onConfirm={() => actions.wakeMutation.mutate(target)}
         title="Wake Process Now"
         description={`Schedule "${label}" to wake immediately. The process decides for itself what a wake at this moment means; the worst case is a wake that does nothing.`}
-        isLoading={actions.wakeMutation.isPending}
+        loading={actions.wakeMutation.isPending}
       />
       <ConfirmDialog
         open={actions.confirmAction === "redrive"}
@@ -89,7 +45,7 @@ function InstanceActionConfirms({
         onConfirm={() => actions.redriveInstanceMutation.mutate(target)}
         title="Redrive Dead Messages"
         description={`Return every dead outbox message of "${label}" to pending, due now, with a fresh attempt budget. Deliveries may reach customers; duplicates are absorbed by each message's key.`}
-        isLoading={actions.redriveInstanceMutation.isPending}
+        loading={actions.redriveInstanceMutation.isPending}
       />
       {/* Discard asks, because nothing un-discards: no redrive path selects a
           discarded row, so a mis-click is permanent. */}
@@ -106,7 +62,7 @@ function InstanceActionConfirms({
         }}
         title="Discard Dead Message"
         description={`Mark "${actions.discardTarget?.intentType}" on "${label}" as never to be sent. The row is kept as the audit record, and it cannot be redriven afterwards.`}
-        isLoading={actions.discardMessageMutation.isPending}
+        loading={actions.discardMessageMutation.isPending}
       />
     </>
   );
@@ -148,52 +104,75 @@ export function ProcessInstanceDrawer({
   };
 
   return (
-    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => onClose()}>
-      <Drawer.Content>
-        <Drawer.Header>
-          <InstanceDrawerTitle label={`${processName} / ${processKey}`} onCopyKey={copyKey} />
-        </Drawer.Header>
-        <Drawer.Body>
-          <CodeBlock.AdapterProvider value={shikiAdapter}>
-            <ProcessInstanceContent
-              detail={detail}
-              isLoading={detailQuery.isPending}
-              outbox={outboxQuery.data ?? null}
-              outboxLoading={outboxQuery.isPending}
-              outboxPage={outboxPage}
-              outboxPageSize={OUTBOX_PAGE_SIZE}
-              onOutboxPageChange={setOutboxPage}
-              grafana={grafanaQuery.data ?? null}
-              canManage={hasAccess}
-              onRedriveMessage={(messageId) =>
-                actions.redriveMessageMutation.mutate({ ...target, messageId })
+    <>
+      <Drawer
+        onClose={onClose}
+        size="lg"
+        eyebrow={{ label: "Process instance" }}
+        title={`${processName} / ${processKey}`}
+        headerTools={
+          <Button
+            size="2xs"
+            variant="ghost"
+            aria-label="Copy process key"
+            onClick={copyKey}
+            flexShrink={0}
+          >
+            <LuCopy size={12} />
+          </Button>
+        }
+        footer={
+          hasAccess && detail
+            ? {
+                secondaryActions: [
+                  {
+                    label: "Wake now",
+                    tone: "info",
+                    onClick: () => actions.setConfirmAction("wake"),
+                  },
+                  {
+                    label: "Redrive dead messages",
+                    tone: "success",
+                    onClick: () => actions.setConfirmAction("redrive"),
+                  },
+                ],
               }
-              onDiscardMessage={actions.setDiscardTarget}
-              onReleaseLease={(messageId) =>
-                actions.releaseLeaseMutation.mutate({ ...target, messageId })
-              }
-              actionPending={
-                actions.redriveMessageMutation.isPending ||
-                actions.discardMessageMutation.isPending ||
-                actions.releaseLeaseMutation.isPending
-              }
-              now={detailQuery.dataUpdatedAt || undefined}
-            />
-          </CodeBlock.AdapterProvider>
-        </Drawer.Body>
-        {hasAccess && detail && (
-          <Drawer.Footer>
-            <InstanceDrawerActions actions={actions} />
-          </Drawer.Footer>
-        )}
-        <Drawer.CloseTrigger />
-      </Drawer.Content>
+            : void 0
+        }
+      >
+        <CodeBlock.AdapterProvider value={shikiAdapter}>
+          <ProcessInstanceContent
+            detail={detail}
+            isLoading={detailQuery.isPending}
+            outbox={outboxQuery.data ?? null}
+            outboxLoading={outboxQuery.isPending}
+            outboxPage={outboxPage}
+            outboxPageSize={OUTBOX_PAGE_SIZE}
+            onOutboxPageChange={setOutboxPage}
+            grafana={grafanaQuery.data ?? null}
+            canManage={hasAccess}
+            onRedriveMessage={(messageId) =>
+              actions.redriveMessageMutation.mutate({ ...target, messageId })
+            }
+            onDiscardMessage={actions.setDiscardTarget}
+            onReleaseLease={(messageId) =>
+              actions.releaseLeaseMutation.mutate({ ...target, messageId })
+            }
+            actionPending={
+              actions.redriveMessageMutation.isPending ||
+              actions.discardMessageMutation.isPending ||
+              actions.releaseLeaseMutation.isPending
+            }
+            now={detailQuery.dataUpdatedAt || undefined}
+          />
+        </CodeBlock.AdapterProvider>
+      </Drawer>
 
       <InstanceActionConfirms
         target={target}
         label={`${processName} / ${processKey}`}
         actions={actions}
       />
-    </Drawer.Root>
+    </>
   );
 }

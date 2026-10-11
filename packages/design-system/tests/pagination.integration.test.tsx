@@ -7,10 +7,13 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Pagination, type PaginationProps } from "../src/components/layout/pagination.tsx";
+import {
+  Pagination,
+  type KnownTotalPaginationProps,
+} from "../src/components/layout/pagination.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
-const BASE: PaginationProps = {
+const BASE: KnownTotalPaginationProps = {
   page: 1,
   pageSize: 50,
   totalCount: 500,
@@ -18,7 +21,7 @@ const BASE: PaginationProps = {
   onPageSizeChange: () => undefined,
 };
 
-function renderPagination(overrides: Partial<PaginationProps> = {}) {
+function renderPagination(overrides: Partial<KnownTotalPaginationProps> = {}) {
   return renderWithDesignSystem(<Pagination {...BASE} {...overrides} />);
 }
 

@@ -92,6 +92,25 @@ describe("given an organization's audit trail", () => {
       expect(auditLogCount).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the filter names one of its own projects", () => {
+    /** @scenario "A project-filtered read holds only that project's events" */
+    it("matches that project's rows only, never a row without a project", async () => {
+      await repository.getAuditLogs({
+        organizationId: "org_acme",
+        projectId: "project_acme",
+        pageOffset: 0,
+        pageSize: 25,
+      });
+
+      const predicates = predicatesOf(auditLogFindMany.mock.calls[0]![0].where);
+      expect(predicates).toContainEqual({ projectId: "project_acme" });
+      expect(predicates).not.toContainEqual(expect.objectContaining({ projectId: null }));
+      expect(auditLogCount.mock.calls[0]![0].where).toEqual(
+        auditLogFindMany.mock.calls[0]![0].where,
+      );
+    });
+  });
 });
 
 describe("given an audit row written under an impersonation", () => {

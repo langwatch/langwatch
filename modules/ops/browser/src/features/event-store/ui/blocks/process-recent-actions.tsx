@@ -1,8 +1,9 @@
+import { Card } from "@langwatch/design-system/card";
+import { IdText } from "@langwatch/design-system/id-text";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Box, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 
 import { formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 
 const ACTION_LABELS: Record<string, string> = {
   process_wake_now: "Wake now",
@@ -16,44 +17,34 @@ export function ProcessRecentActions({ rows, now }: { rows: ProcessAction[]; now
   if (rows.length === 0) return null;
 
   return (
-    <Card.Root borderColor="border.muted" boxShadow="none">
-      <Card.Body padding={0}>
-        <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
-          <Text textStyle="sm" fontWeight="medium">
-            Recent actions
-          </Text>
-        </HStack>
-        <Box maxHeight="240px" overflowY="auto">
-          <ListTable
-            density="compact"
-            columnRules={false}
-            containerProps={{ overflowX: "auto" }}
-            size="sm"
-            variant="line"
-          >
-            <Table.Body>
-              {rows.map((row) => (
-                <Table.Row key={row.id}>
-                  <Table.Cell width="140px">
-                    <Text textStyle="xs" color="fg.muted">
-                      {formatTimeAgo(row.createdAt, now)}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell width="200px">
-                    <Text textStyle="xs">{ACTION_LABELS[row.action] ?? row.action}</Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Text textStyle="xs" fontFamily="mono" color="fg.muted" title={row.targetId}>
-                      {middleEllipsis(row.targetId, 64)}
-                    </Text>
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </ListTable>
-        </Box>
-      </Card.Body>
-    </Card.Root>
+    <Card padding="none">
+      <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
+        <Text textStyle="sm" fontWeight="medium">
+          Recent actions
+        </Text>
+      </HStack>
+      <Box maxHeight="240px" overflowY="auto">
+        <ListTable density="compact" variant="embedded">
+          <ListTable.Body>
+            {rows.map((row) => (
+              <ListTable.Row key={row.id}>
+                <ListTable.Cell width={140}>
+                  <Text textStyle="xs" color="fg.muted">
+                    {formatTimeAgo(row.createdAt, now)}
+                  </Text>
+                </ListTable.Cell>
+                <ListTable.Cell width={200}>
+                  <Text textStyle="xs">{ACTION_LABELS[row.action] ?? row.action}</Text>
+                </ListTable.Cell>
+                <ListTable.Cell>
+                  <IdText value={row.targetId} label="ID" />
+                </ListTable.Cell>
+              </ListTable.Row>
+            ))}
+          </ListTable.Body>
+        </ListTable>
+      </Box>
+    </Card>
   );
 }
 

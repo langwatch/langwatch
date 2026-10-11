@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import {
   Box,
   Button,
@@ -75,19 +76,16 @@ export function CodeEvaluatorEditor({
           Define a Python class with a `__call__` method that takes the inputs and returns the
           outputs (passed, score, label or details).
         </Field.HelperText>
-        <Box
-          width="full"
-          height="320px"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          overflow="hidden"
-        >
-          {renderCodeEditor({
-            code,
-            inputs: validCodeEvaluatorFields(inputs),
-            outputs: validCodeEvaluatorFields(outputs),
-          })}
+        <Box width="full" height="320px" display="flex" flexDirection="column">
+          <Card variant="frame-fill">
+            <Box height="100%">
+              {renderCodeEditor({
+                code,
+                inputs: validCodeEvaluatorFields(inputs),
+                outputs: validCodeEvaluatorFields(outputs),
+              })}
+            </Box>
+          </Card>
         </Box>
       </Field.Root>
 
@@ -112,33 +110,28 @@ function CodeEvaluatorOutputContract() {
         Return a dictionary from your function with any of these fields. Whichever you return become
         the evaluation result.
       </Text>
-      <VStack
-        align="stretch"
-        gap={1.5}
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-        padding={3}
-      >
-        {codeEvaluatorOutputFields.map((field) => (
-          <HStack key={field.identifier} gap={2} align="baseline">
-            <Text
-              fontSize="sm"
-              fontFamily="mono"
-              fontWeight="medium"
-              data-testid={`code-evaluator-output-field-${field.identifier}`}
-            >
-              {field.identifier}
-            </Text>
-            <Text fontSize="xs" color="fg.muted" fontFamily="mono">
-              {field.type}
-            </Text>
-            <Text fontSize="xs" color="fg.muted">
-              {OUTPUT_FIELD_DESCRIPTIONS[field.identifier]}
-            </Text>
-          </HStack>
-        ))}
-      </VStack>
+      <Card variant="frame" padding="sm">
+        <VStack align="stretch" gap={1.5}>
+          {codeEvaluatorOutputFields.map((field) => (
+            <HStack key={field.identifier} gap={2} align="baseline">
+              <Text
+                fontSize="sm"
+                fontFamily="mono"
+                fontWeight="medium"
+                data-testid={`code-evaluator-output-field-${field.identifier}`}
+              >
+                {field.identifier}
+              </Text>
+              <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+                {field.type}
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                {OUTPUT_FIELD_DESCRIPTIONS[field.identifier]}
+              </Text>
+            </HStack>
+          ))}
+        </VStack>
+      </Card>
     </VStack>
   );
 }

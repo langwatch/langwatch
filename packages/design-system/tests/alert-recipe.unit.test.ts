@@ -148,7 +148,7 @@ describe("the alert recipe", () => {
       const dark = paint({ status: "error", variant: "subtle", mode: "dark" });
 
       expect(light.root.background).toContain("var(--chakra-colors-bg-card)");
-      expect(dark.root.background).toContain("var(--chakra-colors-bg-card)");
+      expect(dark.root.background).toContain("var(--chakra-colors-bg-surface)");
       expect(light.ground).not.toBe(dark.ground);
     });
 

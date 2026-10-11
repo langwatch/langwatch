@@ -16,6 +16,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts",
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
   "dependencies": {
@@ -111,6 +112,8 @@
     "@types/qs": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",

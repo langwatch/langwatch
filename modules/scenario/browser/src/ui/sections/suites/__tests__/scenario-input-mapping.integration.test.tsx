@@ -45,7 +45,7 @@ describe("ScenarioInputMappingSection", () => {
       it("shows the 'Scenario Mappings' section header", () => {
         renderSection();
 
-        expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
+        expect(screen.getByText("Scenario mappings")).toBeInTheDocument();
       });
 
       /** @scenario Scenario Mappings section shows a row for each scenario field */

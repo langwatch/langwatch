@@ -115,7 +115,7 @@ export function HeadersConfigSection({
 
       {/* Headers List */}
       {value.length === 0 ? (
-        <Text fontSize="13px" color="fg.subtle" textAlign="center" paddingY={4}>
+        <Text textStyle="bodySm" color="fg.subtle" textAlign="center" paddingY={4}>
           No custom headers defined
         </Text>
       ) : (

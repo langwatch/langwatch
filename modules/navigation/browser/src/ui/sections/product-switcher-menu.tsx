@@ -1,7 +1,7 @@
 import { Menu } from "@langwatch/design-system/menu";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, ServerCog } from "lucide-react";
 
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useReachableProducts } from "../../behavior/use-reachable-products.ts";
@@ -16,7 +16,7 @@ import {
 /** The trigger reads as a raised pill on the top bar's gray. */
 const productPillStyle = {
   variant: "ghost",
-  fontSize: "13px",
+  textStyle: "bodySm",
   fontWeight: "medium",
   paddingX: 2.5,
   height: "28px",
@@ -79,22 +79,38 @@ export function ProductSwitcherMenu({ activeProductId }: { activeProductId: Prod
                 <VStack align="start" gap={0.5} width="full">
                   <HStack gap={2} width="full">
                     <Icon size={13} color="var(--chakra-colors-fg-muted)" />
-                    <Text fontSize="13px" fontWeight="medium">
-                      {product.label}
-                    </Text>
+                    <Text textStyle="label">{product.label}</Text>
                     {isActive && (
                       <Box marginLeft="auto" display="flex">
                         <Check size={13} aria-label="Current product" />
                       </Box>
                     )}
                   </HStack>
-                  <Text fontSize="11px" lineHeight="short" color="fg.muted" paddingLeft="21px">
+                  <Text textStyle="micro" color="fg.muted" paddingLeft="21px">
                     {product.pitch}
                   </Text>
                 </VStack>
               </Menu.Item>
             );
           })}
+          {/* The operator console, for operators only: not a product, so it sits apart. */}
+          {host.opsAccess().hasAccess ? (
+            <>
+              <Menu.Separator />
+              <Menu.Item
+                value="admin"
+                data-testid="product-switcher-admin"
+                onClick={() => host.navigate("/ops")}
+                paddingY={2}
+                borderRadius="lg"
+              >
+                <HStack gap={2} width="full">
+                  <ServerCog size={13} color="var(--chakra-colors-fg-muted)" />
+                  <Text textStyle="label">Admin</Text>
+                </HStack>
+              </Menu.Item>
+            </>
+          ) : null}
         </Menu.Content>
       </Portal>
     </Menu.Root>

@@ -7,7 +7,7 @@ export const Section: React.FC<{
   children: React.ReactNode;
 }> = ({ title, children }) => (
   <VStack align="stretch" gap={2}>
-    <Heading size="sm">{title}</Heading>
+    <Heading textStyle="cardTitle">{title}</Heading>
     {children}
   </VStack>
 );

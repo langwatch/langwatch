@@ -268,12 +268,30 @@ describe("<DefaultModelOverrideDrawer/> inherit direction and save integrity", (
 
   describe("when adding a config with no model picked", () => {
     /** @scenario Save is disabled while a new config carries no model at all */
-    it("keeps the save button disabled", () => {
+    it("keeps save clickable, names the missing model and sends nothing", () => {
       renderDrawer(undefined);
 
       fireEvent.click(screen.getByTestId("pick-org-scope"));
+      const save = screen.getByTestId("config-save");
+      expect(save).not.toBeDisabled();
+      fireEvent.click(save);
 
-      expect(screen.getByTestId("config-save")).toBeDisabled();
+      expect(screen.getByTestId("models-error")).toHaveTextContent(
+        "Set a model for at least one role.",
+      );
+      expect(mockSave).not.toHaveBeenCalled();
+      expect(within(screen.getByTestId("role-row-default")).getByRole("combobox")).toHaveFocus();
+    });
+  });
+
+  describe("when adding a config with no scope picked", () => {
+    it("names the missing scope and sends nothing", () => {
+      renderDrawer(undefined);
+
+      fireEvent.click(screen.getByTestId("config-save"));
+
+      expect(screen.getByTestId("scope-error")).toHaveTextContent("Pick at least one scope.");
+      expect(mockSave).not.toHaveBeenCalled();
     });
   });
 

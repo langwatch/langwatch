@@ -53,7 +53,7 @@ export const TeamRoleSelectItemContent = ({ option }: { option: RoleOption }) =>
         </Text>
       )}
     </HStack>
-    <Text color="fg.muted" fontSize="13px">
+    <Text textStyle="bodySm" color="fg.muted">
       {option.description}
     </Text>
   </VStack>

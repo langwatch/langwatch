@@ -199,7 +199,7 @@ function HomeSection({
     <VStack align="stretch" gap={0} minWidth={0}>
       <HStack gap={2} paddingBottom={2.5} align="center">
         <Text
-          fontSize="11px"
+          textStyle="micro"
           fontWeight="medium"
           letterSpacing="0.09em"
           textTransform="uppercase"

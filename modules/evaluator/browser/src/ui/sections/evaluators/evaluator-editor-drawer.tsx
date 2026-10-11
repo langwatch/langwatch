@@ -1,12 +1,10 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
-import { Button, HStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { LuArrowLeft } from "react-icons/lu";
+import { Drawer } from "@langwatch/design-system/drawer";
 
 import {
   EvaluatorEditorBody,
   type EvaluatorEditorDrawerProps,
-  EvaluatorEditorFooter,
+  evaluatorEditorFooter,
   EvaluatorEditorHeading,
   useEvaluatorEditorController,
 } from "./evaluator-editor-shared.tsx";
@@ -22,42 +20,19 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const controller = useEvaluatorEditorController({ ...props, isOpen });
 
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open }) => !open && controller.handleClose()}
+      onClose={controller.handleClose}
+      onBack={canGoBack ? goBack : void 0}
+      backButtonTestId="back-button"
       size="lg"
-      // Clicking outside (e.g. back on the workbench) closes the drawer.
-      // controller.handleClose() still runs — the unsaved-changes prompt
-      // fires from there, so no work is lost silently.
-      closeOnInteractOutside={true}
-      modal={false}
+      title={controller.title}
+      titleContent={<EvaluatorEditorHeading controller={controller} />}
+      body="flush"
+      bodyScroll="content"
+      footer={evaluatorEditorFooter({ controller })}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <EvaluatorEditorHeading controller={controller} />
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-          <EvaluatorEditorBody controller={controller} />
-        </Drawer.Body>
-        <Drawer.Footer>
-          <EvaluatorEditorFooter controller={controller} />
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      <EvaluatorEditorBody controller={controller} />
+    </Drawer>
   );
 }

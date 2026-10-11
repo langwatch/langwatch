@@ -1,6 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Box, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 export const PAUSED_SUBSCRIBERS_HREF = "/ops/event-sourcing/subscribers";
@@ -33,33 +34,22 @@ export function PausedSubscribersSection({
           </Link>
         )}
       </HStack>
-      <Table.ScrollArea>
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          variant="line"
-          css={{ "& tr:last-child td": { borderBottom: "none" } }}
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Paused</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {pausedKeys.map((key) => (
-              <Table.Row key={key} data-testid="paused-subscriber-row">
-                <Table.Cell>
-                  <Text fontFamily="mono" textStyle="xs">
-                    {key}
-                  </Text>
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </ListTable>
-      </Table.ScrollArea>
+      <ListTable density="compact" variant="embedded" scroll="x" scrollLabel="Paused subscribers">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Paused</ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {pausedKeys.map((key) => (
+            <ListTable.Row key={key} data-testid="paused-subscriber-row">
+              <ListTable.Cell>
+                <InlineCode variant="neutral">{key}</InlineCode>
+              </ListTable.Cell>
+            </ListTable.Row>
+          ))}
+        </ListTable.Body>
+      </ListTable>
     </Box>
   );
 }

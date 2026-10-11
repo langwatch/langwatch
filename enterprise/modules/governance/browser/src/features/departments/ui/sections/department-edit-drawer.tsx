@@ -1,5 +1,5 @@
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, Field, HStack, Input, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Field, Input, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useState } from "react";
 
 import { api } from "../../../../behavior/governance-api.ts";
@@ -61,46 +61,33 @@ export function DepartmentEditDrawer({
     }
   };
 
+  let saveBlockedReason: string | undefined;
+  if (!name.trim()) saveBlockedReason = "Enter a name";
+  else if (name.trim() === department?.name) saveBlockedReason = "Change the name to save";
   return (
-    <Drawer.Root open={!!department} onOpenChange={() => close()} placement="end" size="md">
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Edit department</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={4}>
-            <Field.Root required>
-              <Field.Label>Name</Field.Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && name.trim()) {
-                    void submit();
-                  }
-                }}
-              />
-            </Field.Root>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={close} disabled={renameMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              onClick={() => void submit()}
-              loading={renameMutation.isPending}
-              disabled={!name.trim() || name.trim() === department?.name}
-            >
-              Save changes
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer
+      open={!!department}
+      onClose={close}
+      size="md"
+      title="Edit department"
+      busy={renameMutation.isPending}
+      onSubmit={() => void submit()}
+      footer={{
+        cancel: { onClick: close },
+        primaryAction: {
+          label: "Save changes",
+          type: "submit",
+          loading: renameMutation.isPending,
+          disabledReason: saveBlockedReason,
+        },
+      }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Field.Root required>
+          <Field.Label>Name</Field.Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </Field.Root>
+      </VStack>
+    </Drawer>
   );
 }

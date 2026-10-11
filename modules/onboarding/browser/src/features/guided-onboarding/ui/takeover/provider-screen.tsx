@@ -1,9 +1,10 @@
+import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * Connect an AI provider on the way into the product: one row of marks, one
  * focused connect panel, and a quiet "Skip Guided Tour" link that asks once.
  */
-import { Box, Button, chakra, Flex, Text } from "@langwatch/design-system/primitives";
+import { Box, chakra, Flex, Text } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
@@ -64,8 +65,7 @@ export function ProviderScreen({
       <Box
         minH="68px"
         fontFamily="display"
-        fontSize="24px"
-        lineHeight="1.375"
+        textStyle="pageTitle"
         color="fg"
         data-testid="provider-line"
       >
@@ -113,7 +113,7 @@ export function ProviderScreen({
                 <Box w="16px" h="16px" flexShrink={0} css={{ "& > svg": { w: "full", h: "full" } }}>
                   {modelProviderIcons[provider.registryKey]}
                 </Box>
-                <Text fontSize="12.5px" fontWeight="500" color={isSelected ? "fg" : "fg.muted"}>
+                <Text textStyle="label" color={isSelected ? "fg" : "fg.muted"}>
                   {provider.name}
                 </Text>
               </chakra.button>
@@ -121,30 +121,25 @@ export function ProviderScreen({
           })}
         </Flex>
 
-        <Box
-          key={selected.id}
-          mt={5}
-          borderRadius="16px"
-          border="1px solid"
-          borderColor="border"
-          bg="bg.panel"
-          p={5}
-          boxShadow="xs"
-          data-testid="provider-panel"
-        >
-          <LentEditModelProviderForm
-            providerKey={selected.registryKey}
-            modelProviderId="new"
-            organizationId={organizationId}
-            projectId={projectId}
-            guided
-            onFailed={(failure) => emit("failed", "provider", failure)}
-            onSaved={(saved) =>
-              onSaved(selected, saved).catch(() =>
-                emit("failed", "provider", { provider: selected.registryKey, code: "save_failed" }),
-              )
-            }
-          />
+        <Box key={selected.id} mt={5}>
+          <Card variant="emphasized" padding="lg" data-testid="provider-panel">
+            <LentEditModelProviderForm
+              providerKey={selected.registryKey}
+              modelProviderId="new"
+              organizationId={organizationId}
+              projectId={projectId}
+              guided
+              onFailed={(failure) => emit("failed", "provider", failure)}
+              onSaved={(saved) =>
+                onSaved(selected, saved).catch(() =>
+                  emit("failed", "provider", {
+                    provider: selected.registryKey,
+                    code: "save_failed",
+                  }),
+                )
+              }
+            />
+          </Card>
         </Box>
 
         <Box mt={5} textAlign="center">
@@ -154,8 +149,7 @@ export function ProviderScreen({
               emit("clicked", "skip_tour");
               setConfirmSkip(true);
             }}
-            fontSize="12.5px"
-            fontWeight="500"
+            textStyle="label"
             color="fg.subtle"
             cursor="pointer"
             _hover={{ color: "fg.muted" }}
@@ -165,53 +159,38 @@ export function ProviderScreen({
         </Box>
       </Box>
 
-      <Dialog.Root
+      <Dialog
         open={confirmSkip}
-        onOpenChange={(details) => setConfirmSkip(details.open)}
+        onClose={() => setConfirmSkip(false)}
+        title={SKIP_TOUR_COPY.title}
         size="sm"
         placement="center"
+        ground="card"
+        footerDivider
+        cancelLabel={null}
+        secondaryAction={{
+          label: SKIP_TOUR_COPY.skip,
+          onClick: () => {
+            emit("confirmed", "skip_tour");
+            setConfirmSkip(false);
+            skip()
+              .then(onSkip)
+              .catch((error: unknown) => onSkipFailed?.(error));
+          },
+        }}
+        primaryAction={{
+          label: SKIP_TOUR_COPY.keep,
+          tone: "neutral",
+          onClick: () => {
+            emit("confirmed", "kept_guide");
+            setConfirmSkip(false);
+          },
+        }}
       >
-        <Dialog.Content maxW="400px">
-          <Dialog.Header pb={1}>
-            <Dialog.Title fontSize="15px" fontWeight="600">
-              {SKIP_TOUR_COPY.title}
-            </Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body pt={0}>
-            <Text fontSize="12.5px" lineHeight="1.6" color="fg.muted">
-              {SKIP_TOUR_COPY.body}
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer borderTop="1px solid" borderColor="border" gap={2}>
-            <Button
-              variant="outline"
-              size="sm"
-              color="fg.muted"
-              onClick={() => {
-                emit("confirmed", "skip_tour");
-                setConfirmSkip(false);
-                skip()
-                  .then(onSkip)
-                  .catch((error: unknown) => onSkipFailed?.(error));
-              }}
-            >
-              {SKIP_TOUR_COPY.skip}
-            </Button>
-            <Button
-              size="sm"
-              bg="fg"
-              color="bg.panel"
-              _hover={{ opacity: 0.9 }}
-              onClick={() => {
-                emit("confirmed", "kept_guide");
-                setConfirmSkip(false);
-              }}
-            >
-              {SKIP_TOUR_COPY.keep}
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+        <Text textStyle="bodySm" color="fg.muted">
+          {SKIP_TOUR_COPY.body}
+        </Text>
+      </Dialog>
     </TakeoverRow>
   );
 }

@@ -1,4 +1,5 @@
-import { Box, Heading, HStack, Input, Skeleton } from "@langwatch/design-system/primitives";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Box, HStack, Input, Skeleton } from "@langwatch/design-system/primitives";
 import { Edit2 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
@@ -7,12 +8,17 @@ type EditableHeadingProps = {
   value: string;
   onSave: (newValue: string) => void;
   isLoading?: boolean;
+  /** Shown, muted, while the value is empty; also the input's placeholder. */
+  placeholder?: string;
 };
 
-/**
- * EditableHeading - A heading that can be clicked to edit inline.
- */
-export function EditableHeading({ value, onSave, isLoading = false }: EditableHeadingProps) {
+/** The page's title, renamed in place: click it to edit, Enter saves, Escape cancels. */
+export function EditableHeading({
+  value,
+  onSave,
+  isLoading = false,
+  placeholder,
+}: EditableHeadingProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editingValue, setEditingValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,7 +60,7 @@ export function EditableHeading({ value, onSave, isLoading = false }: EditableHe
   };
 
   if (isLoading) {
-    return <Skeleton height="28px" width="180px" />;
+    return <Skeleton height="28px" width="180px" flexShrink={0} />;
   }
 
   if (isEditing) {
@@ -66,12 +72,12 @@ export function EditableHeading({ value, onSave, isLoading = false }: EditableHe
         onChange={(e) => setEditingValue(e.target.value)}
         onBlur={handleFinishEdit}
         onKeyDown={handleKeyDown}
-        fontSize="md"
-        fontWeight="500"
+        placeholder={placeholder}
+        textStyle="pageTitle"
         variant="flushed"
         width="auto"
-        minWidth="200px"
-        marginY={-2}
+        minWidth="240px"
+        height="28px"
       />
     );
   }
@@ -81,11 +87,21 @@ export function EditableHeading({ value, onSave, isLoading = false }: EditableHe
       cursor="pointer"
       data-testid="experiment-name-edit"
       onClick={handleStartEdit}
-      _hover={{ "& .edit-icon": { opacity: 1 } }}
+      minWidth={0}
+      _hover={{ "& .edit-icon": { color: "fg" } }}
     >
-      <Heading size="md">{value || ""}</Heading>
-      <Box className="edit-icon" opacity={0} transition="opacity 0.2s" color="fg.subtle">
-        <Edit2 size={14} />
+      <PageLayout.Heading color={value ? undefined : "fg.subtle"}>
+        {value || placeholder || ""}
+      </PageLayout.Heading>
+      {/* Always shown, so the title reads as renameable at a glance. */}
+      <Box
+        className="edit-icon"
+        display="flex"
+        transition="color 0.15s"
+        color="fg.muted"
+        aria-hidden
+      >
+        <Edit2 size={16} />
       </Box>
     </HStack>
   );

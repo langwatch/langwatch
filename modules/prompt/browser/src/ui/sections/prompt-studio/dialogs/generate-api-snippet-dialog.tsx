@@ -2,7 +2,7 @@ import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, Tabs, useDisclosure, VStack } from "@langwatch/design-system/primitives";
 import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useId, useMemo, useState } from "react";
 
 import type { Snippet, Target } from "../../api-snippet/openapi-snippet.types.ts";
 
@@ -71,6 +71,8 @@ export function GenerateApiSnippetDialog({
   };
   const onOpen = () => setOpen(true);
   const onClose = () => setOpen(false);
+  const idBase = useId();
+  const previewId = `${idBase}-snippet-preview`;
   const [selectedTarget, setSelectedTarget] = useState<Target>(targets[0] ?? "python_python3");
 
   // Derived, never synced by an effect: callers rebuild `snippets` each render (React #185).
@@ -94,66 +96,59 @@ export function GenerateApiSnippetDialog({
   return (
     <ApiSnippetDialogContext.Provider value={{ open, onOpen: handleOpen, onClose }}>
       {children}
-      <Dialog.Root open={open} onOpenChange={({ open }) => (open ? onOpen() : onClose())} size="lg">
-        <Dialog.Content
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="lg"
-          boxShadow="lg"
-          width={{ base: "calc(100vw - 24px)", md: "calc(100vw - 48px)" }}
-          maxWidth="880px"
-          maxHeight="calc(100dvh - 48px)"
-          overflow="hidden"
-        >
-          <Dialog.CloseTrigger />
-          <Dialog.Header paddingX={6} paddingTop={6} paddingBottom={3} paddingRight={12}>
-            <VStack alignItems="flex-start" gap={1} width="100%">
-              <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
-              {description ? (
-                <Dialog.Description fontSize="sm" color="fg.muted">
-                  {description}
-                </Dialog.Description>
-              ) : null}
-            </VStack>
-          </Dialog.Header>
-          <Dialog.Body paddingX={6} paddingTop={1} paddingBottom={6} overflowY="auto" minHeight={0}>
-            <VStack alignItems="stretch" gap={4} width="100%">
-              {controls}
-              <Box>
-                <Tabs.Root
-                  value={selectedSnippet.target}
-                  onValueChange={({ value }) => {
-                    const next = targets.find((target) => target === value);
-                    if (next) setSelectedTarget(next);
-                  }}
-                  variant="line"
-                  size="sm"
-                >
-                  <Tabs.List aria-label="Snippet language">
-                    {targets.map((target) => (
-                      <Tabs.Trigger key={target} value={target}>
-                        {formatTarget(target)}
-                      </Tabs.Trigger>
-                    ))}
-                  </Tabs.List>
-                </Tabs.Root>
-                <SnippetPreview
-                  code={code}
-                  filename={fileNameForLanguage(language)}
-                  codeLanguage={language}
-                  languageIconUrl={languageIconFor(language)}
-                  sensitiveValue={sensitiveValue}
-                  enableVisibilityToggle={!!sensitiveValue}
-                  // Always the unmasked snippet: a masked key fails only once pasted.
-                  copyText={code}
-                  disableActions={copyDisabled}
-                  maxHeight="min(460px, 58dvh)"
-                />
-              </Box>
-            </VStack>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        title={title ?? "API Usage"}
+        description={description}
+        size="xl"
+        cancelLabel={null}
+      >
+        <VStack alignItems="stretch" gap={4} width="100%">
+          {controls}
+          <Box>
+            <Tabs.Root
+              value={selectedSnippet.target}
+              onValueChange={({ value }) => {
+                const next = targets.find((target) => target === value);
+                if (next) setSelectedTarget(next);
+              }}
+              variant="line"
+              size="sm"
+              ids={{
+                trigger: (value) => `${idBase}-snippet-${value}`,
+                content: () => previewId,
+              }}
+            >
+              <Tabs.List aria-label="Snippet language">
+                {targets.map((target) => (
+                  <Tabs.Trigger key={target} value={target}>
+                    {formatTarget(target)}
+                  </Tabs.Trigger>
+                ))}
+              </Tabs.List>
+            </Tabs.Root>
+            <Box
+              id={previewId}
+              role="tabpanel"
+              aria-labelledby={`${idBase}-snippet-${selectedSnippet.target}`}
+            >
+              <SnippetPreview
+                code={code}
+                filename={fileNameForLanguage(language)}
+                codeLanguage={language}
+                languageIconUrl={languageIconFor(language)}
+                sensitiveValue={sensitiveValue}
+                enableVisibilityToggle={!!sensitiveValue}
+                // Always the unmasked snippet: a masked key fails only once pasted.
+                copyText={code}
+                disableActions={copyDisabled}
+                maxHeight="min(460px, 58dvh)"
+              />
+            </Box>
+          </Box>
+        </VStack>
+      </Dialog>
     </ApiSnippetDialogContext.Provider>
   );
 }

@@ -173,7 +173,7 @@ export const Cards: Story = {
       {(["elevated", "outline", "subtle"] as const).map((variant) => (
         <Card.Root key={variant} variant={variant} width="16rem">
           <Card.Header>
-            <Heading size="sm">Card {variant}</Heading>
+            <Heading textStyle="cardTitle">Card {variant}</Heading>
           </Card.Header>
           <Card.Body>
             <Text color="fg.muted">A group of facts or controls about one thing.</Text>

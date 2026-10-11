@@ -31,6 +31,9 @@ export function buildShimScript(): string {
   function applyColors(context) {
     LW.theme = context.theme;
     if (typeof document === "undefined" || !document.documentElement) return;
+    if (context.theme === "light" || context.theme === "dark") {
+      document.documentElement.style.colorScheme = context.theme;
+    }
     Object.keys(context.colors || {}).forEach(function (name) {
       document.documentElement.style.setProperty("--chakra-colors-" + name.split(".").join("-"), context.colors[name]);
     });

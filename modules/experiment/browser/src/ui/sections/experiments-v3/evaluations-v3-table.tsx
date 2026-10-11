@@ -28,7 +28,7 @@ import {
   useWorkbenchEvaluatorAdd,
   useWorkbenchTargetSelection,
 } from "../../../behavior/experiments-v3/use-workbench-target-flow.ts";
-import { datasetTableCss } from "../../../model/dataset/dataset-table-styles.ts";
+import { datasetTableCss, SECTION_LINE } from "../../../model/dataset/dataset-table-styles.ts";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
 import type {
   EvaluationsV3State,
@@ -716,14 +716,21 @@ export function EvaluationsV3Table({
           borderCollapse: "separate",
           borderSpacing: "0",
         },
-        // Super header row (first row in thead)
+        // Super header row (first row in thead): one title cell per section.
         "& thead tr:first-of-type th": {
           position: "sticky",
           top: 0,
           zIndex: 11,
+          height: "48px",
+          padding: "3",
           backgroundColor: "var(--chakra-colors-bg-panel)",
           // Promotes the sticky cell to its own GPU compositing layer.
           willChange: "transform",
+        },
+        // The dataset title lines up with its first column, past the checkboxes.
+        "& thead tr:first-of-type th:first-of-type": {
+          paddingLeft: `${CHECKBOX_WIDTH_PX + 12}px`,
+          borderRight: SECTION_LINE,
         },
         // Column header row (second row in thead)
         "& thead tr:nth-of-type(2) th": {

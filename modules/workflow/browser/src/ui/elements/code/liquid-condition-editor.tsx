@@ -1,5 +1,6 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from "react";
@@ -143,12 +144,12 @@ export function LiquidConditionEditor({
         border="1px solid"
         borderColor={borderColor}
         borderRadius="md"
-        paddingX="8px"
-        gap="6px"
+        paddingX="2"
+        gap="1.5"
         overflow="hidden"
         data-testid="if-else-condition-input"
       >
-        <Text fontFamily="mono" fontSize="13px" color="fg.muted" userSelect="none">
+        <Text textStyle="mono" color="fg.muted" userSelect="none">
           {"{%"}
         </Text>
         <Box flex="1" minWidth="0" height="22px">
@@ -178,7 +179,7 @@ export function LiquidConditionEditor({
                 overviewRulerLanes: 0,
                 hideCursorInOverviewRuler: true,
                 wordWrap: "off",
-                fontSize: 13,
+                fontSize: TYPE_SCALE_PX.bodySm,
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, monospace",
                 placeholder,
                 fixedOverflowWidgets: true,
@@ -188,17 +189,17 @@ export function LiquidConditionEditor({
             />
           </Suspense>
         </Box>
-        <Text fontFamily="mono" fontSize="13px" color="fg.muted" userSelect="none">
+        <Text textStyle="mono" color="fg.muted" userSelect="none">
           {"%}"}
         </Text>
       </HStack>
       {hasError && (
-        <Text fontSize="12px" color="red.fg" data-testid="if-else-condition-error">
+        <Text textStyle="caption" color="red.fg" data-testid="if-else-condition-error">
           {validation.error}
         </Text>
       )}
       {hasMissingVariables && (
-        <Text fontSize="12px" color="orange.fg" data-testid="if-else-condition-warning">
+        <Text textStyle="caption" color="orange.fg" data-testid="if-else-condition-warning">
           Unknown input
           {validation.missingVariables.length > 1 ? "s" : ""}:{" "}
           {validation.missingVariables.join(", ")}

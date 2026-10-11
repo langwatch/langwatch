@@ -64,41 +64,47 @@ export const LensTab: React.FC<LensTabProps> = ({ lens, isDraft, errorCount, hid
   const ariaLabel =
     errorCount > 0 ? `${lens.name}, ${errorCount} error${errorCount === 1 ? "" : "s"}` : undefined;
 
-  const trigger = (
-    <Tabs.Trigger
-      value={lens.id}
-      paddingX={2}
-      minWidth="auto"
-      gap={1}
-      aria-label={ariaLabel}
-      data-testid={`trace-lens-tab-${lens.id}`}
-      display={hidden ? "none" : undefined}
-      onDoubleClick={handleDoubleClick}
-    >
-      {isRenaming ? (
-        <RenameInput
-          initialValue={lens.name}
-          onCommit={handleRename}
-          onCancel={() => setIsRenaming(false)}
-        />
-      ) : (
-        <BuiltInTooltip enabled={lens.isBuiltIn}>
-          {/* Built-in lenses dim their label instead of carrying a
-              sparkles badge — saves horizontal space and the muted colour
-              already telegraphs "this one's structural, you can't edit it". */}
-          <Box as="span" color={lens.isBuiltIn ? "fg.muted" : undefined}>
-            {lens.name}
-          </Box>
-        </BuiltInTooltip>
-      )}
-      {errorCount > 0 && <ErrorBadge count={errorCount} />}
-    </Tabs.Trigger>
-  );
-
-  return (
+  // The tab machine finds a tab by its id and `data-ownedby`. The context-menu trigger writes
+  // its own values over both, so the tab's are passed back in and the menu is told the same id.
+  const renderTab = (identity: TabIdentity) => (
     <>
-      <MenuRoot>
-        <MenuContextTrigger asChild>{trigger}</MenuContextTrigger>
+      <MenuRoot ids={{ contextTrigger: identity.id }}>
+        <MenuContextTrigger asChild>
+          <Tabs.Trigger
+            value={lens.id}
+            id={identity.id}
+            data-ownedby={identity.ownedBy}
+            data-value={lens.id}
+            paddingX={2}
+            minWidth="auto"
+            gap={1}
+            aria-label={ariaLabel}
+            data-testid={`trace-lens-tab-${lens.id}`}
+            data-lens-slot={lens.id}
+            // Out of the keyboard order while laid out away; still mounted for measurement.
+            disabled={hidden}
+            display={hidden ? "none" : undefined}
+            onDoubleClick={handleDoubleClick}
+          >
+            {isRenaming ? (
+              <RenameInput
+                initialValue={lens.name}
+                onCommit={handleRename}
+                onCancel={() => setIsRenaming(false)}
+              />
+            ) : (
+              <BuiltInTooltip enabled={lens.isBuiltIn}>
+                {/* Built-in lenses dim their label instead of carrying a
+                    sparkles badge — saves horizontal space and the muted colour
+                    already telegraphs "this one's structural, you can't edit it". */}
+                <Box as="span" color={lens.isBuiltIn ? "fg.muted" : undefined}>
+                  {lens.name}
+                </Box>
+              </BuiltInTooltip>
+            )}
+            {errorCount > 0 && <ErrorBadge count={errorCount} />}
+          </Tabs.Trigger>
+        </MenuContextTrigger>
         <MenuContent minWidth="160px">
           {lens.isBuiltIn ? (
             <BuiltInLensMenuItems lensId={lens.id} canDelete={canDelete} />
@@ -115,7 +121,19 @@ export const LensTab: React.FC<LensTabProps> = ({ lens, isDraft, errorCount, hid
       {isDraft && !hidden && <DraftDot lensId={lens.id} lensName={lens.name} />}
     </>
   );
+
+  return (
+    <Tabs.Context>
+      {(tabs) => {
+        const props = tabs.getTriggerProps({ value: lens.id });
+        const ownedBy = "data-ownedby" in props ? props["data-ownedby"] : void 0;
+        return renderTab({ id: props.id, ownedBy: typeof ownedBy === "string" ? ownedBy : void 0 });
+      }}
+    </Tabs.Context>
+  );
 };
+
+type TabIdentity = { id: string | undefined; ownedBy: string | undefined };
 
 interface BuiltInTooltipProps {
   enabled: boolean;
@@ -284,7 +302,7 @@ const ErrorBadge: React.FC<{ count: number }> = ({ count }) => (
     bg="red.solid"
     color="red.contrast"
     fontSize="xs"
-    fontWeight="bold"
+    fontWeight="semibold"
     lineHeight="1"
     minWidth="20px"
     height="18px"
@@ -304,6 +322,8 @@ const RenameInput: React.FC<{
   const [value, setValue] = useState(initialValue);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // The field sits inside the tab: its keys (arrows, Home, End, Space) are the caret's.
+    e.stopPropagation();
     if (e.key === "Enter") onCommit(value);
     else if (e.key === "Escape") onCancel();
   };

@@ -1,15 +1,9 @@
+import { Banner } from "@langwatch/design-system/banner";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Box,
-  Center,
-  EmptyState,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Center, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { OpsEventSubscriberRegistration } from "@langwatch/ops-contract";
-import { Eye, Info } from "lucide-react";
+import { Eye } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useDejaViewKeyboard } from "../../behavior/use-deja-view-keyboard.ts";
@@ -41,18 +35,12 @@ function AggregateEventsPlaceholder({
   errorMessage?: ReactNode;
 }) {
   if (loading) {
-    return (
-      <Center flex={1}>
-        <Spinner size="lg" />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
   if (errorMessage) return <Center flex={1}>{errorMessage}</Center>;
   return (
     <Center flex={1}>
-      <Text textStyle="sm" color="fg.muted">
-        No events found for this aggregate.
-      </Text>
+      <NoDataInfoBlock size="line" title="No events found for this aggregate." />
     </Center>
   );
 }
@@ -100,54 +88,29 @@ function AggregateSearchScreen({
       <Box paddingY={4} w="full">
         <VStack align="stretch" gap={4}>
           {searchLookbackDays !== null && (
-            <Box
-              padding={3}
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="border.muted"
-              bg="bg.muted"
-            >
-              <HStack gap={2} align="start">
-                <Box color="fg.muted" paddingTop={0.5}>
-                  <Info size={14} />
-                </Box>
-                <Text textStyle="xs" color="fg.muted">
-                  Search is bounded to the last {searchLookbackDays} days.
-                  {hotTierDays !== null && (
-                    <>
-                      {" "}
-                      Aggregates older than {hotTierDays} days within that window live in cold
-                      storage and load quite some slower (set by{" "}
-                      {hotTierEnvVar ?? "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}).
-                    </>
-                  )}
-                </Text>
-              </HStack>
-            </Box>
+            <Banner status="info" placement="inline">
+              Search is bounded to the last {searchLookbackDays} days.
+              {hotTierDays !== null && (
+                <>
+                  {" "}
+                  Aggregates older than {hotTierDays} days within that window live in cold storage
+                  and load quite some slower (set by{" "}
+                  {hotTierEnvVar ?? "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}).
+                </>
+              )}
+            </Banner>
           )}
 
-          {searchLoading && !searchResults && (
-            <Center paddingY={10}>
-              <Spinner size="lg" />
-            </Center>
-          )}
+          {searchLoading && !searchResults && <SkeletonRows rows={6} />}
 
           {searchError}
 
           {hasSearched && !searchLoading && searchResults && searchResults.length === 0 && (
-            <Center paddingY={10}>
-              <EmptyState.Root>
-                <EmptyState.Content>
-                  <EmptyState.Indicator>
-                    <Eye size={32} />
-                  </EmptyState.Indicator>
-                  <EmptyState.Title>No aggregates found</EmptyState.Title>
-                  <EmptyState.Description>
-                    No aggregates match your search criteria. Try a different query or tenant ID.
-                  </EmptyState.Description>
-                </EmptyState.Content>
-              </EmptyState.Root>
-            </Center>
+            <NoDataInfoBlock
+              icon={<Eye />}
+              title="No aggregates found"
+              description="No aggregates match your search criteria. Try a different query or tenant ID."
+            />
           )}
 
           {!hasSearched && (

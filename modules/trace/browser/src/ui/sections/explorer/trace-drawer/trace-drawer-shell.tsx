@@ -172,7 +172,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           />
         </Drawer.Body>
       </Drawer.Content>
-      <KeyboardShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <KeyboardShortcutsHelp
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+        fallbackFocusSelector='[data-testid="trace-overflow-menu"]'
+      />
       {/* Show-once feature spotlights — only meaningful once a trace has
           rendered (the anchors live in the drawer body). Keyed reads via
           the traceId prop so the queue re-evaluates per trace. */}

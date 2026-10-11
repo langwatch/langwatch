@@ -18,6 +18,7 @@ const state = vi.hoisted(() => ({
   departments: [] as { id: string; name: string }[],
   twoStepShow: false,
   extraGroups: [] as unknown[],
+  counts: "known" as "known" | "zero" | "unknown",
 }));
 
 vi.mock("../../../../behavior/use-member-provenance.ts", () => ({
@@ -94,6 +95,10 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
   };
 
   const answerFor = (path: string): unknown => {
+    if (path === "organization.getDirectoryCounts" && state.counts === "unknown") return void 0;
+    if (path === "organization.getDirectoryCounts" && state.counts === "zero") {
+      return { members: 0, openInvites: 0, joinRequests: 0, groups: 0, teams: 0 };
+    }
     if (path === "departments.list") return state.departments;
     if (path === "group.listAll") return [...(answers[path] as unknown[]), ...state.extraGroups];
     return answers[path] ?? [];
@@ -158,6 +163,18 @@ function StatusBand({ organizationId, canReadMembership }: DirectorySummaryProps
   );
 }
 
+/**
+ * jsdom collapses the count's visually hidden space and names the tab "People5"; a browser says
+ * "People 5" (design-system content-tabs browser test). So the name is matched either way and
+ * the space is asserted where jsdom keeps it, in the tab's text.
+ */
+function expectCountedTab({ label, count }: { label: string; count?: number }) {
+  const written = count === void 0 ? label : `${label} ${count}`;
+  const name = count === void 0 ? `^${label}$` : `^${label} ?${count}$`;
+  const tab = screen.getByRole("tab", { name: new RegExp(name) });
+  expect(tab.textContent).toBe(written);
+}
+
 const ADMIN = new Set(["organization:manage", "sso:view"]);
 const GOVERNANCE_READER = new Set([...ADMIN, "governance:view"]);
 const GOVERNANCE_FLAG = "release_ui_ai_governance_enabled";
@@ -188,6 +205,7 @@ beforeEach(() => {
   state.departments = [];
   state.twoStepShow = false;
   state.extraGroups = [];
+  state.counts = "known";
 });
 
 afterEach(() => {
@@ -211,9 +229,29 @@ describe("the directory page", () => {
     it("counts everybody on the people tab and every group on the groups tab", () => {
       renderDirectory();
 
-      expect(screen.getByRole("tab", { name: /People/ })).toHaveTextContent("People 5");
-      expect(screen.getByRole("tab", { name: /Groups/ })).toHaveTextContent("Groups 2");
-      expect(screen.getByRole("tab", { name: /Teams/ })).toHaveTextContent("Teams & projects 0");
+      expectCountedTab({ label: "People", count: 5 });
+      expectCountedTab({ label: "Groups", count: 2 });
+      expectCountedTab({ label: "Teams & projects", count: 0 });
+    });
+
+    /** @scenario A tab that names a count names it the same way as its siblings */
+    it("keeps a zero on every tab when nothing is in the directory", () => {
+      state.counts = "zero";
+      renderDirectory();
+
+      expectCountedTab({ label: "People", count: 0 });
+      expectCountedTab({ label: "Groups", count: 0 });
+      expectCountedTab({ label: "Teams & projects", count: 0 });
+    });
+
+    /** @scenario A tab that names a count names it the same way as its siblings */
+    it("names a tab without a number while its count is not known", () => {
+      state.counts = "unknown";
+      renderDirectory();
+
+      expectCountedTab({ label: "People" });
+      expectCountedTab({ label: "Groups" });
+      expectCountedTab({ label: "Teams & projects" });
     });
 
     /** @scenario The tabs name the subjects this page owns */
@@ -320,7 +358,7 @@ describe("the directory page", () => {
     it("offers a departments tab carrying how many there are", () => {
       renderDirectory({ grants: GOVERNANCE_READER, flags: new Set([GOVERNANCE_FLAG]) });
 
-      expect(screen.getByRole("tab", { name: /Departments/ })).toHaveTextContent("Departments 2");
+      expectCountedTab({ label: "Departments", count: 2 });
     });
 
     /** @scenario "The departments tab references what Governance manages" */

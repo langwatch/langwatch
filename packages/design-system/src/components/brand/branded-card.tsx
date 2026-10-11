@@ -114,20 +114,12 @@ export function BrandedCard({
             <Box display="flex" justifyContent="center" {...logoAttributes}>
               <FullLogo width={112} height={27.5} />
             </Box>
-            <Heading
-              as="h1"
-              fontSize="19px"
-              fontWeight={600}
-              letterSpacing="-0.015em"
-              textAlign="center"
-              css={{ textWrap: "balance" }}
-            >
+            <Heading as="h1" textStyle="pageTitle" textAlign="center" css={{ textWrap: "balance" }}>
               {title}
             </Heading>
             {intro ? (
               <Text
-                fontSize="13.5px"
-                lineHeight="1.55"
+                textStyle="body"
                 color="fg.muted"
                 textAlign="center"
                 maxWidth="36ch"

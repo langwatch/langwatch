@@ -42,6 +42,32 @@ interface MeasureOverflowArgs {
   activeId?: string | null;
 }
 
+/** Splits the items, in order, at the first one whose right edge passes `limit`. */
+function splitAtLimit({
+  els,
+  attribute,
+  limit,
+  activeId,
+}: {
+  els: HTMLElement[];
+  attribute: string;
+  limit: number;
+  activeId?: string | null;
+}): { next: Set<string>; visible: { id: string; right: number }[]; activeWidth: number } {
+  const next = new Set<string>();
+  const visible: { id: string; right: number }[] = [];
+  let activeWidth = 0;
+  for (const el of els) {
+    const id = el.getAttribute(attribute);
+    if (!id) continue;
+    const rect = el.getBoundingClientRect();
+    if (id === activeId) activeWidth = rect.width;
+    if (next.size > 0 || rect.right > limit) next.add(id);
+    else visible.push({ id, right: rect.right });
+  }
+  return { next, visible, activeWidth };
+}
+
 /** Measures which marked descendants of `root` fall past the overflow cutoff. */
 function measureOverflow({
   root,
@@ -60,29 +86,18 @@ function measureOverflow({
   if (containerRect.width === 0) return null;
   const limit = containerRect.right - reservePx;
 
-  const next = new Set<string>();
-  const visibleIds: string[] = [];
-  let cutoff = false;
-  for (const el of els) {
-    const id = el.getAttribute(attribute);
-    if (!id) continue;
-    if (cutoff) {
-      next.add(id);
-      continue;
-    }
-    const rect = el.getBoundingClientRect();
-    if (rect.right > limit) {
-      next.add(id);
-      cutoff = true;
-    } else {
-      visibleIds.push(id);
-    }
-  }
+  const { next, visible, activeWidth } = splitAtLimit({ els, attribute, limit, activeId });
 
-  if (activeId && next.has(activeId) && visibleIds.length > 0) {
-    const sacrifice = visibleIds[visibleIds.length - 1]!;
+  // A hidden active item takes the place of the last visible ones, as many as its width
+  // needs, so it is never shown clipped.
+  if (activeId && next.has(activeId) && visible.length > 0) {
     next.delete(activeId);
-    next.add(sacrifice);
+    let used = visible.at(-1)?.right ?? containerRect.left;
+    while (visible.length > 0 && used + activeWidth > limit) {
+      const sacrifice = visible.pop();
+      if (sacrifice) next.add(sacrifice.id);
+      used = visible.at(-1)?.right ?? containerRect.left;
+    }
   }
 
   return next.size > 0 ? next : null;

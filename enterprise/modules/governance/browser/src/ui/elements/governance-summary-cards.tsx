@@ -1,6 +1,7 @@
 /** Summary cards for varied-shape summaries; composable, non-querying. */
 
-import { Card, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren, ReactNode } from "react";
 
 import { GOVERNANCE_SUMMARY_UNMEASURED } from "./governance-summary-bar.tsx";
@@ -51,21 +52,17 @@ export function GovernanceSummaryCard({
   testId?: string;
 }>) {
   return (
-    <Card.Root
-      variant="showcase"
-      data-testid={testId}
-      // Grows with its siblings, never narrower than a readable card.
-      flex="1 1 220px"
-      minWidth="200px"
-      padding={4}
-    >
-      <VStack align="stretch" gap={2}>
-        <Text fontSize="10.5px" letterSpacing="0.1em" textTransform="uppercase" color="fg.subtle">
-          {eyebrow}
-        </Text>
-        {children}
-      </VStack>
-    </Card.Root>
+    // Grows with its siblings, never narrower than a readable card.
+    <Box display="flex" flex="1 1 220px" minWidth="200px">
+      <Card variant="showcase" data-testid={testId} padding="md" bodyLayout="stack">
+        <VStack align="stretch" gap={2}>
+          <Text textStyle="micro" letterSpacing="0.1em" textTransform="uppercase" color="fg.subtle">
+            {eyebrow}
+          </Text>
+          {children}
+        </VStack>
+      </Card>
+    </Box>
   );
 }
 

@@ -74,7 +74,7 @@ describe("the dashboard card menu", () => {
     });
 
     it("edits in the chart builder", async () => {
-      await user.click(screen.getByText("Edit Graph"));
+      await user.click(screen.getByText("Edit graph"));
 
       expect(host.navigations).toContain(
         "/my-project/analytics/custom/chart-1?dashboard=dashboard-1",

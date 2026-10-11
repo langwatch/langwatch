@@ -183,7 +183,7 @@ function MessageRow({
     >
       <MessageContent shared={shared} idx={idx} role={role} />
       {contentError && (
-        <Field.ErrorText fontSize="13px">{String(contentError.message ?? "")}</Field.ErrorText>
+        <Field.ErrorText textStyle="bodySm">{String(contentError.message ?? "")}</Field.ErrorText>
       )}
     </VerticalFormControl>
   );

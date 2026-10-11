@@ -145,7 +145,7 @@ const buildColumns = ({
       header: "",
       size: 32,
       cell: ({ row }) => (
-        <Text fontSize="12px" color="fg.muted" textAlign="right" paddingRight={1}>
+        <Text textStyle="caption" color="fg.muted" textAlign="right" paddingRight={1}>
           {row.index + 1}
         </Text>
       ),
@@ -164,9 +164,7 @@ const buildColumns = ({
         header: () => (
           <HStack gap={1}>
             <ColumnTypeIcon type={columnType} />
-            <Text fontSize="13px" fontWeight="medium">
-              {col.name}
-            </Text>
+            <Text textStyle="label">{col.name}</Text>
           </HStack>
         ),
         size: 210,
@@ -236,7 +234,7 @@ const buildColumns = ({
           }
           if (!targetOutput) {
             return (
-              <Text fontSize="13px" color="fg.subtle">
+              <Text textStyle="bodySm" color="fg.subtle">
                 -
               </Text>
             );
@@ -271,7 +269,7 @@ const buildColumns = ({
         header: () => (
           <HStack gap={1.5}>
             <Swords size={14} />
-            <Text fontSize="12px" fontWeight="600">
+            <Text textStyle="caption" fontWeight="semibold">
               {column.name}
             </Text>
           </HStack>

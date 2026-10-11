@@ -36,11 +36,11 @@ export const EntryNode = forwardRef(function EntryNode(
             data-testid="entry-dataset-marker"
           >
             <Database size={12} style={{ flexShrink: 0 }} />
-            <Text fontSize="11px" truncate>
+            <Text textStyle="micro" truncate>
               {data.dataset.name ?? "Dataset"}
             </Text>
             {total !== void 0 && total !== null && (
-              <Text fontSize="11px" color="fg.subtle" flexShrink={0}>
+              <Text textStyle="micro" color="fg.subtle" flexShrink={0}>
                 ({total} {total === 1 ? "row" : "rows"})
               </Text>
             )}

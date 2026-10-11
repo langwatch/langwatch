@@ -39,6 +39,8 @@ import {
   type CreateTriggerCommand,
   type CustomGraphNameRef,
   type EmailSuppression,
+  type EmailSuppressionPage,
+  type EmailSuppressionPageInput,
   type EmailSuppressionRow,
   type OperatorReportSchedule,
   type ReportSchedule,
@@ -190,7 +192,7 @@ type AutomationActionParamsParse =
     }>;
 
 /** The per-action `actionParams` parser the process's provider registry owns. */
-interface AutomationActionParamsSchema {
+export interface AutomationActionParamsSchema {
   safeParse(value: unknown): AutomationActionParamsParse;
 }
 
@@ -382,6 +384,20 @@ interface AutomationAppCollaborators {
   triggerMatches: AutomationTriggerMatchDispatcherService;
   reportSchedules: ReportScheduleService;
   settlement: AutomationSettlement | undefined;
+}
+
+/** The stored row as the operator table renders it: no project id, plus the automation's name. */
+function toSuppressionRow(
+  row: EmailSuppression & { triggerName: string | null },
+): EmailSuppressionRow {
+  return {
+    id: row.id,
+    email: row.email,
+    triggerId: row.triggerId,
+    triggerName: row.triggerName,
+    reason: row.reason,
+    createdAt: row.createdAt,
+  };
 }
 
 export class AutomationModule implements AutomationApi {
@@ -1331,14 +1347,36 @@ export class AutomationModule implements AutomationApi {
       },
     });
 
-    return rows.map((row) => ({
-      id: row.id,
-      email: row.email,
-      triggerId: row.triggerId,
-      triggerName: row.triggerName,
-      reason: row.reason,
-      createdAt: row.createdAt,
-    }));
+    return rows.map(toSuppressionRow);
+  }
+
+  /**
+   * One page of the operator-facing list. Every page read is audited on its
+   * own, since each page shows customer emails.
+   */
+  async listSuppressionsPage(
+    input: EmailSuppressionPageInput & { actorId: string },
+  ): Promise<EmailSuppressionPage> {
+    const { rows, nextCursor } = await this.#automation.getPageEnriched({
+      projectId: input.projectId,
+      limit: input.limit,
+      cursor: input.cursor,
+    });
+
+    await this.#audit.record({
+      userId: input.actorId,
+      projectId: input.projectId,
+      action: "emailSuppression.getAll",
+      args: {
+        recordCount: rows.length,
+        triggerIds: [
+          ...new Set(rows.map((row) => row.triggerId).filter((id): id is string => id != null)),
+        ],
+        paged: true,
+      },
+    });
+
+    return { suppressions: rows.map(toSuppressionRow), nextCursor };
   }
 
   /** Removing a suppression resumes delivery - a deliberate operator action. */

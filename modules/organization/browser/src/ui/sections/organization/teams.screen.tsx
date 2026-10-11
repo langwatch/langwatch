@@ -4,31 +4,32 @@
  */
 
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Box,
   Button,
-  Card,
   createListCollection,
   Field,
   Heading,
   HStack,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import {
   CreateProjectDrawerToken,
   CreateTeamDrawerToken,
   EditProjectDrawerToken,
 } from "@langwatch/organization-client";
-import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, Users, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { RouterOutputs } from "../../../behavior/organization-api.ts";
 import { api } from "../../../behavior/organization-api.ts";
@@ -149,6 +150,9 @@ function AddToTeamDialog({
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("MEMBER");
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
+  const [attempted, setAttempted] = useState(false);
+  const personRef = useRef<HTMLButtonElement>(null);
+  const personMissing = attempted && !userId;
   const queryClient = api.useUtils();
 
   const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -218,93 +222,89 @@ function AddToTeamDialog({
   }, [selectedMemberRole, role, customRoleId]);
 
   return (
-    <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content maxWidth="440px">
-        <Dialog.Header>
-          <Dialog.Title>Add member to {teamName}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body>
-          <VStack gap={4} align="stretch">
-            <Field.Root>
-              <Field.Label>Person</Field.Label>
-              <Select.Root
-                collection={userCollection}
-                value={userId ? [userId] : []}
-                onValueChange={(e) => setUserId(e.value[0] ?? "")}
-                size="md"
-              >
-                <Select.Trigger>
-                  <Select.ValueText placeholder="Select person..." />
-                </Select.Trigger>
-                <Select.Content>
-                  {userItems.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-            </Field.Root>
-
-            <Field.Root>
-              <Field.Label>Role on this team</Field.Label>
-              <Select.Root
-                collection={allRoleCollection}
-                value={[customRoleId ? `CUSTOM:${customRoleId}` : role]}
-                onValueChange={(e) => {
-                  const v = e.value[0] ?? "MEMBER";
-                  if (v.startsWith("CUSTOM:")) {
-                    setRole("CUSTOM");
-                    setCustomRoleId(v.slice(7));
-                  } else {
-                    setRole(v);
-                    setCustomRoleId(undefined);
-                  }
-                }}
-                size="md"
-              >
-                <Select.Trigger>
-                  <Select.ValueText />
-                </Select.Trigger>
-                <Select.Content>
-                  {allRoleItems.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-            </Field.Root>
-
-            <Text fontSize="sm" color="fg.subtle">
-              This gives them access to all projects in the team at this role level.
-            </Text>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!userId}
-            loading={create.isPending}
-            onClick={() =>
-              create.mutate({
-                organizationId,
-                grant: {
-                  principal: { type: "user", id: userId },
-                  roleId: grantRoleId({ role, customRoleId }),
-                  scope: { type: "team", id: teamId },
-                },
-              })
-            }
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={`Add member to ${teamName}`}
+      size="sm"
+      primaryAction={{
+        label: "Add member",
+        loading: create.isPending,
+        onClick: () => {
+          if (!userId) {
+            setAttempted(true);
+            personRef.current?.focus();
+            return;
+          }
+          create.mutate({
+            organizationId,
+            grant: {
+              principal: { type: "user", id: userId },
+              roleId: grantRoleId({ role, customRoleId }),
+              scope: { type: "team", id: teamId },
+            },
+          });
+        },
+      }}
+    >
+      <VStack gap={4} align="stretch">
+        <Field.Root invalid={personMissing}>
+          <Field.Label>Person</Field.Label>
+          <Select.Root
+            collection={userCollection}
+            value={userId ? [userId] : []}
+            onValueChange={(e) => setUserId(e.value[0] ?? "")}
+            size="md"
           >
-            Add member
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+            <Select.Trigger ref={personRef}>
+              <Select.ValueText placeholder="Select person..." />
+            </Select.Trigger>
+            <Select.Content>
+              {userItems.map((item) => (
+                <Select.Item key={item.value} item={item}>
+                  {item.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          <Field.ErrorText>Choose a person.</Field.ErrorText>
+        </Field.Root>
+
+        <Field.Root>
+          <Field.Label>Role on this team</Field.Label>
+          <Select.Root
+            collection={allRoleCollection}
+            value={[customRoleId ? `CUSTOM:${customRoleId}` : role]}
+            onValueChange={(e) => {
+              const v = e.value[0] ?? "MEMBER";
+              if (v.startsWith("CUSTOM:")) {
+                setRole("CUSTOM");
+                setCustomRoleId(v.slice(7));
+              } else {
+                setRole(v);
+                setCustomRoleId(undefined);
+              }
+            }}
+            size="md"
+          >
+            <Select.Trigger>
+              <Select.ValueText />
+            </Select.Trigger>
+            <Select.Content>
+              {allRoleItems.map((item) => (
+                <Select.Item key={item.value} item={item}>
+                  {item.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+        </Field.Root>
+
+        <Text fontSize="sm" color="fg.subtle">
+          This gives them access to all projects in the team at this role level.
+        </Text>
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -328,6 +328,9 @@ function AddToProjectDialog({
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState("VIEWER");
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
+  const [attempted, setAttempted] = useState(false);
+  const personRef = useRef<HTMLButtonElement>(null);
+  const personMissing = attempted && !userId;
   const queryClient = api.useUtils();
 
   const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -361,94 +364,89 @@ function AddToProjectDialog({
   const allRoleCollection = createListCollection({ items: allRoleItems });
 
   return (
-    <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content maxWidth="440px">
-        <Dialog.Header>
-          <Dialog.Title>Add access to {projectName}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body>
-          <VStack gap={4} align="stretch">
-            <Field.Root>
-              <Field.Label>Person</Field.Label>
-              <Select.Root
-                collection={userCollection}
-                value={userId ? [userId] : []}
-                onValueChange={(e) => setUserId(e.value[0] ?? "")}
-                size="md"
-              >
-                <Select.Trigger>
-                  <Select.ValueText placeholder="Select person..." />
-                </Select.Trigger>
-                <Select.Content>
-                  {userItems.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-            </Field.Root>
-
-            <Field.Root>
-              <Field.Label>Role on this project</Field.Label>
-              <Select.Root
-                collection={allRoleCollection}
-                value={[customRoleId ? `CUSTOM:${customRoleId}` : role]}
-                onValueChange={(e) => {
-                  const v = e.value[0] ?? "VIEWER";
-                  if (v.startsWith("CUSTOM:")) {
-                    setRole("CUSTOM");
-                    setCustomRoleId(v.slice(7));
-                  } else {
-                    setRole(v);
-                    setCustomRoleId(undefined);
-                  }
-                }}
-                size="md"
-              >
-                <Select.Trigger>
-                  <Select.ValueText />
-                </Select.Trigger>
-                <Select.Content>
-                  {allRoleItems.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-            </Field.Root>
-
-            <Text fontSize="sm" color="fg.subtle">
-              If they&apos;re already on the team, this overrides their team role for this project
-              only.
-            </Text>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!userId}
-            loading={create.isPending}
-            onClick={() =>
-              create.mutate({
-                organizationId,
-                grant: {
-                  principal: { type: "user", id: userId },
-                  roleId: grantRoleId({ role, customRoleId }),
-                  scope: { type: "project", id: projectId },
-                },
-              })
-            }
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={`Add access to ${projectName}`}
+      size="sm"
+      primaryAction={{
+        label: "Add access",
+        loading: create.isPending,
+        onClick: () => {
+          if (!userId) {
+            setAttempted(true);
+            personRef.current?.focus();
+            return;
+          }
+          create.mutate({
+            organizationId,
+            grant: {
+              principal: { type: "user", id: userId },
+              roleId: grantRoleId({ role, customRoleId }),
+              scope: { type: "project", id: projectId },
+            },
+          });
+        },
+      }}
+    >
+      <VStack gap={4} align="stretch">
+        <Field.Root invalid={personMissing}>
+          <Field.Label>Person</Field.Label>
+          <Select.Root
+            collection={userCollection}
+            value={userId ? [userId] : []}
+            onValueChange={(e) => setUserId(e.value[0] ?? "")}
+            size="md"
           >
-            Add access
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+            <Select.Trigger ref={personRef}>
+              <Select.ValueText placeholder="Select person..." />
+            </Select.Trigger>
+            <Select.Content>
+              {userItems.map((item) => (
+                <Select.Item key={item.value} item={item}>
+                  {item.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          <Field.ErrorText>Choose a person.</Field.ErrorText>
+        </Field.Root>
+
+        <Field.Root>
+          <Field.Label>Role on this project</Field.Label>
+          <Select.Root
+            collection={allRoleCollection}
+            value={[customRoleId ? `CUSTOM:${customRoleId}` : role]}
+            onValueChange={(e) => {
+              const v = e.value[0] ?? "VIEWER";
+              if (v.startsWith("CUSTOM:")) {
+                setRole("CUSTOM");
+                setCustomRoleId(v.slice(7));
+              } else {
+                setRole(v);
+                setCustomRoleId(undefined);
+              }
+            }}
+            size="md"
+          >
+            <Select.Trigger>
+              <Select.ValueText />
+            </Select.Trigger>
+            <Select.Content>
+              {allRoleItems.map((item) => (
+                <Select.Item key={item.value} item={item}>
+                  {item.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+        </Field.Root>
+
+        <Text fontSize="sm" color="fg.subtle">
+          If they&apos;re already on the team, this overrides their team role for this project only.
+        </Text>
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -488,178 +486,180 @@ function ProjectSection({
 
   return (
     <>
-      <Box borderWidth="1px" borderRadius="md" mb={2} overflow="hidden">
-        <HStack
-          px={3}
-          py={2}
-          cursor="pointer"
-          onClick={() => setExpanded((v) => !v)}
-          _hover={{ bg: "bg.subtle" }}
-        >
-          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <Text fontSize="sm" fontWeight="medium" truncate minWidth={0} title={project.name}>
-            📁 {project.name}
-          </Text>
-          {hasOverrides && (
-            <Badge colorPalette="orange" size="sm">
-              has overrides
-            </Badge>
-          )}
-          <Spacer />
-          <Text fontSize="xs" color="fg.subtle">
-            {access.length} with access
-          </Text>
-          {canManage && (
-            <Button
-              size="xs"
-              variant="ghost"
-              color="fg.subtle"
-              onClick={(e) => {
-                e.stopPropagation();
-                openDrawer(EditProjectDrawerToken, {
-                  projectId: project.id,
-                  projectName: project.name,
-                  currentTeamId: teamId,
-                });
-              }}
-            >
-              <Pencil size={13} />
-              Edit
-            </Button>
-          )}
-          {department.show && canManage && (
-            <InlineDepartment
-              organizationId={organizationId}
-              kind="project"
-              entityId={project.id}
-              value={department.byProject.get(project.id) ?? null}
-              departments={department.departments}
-              onAssigned={department.refetch}
-            />
-          )}
-        </HStack>
-
-        {expanded && (
-          <Box px={3} pb={3} borderTopWidth="1px">
-            {/* Inherited from team */}
-            {inherited.length > 0 && (
-              <Box mt={3}>
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  color="fg.subtle"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                  mb={2}
-                >
-                  Inherited from team
-                </Text>
-                {inherited.map((m, i) => (
-                  <HStack key={i} py={1} opacity={0.5} fontSize="sm">
-                    <MemberAvatar name={m.name} image={m.image} size="xs" />
-                    <Text flex={1}>{m.name}</Text>
-                    <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
-                      <Text truncate maxWidth="160px" title={m.customRoleName ?? m.role}>
-                        {m.customRoleName ?? m.role}
-                      </Text>
-                    </Badge>
-                    {m.viaGroupName ? (
-                      <Link href="/settings/directory?tab=groups" fontSize="xs" color="purple.fg">
-                        via {m.viaGroupName}
-                      </Link>
-                    ) : (
-                      <Text fontSize="xs" color="fg.subtle">
-                        from team
-                      </Text>
-                    )}
-                  </HStack>
-                ))}
-              </Box>
+      <Box mb={2}>
+        <Card variant="frame" padding="none">
+          <HStack
+            px={3}
+            py={2}
+            cursor="pointer"
+            onClick={() => setExpanded((v) => !v)}
+            _hover={{ bg: "bg.subtle" }}
+          >
+            {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <Text fontSize="sm" fontWeight="medium" truncate minWidth={0} title={project.name}>
+              📁 {project.name}
+            </Text>
+            {hasOverrides && (
+              <Badge colorPalette="orange" size="sm">
+                has overrides
+              </Badge>
             )}
+            <Spacer />
+            <Text fontSize="xs" color="fg.subtle">
+              {access.length} with access
+            </Text>
+            {canManage && (
+              <Button
+                size="xs"
+                variant="ghost"
+                color="fg.subtle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDrawer(EditProjectDrawerToken, {
+                    projectId: project.id,
+                    projectName: project.name,
+                    currentTeamId: teamId,
+                  });
+                }}
+              >
+                <Pencil size={13} />
+                Edit
+              </Button>
+            )}
+            {department.show && canManage && (
+              <InlineDepartment
+                organizationId={organizationId}
+                kind="project"
+                entityId={project.id}
+                value={department.byProject.get(project.id) ?? null}
+                departments={department.departments}
+                onAssigned={department.refetch}
+              />
+            )}
+          </HStack>
 
-            {/* Project-level access */}
-            {projectLevel.length > 0 && (
-              <Box mt={3}>
-                <Text
-                  fontSize="xs"
-                  fontWeight="semibold"
-                  color="fg.subtle"
-                  textTransform="uppercase"
-                  letterSpacing="wider"
-                  mb={2}
-                >
-                  Project-level access
-                </Text>
-                {projectLevel.map((m, i) => (
-                  <HStack key={i} py={1} fontSize="sm">
-                    <MemberAvatar name={m.name} image={m.image} size="xs" />
-                    <Box flex={1}>
-                      <Text display="inline">{m.name}</Text>
-                      {m.source === "override" && m.teamRole && (
-                        <Text as="span" fontSize="xs" color="fg.subtle" ml={2}>
-                          team role: {m.teamRole}
+          {expanded && (
+            <Box px={3} pb={3} borderTopWidth="1px">
+              {/* Inherited from team */}
+              {inherited.length > 0 && (
+                <Box mt={3}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="fg.subtle"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    mb={2}
+                  >
+                    Inherited from team
+                  </Text>
+                  {inherited.map((m, i) => (
+                    <HStack key={i} py={1} opacity={0.5} fontSize="sm">
+                      <MemberAvatar name={m.name} image={m.image} size="xs" />
+                      <Text flex={1}>{m.name}</Text>
+                      <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                        <Text truncate maxWidth="160px" title={m.customRoleName ?? m.role}>
+                          {m.customRoleName ?? m.role}
+                        </Text>
+                      </Badge>
+                      {m.viaGroupName ? (
+                        <Link href="/settings/directory?tab=groups" fontSize="xs" color="purple.fg">
+                          via {m.viaGroupName}
+                        </Link>
+                      ) : (
+                        <Text fontSize="xs" color="fg.subtle">
+                          from team
                         </Text>
                       )}
-                    </Box>
-                    {m.source === "override" && (
-                      <Badge colorPalette="orange" size="sm">
-                        override
-                      </Badge>
-                    )}
-                    <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
-                      {m.role}
-                    </Badge>
-                    {canManage && m.bindingId && (
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        color={m.source === "override" ? "accent.fg" : "fg.subtle"}
-                        title={
-                          m.source === "override"
-                            ? "Remove override, revert to team role"
-                            : "Remove project access"
-                        }
-                        loading={revokeGrant.isPending}
-                        onClick={() =>
-                          revokeGrant.mutate({
-                            organizationId,
-                            grantId: m.bindingId!,
-                          })
-                        }
-                      >
-                        {m.source === "override" ? (
-                          <HStack gap={1}>
-                            <RotateCcw size={12} />
-                            <Text>revert</Text>
-                          </HStack>
-                        ) : (
-                          <X size={14} />
+                    </HStack>
+                  ))}
+                </Box>
+              )}
+
+              {/* Project-level access */}
+              {projectLevel.length > 0 && (
+                <Box mt={3}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="fg.subtle"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    mb={2}
+                  >
+                    Project-level access
+                  </Text>
+                  {projectLevel.map((m, i) => (
+                    <HStack key={i} py={1} fontSize="sm">
+                      <MemberAvatar name={m.name} image={m.image} size="xs" />
+                      <Box flex={1}>
+                        <Text display="inline">{m.name}</Text>
+                        {m.source === "override" && m.teamRole && (
+                          <Text as="span" fontSize="xs" color="fg.subtle" ml={2}>
+                            team role: {m.teamRole}
+                          </Text>
                         )}
-                      </Button>
-                    )}
-                  </HStack>
-                ))}
-              </Box>
-            )}
+                      </Box>
+                      {m.source === "override" && (
+                        <Badge colorPalette="orange" size="sm">
+                          override
+                        </Badge>
+                      )}
+                      <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                        {m.role}
+                      </Badge>
+                      {canManage && m.bindingId && (
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          color={m.source === "override" ? "accent.fg" : "fg.subtle"}
+                          title={
+                            m.source === "override"
+                              ? "Remove override, revert to team role"
+                              : "Remove project access"
+                          }
+                          loading={revokeGrant.isPending}
+                          onClick={() =>
+                            revokeGrant.mutate({
+                              organizationId,
+                              grantId: m.bindingId!,
+                            })
+                          }
+                        >
+                          {m.source === "override" ? (
+                            <HStack gap={1}>
+                              <RotateCcw size={12} />
+                              <Text>revert</Text>
+                            </HStack>
+                          ) : (
+                            <X size={14} />
+                          )}
+                        </Button>
+                      )}
+                    </HStack>
+                  ))}
+                </Box>
+              )}
 
-            {/* Empty state */}
-            {projectLevel.length === 0 && inherited.length > 0 && (
-              <Text fontSize="xs" color="fg.subtle" fontStyle="italic" mt={2}>
-                No project-level overrides. Everyone uses their team role.
-              </Text>
-            )}
+              {/* Empty state */}
+              {projectLevel.length === 0 && inherited.length > 0 && (
+                <Text fontSize="xs" color="fg.subtle" fontStyle="italic" mt={2}>
+                  No project-level overrides. Everyone uses their team role.
+                </Text>
+              )}
 
-            {/* Add actions */}
-            {canManage && (
-              <HStack mt={3} gap={2} flexWrap="wrap">
-                <Button size="xs" variant="outline" onClick={() => setAddingPerson(true)}>
-                  <Plus size={12} />
-                  Add person to this project
-                </Button>
-              </HStack>
-            )}
-          </Box>
-        )}
+              {/* Add actions */}
+              {canManage && (
+                <HStack mt={3} gap={2} flexWrap="wrap">
+                  <Button size="xs" variant="outline" onClick={() => setAddingPerson(true)}>
+                    <Plus size={12} />
+                    Add person to this project
+                  </Button>
+                </HStack>
+              )}
+            </Box>
+          )}
+        </Card>
       </Box>
 
       {addingPerson && (
@@ -767,6 +767,30 @@ function TeamMemberRoleControls({
   );
 }
 
+const TEAMS_DOCS_HREF = "https://langwatch.ai/docs/platform/members-and-teams";
+
+function EmptyTeamMembers({ canManage, onAdd }: { canManage: boolean; onAdd: () => void }) {
+  return (
+    <NoDataInfoBlock
+      size="line"
+      title="No members yet."
+      action={canManage ? { label: "Add a member", onClick: onAdd } : void 0}
+      next={[{ kind: "docs", label: "How team access works", href: TEAMS_DOCS_HREF }]}
+    />
+  );
+}
+
+function EmptyTeamProjects({ canCreate, onCreate }: { canCreate: boolean; onCreate: () => void }) {
+  return (
+    <NoDataInfoBlock
+      size="line"
+      title="No projects yet."
+      action={canCreate ? { label: "Create a project", onClick: onCreate } : void 0}
+      next={[{ kind: "docs", label: "How projects and teams relate", href: TEAMS_DOCS_HREF }]}
+    />
+  );
+}
+
 function TeamCard({
   team,
   organizationId,
@@ -809,7 +833,7 @@ function TeamCard({
 
   return (
     <>
-      <Card.Root overflow="hidden">
+      <Card padding="none">
         {/* Team header */}
         <HStack
           px={4}
@@ -851,7 +875,7 @@ function TeamCard({
         </HStack>
 
         {expanded && (
-          <Card.Body pt={0} borderTopWidth="1px">
+          <Box padding={5} paddingTop={0} borderTopWidth="1px">
             {/* ── Team members (team-scoped grants, editable) ── */}
             <Box mt={4}>
               <HStack mb={3}>
@@ -881,9 +905,7 @@ function TeamCard({
               </HStack>
 
               {team.directMembers.length === 0 ? (
-                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
-                  No members yet.
-                </Text>
+                <EmptyTeamMembers canManage={canManage} onAdd={() => setAddingMember(true)} />
               ) : (
                 team.directMembers.map((m, i, arr) => (
                   <HStack
@@ -1005,9 +1027,10 @@ function TeamCard({
                 )}
               </HStack>
               {team.projects.length === 0 ? (
-                <Text fontSize="sm" color="fg.subtle" fontStyle="italic">
-                  No projects yet.
-                </Text>
+                <EmptyTeamProjects
+                  canCreate={host.hasPermission("project:create")}
+                  onCreate={() => openDrawer(CreateProjectDrawerToken, { defaultTeamId: team.id })}
+                />
               ) : (
                 team.projects.map((proj) => (
                   <ProjectSection
@@ -1022,9 +1045,9 @@ function TeamCard({
                 ))
               )}
             </Box>
-          </Card.Body>
+          </Box>
         )}
-      </Card.Root>
+      </Card>
 
       {addingMember && (
         <AddToTeamDialog
@@ -1060,7 +1083,7 @@ export default function TeamsScreen() {
     <VStack gap={6} width="full" align="start">
       <HStack width="full">
         <Box>
-          <Heading size="md">Teams &amp; Projects</Heading>
+          <Heading size="sm">Teams and projects</Heading>
           <Text fontSize="sm" color="fg.subtle" mt={1}>
             People on a team inherit access to all its projects. Expand a project to add overrides
             or direct access.
@@ -1088,9 +1111,32 @@ export default function TeamsScreen() {
         )}
       </HStack>
 
-      {teams.isLoading && <Spinner />}
+      {teams.isLoading && <SkeletonRows rows={3} />}
 
-      {teams.data?.length === 0 && <Text color="fg.subtle">No teams yet.</Text>}
+      {teams.data?.length === 0 && (
+        <NoDataInfoBlock
+          size="inline"
+          icon={<Users size={24} />}
+          title="No teams yet"
+          description="Create a team to group people and the projects they work on."
+          primaryAction={
+            canManage ? (
+              <Button size="sm" onClick={() => openDrawer(CreateTeamDrawerToken)}>
+                Create a team
+              </Button>
+            ) : (
+              void 0
+            )
+          }
+          next={[
+            {
+              kind: "docs",
+              label: "How teams work",
+              href: "https://langwatch.ai/docs/platform/members-and-teams",
+            },
+          ]}
+        />
+      )}
 
       <VStack gap={3} width="full" align="stretch">
         {teams.data?.map((team) => (

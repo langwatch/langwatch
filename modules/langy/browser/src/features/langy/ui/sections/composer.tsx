@@ -261,8 +261,8 @@ function ComposerImpl({
       flexShrink={0}
       css={{
         "@media (max-height: 520px)": {
-          paddingTop: "8px",
-          paddingBottom: "8px",
+          paddingTop: "2",
+          paddingBottom: "2",
         },
       }}
     >
@@ -773,9 +773,7 @@ function SigilButton({
           borderWidth="1px"
           borderStyle="solid"
           borderColor="border.emphasized"
-          fontFamily="mono"
-          fontSize="10px"
-          lineHeight="1"
+          textStyle="monoSm"
         >
           {sigil}
         </chakra.span>
@@ -882,7 +880,7 @@ function ContextSummaryMenu({
                   {...spotlight(chip)}
                 >
                   <HStack gap={2.5} width="full" align="start">
-                    <Box color="orange.fg" display="grid" paddingTop="2px">
+                    <Box color="orange.fg" display="grid" paddingTop="0.5">
                       <Icon size={13} />
                     </Box>
                     <Box minWidth={0} flex={1}>

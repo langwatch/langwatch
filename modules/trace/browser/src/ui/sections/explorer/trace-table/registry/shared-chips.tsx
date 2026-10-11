@@ -102,7 +102,7 @@ function NoVerdictBadge({ label, icon: Icon }: { label: string; icon: IconType }
       <Icon size={10} />
       <Text
         textStyle="2xs"
-        fontWeight="bold"
+        fontWeight="semibold"
         color="fg.muted"
         letterSpacing="0.04em"
         lineHeight="1.2"

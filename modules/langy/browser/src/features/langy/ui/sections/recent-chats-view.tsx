@@ -1,15 +1,15 @@
+import { LoadMore } from "@langwatch/design-system/load-more";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
-  Button,
   chakra,
   HStack,
   IconButton,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LangyConversationListItemDto } from "@langwatch/langy-contract";
 /**
@@ -202,25 +202,22 @@ function OlderChats({
 }) {
   if (history.hasNextPage) {
     return (
-      <Box paddingX={pad} paddingY={2}>
-        <Button
-          width="full"
-          size="xs"
-          variant="ghost"
-          color="fg.muted"
-          disabled={history.isFetchingNextPage}
-          onClick={() => void history.fetchNextPage()}
+      <Box paddingX={pad}>
+        <LoadMore
+          hasMore
+          loading={history.isFetchingNextPage}
+          onLoadMore={() => void history.fetchNextPage()}
+          label="Load older chats"
           aria-label="Load older conversations"
-        >
-          {history.isFetchingNextPage ? <Spinner size="xs" /> : "Load older chats"}
-        </Button>
+          appearance="compact"
+        />
       </Box>
     );
   }
   if (!history.isFetchingNextPage) return null;
   return (
     <HStack justify="center" paddingY={2} aria-label="Loading older conversations">
-      <Spinner size="xs" />
+      <SkeletonRows rows={1} />
     </HStack>
   );
 }
@@ -321,11 +318,8 @@ export function RecentChatsView({
       {searchable ? <ChatSearch pad={pad} query={query} onQueryChange={setQuery} /> : null}
 
       {isLoading ? (
-        <HStack gap={2} paddingX={pad} paddingY={1.5} aria-label="Loading recent conversations">
-          <Spinner size="xs" />
-          <Text textStyle="xs" color="fg.muted">
-            Loading…
-          </Text>
+        <HStack paddingX={pad} paddingY={1.5} aria-label="Loading recent conversations">
+          <SkeletonRows rows={3} />
         </HStack>
       ) : null}
 
@@ -556,8 +550,7 @@ function ChatRowTitleButton({
         <Box
           as="span"
           display="block"
-          fontSize="13px"
-          lineHeight="1.25"
+          textStyle="bodySm"
           fontWeight={isActive ? "600" : undefined}
           color={item.untitled ? "fg.muted" : "fg"}
           fontStyle={item.untitled ? "italic" : undefined}

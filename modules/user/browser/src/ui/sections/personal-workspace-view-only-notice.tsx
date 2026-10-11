@@ -1,4 +1,4 @@
-import { Alert } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
 import { Eye } from "lucide-react";
 
 import { useLiteMemberGuard } from "../../behavior/personal-workspace-session.ts";
@@ -12,16 +12,13 @@ export function PersonalWorkspaceViewOnlyNotice() {
   if (!isLiteMember) return null;
 
   return (
-    <Alert.Root status="neutral" data-testid="personal-workspace-view-only-notice">
-      <Alert.Indicator>
-        <Eye />
-      </Alert.Indicator>
-      <Alert.Content>
-        <Alert.Description>
-          Your organization gives you view-only access, so you can read your workspace but not add
-          to it. Ask an organization admin if you need to change something here.
-        </Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner
+      status="info"
+      icon={<Eye size={16} aria-hidden />}
+      data-testid="personal-workspace-view-only-notice"
+    >
+      Your organization gives you view-only access, so you can read your workspace but not add to
+      it. Ask an organization admin if you need to change something here.
+    </Banner>
   );
 }

@@ -16,6 +16,7 @@ import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 
 import { useRunUntilHereDialogStore } from "../../behavior/use-run-until-here-dialog-store.ts";
+import { WAITING_FOR_ENGINE, useIsStudioConnected } from "../../behavior/use-studio-connected.ts";
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
 
@@ -86,6 +87,7 @@ export function ComponentExecutionButton({
   const { startComponentExecution, stopComponentExecution } = useComponentExecution();
 
   const openRunUntilHereDialog = useRunUntilHereDialogStore((state) => state.open);
+  const isConnected = useIsStudioConnected();
 
   const [isWaitingLong] = useDebounceValue(node?.data.execution_state?.status === "waiting", 600);
 
@@ -115,8 +117,8 @@ export function ComponentExecutionButton({
           minHeight="24px"
           maxWidth="24px"
           maxHeight="24px"
-          marginRight="-4px"
-          marginLeft="-4px"
+          marginRight="-1"
+          marginLeft="-1"
           data-testid="workflow-node-execution-status"
           data-status={executionStatus ?? "idle"}
           role={shouldOpenExecutionResults ? "button" : void 0}
@@ -131,7 +133,7 @@ export function ComponentExecutionButton({
           }}
         >
           {isWaitingLong && executionStatus === "waiting" && (
-            <Box marginLeft="-4px" marginRight="-4px">
+            <Box marginLeft="-1" marginRight="-1">
               <PulseLoader size={2} speedMultiplier={0.5} />
             </Box>
           )}
@@ -160,35 +162,41 @@ export function ComponentExecutionButton({
         </IconButton>
       )}
       {showRunButton && (
-        <IconButton
-          aria-label="Run node"
-          variant="ghost"
-          size="xs"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            if (node) startComponentExecution({ node });
-          }}
-        >
-          <Play size={iconSize} />
-        </IconButton>
+        <Tooltip content={WAITING_FOR_ENGINE} disabled={isConnected} showArrow>
+          <IconButton
+            aria-label="Run node"
+            variant="ghost"
+            size="xs"
+            disabled={!isConnected}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (node) startComponentExecution({ node });
+            }}
+          >
+            <Play size={iconSize} />
+          </IconButton>
+        </Tooltip>
       )}
       {showRunMenu && (
         <Menu.Root positioning={{ placement: "top-start" }}>
-          <Menu.Trigger asChild>
-            <IconButton
-              aria-label="Run node options"
-              variant="ghost"
-              size="xs"
-              paddingX={2}
-              data-testid="workflow-node-run-menu"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              {...props}
-            >
-              <Play size={iconSize} />
-            </IconButton>
-          </Menu.Trigger>
+          <Tooltip content={WAITING_FOR_ENGINE} disabled={isConnected} showArrow>
+            <Menu.Trigger asChild>
+              <IconButton
+                aria-label="Run node options"
+                variant="ghost"
+                size="xs"
+                paddingX={2}
+                data-testid="workflow-node-run-menu"
+                disabled={!isConnected}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                {...props}
+              >
+                <Play size={iconSize} />
+              </IconButton>
+            </Menu.Trigger>
+          </Tooltip>
           <Menu.Content>
             <Menu.Item value="run-manual" onClick={() => node && startComponentExecution({ node })}>
               <Play size={14} />

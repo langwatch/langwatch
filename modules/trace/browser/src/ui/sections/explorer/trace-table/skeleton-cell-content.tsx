@@ -74,7 +74,7 @@ export const SkeletonAddonRow: React.FC<SkeletonAddonRowProps> = ({ rowIdx }) =>
   const inputWidth = widthFor(rowIdx, 1, 0);
   const outputWidth = widthFor(rowIdx, 2, 0);
   return (
-    <Flex direction="column" gap="6px" paddingY={1}>
+    <Flex direction="column" gap="1.5" paddingY={1}>
       <Skeleton
         height={SKELETON_BAR_HEIGHT}
         width={inputWidth}

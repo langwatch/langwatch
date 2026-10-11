@@ -133,8 +133,8 @@ export function WorkbenchHeaderFiller({
   if (!hasTargets) {
     return (
       <th colSpan={2} style={{ width: `calc(${DRAWER_WIDTH}px + ${TARGET_COL_DEFAULT_PCT}%)` }}>
-        <Link fontSize="xs" color="fg.subtle" fontStyle="italic" onClick={onAddClick}>
-          Click "+ Add" above to get started
+        <Link textStyle="caption" color="fg.muted" onClick={onAddClick}>
+          Add a prompt or agent to compare its outputs
         </Link>
       </th>
     );

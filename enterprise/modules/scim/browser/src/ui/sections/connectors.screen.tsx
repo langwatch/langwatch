@@ -5,24 +5,17 @@
  * it is a list of its own beside the identity provider's page.
  */
 import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
-import {
-  SectionNavigationFrame,
-  type SectionNavigationLink,
-} from "@langwatch/design-system/section-navigation-frame";
-import { KeyRound, Plug, ShieldCheck } from "lucide-react";
+import { PageLayout, type PageTab } from "@langwatch/design-system/page-layout";
+import { Box } from "@langwatch/design-system/primitives";
 
 import { useScimHost } from "../../model/scim-host.ts";
 import { ScimSettingsContent } from "./scim.screen.tsx";
 
-/** Main's rail across the three Authentication pages (ARCHITECTURE.md §10). */
-const AUTHENTICATION_LINKS: readonly SectionNavigationLink[] = [
-  { label: "Overview", href: "/settings/authentication", icon: <ShieldCheck size={14} /> },
-  {
-    label: "Identity provider",
-    href: "/settings/authentication/provider",
-    icon: <KeyRound size={14} />,
-  },
-  { label: "Connectors", href: "/settings/authentication/connectors", icon: <Plug size={14} /> },
+/** The three Authentication pages, as header tabs (ARCHITECTURE.md §10). */
+const AUTHENTICATION_TABS: readonly PageTab[] = [
+  { label: "Overview", href: "/settings/authentication" },
+  { label: "Identity provider", href: "/settings/authentication/provider" },
+  { label: "Connectors", href: "/settings/authentication/connectors" },
 ];
 
 export default function ConnectorsScreen() {
@@ -33,18 +26,21 @@ export default function ConnectorsScreen() {
 
   return (
     <>
-      <SectionNavigationFrame
-        label="Authentication"
-        pageTitle="Connectors"
-        links={AUTHENTICATION_LINKS}
-        activeHref="/settings/authentication/connectors"
-        onNavigate={(href) => navigation?.navigate(href)}
-      >
+      <PageLayout.Header>
+        <PageLayout.Heading>Authentication</PageLayout.Heading>
+        <PageLayout.Tabs
+          label="Authentication pages"
+          tabs={AUTHENTICATION_TABS}
+          activeHref="/settings/authentication/connectors"
+          onNavigate={(href) => navigation?.navigate(href)}
+        />
+      </PageLayout.Header>
+      <Box paddingTop={4}>
         <ScimSettingsContent
           organizationId={organizationId}
           lede="Your identity provider creates, updates and removes people here on its own, over SCIM."
         />
-      </SectionNavigationFrame>
+      </Box>
     </>
   );
 }

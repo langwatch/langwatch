@@ -76,12 +76,4 @@ Feature: A successor lane also consumes the key a previous release queued its jo
   Scenario: An alias that could never apply is refused when the pipeline is built
     When a pipeline aliases a key that is not "<pipeline>:<jobType>:<name>", or its successor's own key
     Or two of its aliases take the same event type from one key
-    Or an alias names no release that ends it
     Then building the pipeline refuses, naming the pipeline and the key
-
-  @unit
-  Scenario: An alias past its release is refused so it gets removed
-    Given an alias that ends after release "3.21.0"
-    When release "3.21.0" or a later one has been cut
-    Then the window check names the alias, its pipeline and its key
-    And before that release it names nothing

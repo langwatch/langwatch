@@ -4,9 +4,11 @@ import { Lent } from "@langwatch/browser-host/lent";
 import {
   LlmConfigFieldToken,
   OutputsSectionToken,
+  VariablesSectionToken,
   StudioPromptEditorToken,
   type LlmConfigFieldProps,
   type OutputsSectionProps,
+  type VariablesSectionProps,
   type StudioPromptEditorProps,
 } from "@langwatch/prompt-client";
 
@@ -23,4 +25,9 @@ export function LLMConfigField(props: LlmConfigFieldProps) {
 /** Prompt's outputs editor. */
 export function OutputsSection(props: OutputsSectionProps) {
   return <Lent of={OutputsSectionToken} props={props} />;
+}
+
+/** Prompt's variables editor, with mappings to the studio's sources. */
+export function VariablesSection(props: VariablesSectionProps) {
+  return <Lent of={VariablesSectionToken} props={props} />;
 }

@@ -12,6 +12,7 @@ import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { Card } from "@langwatch/design-system/card";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -155,30 +156,27 @@ export function SandboxedChartFrame({
   // Push dashboard context updates into the live frame without re-mounting it.
   useEffect(() => {
     initialDashboardContextRef.current = dashboardContext;
-    bridgeRef.current?.postDashboardContextChange(withThemeColors(dashboardContext));
+    // The theme's classes land after this commit; read the colours once they have.
+    const frame = requestAnimationFrame(() => {
+      bridgeRef.current?.postDashboardContextChange(withThemeColors(dashboardContext));
+    });
+    return () => cancelAnimationFrame(frame);
   }, [dashboardContext]);
 
   if (restart.status !== "running") {
     return (
-      <VStack
-        align="center"
-        justify="center"
-        minHeight="120px"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-        gap={2}
-        padding={4}
-      >
-        <Text fontSize="13px" color="fg.muted">
-          {restart.status === "exhausted"
-            ? `Restarted ${FRAME_RESTART_MAX_ATTEMPTS} times, still not responding.`
-            : "The chart stopped responding. Restarting…"}
-        </Text>
-        <Button size="sm" onClick={restart.restartNow}>
-          Restart
-        </Button>
-      </VStack>
+      <Card variant="frame">
+        <VStack align="center" justify="center" minHeight="120px" gap={2}>
+          <Text textStyle="bodySm" color="fg.muted">
+            {restart.status === "exhausted"
+              ? `Restarted ${FRAME_RESTART_MAX_ATTEMPTS} times, still not responding.`
+              : "The chart stopped responding. Restarting…"}
+          </Text>
+          <Button size="sm" onClick={restart.restartNow}>
+            Restart
+          </Button>
+        </VStack>
+      </Card>
     );
   }
 

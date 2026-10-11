@@ -148,7 +148,7 @@ Rule: Toolbar strip
   @unimplemented
   Scenario: Toolbar renders the expected controls
     Then the toolbar shows lens tabs flushed left
-    And the right cluster includes (in order): tour button, live indicator, time range picker, columns dropdown, grouping selector, density toggle, find button, keyboard shortcuts button
+    And the right side holds two clusters: filters, save view, time range picker, live indicator, grouping select, density toggle; then columns dropdown, export, tour button and a More menu (automate, keyboard shortcuts)
     And the toolbar row is 36px minimum height
 
   @integration
@@ -157,7 +157,7 @@ Rule: Toolbar strip
 
   @integration
   Scenario: Grouping selector shows checkmark on selected item
-    When the user opens the grouping dropdown
+    When the user opens the grouping select
     Then the selected grouping has a checkmark (not a radio circle)
 
   @integration
@@ -793,6 +793,13 @@ Rule: Density toggle
     Then rows are approximately 44px tall
     And font size is 14px
     And padding is generous
+
+  @integration
+  Scenario: Density toggle shows both densities at once
+    Then the toolbar shows a "Compact" and a "Comfortable" segment, each with an icon and label
+    And hovering a segment explains what that density shows and that D switches it
+    And clicking a segment switches the table's density in one click
+    And the labels drop to icons only while the toolbar is too narrow
 
   @unit
   Scenario: Density preference persists across sessions

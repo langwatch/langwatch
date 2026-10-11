@@ -134,43 +134,43 @@ Contract `../contract/src/license-registry.trpc.ts:34`, router `src/transport/li
 
 ```typescript
 // licenseRegistry.getAll
-// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:7
+// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:18
 interface Input {
   page?: number;
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:79
+type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:88
 
 // licenseRegistry.getById
-// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:13
+// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:22
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.issue
-type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:16
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:104
+type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:37
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:122
 
 // licenseRegistry.registerLegacy
-// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:29
+// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:48
 interface Input {
   licenseKey: string;
   organizationId: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.revoke
-// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:34
+// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:58
 interface Input {
   id: string;
   reason: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.reissue
-// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:39
+// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:72
 interface Input {
   id: string;
   maxMembers?: number;
@@ -178,22 +178,22 @@ interface Input {
   maxMessagesPerMonth?: number;
   expiresAt: string;
 }
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:104
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:122
 
 // licenseRegistry.changeSeats
-// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:48
+// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:82
 interface Input {
   id: string;
   maxMembers: number;
 }
-type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:118
+type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:139
 
 // licenseRegistry.resetInstanceBinding
-type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:13
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:22
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.updateTerms
-// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:53
+// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:92
 interface Input {
   id: string;
   services?: ("instant_evals" | "managed_models")[];
@@ -203,27 +203,27 @@ interface Input {
   overageEnabled?: boolean;
   overageMaxUsdCents?: number | null;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.linkToOrganization
-// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:58
+// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:102
 interface Input {
   id: string;
   organizationId: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.activationCodes
-// Input: listActivationCodesInputSchema, ../../licensing/contract/src/activation-code.ts:46
+// Input: listActivationCodesInputSchema, ../../licensing/contract/src/activation-code.ts:68
 interface Input {
   page?: number;
   pageSize?: number;
   organizationId?: string;
 }
-type Output = z.infer<typeof activationCodePageSchema>; // ../../licensing/contract/src/activation-code.ts:40
+type Output = z.infer<typeof activationCodePageSchema>; // ../../licensing/contract/src/activation-code.ts:56
 
 // licenseRegistry.issueActivationCode
-// Input: issueActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:53
+// Input: issueActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:88
 interface Input {
   organizationId: string;
   organizationName: string;
@@ -236,14 +236,14 @@ interface Input {
   expiresAt: string;
   reusable?: boolean;
 }
-type Output = z.infer<typeof issuedActivationCodeSchema>; // ../../licensing/contract/src/activation-code.ts:73
+type Output = z.infer<typeof issuedActivationCodeSchema>; // ../../licensing/contract/src/activation-code.ts:109
 
 // licenseRegistry.revokeActivationCode
-// Input: revokeActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:70
+// Input: revokeActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:98
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contract/src/activation-code.ts:13
+type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contract/src/activation-code.ts:45
 ```
 
 ### `selfHostedInstances`
@@ -257,20 +257,20 @@ Contract `../contract/src/license-registry.trpc.ts:91`, router `src/transport/se
 
 ```typescript
 // selfHostedInstances.getAll
-// Input: listSelfHostedInstancesInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:64
+// Input: listSelfHostedInstancesInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:84
 interface Input {
   page?: number;
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof selfHostedInstancePageSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:58
+type Output = z.infer<typeof selfHostedInstancePageSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:72
 
 // selfHostedInstances.getById
-// Input: selfHostedInstanceIdInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:70
+// Input: selfHostedInstanceIdInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:91
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof selfHostedInstanceDetailSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:81
+type Output = z.infer<typeof selfHostedInstanceDetailSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:115
 ```
 
 ## Sockets

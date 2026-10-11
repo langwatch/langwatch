@@ -26,7 +26,11 @@ Feature: Webhook settings and the billing events ledger
     @integration
     Scenario: Saving requires a URL and at least one selected event
       Given an empty URL and no selected events
-      Then the save action is disabled
+      Then the save action is enabled
+      When the save action is pressed
+      Then each missing or out-of-range field shows an error naming what to fix
+      And the first of them is focused
+      And nothing is sent
 
   Rule: The drawer asks for the destination before it asks for its address
 
@@ -46,7 +50,11 @@ Feature: Webhook settings and the billing events ledger
     @integration
     Scenario: A queue endpoint saves only once its queue URL is filled in
       Given the drawer is open with Amazon SQS chosen and events selected
-      Then the save action is disabled until a queue URL is entered
+      Then the save action is enabled
+      When the save action is pressed without a queue URL
+      Then the queue URL field shows an error and is focused
+      And nothing is sent
+      And once a queue URL is entered the save is sent
 
     @integration
     Scenario: The list says where each endpoint delivers

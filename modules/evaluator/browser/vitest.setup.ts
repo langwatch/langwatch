@@ -5,13 +5,29 @@
  */
 
 import "@testing-library/jest-dom/vitest";
+import {
+  installTestColourVariables,
+  type TestColourVariables,
+} from "@langwatch/design-system/testing";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, beforeEach } from "vitest";
+
+let colours: TestColourVariables | undefined;
+
+// jsdom ignores the provider's layered token CSS, so a raw-colour reader needs the
+// variables installed for each test and removed after the tree unmounts.
+beforeEach(() => {
+  colours = installTestColourVariables();
+});
 
 // Auto-cleanup only registers itself when a global afterEach exists at import
 // time; this package runs without vitest globals, so an explicit hook is what
 // keeps one test's rendered tree out of the next test's queries.
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  colours?.dispose();
+  colours = void 0;
+});
 
 if (typeof window !== "undefined") {
   if (!window.matchMedia) {

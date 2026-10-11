@@ -1,5 +1,5 @@
 import { ActivityTimeline } from "@langwatch/design-system/activity-timeline";
-import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Alert,
@@ -20,7 +20,6 @@ import { useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
-import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import {
   identifierStateLabel,
   identityFactLabel,
@@ -53,73 +52,61 @@ export function IdentityLookupDrawer({
   const contentRef = useRef<HTMLDivElement>(null);
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!userId}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-      size="2xl"
+      onClose={onClose}
+      size="detail"
+      title={held?.person.name ?? held?.person.email ?? "Person details"}
+      eyebrow={{ label: "Person", icon: <UserRound size={20} /> }}
+      subtitle={held?.person.email ?? address}
+      contentRef={contentRef}
       initialFocusEl={() => contentRef.current}
     >
-      <Drawer.Content ref={contentRef} tabIndex={-1} width="calc(100vw - 16px)">
-        <Drawer.Header borderBottomWidth="1px" borderColor="border.muted" padding={6}>
-          <DetailDrawerHeader
-            kind="Person"
-            icon={<UserRound size={20} />}
-            title={held?.person.name ?? held?.person.email ?? "Person details"}
+      {detail.error && (
+        <VStack align="stretch" gap={4}>
+          <Alert.Root status="error" role="alert">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Couldn't load this person</Alert.Title>
+              <Alert.Description>
+                The person's details are unavailable. Try again.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <Button
+            alignSelf="start"
+            variant="outline"
+            loading={detail.isFetching}
+            onClick={() => void detail.refetch()}
           >
-            {held?.person.email ?? address}
-          </DetailDrawerHeader>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body padding={6}>
-          {detail.error && (
-            <VStack align="stretch" gap={4}>
-              <Alert.Root status="error" role="alert">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Title>Couldn't load this person</Alert.Title>
-                  <Alert.Description>
-                    The person's details are unavailable. Try again.
-                  </Alert.Description>
-                </Alert.Content>
-              </Alert.Root>
-              <Button
-                alignSelf="start"
-                variant="outline"
-                loading={detail.isFetching}
-                onClick={() => void detail.refetch()}
-              >
-                Try again
-              </Button>
-            </VStack>
-          )}
-          {!detail.error && !held && address.length > 0 && (
-            <VStack align="stretch" gap={4} as="output" aria-label="Loading person details">
-              <Text color="fg.muted" fontSize="sm">
-                Loading person details…
-              </Text>
-              <Skeleton height="24" />
-              <Skeleton height="32" />
-              <Skeleton height="32" />
-            </VStack>
-          )}
-          {!detail.error && !held && !address && (
-            <Text color="fg.muted">
-              Close this panel and enter an email address to load this person.
-            </Text>
-          )}
-          {!detail.error && held && (
-            <VStack align="stretch" gap={6}>
-              <PersonFacts person={held.person} />
-              <MethodsPanel detail={held} canRepair={canRepair} userId={held.person.userId} />
-              <WaitingPanel detail={held} canRepair={canRepair} userId={held.person.userId} />
-              <HistoryPanel history={held.history} />
-            </VStack>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+            Try again
+          </Button>
+        </VStack>
+      )}
+      {!detail.error && !held && address.length > 0 && (
+        <VStack align="stretch" gap={4} as="output" aria-label="Loading person details">
+          <Text color="fg.muted" fontSize="sm">
+            Loading person details…
+          </Text>
+          <Skeleton height="24" />
+          <Skeleton height="32" />
+          <Skeleton height="32" />
+        </VStack>
+      )}
+      {!detail.error && !held && !address && (
+        <Text color="fg.muted">
+          Close this panel and enter an email address to load this person.
+        </Text>
+      )}
+      {!detail.error && held && (
+        <VStack align="stretch" gap={6}>
+          <PersonFacts person={held.person} />
+          <MethodsPanel detail={held} canRepair={canRepair} userId={held.person.userId} />
+          <WaitingPanel detail={held} canRepair={canRepair} userId={held.person.userId} />
+          <HistoryPanel history={held.history} />
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 
@@ -226,44 +213,27 @@ function RemoveMethodDialog({
   onConfirm: (identifierId: string) => void;
 }) {
   return (
-    <Dialog.Root
+    <Dialog
       open={identifierId !== null}
-      onOpenChange={({ open }) => {
-        if (!open) onCancel();
+      onClose={onCancel}
+      title={repairConfirmationTitle({
+        verb: "Remove a sign-in method",
+        personName: personName ?? "",
+        organizationName: organizationName ?? "",
+      })}
+      primaryAction={{
+        label: "Remove",
+        danger: true,
+        onClick: () => {
+          if (identifierId) onConfirm(identifierId);
+        },
       }}
     >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>
-            {repairConfirmationTitle({
-              verb: "Remove a sign-in method",
-              personName: personName ?? "",
-              organizationName: organizationName ?? "",
-            })}
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Text>
-            {personName} will no longer be able to sign in with this method. If it is their last way
-            in, or the last one we could reach them at, the removal is refused and nothing changes.
-          </Text>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="red"
-            onClick={() => {
-              if (identifierId) onConfirm(identifierId);
-            }}
-          >
-            Remove
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <Text>
+        {personName} will no longer be able to sign in with this method. If it is their last way in,
+        or the last one we could reach them at, the removal is refused and nothing changes.
+      </Text>
+    </Dialog>
   );
 }
 

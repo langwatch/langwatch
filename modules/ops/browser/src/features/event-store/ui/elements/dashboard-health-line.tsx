@@ -1,4 +1,5 @@
-import { Card, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { CheckCircle2 } from "lucide-react";
 
 export interface HealthLineProps {
@@ -13,7 +14,7 @@ export function HealthLine({ errorClusterCount, anomalyCount, anomaliesKnown }: 
   if (errorClusterCount > 0 || anomalyCount > 0 || !anomaliesKnown) return null;
 
   return (
-    <Card.Root overflow="hidden" borderColor="border.muted" boxShadow="none">
+    <Card padding="none">
       <HStack paddingX={4} paddingY={2} gap={2} data-testid="ops-health-line">
         <Icon color="green.fg" boxSize={3.5}>
           <CheckCircle2 />
@@ -22,6 +23,6 @@ export function HealthLine({ errorClusterCount, anomalyCount, anomaliesKnown }: 
           No errors and no anomalous tenants
         </Text>
       </HStack>
-    </Card.Root>
+    </Card>
   );
 }

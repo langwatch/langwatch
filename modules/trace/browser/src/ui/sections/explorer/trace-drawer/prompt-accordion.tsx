@@ -66,7 +66,7 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
     <VStack align="stretch" gap={3} paddingY={2}>
       {/* Header */}
       <HStack gap={2} paddingX={2}>
-        <Text textStyle="sm" fontWeight="bold" color={displayHandle ? "fg" : "fg.muted"}>
+        <Text textStyle="sm" fontWeight="semibold" color={displayHandle ? "fg" : "fg.muted"}>
           {displayHandle ?? "Prompt (no handle on span)"}
         </Text>
         {ref?.versionNumber != null && (

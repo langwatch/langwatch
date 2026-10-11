@@ -168,6 +168,68 @@ export const analyticsFeedbacksResultSchema: AnalyticsFeedbacksResultSchema =
   analyticsFeedbacksResultSchemaDefinition;
 export type AnalyticsFeedbacksResult = z.infer<typeof analyticsFeedbacksResultSchema>;
 
+/** Page size when a feedbacks page read names none, and the most one page may carry. */
+export const ANALYTICS_FEEDBACKS_PAGE_DEFAULT_LIMIT = 50;
+export const ANALYTICS_FEEDBACKS_PAGE_MAX_LIMIT = 100;
+
+/**
+ * Where a feedbacks page stopped. A feedback is one entry of a span's event arrays, so the
+ * four parts are its persisted identity; timestamp alone ties and trace id alone repeats.
+ */
+const analyticsFeedbackPositionSchemaDefinition = z
+  .object({
+    startedAt: z.number().int().nonnegative(),
+    traceId: z.string().min(1),
+    spanId: z.string().min(1),
+    eventIndex: z.number().int().positive(),
+  })
+  .strict();
+export interface AnalyticsFeedbackPositionSchema extends Named<
+  typeof analyticsFeedbackPositionSchemaDefinition
+> {}
+export const analyticsFeedbackPositionSchema: AnalyticsFeedbackPositionSchema =
+  analyticsFeedbackPositionSchemaDefinition;
+export type AnalyticsFeedbackPosition = z.infer<typeof analyticsFeedbackPositionSchema>;
+
+/** What a page hands back for the next one; `scope` ties it to its project and filters. */
+const analyticsFeedbacksCursorSchemaDefinition = z
+  .object({ scope: z.string().min(1), after: analyticsFeedbackPositionSchema })
+  .strict();
+export interface AnalyticsFeedbacksCursorSchema extends Named<
+  typeof analyticsFeedbacksCursorSchemaDefinition
+> {}
+export const analyticsFeedbacksCursorSchema: AnalyticsFeedbacksCursorSchema =
+  analyticsFeedbacksCursorSchemaDefinition;
+export type AnalyticsFeedbacksCursor = z.infer<typeof analyticsFeedbacksCursorSchema>;
+
+/** The paging half of a feedbacks page read; the other half is the shared filters. */
+const analyticsFeedbacksPageParamsSchemaDefinition = z.object({
+  cursor: analyticsFeedbacksCursorSchema.optional(),
+  limit: z.number().int().min(1).max(ANALYTICS_FEEDBACKS_PAGE_MAX_LIMIT).optional(),
+});
+export interface AnalyticsFeedbacksPageParamsSchema extends Named<
+  typeof analyticsFeedbacksPageParamsSchemaDefinition
+> {}
+export const analyticsFeedbacksPageParamsSchema: AnalyticsFeedbacksPageParamsSchema =
+  analyticsFeedbacksPageParamsSchemaDefinition;
+export type AnalyticsFeedbacksPageParams = z.infer<typeof analyticsFeedbacksPageParamsSchema>;
+
+/** A page of feedbacks, newest first: either the next cursor, or the end of the history. */
+const analyticsFeedbacksPageResultSchemaDefinition = z.discriminatedUnion("hasMore", [
+  z.object({
+    hasMore: z.literal(true),
+    events: z.array(analyticsFeedbackEventSchema),
+    nextCursor: analyticsFeedbacksCursorSchema,
+  }),
+  z.object({ hasMore: z.literal(false), events: z.array(analyticsFeedbackEventSchema) }),
+]);
+export interface AnalyticsFeedbacksPageResultSchema extends Named<
+  typeof analyticsFeedbacksPageResultSchemaDefinition
+> {}
+export const analyticsFeedbacksPageResultSchema: AnalyticsFeedbacksPageResultSchema =
+  analyticsFeedbacksPageResultSchemaDefinition;
+export type AnalyticsFeedbacksPageResult = z.infer<typeof analyticsFeedbacksPageResultSchema>;
+
 const analyticsTopDocumentSchemaDefinition = z.object({
   documentId: z.string(),
   count: z.number(),

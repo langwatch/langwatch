@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
@@ -37,9 +38,7 @@ export function SchedulerRecentActions({
           </Text>
           <Text textStyle="xs">
             {entry.actor ?? "An operator"} {ACTION_LABELS[entry.action] ?? entry.action}{" "}
-            <Text as="span" fontFamily="mono">
-              {entry.scheduleId}
-            </Text>
+            <InlineCode variant="neutral">{entry.scheduleId}</InlineCode>
           </Text>
         </HStack>
       ))}

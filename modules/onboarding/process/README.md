@@ -113,7 +113,7 @@ Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/tr
 Answers at `/api/onboarding/guided`, `/api/v1/onboarding/guided`; also, undocumented, `/api/onboarding/2026-08-07/guided`, `/api/v1/onboarding/2026-08-07/guided`, `/api/onboarding/latest/guided`, `/api/v1/onboarding/latest/guided`.
 
 ```typescript
-type Response = z.infer<typeof guidedStateWithVariantOutputSchema>; // ../contract/src/onboarding.trpc.ts:48
+type Response = z.infer<typeof guidedStateWithVariantOutputSchema>; // ../contract/src/onboarding.trpc.ts:82
 ```
 
 #### `POST /guided/paths/:path/complete` · `postApiOnboardingGuidedPathComplete`
@@ -125,20 +125,20 @@ Permission `project:view`. Hidden from the OpenAPI document. Declared at `src/tr
 Answers at `/api/onboarding/guided/paths/:path/complete`, `/api/v1/onboarding/guided/paths/:path/complete`; also, undocumented, `/api/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/v1/onboarding/2026-08-07/guided/paths/:path/complete`, `/api/onboarding/latest/guided/paths/:path/complete`, `/api/v1/onboarding/latest/guided/paths/:path/complete`.
 
 ```typescript
-// Params: guidedPathRestParamsSchema, ../contract/src/onboarding-schemas.ts:111
+// Params: guidedPathRestParamsSchema, ../contract/src/onboarding-schemas.ts:131
 interface Params {
   path: string;
 }
-// Body: guidedPathCompleteRestInputSchema, ../contract/src/onboarding-schemas.ts:116
+// Body: guidedPathCompleteRestInputSchema, ../contract/src/onboarding-schemas.ts:139
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+type Response = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 ```
 
 ## tRPC transport
 
 ### `integrationsChecks`
 
-Contract `../contract/src/onboarding.trpc.ts:147`, router `src/transport/integrations-checks.trpc.ts:22`.
+Contract `../contract/src/onboarding.trpc.ts:183`, router `src/transport/integrations-checks.trpc.ts:22`.
 
 | Procedure                           | Kind  | Gate                        | Input  | Output                          |
 | ----------------------------------- | ----- | --------------------------- | ------ | ------------------------------- |
@@ -146,16 +146,16 @@ Contract `../contract/src/onboarding.trpc.ts:147`, router `src/transport/integra
 
 ```typescript
 // integrationsChecks.getCheckStatus
-// Input: inline, ../contract/src/onboarding.trpc.ts:149
+// Input: inline, ../contract/src/onboarding.trpc.ts:185
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof integrationsCheckStatusSchema>; // ../contract/src/onboarding.responses.ts:45
+type Output = z.infer<typeof integrationsCheckStatusSchema>; // ../contract/src/onboarding.responses.ts:80
 ```
 
 ### `onboarding`
 
-Contract `../contract/src/onboarding.trpc.ts:91`, router `src/transport/onboarding.trpc.ts:28`.
+Contract `../contract/src/onboarding.trpc.ts:127`, router `src/transport/onboarding.trpc.ts:28`.
 
 | Procedure                           | Kind     | Gate                                                                                                                                                           | Input                                         | Output                                |
 | ----------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------- |
@@ -177,70 +177,70 @@ Contract `../contract/src/onboarding.trpc.ts:91`, router `src/transport/onboardi
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof guidedStateWithVariantOutputSchema>; // ../contract/src/onboarding.trpc.ts:48
+type Output = z.infer<typeof guidedStateWithVariantOutputSchema>; // ../contract/src/onboarding.trpc.ts:82
 
 // onboarding.recordPaths
-// Input: recordPathsInputSchema, ../contract/src/onboarding.trpc.ts:23
+// Input: recordPathsInputSchema, ../contract/src/onboarding.trpc.ts:27
 interface Input {
   organizationId: string;
   paths: string[];
 }
-type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
 // onboarding.recordProvider
-// Input: recordProviderInputSchema, ../contract/src/onboarding.trpc.ts:26
+// Input: recordProviderInputSchema, ../contract/src/onboarding.trpc.ts:36
 interface Input {
   organizationId: string;
   provider: string;
   model: string;
 }
-type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
 // onboarding.recordProviderSkipped
 type Input = z.infer<typeof organizationIdInputSchema>; // ../contract/src/onboarding.trpc.ts:21
-type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
 // onboarding.recordVirtualKeyReveal
-// Input: recordVirtualKeyRevealInputSchema, ../contract/src/onboarding.trpc.ts:30
+// Input: recordVirtualKeyRevealInputSchema, ../contract/src/onboarding.trpc.ts:46
 interface Input {
   organizationId: string;
   name: string;
   preview: string;
   revealId: string;
 }
-type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
 // onboarding.recordTour
-// Input: recordTourInputSchema, ../contract/src/onboarding.trpc.ts:35
+// Input: recordTourInputSchema, ../contract/src/onboarding.trpc.ts:51
 interface Input {
   organizationId: string;
   status: "completed" | "skipped" | "replayed";
 }
-type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
 // onboarding.beginPath
-// Input: guidedPathInputSchema, ../contract/src/onboarding.trpc.ts:38
+// Input: guidedPathInputSchema, ../contract/src/onboarding.trpc.ts:54
 interface Input {
   organizationId: string;
   path: string;
 }
-type Output = z.infer<typeof guidedStateWithInstanceOutputSchema>; // ../contract/src/onboarding.trpc.ts:44
+type Output = z.infer<typeof guidedStateWithInstanceOutputSchema>; // ../contract/src/onboarding.trpc.ts:73
 
 // onboarding.completePath
-type Input = z.infer<typeof guidedPathInputSchema>; // ../contract/src/onboarding.trpc.ts:38
-type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+type Input = z.infer<typeof guidedPathInputSchema>; // ../contract/src/onboarding.trpc.ts:54
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
 // onboarding.attachConversation
-// Input: attachConversationInputSchema, ../contract/src/onboarding.trpc.ts:39
+// Input: attachConversationInputSchema, ../contract/src/onboarding.trpc.ts:62
 interface Input {
   organizationId: string;
   conversationId: string;
 }
-type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:43
+type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboarding.trpc.ts:64
 
 // onboarding.initializeOrganization
-type Input = z.infer<typeof onboardingInitializeOrganizationInputSchema>; // ../contract/src/onboarding.trpc.ts:71
-// Output: organizationInitializedSchema, ../contract/src/onboarding.responses.ts:12
+type Input = z.infer<typeof onboardingInitializeOrganizationInputSchema>; // ../contract/src/onboarding.trpc.ts:118
+// Output: organizationInitializedSchema, ../contract/src/onboarding.responses.ts:27
 interface Output {
   success: true;
   teamSlug: string;
@@ -251,11 +251,11 @@ interface Output {
 }
 
 // onboarding.setIntegrationMethod
-// Input: setIntegrationMethodInputSchema, ../contract/src/onboarding.trpc.ts:87
+// Input: setIntegrationMethodInputSchema, ../contract/src/onboarding.trpc.ts:123
 interface Input {
   integrationMethod: "via-claude-code" | "via-platform" | "via-claude-desktop" | "manually";
 }
-// Output: onboardingWriteAckSchema, ../contract/src/onboarding.responses.ts:25
+// Output: onboardingWriteAckSchema, ../contract/src/onboarding.responses.ts:36
 interface Output {
   success: true;
 }

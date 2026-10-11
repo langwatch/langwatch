@@ -1,10 +1,10 @@
-import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ResourceRow } from "@langwatch/design-system/resource-row";
 import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 import type { AdminSsoConnection } from "@langwatch/enterprise-sso-contract";
-import { Building2, Check, Globe, ShieldCheck, Users } from "lucide-react";
+import { Building2, Check, Globe, Users } from "lucide-react";
 
 import { useAdminOne } from "../../behavior/use-admin-resource.ts";
 import type { AdminUser } from "./users-view.tsx";
@@ -32,15 +32,12 @@ const JOIN_POLICY = {
   refuse: "Existing members only",
 } as const;
 
-export function ConnectionHeader({ connection }: { connection: AdminSsoConnection }) {
+/** The context chips under the drawer title: organization, protocol and state. */
+export function ConnectionHeaderBadges({ connection }: { connection: AdminSsoConnection }) {
   const state = connection.state.replaceAll("_", " ").toLowerCase();
 
   return (
-    <DetailDrawerHeader
-      icon={<ShieldCheck size={14} aria-hidden />}
-      kind="SSO connection"
-      title={connection.providerId}
-    >
+    <>
       <HStack gap={1.5} color="fg.muted" fontSize="sm" minWidth={0}>
         <Building2 size={14} aria-hidden />
         <Text overflowWrap="anywhere">
@@ -54,14 +51,14 @@ export function ConnectionHeader({ connection }: { connection: AdminSsoConnectio
         <Box boxSize="1.5" borderRadius="full" bg="colorPalette.solid" aria-hidden />
         {state.charAt(0).toUpperCase() + state.slice(1)}
       </Badge>
-    </DetailDrawerHeader>
+    </>
   );
 }
 
 export function ConnectionSummary({ connection }: { connection: AdminSsoConnection }) {
   return (
     <Box as="section" aria-label="Summary">
-      <Heading as="h3" size="sm" marginBottom={3}>
+      <Heading as="h3" textStyle="cardTitle" marginBottom={3}>
         Summary
       </Heading>
       <SummaryList>
@@ -111,7 +108,7 @@ export function ConnectionDomains({ connection }: { connection: AdminSsoConnecti
       borderColor="border.muted"
       paddingTop={5}
     >
-      <Heading as="h3" size="sm" marginBottom={3}>
+      <Heading as="h3" textStyle="cardTitle" marginBottom={3}>
         Domains
       </Heading>
       <VStack align="stretch" gap={2}>
@@ -137,9 +134,7 @@ export function ConnectionDomains({ connection }: { connection: AdminSsoConnecti
           />
         ))}
         {connection.domainVerifications.length === 0 && (
-          <Text color="fg.muted" fontSize="sm">
-            No domain has been proved yet.
-          </Text>
+          <NoDataInfoBlock size="line" title={noDomainProvedTitle(connection)} />
         )}
         {connection.claimedDomains.map((domain) => (
           <PendingDomain key={domain} domain={domain} status="Awaiting approval" />
@@ -174,4 +169,25 @@ function PendingDomain({ domain, status }: { domain: string; status: string }) {
       <Badge colorPalette="orange">{status}</Badge>
     </HStack>
   );
+}
+
+/** What an operator can do next, from the claims and approvals the connection already holds. */
+function noDomainProvedTitle(
+  connection: Pick<AdminSsoConnection, "claimedDomains" | "approvedDomains">,
+): string {
+  const steps: string[] = [];
+  if (connection.claimedDomains.length > 0) {
+    steps.push("Review the pending domain claims below before approving them.");
+  }
+  if (connection.approvedDomains.length > 0) {
+    steps.push(
+      "Ask the organization administrator to complete verification for the approved domains.",
+    );
+  }
+  if (steps.length === 0) {
+    steps.push(
+      "Ask the organization administrator to add and verify a domain in single sign-on setup.",
+    );
+  }
+  return `No domain has been proved yet. ${steps.join(" ")}`;
 }

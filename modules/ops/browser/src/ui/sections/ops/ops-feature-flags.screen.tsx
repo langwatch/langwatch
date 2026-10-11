@@ -9,7 +9,7 @@ export default function OpsFeatureFlagsScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Feature flags</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Container paddingY={5} maxWidth="full">
+      <PageLayout.Container width="fill">
         <FeatureFlagsContent />
       </PageLayout.Container>
     </FeatureFlagsOnly>

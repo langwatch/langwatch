@@ -1,5 +1,7 @@
+import { Card } from "@langwatch/design-system/card";
+import { IdText } from "@langwatch/design-system/id-text";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Badge, Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
 import type { OpsScheduledJob, ProcessWakeRow } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 
@@ -40,8 +42,8 @@ function describeDuration(durationMs: number): string {
 function TimedWorkRowView({ row, now }: { row: TimedWorkRow; now: number }) {
   const overdue = row.dueAtMs < now;
   return (
-    <Table.Row bg={overdue ? "orange.subtle" : undefined}>
-      <Table.Cell>
+    <ListTable.Row tone={overdue ? "warning" : undefined}>
+      <ListTable.Cell>
         <Badge
           size="sm"
           variant="subtle"
@@ -49,18 +51,16 @@ function TimedWorkRowView({ row, now }: { row: TimedWorkRow; now: number }) {
         >
           {row.kind === "schedule" ? "schedule" : "process wake"}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono" title={row.what}>
-          {middleEllipsis(row.what, 44)}
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <IdText value={row.what} label="ID" />
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color="fg.muted" title={row.where}>
           {middleEllipsis(row.where, 32)}
         </Text>
-      </Table.Cell>
-      <Table.Cell textAlign="end">
+      </ListTable.Cell>
+      <ListTable.Cell align="end">
         <Text
           textStyle="xs"
           color={overdue ? "fg.warning" : "fg.muted"}
@@ -69,8 +69,8 @@ function TimedWorkRowView({ row, now }: { row: TimedWorkRow; now: number }) {
         >
           {describeDue(row.dueAtMs, now)}
         </Text>
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
@@ -118,51 +118,41 @@ export function UpcomingWorkCard({
   const overdueCount = rows.filter((row) => row.dueAtMs < now).length;
 
   return (
-    <Card.Root borderColor="border.muted" boxShadow="none">
-      <Card.Body padding={0}>
-        <HStack
-          paddingX={4}
-          paddingY={2.5}
-          borderBottom="1px solid"
-          borderBottomColor="border"
-          gap={2}
-        >
-          <Text textStyle="sm" fontWeight="medium">
-            Upcoming timed work
-          </Text>
-          <Text textStyle="xs" color="fg.muted">
-            schedules and process wakes, soonest first
-          </Text>
-          {overdueCount > 0 && (
-            <Badge size="sm" variant="subtle" colorPalette="orange">
-              {overdueCount} overdue
-            </Badge>
-          )}
-        </HStack>
-        <Table.ScrollArea>
-          <ListTable
-            density="compact"
-            columnRules={false}
-            containerProps={{ overflowX: "auto" }}
-            size="sm"
-            variant="line"
-          >
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader width="130px">Kind</Table.ColumnHeader>
-                <Table.ColumnHeader>What</Table.ColumnHeader>
-                <Table.ColumnHeader>Where</Table.ColumnHeader>
-                <Table.ColumnHeader textAlign="end">Due</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {rows.map((row) => (
-                <TimedWorkRowView key={row.key} row={row} now={now} />
-              ))}
-            </Table.Body>
-          </ListTable>
-        </Table.ScrollArea>
-      </Card.Body>
-    </Card.Root>
+    <Card padding="none">
+      <HStack
+        paddingX={4}
+        paddingY={2.5}
+        borderBottom="1px solid"
+        borderBottomColor="border"
+        gap={2}
+      >
+        <Text textStyle="sm" fontWeight="medium">
+          Upcoming timed work
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          schedules and process wakes, soonest first
+        </Text>
+        {overdueCount > 0 && (
+          <Badge size="sm" variant="subtle" colorPalette="orange">
+            {overdueCount} overdue
+          </Badge>
+        )}
+      </HStack>
+      <ListTable density="compact" variant="embedded" scroll="x" scrollLabel="Upcoming timed work">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader width={130}>Kind</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>What</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Where</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader align="end">Due</ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {rows.map((row) => (
+            <TimedWorkRowView key={row.key} row={row} now={now} />
+          ))}
+        </ListTable.Body>
+      </ListTable>
+    </Card>
   );
 }

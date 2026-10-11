@@ -216,7 +216,7 @@ export function EmptyState({
             letterSpacing="0.08em"
             textTransform="uppercase"
             color="fg.subtle"
-            paddingX="10px"
+            paddingX="2.5"
             paddingBottom={1.5}
           >
             Suggested

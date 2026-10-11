@@ -4,14 +4,15 @@
  * Pins regressions: Save reverting code, template overwriting code, lost params.
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import type { Node } from "@xyflow/react";
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { mockAgentQuery, mockMutate, mockSetData, mockSetNode, footerHolder } = vi.hoisted(() => ({
   mockAgentQuery: {
     current: { data: undefined as unknown, isLoading: false },
+    listeners: new Set<() => void>(),
   },
   mockMutate: vi.fn(),
   mockSetData: vi.fn(),
@@ -32,10 +33,16 @@ vi.mock("../../../../../behavior/workflow-api.ts", () => ({
     }),
     agents: {
       getById: {
-        useQuery: () => ({
-          data: mockAgentQuery.current.data,
-          isLoading: mockAgentQuery.current.isLoading,
-        }),
+        useQuery: () => {
+          const answer = useSyncExternalStore(
+            (listener) => {
+              mockAgentQuery.listeners.add(listener);
+              return () => void mockAgentQuery.listeners.delete(listener);
+            },
+            () => mockAgentQuery.current,
+          );
+          return { data: answer.data, isLoading: answer.isLoading };
+        },
       },
       update: {
         useMutation: () => ({
@@ -86,12 +93,9 @@ vi.mock("../../../../../behavior/lent-agent.tsx", () => ({
   HttpConfigEditor: () => null,
 }));
 
-vi.mock("../../../prompt/variables/variables-section.tsx", () => ({
-  VariablesSection: () => null,
-}));
-
 vi.mock("../../../../../behavior/lent-prompt.tsx", () => ({
   OutputsSection: () => null,
+  VariablesSection: () => null,
 }));
 
 vi.mock("../base-properties-panel.tsx", () => ({
@@ -140,8 +144,10 @@ const agentNode = (
 
 function renderPanel(node: Node<AgentComponent>) {
   const utils = renderWithDesignSystem(<AgentPropertiesPanel node={node} />);
-  const rerenderPanel = (nextNode: Node<AgentComponent>) =>
+  const rerenderPanel = (nextNode: Node<AgentComponent>) => {
     utils.rerender(<AgentPropertiesPanel node={nextNode} />);
+    act(() => mockAgentQuery.listeners.forEach((listener) => listener()));
+  };
   return { ...utils, rerenderPanel };
 }
 

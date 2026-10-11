@@ -144,7 +144,12 @@ export function productFromPathname(pathname: string): ProductId | null {
   return "llm-ops";
 }
 
-/** Settings detour: settings and ops pages; both org-scoped, render settings sidebar */
+/** The operator console (/ops): inside the settings detour, but with its own Admin sidebar. */
+export function isAdminShellRoute(pathname: string): boolean {
+  return isPathUnder({ pathname, base: "/ops" });
+}
+
+/** Settings detour: settings and ops pages; both org-scoped, render the detour's sidebar */
 export function isSettingsShellRoute(pathname: string): boolean {
   return isPathUnder({ pathname, base: "/settings" }) || isPathUnder({ pathname, base: "/ops" });
 }

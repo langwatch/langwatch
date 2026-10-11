@@ -9,6 +9,7 @@
  * form arrives one act at a time — pick who, give their console our
  * addresses, bring back what it hands you.
  */
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Button,
   Field,
@@ -143,10 +144,11 @@ export function RegisterConnectionSection({
 
   if (!canManage) {
     return (
-      <Text color="fg.muted" fontSize="sm" data-testid="sso-register-unavailable">
-        No identity provider is registered for this organization yet. An organization administrator
-        can set one up here.
-      </Text>
+      <NoDataInfoBlock
+        size="line"
+        title="No identity provider is registered for this organization yet. An organization administrator can set one up here."
+        testId="sso-register-unavailable"
+      />
     );
   }
 
@@ -236,7 +238,7 @@ function ProviderPicker({
   return (
     <VStack align="stretch" gap={4}>
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">Who signs your team in?</Heading>
+        <Heading textStyle="cardTitle">Who signs your team in?</Heading>
         <Text color="fg.muted" fontSize="sm">
           Pick your identity provider and we&apos;ll walk you through its side of the setup.
         </Text>
@@ -281,7 +283,7 @@ function ProviderConsoleAct({
   return (
     <VStack align="stretch" gap={3} data-testid="sso-register-console">
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">
+        <Heading textStyle="cardTitle">
           {preset.group === "protocol" ? "Give it our addresses" : `Set it up in ${preset.name}`}
         </Heading>
         <Text color="fg.muted" fontSize="sm">
@@ -322,7 +324,7 @@ function CredentialsAct({
   return (
     <VStack align="stretch" gap={3} data-testid="sso-register-credentials">
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">
+        <Heading textStyle="cardTitle">
           {preset.group === "protocol"
             ? "Then bring back what it gives you"
             : `Then bring back what ${preset.name} gives you`}

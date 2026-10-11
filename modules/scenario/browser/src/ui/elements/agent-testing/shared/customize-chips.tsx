@@ -8,8 +8,6 @@
 import { chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-
 export type CustomizeChip = {
   key: string;
   label: string;
@@ -30,7 +28,7 @@ export function CustomizeChips({
 
   return (
     <VStack align="stretch" gap={2} paddingTop={3} data-testid={testId}>
-      <Text fontSize="11.5px" fontWeight="medium" color={FG_MUTED}>
+      <Text textStyle="caption" fontWeight="medium" color="fg.muted">
         {title}
       </Text>
       <HStack gap={2} flexWrap="wrap">
@@ -42,15 +40,15 @@ export function CustomizeChips({
             alignItems="center"
             gap={1.5}
             height="28px"
-            paddingX="10px"
+            paddingX="2.5"
             borderRadius="lg"
             borderWidth="1px"
             borderStyle="dashed"
             borderColor="border.emphasized"
             boxShadow="none"
-            fontSize="12px"
+            textStyle="caption"
             fontWeight="medium"
-            color={FG_MUTED}
+            color="fg.muted"
             cursor="pointer"
             _hover={{ background: "bg.muted/60", color: "fg" }}
             onClick={chip.onAdd}

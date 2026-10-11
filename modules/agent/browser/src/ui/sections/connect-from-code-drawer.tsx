@@ -4,20 +4,18 @@
  */
 
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Box,
-  Button,
   ClientOnly,
   CodeBlock as ChakraCodeBlock,
   HStack,
-  Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 import {
   connectSnippets,
@@ -46,48 +44,27 @@ export function ConnectFromCodeDrawer(props: ConnectFromCodeDrawerProps) {
   const snippets = connectSnippets({});
 
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="md"
-      modal={false}
+      onClose={onClose}
+      onBack={props.onGoBack}
+      backButtonTestId="back-button"
+      title="Connect from code"
     >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {props.onGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={props.onGoBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <ArrowLeft size={20} />
-              </Button>
-            )}
-            <Drawer.Title>Connect from code</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={5} data-testid="connect-from-code-drawer">
-            <HStack justify="space-between" gap={3}>
-              <Text fontSize="sm" color="fg.muted">
-                Write a small function beside your service startup that calls the agent you already
-                have.
-              </Text>
-              {props.setupButton}
-            </HStack>
+      <VStack align="stretch" gap={5} data-testid="connect-from-code-drawer">
+        <HStack justify="space-between" gap={3}>
+          <Text fontSize="sm" color="fg.muted">
+            Write a small function beside your service startup that calls the agent you already
+            have.
+          </Text>
+          {props.setupButton}
+        </HStack>
 
-            <SnippetTabs snippets={snippets} renderCopyButton={props.renderCopyButton} />
+        <SnippetTabs snippets={snippets} renderCopyButton={props.renderCopyButton} />
 
-            <ListeningIndicator />
-          </VStack>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+        <ListeningIndicator />
+      </VStack>
+    </Drawer>
   );
 }
 
@@ -102,39 +79,39 @@ function SnippetTabs({
   // mounts, and that render paints light rather than a dark block that flips.
   const { colorMode } = useColorMode();
   const codeColorMode = colorMode === "dark" ? "dark" : "light";
+  const [language, setLanguage] = useState<SnippetLanguage>("python");
   return (
-    // Without a colorPalette the line variant paints the selected trigger
-    // with the default palette's fg, which reads fainter than the unselected
-    // one. Same palette as the integrate drawer's language tabs.
-    <Tabs.Root defaultValue="python" variant="line" size="sm" colorPalette="orange">
-      <Tabs.List>
-        {SNIPPET_LANGUAGES.map((language) => (
-          <Tabs.Trigger key={language} value={language}>
-            {SNIPPET_LANGUAGE_LABELS[language]}
-          </Tabs.Trigger>
-        ))}
-      </Tabs.List>
-      {SNIPPET_LANGUAGES.map((language) => (
-        <Tabs.Content key={language} value={language} paddingTop={3}>
-          <VStack align="stretch" gap={2}>
-            <CodeBlock
-              code={INSTALL_COMMANDS[language]}
-              label="Install command"
-              language="bash"
-              colorMode={codeColorMode}
-              renderCopyButton={renderCopyButton}
-            />
-            <CodeBlock
-              code={snippets[language]}
-              label="Snippet"
-              language={language}
-              colorMode={codeColorMode}
-              renderCopyButton={renderCopyButton}
-            />
-          </VStack>
-        </Tabs.Content>
-      ))}
-    </Tabs.Root>
+    <ContentTabs
+      label="Snippet language"
+      value={language}
+      onValueChange={({ value }) => setLanguage(value)}
+      body="flush"
+      mount="all"
+      items={SNIPPET_LANGUAGES.map((item) => ({
+        value: item,
+        label: SNIPPET_LANGUAGE_LABELS[item],
+        content: (
+          <Box paddingTop={3}>
+            <VStack align="stretch" gap={2}>
+              <CodeBlock
+                code={INSTALL_COMMANDS[item]}
+                label="Install command"
+                language="bash"
+                colorMode={codeColorMode}
+                renderCopyButton={renderCopyButton}
+              />
+              <CodeBlock
+                code={snippets[item]}
+                label="Snippet"
+                language={item}
+                colorMode={codeColorMode}
+                renderCopyButton={renderCopyButton}
+              />
+            </VStack>
+          </Box>
+        ),
+      }))}
+    />
   );
 }
 
@@ -201,7 +178,7 @@ function ListeningIndicator() {
         }}
         animation="listening-dot 1.6s ease-in-out infinite"
       />
-      <Text fontSize="12px" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         Waiting for an agent to connect
       </Text>
     </HStack>

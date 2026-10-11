@@ -1,13 +1,7 @@
 import type { WireOf } from "@langwatch/api/web";
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { InlineCode } from "@langwatch/design-system/inline-code";
+import { Badge, Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { ProcessOutboxMessageView as StoredProcessOutboxMessageView } from "@langwatch/ops-contract";
 import { useState } from "react";
 
@@ -53,12 +47,10 @@ function MessageHeaderRow({
 }) {
   return (
     <HStack gap={2}>
-      <Text textStyle="xs" fontFamily="mono" truncate title={message.messageKey}>
-        {message.intentType}
-      </Text>
+      <InlineCode variant="neutral">{message.intentType}</InlineCode>
       <StatusBadge status={message.status} />
       {message.attempts > 0 && (
-        <Text textStyle="xs" color="orange.fg" fontFamily="mono">
+        <Text textStyle="caption" color="orange.fg">
           {message.attempts} attempts
         </Text>
       )}
@@ -192,34 +184,32 @@ export function OutboxMessageCard({
   const traceHref = message.traceId && grafana ? grafanaTraceUrl(message.traceId, grafana) : null;
 
   return (
-    <Card.Root variant="outline">
-      <Card.Body padding={2.5} gap={2}>
-        <MessageHeaderRow
-          message={message}
-          now={now}
-          showJson={showJson}
-          onToggleJson={() => setShowJson((v) => !v)}
-        />
-        <MessageMetaRow
-          message={message}
-          now={now}
-          leaseLapsed={leaseLapsed}
-          traceHref={traceHref}
-          canManage={canManage}
-          onRedrive={onRedrive}
-          onDiscard={onDiscard}
-          onReleaseLease={onReleaseLease}
-          actionPending={actionPending}
-        />
-        {showJson && (
-          <Box bg="bg.subtle" borderRadius="sm" padding={2} maxHeight="240px" overflow="auto">
-            <PinnedAwareJsonView
-              content={JSON.stringify(message.payload)}
-              pinnedKeys={NO_PINNED_KEYS}
-            />
-          </Box>
-        )}
-      </Card.Body>
-    </Card.Root>
+    <Card padding="sm" bodyLayout="spaced">
+      <MessageHeaderRow
+        message={message}
+        now={now}
+        showJson={showJson}
+        onToggleJson={() => setShowJson((v) => !v)}
+      />
+      <MessageMetaRow
+        message={message}
+        now={now}
+        leaseLapsed={leaseLapsed}
+        traceHref={traceHref}
+        canManage={canManage}
+        onRedrive={onRedrive}
+        onDiscard={onDiscard}
+        onReleaseLease={onReleaseLease}
+        actionPending={actionPending}
+      />
+      {showJson && (
+        <Box bg="bg.subtle" borderRadius="sm" padding={2} maxHeight="240px" overflow="auto">
+          <PinnedAwareJsonView
+            content={JSON.stringify(message.payload)}
+            pinnedKeys={NO_PINNED_KEYS}
+          />
+        </Box>
+      )}
+    </Card>
   );
 }

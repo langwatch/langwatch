@@ -15,6 +15,7 @@ import {
   IconGlyph,
   LLMIcon,
   MicrosoftIcon,
+  MoreVerticalIcon,
   OpenAIIcon,
   OpenTelemetryIcon,
   WeaviateIcon,
@@ -38,6 +39,7 @@ const MARKS = [
   { name: "GitHub", icon: <GitHubIcon />, monochrome: true },
   { name: "Large language model", icon: <LLMIcon />, monochrome: false },
   { name: "Microsoft", icon: <MicrosoftIcon />, monochrome: false },
+  { name: "More, vertical ellipsis", icon: <MoreVerticalIcon />, monochrome: false },
   { name: "OpenAI", icon: <OpenAIIcon />, monochrome: true },
   { name: "OpenTelemetry", icon: <OpenTelemetryIcon />, monochrome: false },
   { name: "Weaviate", icon: <WeaviateIcon />, monochrome: false },
@@ -85,6 +87,23 @@ export const Sizes: Story = {
       <IconGlyph {...args} size="16px" />
       <IconGlyph {...args} size="24px" />
       <IconGlyph {...args} size="40px" />
+    </Stack>
+  ),
+};
+
+/**
+ * The row-menu glyph is a Lucide icon that draws in the surrounding text colour, so it needs no
+ * inversion on dark. It is decorative: the button that holds it carries the name.
+ */
+export const RowMenuTrigger: Story = {
+  render: () => (
+    <Stack direction="row" gap="6">
+      <Box color="fg">
+        <MoreVerticalIcon size={16} />
+      </Box>
+      <Box color="fg.muted">
+        <MoreVerticalIcon size={16} />
+      </Box>
     </Stack>
   ),
 };

@@ -23,7 +23,6 @@ None.
 ## Calls
 
 - `withApi(authzApi)`, tRPC contracts: –.
-- Client packages (package.json): `@langwatch/enterprise-billing-client`.
 - Host APIs it requires: `AuthzHostApi`.
 - Config slices: `authz`.
 

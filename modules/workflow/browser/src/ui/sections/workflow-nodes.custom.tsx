@@ -1,4 +1,4 @@
-import { Alert, Text } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
 import type { Custom } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
@@ -44,12 +44,7 @@ const LatestComponentVersionCheck = ({ node }: { node: NodeProps<Node<Custom>> }
   return (
     <>
       {node?.data.isCustom && !currentVersion?.isPublishedVersion && (
-        <Alert.Root size="sm">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Text>Version outdated</Text>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="warning">Version outdated</Banner>
       )}
     </>
   );

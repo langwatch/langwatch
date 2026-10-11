@@ -170,7 +170,7 @@ None: this module declares no REST family.
 
 ### `dataRetention`
 
-Contract `../contract/src/data-retention.trpc.ts:54`, router `src/transport/data-retention.trpc.ts:28`.
+Contract `../contract/src/data-retention.trpc.ts:79`, router `src/transport/data-retention.trpc.ts:28`.
 
 | Procedure                                | Kind     | Gate                        | Input                                    | Output                                   |
 | ---------------------------------------- | -------- | --------------------------- | ---------------------------------------- | ---------------------------------------- |
@@ -185,14 +185,14 @@ Contract `../contract/src/data-retention.trpc.ts:54`, router `src/transport/data
 
 ```typescript
 // dataRetention.getRules
-// Input: retentionProjectScopeSchema, ../contract/src/data-retention.trpc.ts:27
+// Input: retentionProjectScopeSchema, ../contract/src/data-retention.trpc.ts:32
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:44
+type Output = z.infer<typeof retentionPolicySnapshotSchema>; // ../contract/src/data-retention.snapshot.ts:75
 
 // dataRetention.setForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:71
+// Input: inline, ../contract/src/data-retention.trpc.ts:96
 interface Input {
   projectId: string;
   scope: {
@@ -203,7 +203,7 @@ interface Input {
   category: "traces" | "scenarios" | "experiments";
   retentionDays: 0 | number;
 }
-// Output: retentionPolicySchema, ../contract/src/data-retention.ts:165
+// Output: retentionPolicySchema, ../contract/src/data-retention.ts:222
 interface Output {
   id: string;
   organizationId: string;
@@ -216,7 +216,7 @@ interface Output {
 }
 
 // dataRetention.previewScopeRemoval
-// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:44
+// Input: retentionScopeWriteInputSchema, ../contract/src/data-retention.trpc.ts:67
 interface Input {
   projectId: string;
   scope: {
@@ -225,7 +225,7 @@ interface Input {
   };
   organizationId?: string;
 }
-// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:189
+// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:245
 interface Output {
   traces: number;
   scenarios: number;
@@ -233,7 +233,7 @@ interface Output {
 }
 
 // dataRetention.removeForScope
-// Input: inline, ../contract/src/data-retention.trpc.ts:91
+// Input: inline, ../contract/src/data-retention.trpc.ts:116
 interface Input {
   projectId: string;
   scope: {
@@ -245,23 +245,23 @@ interface Input {
 }
 
 // dataRetention.triggerRetroactiveUpdate
-// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:49
+// Input: retentionTriggerRetroactiveInputSchema, ../contract/src/data-retention.trpc.ts:77
 interface Input {
   projectId: string;
   category: "traces" | "scenarios" | "experiments";
 }
-// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:249
+// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:314
 interface Output {
   tables: string[];
   appliedRetentionDays: number;
 }
 
 // dataRetention.getMutationProgress
-// Input: retroactiveMutationProjectInputSchema, ../contract/src/data-retention.ts:144
+// Input: retroactiveMutationProjectInputSchema, ../contract/src/data-retention.ts:175
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/data-retention.trpc.ts:101
+// Output: inline, ../contract/src/data-retention.trpc.ts:126
 type Output = {
   mutationId: string;
   table: string;
@@ -272,14 +272,14 @@ type Output = {
 }[];
 
 // dataRetention.killMutation
-// Input: killRetroactiveMutationInputSchema, ../contract/src/data-retention.ts:157
+// Input: killRetroactiveMutationInputSchema, ../contract/src/data-retention.ts:206
 interface Input {
   projectId: string;
   mutationId: string;
 }
 
 // dataRetention.getScopeStorageUsage
-// Input: retentionScopeTargetInputSchema, ../contract/src/data-retention.trpc.ts:35
+// Input: retentionScopeTargetInputSchema, ../contract/src/data-retention.trpc.ts:53
 interface Input {
   projectId: string;
   scope: {
@@ -287,7 +287,7 @@ interface Input {
     scopeId: string;
   };
 }
-// Output: retentionStorageUsageSchema, ../contract/src/data-retention.snapshot.ts:67
+// Output: retentionStorageUsageSchema, ../contract/src/data-retention.snapshot.ts:90
 interface Output {
   totalBytes: number;
   projectCount: number;

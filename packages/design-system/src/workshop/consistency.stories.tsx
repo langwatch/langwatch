@@ -156,7 +156,7 @@ export const RulesSummary: Story = {
   name: "Where each rule lives",
   render: () => (
     <Stack gap={3}>
-      <Heading size="sm">Read these before a screen</Heading>
+      <Heading textStyle="cardTitle">Read these before a screen</Heading>
       {[
         "dev/docs/best_practices/list-table.md",
         "dev/docs/best_practices/alerts-toasts-and-field-errors.md",

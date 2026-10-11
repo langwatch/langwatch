@@ -1,6 +1,7 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, ClientOnly, CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type React from "react";
 
 export function JsonHighlight({
@@ -64,7 +65,7 @@ export function JsonHighlight({
                 "& pre, & code": {
                   background: "transparent !important",
                   fontFamily: "'Geist Mono', 'IBM Plex Mono', 'Source Code Pro', Menlo, monospace",
-                  fontSize: "12.5px",
+                  fontSize: `${TYPE_SCALE_PX.caption}px`,
                   lineHeight: "1.8",
                   letterSpacing: "0.01em",
                   margin: "0 !important",

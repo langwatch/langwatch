@@ -4,9 +4,10 @@
  */
 
 import { Link } from "@langwatch/browser-host/link";
+import { Banner } from "@langwatch/design-system/banner";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { CloudOff, KeyRound } from "lucide-react";
 
 import { connectApi } from "../../behavior/connect-api.ts";
@@ -43,17 +44,12 @@ function ConnectStatusPanel({ organizationId }: { organizationId: string }) {
   if (status.isLoading) return <Skeleton height="120px" width="full" />;
   if (status.error) {
     return (
-      <Alert.Root status="error" data-testid="connect-load-error">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>
-            {host.describeFailure({
-              error: status.error,
-              fallbackTitle: "Couldn't load hosted services",
-            })}
-          </Alert.Title>
-        </Alert.Content>
-      </Alert.Root>
+      <Banner status="error" data-testid="connect-load-error">
+        {host.describeFailure({
+          error: status.error,
+          fallbackTitle: "Couldn't load hosted services",
+        })}
+      </Banner>
     );
   }
   if (!status.data) return null;
@@ -82,17 +78,12 @@ function ConnectedOrganization({
   return (
     <VStack width="full" align="stretch" gap={6}>
       {refusal ? (
-        <Alert.Root status="error" data-testid="connect-refusal">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>
-              {host.describeFailure({
-                error: { error: { code: refusal.code, meta: refusal.meta } },
-                fallbackTitle: "Hosted services are refusing this install",
-              })}
-            </Alert.Title>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="error" data-testid="connect-refusal">
+          {host.describeFailure({
+            error: { error: { code: refusal.code, meta: refusal.meta } },
+            fallbackTitle: "Hosted services are refusing this install",
+          })}
+        </Banner>
       ) : null}
       <ConnectServicesSection
         organizationId={organizationId}

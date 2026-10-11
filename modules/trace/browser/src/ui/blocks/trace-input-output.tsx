@@ -131,9 +131,7 @@ export const TraceInputOutput = memo(function TraceInputOutput({
           </HStack>
         )}
         {raw || forceRaw ? (
-          <Text fontFamily="mono" fontSize="13px">
-            {JSON.stringify(object, null, 2)}
-          </Text>
+          <Text textStyle="mono">{JSON.stringify(object, null, 2)}</Text>
         ) : (
           renderJsonViewer(parsed, {
             collapsed,
@@ -160,9 +158,7 @@ export const TraceInputOutput = memo(function TraceInputOutput({
               {renderCopyButton()}
             </HStack>
           )}
-          <Text fontFamily="mono" fontSize="14px">
-            {formatDisplayValue(value)}
-          </Text>
+          <Text textStyle="mono">{formatDisplayValue(value)}</Text>
         </>
       )}
     </Box>
@@ -185,8 +181,7 @@ function TinyButton(props: ButtonProps) {
   return (
     <Button
       size="xs"
-      fontSize="10px"
-      fontFamily="mono"
+      textStyle="monoSm"
       padding={1}
       height="22px"
       width="auto"

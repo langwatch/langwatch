@@ -9,11 +9,13 @@ import {
 } from "@langwatch/dashboard-contract";
 import { system } from "@langwatch/design-system";
 import { CachedView } from "@langwatch/design-system/cached-view";
+import { ChartEmptyState } from "@langwatch/design-system/chart-empty-state";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { Delayed } from "@langwatch/design-system/delayed";
 import {
   Badge,
   Box,
+  Center,
   Flex,
   HStack,
   Skeleton,
@@ -23,6 +25,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { nowInstant } from "@langwatch/time";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
@@ -516,7 +519,6 @@ function graphIsEmpty({
 }
 
 const SKELETON_BARS = [35, 55, 25, 70, 45, 65, 40, 55, 30, 60, 50, 35];
-const EMPTY_BARS = [40, 65, 30, 80, 50, 70, 45, 60];
 
 function ChartLoadingSkeleton({ height_ }: { height_: number }) {
   return (
@@ -538,23 +540,9 @@ function ChartLoadingSkeleton({ height_ }: { height_: number }) {
 
 function EmptyChart() {
   return (
-    <VStack position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)" gap={2}>
-      <HStack gap={1} align="end" opacity={0.3}>
-        {EMPTY_BARS.map((h, i) => (
-          <Box
-            key={i}
-            width="6px"
-            height={`${h}%`}
-            maxHeight="40px"
-            bg="border"
-            borderRadius="sm"
-          />
-        ))}
-      </HStack>
-      <Text textStyle="xs" color="fg.subtle">
-        No data. Try adjusting the date range.
-      </Text>
-    </VStack>
+    <Center position="absolute" inset={0}>
+      <ChartEmptyState description="Try adjusting the date range." />
+    </Center>
   );
 }
 
@@ -752,7 +740,14 @@ function PieGraph({
           formatter={tooltipValueFormatter}
           wrapperStyle={{ zIndex: 1000 }}
         />
-        <Legend wrapperStyle={{ padding: "0 2rem", flexWrap: "wrap", zIndex: 1, fontSize: 11 }} />
+        <Legend
+          wrapperStyle={{
+            padding: "0 2rem",
+            flexWrap: "wrap",
+            zIndex: 1,
+            fontSize: TYPE_SCALE_PX.micro,
+          }}
+        />
       </PieChart>
     </ResponsiveContainer>
   );
@@ -948,7 +943,7 @@ function CartesianGraph({
           tickLine={false}
           axisLine={false}
           tick={{ fill: palette.gray400 }}
-          style={{ fontSize: "11px" }}
+          style={{ fontSize: TYPE_SCALE_PX.micro }}
         />
         <YAxisComponent
           type="number"
@@ -958,7 +953,7 @@ function CartesianGraph({
           tickMargin={20}
           domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
           tick={{ fill: palette.gray400 }}
-          style={{ fontSize: "11px" }}
+          style={{ fontSize: TYPE_SCALE_PX.micro }}
           tickFormatter={yTickFormatter(yAxisValueFormat)}
         />
         <Tooltip
@@ -980,7 +975,7 @@ function CartesianGraph({
             flexWrap: "wrap",
             zIndex: 1,
             cursor: "pointer",
-            fontSize: 11,
+            fontSize: TYPE_SCALE_PX.micro,
           }}
           onClick={(e) => {
             const key = legendSeriesKey(e.dataKey);
@@ -1537,7 +1532,7 @@ function MonitorGraph({
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: gray400 }}
-                style={{ fontSize: "11px" }}
+                style={{ fontSize: TYPE_SCALE_PX.micro }}
               />
               <YAxis
                 type="number"
@@ -1547,7 +1542,7 @@ function MonitorGraph({
                 tickMargin={20}
                 domain={[0, maxValue]}
                 tick={{ fill: gray400 }}
-                style={{ fontSize: "11px" }}
+                style={{ fontSize: TYPE_SCALE_PX.micro }}
                 tickFormatter={(value) => {
                   if (typeof yAxisValueFormat === "function") {
                     return yAxisValueFormat(value);
@@ -1633,7 +1628,7 @@ function SummaryBarGraph({
           tickLine={false}
           axisLine={false}
           tick={{ fill: gray400 }}
-          style={{ fontSize: "11px" }}
+          style={{ fontSize: TYPE_SCALE_PX.micro }}
           angle={input.graphType === "horizontal_bar" ? undefined : 45}
           textAnchor={input.graphType === "horizontal_bar" ? "end" : "start"}
         />
@@ -1642,7 +1637,7 @@ function SummaryBarGraph({
           dataKey="value"
           domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
           tick={{ fill: gray400 }}
-          style={{ fontSize: "11px" }}
+          style={{ fontSize: TYPE_SCALE_PX.micro }}
           tickFormatter={(value: number) => {
             if (typeof yAxisValueFormat === "function") {
               return yAxisValueFormat(value);

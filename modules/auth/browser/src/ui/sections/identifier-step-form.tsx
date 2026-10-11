@@ -71,9 +71,9 @@ export function IdentifierStepForm({
   const showEmailError = form.formState.errors.email;
 
   return (
-    <VStack width="full" align="stretch" gap="14px">
+    <VStack width="full" align="stretch" gap="3.5">
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-        <VStack width="full" align="stretch" gap="14px">
+        <VStack width="full" align="stretch" gap="3.5">
           <FrontDoorField label="Email" error={showEmailError}>
             {(id) => (
               <Input
@@ -82,7 +82,7 @@ export function IdentifierStepForm({
                 placeholder="you@company.com"
                 // 16px on a phone: anything smaller makes iOS zoom the page in
                 // when the field takes focus, and it never zooms back out.
-                fontSize={{ base: "16px", md: "14px" }}
+                fontSize={{ base: "md", md: "sm" }}
                 minHeight="44px"
                 borderRadius={SHAPE.field}
                 autoComplete="username webauthn"
@@ -106,7 +106,7 @@ export function IdentifierStepForm({
               />
             )}
           </FrontDoorField>
-          <VStack width="full" align="stretch" gap="14px" paddingTop="2px">
+          <VStack width="full" align="stretch" gap="3.5" paddingTop="0.5">
             <FrontDoorPrimaryButton type="submit" isBusy={isSubmitting}>
               {submitLabel}
             </FrontDoorPrimaryButton>

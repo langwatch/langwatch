@@ -19,32 +19,16 @@ export const calculateMinTableWidth = (
 };
 
 /**
- * Shared table styling used by both single run and comparison tables
+ * What the batch tables add to ListTable: a minimum width so wide runs scroll sideways, cells
+ * aligned to the top of tall outputs, a narrow row-number column, and cell actions on hover.
  */
 export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
   "& table": {
-    width: "100%",
     minWidth: `${minTableWidth}px`,
-    borderCollapse: "collapse",
-  },
-  "& th": {
-    position: "sticky",
-    top: 0,
-    background: "var(--chakra-colors-bg-panel)",
-    borderBottom: "1px solid var(--chakra-colors-border)",
-    padding: "8px 12px",
-    textAlign: "left",
-    fontSize: "12px",
-    fontWeight: "600",
-    color: "var(--chakra-colors-fg-muted)",
-    whiteSpace: "nowrap",
-    zIndex: 1,
   },
   "& td": {
-    borderBottom: "1px solid var(--chakra-colors-border-muted)",
-    padding: "12px",
     verticalAlign: "top",
-    fontSize: "13px",
+    textStyle: "bodySm",
   },
   // First column (row number) should stay small
   "& td:first-of-type": {

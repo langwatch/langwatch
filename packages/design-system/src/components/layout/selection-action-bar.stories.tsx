@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
 
 import { SelectionActionBar } from "./selection-action-bar.tsx";
 
@@ -72,3 +73,70 @@ export const LongLabel: Story = {
     ),
   },
 };
+
+/** Inline: one band in normal flow, for a drawer, a dialog or a table in a card. */
+export const Inline: Story = {
+  args: {
+    placement: "inline",
+    children: (
+      <Button size="xs" variant="ghost">
+        Add to dataset
+      </Button>
+    ),
+  },
+  render: (args) => (
+    <Box maxWidth="560px">
+      <SelectionActionBar {...args} />
+    </Box>
+  ),
+};
+
+/** At 320px the label and the actions wrap, and the bar stays inside the viewport. */
+export const Narrow: Story = {
+  args: {
+    label: "Select all 212 matching traces",
+    children: (
+      <>
+        <Button size="xs" variant="ghost">
+          Add to dataset
+        </Button>
+        <Button size="xs" variant="ghost" colorPalette="red">
+          Delete
+        </Button>
+      </>
+    ),
+  },
+  render: (args) => (
+    <Box maxWidth="320px" height="220px" position="relative">
+      <SelectionActionBar {...args} />
+    </Box>
+  ),
+};
+
+function ClearRebuildsHeaderDemo() {
+  const [selected, setSelected] = useState(2);
+  return (
+    <>
+      <table id="rows" aria-label="rows">
+        <thead>
+          <tr>
+            <th key={selected}>
+              <input type="checkbox" data-select-all="" aria-label="Select all" />
+            </th>
+          </tr>
+        </thead>
+      </table>
+      {selected > 0 && (
+        <SelectionActionBar
+          label={`${selected} selected`}
+          placement="inline"
+          forTable="rows"
+          onClear={() => setSelected(0)}
+        />
+      )}
+    </>
+  );
+}
+
+/** Clearing replaces the header and unmounts the bar; focus lands on the new select-all. */
+export const ClearRebuildsHeader: Story = { render: () => <ClearRebuildsHeaderDemo /> };

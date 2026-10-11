@@ -102,7 +102,9 @@ describe("the Roles screen", () => {
         new FakeAuthzHost({ plan: { isEnterprise: false, isLoading: true } }),
       );
 
-      expect(screen.queryByText("Custom roles on Enterprise")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Roles & access is included in Enterprise"),
+      ).not.toBeInTheDocument();
       expect(screen.queryByText("Predefined roles")).not.toBeInTheDocument();
     });
   });
@@ -115,8 +117,9 @@ describe("the Roles screen", () => {
         new FakeAuthzHost({ plan: { isEnterprise: false, isLoading: false } }),
       );
 
-      expect(screen.getByText("Custom roles on Enterprise")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Compare plans" })).toHaveAttribute(
+      expect(screen.getByRole("heading", { name: "Roles & access" })).toBeInTheDocument();
+      expect(screen.getByText("Roles & access is included in Enterprise")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "See plans" })).toHaveAttribute(
         "href",
         "/settings/plans",
       );
@@ -156,9 +159,9 @@ describe("the Roles screen", () => {
         "permission-token",
       );
       expect(chips.map((chip) => chip.textContent)).toEqual([
-        "traces:view",
-        "analytics:view",
-        "datasets:view",
+        "View traces",
+        "View analytics",
+        "View datasets",
       ]);
     });
 
@@ -202,9 +205,13 @@ describe("the Roles screen", () => {
         }),
       );
 
-      expect(await screen.findByText("View traces")).toBeInTheDocument();
+      expect(
+        await within(await screen.findByRole("dialog")).findByText("View traces"),
+      ).toBeInTheDocument();
       // The viewer reads, so its lines are views and never full access.
-      expect(screen.queryByText(/^Full access to/)).not.toBeInTheDocument();
+      expect(
+        within(screen.getByRole("dialog")).queryByText(/^Full access to/),
+      ).not.toBeInTheDocument();
     });
 
     /** @scenario A reader without the grant cannot create a role */

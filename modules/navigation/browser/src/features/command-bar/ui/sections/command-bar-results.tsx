@@ -1,3 +1,4 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { forwardRef, useMemo } from "react";
 
@@ -258,9 +259,19 @@ export const CommandBarResults = forwardRef<HTMLDivElement, CommandBarResultsPro
             </HStack>
           )}
           {query !== "" && allItems.length === 0 && !isLoading && (
-            <Text textAlign="center" py={8} fontSize="sm" color="fg.muted">
-              No results found
-            </Text>
+            <Box paddingX={4} paddingY={6}>
+              <NoDataInfoBlock
+                size="line"
+                title="No results found."
+                next={[
+                  {
+                    kind: "docs",
+                    label: "What the command bar searches",
+                    href: "https://docs.langwatch.ai/platform/command-bar",
+                  },
+                ]}
+              />
+            </Box>
           )}
         </VStack>
       </Box>

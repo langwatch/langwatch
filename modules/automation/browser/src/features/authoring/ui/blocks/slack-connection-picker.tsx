@@ -1,6 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import {
-  Box,
   Field,
   HStack,
   type ListCollection,
@@ -235,20 +235,13 @@ function connectionHelp({
 
 function LegacySecretNotice() {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      bg="bg.subtle"
-      padding={3}
-      data-testid="slack-legacy-secret"
-    >
+    <Card variant="nested" tone="neutral" padding="sm" data-testid="slack-legacy-secret">
       <Text textStyle="xs" fontWeight="medium" color="fg">
         Uses a Slack secret stored on this automation
       </Text>
       <Text textStyle="xs" color="fg.muted">
         Pick a connection to deliver through instead. Until you do, it keeps posting as it does now.
       </Text>
-    </Box>
+    </Card>
   );
 }

@@ -1,12 +1,13 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, Grid, Heading, HStack, Separator } from "@langwatch/design-system/primitives";
+import { Box, Grid, HStack } from "@langwatch/design-system/primitives";
 import { studioWorkflowSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
-import { ChevronLeft, File, Upload } from "lucide-react";
+import { CircleCheck, File, Upload } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { TEMPLATES } from "../../model/templates/templates.registry.ts";
 
 const MAX_WORKFLOW_FILE_SIZE = 5 * 1024 * 1024;
+const CREATE_FORM_ID = "workflow-create-form";
 
 type WorkflowCreateStep = { step: "select" } | { step: "create"; template: StudioWorkflow };
 
@@ -33,7 +34,13 @@ export type WorkflowCreateDialogProps = {
   onClose: () => void;
   onImportError: (error: WorkflowImportError) => void;
   renderContentBoundary: (children: ReactNode) => ReactNode;
-  renderForm: (input: { template: StudioWorkflow; onClose: () => void }) => ReactNode;
+  /** The form lives in the body; its Cancel and submit are portalled into `footerSlot`. */
+  renderForm: (input: {
+    template: StudioWorkflow;
+    onClose: () => void;
+    formId: string;
+    footerSlot: HTMLElement | null;
+  }) => ReactNode;
   renderTemplateCard: (props: WorkflowTemplateCardProps) => ReactNode;
 };
 
@@ -138,6 +145,7 @@ export function WorkflowCreateDialog({
   renderTemplateCard,
 }: WorkflowCreateDialogProps) {
   const [step, setStep] = useState<WorkflowCreateStep>({ step: "select" });
+  const [footerSlot, setFooterSlot] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -160,98 +168,88 @@ export function WorkflowCreateDialog({
     void handleFileUpload(file);
   });
 
-  return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="xl"
-      trapFocus={false}
-      preventScroll={false}
-    >
-      <Dialog.Content paddingX={0}>
-        {renderContentBoundary(
-          <>
-            <Dialog.Header>
-              <HStack gap={2}>
-                {step.step === "create" && (
-                  <Button
-                    variant="ghost"
-                    data-variant="ghost"
-                    onClick={() => setStep({ step: "select" })}
-                    size="sm"
-                    paddingX={0}
-                    marginLeft={-2}
-                    marginBottom={-2}
-                    marginTop={-2}
-                  >
-                    <ChevronLeft />
-                  </Button>
-                )}
-                <Heading>Create new workflow</Heading>
-              </HStack>
-            </Dialog.Header>
-            <Separator />
-            <Dialog.CloseTrigger />
-            {step.step === "select" ? (
-              <Dialog.Body paddingY={6} marginBottom={6}>
-                <Grid width="full" templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={6}>
-                  {Object.entries(TEMPLATES).map(([name, template]) => (
-                    <Fragment key={name}>
-                      {renderTemplateCard({
-                        testId: `new-workflow-card-${name}`,
-                        name: template.name,
-                        icon:
-                          name === "blank" ? (
-                            <File color="var(--chakra-colors-fg-muted)" size={16} />
-                          ) : (
-                            template.icon
-                          ),
-                        description: template.description,
-                        onClick: () => {
-                          setStep({
-                            step: "create",
-                            template:
-                              name === "blank"
-                                ? {
-                                    ...template,
-                                    name: "New Workflow",
-                                    icon: "🧩",
-                                    description: "",
-                                  }
-                                : template,
-                          });
-                        },
-                      })}
-                    </Fragment>
-                  ))}
-                  {renderTemplateCard({
-                    testId: "new-workflow-card-import",
-                    name: "From Export",
-                    icon: <Upload color="var(--chakra-colors-fg-muted)" size={16} />,
-                    description: "Import a workflow from an exported JSON file",
-                    dragging: fileDrop.isDragging,
-                    onClick: fileDrop.handleClick,
-                    onDragOver: fileDrop.handleDragOver,
-                    onDragLeave: fileDrop.handleDragLeave,
-                    onDrop: fileDrop.handleDrop,
-                    children: (
-                      <input
-                        ref={fileDrop.fileInputRef}
-                        type="file"
-                        accept=".json"
-                        style={{ display: "none" }}
-                        onChange={fileDrop.handleFileInputChange}
-                      />
-                    ),
-                  })}
-                </Grid>
-              </Dialog.Body>
-            ) : (
-              renderForm({ template: step.template, onClose })
-            )}
-          </>,
-        )}
-      </Dialog.Content>
-    </Dialog.Root>
+  const selectContent = (
+    <Box paddingX={6} paddingTop={6} paddingBottom={12}>
+      <Grid width="full" templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={6}>
+        {Object.entries(TEMPLATES).map(([name, template]) => (
+          <Fragment key={name}>
+            {renderTemplateCard({
+              testId: `new-workflow-card-${name}`,
+              name: template.name,
+              icon: <TemplateIcon name={name} />,
+              description: template.description,
+              onClick: () => {
+                setStep({
+                  step: "create",
+                  template:
+                    name === "blank"
+                      ? {
+                          ...template,
+                          name: "New Workflow",
+                          icon: "🧩",
+                          description: "",
+                        }
+                      : template,
+                });
+              },
+            })}
+          </Fragment>
+        ))}
+        {renderTemplateCard({
+          testId: "new-workflow-card-import",
+          name: "From export",
+          icon: <Upload color="var(--chakra-colors-fg-muted)" size={16} />,
+          description: "Import a workflow from an exported JSON file",
+          dragging: fileDrop.isDragging,
+          onClick: fileDrop.handleClick,
+          onDragOver: fileDrop.handleDragOver,
+          onDragLeave: fileDrop.handleDragLeave,
+          onDrop: fileDrop.handleDrop,
+          children: (
+            <input
+              ref={fileDrop.fileInputRef}
+              type="file"
+              accept=".json"
+              style={{ display: "none" }}
+              onChange={fileDrop.handleFileInputChange}
+            />
+          ),
+        })}
+      </Grid>
+    </Box>
   );
+
+  const frame = {
+    open,
+    onClose,
+    title: "Create new workflow",
+    size: "detail",
+    body: "flush",
+    // The emoji picker and the file dialog live outside the frame.
+    trapFocus: false,
+    preventScroll: false,
+    children: renderContentBoundary(
+      step.step === "select" ? (
+        selectContent
+      ) : (
+        <Box paddingX={6} paddingY={4}>
+          {renderForm({ template: step.template, onClose, formId: CREATE_FORM_ID, footerSlot })}
+        </Box>
+      ),
+    ),
+  } as const;
+
+  if (step.step === "select") return <Dialog {...frame} cancelLabel={null} />;
+  return (
+    <Dialog
+      {...frame}
+      onBack={() => setStep({ step: "select" })}
+      footerContent={<HStack ref={setFooterSlot} width="full" justify="flex-end" gap={2} />}
+    />
+  );
+}
+
+function TemplateIcon({ name }: { name: string }) {
+  const Icon = name === "blank" ? File : CircleCheck;
+  return <Icon color="var(--chakra-colors-fg-muted)" size={16} />;
 }

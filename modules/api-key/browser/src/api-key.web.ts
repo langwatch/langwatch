@@ -32,7 +32,7 @@ export const apiKeyWeb = defineBrowserModule("api-key")
     "pages/settings/api-keys": {
       path: "/settings/api-keys",
       within: "settings",
-      label: "API Keys",
+      label: "API keys",
       load: () => import("./ui/sections/api-keys-screen.tsx"),
     },
   });

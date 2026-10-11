@@ -3,14 +3,13 @@
  * @see dev/docs/best_practices/selection-action-bar.md
  */
 
-import { Box, chakra, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Folder } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 
 export type MoveToSuiteSelectionBarProps = {
@@ -39,7 +38,7 @@ export function MoveToSuiteSelectionBar({
       >
         <SmallButton
           variant="solid"
-          colorPalette="blue"
+          colorPalette="orange"
           onClick={() => setIsDialogOpen(true)}
           data-testid="cases-selection-move-to-suite"
         >
@@ -82,68 +81,40 @@ function MoveToSuiteDialog({
   }, [open, firstSuiteId]);
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={({ open: nextOpen }) => !nextOpen && onCancel()}
+      onClose={onCancel}
+      title="Move to test suite"
+      size="sm"
       placement="center"
+      primaryAction={{
+        label: "Move",
+        onClick: () => onConfirm(value),
+        ...(value ? {} : { disabledReason: "This project has no test suite to move to." }),
+        "data-testid": "cases-move-to-suite-confirm",
+      }}
+      data-testid="cases-move-to-suite-dialog"
     >
-      <Dialog.Content bg="bg.panel" maxWidth="420px" data-testid="cases-move-to-suite-dialog">
-        <Dialog.Header borderBottomWidth="1px" borderColor="border" paddingX={5} paddingY={3.5}>
-          <Dialog.Title fontSize="14px" fontWeight="semibold">
-            Move to test suite
-          </Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body paddingX={5} paddingY={4}>
-          <VStack align="stretch" gap={3}>
-            <Text fontSize="12px" color={FG_MUTED}>
-              Move {selectedCount === 1 ? "1 scenario" : `${selectedCount} scenarios`} to
-            </Text>
-            <NativeSelect.Root size="sm">
-              <NativeSelect.Field
-                aria-label="Target test suite"
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                data-testid="cases-move-to-suite-select"
-              >
-                {suites.map((suite) => (
-                  <option key={suite.id} value={suite.id}>
-                    {suite.name}
-                  </option>
-                ))}
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer borderTopWidth="1px" borderColor="border" paddingX={5} paddingY={3} gap={2}>
-          <Box flex={1} />
-          <chakra.button
-            type="button"
-            onClick={onCancel}
-            paddingX={3}
-            height="28px"
-            borderRadius="lg"
-            fontSize="12px"
-            fontWeight="medium"
-            color={FG_MUTED}
-            cursor="pointer"
-            boxShadow={QUIET_BUTTON_SHADOW}
-            _hover={{ background: "bg.muted", color: "fg" }}
+      <VStack align="stretch" gap={3}>
+        <Text textStyle="caption" color="fg.muted">
+          Move {selectedCount === 1 ? "1 scenario" : `${selectedCount} scenarios`} to
+        </Text>
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            aria-label="Target test suite"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            data-testid="cases-move-to-suite-select"
           >
-            Cancel
-          </chakra.button>
-          <SmallButton
-            variant="solid"
-            colorPalette="orange"
-            disabled={!value}
-            onClick={() => onConfirm(value)}
-            data-testid="cases-move-to-suite-confirm"
-          >
-            Move
-          </SmallButton>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+            {suites.map((suite) => (
+              <option key={suite.id} value={suite.id}>
+                {suite.name}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </VStack>
+    </Dialog>
   );
 }

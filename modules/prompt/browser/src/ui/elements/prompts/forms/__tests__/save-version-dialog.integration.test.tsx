@@ -39,4 +39,20 @@ describe("given the save-version dialog", () => {
       );
     });
   });
+
+  describe("when Save is clicked with no description", () => {
+    it("explains what is missing and saves nothing", async () => {
+      const onSubmit = vi.fn(() => Promise.resolve());
+      renderWithDesignSystem(
+        <SaveVersionDialog isOpen onClose={() => {}} onSubmit={onSubmit} nextVersion={2} />,
+      );
+      const submit = await screen.findByTestId("prompt-save-version-submit");
+
+      expect(submit).toBeEnabled();
+      await userEvent.click(submit);
+
+      expect(await screen.findByText("Commit message is required")).toBeVisible();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,11 +1,10 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   SectionNavigationFrame,
-  SectionNavigationItem,
   SectionNavigationRail,
 } from "../src/components/layout/section-navigation-frame.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
@@ -259,143 +258,20 @@ describe("SectionNavigationFrame", () => {
   });
 });
 
-describe("Section navigation selection marker", () => {
-  let paintedMarkerPositions: string[];
-  beforeEach(() => {
-    paintedMarkerPositions = [];
-    const computedStyle = globalThis.getComputedStyle;
-    vi.spyOn(globalThis, "getComputedStyle").mockImplementation((element) => {
-      const style = computedStyle(element);
-      if (element.getAttribute("data-testid") === "section-navigation-list") {
-        Object.defineProperty(style, "paddingLeft", { value: "12px" });
-      }
-      return style;
-    });
-    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
-      this: HTMLElement,
-    ) {
-      if (this.dataset.testid === "section-navigation-indicator") {
-        paintedMarkerPositions.push(this.style.transform);
-      }
-      if (this.dataset.testid === "section-navigation-list") return new DOMRect(100, 100, 176, 300);
-      if (this.getAttribute("href") === "/section") return new DOMRect(112, 108, 152, 32);
-      if (this.getAttribute("href") === "/section/details") return new DOMRect(112, 178, 152, 40);
-      return new DOMRect();
-    });
-  });
+describe("Section navigation selection", () => {
+  /** @scenario "The active entry wears the sidebar's pill, with no edge marker" */
+  it("marks the active entry itself and paints no separate marker", () => {
+    renderWithDesignSystem(
+      <SectionNavigationRail
+        label="Section"
+        links={LINKS}
+        activeHref="/section"
+        onNavigate={() => {}}
+      />,
+    );
 
-  const rail = (activeHref: string) => (
-    <SectionNavigationRail
-      label="Section"
-      links={LINKS}
-      activeHref={activeHref}
-      onNavigate={() => {}}
-    />
-  );
-
-  describe("when the controlled selection changes", () => {
-    /** @scenario "One marker follows the active entry" */
-    it("moves the same marker to the new link and hides it without a selection", async () => {
-      const { rerender } = renderWithDesignSystem(rail("/section"));
-      const marker = screen.getByTestId("section-navigation-indicator");
-      expect(marker.style.transform).toBe("translate3d(0px, 16px, 0)");
-      expect(marker.style.height).toBe("16px");
-      expect(marker.style.visibility).toBe("visible");
-      expect(marker.style.transition).toBe("transform 180ms ease-out, height 180ms ease-out");
-
-      rerender(rail("/section/details"));
-      await waitFor(() => expect(marker.style.transform).toBe("translate3d(0px, 86px, 0)"));
-      expect(marker.style.height).toBe("24px");
-      expect(screen.getAllByTestId("section-navigation-indicator")).toEqual([marker]);
-      expect(screen.getByRole("link", { name: "Details" }).getAttribute("aria-current")).toBe(
-        "page",
-      );
-
-      rerender(rail(""));
-      await waitFor(() => expect(marker.style.visibility).toBe("hidden"));
-    });
-  });
-
-  describe("when a route replaces its rail", () => {
-    /** @scenario "A replacement rail continues the selection movement" */
-    it("establishes the previous position before moving the replacement marker", async () => {
-      const page = (href: string) => (
-        <SectionNavigationRail
-          key={href}
-          label="Section"
-          links={LINKS}
-          activeHref={href}
-          onNavigate={() => {}}
-        />
-      );
-      const { rerender } = renderWithDesignSystem(page("/section"));
-      paintedMarkerPositions = [];
-      fireEvent.click(screen.getByRole("link", { name: "Details" }));
-
-      rerender(page("/section/details"));
-
-      expect(paintedMarkerPositions).toEqual(["translate3d(0px, 16px, 0)"]);
-      const marker = screen.getByTestId("section-navigation-indicator");
-      await waitFor(() => expect(marker.style.transform).toBe("translate3d(0px, 86px, 0)"));
-      expect(marker.style.transition).toBe("transform 180ms ease-out, height 180ms ease-out");
-      expect(screen.getAllByTestId("section-navigation-indicator")).toHaveLength(1);
-    });
-  });
-
-  describe("given a reader who prefers reduced motion", () => {
-    /** @scenario "Reduced motion moves the marker without animation" */
-    it("updates position with no transition", async () => {
-      renderWithDesignSystem(<span />);
-      const originalMatchMedia = window.matchMedia;
-      vi.spyOn(window, "matchMedia").mockImplementation((query) => {
-        const media = originalMatchMedia(query);
-        Object.defineProperty(media, "matches", {
-          configurable: true,
-          value: query === "(prefers-reduced-motion: reduce)",
-        });
-        return media;
-      });
-      const { rerender } = renderWithDesignSystem(rail("/section"));
-      const marker = screen.getByTestId("section-navigation-indicator");
-      expect(marker.style.transition).toBe("none");
-
-      rerender(rail("/section/details"));
-      await waitFor(() => expect(marker.style.transform).toBe("translate3d(0px, 86px, 0)"));
-      expect(marker.style.height).toBe("24px");
-      expect(marker.style.transition).toBe("none");
-    });
-  });
-
-  describe("given a nested dashboard list in the extra slot", () => {
-    /** @scenario "The marker follows entries supplied by a nested list" */
-    it("tracks the nested current link even when the rail activeHref stays empty", async () => {
-      const nestedRail = (activeHref: string) => (
-        <SectionNavigationRail
-          label="Analytics"
-          activeHref=""
-          onNavigate={() => {}}
-          groups={[
-            {
-              links: [],
-              extra: LINKS.map((link) => (
-                <SectionNavigationItem
-                  key={link.href}
-                  link={link}
-                  activeHref={activeHref}
-                  onNavigate={() => {}}
-                />
-              )),
-            },
-          ]}
-        />
-      );
-      const { rerender } = renderWithDesignSystem(nestedRail("/section"));
-      const marker = screen.getByTestId("section-navigation-indicator");
-      expect(marker.style.transform).toBe("translate3d(0px, 16px, 0)");
-
-      rerender(nestedRail("/section/details"));
-      await waitFor(() => expect(marker.style.transform).toBe("translate3d(0px, 86px, 0)"));
-      expect(screen.getAllByTestId("section-navigation-indicator")).toEqual([marker]);
-    });
+    const active = screen.getByRole("link", { name: "Overview" });
+    expect(active.getAttribute("aria-current")).toBe("page");
+    expect(screen.queryByTestId("section-navigation-indicator")).toBeNull();
   });
 });

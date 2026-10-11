@@ -146,3 +146,22 @@ export const TitleOnlyAndLongText: Story = {
     </Stack>
   ),
 };
+
+/** A persistent error on the opaque ground used by drawers and dialogs. */
+export const OnPanel: Story = {
+  args: { status: "error" },
+  render: (args) => (
+    <Stack background="bg.panel" borderRadius="xl" padding={6} maxWidth="lg">
+      <Text fontWeight="semibold">Upgrade step</Text>
+      <Alert.Root {...args}>
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Last error</Alert.Title>
+          <Alert.Description>
+            The database could not be reached. Check the connection and retry the step.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
+    </Stack>
+  ),
+};

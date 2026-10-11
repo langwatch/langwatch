@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`PlatformHealthApi`)
 
-Peers call these through the token, declared at `../contract/src/platform-health.ts:94`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/platform-health.ts:119`; nothing else in this package is public.
 
 #### `checkAll`
 
@@ -44,7 +44,7 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/collector`.
 
 ```typescript
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
 // Response: inline, src/transport/platform-health-probe.rest.ts:42
 type Response = unknown;
 ```
@@ -56,7 +56,7 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/evaluations`.
 
 ```typescript
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
 // Response: inline, src/transport/platform-health-probe.rest.ts:51
 type Response = unknown;
 ```
@@ -68,7 +68,7 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/processor`.
 
 ```typescript
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
 // Response: inline, src/transport/platform-health-probe.rest.ts:60
 type Response = unknown;
 ```
@@ -80,12 +80,12 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/triggers`.
 
 ```typescript
-// Query: platformHealthQuerySchema, ../contract/src/platform-health.ts:58
+// Query: platformHealthQuerySchema, ../contract/src/platform-health.ts:76
 interface Query {
   triggerId?: string;
   workflowId?: string;
 }
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
 // Response: inline, src/transport/platform-health-probe.rest.ts:70
 type Response = unknown;
 ```
@@ -97,8 +97,8 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/workflows`.
 
 ```typescript
-type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:58
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
+type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:76
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
 // Response: inline, src/transport/platform-health-probe.rest.ts:87
 type Response = unknown;
 ```
@@ -110,11 +110,11 @@ Public: a project key presented as X-Auth-Token or Authorization: Bearer is reso
 Answers at `/api/health/scenarios`.
 
 ```typescript
-// Query: scenarioCanaryQuerySchema, ../contract/src/platform-health.ts:75
+// Query: scenarioCanaryQuerySchema, ../contract/src/platform-health.ts:100
 interface Query {
   runPlanId?: string;
 }
-type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:66
+type Headers = z.infer<typeof healthProbeHeadersSchema>; // ../contract/src/platform-health.ts:90
 // Response: inline, src/transport/platform-health-probe.rest.ts:104
 type Response = unknown;
 ```
@@ -157,8 +157,8 @@ Authenticated: PLATFORM_HEALTH_API_KEY is the bearer this door compares in const
 Answers at `/api/v1/platform-health`.
 
 ```typescript
-type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:58
-// Response: platformHealthReportSchema, ../contract/src/platform-health.ts:49
+type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:76
+// Response: platformHealthReportSchema, ../contract/src/platform-health.ts:63
 interface Response {
   status: "healthy" | "degraded" | "unhealthy";
   checkedAt: string;
@@ -184,8 +184,8 @@ Answers at `/api/v1/platform-health/:check`.
 interface Params {
   check: string;
 }
-type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:58
-type Response = z.infer<typeof platformHealthReportSchema>; // ../contract/src/platform-health.ts:49
+type Query = z.infer<typeof platformHealthQuerySchema>; // ../contract/src/platform-health.ts:76
+type Response = z.infer<typeof platformHealthReportSchema>; // ../contract/src/platform-health.ts:63
 ```
 
 ## tRPC transport

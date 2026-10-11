@@ -1,4 +1,6 @@
 import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 /**
  * BatchRunsSidebar - Sidebar component showing list of evaluation runs
  */
@@ -15,7 +17,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
-import { GitCompare, X } from "lucide-react";
+import { FlaskConical, GitCompare, X } from "lucide-react";
 import { useMemo } from "react";
 
 import { getRunDisplayName } from "../../../../model/experiment/batch-evaluation-results.run-display-name.ts";
@@ -24,7 +26,7 @@ import {
   isRunFinished,
 } from "../../../../model/experiment/batch-evaluation-results.run-state.ts";
 import { RunDisplayName } from "../../../elements/experiment/batch-results/run-display-name.tsx";
-import { formatTimeAgo, getColorForString } from "./presentation.tsx";
+import { getColorForString } from "./presentation.tsx";
 
 /**
  * Summary data for a single evaluation run
@@ -246,7 +248,7 @@ const RunItem = ({
             <HStack gap={1} flex={1} minWidth={0} width="100%">
               <Box width="10px" height="10px" borderRadius="sm" bg={runColor} flexShrink={0} />
               <Text
-                fontSize="13px"
+                textStyle="bodySm"
                 fontWeight="medium"
                 lineClamp={1}
                 wordBreak="break-all"
@@ -262,14 +264,18 @@ const RunItem = ({
             </HStack>
           </Tooltip>
           {run.workflowVersion?.version && (
-            <Text fontSize="10px" fontWeight="600" color="fg.muted" flexShrink={0}>
+            <Text textStyle="micro" fontWeight="600" color="fg.muted" flexShrink={0}>
               v{run.workflowVersion.version}
             </Text>
           )}
           {!isRunFinished(run.timestamps) && <Spinner size="xs" color="blue.fg" flexShrink={0} />}
         </HStack>
-        <Text color="fg.muted" fontSize="12px">
-          {run.timestamps.createdAt ? formatTimeAgo(run.timestamps.createdAt) : "..."}
+        <Text color="fg.muted" textStyle="caption">
+          {run.timestamps.createdAt ? (
+            <FormattedDate value={run.timestamps.createdAt} display="auto" />
+          ) : (
+            "..."
+          )}
           {run.timestamps.stoppedAt && " · stopped"}
           {interrupted && " · interrupted"}
         </Text>
@@ -325,7 +331,7 @@ export function BatchRunsSidebar({
     <VStack
       align="stretch"
       paddingY={2}
-      fontSize="14px"
+      textStyle="body"
       minWidth={size === "sm" ? "220px" : "260px"}
       maxWidth={size === "sm" ? "220px" : "260px"}
       height="full"
@@ -361,9 +367,21 @@ export function BatchRunsSidebar({
 
       {/* Empty state */}
       {!isLoading && !error && runs.length === 0 && (
-        <Text paddingX={3} paddingY={4} color="fg.muted" fontSize="sm">
-          No runs yet
-        </Text>
+        <NoDataInfoBlock
+          size="inline"
+          bordered={false}
+          icon={<FlaskConical />}
+          title="No runs yet"
+          description="Run an evaluation from the studio and its results appear here."
+          next={[
+            {
+              kind: "docs",
+              label: "How experiments work",
+              href: "https://docs.langwatch.ai/evaluations/experiments/overview",
+            },
+          ]}
+          testId="batch-runs-empty"
+        />
       )}
 
       {/* Run list - Apple Notes style */}

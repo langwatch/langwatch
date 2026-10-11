@@ -2,9 +2,9 @@ import { formatCost, formatTokens } from "@langwatch/design-system/display-forma
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Pagination } from "@langwatch/design-system/pagination";
-import { Button, HStack, Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
@@ -56,6 +56,14 @@ const MAX_LIVE_STATUS_REFS = 50;
 
 /** How long a status answer is reused before the table asks again. */
 const STATUS_STALE_TIME_MS = 60_000;
+
+const PULL_REQUESTS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How pull requests are linked",
+    href: "https://docs.langwatch.ai/coding-agents/pull-requests",
+  },
+];
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 25;
@@ -210,6 +218,7 @@ export function PullRequestsTable({ projectId }: { projectId: string }) {
         title="No pull requests yet"
         icon={<GitPullRequest />}
         description="Pull requests show up here once your coding agent runs on a branch that has one."
+        next={PULL_REQUESTS_NEXT}
       />
     );
   }
@@ -277,9 +286,19 @@ const ListedPullRequests: React.FC<{
         }}
       />
       {sorted.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted">
-          No pull requests match
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No pull requests match"
+          action={{
+            label: "Clear filters",
+            onClick: () => {
+              setSearch("");
+              setPeriodSelection(null);
+              setPage(1);
+            },
+          }}
+          next={PULL_REQUESTS_NEXT}
+        />
       ) : (
         <OnePageOfPullRequests
           projectId={projectId}
@@ -346,7 +365,7 @@ const OnePageOfPullRequests: React.FC<{
     <>
       <ListTable size="sm">
         <TableHeaderRow sort={sort} onSort={onSort} />
-        <Table.Body>
+        <ListTable.Body>
           {rows.map((row) => (
             <PullRequestRow
               key={row.key}
@@ -359,7 +378,7 @@ const OnePageOfPullRequests: React.FC<{
               onOpenDetail={detailOpenerFor({ row, router })}
             />
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
       <Pagination
         page={page}
@@ -511,8 +530,8 @@ const TableHeaderRow: React.FC<{
   sort: PullRequestSortState;
   onSort: (column: PullRequestSortColumn) => void;
 }> = ({ sort, onSort }) => (
-  <Table.Header>
-    <Table.Row>
+  <ListTable.Header>
+    <ListTable.Row>
       <SortableColumnHeader label="Pull request" column="number" sort={sort} onSort={onSort} />
       <SortableColumnHeader label="Title" column="title" sort={sort} onSort={onSort} />
       <SortableColumnHeader label="Status" column="status" sort={sort} onSort={onSort} />
@@ -532,9 +551,9 @@ const TableHeaderRow: React.FC<{
         onSort={onSort}
         align="end"
       />
-      <Table.ColumnHeader width={12} />
-    </Table.Row>
-  </Table.Header>
+      <ListTable.ColumnHeader label="Row actions" width={48} />
+    </ListTable.Row>
+  </ListTable.Header>
 );
 
 const NotConnectedState: React.FC<{
@@ -544,6 +563,7 @@ const NotConnectedState: React.FC<{
   <NoDataInfoBlock
     title="GitHub is not connected"
     icon={<GitPullRequest />}
+    next={PULL_REQUESTS_NEXT}
     description={
       canManageOrganization
         ? "Connect GitHub so your sessions line up with the pull requests they went into."
@@ -567,13 +587,8 @@ const PullRequestRow: React.FC<{
   costStats: { p95: number; hasStats: boolean };
   onOpenDetail: (() => void) | undefined;
 }> = ({ row, status, installUrl, canManageOrganization, tokenStats, costStats, onOpenDetail }) => (
-  <Table.Row
-    data-testid="coding-agent-pull-request-row"
-    onClick={onOpenDetail}
-    cursor={onOpenDetail ? "pointer" : undefined}
-    _hover={onOpenDetail ? { bg: "bg.subtle" } : undefined}
-  >
-    <Table.Cell>
+  <ListTable.Row data-testid="coding-agent-pull-request-row" onActivate={onOpenDetail}>
+    <ListTable.Cell>
       {row.pullRequest ? (
         // The row opens the detail; this link leaves for GitHub, so it stops
         // the click from reaching the row underneath it.
@@ -592,8 +607,8 @@ const PullRequestRow: React.FC<{
           {MISSING_VALUE}
         </Text>
       )}
-    </Table.Cell>
-    <Table.Cell maxWidth="360px">
+    </ListTable.Cell>
+    <ListTable.Cell maxWidth="360px">
       {row.pullRequest ? (
         <Text fontSize="sm" fontWeight="medium" truncate>
           {row.pullRequest.title || row.headBranch}
@@ -614,19 +629,19 @@ const PullRequestRow: React.FC<{
           />
         ) : null}
       </HStack>
-    </Table.Cell>
-    <Table.Cell>
+    </ListTable.Cell>
+    <ListTable.Cell>
       <StatusCell row={row} status={status} />
-    </Table.Cell>
-    <Table.Cell fontSize="sm" color="fg.muted" whiteSpace="nowrap">
+    </ListTable.Cell>
+    <ListTable.Cell tone="muted" nowrap>
       {row.lastActivityAtMs === 0
         ? MISSING_VALUE
         : formatLastUpdate({ timestampMs: row.lastActivityAtMs })}
-    </Table.Cell>
-    <Table.Cell maxWidth="160px">
+    </ListTable.Cell>
+    <ListTable.Cell maxWidth="160px">
       <ModelsCell models={row.modelBreakdown} />
-    </Table.Cell>
-    <Table.Cell textAlign="end">
+    </ListTable.Cell>
+    <ListTable.Cell align="end">
       <PeerComparisonCell
         value={row.totalTokens}
         p95={tokenStats.p95}
@@ -634,19 +649,19 @@ const PullRequestRow: React.FC<{
         formatValue={formatTokens}
         metricPhrase="total tokens"
       />
-    </Table.Cell>
-    <Table.Cell textAlign="end">
+    </ListTable.Cell>
+    <ListTable.Cell align="end">
       <TokenCostCell row={row} stats={costStats} />
-    </Table.Cell>
-    <Table.Cell>
+    </ListTable.Cell>
+    <ListTable.Cell>
       <RowActionsMenu
         row={row}
         installUrl={installUrl}
         canManageOrganization={canManageOrganization}
         onOpenDetail={onOpenDetail}
       />
-    </Table.Cell>
-  </Table.Row>
+    </ListTable.Cell>
+  </ListTable.Row>
 );
 
 /**

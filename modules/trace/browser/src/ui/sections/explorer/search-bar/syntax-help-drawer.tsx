@@ -1,13 +1,14 @@
+import { Card } from "@langwatch/design-system/card";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
   Box,
   Clipboard,
   Code,
   chakra,
-  Heading,
   HStack,
   IconButton,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -19,7 +20,6 @@ import type React from "react";
 
 import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
-import { Drawer } from "../../drawer.tsx";
 import { QueryPreview } from "./query-preview.tsx";
 
 interface Example {
@@ -155,17 +155,11 @@ export const SyntaxHelpDrawerHost: React.FC = () => {
   const open = useUIStore((s) => s.syntaxHelpOpen);
   const setOpen = useUIStore((s) => s.setSyntaxHelpOpen);
   return (
-    <Drawer.Root open={open} onOpenChange={(e) => setOpen(e.open)} size="md" modal>
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Query syntax</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body padding={0} bg="bg.muted">
-          <SyntaxHelpBody onClose={() => setOpen(false)} />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer open={open} onClose={() => setOpen(false)} size="md" title="Query syntax" body="flush">
+      <Box bg="bg.muted" minHeight="full">
+        <SyntaxHelpBody onClose={() => setOpen(false)} />
+      </Box>
+    </Drawer>
   );
 };
 
@@ -193,6 +187,7 @@ const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) =>
 
       <Section title="Operators">
         <SyntaxTable
+          label="Operators"
           columns={["Operator", "Meaning", "Example"]}
           rows={OPERATOR_ROWS.map((r) => ({
             key: r.op,
@@ -211,11 +206,12 @@ const SyntaxHelpBody: React.FC<SyntaxHelpBodyProps> = ({ onClose: _onClose }) =>
 
       <Section title="Values">
         <SyntaxTable
+          label="Value forms"
           columns={["Form", "Example", "Notes"]}
           rows={VALUE_ROWS.map((r) => ({
             key: r.form,
             cells: [
-              <Text key="form" textStyle="sm" fontWeight="600" color="fg">
+              <Text key="form" textStyle="sm" fontWeight="semibold" color="fg">
                 {r.form}
               </Text>,
               <CopyableQuery key="ex" query={r.example} onApply={apply} />,
@@ -245,14 +241,7 @@ const SYNTAX_TIPS: readonly { label: string; example: string }[] = [
 ];
 
 const SyntaxTipStrip: React.FC = () => (
-  <Box
-    paddingX={4}
-    paddingY={3}
-    borderRadius="md"
-    bg="bg.subtle"
-    borderWidth="1px"
-    borderColor="border"
-  >
+  <Card variant="nested" padding="sm">
     <HStack gap={4} flexWrap="wrap" rowGap={2}>
       {SYNTAX_TIPS.map((tip) => (
         <HStack key={tip.label} gap={1.5}>
@@ -263,7 +252,7 @@ const SyntaxTipStrip: React.FC = () => (
         </HStack>
       ))}
     </HStack>
-  </Box>
+  </Card>
 );
 
 const Section: React.FC<{
@@ -271,27 +260,19 @@ const Section: React.FC<{
   caption?: string;
   children: React.ReactNode;
 }> = ({ title, caption, children }) => (
-  <VStack
-    align="stretch"
-    gap={3}
-    padding={4}
-    bg="bg.panel"
-    borderWidth="1px"
-    borderColor="border"
-    borderRadius="lg"
-  >
-    <HStack justify="space-between" align="baseline">
-      <Heading size="sm" letterSpacing="-0.01em">
-        {title}
-      </Heading>
-      {caption && (
+  <Card
+    title={title}
+    titleLevel={3}
+    badge={
+      caption ? (
         <Text textStyle="xs" color="fg.muted">
           {caption}
         </Text>
-      )}
-    </HStack>
+      ) : undefined
+    }
+  >
     {children}
-  </VStack>
+  </Card>
 );
 
 const ExampleCookbook: React.FC<{ onApply: (query: string) => void }> = ({ onApply }) => (
@@ -308,45 +289,37 @@ const ExampleCard: React.FC<{
 }> = ({ group, onApply }) => {
   const Icon = group.icon;
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      padding={3}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      bg="bg.subtle"
-      transition="border-color 120ms ease"
-      _hover={{ borderColor: `${group.accent}.muted` }}
-    >
-      <HStack gap={2} align="center">
-        <Box
-          boxSize="22px"
-          borderRadius="sm"
-          bg={`${group.accent}.subtle`}
-          color={`${group.accent}.fg`}
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Icon size={12} />
-        </Box>
-        <Text
-          textStyle="2xs"
-          fontWeight="700"
-          color="fg"
-          textTransform="uppercase"
-          letterSpacing="0.08em"
-        >
-          {group.title}
-        </Text>
-      </HStack>
-      <VStack align="stretch" gap={1}>
-        {group.examples.map((ex) => (
-          <ExampleRow key={ex.query} example={ex} accent={group.accent} onApply={onApply} />
-        ))}
+    <Card variant="nested" padding="sm">
+      <VStack align="stretch" gap={2}>
+        <HStack gap={2} align="center">
+          <Box
+            boxSize="22px"
+            borderRadius="sm"
+            bg={`${group.accent}.subtle`}
+            color={`${group.accent}.fg`}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Icon size={12} />
+          </Box>
+          <Text
+            textStyle="2xs"
+            fontWeight="semibold"
+            color="fg"
+            textTransform="uppercase"
+            letterSpacing="0.08em"
+          >
+            {group.title}
+          </Text>
+        </HStack>
+        <VStack align="stretch" gap={1}>
+          {group.examples.map((ex) => (
+            <ExampleRow key={ex.query} example={ex} accent={group.accent} onApply={onApply} />
+          ))}
+        </VStack>
       </VStack>
-    </VStack>
+    </Card>
   );
 };
 
@@ -423,29 +396,28 @@ const CopyTrigger: React.FC<{ value: string }> = ({ value }) => (
 );
 
 const SyntaxTable: React.FC<{
+  label: string;
   columns: readonly string[];
   rows: readonly { key: string; cells: readonly React.ReactNode[] }[];
-}> = ({ columns, rows }) => (
-  <Table.Root size="sm" variant="outline">
-    <Table.Header>
-      <Table.Row bg="bg.subtle">
+}> = ({ label, columns, rows }) => (
+  <ListTable aria-label={label}>
+    <ListTable.Header>
+      <ListTable.Row>
         {columns.map((col) => (
-          <Table.ColumnHeader key={col} textStyle="2xs" letterSpacing="0.08em">
-            {col}
-          </Table.ColumnHeader>
+          <ListTable.ColumnHeader key={col}>{col}</ListTable.ColumnHeader>
         ))}
-      </Table.Row>
-    </Table.Header>
-    <Table.Body>
+      </ListTable.Row>
+    </ListTable.Header>
+    <ListTable.Body>
       {rows.map((row) => (
-        <Table.Row key={row.key}>
+        <ListTable.Row key={row.key}>
           {row.cells.map((cell, idx) => (
-            <Table.Cell key={idx}>{cell}</Table.Cell>
+            <ListTable.Cell key={idx}>{cell}</ListTable.Cell>
           ))}
-        </Table.Row>
+        </ListTable.Row>
       ))}
-    </Table.Body>
-  </Table.Root>
+    </ListTable.Body>
+  </ListTable>
 );
 
 const CopyableQuery: React.FC<{
@@ -473,26 +445,20 @@ const CopyableQuery: React.FC<{
 const FieldsTable: React.FC<{ onApply: (query: string) => void }> = ({ onApply }) => {
   const entries = Object.entries(SEARCH_FIELDS);
   return (
-    <Table.Root size="sm" variant="outline">
-      <Table.Header>
-        <Table.Row bg="bg.subtle">
-          <Table.ColumnHeader textStyle="2xs" letterSpacing="0.08em">
-            Field
-          </Table.ColumnHeader>
-          <Table.ColumnHeader textStyle="2xs" letterSpacing="0.08em">
-            Type
-          </Table.ColumnHeader>
-          <Table.ColumnHeader textStyle="2xs" letterSpacing="0.08em">
-            Example
-          </Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable aria-label="Searchable fields">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Field</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Type</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Example</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {entries.map(([name, meta]) => (
           <FieldRow key={name} name={name} meta={meta} onApply={onApply} />
         ))}
-      </Table.Body>
-    </Table.Root>
+      </ListTable.Body>
+    </ListTable>
   );
 };
 
@@ -510,21 +476,21 @@ const FieldRow: React.FC<{
 }> = ({ name, meta, onApply }) => {
   const example = exampleFor(name, meta);
   return (
-    <Table.Row>
-      <Table.Cell>
+    <ListTable.Row>
+      <ListTable.Cell>
         <Code size="sm" variant="surface">
           {name}
         </Code>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge size="xs" colorPalette={TYPE_PALETTE[meta.valueType]} variant="subtle">
           {meta.valueType}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <CopyableQuery query={example} onApply={onApply} />
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 };
 

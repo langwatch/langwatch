@@ -6,7 +6,7 @@
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const PROJECT_ID = "project-demo";
@@ -85,10 +85,36 @@ vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
   ),
 }));
 
-/** Drives the gate query the inline model-setup branch reads. */
-const resolvedDefaultRef: {
-  current: { data: { model: string | null } | undefined; isLoading: boolean; isError: boolean };
-} = { current: { data: undefined, isLoading: false, isError: false } };
+type ResolvedDefault = {
+  data: { model: string | null } | undefined;
+  isLoading: boolean;
+  isError: boolean;
+};
+
+/**
+ * Drives the gate query the inline model-setup branch reads. Setting `current`
+ * notifies subscribers, as a real query does, so the compiled panel re-reads.
+ */
+const resolvedDefaultRef = vi.hoisted(() => {
+  let value: ResolvedDefault = { data: undefined, isLoading: false, isError: false };
+  let version = 0;
+  const listeners = new Set<() => void>();
+  return {
+    get current(): ResolvedDefault {
+      return value;
+    },
+    set current(next: ResolvedDefault) {
+      value = next;
+      version += 1;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+    snapshot: () => version,
+  };
+});
 
 /**
  * Saving writes the provider key and the project default; the next
@@ -130,16 +156,20 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
     useContext: () => trpcUtils,
     modelProvider: {
       getResolvedDefault: {
-        useQuery: () => ({
-          data: resolvedDefaultRef.current.data,
-          isLoading: resolvedDefaultRef.current.isLoading,
-          // Mirrors react-query's own relationship between the three fields:
-          // an errored query also reports isLoading false with data
-          // undefined, so the panel gates on isSuccess rather than !isLoading.
-          isSuccess: !resolvedDefaultRef.current.isLoading && !resolvedDefaultRef.current.isError,
-          isError: resolvedDefaultRef.current.isError,
-          refetch: refetchResolvedDefault,
-        }),
+        useQuery: () => {
+          "use no memo";
+          useSyncExternalStore(resolvedDefaultRef.subscribe, resolvedDefaultRef.snapshot);
+          return {
+            data: resolvedDefaultRef.current.data,
+            isLoading: resolvedDefaultRef.current.isLoading,
+            // Mirrors react-query's own relationship between the three fields:
+            // an errored query also reports isLoading false with data
+            // undefined, so the panel gates on isSuccess rather than !isLoading.
+            isSuccess: !resolvedDefaultRef.current.isLoading && !resolvedDefaultRef.current.isError,
+            isError: resolvedDefaultRef.current.isError,
+            refetch: refetchResolvedDefault,
+          };
+        },
       },
       listAllForProjectForFrontend: {
         useQuery: () => ({ data: [], isLoading: false }),
@@ -323,7 +353,7 @@ describe("given a project with no model and a question handed to Langy from a pa
     /** @scenario "A question handed to Langy waits for a model instead of failing" */
     it("holds the question behind the setup prompt and sends it once a model resolves", async () => {
       resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
-      const rendered = renderPanel();
+      renderPanel();
       act(() => {
         useLangyStore.getState().askLangy("Set up my first evaluator");
       });
@@ -334,12 +364,13 @@ describe("given a project with no model and a question handed to Langy from a pa
       expect(screen.getByText("Set up my first evaluator")).toBeInTheDocument();
       expect(screen.getByText("Langy sends this once a model is set up.")).toBeInTheDocument();
 
-      resolvedDefaultRef.current = {
-        data: { model: "gpt-5-mini" },
-        isLoading: false,
-        isError: false,
-      };
-      rendered.rerender(<LangySidecar />);
+      act(() => {
+        resolvedDefaultRef.current = {
+          data: { model: "gpt-5-mini" },
+          isLoading: false,
+          isError: false,
+        };
+      });
 
       await waitFor(() => {
         expect(sendMessage).toHaveBeenCalledTimes(1);
@@ -357,17 +388,13 @@ describe("given the Langy panel is showing the inline model setup", () => {
       const user = userEvent.setup();
       resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
 
-      const rendered = renderPanel();
+      renderPanel();
       expect(await screen.findByText("Langy needs a model to get started")).toBeInTheDocument();
 
       await user.type(screen.getByLabelText("Provider API Key"), "sk-test-key");
       await user.click(screen.getByRole("button", { name: "Save and continue" }));
 
       expect(refetchResolvedDefault).toHaveBeenCalledTimes(1);
-      // The real refetch notifies subscribers; this mutable query double needs
-      // an explicit rerender to model that update.
-      rendered.rerender(<LangySidecar />);
-
       await waitFor(() => {
         expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
       });

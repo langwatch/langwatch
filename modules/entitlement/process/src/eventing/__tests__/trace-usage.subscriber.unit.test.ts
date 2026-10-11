@@ -121,6 +121,20 @@ describe("trace usage subscribers", () => {
     });
   });
 
+  describe("when a member project holds the traces of an aggregate project", () => {
+    /** @scenario "Billing stays with the owning project" */
+    it("counts the trace against the member and writes nothing for the aggregate", async () => {
+      const { counts, deliver } = compose();
+
+      await deliver("traceUsageSpan", span({ traceId: "trace-1", createdAt: OCT_8 }));
+
+      const countFor = (projectId: string) =>
+        counts.rows.filter((row) => row.projectId === projectId).length;
+      expect(countFor("project-1")).toBe(1);
+      expect(countFor("aggregate-project-1")).toBe(0);
+    });
+  });
+
   describe("when a span job runs", () => {
     /** @scenario "A trace's span writes one usage row for its project and month" */
     it("writes one row for the trace in the month the span was appended", async () => {

@@ -1,4 +1,3 @@
-import { CopyButton } from "@langwatch/browser-host/copy-button";
 import {
   Box,
   type BoxProps,
@@ -68,32 +67,29 @@ export function DatasetSlugDisplay({
     <Box {...boxProps}>
       <Field.HelperText>
         <VStack align="start">
-          <HStack>
-            <Text
-              className="slug-text"
-              fontSize="2xs"
-              color="fg.muted"
-              textAlign="left"
-              transition="opacity 0.2s"
-              minWidth={0}
-            >
-              slug:{" "}
-              {slugWillChange ? (
-                <>
-                  <Text as="span" textDecoration="line-through">
-                    {dbSlug}
-                  </Text>
-                  {" -> "}
-                  <b> {displaySlug}</b>
-                </>
-              ) : (
-                displaySlug
-              )}
-            </Text>
-            {!slugWillChange && displaySlug && (
-              <CopyButton value={displaySlug} label="Dataset slug" />
-            )}
-          </HStack>
+          {slugWillChange && (
+            <HStack>
+              <Text
+                className="slug-text"
+                textStyle="micro"
+                color="fg.muted"
+                textAlign="left"
+                transition="opacity 0.2s"
+                minWidth={0}
+              >
+                slug:{" "}
+                {
+                  <>
+                    <Text as="span" textDecoration="line-through">
+                      {dbSlug}
+                    </Text>
+                    {" -> "}
+                    <b> {displaySlug}</b>
+                  </>
+                }
+              </Text>
+            </HStack>
+          )}
           {renderAlert()}
         </VStack>
       </Field.HelperText>

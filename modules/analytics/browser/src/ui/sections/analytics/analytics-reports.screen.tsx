@@ -1,6 +1,7 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Banner } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, Skeleton } from "@langwatch/design-system/primitives";
 import { useFeatureFlag } from "@langwatch/feature-flag-client";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Plus } from "lucide-react";
@@ -206,25 +207,30 @@ function ReportsContent() {
 
   return (
     <AnalyticsLayout
-      title={dashboardTitle}
-      railEntry="reports"
+      tab="reports"
       activeDashboardId={activeDashboardId}
-      analyticsHeaderProps={{
+      dashboard={{
+        title: dashboardTitle,
+        projectSlug: project?.slug ?? "",
+        dashboardId: isMissingDashboard ? void 0 : (activeDashboardId ?? void 0),
         isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
-      }}
-      extraHeaderButtons={
-        <>
-          <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
-          {project && canAddChart ? (
-            <AddChartButton
-              opensDrawer={customChartPlaygroundEnabled}
-              href={addChartUrl}
-              onOpenDrawer={() => setIsAddChartOpen(true)}
+        actions: (
+          <>
+            <DashboardAutoRefreshMenu
+              option={autoRefresh.option}
+              onChange={autoRefresh.setOption}
             />
-          ) : null}
-        </>
-      }
+            {project && canAddChart ? (
+              <AddChartButton
+                opensDrawer={customChartPlaygroundEnabled}
+                href={addChartUrl}
+                onOpenDrawer={() => setIsAddChartOpen(true)}
+              />
+            ) : null}
+          </>
+        ),
+      }}
     >
       {/* The workbench builder's own save path is disabled while the
           custom-chart-playground is enabled (see DashboardWidgetService /
@@ -243,34 +249,25 @@ function ReportsContent() {
       )}
 
       {isMissingDashboard && (
-        <Alert.Root status="warning" variant="surface" marginBottom={6}>
-          <Alert.Indicator />
-          <VStack align="start">
-            <Alert.Title>This dashboard doesn&apos;t exist</Alert.Title>
-            <Alert.Description>
-              <Text as="span">It may have been deleted. Pick another dashboard from the menu.</Text>
-            </Alert.Description>
-          </VStack>
-        </Alert.Root>
+        <Box marginBottom={6}>
+          <Banner status="warning" title="This dashboard doesn't exist">
+            It may have been deleted. Pick another dashboard from the menu.
+          </Banner>
+        </Box>
       )}
 
       {/* Empty state */}
       {hasNoGraphs && !isMissingDashboard && (
-        <Alert.Root status="info" variant="surface" marginBottom={6}>
-          <Alert.Indicator />
-          <VStack align="start">
-            <Alert.Title>
-              {canAddChart ? "Add your custom graphs here" : "No custom graphs yet"}
-            </Alert.Title>
-            <Alert.Description>
-              <Text as="span">
-                {canAddChart
-                  ? "You haven't set up any custom graphs yet. Click + Add chart to get started."
-                  : "Nobody has added a custom graph to this dashboard yet."}
-              </Text>
-            </Alert.Description>
-          </VStack>
-        </Alert.Root>
+        <Box marginBottom={6}>
+          <Banner
+            status="info"
+            title={canAddChart ? "Add your custom graphs here" : "No custom graphs yet"}
+          >
+            {canAddChart
+              ? "You haven't set up any custom graphs yet. Click + Add chart to get started."
+              : "Nobody has added a custom graph to this dashboard yet."}
+          </Banner>
+        </Box>
       )}
 
       {/* Main content */}

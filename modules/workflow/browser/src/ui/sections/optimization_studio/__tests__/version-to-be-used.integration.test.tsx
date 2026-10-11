@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (state: unknown) => unknown) =>
     selector({
+      socketStatus: "connected",
       checkCanCommitNewVersion: () => true,
       getWorkflow: () => ({ nodes: [], edges: [] }),
     }),
@@ -53,6 +54,9 @@ vi.mock("../../../../behavior/workflow-api.ts", () => ({
 const { VersionToBeUsed } = await import("../version-to-be-used.tsx");
 
 function Harness({ children }: { children: ReactNode }) {
+  // The compiler would hold the spread context value across renders and the
+  // fields would never see the submit; the dialogs read `watch`, which opts them out.
+  "use no memo";
   const form = useForm<{ version: string; commitMessage: string }>({
     defaultValues: { version: "", commitMessage: "" },
   });

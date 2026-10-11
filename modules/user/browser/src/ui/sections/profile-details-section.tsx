@@ -96,7 +96,7 @@ export function ProfileDetailsSection() {
 
           <HStack gap={2} flexWrap="wrap">
             {actor?.email && (
-              <Text fontSize="sm" color="fg.muted" data-testid="profile-email">
+              <Text textStyle="body" color="fg.muted" data-testid="profile-email">
                 {actor.email}
               </Text>
             )}

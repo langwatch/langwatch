@@ -4,10 +4,11 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
+import { Card } from "@langwatch/design-system/card";
+import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { AtomCost, ResultTotals, SeriesBucket } from "@langwatch/scenario-contract";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { formatCost } from "../../../../model/suite/formatters.ts";
 import {
   formatPassRate,
@@ -29,36 +30,28 @@ function Stat({
   testId?: string;
 }) {
   return (
-    <VStack
-      align="stretch"
-      justify="center"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      paddingX={3.5}
-      paddingY={2.5}
-      data-testid={testId}
-    >
-      <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
-        {label}
-      </Text>
-      <Text
-        fontSize="22px"
-        lineHeight="1"
-        fontWeight="semibold"
-        marginTop={1}
-        fontVariantNumeric="tabular-nums"
-        color={color ?? "fg"}
-      >
-        {value}
-      </Text>
-      {note ? (
-        <Text fontSize="10.5px" color={FG_MUTED} marginTop={1.5}>
-          {note}
+    <Card variant="frame" padding="sm" bodyLayout="stack" data-testid={testId}>
+      <VStack align="stretch" justify="center" gap={0} flex={1}>
+        <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
+          {label}
         </Text>
-      ) : null}
-    </VStack>
+        <Text
+          textStyle="metric"
+          lineHeight="1"
+          fontWeight="semibold"
+          marginTop={1}
+          fontVariantNumeric="tabular-nums"
+          color={color ?? "fg"}
+        >
+          {value}
+        </Text>
+        {note ? (
+          <Text textStyle="micro" color="fg.muted" marginTop={1.5}>
+            {note}
+          </Text>
+        ) : null}
+      </VStack>
+    </Card>
   );
 }
 
@@ -68,17 +61,8 @@ const CHART_BAR_MAX = 30;
 /** The pass rate of the window, bucket by bucket, oldest first. */
 function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
   return (
-    <VStack
-      align="stretch"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      paddingX={3.5}
-      paddingY={3}
-      data-testid="results-pass-rate-chart"
-    >
-      <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
+    <Card variant="frame" padding="sm" data-testid="results-pass-rate-chart">
+      <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
         Pass rate over time
       </Text>
 
@@ -93,12 +77,12 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
             justify="flex-end"
           >
             <Text
-              fontSize="10.5px"
+              textStyle="micro"
               fontWeight="medium"
               fontVariantNumeric="tabular-nums"
-              color={bucket.isEmpty ? FG_MUTED : "fg"}
+              color={bucket.isEmpty ? "fg.muted" : "fg"}
             >
-              {bucket.isEmpty ? "-" : formatPassRate(bucket.passRate)}
+              {bucket.isEmpty ? <EmptyValue label="No runs" /> : formatPassRate(bucket.passRate)}
             </Text>
             {/* An empty bucket is drawn as a gap, not as a bar of zero: a
                 zero-height bar reads as a run that failed completely. */}
@@ -119,8 +103,8 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
             key={bucket.label}
             flex={1}
             minWidth={0}
-            fontSize="10px"
-            color={FG_MUTED}
+            textStyle="micro"
+            color="fg.muted"
             textAlign="center"
             truncate
           >
@@ -128,7 +112,7 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
           </Text>
         ))}
       </HStack>
-    </VStack>
+    </Card>
   );
 }
 

@@ -61,7 +61,7 @@ export function EmojiPickerModal({
                 key={emoji}
                 variant="ghost"
                 size="sm"
-                fontSize="18px"
+                textStyle="metric"
                 onClick={() => choose(emoji)}
               >
                 {emoji}

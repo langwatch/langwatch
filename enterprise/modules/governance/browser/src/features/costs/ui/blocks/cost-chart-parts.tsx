@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Text, VStack } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { type ReactNode } from "react";
 import { Legend } from "recharts";
 
@@ -77,7 +78,7 @@ export const PROJECTION_INK = "var(--chakra-colors-gray-emphasized)";
 export function ChartLegend({ keys }: { keys: { key: string; label: string }[] }) {
   return (
     <Legend
-      wrapperStyle={{ fontSize: 11 }}
+      wrapperStyle={{ fontSize: TYPE_SCALE_PX.micro }}
       iconType="circle"
       formatter={(value: string) => keys.find((k) => k.key === value)?.label ?? value}
     />

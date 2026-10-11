@@ -20,7 +20,7 @@ import {
   FolderOpen,
   Gauge,
   KeyRound,
-  Lock,
+  LogIn,
   MailX,
   Network,
   RefreshCw,
@@ -32,6 +32,12 @@ import {
   UserCog,
   UserRound,
   Workflow,
+  Vault,
+  UserStar,
+  ShieldUser,
+  FolderSync,
+  Receipt,
+  Ticket,
   UserSearch,
   BookUser,
   type LucideIcon,
@@ -53,11 +59,16 @@ export interface SettingsMenuItem {
    */
   alsoActiveAt?: string[];
   icon: LucideIcon;
-  /** Enterprise-plan entry; renders the quiet grey pill. */
+  /**
+   * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
+   * in Enterprise", and the page opens on its upsell.
+   */
+  isLocked?: boolean;
+  /** An Enterprise entry on a plan that includes it: the sidebar marks it with the "ENT" chip. */
   isEnterprise?: boolean;
 }
 
-/** Settings entry active check; uses pathname, not router pattern */
+/** Settings entry active check by path prefix; uses pathname, not router pattern */
 export function isSettingsMenuItemActive({
   item,
   pathname,
@@ -65,7 +76,8 @@ export function isSettingsMenuItemActive({
   item: SettingsMenuItem;
   pathname: string;
 }): boolean {
-  if (item.alsoActiveAt?.includes(pathname)) return true;
+  // By prefix, so a detail page (/settings/teams/:team) keeps its owner lit.
+  if (item.alsoActiveAt?.some((base) => isPathUnder({ pathname, base }))) return true;
   if (item.isExactMatch) return pathname === item.href;
   return isPathUnder({ pathname, base: item.includePath ?? item.href });
 }
@@ -91,10 +103,40 @@ export interface SettingsMenuGates {
   isSaaS: boolean;
   hasCloudOps: boolean;
   hosting: Hosting;
-  showEnterpriseNav: boolean;
+  /** Enterprise entries: shown, shown locked, or hidden while the plan has not answered. */
+  enterprisePlan: EnterprisePlanGate;
   isLiteMember: boolean;
   hasOpsAccess: boolean;
   isPlatformAdmin: boolean;
+}
+
+export type EnterprisePlanGate = "included" | "locked" | "pending";
+
+/** A plan still in flight offers no Enterprise entry, so none flickers from locked to open. */
+export function enterprisePlanGate({
+  isEnterprise,
+  isLoading,
+}: {
+  isEnterprise: boolean;
+  isLoading: boolean;
+}): EnterprisePlanGate {
+  if (isEnterprise) return "included";
+  if (isLoading) return "pending";
+  return "locked";
+}
+
+/** An Enterprise entry under the plan gate; permission and lite-member gates stay the caller's. */
+function enterpriseEntry({
+  item,
+  enterprisePlan,
+}: {
+  item: SettingsMenuItem;
+  enterprisePlan: EnterprisePlanGate;
+}): SettingsMenuItem[] {
+  if (enterprisePlan === "pending") return [];
+  return [
+    enterprisePlan === "locked" ? { ...item, isLocked: true } : { ...item, isEnterprise: true },
+  ];
 }
 
 /**
@@ -115,7 +157,7 @@ function youGroup(): SettingsMenuGroup {
 function organizationGroup({
   hasPermission,
   isSaaS,
-  showEnterpriseNav,
+  enterprisePlan,
   isLiteMember,
 }: SettingsMenuGates): SettingsMenuGroup {
   return {
@@ -131,31 +173,22 @@ function organizationGroup({
       // Keys sit here rather than in Access, where four enterprise entries
       // came first and left a page most readers use at the bottom of a group
       // they cannot open.
-      ...(!isLiteMember ? [{ label: "API Keys", href: "/settings/api-keys", icon: KeyRound }] : []),
-      ...(showEnterpriseNav && !isLiteMember && hasPermission("auditLog:view")
-        ? [
-            {
-              label: "Audit Log",
-              href: "/settings/audit-log",
-              icon: ScrollText,
-              isEnterprise: true,
-            },
-          ]
+      ...(!isLiteMember ? [{ label: "API keys", href: "/settings/api-keys", icon: KeyRound }] : []),
+      ...(!isLiteMember && hasPermission("auditLog:view")
+        ? enterpriseEntry({
+            item: { label: "Audit log", href: "/settings/audit-log", icon: ScrollText },
+            enterprisePlan,
+          })
         : []),
       // How the organization signs in; one entry lit on the provider and connectors pages too.
       // Offered only to a reader who may see single sign-on; the page refuses the address as well.
-      ...(showEnterpriseNav && !isLiteMember && hasPermission("sso:view")
-        ? [
-            {
-              label: "Authentication",
-              href: "/settings/authentication",
-              icon: Lock,
-              isEnterprise: true,
-            },
-          ]
+      // On every plan, never locked: only its single sign-on card needs Enterprise
+      // (Alex, 2026-10-11).
+      ...(!isLiteMember && hasPermission("sso:view")
+        ? [{ label: "Authentication", href: "/settings/authentication", icon: LogIn }]
         : []),
       ...(!isLiteMember
-        ? [{ label: "Usage & Billing", href: "/settings/usage", icon: Gauge }]
+        ? [{ label: "Usage & billing", href: "/settings/usage", icon: Gauge }]
         : []),
       ...(!isLiteMember && isSaaS
         ? [
@@ -177,7 +210,7 @@ function organizationGroup({
   };
 }
 
-function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({ enterprisePlan, isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "People & access",
@@ -197,36 +230,34 @@ function accessGroup({ showEnterpriseNav, isLiteMember }: SettingsMenuGates): Se
           "/settings/access",
         ],
       },
-      ...(showEnterpriseNav && !isLiteMember ? enterpriseAccessItems() : []),
+      ...(!isLiteMember
+        ? enterpriseEntry({
+            // Definitions and their assignments are two tabs of one page.
+            item: {
+              label: "Roles & access",
+              href: "/settings/roles",
+              icon: ShieldCheck,
+              alsoActiveAt: ["/settings/role-bindings"],
+            },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
-}
-
-function enterpriseAccessItems(): SettingsMenuItem[] {
-  return [
-    {
-      // Definitions and their assignments are two tabs of one page.
-      label: "Roles & access",
-      href: "/settings/roles",
-      icon: ShieldCheck,
-      alsoActiveAt: ["/settings/role-bindings"],
-      isEnterprise: true,
-    },
-  ];
 }
 
 function aiInfrastructureGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-ai-infrastructure",
-    label: "AI Infrastructure",
+    label: "AI infrastructure",
     items: [
       {
-        label: "Model Providers",
+        label: "Model providers",
         href: "/settings/model-providers",
         icon: Brain,
       },
-      { label: "Model Costs", href: "/settings/model-costs", icon: Coins },
-      ...(!isLiteMember ? [{ label: "Secrets", href: "/settings/secrets", icon: Lock }] : []),
+      { label: "Model costs", href: "/settings/model-costs", icon: Coins },
+      ...(!isLiteMember ? [{ label: "Secrets", href: "/settings/secrets", icon: Vault }] : []),
     ],
   };
 }
@@ -234,18 +265,18 @@ function aiInfrastructureGroup({ isLiteMember }: SettingsMenuGates): SettingsMen
 function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-data-controls",
-    label: "Data Controls",
+    label: "Data controls",
     items: [
       {
-        label: "Data Retention",
+        label: "Data retention",
         href: "/settings/data-retention",
         icon: Archive,
       },
-      { label: "Data Privacy", href: "/settings/data-privacy", icon: EyeOff },
+      { label: "Data privacy", href: "/settings/data-privacy", icon: EyeOff },
       ...(hasPermission("triggers:view")
         ? [
             {
-              label: "Email Suppressions",
+              label: "Email suppressions",
               href: "/settings/email-suppressions",
               icon: MailX,
             },
@@ -260,15 +291,16 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
     id: "settings-project",
     label: "Project",
     items: [
+      { label: "General", href: "/settings/project", icon: FolderOpen },
       {
-        label: "Annotation Scores",
+        label: "Annotation scores",
         href: "/settings/annotation-scores",
         icon: Sparkles,
       },
       ...(!isLiteMember
         ? [
             {
-              label: "Topic Clustering",
+              label: "Topic clustering",
               href: "/settings/topic-clustering",
               icon: Network,
             },
@@ -287,47 +319,49 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
 export const OPS_ATTENTION_HREF = "/ops";
 
 /**
- * Every internal ops page — the only place they're offered in the new
- * navigation, so a page missing here can't be reached from the menu.
- * `opsMenuReachability` pins it against the route table (ops-navigation-v2).
+ * The operator console's health pages; with Tools, Instance and Cloud, every internal ops page.
+ * A page missing from adminMenu can't be reached from the menu; `opsMenuReachability` pins
+ * it against the route table (ops-navigation-v2).
  */
-export function opsGroup({
-  hasCloudOps,
-  hosting,
-}: Pick<SettingsMenuGates, "hasCloudOps" | "hosting">): SettingsMenuGroup {
+function healthGroup(): SettingsMenuGroup {
   return {
-    id: "settings-ops",
-    label: "Ops",
+    id: "admin-health",
+    label: "Health",
     items: [
       {
         label: "Dashboard",
         href: OPS_ATTENTION_HREF,
         isExactMatch: true,
-        // The queues address redirects onto the dashboard, which reads
-        // the same queues.
+        // The queues address redirects onto the dashboard, which reads the same queues.
         alsoActiveAt: ["/ops/queues"],
         icon: Activity,
       },
       {
-        label: "Event Sourcing",
+        label: "Event sourcing",
         href: "/ops/event-sourcing",
-        // Addresses this workspace owns outside its own prefix. Naming them
-        // here keeps this entry lit while the reader is inside the
-        // workspace, and tells the reachability test they have an owner.
+        // Addresses this workspace owns outside its own prefix: they keep this entry lit
+        // while the reader is inside the workspace, and give the reachability test an owner.
         alsoActiveAt: ["/ops/scheduler", "/ops/projections", "/ops/blobs", "/ops/dejaview"],
         icon: Workflow,
       },
-      // Projection replay, the payload store and Deja View are not here:
-      // all three are event-sourcing tools, and they now live in that
-      // workspace's own rail rather than as top-level Ops entries. Replay was
-      // already only a drawer opened from the projections section, so its
-      // entry here pointed at a redirect.
-      { label: "The Foundry", href: "/ops/foundry", icon: Anvil },
+      { label: "Upgrades", href: "/ops/upgrades", icon: RefreshCw },
+    ],
+  };
+}
+
+function toolsGroup({
+  hasCloudOps,
+  hosting,
+}: Pick<SettingsMenuGates, "hasCloudOps" | "hosting">): SettingsMenuGroup {
+  return {
+    id: "admin-tools",
+    label: "Tools",
+    items: [
+      { label: "Foundry", href: "/ops/foundry", icon: Anvil },
       // The cloud's gradual-rollout switch, also on a developer's machine; never self-hosted.
       ...(hasCloudOps || hosting === "local"
-        ? [{ label: "Feature Flags", href: "/ops/feature-flags", icon: Flag }]
+        ? [{ label: "Feature flags", href: "/ops/feature-flags", icon: Flag }]
         : []),
-      { label: "Upgrades", href: "/ops/upgrades", icon: RefreshCw },
     ],
   };
 }
@@ -335,16 +369,16 @@ export function opsGroup({
 /** Instance administration, for every instance operator, self-hosted included (§3.5). */
 export function instanceGroup(): SettingsMenuGroup {
   return {
-    id: "settings-ops-instance",
+    id: "admin-instance",
     label: "Instance",
     items: [
-      { label: "Operators", href: "/ops/operators", icon: KeyRound },
+      { label: "Operators", href: "/ops/operators", icon: UserStar },
       { label: "Users", href: "/ops/users", icon: UserCog },
       { label: "Organizations", href: "/ops/organizations", icon: Building2 },
       { label: "Projects", href: "/ops/projects", icon: FolderOpen },
-      { label: "Single Sign-On", href: "/ops/sso-connections", icon: ShieldCheck },
-      { label: "Identity Lookup", href: "/ops/identity-lookup", icon: UserSearch },
-      { label: "Directory Sync", href: "/ops/directory-sync", icon: RefreshCw },
+      { label: "Single sign-on", href: "/ops/sso-connections", icon: ShieldUser },
+      { label: "Identity lookup", href: "/ops/identity-lookup", icon: UserSearch },
+      { label: "Directory sync", href: "/ops/directory-sync", icon: FolderSync },
     ],
   };
 }
@@ -352,13 +386,13 @@ export function instanceGroup(): SettingsMenuGroup {
 /** LangWatch's own company tooling, offered only on SaaS (ARCHITECTURE.md §3.5). */
 export function cloudAdminGroup(): SettingsMenuGroup {
   return {
-    id: "settings-cloud-admin",
-    label: "Cloud admin",
+    id: "admin-cloud",
+    label: "Cloud",
     items: [
-      { label: "Subscriptions", href: "/ops/cloud/subscriptions", icon: CreditCard },
-      { label: "Licenses", href: "/ops/cloud/licenses", icon: KeyRound },
+      { label: "Subscriptions", href: "/ops/cloud/subscriptions", icon: Receipt },
+      { label: "Licenses", href: "/ops/cloud/licenses", icon: Ticket },
       { label: "Self-hosted installs", href: "/ops/cloud/self-hosted-instances", icon: Server },
-      { label: "Bug Reports", href: "/ops/cloud/bug-reports", icon: Bug },
+      { label: "Bug reports", href: "/ops/cloud/bug-reports", icon: Bug },
     ],
   };
 }
@@ -372,7 +406,20 @@ export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
     aiInfrastructureGroup(gates),
     dataControlsGroup(gates),
     projectGroup(gates),
-    ...(gates.hasOpsAccess ? [opsGroup(gates)] : []),
+  ];
+
+  return groups.filter((group) => group.items.length > 0);
+}
+
+export type AdminMenuGates = Pick<
+  SettingsMenuGates,
+  "hasCloudOps" | "hosting" | "hasOpsAccess" | "isPlatformAdmin"
+>;
+
+/** The operator console's menu (/ops): its own sidebar, never appended to Settings. */
+export function adminMenu(gates: AdminMenuGates): SettingsMenuGroup[] {
+  const groups: SettingsMenuGroup[] = [
+    ...(gates.hasOpsAccess ? [healthGroup(), toolsGroup(gates)] : []),
     ...(gates.isPlatformAdmin ? [instanceGroup()] : []),
     ...(gates.isPlatformAdmin && gates.hasCloudOps ? [cloudAdminGroup()] : []),
   ];

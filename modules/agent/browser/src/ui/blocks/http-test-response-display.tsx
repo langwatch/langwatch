@@ -1,4 +1,5 @@
 import type { HttpTestErrorExplanation, HttpTestResult } from "@langwatch/agent-contract/http-test";
+import { Card } from "@langwatch/design-system/card";
 import { Alert, Badge, Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertCircle, Clock } from "lucide-react";
 
@@ -80,29 +81,24 @@ export function HttpTestResponseDisplay({
   return (
     <VStack align="stretch" gap={3}>
       {(result.status !== void 0 || result.duration !== void 0 || responseString) && (
-        <HStack
-          justify="space-between"
-          padding={3}
-          bg={result.success ? "green.subtle" : "red.subtle"}
-          borderRadius="md"
-          borderWidth="1px"
-          borderColor={result.success ? "green.muted" : "red.muted"}
-        >
-          <HStack gap={3}>
-            {result.status !== void 0 && (
-              <Badge colorPalette={getStatusColor(result.status)} size="lg">
-                {result.status} {result.statusText ?? ""}
-              </Badge>
-            )}
-            {result.duration !== void 0 && (
-              <HStack gap={1} color="fg.muted" fontSize="sm">
-                <Clock size={14} />
-                <Text>{formatDuration(result.duration)}</Text>
-              </HStack>
-            )}
+        <Card variant="nested" tone={result.success ? "green" : "red"} padding="sm">
+          <HStack justify="space-between">
+            <HStack gap={3}>
+              {result.status !== void 0 && (
+                <Badge colorPalette={getStatusColor(result.status)} size="lg">
+                  {result.status} {result.statusText ?? ""}
+                </Badge>
+              )}
+              {result.duration !== void 0 && (
+                <HStack gap={1} color="fg.muted" fontSize="sm">
+                  <Clock size={14} />
+                  <Text>{formatDuration(result.duration)}</Text>
+                </HStack>
+              )}
+            </HStack>
+            {responseString && <CopyButton text={responseString} label="Copy response" />}
           </HStack>
-          {responseString && <CopyButton text={responseString} label="Copy response" />}
-        </HStack>
+        </Card>
       )}
 
       {!result.success && <TestFailure result={result} explainError={explainError} />}
@@ -195,13 +191,7 @@ export function HttpTestResponseDisplay({
       )}
 
       {result.extractedOutput !== void 0 && (
-        <Box
-          padding={3}
-          bg="blue.subtle"
-          borderRadius="md"
-          borderWidth="1px"
-          borderColor="blue.muted"
-        >
+        <Card variant="nested" tone="blue" padding="sm">
           <HStack justify="space-between" marginBottom={2}>
             <Text fontSize="sm" fontWeight="medium" color="blue.fg">
               Extracted Output (JSONPath)
@@ -217,7 +207,7 @@ export function HttpTestResponseDisplay({
           >
             {result.extractedOutput}
           </Box>
-        </Box>
+        </Card>
       )}
 
       {result.success && result.response !== void 0 && result.extractedOutput === void 0 && (

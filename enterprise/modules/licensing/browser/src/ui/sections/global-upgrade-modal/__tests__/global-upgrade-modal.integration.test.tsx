@@ -10,8 +10,8 @@ import {
   SeatProrationPreviewToken,
   type SeatProrationPreviewProps,
 } from "@langwatch/enterprise-billing-client";
-import { act, cleanup, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useUpgradeModalStore } from "../../../../model/upgrade-modal-store.ts";
 import { GlobalUpgradeModal } from "../global-upgrade-modal.tsx";
@@ -103,6 +103,57 @@ describe("<GlobalUpgradeModal/>", () => {
 
       const link = await screen.findByRole("link", { name: "Manage license" });
       expect(link).toHaveAttribute("href", "/settings/license");
+    });
+  });
+
+  describe("when the plan link is followed", () => {
+    function renderWithNavigation(isSaaS: boolean) {
+      const navigate = vi.fn();
+      renderWithDesignSystem(
+        <UiHostServicesContextProvider
+          value={createUiHostServicesFromHost({
+            route: () => ({ params: {}, query: {} }),
+            navigate,
+          })}
+        >
+          <GlobalUpgradeModal isSaaS={isSaaS} />
+        </UiHostServicesContextProvider>,
+      );
+      act(() => {
+        useUpgradeModalStore.getState().open("members", 5, 5);
+      });
+      return navigate;
+    }
+
+    it("closes and routes in-app exactly once on a plain click", async () => {
+      const navigate = renderWithNavigation(true);
+      const link = await screen.findByRole("link", { name: "Compare plans" });
+
+      fireEvent.click(link);
+
+      expect(navigate).toHaveBeenCalledTimes(1);
+      expect(navigate).toHaveBeenCalledWith("/settings/subscription");
+      await waitFor(() => expect(screen.queryByText("Upgrade required")).toBeNull());
+    });
+
+    it("keeps the modal and leaves the browser to follow a modified click", async () => {
+      const navigate = renderWithNavigation(false);
+      const link = await screen.findByRole("link", { name: "Manage license" });
+
+      fireEvent.click(link, { ctrlKey: true });
+
+      expect(navigate).not.toHaveBeenCalled();
+      expect(screen.getByText("Upgrade required")).toBeInTheDocument();
+      expect(link).toHaveAttribute("href", "/settings/license");
+    });
+
+    it("keeps Cancel beside the link", async () => {
+      renderGate(true);
+      act(() => {
+        useUpgradeModalStore.getState().open("members", 5, 5);
+      });
+
+      expect(await screen.findByRole("button", { name: "Cancel" })).toBeInTheDocument();
     });
   });
 
