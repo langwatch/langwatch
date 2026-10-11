@@ -289,40 +289,25 @@ export function WebhookDeliveriesDrawer({
   );
 
   return (
-    <Drawer.Root
-      placement="end"
-      size="lg"
-      open={endpoint !== null}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Deliveries</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="start" gap={4} width="full">
-            {endpoint && <WebhookHealthStrip endpoint={endpoint} health={health.data} />}
+    <Drawer open={endpoint !== null} onClose={onClose} size="lg" title="Deliveries">
+      <VStack align="start" gap={4} width="full">
+        {endpoint && <WebhookHealthStrip endpoint={endpoint} health={health.data} />}
 
-            {deliveries.isLoading && <SkeletonRows rows={4} />}
-            {deliveries.data && rows.length === 0 && isFirstPage && (
-              <Text fontSize="sm" color="fg.muted">
-                No deliveries recorded in the last 30 days.
-              </Text>
-            )}
-            {rows.length > 0 && (
-              <DeliveriesTable
-                rows={rows}
-                hasMore={hasMore}
-                isFetching={deliveries.isFetching}
-                onLoadMore={loadMore}
-              />
-            )}
-          </VStack>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+        {deliveries.isLoading && <SkeletonRows rows={4} />}
+        {deliveries.data && rows.length === 0 && isFirstPage && (
+          <Text fontSize="sm" color="fg.muted">
+            No deliveries recorded in the last 30 days.
+          </Text>
+        )}
+        {rows.length > 0 && (
+          <DeliveriesTable
+            rows={rows}
+            hasMore={hasMore}
+            isFetching={deliveries.isFetching}
+            onLoadMore={loadMore}
+          />
+        )}
+      </VStack>
+    </Drawer>
   );
 }

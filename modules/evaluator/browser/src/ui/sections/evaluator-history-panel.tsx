@@ -63,57 +63,49 @@ export function EvaluatorHistoryPanel({
   );
 
   return (
-    <Drawer.Root open placement="end" size="md" onOpenChange={() => closeDrawer()}>
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{`${evaluatorName} history`}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {isLoading && (
-            <HStack justify="center" paddingY={8}>
-              <Spinner />
-            </HStack>
-          )}
-          {isError && (
-            <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
-              Failed to load history.
-            </Text>
-          )}
-          {!isLoading && !isError && (data?.length ?? 0) === 0 && (
-            <Text color="fg.muted" textAlign="center" paddingY={8}>
-              No history recorded yet.
-            </Text>
-          )}
-          {data && data.length > 0 && (
-            <VStack gap={0} align="stretch">
-              {data.map((entry, index) => {
-                const { label, icon: Icon } = actionMeta(entry.action);
-                const isLast = index === data.length - 1;
-                return (
-                  <HStack key={entry.id} align="start" gap={3}>
-                    <VStack gap={0} align="center" flexShrink={0} width="24px">
-                      <Box bg="blue.subtle" borderRadius="full" padding={1} marginTop="0.5">
-                        <Icon size={12} color="var(--chakra-colors-blue-fg)" />
-                      </Box>
-                      {!isLast && <Box width="1px" flex={1} minHeight="24px" bg="border.muted" />}
-                    </VStack>
-                    <VStack align="start" gap={0} paddingBottom={4} flex={1}>
-                      <Text fontWeight="medium" fontSize="sm">
-                        {label}
-                      </Text>
-                      <Text color="fg.muted" fontSize="xs">
-                        {entry.user?.name ?? entry.user?.email ?? "Unknown user"} ·{" "}
-                        {formatTimeAgo(toEpochMs(entry.createdAt))}
-                      </Text>
-                    </VStack>
-                  </HStack>
-                );
-              })}
-            </VStack>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer onClose={closeDrawer} title={`${evaluatorName} history`}>
+      {isLoading && (
+        <HStack justify="center" paddingY={8}>
+          <Spinner />
+        </HStack>
+      )}
+      {isError && (
+        <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
+          Failed to load history.
+        </Text>
+      )}
+      {!isLoading && !isError && (data?.length ?? 0) === 0 && (
+        <Text color="fg.muted" textAlign="center" paddingY={8}>
+          No history recorded yet.
+        </Text>
+      )}
+      {data && data.length > 0 && (
+        <VStack gap={0} align="stretch">
+          {data.map((entry, index) => {
+            const { label, icon: Icon } = actionMeta(entry.action);
+            const isLast = index === data.length - 1;
+            return (
+              <HStack key={entry.id} align="start" gap={3}>
+                <VStack gap={0} align="center" flexShrink={0} width="24px">
+                  <Box bg="blue.subtle" borderRadius="full" padding={1} marginTop="0.5">
+                    <Icon size={12} color="var(--chakra-colors-blue-fg)" />
+                  </Box>
+                  {!isLast && <Box width="1px" flex={1} minHeight="24px" bg="border.muted" />}
+                </VStack>
+                <VStack align="start" gap={0} paddingBottom={4} flex={1}>
+                  <Text fontWeight="medium" fontSize="sm">
+                    {label}
+                  </Text>
+                  <Text color="fg.muted" fontSize="xs">
+                    {entry.user?.name ?? entry.user?.email ?? "Unknown user"} ·{" "}
+                    {formatTimeAgo(toEpochMs(entry.createdAt))}
+                  </Text>
+                </VStack>
+              </HStack>
+            );
+          })}
+        </VStack>
+      )}
+    </Drawer>
   );
 }

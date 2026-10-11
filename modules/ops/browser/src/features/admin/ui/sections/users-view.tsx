@@ -390,83 +390,63 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!user}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-      size="md"
+      onClose={onClose}
+      title="Edit user"
+      footer={{ primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending } }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Edit user</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {user && (
-            <VStack gap={4} align="stretch">
-              <Field.Root>
-                <Field.Label>Name</Field.Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Email</Field.Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Avatar URL</Field.Label>
-                <Input
-                  type="url"
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
-                  placeholder="https://…"
-                />
-              </Field.Root>
-              <ToggleRow
-                label="Email verified"
-                hint="Flip manually after an out-of-band verification."
-                checked={emailVerified}
-                onChange={setEmailVerified}
-              />
-              <ToggleRow
-                label="Pending SSO setup"
-                hint="Allows first-time SSO provider linking."
-                checked={pendingSsoSetup}
-                onChange={setPendingSsoSetup}
-              />
-              <ToggleRow
-                label="Deactivated"
-                hint="Revokes sessions + blocks new logins until reactivated."
-                checked={deactivate}
-                onChange={setDeactivate}
-              />
-              <VStack align="start" gap={0} pt={2}>
-                <Text fontSize="xs" color="fg.muted">
-                  User ID: {user.id}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Created: {formatDateTime(user.createdAt)}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Last login: {formatDateTime(user.lastLoginAt)}
-                </Text>
-              </VStack>
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button loading={update.isPending} onClick={handleSave}>
-              Save
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      {user && (
+        <VStack gap={4} align="stretch">
+          <Field.Root>
+            <Field.Label>Name</Field.Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Email</Field.Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Avatar URL</Field.Label>
+            <Input
+              type="url"
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              placeholder="https://…"
+            />
+          </Field.Root>
+          <ToggleRow
+            label="Email verified"
+            hint="Flip manually after an out-of-band verification."
+            checked={emailVerified}
+            onChange={setEmailVerified}
+          />
+          <ToggleRow
+            label="Pending SSO setup"
+            hint="Allows first-time SSO provider linking."
+            checked={pendingSsoSetup}
+            onChange={setPendingSsoSetup}
+          />
+          <ToggleRow
+            label="Deactivated"
+            hint="Revokes sessions + blocks new logins until reactivated."
+            checked={deactivate}
+            onChange={setDeactivate}
+          />
+          <VStack align="start" gap={0} pt={2}>
+            <Text fontSize="xs" color="fg.muted">
+              User ID: {user.id}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Created: {formatDateTime(user.createdAt)}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Last login: {formatDateTime(user.lastLoginAt)}
+            </Text>
+          </VStack>
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 

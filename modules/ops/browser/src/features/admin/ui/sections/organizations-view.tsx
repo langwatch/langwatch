@@ -5,7 +5,6 @@ import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Box,
-  Button,
   Field,
   Heading,
   HStack,
@@ -371,56 +370,32 @@ export function OrganizationEditDrawer({
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!organization}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-      size="md"
+      onClose={onClose}
+      title="Edit Organization"
+      footer={{ primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending } }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Edit Organization</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {organization && form && (
-            <VStack gap={4} align="stretch">
-              <IdentityFields form={form} setField={setField} />
-              <BillingFields form={form} setField={setField} />
-              <LimitFields
-                form={form}
-                setField={setField}
-                error={fieldErrors.datasetAttachmentMaxMb}
-              />
-              <AuthenticationSection />
-              <LicenseFields form={form} setField={setField} />
-              <CustomS3Fields form={form} setField={setField} />
-              <Separator my={2} />
-              <VStack align="start" gap={0}>
-                <Text fontSize="xs" color="fg.muted">
-                  Organization ID: {organization.id}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Created: {formatDate(organization.createdAt)}
-                </Text>
-              </VStack>
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button loading={update.isPending} onClick={handleSave}>
-              Save
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      {organization && form && (
+        <VStack gap={4} align="stretch">
+          <IdentityFields form={form} setField={setField} />
+          <BillingFields form={form} setField={setField} />
+          <LimitFields form={form} setField={setField} error={fieldErrors.datasetAttachmentMaxMb} />
+          <AuthenticationSection />
+          <LicenseFields form={form} setField={setField} />
+          <CustomS3Fields form={form} setField={setField} />
+          <Separator my={2} />
+          <VStack align="start" gap={0}>
+            <Text fontSize="xs" color="fg.muted">
+              Organization ID: {organization.id}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Created: {formatDate(organization.createdAt)}
+            </Text>
+          </VStack>
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 

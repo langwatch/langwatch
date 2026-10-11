@@ -50,44 +50,31 @@ export function AgentHistoryDrawer(props: AgentHistoryDrawerProps) {
   }, [props.agentId, props.agents, props.projectId]);
 
   return (
-    <Drawer.Root
-      open
-      placement="end"
-      size="md"
-      onOpenChange={({ open }) => !open && props.onClose()}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{`${props.agentName} history`}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {isLoading && <SkeletonRows rows={4} />}
-          {isError && (
-            <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
-              Failed to load history.
-            </Text>
-          )}
-          {!isLoading && !isError && entries.length === 0 && (
-            <Text color="fg.muted" textAlign="center" paddingY={8}>
-              No history recorded yet.
-            </Text>
-          )}
-          {!isLoading && !isError && entries.length > 0 && (
-            <VStack gap={0} align="stretch">
-              {entries.map((entry, index) => (
-                <HistoryEntry
-                  key={entry.id}
-                  entry={entry}
-                  isLast={index === entries.length - 1}
-                  createdAtLabel={props.formatCreatedAt(entry.createdAt)}
-                />
-              ))}
-            </VStack>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer onClose={() => props.onClose()} title={`${props.agentName} history`}>
+      {isLoading && <SkeletonRows rows={4} />}
+      {isError && (
+        <Text role="alert" color="red.fg" textAlign="center" paddingY={8}>
+          Failed to load history.
+        </Text>
+      )}
+      {!isLoading && !isError && entries.length === 0 && (
+        <Text color="fg.muted" textAlign="center" paddingY={8}>
+          No history recorded yet.
+        </Text>
+      )}
+      {!isLoading && !isError && entries.length > 0 && (
+        <VStack gap={0} align="stretch">
+          {entries.map((entry, index) => (
+            <HistoryEntry
+              key={entry.id}
+              entry={entry}
+              isLast={index === entries.length - 1}
+              createdAtLabel={props.formatCreatedAt(entry.createdAt)}
+            />
+          ))}
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 
