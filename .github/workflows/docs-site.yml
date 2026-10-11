@@ -9,6 +9,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "packages/design-system/**"
+      - "packages/time/**"
       - "CHANGELOG.md"
       - ".gitattributes"
       - ".github/workflows/docs-site.yml"
@@ -19,6 +20,7 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "packages/design-system/**"
+      - "packages/time/**"
       - "CHANGELOG.md"
       - ".gitattributes"
       - ".github/workflows/docs-site.yml"
@@ -45,6 +47,8 @@ jobs:
           install: "@langwatch/docs-site..."
       - name: Install build browser
         run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - name: Typecheck the docs app
+        run: pnpm --filter @langwatch/docs-site typecheck
       - name: Test docs generation and local routing
         run: VITEST_MAX_WORKERS=2 pnpm --filter @langwatch/docs-site test
       - name: Build the documentation
