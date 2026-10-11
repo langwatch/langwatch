@@ -454,6 +454,44 @@ describe.skipIf(!DB_URL)("re-running a migration below the marker", () => {
     expect(hold.rows).toEqual([{ count: "0" }]);
   });
 
+  /** @scenario "A first install re-runs a failed folder the image contains but no release file names" */
+  it("re-runs 0_init once the operator drops the planted type, since the image contains it", async () => {
+    const INIT = "0_init";
+    const planted = 'CREATE TYPE "held"."Planted" AS ENUM (\'a\');';
+    await scratch.postgres.query('CREATE SCHEMA "held"');
+    await scratch.postgres.query(planted);
+    const { applier, resolves } = await realApplier({ next: INIT, sql: planted });
+    const base = step(`prisma:${BASE}`);
+    const only = {
+      release: "3.21.0",
+      previous: null,
+      cutAt: "2026-10-02T09:00:00Z",
+      steps: [base],
+    };
+    const runner = () =>
+      runnerFor({
+        release: "3.21.0",
+        next: INIT,
+        applier,
+        releases: { manifests: [only] },
+        image: { release: "3.21.0", steps: [base], prismaFolders: [INIT, BASE] },
+      });
+
+    const failed = await run(runner());
+    expect(failed.exitCode).toBe(1);
+    expect(failed.message).not.toContain("This image does not ship it");
+    expect(resolves).toContain(INIT);
+
+    await scratch.postgres.query('DROP TYPE "held"."Planted"');
+    const outcome = await run(runner());
+
+    expect(outcome, outcome.message).toMatchObject({ exitCode: 0, code: "done" });
+    expect(await failedRows()).toEqual([]);
+    expect((await rowsOf(INIT)).at(-1)).toEqual({ finished: true, rolledBack: false });
+    const alpha = await scratch.postgres.query(`SELECT to_regclass('"Alpha"') IS NOT NULL AS ok`);
+    expect(alpha.rows).toEqual([{ ok: true }]);
+  });
+
   /** @scenario "Retry on Ops Upgrades is the operator's consent to re-run a failed migration" */
   it("re-runs a folder below the marker once the operator presses Retry", async () => {
     const lock = await atBaseWithLockedAlpha({ next: OLDER });

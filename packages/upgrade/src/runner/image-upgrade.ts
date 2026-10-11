@@ -25,6 +25,7 @@ import { nowInstant } from "@langwatch/time";
 import { TASKS_APP_DIRECTORY } from "../gate/first-install-upgrade.ts";
 import {
   IMAGE_MIGRATION_DIRECTORIES,
+  imagePrismaFolders,
   imageRelease,
   imageSteps,
   readImageTree,
@@ -546,7 +547,11 @@ export async function withImageUpgradeRunner<Result>({
     const runner = createUpgradeRunner({
       postgres: inputs.postgres,
       ...(shared ? { clickhouse: sqlReader({ client: shared }) } : {}),
-      image: { release, steps: imageSteps({ release: release ?? "0.0.0", tree }) },
+      image: {
+        release,
+        steps: imageSteps({ release: release ?? "0.0.0", tree }),
+        prismaFolders: imagePrismaFolders(),
+      },
       // Registered on the ledger, run only here: tenant steps are ops' pass (S6-WIRE).
       codeSteps: inputs.steps.filter(isMigrationStep),
       releases,

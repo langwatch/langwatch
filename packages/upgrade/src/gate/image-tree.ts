@@ -33,6 +33,15 @@ export function readImageTree({
   };
 }
 
+/** Every Prisma folder in the image's migrations directory, `0_init` included (UD-F2). */
+export function imagePrismaFolders({
+  directory = IMAGE_MIGRATION_DIRECTORIES.prisma,
+}: { directory?: string } = {}): string[] {
+  return readdirSync(directory).filter((name) =>
+    existsSync(join(directory, name, "migration.sql")),
+  );
+}
+
 /**
  * What the serving gate requires and what the serving roster declares (blitz plan 3.1, 5.3): the
  * blocking ids are the tree's schema and blocking code steps, the same ids the runner registers.

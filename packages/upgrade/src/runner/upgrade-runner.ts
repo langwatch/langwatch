@@ -54,8 +54,13 @@ export interface UpgradeRunnerOptions {
   postgres: UpgradePostgres;
   /** The shared ClickHouse, read only to seed an empty ledger from `goose_db_version`. */
   clickhouse?: UpgradeClickHouse;
-  /** The image's release (its newest manifest) and every step its tree declares. */
-  image: { release: string | null; steps: readonly ManifestStep[] };
+  /** The image's release (its newest manifest), every step its tree declares and, to re-run a
+   *  failed one, every Prisma folder it contains (`0_init` too; UD-F2). */
+  image: {
+    release: string | null;
+    steps: readonly ManifestStep[];
+    prismaFolders?: readonly string[];
+  };
   releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
   codeSteps?: readonly MigrationStep[];
@@ -284,6 +289,7 @@ export class UpgradeRunnerService {
   private readonly shipped: RegisteredStep[];
   private readonly narrate: UpgradeRunLog;
   private readonly shippedIds: ReadonlySet<string>;
+  private readonly shippedFolders: ReadonlySet<string>;
   private readonly archiver: ContractArchiveService;
   private resolved: { migration: string; attempt: number }[] = [];
   private permit: RerunPermit = { firstInstall: false, retried: new Set() };
@@ -297,6 +303,7 @@ export class UpgradeRunnerService {
     this.shipped = shippedSteps({ image: options.image, manifests: options.releases.manifests });
     this.narrate = new UpgradeRunLog(options.log);
     this.shippedIds = new Set(this.shipped.map((step) => step.id));
+    this.shippedFolders = new Set(options.image.prismaFolders ?? []);
     const store = ContractArchiveRepository.create({ postgres: options.postgres });
     this.archiver = ContractArchiveService.create({ store });
   }
@@ -642,9 +649,14 @@ export class UpgradeRunnerService {
     const handApplied = names.find((name) => findHandAppliedSql({ name }).length > 0);
     if (handApplied !== undefined) return { handApplied };
     if (!names.every((name) => this.mayRerun({ name }))) return "below-marker";
-    if (!names.every((name) => this.shippedIds.has(`prisma:${name}`))) return "not-shipped";
+    if (!names.every((name) => this.ships({ name }))) return "not-shipped";
     if (!this.options.applier.resolveRolledBack) return "no-resolver";
     return null;
+  }
+
+  /** Named by a release file or the image's step list, or a folder the image contains (UD-F2). */
+  private ships({ name }: { name: string }): boolean {
+    return this.shippedIds.has(`prisma:${name}`) || this.shippedFolders.has(name);
   }
 
   /** Re-runnable, a first install (UD12-F2) or an operator's Retry (Alex, 2026-10-11). */

@@ -129,6 +129,13 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     When the browser's query client decides whether to try again
     Then it keeps retrying with backoff past the usual retry limit
 
+  @integration
+  Scenario: The shell's last-login write answered upgrade_in_progress waits instead of throwing
+    Given the api answers the signed-in shell's last-login write upgrade_in_progress
+    When a page opens while head's api is not ready
+    Then the page raises no uncaught error
+    And the write is tried again with backoff and lands once the api is ready
+
   @unit
   Scenario: A ClickHouse read leaves out a column a pending step has not added
     Given a ClickHouse schema step that adds a column is pending on a target
