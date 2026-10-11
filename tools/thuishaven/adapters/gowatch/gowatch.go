@@ -45,6 +45,18 @@ func (c *Clock) Due(now time.Time) bool {
 // Reset clears the pending burst; call it as the rebuild starts.
 func (c *Clock) Reset() { c.isDirty = false }
 
+// DueAt is when the pending burst falls due; zero when nothing is pending.
+func (c *Clock) DueAt() time.Time {
+	if !c.isDirty {
+		return time.Time{}
+	}
+	at := c.last.Add(c.Quiet)
+	if limit := c.first.Add(c.MaxWait); limit.Before(at) {
+		at = limit
+	}
+	return at
+}
+
 // watchedDirs are the Go trees `./cmd/service` builds from.
 var watchedDirs = []string{"cmd", "pkg", "services"}
 
@@ -172,7 +184,7 @@ func (t *Tree) listingFor(dir string, info fs.FileInfo) (listing, bool) {
 	for _, e := range entries {
 		name := e.Name()
 		switch {
-		case e.IsDir() && !t.skipped[name] && !strings.HasPrefix(name, "."):
+		case e.IsDir() && !t.skipsDir(name):
 			l.subdirs = append(l.subdirs, filepath.Join(dir, name))
 		case !e.IsDir() && t.isWatched(name):
 			l.files = append(l.files, filepath.Join(dir, name))
@@ -180,6 +192,9 @@ func (t *Tree) listingFor(dir string, info fs.FileInfo) (listing, bool) {
 	}
 	return l, true
 }
+
+// skipsDir reports whether the Tree never descends into a directory of this name.
+func (t *Tree) skipsDir(name string) bool { return t.skipped[name] || strings.HasPrefix(name, ".") }
 
 // stampFile writes a file's path, size and mtime straight into the hash.
 func stampFile(h hash.Hash64, path string, info fs.FileInfo) {
@@ -257,7 +272,8 @@ func (s *Swapper) Pid() int {
 	return s.child.Process.Pid
 }
 
-// Watcher polls a checkout's Go trees and drives the swapper.
+// Watcher watches a checkout's Go trees and drives the swapper: file events
+// wake it, with Poll the fallback when the operating system refuses them.
 type Watcher struct {
 	RepoRoot string
 	Clock    *Clock
@@ -273,20 +289,16 @@ func (w *Watcher) Run(ctx context.Context) error {
 	w.tree = GoTree(w.RepoRoot)
 	w.last = w.tree.Fingerprint()
 	_ = w.Swapper.Rebuild(ctx)
-	tick := time.NewTicker(w.Poll)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case now := <-tick.C:
-			w.observe(ctx, now)
-		}
-	}
+	loop := Loop{Tree: w.tree, Clock: w.Clock, Poll: w.Poll, Safety: SafetyPoll, Log: w.Swapper.Log}
+	loop.Run(ctx, func(now time.Time) bool {
+		w.observe(ctx, now)
+		return false
+	})
+	return nil
 }
 
-// observe feeds one poll to the clock and rebuilds when the burst is due.
-// Changes made during the build show at the next poll: one rebuild follows.
+// observe feeds one wake to the clock and rebuilds when the burst is due.
+// Changes made during the build wake the loop again: one rebuild follows.
 func (w *Watcher) observe(ctx context.Context, now time.Time) {
 	if w.tree == nil {
 		w.tree = GoTree(w.RepoRoot)

@@ -78,21 +78,11 @@ func newSelfWatch(handOver func() error) *selfWatch {
 	}
 }
 
-// run polls until ctx ends or a rebuild has handed over.
+// run watches until ctx ends or a rebuild has handed over.
 func (w *selfWatch) run(ctx context.Context) {
 	w.last = w.fingerprint()
-	tick := time.NewTicker(w.poll)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case now := <-tick.C:
-			if w.observe(ctx, now) {
-				return
-			}
-		}
-	}
+	loop := gowatch.Loop{Tree: w.tree, Clock: w.clock, Poll: w.poll, Safety: gowatch.SafetyPoll, Log: w.log}
+	loop.Run(ctx, func(now time.Time) bool { return w.observe(ctx, now) })
 }
 
 // fingerprint hashes haven's own source, keeping directory listings across polls.
@@ -103,7 +93,7 @@ func (w *selfWatch) fingerprint() uint64 {
 	return w.tree.Fingerprint()
 }
 
-// observe feeds one poll to the clock; true once a rebuild has handed over.
+// observe feeds one wake to the clock; true once a rebuild has handed over.
 func (w *selfWatch) observe(ctx context.Context, now time.Time) bool {
 	if fp := w.fingerprint(); fp != w.last {
 		w.last = fp

@@ -34,31 +34,27 @@ func runUIWatch(ctx context.Context, _ deps, _ invocation) error {
 	served := filepath.Join(repoRoot, app.UIDirRel, "dist", "client", "index.html")
 	tree := gowatch.UITree(repoRoot)
 	last := tree.Fingerprint()
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case now := <-tick.C:
-			if fp := tree.Fingerprint(); fp != last {
-				last = fp
-				clock.Change(now)
-			}
-			// Wait out the app lane's first build rather than racing it into client.next.
-			if _, err := os.Stat(served); err != nil || !clock.Due(now) {
-				continue
-			}
-			clock.Reset() // changes made during the build start the next burst
-			logf("UI source changed; rebuilding")
-			start := time.Now()
-			build := exec.CommandContext(ctx, "sh", "-c", app.UIBuildShell)
-			build.Dir, build.Stdout, build.Stderr = repoRoot, os.Stderr, os.Stderr
-			if err := build.Run(); err != nil {
-				logf(fmt.Sprintf("build failed after %s (%v); the last good bundle keeps serving", time.Since(start).Round(time.Millisecond), err))
-				continue
-			}
-			logf(fmt.Sprintf("ui bundle swapped in after %s", time.Since(start).Round(time.Millisecond)))
+	loop := gowatch.Loop{Tree: tree, Clock: clock, Poll: time.Second, Safety: gowatch.SafetyPoll, Log: logf}
+	loop.Run(ctx, func(now time.Time) bool {
+		if fp := tree.Fingerprint(); fp != last {
+			last = fp
+			clock.Change(now)
 		}
-	}
+		// Wait out the app lane's first build rather than racing it into client.next.
+		if _, err := os.Stat(served); err != nil || !clock.Due(now) {
+			return false
+		}
+		clock.Reset() // changes made during the build start the next burst
+		logf("UI source changed; rebuilding")
+		start := time.Now()
+		build := exec.CommandContext(ctx, "sh", "-c", app.UIBuildShell) //nolint:gosec // the fixed UI build script
+		build.Dir, build.Stdout, build.Stderr = repoRoot, os.Stderr, os.Stderr
+		if err := build.Run(); err != nil {
+			logf(fmt.Sprintf("build failed after %s (%v); the last good bundle keeps serving", time.Since(start).Round(time.Millisecond), err))
+			return false
+		}
+		logf(fmt.Sprintf("ui bundle swapped in after %s", time.Since(start).Round(time.Millisecond)))
+		return false
+	})
+	return nil
 }
