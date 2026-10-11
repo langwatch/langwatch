@@ -1,7 +1,9 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Archive, Plus, Tag } from "lucide-react";
+import { Archive, FlaskConical, Plus, Tag } from "lucide-react";
 
 import { SmallButton } from "./agent-testing/shared/small-button.tsx";
 
@@ -115,16 +117,15 @@ export function ScenarioBatchActionBar({
 
 export function ScenarioEmptyState({ onCreateClick }: { onCreateClick: () => void }) {
   return (
-    <VStack gap={4} align="center" py={12}>
-      <Text fontSize="lg" color="fg.muted">
-        No scenarios yet
-      </Text>
-      <Text fontSize="sm" color="fg.subtle">
-        Create your first scenario to get started
-      </Text>
-      <Button colorPalette="orange" variant="solid" onClick={onCreateClick}>
-        <Plus size={16} /> Create Scenario
-      </Button>
-    </VStack>
+    <NoDataInfoBlock
+      title="No scenarios yet"
+      description="Create your first scenario to get started"
+      icon={<FlaskConical size={24} />}
+      primaryAction={
+        <PageLayout.HeaderButton primary onClick={onCreateClick}>
+          <Plus size={16} /> Create Scenario
+        </PageLayout.HeaderButton>
+      }
+    />
   );
 }

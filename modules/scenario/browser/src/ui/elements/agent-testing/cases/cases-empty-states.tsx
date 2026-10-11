@@ -4,9 +4,10 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box } from "@langwatch/design-system/primitives";
+import { Text } from "@langwatch/design-system/primitives";
 import { FlaskConical, FolderCode, Plus, FolderPlus, Plug } from "lucide-react";
 
 export type EmptyStateActionProps = {
@@ -107,19 +108,11 @@ export function FirstCaseEmptyState({ canManage, onNewTestCase }: EmptyStateActi
  */
 export function NoCasesHereEmptyState() {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      background="bg.panel"
-      paddingX={4}
-      paddingY={4}
-      textStyle="caption"
-      color="fg.muted"
-      data-testid="agent-testing-empty-suite"
-    >
-      Empty suite. Add a scenario, or move one here from another suite.
-    </Box>
+    <Card variant="panel" padding="md" data-testid="agent-testing-empty-suite">
+      <Text textStyle="caption" color="fg.muted">
+        Empty suite. Add a scenario, or move one here from another suite.
+      </Text>
+    </Card>
   );
 }
 
