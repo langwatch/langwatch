@@ -80,6 +80,6 @@ Feature: Project becomes integrated after first trace ingestion
     # The legacy Traces page owned this gate through
     # api.project.getHasFirstMessage; it was removed with that page and the
     # Trace Explorer now decides from its own `hasAnyTraces` result, which
-    # answers the same question without a second query. The dedicated
-    # setup screen still lives at /[project]/setup. project.firstMessage is
+    # answers the same question without a second query. The old
+    # /[project]/setup address redirects to Traces. project.firstMessage is
     # set by the projectMetadata subscriber on first trace ingestion.

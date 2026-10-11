@@ -318,3 +318,23 @@ Rule: First trace celebration
   # @planned — Auto-dismiss after 10s, confetti burst, and a once-per-
   # project gate are not yet implemented as of 2026-05-01. The current
   # banner stays until manually dismissed.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHARED TRACE AND RETIRED SETUP ADDRESS
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: The shared trace page and the old setup address
+  The public shared trace page holds no project key, and the retired
+  `/:project/setup` address leads to the Trace Explorer.
+
+  @integration
+  Scenario: The shared trace page asks for no key
+    Given nobody is signed in
+    When the trace explorer mounts for a shared trace
+    Then it asks the server for no project key
+
+  @integration
+  Scenario: The old setup page sends you to Traces
+    Given I have a saved link to a project's setup page
+    When I open the old setup page
+    Then I land on that project's Traces page
