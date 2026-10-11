@@ -274,9 +274,10 @@ func judgeOddities(heldOrg string, before, after oddFacts) []Verdict {
 func judgeHeld(heldOrg string, after oddFacts) Verdict {
 	held := len(after.HeldStates) == 1 && (after.HeldStates[0] == "migrated" || after.HeldStates[0] == "parked")
 	named := after.OpsErr == nil && strings.Contains(after.OpsText, heldOrg)
+	// Held organizations live on Ops > Upgrades only; the Home card is for operator steps (modules/ops/specs/upgrades.feature).
 	card := after.HomeErr == nil && strings.Contains(after.HomeText, actionNeededCard)
-	return verdict("A1", held && named && card && len(after.OtherHeld) == 0, fmt.Sprintf(
-		"held organization %s state %v (want migrated or parked); others held or parked: %v; Ops > Upgrades > Organizations names it: %t%s; Home shows %q to the operator: %t%s (names it: %t)",
+	return verdict("A1", held && named && len(after.OtherHeld) == 0, fmt.Sprintf(
+		"held organization %s state %v (want migrated or parked); others held or parked: %v; Ops > Upgrades > Organizations names it: %t%s; Home shows %q to the operator (not expected for a held organization): %t%s (names it: %t)",
 		heldOrg, after.HeldStates, after.OtherHeld, named, oddErr(after.OpsErr), actionNeededCard, card, oddErr(after.HomeErr), strings.Contains(after.HomeText, heldOrg)))
 }
 

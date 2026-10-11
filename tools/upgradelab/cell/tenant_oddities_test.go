@@ -27,7 +27,7 @@ func TestJudgeOdditiesPassesWhenEveryOddityIsHandled(t *testing.T) {
 
 func TestJudgeOdditiesFailsEachOddityOnItsOwn(t *testing.T) {
 	cases := map[string]func(after *oddFacts){
-		"A1": func(after *oddFacts) { after.HomeErr = errors.New("no card") },
+		"A1": func(after *oddFacts) { after.OpsErr = errors.New("no Organizations tab") },
 		"A2": func(after *oddFacts) { after.ProvidersBody += oddPlaintextKey },
 		"A3": func(after *oddFacts) { after.DatasetRows = 0 },
 		"A4": func(after *oddFacts) { after.UntaggedTags = 0 },
