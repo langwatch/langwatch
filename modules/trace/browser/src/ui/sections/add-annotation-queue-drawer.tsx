@@ -1,5 +1,6 @@
 import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
@@ -7,7 +8,6 @@ import {
   Field,
   HStack,
   Input,
-  Spacer,
   Tag,
   Text,
   Textarea,
@@ -29,7 +29,6 @@ import { useOrganizationTeamProject } from "../../behavior/use-organization-team
 import { useCreateOrUpdateAnnotationQueue } from "../../behavior/writes/use-trace-writes.ts";
 import { RandomColorAvatar } from "../blocks/random-color-avatar.tsx";
 import { FullWidthFormControl } from "../elements/full-width-form-control.tsx";
-import { Drawer } from "./drawer.tsx";
 import { applyHandledErrorToForm, FormServerError, showErrorToast } from "./errors/index.ts";
 
 type Picked = { id: string; name: string | null };
@@ -266,113 +265,85 @@ export const AddAnnotationQueueDrawer = ({
   const slug = queueSlug(name);
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!open}
-      placement="end"
+      onClose={closeAll}
       size="lg"
-      onOpenChange={({ open }) => {
-        if (!open) {
-          closeAll();
-        }
+      title={queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
+      onSubmit={(event) => void handleSubmit(onSubmit)(event)}
+      footer={{
+        primaryAction: { label: "Save", type: "submit", loading: createOrUpdateQueue.isPending },
       }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger onClick={() => closeAll()} />
-          </HStack>
-          <HStack>
-            <Drawer.Title>
-              {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
-            </Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <VStack align="start">
-              <FormServerError form={form} />
+      <VStack align="start">
+        <FormServerError form={form} />
 
-              <FullWidthFormControl
-                label="Participants"
-                helper="Select the participants for this annotation queue"
+        <FullWidthFormControl
+          label="Participants"
+          helper="Select the participants for this annotation queue"
+        >
+          <MultiPick
+            disclosure={participantsPopoverOpen}
+            placeholder="Add Participants"
+            selected={participants}
+            options={(users.data?.members ?? []).map((member) => ({
+              id: member.user.id,
+              name: member.user.name,
+            }))}
+            withAvatar
+            onToggle={(item) => setParticipants(toggled(participants, item))}
+          />
+        </FullWidthFormControl>
+
+        <FullWidthFormControl
+          label="Name Annotation Queue"
+          helper="Give it a name to identify this annotation queue"
+          invalid={!!errors.name}
+        >
+          <Input {...register("name")} required />
+          {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
+          <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
+        </FullWidthFormControl>
+
+        <FullWidthFormControl
+          label="Description"
+          helper="Provide a description of the annotation"
+          invalid={!!errors.description}
+        >
+          <Textarea {...register("description")} required />
+          <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
+        </FullWidthFormControl>
+
+        <FullWidthFormControl
+          label="Score Type"
+          helper="Select the score type for this annotation queue"
+        >
+          <MultiPick
+            disclosure={scoreTypesPopoverOpen}
+            placeholder="Add Score Type"
+            selected={scoreTypes}
+            options={(annotationScores.data ?? []).map((score) => ({
+              id: score.id,
+              name: score.name,
+            }))}
+            onToggle={(item) => setScoreTypes(toggled(scoreTypes, item))}
+            footer={
+              <Button
+                width="100%"
+                colorPalette="blue"
+                onClick={() => {
+                  scoreTypesPopoverOpen.onClose();
+                  openDrawer("addOrEditAnnotationScore");
+                }}
+                variant="outline"
+                size="sm"
               >
-                <MultiPick
-                  disclosure={participantsPopoverOpen}
-                  placeholder="Add Participants"
-                  selected={participants}
-                  options={(users.data?.members ?? []).map((member) => ({
-                    id: member.user.id,
-                    name: member.user.name,
-                  }))}
-                  withAvatar
-                  onToggle={(item) => setParticipants(toggled(participants, item))}
-                />
-              </FullWidthFormControl>
-
-              <FullWidthFormControl
-                label="Name Annotation Queue"
-                helper="Give it a name to identify this annotation queue"
-                invalid={!!errors.name}
-              >
-                <Input {...register("name")} required />
-                {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
-                <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
-              </FullWidthFormControl>
-
-              <FullWidthFormControl
-                label="Description"
-                helper="Provide a description of the annotation"
-                invalid={!!errors.description}
-              >
-                <Textarea {...register("description")} required />
-                <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
-              </FullWidthFormControl>
-
-              <FullWidthFormControl
-                label="Score Type"
-                helper="Select the score type for this annotation queue"
-              >
-                <MultiPick
-                  disclosure={scoreTypesPopoverOpen}
-                  placeholder="Add Score Type"
-                  selected={scoreTypes}
-                  options={(annotationScores.data ?? []).map((score) => ({
-                    id: score.id,
-                    name: score.name,
-                  }))}
-                  onToggle={(item) => setScoreTypes(toggled(scoreTypes, item))}
-                  footer={
-                    <Button
-                      width="100%"
-                      colorPalette="blue"
-                      onClick={() => {
-                        scoreTypesPopoverOpen.onClose();
-                        openDrawer("addOrEditAnnotationScore");
-                      }}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Plus /> Add New
-                    </Button>
-                  }
-                />
-              </FullWidthFormControl>
-
-              <HStack width="full">
-                <Spacer />
-                <Button
-                  colorPalette="orange"
-                  type="submit"
-                  minWidth="fit-content"
-                  loading={createOrUpdateQueue.isPending}
-                >
-                  Save
-                </Button>
-              </HStack>
-            </VStack>
-          </form>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+                <Plus /> Add New
+              </Button>
+            }
+          />
+        </FullWidthFormControl>
+      </VStack>
+    </Drawer>
   );
 };
