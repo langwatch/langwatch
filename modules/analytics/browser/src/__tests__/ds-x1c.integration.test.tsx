@@ -17,6 +17,11 @@ import { SummaryMetric } from "../ui/elements/summary-metric.tsx";
 import type { CustomGraphInput } from "../ui/sections/custom-graph.tsx";
 
 const mounts = vi.hoisted(() => ({ code: 0, queries: 0 }));
+const dashboardRows = vi.hoisted(() => [{ id: "dash-1", name: "Latency" }]);
+
+vi.mock("../behavior/use-dashboards.ts", () => ({
+  useDashboards: () => ({ data: dashboardRows, isLoading: false }),
+}));
 
 function MockCustomGraph({ input }: { input: CustomGraphInput }) {
   const series = input.series[0];
@@ -59,6 +64,7 @@ vi.mock(
 );
 
 import { DashboardWidgetEditDrawer } from "../features/dashboard-widget/ui/sections/dashboard-widget-edit-drawer.tsx";
+import { CustomReportsSection } from "../ui/sections/analytics/analytics-overview.screen.tsx";
 import { LLMMetrics } from "../ui/sections/llm-metrics.tsx";
 import { UserMetrics } from "../ui/sections/user-metrics.tsx";
 
@@ -278,6 +284,46 @@ describe("the widget editor drawer", () => {
       fireEvent.click(cancel);
       expect(props.onClose).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("the widget editor's code frame", () => {
+  /** @scenario "The code editor is framed by the shared frame card" */
+  it("stands the code editor inside one frame-fill card, and the Queries tab has none", () => {
+    renderDrawer();
+
+    const editor = screen.getByTestId("code-editor");
+    const frame = editor.closest("[data-card-variant]");
+    expect(frame).toHaveAttribute("data-card-variant", "frame-fill");
+    expect(frame).toHaveAttribute("data-card-padding", "none");
+    expect(screen.getByTestId("queries-panel").closest("[data-card-variant]")).toBeNull();
+  });
+});
+
+describe("the overview's custom dashboard tiles", () => {
+  /** @scenario "A dashboard tile is one link named for the dashboard" */
+  it("draws each dashboard as one link named for it", () => {
+    renderWithAnalyticsHost(<CustomReportsSection slug="test-project" />);
+
+    const link = screen.getByRole("link", { name: "Open Latency" });
+    expect(link).toHaveAttribute("href", "/test-project/analytics/reports?dashboard=dash-1");
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(link.closest("[data-card-variant]")).toBeInTheDocument();
+  });
+
+  /** @scenario "Choosing a dashboard tile goes to the dashboard once" */
+  it("goes to the dashboard through the host once, and leaves a new-tab click to the browser", async () => {
+    const { host } = renderWithAnalyticsHost(<CustomReportsSection slug="test-project" />);
+    const link = screen.getByRole("link", { name: "Open Latency" });
+
+    await userEvent.setup().click(link);
+    expect(host.navigations).toEqual(["/test-project/analytics/reports?dashboard=dash-1"]);
+
+    const stopJsdomNavigation = (event: Event) => event.preventDefault();
+    document.addEventListener("click", stopJsdomNavigation);
+    fireEvent.click(link, { ctrlKey: true });
+    document.removeEventListener("click", stopJsdomNavigation);
+    expect(host.navigations).toHaveLength(1);
   });
 });
 

@@ -5,6 +5,7 @@
  */
 
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { Card } from "@langwatch/design-system/card";
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Button } from "@langwatch/design-system/primitives";
@@ -173,20 +174,15 @@ function WidgetEditTabs({
           testId: "analytics-widget-tab-code",
           content: (
             <Box flex={1} minHeight={0} display="flex" flexDirection="column" paddingTop={3}>
-              <Box
-                flex={1}
-                minHeight={0}
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="md"
-                overflow="hidden"
-              >
-                <DashboardWidgetCodeEditor
-                  value={code}
-                  onChange={onCodeChange}
-                  queryColumns={queryColumns}
-                />
-              </Box>
+              <Card variant="frame-fill">
+                <Box flex={1} minHeight={0}>
+                  <DashboardWidgetCodeEditor
+                    value={code}
+                    onChange={onCodeChange}
+                    queryColumns={queryColumns}
+                  />
+                </Box>
+              </Card>
             </Box>
           ),
         },

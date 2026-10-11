@@ -109,7 +109,7 @@ function DocumentsMetrics() {
   );
 }
 
-function CustomReportsSection({ slug }: { slug: string }) {
+export function CustomReportsSection({ slug }: { slug: string }) {
   const host = useAnalyticsHost();
   const project = host.project();
   const dashboardsQuery = useDashboards({ projectId: project?.id ?? "" });
@@ -158,38 +158,34 @@ function CustomReportsSection({ slug }: { slug: string }) {
       </Heading>
       <Grid width="full" gap={3} gridTemplateColumns="repeat(auto-fill, minmax(250px, 1fr))">
         {dashboards.map((dashboard) => (
-          <Link
+          <Card
             key={dashboard.id}
-            href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
-            _hover={{ textDecoration: "none" }}
+            padding="none"
+            opener={
+              <Link
+                href={`/${slug}/analytics/reports?dashboard=${dashboard.id}`}
+                aria-label={`Open ${dashboard.name}`}
+                _hover={{ textDecoration: "none" }}
+              />
+            }
           >
-            <LinkCard.Root
-              width="full"
-              cursor="pointer"
-              borderColor="border"
-              _hover={{ borderColor: "orange.emphasized", shadow: "sm" }}
-              transition="all 0.15s ease"
-            >
-              <LinkCard.Body paddingX={4} paddingY={3}>
-                <Flex gap={3} alignItems="center">
-                  <Box padding={2} borderRadius="md" bg="orange.subtle" color="orange.fg">
-                    <BarChart2 size={16} />
-                  </Box>
-                  <VStack align="start" gap={0} flex={1}>
-                    <Text fontWeight="500" textStyle="sm">
-                      {dashboard.name}
-                    </Text>
-                    <Text textStyle="xs" color="fg.muted">
-                      Custom Dashboard
-                    </Text>
-                  </VStack>
-                  <Box color="fg.subtle" marginLeft="auto">
-                    <ArrowUpRight size={14} />
-                  </Box>
-                </Flex>
-              </LinkCard.Body>
-            </LinkCard.Root>
-          </Link>
+            <Flex gap={3} alignItems="center" paddingX={4} paddingY={3}>
+              <Box padding={2} borderRadius="md" bg="orange.subtle" color="orange.fg">
+                <BarChart2 size={16} />
+              </Box>
+              <VStack align="start" gap={0} flex={1}>
+                <Text fontWeight="500" textStyle="sm">
+                  {dashboard.name}
+                </Text>
+                <Text textStyle="xs" color="fg.muted">
+                  Custom Dashboard
+                </Text>
+              </VStack>
+              <Box color="fg.subtle" marginLeft="auto">
+                <ArrowUpRight size={14} />
+              </Box>
+            </Flex>
+          </Card>
         ))}
       </Grid>
     </>
