@@ -294,9 +294,9 @@ export const OpenedRowsAndNote: Story = { render: (args) => <OpeningRows {...arg
 
 const WIDE_COLUMNS = ["Request", "Model", "Route", "Latency", "Tokens in", "Tokens out", "Cost"];
 
-function wideTable(extra: { scroll: "x"; scrollLabel: string } | { scroll: "external" }) {
+function wideRows() {
   return (
-    <ListTable {...extra} tableLayout="fixed" minWidth="56rem" stickyHeader>
+    <>
       <Table.Header>
         <Table.Row>
           {WIDE_COLUMNS.map((name) => (
@@ -317,28 +317,32 @@ function wideTable(extra: { scroll: "x"; scrollLabel: string } | { scroll: "exte
           </Table.Row>
         ))}
       </Table.Body>
-    </ListTable>
+    </>
   );
 }
 
+const wideX = (
+  <ListTable scroll="x" scrollLabel="Billing events" tableLayout="fixed" minWidth="56rem">
+    {wideRows()}
+  </ListTable>
+);
+
 /** Wider than its parent: the table scrolls inside a focusable region named by `scrollLabel`. */
 export const ScrollsSideways: Story = {
-  render: () => (
-    <Box maxWidth="40rem">{wideTable({ scroll: "x", scrollLabel: "Billing events" })}</Box>
-  ),
+  render: () => <Box maxWidth="40rem">{wideX}</Box>,
 };
 
 /** An outer scroller owns scrolling (a virtual list): the table never clips its header. */
 export const ExternalScroll: Story = {
   render: () => (
     <Box maxWidth="40rem" maxHeight="9rem" overflow="auto">
-      {wideTable({ scroll: "external" })}
+      <ListTable scroll="external" stickyHeader tableLayout="fixed" minWidth="56rem">
+        {wideRows()}
+      </ListTable>
     </Box>
   ),
 };
 
 export const NarrowScroll: Story = {
-  render: () => (
-    <Box maxWidth="320px">{wideTable({ scroll: "x", scrollLabel: "Billing events" })}</Box>
-  ),
+  render: () => <Box maxWidth="320px">{wideX}</Box>,
 };

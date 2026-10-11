@@ -1,8 +1,53 @@
-import { Box, type BoxProps, Skeleton, Table, VisuallyHidden, chakra } from "@chakra-ui/react";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { Box, type BoxProps, Table, VisuallyHidden } from "@chakra-ui/react";
 import type { ComponentProps, ReactNode } from "react";
 
-import { IdText, type IdTextProps } from "../values/id-text.tsx";
+import { EmptyRow } from "./list-table-parts/empty-row.tsx";
+import {
+  Body,
+  Cell,
+  Column,
+  ColumnGroup,
+  ColumnHeader,
+  Header,
+  LoadingRows,
+  PaddingRow,
+  Row,
+  SpanRow,
+} from "./list-table-parts/parts.tsx";
+import {
+  ActionCell,
+  ActionHeader,
+  ExpandCell,
+  IdCell,
+  SelectCell,
+  SelectHeader,
+} from "./list-table-parts/pinned.tsx";
+import { RowAction } from "./list-table-parts/row-action.tsx";
+import { SortHeader } from "./list-table-parts/sort-header.tsx";
+
+export type { ColumnWidth } from "./list-table-parts/shared.ts";
+export type { ListTableEmptyRowProps } from "./list-table-parts/empty-row.tsx";
+export type {
+  ListTableActionCellProps,
+  ListTableActionHeaderProps,
+  ListTableExpandCellProps,
+  ListTableIdCellProps,
+  ListTableSelectCellProps,
+  ListTableSelectHeaderProps,
+} from "./list-table-parts/pinned.tsx";
+export type {
+  ListTableBodyProps,
+  ListTableCellProps,
+  ListTableColumnGroupProps,
+  ListTableColumnHeaderProps,
+  ListTableColumnProps,
+  ListTableHeaderProps,
+  ListTablePaddingRowProps,
+  ListTableRowProps,
+  ListTableSpanRowProps,
+} from "./list-table-parts/parts.tsx";
+export type { ListTableRowActionProps } from "./list-table-parts/row-action.tsx";
+export type { ListTableSortHeaderProps, SortDirection } from "./list-table-parts/sort-header.tsx";
 
 /** One header look at every density: 12px medium, muted, sentence case, no tracking. */
 const HEADER = {
@@ -20,9 +65,11 @@ const HEADER_HEIGHT = { default: "40px", compact: "32px" } as const;
 /** Zero-specificity defaults, so a row's or a cell's own padding wins. */
 const COMPACT_CELLS = { "& :where(tbody td)": { paddingY: "1.5", paddingX: "3" } } as const;
 
-/** What the pinned action column paints under itself, so scrolled cells don't show through. */
+/** What the pinned columns paint under themselves, so scrolled cells don't show through. */
 const GROUND = "--list-table-ground";
-/** Above the pinned action cells; a collapsed border scrolls away, so the rule is a shadow. */
+/** The row's own tint (hover, selected, toned), painted over the ground on pinned cells. */
+const ROW_GROUND = "var(--list-table-row-ground, transparent)";
+/** Above the pinned body cells; a collapsed border scrolls away, so the rule is a shadow. */
 const STICKY_HEADER = {
   position: "sticky",
   top: 0,
@@ -31,7 +78,20 @@ const STICKY_HEADER = {
   boxShadow: "inset 0 -1px 0 var(--chakra-colors-border-muted)",
 } as const;
 
-/** What every list table takes; the `Table.*` parts inside it are unchanged. */
+/** Leading select and expand columns stick left, the action column right; headers sit above all. */
+const PINNED = {
+  "& [data-pin]": { position: "sticky", zIndex: 1 },
+  "& [data-pin=end]": { right: 0, width: "1%", whiteSpace: "nowrap", textAlign: "end" },
+  "& [data-pin=start]": { left: 0 },
+  "& [data-pin=start] ~ [data-pin=start]": { left: "48px" },
+  "& td[data-pin]": {
+    backgroundColor: `var(${GROUND})`,
+    backgroundImage: `linear-gradient(${ROW_GROUND}, ${ROW_GROUND})`,
+  },
+  "& thead th[data-pin]": { zIndex: 3, background: `var(${GROUND})` },
+} as const;
+
+/** What every list table takes; the parts inside it close their own props. */
 interface ListTableBaseProps {
   children: ReactNode;
   /** `compact`: a shorter header and tighter cells, for dense logs. */
@@ -43,15 +103,16 @@ interface ListTableBaseProps {
   variant?: "card" | "embedded";
   /** Opt in to column dividers; ordinary lists use row rules only. */
   columnRules?: boolean;
-  /**
-   * Keeps the header row in view while its scroller moves, painting the table's ground under
-   * it. Pair it with `scroll="external"` when an outer element owns the scrolling.
-   */
-  stickyHeader?: boolean;
   /** `fixed` makes the `width` set on column headers authoritative. */
   tableLayout?: "auto" | "fixed";
   /** The width below which a wide table stops shrinking and scrolls (with `scroll="x"`). */
   minWidth?: string | number;
+  /** Fixed body row height in px: cells become single-line, so a virtualiser's estimate holds. */
+  rowHeight?: number;
+  /** Aria-busy on the table plus a named status; set it on append and refresh too. */
+  loading?: boolean;
+  /** Default "Loading rows". */
+  loadingLabel?: string;
   id?: string;
   "data-testid"?: string;
   "aria-label"?: string;
@@ -62,14 +123,14 @@ interface ListTableBaseProps {
 }
 
 /**
- * Scrolling is the design system's or the caller's, never improvised. `x`: a wide table
- * scrolls sideways inside a keyboard-focusable region named by `scrollLabel`. `external`:
- * an outer element (a virtual scroller, the page) scrolls; the table never clips.
+ * `x`: a wide table scrolls in a focusable region named by `scrollLabel`. `external`: an outer
+ * element (a virtual scroller, the page) scrolls and the table never clips; only then can
+ * the header stick.
  */
 type ListTableScroll =
-  | { scroll?: undefined; scrollLabel?: never }
-  | { scroll: "external"; scrollLabel?: never }
-  | { scroll: "x"; scrollLabel: string };
+  | { scroll?: undefined; scrollLabel?: never; stickyHeader?: never }
+  | { scroll: "x"; scrollLabel: string; stickyHeader?: never }
+  | { scroll: "external"; scrollLabel?: never; stickyHeader?: boolean };
 
 export type ListTableProps = ListTableBaseProps & ListTableScroll;
 
@@ -78,6 +139,8 @@ export type LegacyListTableProps = Omit<ComponentProps<typeof Table.Root>, "vari
   Omit<ListTableBaseProps, "children" | "tableLayout" | "minWidth"> & {
     /** @deprecated Use `scroll`. */
     containerProps?: BoxProps;
+    /** @deprecated Use `scroll="external"`, which alone can stick the header. */
+    stickyHeader?: boolean;
   };
 
 const SCROLL_REGION = {
@@ -98,10 +161,19 @@ function ListTableRoot({
   density = "default",
   variant = "card",
   stickyHeader = false,
+  rowHeight,
+  loading = false,
+  loadingLabel = "Loading rows",
   scroll,
   scrollLabel,
   ...props
-}: LegacyListTableProps & { scroll?: "x" | "external"; scrollLabel?: string }): ReactNode {
+}: LegacyListTableProps & {
+  scroll?: "x" | "external";
+  scrollLabel?: string;
+  rowHeight?: number;
+  loading?: boolean;
+  loadingLabel?: string;
+}): ReactNode {
   const embedded = variant === "embedded";
   return (
     <Box
@@ -116,9 +188,11 @@ function ListTableRoot({
       css={{ [GROUND]: "var(--chakra-colors-bg-card)" }}
       {...containerProps}
     >
+      <VisuallyHidden as="output">{loading ? loadingLabel : ""}</VisuallyHidden>
       <Table.Root
         borderRadius="inherit"
         variant="line"
+        aria-busy={loading || undefined}
         css={{
           "& thead th": {
             ...HEADER,
@@ -126,6 +200,18 @@ function ListTableRoot({
             ...(stickyHeader ? STICKY_HEADER : {}),
           },
           ...(density === "compact" ? COMPACT_CELLS : {}),
+          ...(rowHeight === undefined
+            ? {}
+            : {
+                "& tbody tr:not([data-span-row]):not([data-padding-row]) td": {
+                  height: `${rowHeight}px`,
+                  boxSizing: "border-box",
+                  paddingY: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                },
+              }),
           // Quiet row rules in the softer separator token.
           "& th, & td": { borderColor: "border.muted" },
           ...(columnRules
@@ -142,6 +228,7 @@ function ListTableRoot({
           "& th:last-of-type, & td:last-of-type": { paddingRight: "4" },
           // A spanning cell is flush: what it holds pads itself.
           "& td[data-span-cell]": { padding: "0" },
+          ...PINNED,
         }}
         {...props}
       >
@@ -151,150 +238,31 @@ function ListTableRoot({
   );
 }
 
-export type SortDirection = "asc" | "desc";
-
-const SORT_ICON = { asc: ArrowUp, desc: ArrowDown, none: ArrowUpDown } as const;
-const ARIA_SORT = { asc: "ascending", desc: "descending", none: "none" } as const;
-
 /**
- * A sortable column header. The label stays sentence case; the arrow shows the order,
- * `aria-sort` tells assistive tech. One click calls `onSort`; the page owns the order.
- */
-function SortHeader({
-  children,
-  sorted,
-  onSort,
-  align = "start",
-  ...props
-}: Omit<ComponentProps<typeof Table.ColumnHeader>, "onClick" | "align"> & {
-  children: ReactNode;
-  /** The column's current order, or `false` when another column sorts the list. */
-  sorted: SortDirection | false;
-  onSort: () => void;
-  align?: "start" | "end";
-}) {
-  const order = sorted || "none";
-  const ArrowIcon = SORT_ICON[order];
-  return (
-    <Table.ColumnHeader aria-sort={ARIA_SORT[order]} textAlign={align} {...props}>
-      <chakra.button
-        type="button"
-        onClick={onSort}
-        display="inline-flex"
-        alignItems="center"
-        gap={1}
-        flexDirection={align === "end" ? "row-reverse" : "row"}
-        font="inherit"
-        color={sorted ? "fg" : "inherit"}
-        cursor="pointer"
-        borderRadius="xs"
-        _hover={{ color: "fg" }}
-        _focusVisible={{ outline: "2px solid", outlineColor: "colorPalette.focusRing" }}
-      >
-        {children}
-        <Box as="span" color={sorted ? "fg" : "fg.subtle"} display="inline-flex">
-          <ArrowIcon size={12} aria-hidden />
-        </Box>
-      </chakra.button>
-    </Table.ColumnHeader>
-  );
-}
-
-/** A cell holding an identifier: IdText, cut in the middle, with a copy button. */
-function IdCell({ value, label, tail, ...props }: ComponentProps<typeof Table.Cell> & IdTextProps) {
-  return (
-    <Table.Cell {...props}>
-      <IdText value={value} label={label} tail={tail} />
-    </Table.Cell>
-  );
-}
-
-/** Placeholder rows while the first page loads, in place of a Spinner. */
-function LoadingRows({ rows = 5, columns }: { rows?: number; columns: number }) {
-  return (
-    <>
-      {Array.from({ length: rows }, (_, row) => (
-        <Table.Row key={row} aria-hidden data-loading-row="">
-          {Array.from({ length: columns }, (_, column) => (
-            <Table.Cell key={column}>
-              <Skeleton height="12px" width={column === 0 ? "60%" : "40%"} />
-            </Table.Cell>
-          ))}
-        </Table.Row>
-      ))}
-    </>
-  );
-}
-
-/** Keeps the row actions in view at the right edge when a wide table scrolls sideways. */
-const PINNED = {
-  position: "sticky",
-  right: 0,
-  zIndex: 1,
-  width: "1%",
-  whiteSpace: "nowrap",
-  textAlign: "end",
-  background: `var(${GROUND})`,
-} as const;
-
-/** The pinned header over the action column; empty, with a hidden name for screen readers. */
-function ActionHeader({ label = "Actions" }: { label?: string }) {
-  return (
-    <Table.ColumnHeader css={PINNED}>
-      <VisuallyHidden>{label}</VisuallyHidden>
-    </Table.ColumnHeader>
-  );
-}
-
-/** The row's actions (an overflow menu, one icon button), pinned to the right edge. */
-function ActionCell({ children, ...props }: ComponentProps<typeof Table.Cell>) {
-  return (
-    <Table.Cell
-      css={{
-        ...PINNED,
-        "tr:hover > &": {
-          backgroundImage:
-            "linear-gradient(var(--chakra-colors-bg-hover), var(--chakra-colors-bg-hover))",
-        },
-      }}
-      onClick={(event) => event.stopPropagation()}
-      {...props}
-    >
-      {children}
-    </Table.Cell>
-  );
-}
-
-/**
- * A row whose one cell spans every column: an opened row's details, an empty line, a note
- * under the rows. The cell is flush and takes no row hover; what it holds pads itself.
- */
-function SpanRow({
-  columns,
-  children,
-  ...props
-}: ComponentProps<typeof Table.Row> & {
-  /** How many columns the table has, so the one cell spans them all. */
-  columns: number;
-}) {
-  return (
-    <Table.Row data-span-row="" _hover={{ bg: "transparent" }} {...props}>
-      <Table.Cell colSpan={columns} data-span-cell="">
-        {children}
-      </Table.Cell>
-    </Table.Row>
-  );
-}
-
-/**
- * The one list look: rounded card, quiet rules, sentence-case headers. Compose with
- * Table parts plus SortHeader, IdCell, ActionHeader, ActionCell, LoadingRows and SpanRow.
+ * The one list look: rounded card, quiet rules, sentence-case headers. Compose with its
+ * closed parts (`ListTable.Row`, `.Cell`, `.RowAction`, `.SelectCell`, `.EmptyRow`...).
  */
 export const ListTable = Object.assign(ListTableRoot, {
+  Header,
+  Body,
+  Row,
+  Cell,
+  ColumnHeader,
+  ColumnGroup,
+  Column,
+  RowAction,
+  SelectHeader,
+  SelectCell,
+  ExpandCell,
   SortHeader,
   IdCell,
-  LoadingRows,
   ActionHeader,
   ActionCell,
+  LoadingRows,
+  EmptyRow,
   SpanRow,
+  PaddingRow,
 });
+
+/** The Chakra table, for the named escapes that cannot be a ListTable. */
+export { Table as RawTable } from "@chakra-ui/react";

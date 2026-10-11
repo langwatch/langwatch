@@ -550,6 +550,26 @@
     "./charts": {
       "types": "./dist/charts.d.ts",
       "default": "./src/charts.ts"
+    },
+    "./content-tabs": {
+      "types": "./dist/components/layout/content-tabs.d.ts",
+      "default": "./src/components/layout/content-tabs.tsx"
+    },
+    "./code-tabs": {
+      "types": "./dist/components/layout/code-tabs.d.ts",
+      "default": "./src/components/layout/code-tabs.tsx"
+    },
+    "./metric-tabs": {
+      "types": "./dist/components/layout/metric-tabs.d.ts",
+      "default": "./src/components/layout/metric-tabs.tsx"
+    },
+    "./table-toolbar": {
+      "types": "./dist/components/layout/table-toolbar.d.ts",
+      "default": "./src/components/layout/table-toolbar.tsx"
+    },
+    "./column-picker": {
+      "types": "./dist/components/layout/column-picker.d.ts",
+      "default": "./src/components/layout/column-picker.tsx"
     }
   },
   "scripts": {

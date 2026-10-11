@@ -1,30 +1,24 @@
 import { Alert, Box, HStack, Skeleton, Stack, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import { SearchInput } from "../forms/search-input.tsx";
 import { Banner, BannerAction } from "../states/banner.tsx";
 import {
+  EmptyNextSteps,
+  type EmptyNext,
+  type EmptyStateProps,
   NoDataInfoBlock,
-  type NoDataInfoBlockProps,
-  type NoDataNext,
 } from "../states/no-data-info-block.tsx";
 import { BackLink } from "./back-link.tsx";
 import { LoadMore, type LoadMoreProps } from "./load-more.tsx";
 import { PageLayout } from "./page-layout.tsx";
 import { Pagination, type PaginationProps } from "./pagination.tsx";
 import { SelectionActionBar, type SelectionActionBarProps } from "./selection-action-bar.tsx";
+import { TableToolbar, type TableToolbarProps } from "./table-toolbar.tsx";
+
+export type { ListPageSearch } from "./table-toolbar.tsx";
 
 /** What the list shows. The caller derives it from its read; the page never guesses. */
 export type ListPageState = "loading" | "error" | "empty" | "no-results" | "ready";
-
-export interface ListPageSearch {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-  /** The search box's accessible name. */
-  ariaLabel: string;
-  testId?: string;
-}
 
 /** A way back to the list this page hangs under; a plain click routes through `onNavigate`. */
 export interface ListPageBack {
@@ -36,17 +30,22 @@ export interface ListPageBack {
 export interface ListPageErrorConfig {
   title: string;
   description?: string;
+  /** Drawn beside the next step, never instead of it. */
   onRetry?: () => void;
+  /** Where to go when retrying does not help: a setting, the docs or an agent prompt. */
+  next: EmptyNext;
 }
 
 /** Filters matched nothing, though records exist. */
 export interface ListPageNoResults {
   description: string;
+  /** Drawn beside the next step, never instead of it. */
   onClear?: () => void;
+  next: EmptyNext;
 }
 
 /** The empty state's block or line, with the next step it must carry. */
-export type ListPageEmptyConfig = NoDataInfoBlockProps & { next: NoDataNext };
+export type ListPageEmptyConfig = EmptyStateProps;
 
 /** Each state's config is required with its state; the others are optional. */
 type ListPageStateConfig =
@@ -73,13 +72,13 @@ export type ListPageProps = ListPagePaging &
     back?: ListPageBack;
     /** `PageLayout.HeaderButton`s only; one `primary`. */
     actions?: ReactNode;
-    search?: ListPageSearch;
-    /** FilterChips, a scope picker, a segmented control. */
-    filters?: ReactNode;
+    /** Search, lookup, filters, columns, summary and actions; the selection stays its own prop. */
+    toolbar?: Omit<TableToolbarProps, "disabled" | "attached" | "selection">;
     refreshing?: boolean;
     error?: ListPageErrorConfig;
     empty?: ListPageEmptyConfig;
     noResults?: ListPageNoResults;
+    /** `placement="inline"` draws the bar as the first band; floating is the default. */
     selection?: SelectionActionBarProps;
     /** A ListTable, or a CardGrid of ResourceTiles. */
     children: ReactNode;
@@ -114,8 +113,7 @@ function ListPageView({
   back,
   actions,
   state,
-  search,
-  filters,
+  toolbar,
   refreshing = false,
   error,
   empty,
@@ -126,7 +124,9 @@ function ListPageView({
   children,
 }: ListPageProps) {
   const ready = state === "ready";
-  const showToolbar = (search || filters) && state !== "error" && state !== "empty";
+  const inlineSelection = ready && selection?.placement === "inline" ? selection : undefined;
+  const floatingSelection = ready && selection?.placement !== "inline" ? selection : undefined;
+  const showToolbar = (toolbar || inlineSelection) && state !== "error" && state !== "empty";
   return (
     <>
       <PageLayout.Header actions={actions}>
@@ -150,20 +150,7 @@ function ListPageView({
             </Text>
           )}
           {showToolbar && (
-            <HStack wrap="wrap" gap={3} minWidth={0}>
-              {search && (
-                <SearchInput
-                  value={search.value}
-                  onChange={(event) => search.onChange(event.target.value)}
-                  placeholder={search.placeholder}
-                  aria-label={search.ariaLabel}
-                  data-testid={search.testId}
-                  disabled={state === "loading"}
-                  containerProps={{ flex: "1 1 12rem", maxWidth: "20rem" }}
-                />
-              )}
-              {filters}
-            </HStack>
+            <TableToolbar {...toolbar} selection={inlineSelection} disabled={state === "loading"} />
           )}
           {ready && refreshing && (
             <Text as="output" textStyle="xs" color="fg.muted">
@@ -177,7 +164,7 @@ function ListPageView({
           {state === "no-results" && <ListPageNoResultsLine {...noResults} />}
           {ready && (
             <>
-              <Box minWidth="0" overflowX="auto">
+              <Box minWidth="0" maxWidth="100%">
                 {children}
               </Box>
               {pagination && <Pagination {...pagination} />}
@@ -186,29 +173,35 @@ function ListPageView({
           )}
         </Stack>
       </PageLayout.Container>
-      {ready && selection && <SelectionActionBar {...selection} />}
+      {floatingSelection && <SelectionActionBar {...floatingSelection} />}
     </>
   );
 }
 
-function ListPageErrorBanner({ title, description, onRetry }: ListPageErrorConfig) {
+function ListPageErrorBanner({ title, description, onRetry, next }: ListPageErrorConfig) {
   return (
     <Banner
       status="error"
       title={title}
-      action={onRetry && <BannerAction onClick={onRetry}>Try again</BannerAction>}
+      action={
+        <HStack gap={3} wrap="wrap">
+          {onRetry && <BannerAction onClick={onRetry}>Try again</BannerAction>}
+          <EmptyNextSteps next={next} />
+        </HStack>
+      }
     >
       {description}
     </Banner>
   );
 }
 
-function ListPageNoResultsLine({ description, onClear }: ListPageNoResults) {
+function ListPageNoResultsLine({ description, onClear, next }: ListPageNoResults) {
   return (
     <NoDataInfoBlock
       size="line"
       title={description}
       action={onClear && { label: "Clear filters", onClick: onClear }}
+      next={next}
     />
   );
 }

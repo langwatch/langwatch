@@ -72,3 +72,42 @@ export const LongLabel: Story = {
     ),
   },
 };
+
+/** Inline: one band in normal flow, for a drawer, a dialog or a table in a card. */
+export const Inline: Story = {
+  args: {
+    placement: "inline",
+    children: (
+      <Button size="xs" variant="ghost">
+        Add to dataset
+      </Button>
+    ),
+  },
+  render: (args) => (
+    <Box maxWidth="560px">
+      <SelectionActionBar {...args} />
+    </Box>
+  ),
+};
+
+/** At 320px the label and the actions wrap, and the bar stays inside the viewport. */
+export const Narrow: Story = {
+  args: {
+    label: "Select all 212 matching traces",
+    children: (
+      <>
+        <Button size="xs" variant="ghost">
+          Add to dataset
+        </Button>
+        <Button size="xs" variant="ghost" colorPalette="red">
+          Delete
+        </Button>
+      </>
+    ),
+  },
+  render: (args) => (
+    <Box maxWidth="320px" height="220px" position="relative">
+      <SelectionActionBar {...args} />
+    </Box>
+  ),
+};

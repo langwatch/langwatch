@@ -42,21 +42,23 @@ const meta = {
     description: "People who can manage this installation.",
     state: "ready",
     actions: <Button size="sm">Grant access</Button>,
-    search: {
-      value: "",
-      onChange: () => void 0,
-      placeholder: "Search operators",
-      ariaLabel: "Search operators",
-      testId: "operators-search",
+    toolbar: {
+      search: {
+        value: "",
+        onChange: () => void 0,
+        placeholder: "Search operators",
+        ariaLabel: "Search operators",
+        testId: "operators-search",
+      },
+      filters: (
+        <FilterChips
+          groupLabel="Filter operators"
+          value="all"
+          onChange={() => void 0}
+          items={[{ value: "all", label: "All", count: 1 }]}
+        />
+      ),
     },
-    filters: (
-      <FilterChips
-        groupLabel="Filter operators"
-        value="all"
-        onChange={() => void 0}
-        items={[{ value: "all", label: "All", count: 1 }]}
-      />
-    ),
     children: rows,
     pagination: {
       page: 1,
@@ -81,7 +83,8 @@ export const Empty: Story = {
       icon: <Users />,
       title: "No operators yet",
       description: "Grant access to the first person who runs this installation.",
-      next: { kind: "action", label: "Grant access", onClick: () => void 0 },
+      next: [{ kind: "docs", label: "Read how access works", href: "https://langwatch.ai/docs" }],
+      primaryAction: <Button size="sm">Grant access</Button>,
     },
   },
 };
@@ -93,7 +96,7 @@ export const EmptyWithSetting: Story = {
       icon: <Users />,
       title: "No operators yet",
       description: "Grant access to the first person who runs this installation.",
-      next: { kind: "setting", label: "Open operator settings", href: "/settings/operators" },
+      next: [{ kind: "setting", label: "Open operator settings", href: "/settings/operators" }],
     },
   },
 };
@@ -105,7 +108,7 @@ export const EmptyWithDocs: Story = {
       icon: <Users />,
       title: "No operators yet",
       description: "Grant access to the first person who runs this installation.",
-      next: { kind: "docs", label: "Read how operators work", href: "https://langwatch.ai/docs" },
+      next: [{ kind: "docs", label: "Read how operators work", href: "https://langwatch.ai/docs" }],
     },
   },
 };
@@ -117,10 +120,12 @@ export const EmptyWithAgentPrompt: Story = {
       icon: <Users />,
       title: "No operators yet",
       description: "Grant access to the first person who runs this installation.",
-      next: {
-        kind: "agent-prompt",
-        prompt: "Add LangWatch tracing to this project and grant me operator access.",
-      },
+      next: [
+        {
+          kind: "agent-prompt",
+          prompt: "Add LangWatch tracing to this project and grant me operator access.",
+        },
+      ],
     },
   },
 };
@@ -129,13 +134,19 @@ export const EmptyWithAgentPrompt: Story = {
 export const NoResults: Story = {
   args: {
     state: "no-results",
-    search: {
-      value: "zed",
-      onChange: () => void 0,
-      placeholder: "Search operators",
-      ariaLabel: "Search operators",
+    toolbar: {
+      search: {
+        value: "zed",
+        onChange: () => void 0,
+        placeholder: "Search operators",
+        ariaLabel: "Search operators",
+      },
     },
-    noResults: { description: "No operators match your search.", onClear: () => void 0 },
+    noResults: {
+      description: "No operators match your search.",
+      onClear: () => void 0,
+      next: [{ kind: "docs", label: "How search works", href: "https://langwatch.ai/docs" }],
+    },
   },
 };
 export const Failed: Story = {
@@ -145,13 +156,18 @@ export const Failed: Story = {
       title: "Operators could not load",
       description: "Try again in a moment.",
       onRetry: () => void 0,
+      next: [{ kind: "docs", label: "Check the status page", href: "https://status.langwatch.ai" }],
     },
   },
 };
 /** A failed refetch with rows still on screen: an inline notice, never a blank page. */
 export const FailedWithRows: Story = {
   args: {
-    error: { title: "Showing the last results", description: "The refresh failed." },
+    error: {
+      title: "Showing the last results",
+      description: "The refresh failed.",
+      next: [{ kind: "docs", label: "Check the status page", href: "https://status.langwatch.ai" }],
+    },
   },
 };
 export const AppendFeed: Story = {
@@ -176,6 +192,17 @@ export const WithBack: Story = {
 export const Selection: Story = {
   args: {
     selection: {
+      label: "1 selected",
+      onClear: () => void 0,
+      children: <Button size="xs">Revoke</Button>,
+    },
+  },
+};
+/** The bar as the first band of the page, for a list that lives in a drawer or dialog. */
+export const SelectionInline: Story = {
+  args: {
+    selection: {
+      placement: "inline",
       label: "1 selected",
       onClear: () => void 0,
       children: <Button size="xs">Revoke</Button>,

@@ -21,15 +21,22 @@ function page(state: ListPageState, extra: Partial<ListPageProps> = {}) {
     <ListPage
       title="Operators"
       state={state}
-      search={search}
-      filters={<button type="button">Active only</button>}
+      toolbar={{ search, filters: <button type="button">Active only</button> }}
       empty={{
         size: "line",
         title: "No operators yet",
-        next: { kind: "action", label: "Grant access", onClick: vi.fn() },
+        next: [{ kind: "docs", label: "Read about access", href: "https://example.com" }],
       }}
-      noResults={{ description: "No operators match.", onClear: vi.fn() }}
-      error={{ title: "Could not load operators", onRetry: vi.fn() }}
+      noResults={{
+        description: "No operators match.",
+        onClear: vi.fn(),
+        next: [{ kind: "docs", label: "How search works", href: "https://example.com" }],
+      }}
+      error={{
+        title: "Could not load operators",
+        onRetry: vi.fn(),
+        next: [{ kind: "docs", label: "Status page", href: "https://example.com" }],
+      }}
       selection={{ label: "1 selected", onClear: vi.fn() }}
       {...extra}
     >
@@ -56,7 +63,15 @@ describe("ListPage", () => {
   /** @scenario A list distinguishes loading, empty and failed reads */
   it("runs the retry the error carries", async () => {
     const onRetry = vi.fn();
-    renderWithDesignSystem(page("error", { error: { title: "Failed", onRetry } }));
+    renderWithDesignSystem(
+      page("error", {
+        error: {
+          title: "Failed",
+          onRetry,
+          next: [{ kind: "docs", label: "Status page", href: "https://example.com" }],
+        },
+      }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
@@ -106,7 +121,7 @@ describe("ListPage", () => {
   /** @scenario Search is a named, testable control */
   it("names the search box and reports typing", async () => {
     const onChange = vi.fn();
-    renderWithDesignSystem(page("ready", { search: { ...search, onChange } }));
+    renderWithDesignSystem(page("ready", { toolbar: { search: { ...search, onChange } } }));
     const box = screen.getByRole("searchbox", { name: "Search operators" });
     expect(box.getAttribute("placeholder")).toBe("Search operators");
     expect(box.getAttribute("data-testid")).toBe("operators-search");
@@ -196,5 +211,52 @@ describe("ListPage", () => {
     );
     expect(screen.getByText("No operators yet")).toBeTruthy();
     expect(screen.queryByText("Nothing here yet.")).toBeNull();
+  });
+
+  /** @scenario An empty list always points to a next step */
+  it("refuses error, no-results and empty configs without a non-empty next step", () => {
+    const rejected = () => (
+      <>
+        {/* @ts-expect-error an error config needs a next step */}
+        <ListPage title="A" state="error" error={{ title: "Failed" }}>
+          <div />
+        </ListPage>
+        {/* @ts-expect-error a no-results config needs a next step */}
+        <ListPage title="A" state="no-results" noResults={{ description: "None" }}>
+          <div />
+        </ListPage>
+        {/* @ts-expect-error a next step cannot be an empty list */}
+        <ListPage title="A" state="empty" empty={{ size: "line", title: "None", next: [] }}>
+          <div />
+        </ListPage>
+      </>
+    );
+    expect(rejected).toBeTypeOf("function");
+  });
+
+  /** @scenario An empty list always points to a next step */
+  it("draws the next step beside retry and clear, never instead of them", async () => {
+    const { rerender } = renderWithDesignSystem(page("error"));
+    expect(screen.getByRole("link", { name: "Status page" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    rerender(page("no-results"));
+    expect(screen.getByRole("link", { name: "How search works" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeTruthy();
+  });
+
+  /** @scenario Bulk selection appears only over ready rows */
+  it("draws an inline selection bar as the first band of the page, not a floating one", () => {
+    renderWithDesignSystem(
+      page("ready", {
+        error: undefined,
+        selection: { placement: "inline", label: "2 selected", onClear: vi.fn() },
+      }),
+    );
+    const bar = screen.getByText("2 selected").closest("[data-placement]");
+    expect(bar?.getAttribute("data-placement")).toBe("inline");
+    const search = screen.getByRole("searchbox");
+    expect(
+      bar && search.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
   });
 });
