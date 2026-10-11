@@ -76,3 +76,60 @@ Feature: A lookup by id reads only the partitions its id index names
     When its events are read for replay with no lower bound
     Then the read touches only those weeks' partitions
     And events with an unknown occurred time are still included
+
+  @integration @unimplemented
+  Scenario: a projection replay re-inserting rows leaves the index range correct
+    Given a trace whose index range covers Monday to Thursday
+    When its projection is replayed and its rows are inserted again
+    Then the trace's index range still covers Monday to Thursday
+
+  @integration @unimplemented
+  Scenario: a retention change reaches the index as well as the data
+    Given a project whose traces are kept for 365 days
+    When the project's trace retention is changed to 30 days
+    Then the trace id index rows for that project carry 30 days as well
+
+  @integration @unimplemented
+  Scenario: an id kept forever is not expired by a finite-retention row
+    Given an id whose earlier rows are kept forever
+    When a later row for the same id arrives with a 30-day retention
+    Then the id's index row is still kept forever
+
+  @integration @unimplemented
+  Scenario: events with an unknown occurred time do not widen an aggregate's range
+    Given an aggregate with events last month and one event with no occurred time
+    When its index range is read
+    Then the range covers last month only
+
+  @integration @unimplemented
+  Scenario: an event is found first in the window its id's time names
+    Given an event stored eight weeks ago whose occurred time is close to when its id was made
+    When it is looked up by tenant and event id
+    Then the first read touches only the partitions within seven days of the id's time
+
+  @integration @unimplemented
+  Scenario: an event whose occurred time drifted far from its id falls back
+    Given a span exported today whose occurred time is three months ago
+    When its event is looked up by tenant and event id
+    Then the first read finds nothing and the lookup falls back to the existing path
+    And the fallback is recorded
+
+  @integration @unimplemented
+  Scenario: readers trust the index only once its backfill has completed
+    Given an index whose backfill has written its complete marker on this ClickHouse target
+    When a process starts
+    Then it reads the marker once and keeps the answer in memory
+    And lookups by id read no marker
+
+  @integration @unimplemented
+  Scenario: a retention change during the backfill does not leave stale index rows
+    Given a backfill in progress
+    And a project's retention is lengthened from 30 to 365 days while it runs
+    When the backfill completes
+    Then every index row for that project carries the new retention
+
+  @unit @unimplemented
+  Scenario: an event id that is not a KSUID takes the existing lookup path
+    Given a legacy event id that is not a KSUID
+    When it is looked up by tenant and event id
+    Then the lookup uses the existing path rather than a time from the id
