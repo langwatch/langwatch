@@ -39,6 +39,7 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
   `<PROVIDER>_CLIENT_ID`/`_SECRET` (idpsim accepts anything), then press the provider's button;
   `login_hint=admin@acme1.test` skips the picker. Read `social.<provider>.*` in the activity feed.
 - Activity (every authorize, token, assertion, SCIM call with an outcome and a reason):
+- On an IS_SAAS stack also set LOCAL_PASSWORDS_ENABLED=on, or admin password sign-in is refused (EMAIL_PASSWORD_DISABLED).
   `GET /control/t/<n>/activity`, or the tenant page's activity tab. Read it first when a
   login fails: it says whether the request even arrived.
 
