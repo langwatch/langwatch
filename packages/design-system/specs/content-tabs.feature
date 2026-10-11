@@ -82,6 +82,11 @@ Feature: Content tabs
     And copying writes the open snippet
 
   @integration
+  Scenario: CodeTabs highlights in the page's colour mode, forced or not
+    Given code tabs under a colour mode forced to dark, and again forced to light
+    Then the dark page highlights with the dark theme and the light page with the light theme
+
+  @integration
   Scenario: MetricTabs names a tab by label and figure and waits for Enter
     Given metric tabs
     Then each tab is named by its label then its figure
