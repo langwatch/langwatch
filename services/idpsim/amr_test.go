@@ -44,3 +44,21 @@ func TestAmrIsClearedByAnEmptyListAndByReset(t *testing.T) {
 	tenant.Reset()
 	assert.Empty(t, tenant.Amr())
 }
+
+// @scenario "A tenant can assert a second factor in its ID tokens"
+func TestAmrOverridesALegacyOktaTenantsDefault(t *testing.T) {
+	s := newTestServer(t, 1)
+	tenant, _ := s.Tenant(1)
+	tenant.SetLegacyProvider(LegacyProviderOkta)
+	parse := func() any {
+		raw, err := s.mintIDToken(tenant, tenant.Users()[0], audience{ClientID: "client-1"})
+		require.NoError(t, err)
+		claims, err := parseIDToken(t, tenant, raw)
+		require.NoError(t, err)
+		return claims["amr"]
+	}
+	assert.Equal(t, []any{"pwd"}, parse())
+
+	tenant.SetAmr([]string{"pwd", "mfa"})
+	assert.Equal(t, []any{"pwd", "mfa"}, parse())
+}

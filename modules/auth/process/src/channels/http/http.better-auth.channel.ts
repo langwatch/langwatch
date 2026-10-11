@@ -64,6 +64,7 @@ import {
   type FindGoverningConnections,
   type SessionMintClaims,
   type SignUpPolicy,
+  toConcretePath,
 } from "./http.better-auth-hooks.channel.ts";
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
 import type { IdTokenIssuerRefusalChannel } from "./http.id-token-issuer-refusal.channel.ts";
@@ -365,6 +366,35 @@ function createBeforeRequestHook({
 }
 
 /**
+ * What an Auth0 or Okta callback proved, kept for the session it is about to mint: the
+ * verified ID token first, then the account it accepted (main's database hooks).
+ */
+function recordCallbackEvidence({
+  evidence,
+  account,
+  context,
+}: {
+  evidence: SessionMintClaims["evidence"];
+  account: Partial<Record<"providerId" | "accountId" | "idToken", unknown>>;
+  context: { path?: string; params?: Record<string, string | undefined> } | null | undefined;
+}): void {
+  if (typeof account.providerId !== "string") return;
+  const path =
+    context?.path === undefined ? undefined : toConcretePath(context.path, context.params);
+  evidence.recordVerifiedCallbackToken({
+    providerId: account.providerId,
+    path,
+    verifiedIdToken: typeof account.idToken === "string" ? account.idToken : undefined,
+  });
+  if (typeof account.accountId !== "string") return;
+  evidence.recordAuthenticatedCallbackAccount({
+    providerId: account.providerId,
+    providerAccountId: account.accountId,
+    path,
+  });
+}
+
+/**
  * Builds the Better Auth transport around the process-owned mailer.
  */
 export const createAuthOptions = ({
@@ -622,6 +652,7 @@ export const createAuthOptions = ({
             findGoverningConnections,
             linkProposals: hooks.linkProposals,
           })(account, context);
+          recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
@@ -643,6 +674,10 @@ export const createAuthOptions = ({
         },
       },
       update: {
+        before: async (account, context) => {
+          recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
+          return undefined;
+        },
         after: async (account) => {
           // BetterAuth refreshes tokens on the linked Account row on every
           // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
