@@ -480,5 +480,13 @@
     "reason": "A provider logo tile, not a card (R2m2 review).",
     "owner": "model-provider",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/data-privacy/browser/src/ui/elements/audience-picker.tsx",
+    "rule": "card-box",
+    "line": 104,
+    "reason": "A small icon-and-label chip inside the select trigger, not a surface (R2s1 review).",
+    "owner": "data-privacy",
+    "disposition": "reviewed"
   }
 ]

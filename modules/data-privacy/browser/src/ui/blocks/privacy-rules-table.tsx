@@ -1,10 +1,13 @@
 import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Button, Card, Table, Text } from "@langwatch/design-system/primitives";
-import { MoreVertical } from "lucide-react";
+import { Button } from "@langwatch/design-system/primitives";
 
 import { ruleSummary } from "../../model/data-privacy-rule-config.ts";
 import { RuleScopeLabel } from "../elements/rule-scope-label.tsx";
+
+const PRIVACY_DOCS_HREF = "https://langwatch.ai/docs/platform/data-privacy";
 
 /** The rules at the selected scope, each with edit and delete for a caller who may write. */
 export function PrivacyRulesTable({
@@ -19,42 +22,37 @@ export function PrivacyRulesTable({
   onRemove: (rule: DataPrivacyRule) => void;
 }) {
   return (
-    <Card.Root width="full" overflow="hidden">
-      <Card.Body paddingX={0} paddingY={0}>
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Scope</Table.ColumnHeader>
-              <Table.ColumnHeader>Rule</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {rules.length === 0 ? (
-              <Table.Row>
-                <Table.Cell colSpan={3}>
-                  <Text color="fg.muted" fontSize="sm" paddingY={2}>
-                    No privacy rules at the selected scope.
-                  </Text>
-                </Table.Cell>
-              </Table.Row>
-            ) : (
-              rules.map((rule) => (
-                <Table.Row key={`${rule.scopeType}:${rule.scopeId}:${rule.personalOnly}`}>
-                  <Table.Cell>
-                    <RuleScopeLabel rule={rule} />
-                  </Table.Cell>
-                  <Table.Cell>{ruleSummary(rule.config)}</Table.Cell>
-                  <Table.Cell textAlign="end">
-                    {canWrite && <RuleActions rule={rule} onEdit={onEdit} onRemove={onRemove} />}
-                  </Table.Cell>
-                </Table.Row>
-              ))
-            )}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+    <ListTable aria-label="Privacy rules">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Rule</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {rules.length === 0 ? (
+          <ListTable.EmptyRow
+            columns={3}
+            state="no-results"
+            title="No privacy rules at the selected scope"
+            next={[{ kind: "docs", label: "How privacy rules cascade", href: PRIVACY_DOCS_HREF }]}
+          />
+        ) : (
+          rules.map((rule) => (
+            <ListTable.Row key={`${rule.scopeType}:${rule.scopeId}:${rule.personalOnly}`}>
+              <ListTable.Cell>
+                <RuleScopeLabel rule={rule} />
+              </ListTable.Cell>
+              <ListTable.Cell>{ruleSummary(rule.config)}</ListTable.Cell>
+              <ListTable.ActionCell>
+                {canWrite && <RuleActions rule={rule} onEdit={onEdit} onRemove={onRemove} />}
+              </ListTable.ActionCell>
+            </ListTable.Row>
+          ))
+        )}
+      </ListTable.Body>
+    </ListTable>
   );
 }
 
@@ -71,7 +69,7 @@ function RuleActions({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button size="xs" variant="ghost" aria-label={`Actions for ${rule.name} privacy rule`}>
-          <MoreVertical size={14} />
+          <MoreVerticalIcon size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
