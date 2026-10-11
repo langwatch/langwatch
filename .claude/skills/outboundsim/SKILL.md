@@ -61,6 +61,38 @@ generic usage feed for custom HTTP pulls (`GET /feeds/<name>?cursor=<n>`; events
 cursor at `$.next_cursor`). A word in the bearer token (or client id) picks the workspace:
 `empty`, `revoked` (401), `noscope` (403), `ratelimited` (429), `down` (503), `malformed`
 (200 HTML) or `cycle` (repeating page token); anything else is a seeded three-space workspace.
-Faults use channels `databricks` and `feed`, target = the path. `PUT /_sim/api/databricks/users`
-replaces the SCIM directory. The product cannot reach these yet: the Databricks workspace URL
-guard and the hard-wired OpenAI, Anthropic and Microsoft hosts await a ruling (handoff fl-vsim).
+Faults use channels `databricks`, `feed` and `vendor`, target = the path. `PUT /_sim/api/databricks/users`
+replaces the SCIM directory.
+
+`vendors.go` adds small OpenAI (`/openai/v1/organization/users|projects`), Anthropic
+(`/anthropic/v1/organizations/users|me`) and Microsoft (`/microsoft-login/<tenant>/oauth2/v2.0/token`,
+`/microsoft-graph/v1.0/users|subscribedSkus`) routes, same tenant words in the key or bearer.
+Dataverse bots and transcripts, the OpenAI cost report, the Anthropic usage/cost reports and the
+audit-log feeds are not served yet.
+
+### Reaching it from the product
+
+`haven up +outbound` sets one base per vendor (unless .env names it): `DATABRICKS_WORKSPACE_BASE`
+(the outbound origin), `OPENAI_ADMIN_API_BASE`, `ANTHROPIC_ADMIN_API_BASE`, `MICROSOFT_LOGIN_BASE`,
+`MICROSOFT_GRAPH_API_BASE` (origin + `/openai`, `/anthropic`, `/microsoft-login`,
+`/microsoft-graph`). Unset or blank means the real vendor. A request to exactly that origin is the
+one local address the pull fence allows. In the UI, type the outbound origin
+(`haven status` shows it) as the Databricks workspace URL.
+
+Tester recipes:
+- GOV-56: Governance > Sources > Add Databricks Genie, workspace URL = outbound origin, token
+  `dapi-good`; Agents > Sync lists 3 spaces. Repeat with `dapi-revoked|noscope|ratelimited|down|
+  malformed|cycle`: refusals unauthorized, forbidden, rate_limited, unavailable, malformed_response,
+  pagination_stalled. `dapi-empty`: no agents. One-off: `haven sim outbound fault add --channel
+  databricks --target /api/2.0/genie/spaces --status 404 --times 1` -> not_found.
+- GOV-06: the Genie source pulls 6 messages (2 per space); `haven sim outbound list --channel
+  databricks` shows the reads. Custom HTTP pull: URL `<outbound>/feeds/usage`, bearer `feed-good`,
+  eventsJsonPath `$.events`, cursorJsonPath `$.next_cursor`, cursorQueryParam `cursor`: 5 events,
+  next run 0. Non-local custom URLs stay as before.
+- GOV-50: `curl -X PUT <outbound>/_sim/api/databricks/users -d '[{"id":"1001","userName":
+  "<member email>","active":true},{"id":"1002","userName":"<same email>","active":true}]'`, pull;
+  People shows suggestions to confirm and a duplicate to refuse. OpenAI/Anthropic member lists
+  (`sk-admin-good`) give three `@sim.vendor.test` people.
+- GOV-44: Copilot Studio Dataverse source with any tenant id and client secret: sign-in, seats
+  (`subscribedSkus`) and the directory (`/microsoft-graph/v1.0/users`) work. Dataverse bots and
+  transcripts need routes not built yet.

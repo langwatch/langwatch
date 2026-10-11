@@ -296,3 +296,17 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       When a custom HTTP pull source reads /feeds/<name>?cursor=<n> with a bearer token
       Then outboundsim answers the events after n and next_cursor
       And a token holding revoked is refused 401
+
+    @unit
+    Scenario: The overlay points the governance pull vendors at outboundsim
+      Given the worktree's environment names none of the five vendor base settings
+      When the developer runs "haven up +outbound"
+      Then the overlay sets DATABRICKS_WORKSPACE_BASE to outboundsim's origin
+      And OPENAI_ADMIN_API_BASE, ANTHROPIC_ADMIN_API_BASE, MICROSOFT_LOGIN_BASE and MICROSOFT_GRAPH_API_BASE to its /openai, /anthropic, /microsoft-login and /microsoft-graph
+      And a base .env names is left alone
+
+    @unit
+    Scenario: Outboundsim answers the OpenAI, Anthropic and Microsoft calls a pull source makes
+      When a pull source reads member lists, the account lookup, a Microsoft token, Graph users or subscribed SKUs
+      Then outboundsim answers each from a seeded tenant
+      And a key holding revoked, or no credential, is refused 401
