@@ -1,6 +1,7 @@
 import type { AgentCopy } from "@langwatch/agent-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
@@ -76,9 +77,10 @@ function ReplicaSelection({
     );
   if (copies.length === 0) {
     return (
-      <Text color="fg.muted">
-        No replicas found. Use Replicate to another project on this agent's menu to create one.
-      </Text>
+      <NoDataInfoBlock
+        size="line"
+        title="No replicas found. Use Replicate to another project on this agent's menu to create one."
+      />
     );
   }
 
