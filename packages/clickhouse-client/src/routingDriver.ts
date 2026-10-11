@@ -7,6 +7,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseCloseableClient, ClickHouseConnection } from "./connection.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
+import { inbandExceptionOf } from "./statementShape.ts";
 
 /**
  * Anything a routed connection can run a statement against. Method shorthand
@@ -74,6 +75,20 @@ function queryParams(request: QueryRequest): Record<string, unknown> {
   return params;
 }
 
+/**
+ * A server before 25.11 that fails after its 200 writes the failure as a last `{"exception"}`
+ * row, which the vendor client hands over as data; read it as the failure it is, with the
+ * server's code, as VendorClientResilience does (specs/clickhouse/single-client-access.feature).
+ */
+function refuseInbandException(rows: readonly unknown[]): void {
+  const exception = inbandExceptionOf(rows[rows.length - 1]);
+  if (exception === undefined) return;
+  const error = new Error(exception);
+  const code = /Code:\s*(\d+)/.exec(exception)?.[1];
+  if (code) Object.assign(error, { code });
+  throw error;
+}
+
 export function routingDriver<Client extends RoutableStatementClient>(
   connection: ClickHouseConnection<Client>,
 ): QueryDriver {
@@ -94,6 +109,7 @@ export function routingDriver<Client extends RoutableStatementClient>(
       const started = nowInstant().epochMilliseconds;
       const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
       const rows = (await resultSet.json()) as Row[];
+      refuseInbandException(rows);
       return { rows, stats: { durationMs: nowInstant().epochMilliseconds - started } };
     },
 
@@ -101,7 +117,9 @@ export function routingDriver<Client extends RoutableStatementClient>(
       const vendor = await serverFor(connection, request);
       const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
       for await (const batch of resultSet.stream<Row>()) {
-        yield batch.map((row) => row.json());
+        const rows = batch.map((row) => row.json());
+        refuseInbandException(rows);
+        yield rows;
       }
     },
   };
