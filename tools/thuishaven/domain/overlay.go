@@ -142,6 +142,7 @@ func (s Stack) OverlayEnv() []string {
 			"LANGWATCH_IDPSIM_URL="+idp.URL,
 			"SSO_TRUSTED_IDP_ORIGINS="+idp.URL,
 		)
+		env = append(env, IdpSocialSignInEnv(idp.URL)...)
 		// And its NAMESERVER, because the domains a local walk claims are
 		// reserved names like `acme.test` that no public resolver will ever
 		// answer for. The simulator is authoritative for them and the

@@ -33,6 +33,11 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 - SAML: sign-in `<base>/t/<n>/saml/sso`, metadata `<base>/t/<n>/saml/metadata`.
 - Zero-click login in a test: `login_hint=<email>`. Seeded users per tenant:
   `admin@acme<n>.test`, `member@acme<n>.test`.
+- Social sign-in (Google, GitHub, GitLab, Microsoft): `+idp` points `GOOGLE_SIGN_IN_BASE`,
+  `GITHUB_SIGN_IN_BASE`, `GITLAB_SIGN_IN_BASE` and `MICROSOFT_SIGN_IN_BASE` at tenant 1's
+  `/t/1/social/<provider>`. Set `AUTH_PROVIDER` to a non-email provider and any
+  `<PROVIDER>_CLIENT_ID`/`_SECRET` (idpsim accepts anything), then press the provider's button;
+  `login_hint=admin@acme1.test` skips the picker. Read `social.<provider>.*` in the activity feed.
 - Activity (every authorize, token, assertion, SCIM call with an outcome and a reason):
   `GET /control/t/<n>/activity`, or the tenant page's activity tab. Read it first when a
   login fails: it says whether the request even arrived.
