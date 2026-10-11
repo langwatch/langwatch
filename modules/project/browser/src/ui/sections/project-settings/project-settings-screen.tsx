@@ -495,80 +495,50 @@ function SettingsForm({
 
       {/* ADR-038 v6: governance -> LLMOps flip on a project-less org — the
         user must know a project is required before the drawer opens */}
-      <Dialog.Root
+      <Dialog
         open={showCreateProjectDialog}
-        onOpenChange={({ open }) => setShowCreateProjectDialog(open)}
+        onClose={() => setShowCreateProjectDialog(false)}
+        title="A project is needed"
+        secondaryAction={{ label: "Later", onClick: () => setShowCreateProjectDialog(false) }}
+        primaryAction={{
+          label: "Set up project",
+          onClick: () => {
+            setShowCreateProjectDialog(false);
+            host.openOverlay("createProject", {
+              navigateOnCreate: true,
+              organizationId: organization.id,
+              defaultTeamId: organization.teams.find((t) => !t.isPersonal)?.id,
+            });
+          },
+        }}
       >
-        <Dialog.Content>
-          <Dialog.CloseTrigger />
-          <Dialog.Header>
-            <Dialog.Title>A project is needed</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text>
-              Your changes are saved. Monitoring LLM apps happens inside a project, and this
-              organization doesn&apos;t have one yet, create your first project so everyone has
-              somewhere to land.
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack gap={2}>
-              <Button variant="outline" onClick={() => setShowCreateProjectDialog(false)}>
-                Later
-              </Button>
-              <Button
-                colorPalette="accent"
-                onClick={() => {
-                  setShowCreateProjectDialog(false);
-                  host.openOverlay("createProject", {
-                    navigateOnCreate: true,
-                    organizationId: organization.id,
-                    defaultTeamId: organization.teams.find((t) => !t.isPersonal)?.id,
-                  });
-                }}
-              >
-                Set up project
-              </Button>
-            </HStack>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+        <Text>
+          Your changes are saved. Monitoring LLM apps happens inside a project, and this
+          organization doesn&apos;t have one yet, create your first project so everyone has
+          somewhere to land.
+        </Text>
+      </Dialog>
 
       {/* ADR-038 F9: governance -> LLMOps flip offers the project setup */}
-      <Dialog.Root
+      <Dialog
         open={showLlmOpsSetupDialog && !!project}
-        onOpenChange={({ open }) => setShowLlmOpsSetupDialog(open)}
+        onClose={() => setShowLlmOpsSetupDialog(false)}
+        title="Set up your project"
+        secondaryAction={{ label: "Later", onClick: () => setShowLlmOpsSetupDialog(false) }}
+        primaryAction={{
+          label: "Set up the project",
+          onClick: () => {
+            // Dialog only opens when a project exists (see open guard).
+            window.location.href = `/onboarding/product?projectSlug=${project?.slug ?? ""}`;
+          },
+        }}
       >
-        <Dialog.Content>
-          <Dialog.CloseTrigger />
-          <Dialog.Header>
-            <Dialog.Title>Set up your project</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text>
-              Everyone in this organization will now land on the project home, but the project
-              hasn&apos;t received any data yet. Walk through the project setup so there&apos;s
-              something to see when they arrive.
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack gap={2}>
-              <Button variant="outline" onClick={() => setShowLlmOpsSetupDialog(false)}>
-                Later
-              </Button>
-              <Button
-                colorPalette="accent"
-                onClick={() => {
-                  // Dialog only opens when a project exists (see open guard).
-                  window.location.href = `/onboarding/product?projectSlug=${project?.slug ?? ""}`;
-                }}
-              >
-                Set up the project
-              </Button>
-            </HStack>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+        <Text>
+          Everyone in this organization will now land on the project home, but the project
+          hasn&apos;t received any data yet. Walk through the project setup so there&apos;s
+          something to see when they arrive.
+        </Text>
+      </Dialog>
     </Box>
   );
 }
@@ -859,37 +829,24 @@ function TurnOffSharingDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={pending !== null}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
+      onClose={onClose}
+      title="Turn off sharing"
+      secondaryAction={{ label: "Keep links paused", onClick: () => choose(false) }}
+      primaryAction={{
+        label: `Revoke ${pending?.linkCount} links`,
+        danger: true,
+        onClick: () => choose(true),
       }}
     >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Turn off sharing</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="start" gap={2}>
-            <Text>{pending?.linkCount} share links exist for this project.</Text>
-            <Text textStyle="bodySm" color="fg.muted">
-              Paused links stop working while sharing is off and work again when you turn it back
-              on. Revoked links are gone for good.
-            </Text>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={2}>
-            <Button variant="outline" onClick={() => choose(false)}>
-              Keep links paused
-            </Button>
-            <Button colorPalette="red" onClick={() => choose(true)}>
-              Revoke {pending?.linkCount} links
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack align="start" gap={2}>
+        <Text>{pending?.linkCount} share links exist for this project.</Text>
+        <Text textStyle="bodySm" color="fg.muted">
+          Paused links stop working while sharing is off and work again when you turn it back on.
+          Revoked links are gone for good.
+        </Text>
+      </VStack>
+    </Dialog>
   );
 }
