@@ -1,12 +1,11 @@
+import { Card } from "@langwatch/design-system/card";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
   Badge,
-  Box,
   Field,
   HStack,
   Input,
   NativeSelect,
-  Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -270,15 +269,16 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
         </Field.Root>
       </HStack>
 
-      <Box borderWidth="1px" borderColor="border.subtle" borderRadius="md" padding={4}>
-        <HStack mb={3}>
-          <Text fontSize="sm" fontWeight="semibold">
-            Match when
-          </Text>
+      <Card
+        variant="frame"
+        titleLevel={3}
+        title="Match when"
+        badge={
           <Badge colorPalette="gray" fontSize="2xs">
             AND across non-empty fields
           </Badge>
-        </HStack>
+        }
+      >
         <VStack align="stretch" gap={3}>
           <Field.Root>
             <Field.Label>
@@ -364,12 +364,9 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
             </Field.Root>
           </HStack>
         </VStack>
-      </Box>
+      </Card>
 
-      <Box borderWidth="1px" borderColor="border.subtle" borderRadius="md" padding={4}>
-        <Text fontSize="sm" fontWeight="semibold" mb={3}>
-          Then do
-        </Text>
+      <Card variant="frame" titleLevel={3} title="Then do">
         <VStack align="stretch" gap={3}>
           <Field.Root>
             <Field.Label>
@@ -441,7 +438,7 @@ export function CacheRuleForm({ state, onChange, complaint }: FormProps) {
             />
           </Field.Root>
         </VStack>
-      </Box>
+      </Card>
     </VStack>
   );
 }

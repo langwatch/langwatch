@@ -228,5 +228,69 @@
     "reason": "The dashed drag-and-drop licence zone with drop handlers, not a card (X3e1 review).",
     "owner": "licensing",
     "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/features/overview/ui/elements/governance-welcome-header.tsx",
+    "rule": "page-title-size",
+    "line": 52,
+    "reason": "The serif time-of-day greeting is a hero line, not a page title, like the Langy home greeting (X2e2 review).",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/governance/browser/src/ui/sections/governance/governance-ingestion-source.screen.tsx",
+    "rule": "empty-text",
+    "line": 712,
+    "reason": "A setup walkthrough with endpoint code, links and a sample body, not a bare empty state (X2e2 review).",
+    "owner": "governance",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/routing-policies/ui/elements/provider-credential-picker.tsx",
+    "rule": "card-box",
+    "line": 194,
+    "reason": "An ordered provider row with reorder and remove buttons and an error tint, not a card. (X2g1 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/blocks/eligible-model-providers-preview.tsx",
+    "rule": "card-box",
+    "line": 68,
+    "reason": "A clickable row that picks a model, with a selected tint, not a card. (X2g1 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/blocks/virtual-key-provider-row.tsx",
+    "rule": "card-box",
+    "line": 63,
+    "reason": "A checkbox row that expands to a model list, not a card. (X2g1 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-budget-section.tsx",
+    "rule": "card-box",
+    "line": 209,
+    "reason": "The protected inherited-budgets breakdown, kept as it is. (X2g1 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/scim/browser/src/ui/sections/provisioning-tokens.tsx",
+    "rule": "empty-text",
+    "line": 146,
+    "reason": "False positive: helper text under the Never badge in the Last used cell (X3e2 review).",
+    "owner": "scim",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "enterprise/modules/scim/browser/src/ui/sections/directory-reconciliation.tsx",
+    "rule": "hand-append",
+    "line": 323,
+    "reason": "Show N more expands rows already in memory; it never loads a page (X3e2 review).",
+    "owner": "scim",
+    "disposition": "reviewed"
   }
 ]

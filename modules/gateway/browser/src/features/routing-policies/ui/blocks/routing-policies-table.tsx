@@ -1,8 +1,8 @@
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Badge, Button, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
-import { Plus } from "lucide-react";
 import { Fragment } from "react";
 
 import { isModelTier } from "../../model/model-tier-presets.ts";
@@ -67,8 +67,8 @@ export function RoutingPoliciesTable({
 }) {
   const { bucketed, unplaced } = bucketByScopeLevel(policies);
   const renderRow = (policy: RoutingPolicyRow) => (
-    <Table.Row key={policy.id}>
-      <Table.Cell>
+    <ListTable.Row key={policy.id}>
+      <ListTable.Cell>
         <PolicyRow
           policy={policy}
           resolveScopeNames={resolveScopeNames}
@@ -77,13 +77,13 @@ export function RoutingPoliciesTable({
           onDelete={() => onDelete(policy)}
           canManage={canManage}
         />
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 
   return (
     <ListTable>
-      <Table.Body>
+      <ListTable.Body>
         {SCOPE_LEVELS.map(({ level, label, subtitle }) => {
           const rows = bucketed.get(level) ?? [];
           return (
@@ -91,20 +91,22 @@ export function RoutingPoliciesTable({
               <GroupHeadingRow label={label} subtitle={subtitle} />
               {rows.map(renderRow)}
               {rows.length === 0 && (
-                <Table.Row>
-                  <Table.Cell>
-                    <HStack gap={3}>
-                      <Text textStyle="sm" color="fg.muted">
-                        No policies here yet.
-                      </Text>
-                      {canManage && (
-                        <Button size="xs" variant="ghost" onClick={() => onNew(level)}>
-                          <Plus size={12} /> Add {label.toLowerCase()} policy
-                        </Button>
-                      )}
-                    </HStack>
-                  </Table.Cell>
-                </Table.Row>
+                <ListTable.SpanRow columns={1}>
+                  <HStack paddingX={4}>
+                    <NoDataInfoBlock
+                      size="line"
+                      title="No policies here yet."
+                      action={
+                        canManage
+                          ? {
+                              label: `Add ${label.toLowerCase()} policy`,
+                              onClick: () => onNew(level),
+                            }
+                          : void 0
+                      }
+                    />
+                  </HStack>
+                </ListTable.SpanRow>
               )}
             </Fragment>
           );
@@ -118,25 +120,23 @@ export function RoutingPoliciesTable({
             {unplaced.map(renderRow)}
           </>
         )}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
 
 function GroupHeadingRow({ label, subtitle }: { label: string; subtitle: string }) {
   return (
-    <Table.Row bg="bg.subtle">
-      <Table.Cell>
-        <VStack align="start" gap={0}>
-          <Text textStyle="sm" fontWeight="semibold">
-            {label}
-          </Text>
-          <Text textStyle="xs" color="fg.muted">
-            {subtitle}
-          </Text>
-        </VStack>
-      </Table.Cell>
-    </Table.Row>
+    <ListTable.SpanRow columns={1} band>
+      <VStack align="start" gap={0} paddingX={4} paddingY={3}>
+        <Text textStyle="sm" fontWeight="semibold">
+          {label}
+        </Text>
+        <Text textStyle="xs" color="fg.muted">
+          {subtitle}
+        </Text>
+      </VStack>
+    </ListTable.SpanRow>
   );
 }
 
