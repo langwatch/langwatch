@@ -18,15 +18,9 @@ export default function CheckupScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <VStack align="start" gap={1} minWidth={0}>
-          <PageLayout.Heading>Checkup</PageLayout.Heading>
-        </VStack>
+      <PageLayout.Header description="Whether this install is correctly wired, what is broken and how to fix it, and exactly what it sends to LangWatch.">
+        <PageLayout.Heading>Checkup</PageLayout.Heading>
       </PageLayout.Header>
-      <PageLayout.Subtitle paddingTop={3}>
-        Whether this install is correctly wired, what is broken and how to fix it, and exactly what
-        it sends to LangWatch.
-      </PageLayout.Subtitle>
       <VStack align="stretch" gap={6} width="full" paddingTop={4}>
         {organizationId ? <CheckupSettings organizationId={organizationId} /> : null}
       </VStack>
