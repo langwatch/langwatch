@@ -204,3 +204,29 @@ describe("given a widget whose compiled module has a default export", () => {
     });
   });
 });
+
+describe("given a widget that imports an http module URL", () => {
+  /** @scenario "An http module URL is rejected with a clear compile error" */
+  it("shows the Compile error panel with the https message, even when the import is unused", () => {
+    const runtime = evaluateAuthorRuntime();
+    interface ProgramVisitor {
+      Program: { enter: (path: { node: { body: { source?: { value: string } }[] } }) => void };
+    }
+    // Stand-in for the real compiler: Babel visits Program before anything else
+    // and propagates a throw from the plugin, as the real one does.
+    runtime.win.Babel = {
+      transform: (_source: string, options: { plugins: { visitor: ProgramVisitor }[] }) => {
+        options.plugins[0]?.visitor.Program.enter({
+          node: { body: [{ source: { value: "http://example.com/lib.js" } }, {}] },
+        });
+        return { code: "" };
+      },
+    };
+    runtime.win.__LW_AUTHOR_SOURCE__ = 'import x from "http://example.com/lib.js";';
+    (runtime.win.__lwActivateAuthor as () => void)();
+
+    expect(runtime.panel.style.display).toBe("block");
+    expect(runtime.panel.textContent).toContain("Compile error");
+    expect(runtime.panel.textContent).toContain("Module URLs must use https:");
+  });
+});

@@ -134,6 +134,16 @@ export function buildAuthorRuntimeScript(): string {
         // the frame's import map when the module is loaded below.
         plugins: [{
           visitor: {
+            // The TypeScript preset drops an unused import before its own
+            // ImportDeclaration visit, so resolve every top-level source here
+            // first: an unused http:// import must still fail to compile.
+            Program: {
+              enter: function (path) {
+                path.node.body.forEach(function (statement) {
+                  rewrite({ node: statement });
+                });
+              }
+            },
             ImportDeclaration: rewrite,
             ExportNamedDeclaration: rewrite,
             ExportAllDeclaration: rewrite,
