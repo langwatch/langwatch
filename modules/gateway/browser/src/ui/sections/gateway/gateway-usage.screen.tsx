@@ -14,7 +14,6 @@ import {
   Heading,
   HStack,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -400,37 +399,33 @@ function UsageBreakdown({
         <VStack align="stretch" gap={2}>
           <Heading textStyle="cardTitle">Top virtual keys</Heading>
           <Card variant="showcase" padding="none">
-            <ListTable
-              containerProps={{ overflowX: "auto", maxWidth: "full" }}
-              size="sm"
-              width="full"
-            >
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Key</Table.ColumnHeader>
-                  <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                  <Table.ColumnHeader>Spend</Table.ColumnHeader>
-                  <Table.ColumnHeader>Requests</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
+            <ListTable variant="embedded" scroll="x" scrollLabel="Top virtual keys table">
+              <ListTable.Header>
+                <ListTable.Row>
+                  <ListTable.ColumnHeader>Key</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Prefix</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Spend</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Requests</ListTable.ColumnHeader>
+                </ListTable.Row>
+              </ListTable.Header>
+              <ListTable.Body>
                 {data.byVirtualKey.map((row) => (
-                  <Table.Row key={row.virtualKeyId}>
-                    <Table.Cell>
+                  <ListTable.Row key={row.virtualKeyId}>
+                    <ListTable.Cell>
                       <Link href={`/gateway/virtual-keys/${row.virtualKeyId}`}>{row.name}</Link>
-                    </Table.Cell>
-                    <Table.Cell>
+                    </ListTable.Cell>
+                    <ListTable.Cell>
                       <Text fontFamily="mono" fontSize="xs">
                         {row.displayPrefix}…
                       </Text>
-                    </Table.Cell>
-                    <Table.Cell>
+                    </ListTable.Cell>
+                    <ListTable.Cell>
                       <Money amount={Number(row.totalUsd)} currency="USD" plain />
-                    </Table.Cell>
-                    <Table.Cell>{row.requests}</Table.Cell>
-                  </Table.Row>
+                    </ListTable.Cell>
+                    <ListTable.Cell>{row.requests}</ListTable.Cell>
+                  </ListTable.Row>
                 ))}
-              </Table.Body>
+              </ListTable.Body>
             </ListTable>
           </Card>
         </VStack>
@@ -449,31 +444,27 @@ function UsageBreakdown({
           )}
         </HStack>
         <Card variant="showcase" padding="none">
-          <ListTable
-            containerProps={{ overflowX: "auto", maxWidth: "full" }}
-            size="sm"
-            width="full"
-          >
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Model</Table.ColumnHeader>
-                <Table.ColumnHeader>Spend</Table.ColumnHeader>
-                <Table.ColumnHeader>Requests</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
+          <ListTable variant="embedded" scroll="x" scrollLabel="Spend by model table">
+            <ListTable.Header>
+              <ListTable.Row>
+                <ListTable.ColumnHeader>Model</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Spend</ListTable.ColumnHeader>
+                <ListTable.ColumnHeader>Requests</ListTable.ColumnHeader>
+              </ListTable.Row>
+            </ListTable.Header>
+            <ListTable.Body>
               {data.byModel.map((row) => (
-                <Table.Row key={row.model}>
-                  <Table.Cell>
+                <ListTable.Row key={row.model}>
+                  <ListTable.Cell>
                     <InlineCode>{row.model}</InlineCode>
-                  </Table.Cell>
-                  <Table.Cell>
+                  </ListTable.Cell>
+                  <ListTable.Cell>
                     <Money amount={Number(row.totalUsd)} currency="USD" plain />
-                  </Table.Cell>
-                  <Table.Cell>{row.requests}</Table.Cell>
-                </Table.Row>
+                  </ListTable.Cell>
+                  <ListTable.Cell>{row.requests}</ListTable.Cell>
+                </ListTable.Row>
               ))}
-            </Table.Body>
+            </ListTable.Body>
           </ListTable>
         </Card>
       </VStack>

@@ -7,13 +7,11 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
-  Box,
   Field,
   HStack,
   Input,
   NativeSelect,
   Spacer,
-  Table,
   Text,
   Textarea,
   VStack,
@@ -254,93 +252,91 @@ function GuardrailsTable({
   onArchive: (row: GuardrailRow) => void;
 }) {
   return (
-    <Box as="section" overflowX="auto" tabIndex={0} aria-label="Guardrails table">
-      <ListTable containerProps={{ overflowX: "auto", maxWidth: "full" }} size="md" width="full">
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Name</Table.ColumnHeader>
-            <Table.ColumnHeader>Direction</Table.ColumnHeader>
-            <Table.ColumnHeader>Evaluator</Table.ColumnHeader>
-            <Table.ColumnHeader>Failure mode</Table.ColumnHeader>
-            <Table.ColumnHeader />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {rows.map((row) => {
-            const evaluator = evaluatorById.get(row.evaluatorId);
-            return (
-              <Table.Row key={row.id} data-testid="gateway-guardrail-row">
-                <Table.Cell>
+    <ListTable scroll="x" scrollLabel="Guardrails table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Direction</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Evaluator</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Failure mode</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader label="Actions" />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {rows.map((row) => {
+          const evaluator = evaluatorById.get(row.evaluatorId);
+          return (
+            <ListTable.Row key={row.id} data-testid="gateway-guardrail-row">
+              <ListTable.Cell>
+                <VStack align="start" gap={0}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {row.name}
+                  </Text>
+                  {row.description && (
+                    <Text fontSize="xs" color="fg.muted">
+                      {row.description}
+                    </Text>
+                  )}
+                </VStack>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                {evaluator ? (
                   <VStack align="start" gap={0}>
-                    <Text fontSize="sm" fontWeight="medium">
-                      {row.name}
+                    <Text fontSize="sm">{evaluator.name}</Text>
+                    <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
+                      {evaluator.slug}
                     </Text>
-                    {row.description && (
-                      <Text fontSize="xs" color="fg.muted">
-                        {row.description}
-                      </Text>
-                    )}
                   </VStack>
-                </Table.Cell>
-                <Table.Cell>
-                  <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
-                </Table.Cell>
-                <Table.Cell>
-                  {evaluator ? (
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="sm">{evaluator.name}</Text>
-                      <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
-                        {evaluator.slug}
-                      </Text>
-                    </VStack>
-                  ) : (
-                    <Text fontSize="xs" color="fg.muted" fontFamily="mono">
-                      {row.evaluatorId}
-                    </Text>
-                  )}
-                </Table.Cell>
-                <Table.Cell>
-                  <Badge
-                    variant="surface"
-                    colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
-                  >
-                    {row.failureMode === "FAIL_CLOSED" ? "Fail closed" : "Fail open"}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell>
-                  {canManage && (
-                    <Menu.Root>
-                      <Menu.Trigger asChild>
-                        <Button size="xs" variant="ghost" aria-label={`Actions for ${row.name}`}>
-                          <MoreVertical size={14} />
-                        </Button>
-                      </Menu.Trigger>
-                      <Menu.Content>
-                        <Menu.Item
-                          value="edit"
-                          data-testid="gateway-guardrail-edit"
-                          onClick={() => onEdit(row)}
-                        >
-                          <Pencil size={14} /> Edit
-                        </Menu.Item>
-                        <Menu.Item
-                          value="archive"
-                          color="fg.error"
-                          data-testid="gateway-guardrail-archive"
-                          onClick={() => onArchive(row)}
-                        >
-                          <Archive size={14} /> Archive
-                        </Menu.Item>
-                      </Menu.Content>
-                    </Menu.Root>
-                  )}
-                </Table.Cell>
-              </Table.Row>
-            );
-          })}
-        </Table.Body>
-      </ListTable>
-    </Box>
+                ) : (
+                  <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+                    {row.evaluatorId}
+                  </Text>
+                )}
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <Badge
+                  variant="surface"
+                  colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
+                >
+                  {row.failureMode === "FAIL_CLOSED" ? "Fail closed" : "Fail open"}
+                </Badge>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                {canManage && (
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <Button size="xs" variant="ghost" aria-label={`Actions for ${row.name}`}>
+                        <MoreVertical size={14} />
+                      </Button>
+                    </Menu.Trigger>
+                    <Menu.Content>
+                      <Menu.Item
+                        value="edit"
+                        data-testid="gateway-guardrail-edit"
+                        onClick={() => onEdit(row)}
+                      >
+                        <Pencil size={14} /> Edit
+                      </Menu.Item>
+                      <Menu.Item
+                        value="archive"
+                        color="fg.error"
+                        data-testid="gateway-guardrail-archive"
+                        onClick={() => onArchive(row)}
+                      >
+                        <Archive size={14} /> Archive
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Root>
+                )}
+              </ListTable.Cell>
+            </ListTable.Row>
+          );
+        })}
+      </ListTable.Body>
+    </ListTable>
   );
 }
 

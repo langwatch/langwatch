@@ -156,5 +156,61 @@
     "reason": "An inline editor status note; today's look kept. (X2e1 review)",
     "owner": "governance",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx",
+    "rule": "card-box",
+    "line": 155,
+    "reason": "An inline secret readout row with reveal and copy, not a card. (X2g2 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/ui/sections/gateway/gateway-budget.screen.tsx",
+    "rule": "empty-text",
+    "line": 266,
+    "reason": "False positive: a tooltip sentence, not an empty state. (X2g2 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/ui/sections/gateway/gateway-budget.screen.tsx",
+    "rule": "list-page-inference",
+    "line": 213,
+    "reason": "False positive: a budget detail page, not a list page. (X2g2 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/ui/sections/gateway/gateway-budgets.screen.tsx",
+    "rule": "empty-text",
+    "line": 369,
+    "reason": "False positive: an alert sentence, not an empty state. (X2g2 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/ui/sections/gateway/gateway-budgets.screen.tsx",
+    "rule": "list-page-inference",
+    "line": 199,
+    "reason": "Protected shape: ListPage would replace the permission-refused notice and the spend-unavailable banner. (X2g2 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/ui/sections/gateway/gateway-usage.screen.tsx",
+    "rule": "card-box",
+    "line": 494,
+    "reason": "A chart frame; charts stay as they are. (X2g2 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/gateway/browser/src/ui/sections/gateway/gateway-virtual-key.screen.tsx",
+    "rule": "card-box",
+    "line": 790,
+    "reason": "A chart frame; charts stay as they are. (X2g2 review)",
+    "owner": "gateway",
+    "disposition": "reviewed"
   }
 ]

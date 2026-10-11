@@ -2,6 +2,7 @@ import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
@@ -17,7 +18,6 @@ import {
   Skeleton,
   SkeletonText,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -763,10 +763,10 @@ function UsageSection({
   if (data.totalRequests === 0) {
     return (
       <Section title="Usage (last 30 days)" action={action}>
-        <Text fontSize="sm" color="fg.muted">
-          No usage in the last 30 days. Send a request through this virtual key and it'll show up
-          here.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No usage in the last 30 days. Send a request through this virtual key and it'll show up here."
+        />
       </Section>
     );
   }
@@ -883,45 +883,45 @@ function UsageSection({
                 No requests on that model in the last 30 days.
               </Text>
             ) : (
-              <ListTable containerProps={{ overflowX: "auto", maxWidth: "full" }} size="sm">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>When</Table.ColumnHeader>
-                    <Table.ColumnHeader>Model</Table.ColumnHeader>
-                    <Table.ColumnHeader>Tokens</Table.ColumnHeader>
-                    <Table.ColumnHeader>Amount</Table.ColumnHeader>
-                    <Table.ColumnHeader>Latency</Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
+              <ListTable scroll="x" scrollLabel="Recent activity table">
+                <ListTable.Header>
+                  <ListTable.Row>
+                    <ListTable.ColumnHeader>When</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Model</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Tokens</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Amount</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Latency</ListTable.ColumnHeader>
+                  </ListTable.Row>
+                </ListTable.Header>
+                <ListTable.Body>
                   {data.recentDebits.slice(0, 10).map((d) => (
-                    <Table.Row key={d.id}>
-                      <Table.Cell>
+                    <ListTable.Row key={d.id}>
+                      <ListTable.Cell>
                         <Tooltip content={readableDate(d.occurredAt).toLocaleString()}>
                           <Text fontSize="xs" color="fg.muted">
                             {formatTimeAgo(toEpochMs(d.occurredAt))}
                           </Text>
                         </Tooltip>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
                         <Code fontSize="xs">{d.model}</Code>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
                         <Text fontSize="xs" color="fg.muted">
                           {d.tokensInput.toLocaleString()} → {d.tokensOutput.toLocaleString()}
                         </Text>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
                         <Text fontSize="xs">{formatVkAmount(d.amountUsd)}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
                         <Text fontSize="xs" color="fg.muted">
                           {d.durationMs !== null ? `${d.durationMs}ms` : "—"}
                         </Text>
-                      </Table.Cell>
-                    </Table.Row>
+                      </ListTable.Cell>
+                    </ListTable.Row>
                   ))}
-                </Table.Body>
+                </ListTable.Body>
               </ListTable>
             )}
           </VStack>

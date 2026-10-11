@@ -4,15 +4,7 @@ import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Badge,
-  Button,
-  HStack,
-  Spacer,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
@@ -193,13 +185,14 @@ function CacheRulesEmptyState({
       title="No cache rules yet"
       description="Cache rules let operators force, disable, or override cache behaviour across virtual keys, models, principals, or custom request metadata: no client code changes required."
       icon={<Zap size={32} />}
-    >
-      {canCreate && (
-        <PageLayout.HeaderButton primary onClick={onCreate} marginTop={4}>
-          <Plus size={14} /> New rule
-        </PageLayout.HeaderButton>
-      )}
-    </NoDataInfoBlock>
+      primaryAction={
+        canCreate && (
+          <PageLayout.HeaderButton primary onClick={onCreate}>
+            <Plus size={14} /> New rule
+          </PageLayout.HeaderButton>
+        )
+      }
+    />
   );
 }
 
@@ -220,24 +213,24 @@ function CacheRulesTable({
 }) {
   return (
     <Card variant="showcase" padding="none">
-      <ListTable containerProps={{ overflowX: "auto", maxWidth: "full" }} size="md" width="full">
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader width="60px">Priority</Table.ColumnHeader>
-            <Table.ColumnHeader>Name</Table.ColumnHeader>
-            <Table.ColumnHeader>Match</Table.ColumnHeader>
-            <Table.ColumnHeader>Action</Table.ColumnHeader>
-            <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-            <Table.ColumnHeader></Table.ColumnHeader>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+      <ListTable variant="embedded" scroll="x" scrollLabel="Cache rules table">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader width="60px">Priority</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Match</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Action</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Enabled</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader label="Actions" />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {rows.map((r) => (
-            <Table.Row key={r.id}>
-              <Table.Cell>
+            <ListTable.Row key={r.id}>
+              <ListTable.Cell>
                 <Badge colorPalette="gray">{r.priority}</Badge>
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 <VStack align="start" gap={0}>
                   <Text fontWeight="medium">{r.name}</Text>
                   {r.description && (
@@ -246,14 +239,14 @@ function CacheRulesTable({
                     </Text>
                   )}
                 </VStack>
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 <MatcherSummary matchers={r.matchers} />
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 <ActionBadge action={r.action} modeEnum={r.modeEnum} />
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 <Switch
                   colorPalette="accent"
                   checked={r.enabled}
@@ -261,8 +254,8 @@ function CacheRulesTable({
                   disabled={!canUpdate}
                   size="sm"
                 />
-              </Table.Cell>
-              <Table.Cell>
+              </ListTable.Cell>
+              <ListTable.Cell>
                 {(canUpdate || canDelete) && (
                   <Menu.Root>
                     <Menu.Trigger asChild>
@@ -284,10 +277,10 @@ function CacheRulesTable({
                     </Menu.Content>
                   </Menu.Root>
                 )}
-              </Table.Cell>
-            </Table.Row>
+              </ListTable.Cell>
+            </ListTable.Row>
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     </Card>
   );

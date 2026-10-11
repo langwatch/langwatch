@@ -7,15 +7,7 @@ import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Badge,
-  Button,
-  HStack,
-  Spacer,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { readableDate } from "@langwatch/time";
 import {
   History,
@@ -288,21 +280,21 @@ function WebhookRowMenu(props: EndpointActionProps) {
 function WebhookRow(props: EndpointActionProps) {
   const { endpoint } = props;
   return (
-    <Table.Row>
+    <ListTable.Row>
       <WebhookDestinationCell endpoint={endpoint} />
-      <Table.Cell>
+      <ListTable.Cell>
         <Text as="div" fontSize="sm" color="fg.muted">
           <EventsSummary enabledEvents={endpoint.enabledEvents} />
         </Text>
-      </Table.Cell>
-      <Table.Cell>{statusBadge(endpoint)}</Table.Cell>
-      <Table.Cell whiteSpace="nowrap">
+      </ListTable.Cell>
+      <ListTable.Cell>{statusBadge(endpoint)}</ListTable.Cell>
+      <ListTable.Cell nowrap>
         {endpoint.lastSuccessAt ? readableDate(endpoint.lastSuccessAt).toLocaleString() : "never"}
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <WebhookRowMenu {...props} />
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
@@ -312,21 +304,21 @@ function WebhookEndpointsTable({
 }: EndpointListActions & { endpoints: EndpointView[] }) {
   return (
     <Card variant="showcase" padding="none">
-      <ListTable containerProps={{ overflowX: "auto", maxWidth: "full" }} size="md" width="full">
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Destination</Table.ColumnHeader>
-            <Table.ColumnHeader>Events</Table.ColumnHeader>
-            <Table.ColumnHeader>Status</Table.ColumnHeader>
-            <Table.ColumnHeader>Last success</Table.ColumnHeader>
-            <Table.ColumnHeader width="1%"></Table.ColumnHeader>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+      <ListTable variant="embedded" scroll="x" scrollLabel="Webhook endpoints table">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Destination</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Events</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Last success</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="1%" label="Actions" />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {endpoints.map((endpoint) => (
             <WebhookRow key={endpoint.id} endpoint={endpoint} {...actions} />
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     </Card>
   );

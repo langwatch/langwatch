@@ -17,7 +17,6 @@ import {
   Skeleton,
   SkeletonText,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -353,47 +352,47 @@ function BudgetDetailPage() {
                 ) : (
                   <Card variant="showcase" padding="none">
                     <ListTable
-                      containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                      size="sm"
-                      width="full"
+                      variant="embedded"
+                      scroll="x"
+                      scrollLabel="Recent budget activity table"
                     >
-                      <Table.Header>
-                        <Table.Row>
-                          <Table.ColumnHeader>When</Table.ColumnHeader>
-                          <Table.ColumnHeader>Virtual key</Table.ColumnHeader>
-                          <Table.ColumnHeader>Model</Table.ColumnHeader>
-                          <Table.ColumnHeader>Amount</Table.ColumnHeader>
-                          <Table.ColumnHeader>Status</Table.ColumnHeader>
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
+                      <ListTable.Header>
+                        <ListTable.Row>
+                          <ListTable.ColumnHeader>When</ListTable.ColumnHeader>
+                          <ListTable.ColumnHeader>Virtual key</ListTable.ColumnHeader>
+                          <ListTable.ColumnHeader>Model</ListTable.ColumnHeader>
+                          <ListTable.ColumnHeader>Amount</ListTable.ColumnHeader>
+                          <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+                        </ListTable.Row>
+                      </ListTable.Header>
+                      <ListTable.Body>
                         {budget.recentLedger.map((line) => (
-                          <Table.Row key={line.id}>
-                            <Table.Cell>
+                          <ListTable.Row key={line.id}>
+                            <ListTable.Cell>
                               <Tooltip content={readableDate(line.occurredAt).toLocaleString()}>
                                 <Text fontSize="xs" color="fg.muted">
                                   {formatTimeAgo(toEpochMs(line.occurredAt))}
                                 </Text>
                               </Tooltip>
-                            </Table.Cell>
-                            <Table.Cell>
+                            </ListTable.Cell>
+                            <ListTable.Cell>
                               <Link
                                 href={`/gateway/virtual-keys/${line.virtualKeyId}`}
                                 color="orange.fg"
                               >
                                 <Text fontSize="sm">{line.virtualKeyName}</Text>
                               </Link>
-                            </Table.Cell>
-                            <Table.Cell>
+                            </ListTable.Cell>
+                            <ListTable.Cell>
                               <Code fontSize="xs">{line.model}</Code>
-                            </Table.Cell>
-                            <Table.Cell>{formatAmount(line.amountUsd)}</Table.Cell>
-                            <Table.Cell>
+                            </ListTable.Cell>
+                            <ListTable.Cell>{formatAmount(line.amountUsd)}</ListTable.Cell>
+                            <ListTable.Cell>
                               <StatusBadge status={line.status} />
-                            </Table.Cell>
-                          </Table.Row>
+                            </ListTable.Cell>
+                          </ListTable.Row>
                         ))}
-                      </Table.Body>
+                      </ListTable.Body>
                     </ListTable>
                   </Card>
                 )}

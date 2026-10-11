@@ -7,12 +7,10 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
-  Box,
   Button,
   HStack,
   Progress,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -243,51 +241,44 @@ function BudgetsPage() {
                   about anything.
                 </Banner>
               )}
-              {/* The wrapper scrolls so right-hand columns stay reachable on a narrow window. */}
-              <Box as="section" overflowX="auto" tabIndex={0} aria-label="Budgets table">
-                <ListTable
-                  containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                  size="md"
-                  width="full"
-                >
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader>Name</Table.ColumnHeader>
-                      <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                      <Table.ColumnHeader>Window</Table.ColumnHeader>
-                      <Table.ColumnHeader>Spent / Limit</Table.ColumnHeader>
-                      <Table.ColumnHeader>
-                        <Tooltip
-                          content={
-                            <Text fontSize="xs">
-                              WARN: emits 402-equivalent warning header + audit event, request
-                              proceeds.{"\n"}BLOCK: the gateway returns HTTP 402 and refuses to
-                              dispatch once the limit is crossed.
-                            </Text>
-                          }
-                        >
-                          <Text as="span">On breach</Text>
-                        </Tooltip>
-                      </Table.ColumnHeader>
-                      <Table.ColumnHeader>Resets</Table.ColumnHeader>
-                      <Table.ColumnHeader></Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {rows.map((b) => (
-                      <BudgetTableRow
-                        key={b.id}
-                        budget={b}
-                        canUpdate={canUpdate}
-                        canDelete={canDelete}
-                        onOpen={() => router.push(`/gateway/budgets/${b.id}`)}
-                        onEdit={() => setEditing(b)}
-                        onArchive={() => setArchiving(b)}
-                      />
-                    ))}
-                  </Table.Body>
-                </ListTable>
-              </Box>
+              <ListTable scroll="x" scrollLabel="Budgets table">
+                <ListTable.Header>
+                  <ListTable.Row>
+                    <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Window</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Spent / Limit</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>
+                      <Tooltip
+                        content={
+                          <Text fontSize="xs">
+                            WARN: emits 402-equivalent warning header + audit event, request
+                            proceeds.{"\n"}BLOCK: the gateway returns HTTP 402 and refuses to
+                            dispatch once the limit is crossed.
+                          </Text>
+                        }
+                      >
+                        <Text as="span">On breach</Text>
+                      </Tooltip>
+                    </ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Resets</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader label="Actions" />
+                  </ListTable.Row>
+                </ListTable.Header>
+                <ListTable.Body>
+                  {rows.map((b) => (
+                    <BudgetTableRow
+                      key={b.id}
+                      budget={b}
+                      canUpdate={canUpdate}
+                      canDelete={canDelete}
+                      onOpen={() => router.push(`/gateway/budgets/${b.id}`)}
+                      onEdit={() => setEditing(b)}
+                      onArchive={() => setArchiving(b)}
+                    />
+                  ))}
+                </ListTable.Body>
+              </ListTable>
             </VStack>
           )}
         </PageLayout.Container>
@@ -353,13 +344,8 @@ function BudgetTableRow({
   const seatsOver = b.endUsersOver ?? 0;
   const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
   return (
-    <Table.Row
-      data-testid="gateway-budget-row"
-      cursor="pointer"
-      _hover={{ bg: "bg.subtle" }}
-      onClick={onOpen}
-    >
-      <Table.Cell>
+    <ListTable.Row data-testid="gateway-budget-row" onActivate={onOpen}>
+      <ListTable.Cell>
         <VStack align="start" gap={0}>
           <Link href={`/gateway/budgets/${b.id}`}>
             <Text fontWeight="medium">{b.name}</Text>
@@ -370,8 +356,8 @@ function BudgetTableRow({
             </Text>
           )}
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <VStack align="start" gap={1}>
           <ScopeCell
             scopeType={b.scopeType}
@@ -391,13 +377,13 @@ function BudgetTableRow({
             </Tooltip>
           )}
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge variant="subtle" colorPalette="gray" textTransform="capitalize">
           {b.window.toLowerCase()}
         </Badge>
-      </Table.Cell>
-      <Table.Cell minWidth="220px">
+      </ListTable.Cell>
+      <ListTable.Cell minWidth="220px">
         <BudgetSpendCell
           budget={b}
           spent={spent}
@@ -407,13 +393,13 @@ function BudgetTableRow({
           seatsOver={seatsOver}
           seatsOverPct={seatsOverPct}
         />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}>
           {b.onBreach.toLowerCase()}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {b.window === "TOTAL" || b.window === "MANUAL" ? (
           <Text fontSize="xs" color="fg.muted">
             {b.window === "TOTAL" ? "never" : "on request"}
@@ -423,8 +409,8 @@ function BudgetTableRow({
             <Text fontSize="xs">{formatTimeAgo(toEpochMs(b.resetsAt))}</Text>
           </Tooltip>
         )}
-      </Table.Cell>
-      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
+      </ListTable.Cell>
+      <ListTable.Cell stopRowActivation>
         <Menu.Root>
           <Menu.Trigger asChild>
             <Button
@@ -456,8 +442,8 @@ function BudgetTableRow({
             )}
           </Menu.Content>
         </Menu.Root>
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
