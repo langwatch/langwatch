@@ -31,6 +31,7 @@ type Options struct {
 	Deployment, Tier, Shape, Release string
 	Seed                             int64
 	FromDir, HeadDir, RunDir         string
+	ViaDir                           string // a release between from and head the operator upgrades to first (UM-21); empty: none
 	PostgresBase, ClickHouseBase     string
 	Before, AtCut, AfterReady        time.Duration // traffic on main, with main's worker paused, after head is ready
 	ReadyWithin, SettleWithin        time.Duration
@@ -147,6 +148,9 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 		origin = []step{{"stores", cell.freshStores}, {"restore", cell.restore}, {"from-up", cell.fromUp}, {"sign-in", cell.resumeSeed}}
 	}
 	before, cut := []step{{"traffic-before", cell.trafficBefore}}, []step{{"cut", cell.cut}}
+	if options.ViaDir != "" {
+		cut = append(cut, step{"via", cell.viaRelease})
+	}
 	if cell.overlay(OverlayRetention) {
 		origin = append(origin, step{"retention-rules", cell.retentionRules})
 		before = append(before, step{"retention-age", cell.retentionAge})
@@ -199,6 +203,11 @@ func (cell *run) runSteps(ctx context.Context, steps []step) {
 func (cell *run) buildBoth(ctx context.Context) error {
 	if err := FromBuild(cell.options.FromDir).Ensure(ctx, cell.logPath("from-build")); err != nil {
 		return err
+	}
+	if cell.options.ViaDir != "" {
+		if err := FromBuild(cell.options.ViaDir).Ensure(ctx, cell.logPath("via-build")); err != nil {
+			return err
+		}
 	}
 	return HeadBuild(cell.options.HeadDir).Ensure(ctx, cell.logPath("head-build"))
 }
@@ -261,7 +270,10 @@ func prepare(options Options) (*run, error) {
 			return nil, errors.New("the tenant-oddities overlay needs an SSO deployment (cloud-sso or cloud-legacy-sso)")
 		}
 	}
-	for _, dir := range []string{options.FromDir, options.HeadDir} {
+	for _, dir := range []string{options.FromDir, options.HeadDir, options.ViaDir} {
+		if dir == "" {
+			continue
+		}
 		if err := CheckSourceDir(dir); err != nil {
 			return nil, err
 		}
@@ -616,6 +628,7 @@ func (cell *run) cut(ctx context.Context) error {
 	} else {
 		cell.report.Notes = append(cell.report.Notes, "queue depth at the cut: "+err.Error())
 	}
+	cell.noteStores(ctx, "at the cut")
 	fingerprint, err := cell.fingerprint(ctx)
 	cell.before = fingerprint
 	cell.placementAtCut(ctx)
@@ -781,6 +794,7 @@ func (cell *run) switchEarly(ctx context.Context) error {
 func (cell *run) stopFrom() {
 	cell.proc("from-app").Stop(20 * time.Second)
 	cell.proc("from-worker").Stop(20 * time.Second)
+	cell.stopVia()
 	cell.mark("fromStopped")
 }
 
@@ -847,6 +861,8 @@ func (cell *run) awaitReady(ctx context.Context) error {
 	}
 	cell.grantOperator(ctx)
 	cell.assertOldWritersGone(ctx)
+	cell.headTask(ctx, "upgrade-status-at-ready", "upgrade", "status")
+	cell.noteStores(ctx, "at ready")
 	ledger, err := Ledger(ctx, cell.stores)
 	cell.atReady = ledger
 	if err != nil {

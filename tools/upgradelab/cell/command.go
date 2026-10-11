@@ -75,6 +75,7 @@ func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags.Int64Var(&options.Seed, "seed", 1, "seed for every generated id and payload")
 	flags.StringVar(&options.FromDir, "from-dir", ".worktrees/upgradelab-main", "checkout of the release upgraded from (no .env)")
 	flags.StringVar(&options.HeadDir, "head-dir", ".worktrees/upgradelab-head", "checkout of the release upgraded to (no .env)")
+	flags.StringVar(&options.ViaDir, "via-dir", "", "checkout of a release the operator upgrades to first, between from and head (its own startup migrates; no .env)")
 	flags.StringVar(&options.Release, "release", "", "the from release: main@<sha> (default: from-dir's commit) or a tag")
 	flags.StringVar(&options.RunDir, "run-dir", "", "where logs, shots and the report go (default .claude/tmp/upgradelab/cells/<cell>-<time>)")
 	flags.StringVar(&options.PostgresBase, "postgres-base", "", "Postgres server URL with credentials (default: haven db url)")
