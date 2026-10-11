@@ -1,3 +1,5 @@
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Code, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { toEpochMs } from "@langwatch/time";
 import { useState } from "react";
@@ -46,9 +48,17 @@ function DeliveriesBody({
   if (isLoading) return <Skeleton height="60px" width="full" />;
   if (deliveries.length === 0) {
     return (
-      <Text textStyle="sm" color="fg.muted">
-        No delivery attempts recorded yet.
-      </Text>
+      <NoDataInfoBlock
+        size="line"
+        title="No delivery attempts recorded yet."
+        next={[
+          {
+            kind: "docs",
+            label: "How webhook delivery works",
+            href: "https://docs.langwatch.ai/features/webhooks",
+          },
+        ]}
+      />
     );
   }
   return <WebhookDeliveriesList deliveries={deliveries} />;
@@ -77,16 +87,7 @@ function WebhookDeliveriesList({ deliveries }: { deliveries: WebhookDelivery[] }
   return (
     <VStack align="stretch" gap={2} width="full">
       {groups.map((g) => (
-        <VStack
-          key={g.dispatchId}
-          align="stretch"
-          gap={0}
-          width="full"
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          overflow="hidden"
-        >
+        <Card key={g.dispatchId} variant="frame" padding="none" bodyLayout="stack">
           {g.attempts.map((attempt, index) => (
             <DeliveryAttemptRow
               key={attempt.id}
@@ -95,7 +96,7 @@ function WebhookDeliveriesList({ deliveries }: { deliveries: WebhookDelivery[] }
               total={g.attempts.length}
             />
           ))}
-        </VStack>
+        </Card>
       ))}
     </VStack>
   );

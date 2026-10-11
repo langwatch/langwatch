@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import {
   Badge,
   Box,
@@ -401,7 +402,7 @@ export function CompactSlackPreview({
 
   const blockCount = payload.blocks.length;
   return (
-    <Box bg="bg.subtle" borderRadius="md" padding={4} border="1px solid" borderColor="border">
+    <Card variant="nested" tone="neutral" padding="md">
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
           <Text textStyle="sm" fontWeight="semibold">
@@ -433,7 +434,7 @@ export function CompactSlackPreview({
           </Tooltip>
         </HStack>
       </VStack>
-    </Box>
+    </Card>
   );
 }
 
