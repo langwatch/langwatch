@@ -231,23 +231,23 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The IdP simulator. Its scenarios (OIDC/SAML/SCIM/domain verification,
   // specs/setup/idp-simulator.feature) are satisfied by Go tests and by
   // nothing else.
-  "services/idpsim",
+  "services/sims/idpsim",
   // The mail sink. Its service-side scenarios (SMTP intake, the message API,
   // security headers, the browser inbox — specs/setup/mail-sink.feature) are
   // satisfied by Go tests and by nothing else.
-  "services/mailsim",
+  "services/sims/mailsim",
   // The other simulators haven runs (LLM, storage, analytics, voice, outbound,
   // telemetry) and the diff and fuzz suites: their specs/setup scenarios bind
   // only from Go tests.
-  "services/llmsim",
-  "services/storagesim",
-  "services/analyticssim",
-  "services/voicesim",
-  "services/outboundsim",
-  "services/paymentsim",
-  "services/telemetrysim",
-  "services/lambdasim",
-  "services/githubsim",
+  "services/sims/llmsim",
+  "services/sims/storagesim",
+  "services/sims/analyticssim",
+  "services/sims/voicesim",
+  "services/sims/outboundsim",
+  "services/sims/paymentsim",
+  "services/sims/telemetrysim",
+  "services/sims/lambdasim",
+  "services/sims/githubsim",
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",
@@ -292,7 +292,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "tools/upgradelab",
   // telemetrysim: presets, rates, fuzz replay and its control API
   // (specs/setup/haven-telemetrysim.feature) are asserted by these Go tests only.
-  "services/telemetrysim",
+  "services/sims/telemetrysim",
   // ClickHouse serverless chart configuration rendering. Scenarios describing
   // keeper-backed replicated access storage binding through unit tests in
   // internal/render/render_test.go that verify the XML config is generated

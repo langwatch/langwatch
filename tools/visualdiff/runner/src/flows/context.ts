@@ -11,7 +11,7 @@ export interface ActionContext {
   args: Record<string, string>;
   /** values are the flow's captured strings, by name; a later step's placeholders read them. */
   values: Record<string, string>;
-  /** mailUrl is the side's mail sink (services/mailsim), absent where the stack has none. */
+  /** mailUrl is the side's mail sink (services/sims/mailsim), absent where the stack has none. */
   mailUrl?: string;
   /** snapshot photographs the screen mid-action, so a wizard's every page is evidence. */
   snapshot: (label: string) => Promise<void>;

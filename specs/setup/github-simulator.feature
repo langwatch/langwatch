@@ -7,7 +7,7 @@ Feature: githubsim, a local stand-in for GitHub
   the OAuth authorize, token and user calls, and sends HMAC-signed webhooks to
   the stack. It checks no JWT signature.
 
-  # Bound by Go tests in services/githubsim/githubsim_test.go and gh_test.go,
+  # Bound by Go tests in services/sims/githubsim/githubsim_test.go and gh_test.go,
   # services/langyagent/adapters/github and adapters/pi,
   # tools/thuishaven/domain/overlay_github_test.go and
   # tools/thuishaven/app/plan_github_test.go, and by the host-origin tests in

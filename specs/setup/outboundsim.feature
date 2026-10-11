@@ -9,8 +9,8 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
   credential: it is a dev shim. haven runs it from the bundled simulator binary.
 
   # Design: .claude/tmp/handoffs/outboundsim-design.md. To be bound by Go tests in
-  # services/outboundsim, tools/thuishaven/domain/overlay_outbound_test.go,
-  # tools/thuishaven/cmd/sim_outbound_test.go and apps/outboundsim-web.
+  # services/sims/outboundsim, tools/thuishaven/domain/overlay_outbound_test.go,
+  # tools/thuishaven/cmd/sim_outbound_test.go and apps/sims/src/outbound.
 
   Rule: Slack incoming webhooks
 
@@ -254,7 +254,7 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       Then haven exits non-zero and says to run "haven up +outbound"
 
   Rule: Governance pull vendors (Databricks Genie and usage feeds)
-    # The product's pull sources read these paths; see services/outboundsim/databricks.go.
+    # The product's pull sources read these paths; see services/sims/outboundsim/databricks.go.
     # A word in the token (or a service principal's client id) picks the workspace:
     # empty, revoked, noscope, ratelimited, down, malformed or cycle; anything else is the seed.
 

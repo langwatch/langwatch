@@ -9,8 +9,8 @@ user-invocable: true
 One Go process playing the customer's IdP across independent tenants (`/t/1` to `/t/N`):
 an OIDC provider, a SAML identity provider, a SCIM 2.0 directory (it also pushes at
 LangWatch's SCIM endpoint) and a fake domain owner (`acme<n>.test`, DNS TXT and a
-well-known token). Permissive by design: never expose it. Code: `services/idpsim` (the
-README there is the full reference), console `apps/idpsim-web` (ADR-160).
+well-known token). Permissive by design: never expose it. Code: `services/sims/idpsim` (the
+README there is the full reference), console `apps/sims/src/idp` (ADR-160).
 
 ## Run it
 
@@ -81,7 +81,7 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 `tenants` (every tenant, as the console's landing page lists them), `tenant show <t>` (also prints signing keys, skew and the armed break), `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
 `scim push|pull|sync`, `scim-event <t> <kind> [--style okta|entra] [--user] [--group] [--set k=v]`,
 `dns add|remove`, `verification set|clear`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
-`reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.
+`reset`, `samlp <t> on|off`. Full table: `services/sims/idpsim/README.md`.
 
 - SAML sign-in (redirect binding) with no `login_hint` lands on the same account picker as OIDC;
   scripts skip it with `login_hint=<email>` on the SSO URL. A POST-binding request without a hint still asserts the first active user.
@@ -113,4 +113,4 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 
 ## Spec and tests
 
-`specs/setup/idp-simulator.feature`. Go tests: `go test ./services/idpsim`.
+`specs/setup/idp-simulator.feature`. Go tests: `go test ./services/sims/idpsim`.

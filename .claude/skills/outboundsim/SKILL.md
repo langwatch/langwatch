@@ -9,7 +9,7 @@ user-invocable: true
 Fakes Slack (incoming webhooks and the Web API: `chat.postMessage`, `conversations.list`,
 `auth.test`), any webhook receiver, and SQS `SendMessage` (JSON protocol). Every call becomes
 one record in memory, bounded; tokens are checked for presence only: a dev shim, never expose
-it. Code: `services/outboundsim`, console `apps/outboundsim-web`.
+it. Code: `services/sims/outboundsim`, console `apps/sims/src/outbound`.
 
 ## Run it
 

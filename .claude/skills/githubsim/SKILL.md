@@ -7,7 +7,7 @@ user-invocable: true
 # githubsim
 
 Answers the GitHub calls the github module makes, serves the App install page, and sends
-HMAC-signed webhooks to the stack. Code: `services/githubsim`, spec
+HMAC-signed webhooks to the stack. Code: `services/sims/githubsim`, spec
 `specs/setup/github-simulator.feature`. It checks no JWT signature (the App id in the
 claims and expiry only). Console: `https://github.<slug>.langwatch.localhost` (a plain page:
 installations, pull requests, fault count).

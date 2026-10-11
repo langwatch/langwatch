@@ -9,7 +9,7 @@ user-invocable: true
 Fakes exactly the Stripe surface `enterprise/modules/billing` calls, in Stripe's wire shapes
 (form bodies, list/search/error envelopes, `Idempotency-Key` replay), and signs webhooks with
 `Stripe-Signature: t=<unix>,v1=<hmac>` so billing's real `constructEvent` verifies them. Ids
-are counters (`cus_sim000001`); catalog prices keep their real ids. Code: `services/paymentsim`;
+are counters (`cus_sim000001`); catalog prices keep their real ids. Code: `services/sims/paymentsim`;
 spec: `specs/setup/payment-simulator.feature`. State is in memory: a restart forgets it.
 
 ## Run it

@@ -83,7 +83,7 @@ func (stack Stack) URL() string {
 	return "http://localhost:" + strconv.Itoa(stack.Ports.UI)
 }
 
-// MailURL is the origin of the stack's mail sink (services/mailsim): haven
+// MailURL is the origin of the stack's mail sink (services/sims/mailsim): haven
 // routes it as mail.<slug>... beside app.<slug>..., so it is derived from the
 // app hostname. Empty off haven, where no sink runs.
 func (stack Stack) MailURL() string {

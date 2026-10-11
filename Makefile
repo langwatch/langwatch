@@ -140,13 +140,12 @@ setup-hooks:
 # budget and auth traffic to whichever control plane that port belongs to.
 DEV_ENV_FILE ?= .env
 # Both targets build with -tags dev, which links the simulators (cmd/service/
-# combined_dev.go); release images build untagged. SIM_CONSOLES are the consoles
-# the run embeds (ADR-160): a simulator's own, or those `combined` hosts. Nx
-# caches each build, so an unchanged console costs a cache hit, a changed one rebuilds.
+# combined_dev.go); release images build untagged. SIM_CONSOLES are the
+# simulators the run hosts; any at all builds @langwatch/sims, the one app holding
+# every console (ADR-160). Nx caches the build, so unchanged consoles cost a cache hit.
 SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim paymentsim lambdasim githubsim
 SIM_CONSOLES = $(if $(filter combined,$(svc)),$(if $(args),$(filter $(SIMULATORS),$(args)),$(SIMULATORS)),$(filter $(SIMULATORS),$(svc)))
-BUILD_SIM_CONSOLES = for sim in $(SIM_CONSOLES); do \
-	$(NX) run @langwatch/$$sim-web:build --outputStyle=static || echo "$$sim-web did not build; its console names the fix"; done
+BUILD_SIM_CONSOLES = $(if $(SIM_CONSOLES),$(NX) run @langwatch/sims:build --outputStyle=static || echo "@langwatch/sims did not build; each console names the fix",true)
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@$(BUILD_SIM_CONSOLES)

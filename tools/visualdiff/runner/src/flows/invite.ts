@@ -53,7 +53,7 @@ const verifyLink = async ({
   to: string;
 }): Promise<string> => {
   const { mailUrl } = context;
-  if (mailUrl === undefined) throw new Error("this side has no mail sink (services/mailsim)");
+  if (mailUrl === undefined) throw new Error("this side has no mail sink (services/sims/mailsim)");
   const { request } = context.side.page;
   const options = { ignoreHTTPSErrors: true, failOnStatusCode: false };
   const deadline = Date.now() + LINK_TIMEOUT_MILLIS;

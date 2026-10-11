@@ -7,8 +7,8 @@ user-invocable: true
 # mailsim
 
 A local SMTP sink plus inbox. It catches every message the stack sends and relays
-nothing, whatever the recipient domain. Code: `services/mailsim`, console
-`apps/mailsim-web`.
+nothing, whatever the recipient domain. Code: `services/sims/mailsim`, console
+`apps/sims/src/mail`.
 
 ## Run it
 
@@ -45,7 +45,7 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 - Send with any SMTP client to the SMTP port; no auth needed.
 - Bounded: `MAILSIM_MAX_MESSAGES` (default 10000) keeps the newest and evicts the oldest;
   `MAILSIM_MAX_MESSAGE_BYTES` (default 10 MiB) caps one message. Id and recipient lookups
-  are indexed. Benchmark: `go test -bench . -benchmem ./services/mailsim`.
+  are indexed. Benchmark: `go test -bench . -benchmem ./services/sims/mailsim`.
 
 ## From a terminal or agent
 

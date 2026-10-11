@@ -225,13 +225,13 @@ off by default too (its imports hold a few GiB). `haven up +langevals` runs
 `langevals.<slug>.langwatch.localhost`, and sets `LANGEVALS_ENDPOINT` to its
 loopback port for every lane; without it `.env`'s value stands. diffsuite's
 `-langevals` passes `+langevals` to the branch stack it starts with `-up`.
-idp — the identity-provider simulator (`services/idpsim`: a range of OIDC +
+idp — the identity-provider simulator (`services/sims/idpsim`: a range of OIDC +
 SAML + SCIM tenants with DNS/HTTP domain verification, routed at
 `idp.<slug>.langwatch.localhost`) — runs by default; a worktree that does not
 want it says `haven up -idp` once. `haven simulator idp` runs the simulator alone —
 no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
 
-storage — the S3 stand-in (`services/storagesim`) — runs by default too, as
+storage — the S3 stand-in (`services/sims/storagesim`) — runs by default too, as
 the `storage` lane routed at `storage.<slug>.langwatch.localhost`; a worktree
 that does not want it says `haven up -storage` once. It answers only the S3
 calls the product makes (path-style PUT/GET/HEAD/DELETE object, HEAD bucket),
@@ -245,7 +245,7 @@ environment already names `STORED_OBJECTS_BACKEND`, `S3_BUCKET_NAME`,
 `S3_ENDPOINT` or `LANGWATCH_LOCAL_STORAGE_PATH`: the root `.env` beats the
 overlay, so haven stays out of a storage choice rather than half-overriding it.
 
-payment — the Stripe stand-in (`services/paymentsim`) — runs by default, so no
+payment — the Stripe stand-in (`services/sims/paymentsim`) — runs by default, so no
 local or CI stack needs a Stripe account. Unless `.env` or the shell names
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, the overlay
 points billing at it (`STRIPE_API_BASE=https://payment.<slug>.langwatch.localhost`,
@@ -259,7 +259,7 @@ it. `haven up` prints `Stripe: paymentsim`, `Stripe: your test key from .env` or
 the old `"payment"` key, written as false while it was opt-in, is not read.
 Objects persist in `storage/<slug>/` under Haven's home.
 
-llm — the LLM provider stand-in (`services/llmsim`) — is opt-in: `haven up
+llm — the LLM provider stand-in (`services/sims/llmsim`) — is opt-in: `haven up
 +llm` runs it as the `llm` lane routed at `llm.<slug>.langwatch.localhost`. It
 answers OpenAI chat completions (JSON and SSE), embeddings and models, and
 Anthropic messages, from a seeded Markov chain, so the same prompt gets the
@@ -279,7 +279,7 @@ instead of meeting the vendor's 401. It also sets `ALLOWED_PROXY_HOSTS` to
 loopback sims. Vertex, Azure and Bedrock are never probed. Its console at the
 lane's URL lists the last 500 calls.
 
-voice — the voice provider stand-in (`services/voicesim`) — is opt-in: `haven
+voice — the voice provider stand-in (`services/sims/voicesim`) — is opt-in: `haven
 up +voice` once runs the `voice` lane, routed at
 `voice.<slug>.langwatch.localhost`. It fakes what a scenario voice call needs
 from ElevenLabs (the signed-URL mint and the Conversational AI socket, with a
@@ -292,7 +292,7 @@ own URL, lists recent calls with their turns and protocol events. That
 `ELEVENLABS_BASE_URL` is also where the model-provider credential probe goes:
 voicesim answers `GET /models` and `GET /v1/models` for any key.
 
-analytics — the product-analytics stand-in (`services/analyticssim`) — is
+analytics — the product-analytics stand-in (`services/sims/analyticssim`) — is
 opt-in: `haven up +analytics` once runs the `analytics` lane, routed at
 `analytics.<slug>.langwatch.localhost`. It accepts PostHog's capture calls
 (posthog-node's `/batch/`, posthog-js's `/e/`, flags answered empty) and
@@ -312,7 +312,7 @@ preserve received messages, registered IdP applications, users, groups,
 provisioning connections, domain proofs, and signing keys. Standalone
 `haven simulator idp` uses a separate `idp-standalone/` directory.
 They work even when the checkout predates
-`services/mailsim` or `services/idpsim`, without Go or Make on the child process's
+`services/sims/mailsim` or `services/sims/idpsim`, without Go or Make on the child process's
 PATH. Their browser pages are linked from the stack's `mail` and `idp` rows on
 the web dashboard.
 

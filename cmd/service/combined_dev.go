@@ -5,17 +5,17 @@ package main
 import (
 	"context"
 
-	analyticssim "github.com/langwatch/langwatch/services/analyticssim/cmd"
-	githubsim "github.com/langwatch/langwatch/services/githubsim/cmd"
-	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
-	lambdasim "github.com/langwatch/langwatch/services/lambdasim/cmd"
-	llmsim "github.com/langwatch/langwatch/services/llmsim/cmd"
-	mailsim "github.com/langwatch/langwatch/services/mailsim/cmd"
-	outboundsim "github.com/langwatch/langwatch/services/outboundsim/cmd"
-	paymentsim "github.com/langwatch/langwatch/services/paymentsim/cmd"
-	storagesim "github.com/langwatch/langwatch/services/storagesim/cmd"
-	telemetrysim "github.com/langwatch/langwatch/services/telemetrysim/cmd"
-	voicesim "github.com/langwatch/langwatch/services/voicesim/cmd"
+	analyticssim "github.com/langwatch/langwatch/services/sims/analyticssim/cmd"
+	githubsim "github.com/langwatch/langwatch/services/sims/githubsim/cmd"
+	idpsim "github.com/langwatch/langwatch/services/sims/idpsim/cmd"
+	lambdasim "github.com/langwatch/langwatch/services/sims/lambdasim/cmd"
+	llmsim "github.com/langwatch/langwatch/services/sims/llmsim/cmd"
+	mailsim "github.com/langwatch/langwatch/services/sims/mailsim/cmd"
+	outboundsim "github.com/langwatch/langwatch/services/sims/outboundsim/cmd"
+	paymentsim "github.com/langwatch/langwatch/services/sims/paymentsim/cmd"
+	storagesim "github.com/langwatch/langwatch/services/sims/storagesim/cmd"
+	telemetrysim "github.com/langwatch/langwatch/services/sims/telemetrysim/cmd"
+	voicesim "github.com/langwatch/langwatch/services/sims/voicesim/cmd"
 )
 
 // combinedIDPAddrEnv is idpsim's port in the combined process (SERVER_ADDR alone).

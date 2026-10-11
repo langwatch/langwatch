@@ -8,7 +8,7 @@ user-invocable: true
 
 Answers OpenAI chat completions, embeddings and models, Anthropic messages, Gemini and
 Vertex generateContent, and Bedrock Converse from a seeded Markov chain: the same prompt
-gets the same answer, at no cost. Code: `services/llmsim`, console `apps/llmsim-web`.
+gets the same answer, at no cost. Code: `services/sims/llmsim`, console `apps/sims/src/llm`.
 
 ## Run it
 
