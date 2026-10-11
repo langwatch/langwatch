@@ -4,18 +4,19 @@
  */
 
 import { type ScopeAssignment } from "@langwatch/data-retention-contract";
+import { Card } from "@langwatch/design-system/card";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Button,
-  Card,
   HStack,
   Spacer,
   Skeleton,
   SkeletonText,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -30,7 +31,7 @@ import {
   scopeHierarchyOf,
 } from "@langwatch/design-system/scope-filter";
 import { StatTileSkeleton } from "@langwatch/design-system/stat-tile";
-import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { DatabaseBackup, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
@@ -55,6 +56,8 @@ import { ApplyToExistingConfirmDialog } from "../blocks/apply-to-existing-confir
 import { RemoveScopeConfirmDialog } from "../blocks/remove-scope-confirm-dialog.tsx";
 import { RetentionAndUsageCard } from "../blocks/retention-and-usage-card.tsx";
 import { RetroactiveProgressCard } from "../blocks/retroactive-progress-card.tsx";
+
+const RETENTION_DOCS_HREF = "https://langwatch.ai/docs/platform/data-retention";
 
 export default function DataRetentionScreen() {
   const host = useDataRetentionHost();
@@ -440,15 +443,13 @@ function DataRetentionLoading() {
       <VStack gap={6} width="full" align="start" paddingTop={4} aria-busy="true">
         <SkeletonText noOfLines={1} width="sm" />
         <StatTileSkeleton columns={2} />
-        <Card.Root width="full">
-          <Card.Body>
-            <VStack gap={4} align="stretch">
-              {[0, 1, 2].map((row) => (
-                <Skeleton key={row} height="5" />
-              ))}
-            </VStack>
-          </Card.Body>
-        </Card.Root>
+        <Card padding="lg">
+          <VStack gap={4} align="stretch">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} height="5" />
+            ))}
+          </VStack>
+        </Card>
       </VStack>
     </>
   );
@@ -481,13 +482,15 @@ function RetentionPolicyList({
         title="No retention policies"
         description={`Add a retention policy to override the platform default of ${defaultDays} days.`}
         icon={<DatabaseBackup size={24} />}
-      >
-        {canWrite && (
-          <PageLayout.HeaderButton primary onClick={onAdd}>
-            <Plus /> Add retention policy
-          </PageLayout.HeaderButton>
-        )}
-      </NoDataInfoBlock>
+        primaryAction={
+          canWrite && (
+            <PageLayout.HeaderButton primary onClick={onAdd}>
+              <Plus /> Add retention policy
+            </PageLayout.HeaderButton>
+          )
+        }
+        next={[{ kind: "docs", label: "How retention scopes work", href: RETENTION_DOCS_HREF }]}
+      />
     );
   }
   if (scopeGroups.length === 0) {
@@ -496,66 +499,59 @@ function RetentionPolicyList({
         title="No matching policies"
         description="No retention policies match the current scope filter."
         icon={<DatabaseBackup size={24} />}
+        next={[{ kind: "docs", label: "How retention scopes work", href: RETENTION_DOCS_HREF }]}
       />
     );
   }
   return (
-    <Card.Root width="full" overflow="hidden">
-      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Scope</Table.ColumnHeader>
-              <Table.ColumnHeader>Policy</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {scopeGroups.map((group) => {
-              const Icon = SCOPE_ICON[group.scopeType];
-              return (
-                <Table.Row key={`${group.scopeType}:${group.scopeId}`}>
-                  <Table.Cell>
-                    <HStack gap={3}>
-                      <Icon size={16} />
-                      <VStack align="start" gap={0}>
-                        <Text fontWeight="medium">{group.name}</Text>
-                        <Text fontSize="xs" color="fg.muted" textTransform="capitalize">
-                          {group.scopeType.toLowerCase()}
-                        </Text>
-                      </VStack>
-                    </HStack>
-                  </Table.Cell>
-                  <Table.Cell>{renderPolicyValue(group.byCategory)}</Table.Cell>
-                  <Table.Cell textAlign="end">
-                    {canWrite && (
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            aria-label={`Actions for ${group.name}`}
-                          >
-                            <MoreVertical size={14} />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Menu.Item value="edit" onClick={() => onEdit(group)}>
-                            <Pencil size={14} /> Edit
-                          </Menu.Item>
-                          <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(group)}>
-                            <Trash2 size={14} /> Remove
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
-                    )}
-                  </Table.Cell>
-                </Table.Row>
-              );
-            })}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+    <ListTable scroll="x" scrollLabel="Retention policies">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Policy</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {scopeGroups.map((group) => {
+          const Icon = SCOPE_ICON[group.scopeType];
+          return (
+            <ListTable.Row key={`${group.scopeType}:${group.scopeId}`}>
+              <ListTable.Cell>
+                <HStack gap={3}>
+                  <Icon size={16} />
+                  <VStack align="start" gap={0}>
+                    <Text fontWeight="medium">{group.name}</Text>
+                    <Text fontSize="xs" color="fg.muted" textTransform="capitalize">
+                      {group.scopeType.toLowerCase()}
+                    </Text>
+                  </VStack>
+                </HStack>
+              </ListTable.Cell>
+              <ListTable.Cell>{renderPolicyValue(group.byCategory)}</ListTable.Cell>
+              <ListTable.ActionCell>
+                {canWrite && (
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <Button size="xs" variant="ghost" aria-label={`Actions for ${group.name}`}>
+                        <MoreVerticalIcon size={14} />
+                      </Button>
+                    </Menu.Trigger>
+                    <Menu.Content>
+                      <Menu.Item value="edit" onClick={() => onEdit(group)}>
+                        <Pencil size={14} /> Edit
+                      </Menu.Item>
+                      <Menu.Item value="remove" color="red.fg" onClick={() => onRemove(group)}>
+                        <Trash2 size={14} /> Remove
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Root>
+                )}
+              </ListTable.ActionCell>
+            </ListTable.Row>
+          );
+        })}
+      </ListTable.Body>
+    </ListTable>
   );
 }

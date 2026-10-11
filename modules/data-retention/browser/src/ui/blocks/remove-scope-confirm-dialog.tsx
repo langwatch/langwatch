@@ -1,4 +1,5 @@
 import type { ResolvedRetention } from "@langwatch/data-retention-contract";
+import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Alert, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowRight } from "lucide-react";
@@ -53,36 +54,31 @@ export function RemoveScopeConfirmDialog({
             now on.
           </Text>
 
-          <VStack
-            align="stretch"
-            gap={1}
-            padding={3}
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="md"
-            background="bg.subtle"
-          >
-            <Text fontSize="xs" color="fg.muted">
-              Retention for {group.name}
-            </Text>
-            {preview.isLoading ? (
-              <HStack gap={2}>
-                <Spinner size="sm" />
-                <Text fontSize="sm" color="fg.muted">
-                  Resolving fallback…
-                </Text>
-              </HStack>
-            ) : (
-              <HStack gap={2}>
-                <Text fontWeight="600">{current}</Text>
-                <ArrowRight size={14} />
-                <Text fontWeight="600">{fallback ?? "the next policy"}</Text>
-              </HStack>
-            )}
-            <Text fontSize="xs" color="fg.muted">
-              Falls back to the next applicable policy, or the platform default when none is closer.
-            </Text>
-          </VStack>
+          <Card variant="nested" tone="neutral" padding="sm">
+            <VStack align="stretch" gap={1}>
+              <Text fontSize="xs" color="fg.muted">
+                Retention for {group.name}
+              </Text>
+              {preview.isLoading ? (
+                <HStack gap={2}>
+                  <Spinner size="sm" />
+                  <Text fontSize="sm" color="fg.muted">
+                    Resolving fallback…
+                  </Text>
+                </HStack>
+              ) : (
+                <HStack gap={2}>
+                  <Text fontWeight="600">{current}</Text>
+                  <ArrowRight size={14} />
+                  <Text fontWeight="600">{fallback ?? "the next policy"}</Text>
+                </HStack>
+              )}
+              <Text fontSize="xs" color="fg.muted">
+                Falls back to the next applicable policy, or the platform default when none is
+                closer.
+              </Text>
+            </VStack>
+          </Card>
 
           {preview.isError && (
             <Alert.Root status="warning">
