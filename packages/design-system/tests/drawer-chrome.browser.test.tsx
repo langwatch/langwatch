@@ -136,7 +136,7 @@ describe("a glass drawer in a browser", () => {
     expect(getComputedStyle(footer()).backdropFilter).toBe("none");
   });
 
-  /** @scenario "The translucent header and footer ship off until the screenshots are seen" */
+  /** @scenario "The translucent header and footer are on by default, approved after the screenshots" */
   it("keeps the solid look's flow layout when the glass is off", async () => {
     renderDrawer({ glass: false });
     const title = await screen.findByText("Production key");

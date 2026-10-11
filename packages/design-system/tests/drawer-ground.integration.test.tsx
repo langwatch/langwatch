@@ -111,7 +111,7 @@ function measure({
 }
 
 describe("the Drawer shape's glass switch", () => {
-  /** @scenario "The translucent header and footer ship off until the screenshots are seen" */
+  /** @scenario "The translucent header and footer are on by default, approved after the screenshots" */
   it("draws the solid look when nobody switches the glass on", () => {
     renderDrawer({ glass: false });
     const { body, header, footer } = parts();

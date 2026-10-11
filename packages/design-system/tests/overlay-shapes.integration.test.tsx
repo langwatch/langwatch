@@ -539,6 +539,153 @@ describe("a drawer footer", () => {
   });
 });
 
+describe("a drawer's action hooks", () => {
+  /** @scenario "Existing back and cancel hooks identify the actual action buttons" */
+  it("puts the given ids on the real Back and Cancel buttons, each running only its own callback", async () => {
+    const onBack = vi.fn();
+    const onCancel = vi.fn();
+    const onClose = vi.fn();
+    renderWithDesignSystem(
+      <Drawer
+        onClose={onClose}
+        onBack={onBack}
+        backButtonTestId="back-button"
+        title="Connect from code"
+        data-testid="connect"
+        footer={{ cancel: { onClick: onCancel, "data-testid": "widget-cancel" } }}
+      />,
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: "Connect from code" });
+    const back = within(drawer).getByRole("button", { name: "Back" });
+    const cancel = within(drawer).getByRole("button", { name: "Cancel" });
+    expect(back).toBe(screen.getByTestId("back-button"));
+    expect(cancel).toBe(screen.getByTestId("widget-cancel"));
+    expect(screen.queryByTestId("connect-back")).toBeNull();
+    const user = userEvent.setup();
+    await user.click(back);
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
+    await user.click(cancel);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Existing back and cancel hooks identify the actual action buttons" */
+  it("falls back to the drawer's id and the suffix back, and to no id without either", async () => {
+    renderWithDesignSystem(
+      <Drawer onClose={vi.fn()} onBack={vi.fn()} title="Prefixed" data-testid="prefixed" />,
+    );
+    const prefixed = await screen.findByRole("dialog", { name: "Prefixed" });
+    expect(within(prefixed).getByRole("button", { name: "Back" })).toBe(
+      screen.getByTestId("prefixed-back"),
+    );
+    cleanup();
+
+    renderWithDesignSystem(<Drawer onClose={vi.fn()} onBack={vi.fn()} title="Anonymous" />);
+    const anonymous = await screen.findByRole("dialog", { name: "Anonymous" });
+    expect(
+      within(anonymous).getByRole("button", { name: "Back" }).hasAttribute("data-testid"),
+    ).toBe(false);
+  });
+
+  /** @scenario "Existing back and cancel hooks identify the actual action buttons" */
+  it("waits on Back and Cancel while a save is in flight", async () => {
+    renderWithDesignSystem(
+      <Drawer
+        onClose={vi.fn()}
+        onBack={vi.fn()}
+        busy
+        title="Saving"
+        backButtonTestId="back-button"
+        footer={{ cancel: { onClick: vi.fn(), "data-testid": "widget-cancel" } }}
+      />,
+    );
+
+    await screen.findByRole("dialog", { name: "Saving" });
+    expect(screen.getByTestId("back-button").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByTestId("widget-cancel").hasAttribute("disabled")).toBe(true);
+  });
+});
+
+describe("a drawer's icon", () => {
+  /** @scenario "A drawer title keeps its 24px source icon visible" */
+  it("is decorative: the drawer is named by its title alone", async () => {
+    renderWithDesignSystem(
+      <Drawer
+        onClose={vi.fn()}
+        title="GitHub source"
+        icon={<svg width="24" height="24" data-testid="glyph" />}
+      />,
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: "GitHub source" });
+    const glyph = within(drawer).getByTestId("glyph");
+    expect(glyph.closest("[aria-hidden='true']")).toBeTruthy();
+    expect(glyph.getAttribute("width")).toBe("24");
+    expect(within(drawer).getByRole("heading", { name: "GitHub source" })).toBeTruthy();
+  });
+
+  /** @scenario "A drawer title keeps its 24px source icon visible" */
+  it("draws the header it had when there is no icon", async () => {
+    renderWithDesignSystem(<Drawer onClose={vi.fn()} title="Plain" />);
+
+    const drawer = await screen.findByRole("dialog", { name: "Plain" });
+    const heading = within(drawer).getByRole("heading", { name: "Plain" });
+    expect(parentOf(heading).querySelector("[aria-hidden='true']")).toBeNull();
+  });
+});
+
+describe("a dialog that ignores an outside click", () => {
+  /** @scenario "A secret dialog ignores an outside click but closes by X or Escape" */
+  it("stays open on an outside click, then closes once by the X and once by Escape", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={onClose}
+        title="Your new token"
+        closeOnInteractOutside={false}
+        primaryAction={{ label: "Done", onClick: vi.fn() }}
+      />,
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "Your new token" });
+    fireEvent.pointerDown(document.body);
+    fireEvent.pointerUp(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    await user.keyboard("{Escape}");
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  /** @scenario "A secret dialog ignores an outside click but closes by X or Escape" */
+  it("keeps a non-dismissible dialog open on an outside click whatever the flag says", async () => {
+    const onClose = vi.fn();
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={onClose}
+        title="Must acknowledge"
+        dismissible={false}
+        closeOnInteractOutside
+        primaryAction={{ label: "Done", onClick: vi.fn() }}
+      />,
+    );
+
+    await screen.findByRole("dialog", { name: "Must acknowledge" });
+    fireEvent.pointerDown(document.body);
+    fireEvent.pointerUp(document.body);
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
 describe("a drawer on a narrow screen", () => {
   /** @scenario "A drawer header and footer give way on a narrow screen" */
   it("lets the header row wrap its tools and keeps the footer actions wrapping", async () => {

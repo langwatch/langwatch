@@ -257,6 +257,8 @@ export interface DrawerProps {
   title: string;
   /** Drawn in the title's place: an inline-rename element. `title` still names the drawer. */
   titleContent?: React.ReactNode;
+  /** Before the title, decorative, kept at the size given (24px glyphs stay 24px). */
+  icon?: React.ReactNode;
   /** The kind line above the title ("Self-hosted instance"). */
   eyebrow?: { label: string; icon?: React.ReactNode };
   /** One line under the title; it describes the drawer (`aria-describedby`). */
@@ -286,6 +288,8 @@ export interface DrawerProps {
   footer?: DrawerFooterProps;
   /** A save in flight: the X, back, Escape and every action wait. */
   busy?: boolean;
+  /** The Back button's test id, when it is not `<data-testid>-back`. */
+  backButtonTestId?: string;
   /** The error boundary's label; defaults to the title. */
   errorScope?: string;
   /** Names the entity shown: a crash clears when it changes, even if the title stays the same. */
@@ -304,6 +308,8 @@ type DrawerFrameProps = Pick<
   | "onBack"
   | "title"
   | "titleContent"
+  | "icon"
+  | "backButtonTestId"
   | "eyebrow"
   | "subtitle"
   | "badges"
@@ -330,6 +336,8 @@ function DrawerFrame({
   onBack,
   title,
   titleContent,
+  icon,
+  backButtonTestId,
   eyebrow,
   subtitle,
   badges,
@@ -351,6 +359,14 @@ function DrawerFrame({
   const chrome = useDrawerChrome({ enabled: glass, hasFooter: footer != null });
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
   const resetKeys = [title, entityKey];
+  const titleLines = (
+    <>
+      <ChakraDrawer.Title overflowWrap="anywhere" srOnly={titleContent != null}>
+        {title}
+      </ChakraDrawer.Title>
+      {titleContent}
+    </>
+  );
   return (
     <>
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
@@ -366,7 +382,7 @@ function DrawerFrame({
                   onClick={onBack}
                   disabled={busy}
                   marginStart={-2}
-                  data-testid={slot("back")}
+                  data-testid={backButtonTestId ?? slot("back")}
                 >
                   <ArrowLeft aria-hidden />
                 </IconButton>
@@ -378,10 +394,27 @@ function DrawerFrame({
                     <Text>{eyebrow.label}</Text>
                   </HStack>
                 )}
-                <ChakraDrawer.Title overflowWrap="anywhere" srOnly={titleContent != null}>
-                  {title}
-                </ChakraDrawer.Title>
-                {titleContent}
+                {icon != null ? (
+                  <HStack align="flex-start" gap={2} minWidth={0}>
+                    <chakra.span
+                      display="inline-flex"
+                      flexShrink={0}
+                      alignItems="center"
+                      justifyContent="center"
+                      minWidth="24px"
+                      minHeight="24px"
+                      color="fg.muted"
+                      aria-hidden
+                    >
+                      {icon}
+                    </chakra.span>
+                    <VStack align="stretch" gap={1} flex={1} minWidth={0}>
+                      {titleLines}
+                    </VStack>
+                  </HStack>
+                ) : (
+                  titleLines
+                )}
                 {subtitle != null && (
                   <ChakraDrawer.Description>{subtitle}</ChakraDrawer.Description>
                 )}
@@ -451,6 +484,7 @@ export function Drawer({
   size = "md",
   title,
   titleContent,
+  icon,
   eyebrow,
   subtitle,
   badges,
@@ -466,6 +500,7 @@ export function Drawer({
   children,
   footer,
   busy = false,
+  backButtonTestId,
   errorScope,
   entityKey,
   initialFocusEl,
@@ -482,6 +517,8 @@ export function Drawer({
       onBack={onBack}
       title={title}
       titleContent={titleContent}
+      icon={icon}
+      backButtonTestId={backButtonTestId}
       eyebrow={eyebrow}
       subtitle={subtitle}
       badges={badges}

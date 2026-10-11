@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { Copy, Database, Expand, Plus, Server, Trash2 } from "lucide-react";
+import { Copy, Database, Expand, GitBranch, Plus, Server, Trash2 } from "lucide-react";
 
 import { Badge, Box, IconButton, Input, Stack, Text } from "../../primitives.ts";
 import { SearchInput } from "../forms/search-input.tsx";
@@ -222,4 +222,32 @@ export const GlassDark: Story = {
   args: longForm,
   decorators: withGlass(true),
   globals: { colorMode: "dark" },
+};
+
+/** A 24px source glyph stays 24px beside the title, and a long title wraps beside it. */
+export const WithIcon: Story = {
+  args: {
+    title: "A source type with a name long enough to wrap onto a second line of the header",
+    icon: <GitBranch size={24} />,
+    subtitle: "Connected 4 minutes ago",
+  },
+  globals: { colorMode: "light" },
+};
+
+export const WithIconDark: Story = { ...WithIcon, globals: { colorMode: "dark" } };
+
+/** At 320px: the glyph keeps its size, the title and subtitle wrap beside it. */
+export const WithIconNarrow: Story = {
+  ...WithIcon,
+  parameters: { viewport: { defaultViewport: "mobile1" } },
+};
+
+/** The Back arrow carries a test id of its own when the drawer's id would not name it. */
+export const WithBackTestId: Story = {
+  args: {
+    title: "Connect from code",
+    onBack: noop,
+    backButtonTestId: "back-button",
+    footer: { cancel: { label: "Cancel", onClick: noop, "data-testid": "widget-cancel" } },
+  },
 };

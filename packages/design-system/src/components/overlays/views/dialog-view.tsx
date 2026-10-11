@@ -176,6 +176,11 @@ export interface DialogProps {
   note?: React.ReactNode;
   /** `false`: no X, no Cancel, no Escape, no outside click; only the actions close it. */
   dismissible?: boolean;
+  /**
+   * `false`: a click outside leaves it open (a once-shown secret); X and Escape still close it,
+   * under `dismissible` and `busy` as ever. Default true.
+   */
+  closeOnInteractOutside?: boolean;
   /** "alertdialog" for a must-acknowledge or destroying confirm. Default "dialog". */
   role?: "dialog" | "alertdialog";
   /** Shorthand for `initialFocusEl`; falls back to the first field, then Cancel. */
@@ -215,6 +220,7 @@ export function Dialog({
   cancelLabel = "Cancel",
   note,
   dismissible = true,
+  closeOnInteractOutside = true,
   role = "dialog",
   initialFocus,
   initialFocusEl,
@@ -303,7 +309,7 @@ export function Dialog({
       placement={placement}
       role={role}
       closeOnEscape={closable}
-      closeOnInteractOutside={closable}
+      closeOnInteractOutside={closable && closeOnInteractOutside}
       initialFocusEl={initialFocusEl ?? pickInitialFocus}
       finalFocusEl={finalFocusEl}
       onExitComplete={onExitComplete}

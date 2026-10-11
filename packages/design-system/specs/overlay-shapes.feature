@@ -155,3 +155,25 @@ Feature: Drawer and dialog shapes
     And the footer edge is on until the body reaches its end
     And nothing is on when the content fits
     And the drawer's observers and listeners are released when it closes
+
+  @integration @browser
+  Scenario: A drawer title keeps its 24px source icon visible
+    Given a drawer with a 24px icon and a long title
+    Then the icon stays 24px, unclipped, beside a title that wraps
+    And the drawer is still named by its title alone
+    And a drawer without an icon keeps the header it had
+
+  @integration
+  Scenario: Existing back and cancel hooks identify the actual action buttons
+    Given a drawer with a Back test id and a Cancel test id
+    Then each id lands on its real button, which runs only its own callback once
+    And without a Back test id the Back button takes the drawer's id and the suffix back
+    And a busy drawer waits on both
+
+  @integration
+  Scenario: A secret dialog ignores an outside click but closes by X or Escape
+    Given a dialog that does not close on an outside interaction
+    Then an outside click requests no close
+    And the X requests one close and Escape requests one close
+    And the default dialog still closes on an outside click
+    And a busy or non-dismissible dialog ignores the outside click either way

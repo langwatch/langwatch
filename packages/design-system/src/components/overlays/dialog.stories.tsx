@@ -68,6 +68,18 @@ export const MustAcknowledge: Story = {
   },
 };
 
+/** A once-shown secret: a click outside leaves it open; X and Escape still close it. */
+export const SecretIgnoresOutsideClick: Story = {
+  args: {
+    title: "Your new token",
+    description: "This is the only time the token is shown.",
+    closeOnInteractOutside: false,
+    primaryAction: { label: "Done", onClick: noop },
+    children: <Text fontFamily="mono">lw-••••••••••••••••</Text>,
+  },
+  globals: { colorMode: "dark" },
+};
+
 export const ReadOnly: Story = {
   args: {
     size: "lg",
