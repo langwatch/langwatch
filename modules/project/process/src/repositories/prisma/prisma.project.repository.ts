@@ -197,20 +197,21 @@ export class PrismaProjectRepository
 
   async findSharedProjectSlugs({
     organizationId,
-    memberUserId,
+    member,
     limit,
   }: {
     organizationId: string;
-    memberUserId?: string;
+    member?: { teamIds: readonly string[]; projectIds: readonly string[] };
     limit: number;
   }): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
       where: {
-        team: {
-          organizationId,
-          isPersonal: false,
-          ...(memberUserId === undefined ? {} : { members: { some: { userId: memberUserId } } }),
-        },
+        team: { organizationId, isPersonal: false },
+        ...(member === undefined
+          ? {}
+          : {
+              OR: [{ teamId: { in: [...member.teamIds] } }, { id: { in: [...member.projectIds] } }],
+            }),
         archivedAt: null,
         // An aggregate is opened on purpose (ADR-177 block F): never landed on.
         kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },

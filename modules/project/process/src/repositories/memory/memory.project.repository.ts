@@ -429,11 +429,11 @@ export class MemoryProjectRepository implements ProjectRepository {
 
   async findSharedProjectSlugs({
     organizationId,
-    memberUserId,
+    member,
     limit,
   }: {
     organizationId: string;
-    memberUserId?: string;
+    member?: { teamIds: readonly string[]; projectIds: readonly string[] };
     limit: number;
   }): Promise<string[]> {
     return this.#database
@@ -445,7 +445,9 @@ export class MemoryProjectRepository implements ProjectRepository {
           !team.isPersonal &&
           project.archivedAt === null &&
           !NEVER_LANDED_ON_PROJECT_KINDS.includes(project.kind) &&
-          (memberUserId === undefined || this.#database.isTeamMember(team.id, memberUserId))
+          (member === undefined ||
+            member.teamIds.includes(team.id) ||
+            member.projectIds.includes(project.id))
         );
       })
       .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())

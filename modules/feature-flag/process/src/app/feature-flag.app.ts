@@ -1,5 +1,5 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
-import { AuthzApi, scopeOrganizationId } from "@langwatch/authz-contract";
+import { AuthzApi, AuthzScopeNotFoundError, scopeOrganizationId } from "@langwatch/authz-contract";
 import {
   FEATURE_FLAG_REGISTRY,
   FeatureFlagApi,
@@ -189,7 +189,7 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
   async resolveFrontendFlagsForCaller(
     input: FeatureFlagTargetRequestForCaller,
   ): Promise<FrontendFeatureFlagMap> {
-    const target = await this.authorizeTarget(input.userId, input.target);
+    const target = await this.authorizeTarget(input.userId, input.target, "flag-read");
 
     return this.#flags.resolveFrontendFlags(target);
   }
@@ -232,6 +232,7 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
   private async authorizeTarget(
     userId: string,
     target: AuthenticatedFeatureFlagTargetInput,
+    access: "flag-read" | "project-view" = "project-view",
   ): Promise<AuthenticatedExperimentTarget> {
     if (target.kind === "user") {
       return { kind: "user", userId };
@@ -243,6 +244,16 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
       return { kind: "organization", userId, organizationId: target.organizationId };
     }
 
+    if (access === "flag-read") {
+      const organizationId = await this.authorizeProjectFlagRead({
+        userId,
+        projectId: target.projectId,
+        organizationId: target.organizationId,
+      });
+
+      return { kind: "project", userId, projectId: target.projectId, organizationId };
+    }
+
     await this.authorizeProjectView(userId, target.projectId);
     const organizationId = await this.getProjectOrganizationId(target.projectId);
     if (organizationId !== target.organizationId) {
@@ -250,6 +261,38 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
     }
 
     return { kind: "project", userId, projectId: target.projectId, organizationId };
+  }
+
+  /**
+   * A flag read at a project asks organization:view on the organization that owns it, as main
+   * asked no permission: a custom team role without project:view still reads its flags. An
+   * unknown project, or one paired with another organization, is refused as no membership.
+   */
+  private async authorizeProjectFlagRead({
+    userId,
+    projectId,
+    organizationId,
+  }: {
+    userId: string;
+    projectId: string;
+    organizationId?: string | null;
+  }): Promise<string> {
+    const owning = await this.findProjectOrganizationId(projectId);
+    if (owning === undefined || (organizationId && owning !== organizationId)) {
+      throw this.projectOrganizationMismatch(projectId);
+    }
+    await this.authorizeOrganizationView(userId, owning);
+
+    return owning;
+  }
+
+  private async findProjectOrganizationId(projectId: string): Promise<string | undefined> {
+    try {
+      return await this.getProjectOrganizationId(projectId);
+    } catch (error) {
+      if (AuthzScopeNotFoundError.is(error)) return undefined;
+      throw error;
+    }
   }
 
   private async getProjectOrganizationId(projectId: string): Promise<string> {
@@ -261,11 +304,11 @@ export class FeatureFlagModule implements FeatureFlagApiContract {
     input: FeatureFlagReadForCaller,
   ): Promise<AuthenticatedExperimentTarget> {
     if (input.projectId) {
-      await this.authorizeProjectView(input.userId, input.projectId);
-      const organizationId = await this.getProjectOrganizationId(input.projectId);
-      if (input.organizationId && organizationId !== input.organizationId) {
-        throw this.projectOrganizationMismatch(input.projectId);
-      }
+      const organizationId = await this.authorizeProjectFlagRead({
+        userId: input.userId,
+        projectId: input.projectId,
+        organizationId: input.organizationId,
+      });
 
       return {
         kind: "project",

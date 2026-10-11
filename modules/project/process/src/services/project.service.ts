@@ -110,6 +110,7 @@ export class ProjectService {
   private readonly repository: ProjectRepository;
   private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
+  private readonly authorization: Pick<AuthzApi, "listUserBindings">;
   private readonly created: ProjectCreatedNoticeService;
 
   private constructor({
@@ -118,6 +119,7 @@ export class ProjectService {
     repository,
     credentials,
     organizations,
+    authorization,
     created,
   }: {
     metadata: ProjectMetadataService;
@@ -125,6 +127,7 @@ export class ProjectService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
+    authorization: Pick<AuthzApi, "listUserBindings">;
     created: ProjectCreatedNoticeService;
   }) {
     this.metadata = metadata;
@@ -132,6 +135,7 @@ export class ProjectService {
     this.repository = repository;
     this.credentials = credentials;
     this.organizations = organizations;
+    this.authorization = authorization;
     this.created = created;
   }
 
@@ -139,7 +143,7 @@ export class ProjectService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
-    authorization: Pick<AuthzApi, "checkByIds">;
+    authorization: Pick<AuthzApi, "checkByIds" | "listUserBindings">;
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
@@ -153,6 +157,7 @@ export class ProjectService {
       repository: options.repository,
       credentials: options.credentials,
       organizations: options.organizations,
+      authorization: options.authorization,
       created: options.created,
     });
   }
@@ -369,12 +374,30 @@ export class ProjectService {
     return this.repository.listLwqlKeys(input);
   }
 
-  findSharedProjectSlugs(input: {
+  /** A member's projects are those its own grants name, at their team or the project itself. */
+  async findSharedProjectSlugs({
+    organizationId,
+    memberUserId,
+    limit,
+  }: {
     organizationId: string;
     memberUserId?: string;
     limit: number;
   }): Promise<string[]> {
-    return this.repository.findSharedProjectSlugs(input);
+    if (memberUserId === undefined) {
+      return this.repository.findSharedProjectSlugs({ organizationId, limit });
+    }
+
+    const bindings = await this.authorization.listUserBindings({
+      organizationId,
+      userId: memberUserId,
+    });
+    const scopeIds = (scopeType: "TEAM" | "PROJECT") =>
+      bindings.filter((binding) => binding.scopeType === scopeType).map(({ scopeId }) => scopeId);
+    const member = { teamIds: scopeIds("TEAM"), projectIds: scopeIds("PROJECT") };
+    if (member.teamIds.length === 0 && member.projectIds.length === 0) return [];
+
+    return this.repository.findSharedProjectSlugs({ organizationId, member, limit });
   }
 
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]> {

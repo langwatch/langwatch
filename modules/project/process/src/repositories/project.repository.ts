@@ -154,9 +154,10 @@ export interface ProjectRepository {
     since?: number;
   }): Promise<ProjectUsageCount>;
   countWithTraces(input: { organizationId: string }): Promise<number>;
+  /** `member` keeps the projects under these teams or with these ids; absent keeps every one. */
   findSharedProjectSlugs(input: {
     organizationId: string;
-    memberUserId?: string;
+    member?: { teamIds: readonly string[]; projectIds: readonly string[] };
     limit: number;
   }): Promise<string[]>;
   /** Every project id, archived included, ordered by id and paged by cursor. */
