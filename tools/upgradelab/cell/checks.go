@@ -612,8 +612,8 @@ func (cell *run) traceMeterPart(ctx context.Context) Verdict {
 	var mismatched []string
 	traces := 0
 	for _, label := range append([]string{""}, cell.stores.Private...) {
-		meter, err1 := tenantTraceCounts(ctx, cell.stores.queryURL(label), "usage_trace_meter")
-		summaries, err2 := tenantTraceCounts(ctx, cell.stores.queryURL(label), "trace_summaries")
+		meter, err1 := tenantTraceCounts(ctx, cell.stores.queryURL(label), monthMeterQuery)
+		summaries, err2 := tenantTraceCounts(ctx, cell.stores.queryURL(label), monthTracesQuery)
 		if err1 != nil || err2 != nil {
 			return Verdict{Name: part.Name, Result: "inconclusive", Detail: errText(err1) + " " + errText(err2)}
 		}
@@ -632,7 +632,7 @@ func (cell *run) traceMeterPart(ctx context.Context) Verdict {
 			}
 		}
 	}
-	part.Detail = fmt.Sprintf("%d traces; mismatched: %v", traces, mismatched)
+	part.Detail = fmt.Sprintf("%d traces first stored this month; mismatched: %v", traces, mismatched)
 	if traces == 0 {
 		part.Result, part.Detail = "inconclusive", "no trace on any target to count"
 	} else if len(mismatched) > 0 {
@@ -641,8 +641,14 @@ func (cell *run) traceMeterPart(ctx context.Context) Verdict {
 	return part
 }
 
-func tenantTraceCounts(ctx context.Context, target, table string) (map[string]int, error) {
-	out, err := clickhouseQuery(ctx, target, "SELECT TenantId, uniqExact(TraceId) FROM "+table+" GROUP BY TenantId FORMAT TSV")
+// The meter holds one row per project, UTC month and trace; a trace counts in the month it was first stored.
+const (
+	monthMeterQuery  = "SELECT TenantId, uniqExact(TraceId) FROM usage_trace_meter WHERE Month = toStartOfMonth(now('UTC')) GROUP BY TenantId FORMAT TSV"
+	monthTracesQuery = "SELECT TenantId, count() FROM (SELECT TenantId, TraceId FROM trace_summaries GROUP BY TenantId, TraceId HAVING min(CreatedAt) >= toStartOfMonth(now('UTC'))) GROUP BY TenantId FORMAT TSV"
+)
+
+func tenantTraceCounts(ctx context.Context, target, query string) (map[string]int, error) {
+	out, err := clickhouseQuery(ctx, target, query)
 	if err != nil {
 		return nil, err
 	}
