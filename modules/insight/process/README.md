@@ -119,18 +119,18 @@ Contract `../contract/src/insight.trpc.ts:28`, router `src/transport/insight.trp
 
 ```typescript
 // insights.getAll
-// Input: insightProjectScopeSchema, ../contract/src/insight.ts:119
+// Input: insightProjectScopeSchema, ../contract/src/insight.ts:122
 interface Input {
   projectId: string;
 }
 // Output: insightEntrySchema.array() (inline, ../contract/src/insight.trpc.ts:31)
 
 // insights.file
-type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:139
-type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:111
+type Input = z.infer<typeof fileInsightInputSchema>; // ../contract/src/insight.ts:142
+type Output = z.infer<typeof insightEntrySchema>; // ../contract/src/insight.ts:114
 
 // insights.markSeen
-// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:159
+// Input: markInsightsSeenInputSchema, ../contract/src/insight.ts:162
 interface Input {
   projectId: string;
   insightIds: string[];
@@ -139,7 +139,7 @@ interface Input {
 type Output = unknown;
 
 // insights.archive
-// Input: insightScopeSchema, ../contract/src/insight.ts:147
+// Input: insightScopeSchema, ../contract/src/insight.ts:150
 interface Input {
   projectId: string;
   insightId: string;
@@ -148,12 +148,12 @@ interface Input {
 type Output = unknown;
 
 // insights.keep
-type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:147
+type Input = z.infer<typeof insightScopeSchema>; // ../contract/src/insight.ts:150
 // Output: inline, ../contract/src/insight.trpc.ts:47
 type Output = unknown;
 
 // insights.getBoardDailyRun
-// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:176
+// Input: insightBoardDailyRunScopeSchema, ../contract/src/insight-daily-run.ts:178
 interface Input {
   projectId: string;
   board: {
@@ -161,15 +161,15 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:164
+type Output = z.infer<typeof insightDailyRunSettingSchema>; // ../contract/src/insight-daily-run.ts:166
 
 // insights.configureBoardDailyRun
-type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:189
+type Input = z.infer<typeof configureInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:191
 // Output: inline, ../contract/src/insight.trpc.ts:56
 type Output = unknown;
 
 // insights.turnOffBoardDailyRun
-type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:201
+type Input = z.infer<typeof turnOffInsightDailyRunInputSchema>; // ../contract/src/insight-daily-run.ts:203
 // Output: inline, ../contract/src/insight.trpc.ts:60
 type Output = unknown;
 ```
@@ -198,16 +198,17 @@ Declared at `src/eventing/insight-daily-run.pipeline.ts:87`. Events: `INSIGHT_DA
 
 ### Pipeline `insight_processing` (aggregate `insight`)
 
-Declared at `src/eventing/insight.pipeline.ts:39`. Events: `INSIGHT_EVENT_SCHEMAS`.
+Declared at `src/eventing/insight.pipeline.ts:40`. Events: `INSIGHT_EVENT_SCHEMAS`.
 
 | Kind                | Name                                                           | Handles | Declared at                           |
 | ------------------- | -------------------------------------------------------------- | ------- | ------------------------------------- |
-| command             | `fileInsight`                                                  | –       | `src/eventing/insight.pipeline.ts:46` |
-| command             | `markInsightSeen`                                              | –       | `src/eventing/insight.pipeline.ts:47` |
-| command             | `archiveInsight`                                               | –       | `src/eventing/insight.pipeline.ts:48` |
-| command             | `keepInsight`                                                  | –       | `src/eventing/insight.pipeline.ts:49` |
-| Postgres projection | `≈ createInsightProjection({ store: deps.insightStore })`      | –       | `src/eventing/insight.pipeline.ts:44` |
-| Postgres projection | `≈ createInsightReaderProjection({ store: deps.readerStore })` | –       | `src/eventing/insight.pipeline.ts:45` |
+| command             | `fileInsight`                                                  | –       | `src/eventing/insight.pipeline.ts:47` |
+| command             | `renewInsight`                                                 | –       | `src/eventing/insight.pipeline.ts:48` |
+| command             | `markInsightSeen`                                              | –       | `src/eventing/insight.pipeline.ts:49` |
+| command             | `archiveInsight`                                               | –       | `src/eventing/insight.pipeline.ts:50` |
+| command             | `keepInsight`                                                  | –       | `src/eventing/insight.pipeline.ts:51` |
+| Postgres projection | `≈ createInsightProjection({ store: deps.insightStore })`      | –       | `src/eventing/insight.pipeline.ts:45` |
+| Postgres projection | `≈ createInsightReaderProjection({ store: deps.readerStore })` | –       | `src/eventing/insight.pipeline.ts:46` |
 
 ### Tasks
 
