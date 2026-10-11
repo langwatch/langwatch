@@ -125,6 +125,33 @@ describe("CodexAccountService", () => {
     });
   });
 
+  describe("given the device code ended before approval", () => {
+    it.each([
+      ["expired_token", "sign_in_expired", 400],
+      ["access_denied", "sign_in_denied", 403],
+    ])("names the issuer's %s as a %s refusal", async (issuerError, kind, httpStatus) => {
+      const { impl } = scriptedFetch({
+        "/api/accounts/deviceauth/token": () => ({
+          status: 400,
+          json: { error: issuerError },
+        }),
+      });
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
+      await expect(
+        service.pollDeviceSignIn({ deviceAuthId: "dev-1", userCode: "ABCD-1234" }),
+      ).rejects.toMatchObject({
+        code: "codex_auth_failed",
+        kind,
+        httpStatus,
+        fault: "customer",
+        meta: { kind },
+      });
+    });
+  });
+
   describe("when the user approves", () => {
     it("exchanges the server-made PKCE pair and returns the token keys", async () => {
       const { impl, calls } = scriptedFetch({

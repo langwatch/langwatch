@@ -1175,3 +1175,54 @@ describe("webhook_endpoint_invalid", () => {
     expect(description).toContain("reserved");
   });
 });
+
+describe("codex_auth_failed", () => {
+  const codex = (kind: string) =>
+    explainHandledError(shape({ code: "codex_auth_failed", httpStatus: 401, meta: { kind } }));
+
+  describe("when the OpenAI session ran out", () => {
+    it("says to sign in to Codex again, never to check a key", () => {
+      const { title, description } = codex("refresh_rejected");
+
+      expect(title).toBe("Your OpenAI session expired");
+      expect(description).toContain("Sign in to Codex again");
+      expect(description).not.toContain("key");
+    });
+  });
+
+  describe("when the device code expired before approval", () => {
+    it("says the code expired and offers a new one", () => {
+      const { title, description } = codex("sign_in_expired");
+
+      expect(title).toBe("The sign-in code expired");
+      expect(description).toContain("Start the sign-in again");
+    });
+  });
+
+  describe("when the failure is OpenAI's own", () => {
+    it("keeps the generic sign-in line", () => {
+      const { title, description } = codex("http");
+
+      expect(title).toBe("OpenAI sign-in didn't go through");
+      expect(description).toContain("Connect it again");
+    });
+  });
+});
+
+describe("provider_usage_limit_reached", () => {
+  it("explains the plan's allowance, never the key", () => {
+    const { title, description } = explainSerializedError({
+      code: "provider_usage_limit_reached",
+      kind: "provider_usage_limit_reached",
+      retryable: false,
+      meta: { provider: "openai_codex" },
+      httpStatus: 429,
+      fault: "customer",
+      reasons: [],
+    });
+
+    expect(title).toBe("That plan is over its usage limit");
+    expect(description).toContain("allowance resets");
+    expect(description).not.toContain("copied the whole key");
+  });
+});

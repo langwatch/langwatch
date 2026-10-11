@@ -1,3 +1,5 @@
+import { describeError } from "@langwatch/browser-host/errors";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { CODEX_SIGN_IN_TTL_MS } from "@langwatch/model-provider-contract";
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -34,8 +36,15 @@ function clearPollTimer(timer: { current: ReturnType<typeof setTimeout> | null }
   timer.current = null;
 }
 
+/** The registry's words for the failure; a handled error's own message is only its code. */
 function failureMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return describeError({ error, fallbackTitle: fallback });
+}
+
+/** The issuer said the code ran out: as calm as our own timeout, with a fresh start offered. */
+function isExpiredSignIn(error: unknown): boolean {
+  const handled = readHandledError(error);
+  return handled?.code === "codex_auth_failed" && handled.meta.kind === "sign_in_expired";
 }
 
 /**
@@ -127,7 +136,7 @@ async function runPollRound({
     setPhase({
       name: "error",
       message: failureMessage(error, "The sign-in failed. Try again."),
-      timedOut: false,
+      timedOut: isExpiredSignIn(error),
     });
 
     return "stop";

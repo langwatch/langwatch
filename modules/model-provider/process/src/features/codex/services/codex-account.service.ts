@@ -111,7 +111,7 @@ export class CodexAccountService {
       ) {
         return { status: "pending" };
       }
-      throw error;
+      throw deviceRefusalOf(error);
     }
     const code = json.authorization_code;
     const verifier = json.code_verifier;
@@ -252,6 +252,20 @@ function isTerminalOAuthRejection(error: unknown): error is CodexAuthError {
     error.status < 500 &&
     error.message.includes("invalid_grant")
   );
+}
+
+/** The issuer's RFC 8628 answers that end a device code, named; anything else passes through. */
+function deviceRefusalOf(error: unknown): unknown {
+  if (!(error instanceof CodexAuthError) || error.kind !== "http" || error.status !== 400) {
+    return error;
+  }
+  if (error.message.includes("expired_token")) {
+    return new CodexAuthError("sign_in_expired", "the sign-in code expired before it was approved");
+  }
+  if (error.message.includes("access_denied")) {
+    return new CodexAuthError("sign_in_denied", "the sign-in was not approved");
+  }
+  return error;
 }
 
 interface CodexClaims {

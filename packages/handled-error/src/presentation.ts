@@ -55,6 +55,23 @@ export interface ErrorPresentation {
   describe?: (error: HandledErrorShape) => string;
 }
 
+/** `codex_auth_failed` by `meta.kind`: the ones the customer ends by signing in again. */
+const CODEX_AUTH_FAILURE_COPY: Partial<Record<string, { title: string; description: string }>> = {
+  refresh_rejected: {
+    title: "Your OpenAI session expired",
+    description:
+      "Codex runs on your OpenAI account, and its sign-in has expired. Sign in to Codex again to keep using it.",
+  },
+  sign_in_expired: {
+    title: "The sign-in code expired",
+    description: "It wasn't approved in time. Start the sign-in again for a new code.",
+  },
+  sign_in_denied: {
+    title: "The sign-in wasn't approved",
+    description: "OpenAI says the code was declined. Start the sign-in again to try once more.",
+  },
+};
+
 /** The Auth0 settings an operator must change, keyed by `meta.reason`; main's wording. */
 const AUTH0_PASSWORD_MISCONFIGURATIONS: Partial<Record<string, string>> = {
   insufficient_scope:
@@ -1336,7 +1353,9 @@ const presentations = {
     // in the sign-in round trip, not the customer's input — so the copy points
     // at retrying the connection rather than fixing a field.
     title: "OpenAI sign-in didn't go through",
-    describe: () =>
+    titleFor: (error) => CODEX_AUTH_FAILURE_COPY[String(error.meta.kind)]?.title,
+    describe: (error) =>
+      CODEX_AUTH_FAILURE_COPY[String(error.meta.kind)]?.description ??
       "Codex couldn't reach or verify your OpenAI account. Connect it again to continue.",
   },
 

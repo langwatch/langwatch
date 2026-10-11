@@ -61,6 +61,7 @@ export function CodexSignIn({
     return (
       <ConnectedPanel
         account={connected}
+        failure={phase.name === "error" ? phase : null}
         canDisconnect={!!signIn.storedProviderId}
         disconnecting={signIn.disconnecting}
         onReauthenticate={() => void signIn.begin()}
@@ -80,12 +81,15 @@ export function CodexSignIn({
 /** Connected state: who is signed in, plus re-authenticate / disconnect. */
 function ConnectedPanel({
   account,
+  failure,
   canDisconnect,
   disconnecting,
   onReauthenticate,
   onDisconnect,
 }: {
   account: { email: string; plan: string };
+  /** A re-authentication that ended without connecting; the stored account still stands. */
+  failure: Extract<CodexSignInPhase, { name: "error" }> | null;
   canDisconnect: boolean;
   disconnecting: boolean;
   onReauthenticate: () => void;
@@ -106,9 +110,14 @@ function ConnectedPanel({
         Langy and the AI assists run on this account's plan. Usage counts against your OpenAI
         subscription limits, not API credits.
       </Text>
+      {failure ? (
+        <Text as="output" fontSize="xs" color={failure.timedOut ? "fg.muted" : "fg.error"}>
+          {failure.message}
+        </Text>
+      ) : null}
       <HStack gap={2}>
         <Button size="xs" variant="outline" onClick={onReauthenticate}>
-          <RefreshCw size={13} /> Re-authenticate
+          <RefreshCw size={13} /> {failure?.timedOut ? "Start sign-in again" : "Re-authenticate"}
         </Button>
         {canDisconnect ? (
           <Button
