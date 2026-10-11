@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Copy, Database, Expand, GitBranch, Plus, Server, Trash2 } from "lucide-react";
+import { useState } from "react";
 
-import { Badge, Box, IconButton, Input, Stack, Text } from "../../primitives.ts";
+import { Badge, Box, Button, IconButton, Input, Stack, Text } from "../../primitives.ts";
 import { SearchInput } from "../forms/search-input.tsx";
 import { NoDataInfoBlock } from "../states/no-data-info-block.tsx";
 import { Drawer, DrawerGlassProvider } from "./drawer.tsx";
@@ -251,3 +252,24 @@ export const WithBackTestId: Story = {
     footer: { cancel: { label: "Cancel", onClick: noop, "data-testid": "widget-cancel" } },
   },
 };
+
+function FocusReturnDemo() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Stack gap={3} align="start">
+      <Button onClick={() => setOpen(true)}>Edit key</Button>
+      <Text textStyle="sm">Close the drawer: focus goes back to Edit key.</Text>
+      <Drawer
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Production key"
+        footer={{ primaryAction: { label: "Save", onClick: () => setOpen(false) } }}
+      >
+        <Input aria-label="Name" defaultValue="prod-openai" />
+      </Drawer>
+    </Stack>
+  );
+}
+
+/** A closing drawer hands focus back to the control that opened it, or to `finalFocusEl`. */
+export const ReturnsFocus: Story = { render: () => <FocusReturnDemo /> };

@@ -4,6 +4,7 @@
  */
 export * from "./views/drawer-view.tsx";
 export { Drawer as RawDrawer } from "@chakra-ui/react";
+export { useReserveDrawerFocus } from "../../overlays/drawer-focus.ts";
 export {
   DrawerOffsetProvider,
   setDrawerEndInset,

@@ -15,6 +15,7 @@ import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
 import { DrawerFooterBand, DrawerHeaderBand } from "../../../overlays/drawer-chrome.tsx";
+import { useDrawerFocusRestore } from "../../../overlays/drawer-focus.ts";
 import { DrawerOffsetContext, useDrawerEndInset } from "../../../overlays/drawer-inset.ts";
 import { useHasOpenModal } from "../../../overlays/modal-stack.ts";
 import { BOUNDED_BODY, OverlayBodyState } from "../../../overlays/overlay-body.tsx";
@@ -203,10 +204,22 @@ export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {
 /**
  * Non-modal by default so nested drawers and portalled popovers stay operable. Opened on top of a
  * modal dialog it is modal itself: its focus trap pauses the dialog's and hands focus back on
- * close.
+ * close. A non-modal drawer returns focus itself, to `finalFocusEl` or the opener (drawer-focus).
  */
-export const DrawerRoot = function DrawerRoot({ size, ...props }: DrawerRootProps) {
+export const DrawerRoot = function DrawerRoot({
+  size,
+  onOpenChange,
+  onExitComplete,
+  ...props
+}: DrawerRootProps) {
   const overModal = useHasOpenModal();
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(props.defaultOpen ?? false);
+  const handleExitComplete = useDrawerFocusRestore({
+    open: props.open ?? uncontrolledOpen,
+    modal: props.modal ?? overModal,
+    finalFocusEl: props.finalFocusEl,
+    onExitComplete,
+  });
   return (
     <ChakraDrawer.Root
       modal={overModal}
@@ -214,6 +227,11 @@ export const DrawerRoot = function DrawerRoot({ size, ...props }: DrawerRootProp
       preventScroll={false}
       size={size as ChakraDrawer.RootProps["size"]}
       {...props}
+      onExitComplete={handleExitComplete}
+      onOpenChange={(details) => {
+        setUncontrolledOpen(details.open);
+        onOpenChange?.(details);
+      }}
     />
   );
 };

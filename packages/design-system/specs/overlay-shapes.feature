@@ -141,6 +141,51 @@ Feature: Drawer and dialog shapes
     Then the reader can type and tab inside the drawer
     And closing the drawer returns focus to the dialog's opener control and the dialog's trap holds again
 
+  @integration @browser
+  Scenario: A non-modal drawer returns focus to the control that opened it
+    Given a drawer opened from a button on the page
+    When it closes by its X, Escape, its Cancel, a footer action or its owner unmounting it
+    Then focus is on the opener once the drawer has gone
+    And the page has not scrolled
+
+  @integration @browser
+  Scenario: A drawer returns focus to an explicit target and skips one that cannot take it
+    Given a drawer given a live final focus resolver
+    Then focus goes to what the resolver answers when it closes, not to the opener
+    And a resolver that answers nothing falls back to the opener
+    And a removed, disabled or hidden target takes no focus and nothing throws
+
+  @integration @browser
+  Scenario: A drawer does not take back focus that moved on by choice
+    Given a drawer whose reader moves focus to the page or a dialog opens as it closes
+    Then focus stays where the reader or the dialog put it
+    And closing then reopening quickly leaves focus in the drawer
+
+  @integration @browser
+  Scenario: A drawer mounted open, or rendered twice by StrictMode, restores only after a real close
+    Given a drawer that mounts open, or never opens, under StrictMode
+    Then nothing is focused or restored while it is open or closed
+    And one real close restores focus exactly once
+
+  @integration @browser
+  Scenario: A drawer that exits under reduced motion still returns focus
+    Given a reader who has asked for reduced motion
+    Then closing the drawer returns focus to its opener
+
+  @integration @browser
+  Scenario: A drawer opened over a dialog leaves restoration to the dialog's trap
+    Given an open modal dialog and a drawer opened from inside it
+    Then the drawer is modal and closing it returns focus to the dialog's control once
+    And a part-built drawer returns focus to its trigger as well
+
+  @integration
+  Scenario: A routed drawer stack hands the page opener to its last drawer
+    Given a page button that opens a routed drawer which opens another
+    When the reader pushes, goes back and closes the whole stack
+    Then pushing restores nothing and going back focuses the returned drawer
+    And closing the stack returns focus to the page button, even when the drawer loads lazily
+    And a deep link has no opener to restore
+
   @unit
   Scenario: The translucent header and footer are on by default, approved after the screenshots
     Given a drawer rendered with no glass switch
