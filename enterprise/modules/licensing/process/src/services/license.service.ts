@@ -42,17 +42,34 @@ export type LicenseRetentionConfiguration = {
 export type LicenseServiceConfigurationInput = {
   retention?: LicenseRetentionConfiguration;
   now?: () => Instant;
+  /** How long a sign-in waits on the platform SSO scan before denying (main's gate: 5 s). */
+  ssoGateTimeoutMs?: number;
 };
+
+/** main's `GATE_EVALUATION_TIMEOUT_MS` (ee/sso/sso-gate.ts). */
+const SSO_GATE_EVALUATION_TIMEOUT_MS = 5_000;
+
+class SsoGateTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`platform SSO licence scan exceeded ${timeoutMs}ms; treating the store as unreachable`);
+    this.name = "SsoGateTimeoutError";
+  }
+}
 
 /** Immutable runtime configuration; environment resolution stays in composition. */
 export class LicenseServiceConfiguration {
   private constructor(
     readonly retention: LicenseRetentionConfiguration | undefined,
     readonly now: () => Instant,
+    readonly ssoGateTimeoutMs: number,
   ) {}
 
   static create(input: LicenseServiceConfigurationInput = {}): LicenseServiceConfiguration {
-    return new LicenseServiceConfiguration(input.retention, input.now ?? nowInstant);
+    return new LicenseServiceConfiguration(
+      input.retention,
+      input.now ?? nowInstant,
+      input.ssoGateTimeoutMs ?? SSO_GATE_EVALUATION_TIMEOUT_MS,
+    );
   }
 }
 
@@ -191,10 +208,27 @@ export class LicenseService extends LicensingServiceContract {
       this.platformSsoGate = pending;
     }
     try {
-      return await this.platformSsoGate;
+      return await this.withinSsoGateTimeout(this.platformSsoGate);
     } catch (error) {
       logScanFailure({ logger: this.logger, error });
       return false;
+    }
+  }
+
+  /** A stuck store denies this request in time; the scan in flight stays the memo. */
+  private async withinSsoGateTimeout(gate: Promise<boolean>): Promise<boolean> {
+    const timeoutMs = this.configuration.ssoGateTimeoutMs;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        gate,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new SsoGateTimeoutError(timeoutMs)), timeoutMs);
+          timer.unref?.();
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 
