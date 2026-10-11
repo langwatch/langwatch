@@ -10,6 +10,7 @@ import {
 import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
+import { useDrawerEndInset } from "../../../overlays/drawer-inset.ts";
 import { firstFocusable } from "../../../overlays/focusable.ts";
 import { registerOpenModal } from "../../../overlays/modal-stack.ts";
 import { BOUNDED_BODY, OverlayBodyState } from "../../../overlays/overlay-body.tsx";
@@ -65,6 +66,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
   ) {
     const portalTarget = React.useRef<HTMLDivElement | null>(null);
     const { open } = useDialogContext();
+    const inset = useDrawerEndInset();
     React.useEffect(() => (open ? registerOpenModal() : undefined), [open]);
     const guarded = withErrorBoundary;
     return (
@@ -79,7 +81,10 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
         )}
         <FieldLayoutProvider value="stacked">
           <OverlayPortalTargetProvider value={portalTarget}>
-            <ChakraDialog.Positioner {...positionerProps}>
+            <ChakraDialog.Positioner
+              paddingEnd={inset > 0 ? { base: 0, md: `${inset}px` } : undefined}
+              {...positionerProps}
+            >
               <ChakraDialog.Content
                 ref={contentProps.asChild ? mergeRefs(ref, portalTarget) : ref}
                 {...contentProps}
@@ -148,6 +153,13 @@ const DIALOG_WIDTH: Record<DialogSize, string> = {
   xl: "56rem",
   document: "64rem",
 };
+
+/** The size cap, kept clear of a docked panel's room from the md breakpoint up. */
+function dialogMaxWidth({ size, endInset }: { size: DialogSize; endInset: number }) {
+  const cap = (room: string) => `min(${DIALOG_WIDTH[size]}, calc(100vw - 2rem${room}))`;
+  if (endInset <= 0) return cap("");
+  return { base: cap(""), md: cap(` - ${endInset}px`) };
+}
 
 const FOOTER_DIVIDER = {
   borderTopWidth: "1px",
@@ -502,6 +514,7 @@ export function Dialog({
   "data-testid": testId,
 }: DialogProps) {
   const ownRef = React.useRef<HTMLDivElement>(null);
+  const endInset = useDrawerEndInset();
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
   const closable = dismissible && !busy;
   const cancel =
@@ -585,7 +598,7 @@ export function Dialog({
     >
       <DialogContent
         ref={mergeRefs(ownRef, contentRef)}
-        maxWidth={`min(${DIALOG_WIDTH[size]}, calc(100vw - 2rem))`}
+        maxWidth={dialogMaxWidth({ size, endInset })}
         width="full"
         maxHeight={
           heightLimit === "reading" ? "min(85vh, calc(100dvh - 4rem))" : "calc(100dvh - 4rem)"
