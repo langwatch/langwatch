@@ -80,6 +80,7 @@ func paceVerdict(depth int, readErr error, above int, waited, limit time.Duratio
 type HeavyResult struct {
 	Sent    map[string]int
 	Refused map[string]int
+	Made    []string // API keys of the projects made through the product's doors: the scrubber allows them
 }
 
 // Heavy first makes the product's own organizations and one of every product and REST kind in each
@@ -119,10 +120,27 @@ func Heavy(ctx context.Context, in HeavyInput) (HeavyResult, error) {
 		return result, errors.Join(run.telemetry(ctx)...)
 	}
 	productErrs := run.product(ctx)
+	result.Made = madeKeys(door.Keys, live)
 	if slices.ContainsFunc(productErrs, func(err error) bool { return errors.Is(err, ErrOrganizationsRefused) }) {
 		return result, errors.Join(productErrs...)
 	}
 	return result, errors.Join(append(productErrs, run.telemetry(ctx)...)...)
+}
+
+// madeKeys is every door key that belongs to no tenancy project, so to a project the seed made.
+func madeKeys(keys map[string]string, tenancy []Project) []string {
+	seeded := map[string]bool{}
+	for i := range tenancy {
+		seeded[tenancy[i].ID] = true
+	}
+	var made []string
+	for id, key := range keys {
+		if !seeded[id] && key != "" {
+			made = append(made, key)
+		}
+	}
+	slices.Sort(made)
+	return made
 }
 
 func heavyPlan(in HeavyInput) (*seedgen.Plan, error) {

@@ -169,6 +169,7 @@ func (cell *run) seedTier(ctx context.Context) error {
 	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: tenancy, Seed: cell.options.Seed,
 		Anchor: cell.anchor, Spans: seed.HeavySpans(cell.options.Tier), Pace: pace, Log: cell.options.Stdout})
 	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("heavy seed sent %v, refused %v", result.Sent, result.Refused))
+	cell.madeKeys = result.Made
 	if err != nil {
 		cell.report.Notes = append(cell.report.Notes, "heavy seed: "+err.Error())
 		if errors.Is(err, seed.ErrOrganizationsRefused) || errors.Is(err, seed.ErrPaceExpired) {
@@ -253,7 +254,7 @@ func (cell *run) capture(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	allow := append(cell.tenancy.APIKeys(), cell.seeder.Context.APIKey)
+	allow := append(append(cell.tenancy.APIKeys(), cell.seeder.Context.APIKey), cell.madeKeys...)
 	for _, name := range shape.SecretNames {
 		allow = append(allow, shape.Secrets[name])
 	}

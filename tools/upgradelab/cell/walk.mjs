@@ -55,15 +55,18 @@ async function signIn(page) {
   await dismissNudge(page);
 }
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+let browser = await chromium.launch();
+let page;
+let step = "start";
+// Opens the walker's one tab, relaunching Chromium first when it died, so a crash costs one round.
+async function openPage() {
+  if (!browser.isConnected()) browser = await chromium.launch();
+  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   // The lab has no internet: web fonts answer empty CSS, so a stalled DNS lookup never holds
   // the page.
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
     route.fulfill({ contentType: "text/css", body: "" }),
   );
-  let step = "start";
   page.on(
     "console",
     (message) =>
@@ -94,6 +97,10 @@ try {
       retryAfter: response.headers()["retry-after"] ?? "",
     });
   });
+}
+
+try {
+  await openPage();
 
   let project = "";
   const shot = new Set();
@@ -179,6 +186,15 @@ try {
           .catch(() => undefined);
       }
       project = "";
+      if (page.isClosed() || !browser.isConnected()) {
+        log({
+          kind: "walkerror",
+          step: "reopen",
+          url: "",
+          text: "tab or browser closed: opening a new one",
+        });
+        await openPage().catch(() => undefined);
+      }
     }
     await nap(every);
   }

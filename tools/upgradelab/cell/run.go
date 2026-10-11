@@ -84,6 +84,7 @@ type run struct {
 	fromPort, headPort int
 	private            map[string]string // label -> organization on that private ClickHouse target
 	tenancy            seed.Tenancy
+	madeKeys           []string      // API keys of the projects the heavy seed made through the product
 	apiCrashes         []int64       // ms from start of each head api exit before ready
 	granted            chan struct{} // closed once the seed account is a platform operator on head
 	recipe             snapshot.Recipe
