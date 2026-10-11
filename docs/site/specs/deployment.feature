@@ -25,3 +25,10 @@ Feature: Publish the static documentation through CloudFront
     Given redirect data exceeds the CloudFront function size limit
     When the deployment artefact is generated
     Then generation fails before it can be published
+
+  @unit
+  Scenario: Build with materialized Git LFS assets
+    Given docs images, videos and fonts are tracked with Git LFS
+    When the documentation checkout downloads its LFS objects
+    Then the static build copies the original asset bytes
+    But a remaining LFS pointer makes the build fail before publishing

@@ -2,6 +2,10 @@
 # Copies .env files from the main checkout into newly created worktrees.
 # Installed via: git config core.hooksPath .githooks
 
+if command -v git-lfs >/dev/null 2>&1; then
+  git lfs post-checkout "$@" || exit "$?"
+fi
+
 prev_head="$1"
 new_head="$2"
 branch_flag="$3"

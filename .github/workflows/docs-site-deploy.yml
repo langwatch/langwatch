@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "CHANGELOG.md"
+      - ".gitattributes"
       - ".github/workflows/docs-site-deploy.yml"
   pull_request:
     paths:
       - "docs/**"
+      - "CHANGELOG.md"
+      - ".gitattributes"
       - ".github/workflows/docs-site-deploy.yml"
   workflow_dispatch:
 
@@ -27,6 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          lfs: true
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: "@langwatch/docs-site..."
@@ -94,6 +99,13 @@ jobs:
           aws s3 sync dist/ "s3://${DOCS_BUCKET}/" --delete \
             --exclude 'assets/*' --exclude '_deployment/*' \
             --exclude 'link-report.json' --exclude 'skipped.json' --exclude 'redirects.json' \
+            --cache-control 'public,max-age=60,must-revalidate' --only-show-errors
+      - name: Set agent export content types
+        run: |
+          set -euo pipefail
+          aws s3 cp dist/ "s3://${DOCS_BUCKET}/" --recursive \
+            --exclude '*' --include '*.md' --include '*.claude' --include '*.agent' \
+            --content-type 'text/markdown; charset=utf-8' \
             --cache-control 'public,max-age=60,must-revalidate' --only-show-errors
       - name: Publish the existing viewer request function
         run: |

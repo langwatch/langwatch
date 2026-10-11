@@ -299,3 +299,35 @@ pnpm --filter @langwatch/docs-site test:polish --out-dir "$TMPDIR/docs-test-dist
 Pass `--before <previous-build>` to capture matching guide and agent-card baseline
 screenshots. The suite also exercises grouped command results, keyboard actions,
 contextual menus, theme selection and complete prompt copying.
+
+## Release updates
+
+The root `CHANGELOG.md` supplies the latest published version, date and change
+for the static announcement. The two newest entries also appear on
+`/self-hosting/releases` and in its Markdown export. Source MDX is unchanged.
+Dev watches the changelog, and the deployment workflow includes it in its path
+filter. Missing or invalid release data hides the strip. Dismissal is remembered
+per version; storage denial still allows dismissal for the current document.
+There is no automatic ticker or additional announcement script.
+
+```sh
+pnpm --filter @langwatch/docs-site test:news --out-dir "$TMPDIR/docs-test-dist" --screenshots "$TMPDIR/docs-news"
+```
+
+Every configured page exports identical Markdown at `.md`, `.claude` and `.agent`; API exports include the resolved endpoint, authentication, parameters, request/response schemas and curl example, while guides retain authored MDX with their title and description. The latter two are content aliases rather than agent configuration. Root `index` exports map to the introduction. Discovery includes `llms.txt`, `robots.txt`, `humans.txt`, `agents.txt` and `sitemap.xml`. The deployment sets Markdown content types explicitly for all three extensions.
+
+Alt+Shift+C copies the current page outside editable controls. The sidebar command selector copies the five supported CLI launchers; Cursor and Aider use the gateway guide rather than an invented wrapper command. Page feedback links open a GitHub issue draft containing the page URL.
+
+The coding-agent hero uses checked-in 640/1024/1560px WebP derivatives of the existing session-detail PNG, with responsive preload only on its overview page. Other imagery remains lazy. Ambient rendering has a docs-specific 360,000-pixel cap and 0.5 minimum pixel ratio; design-system callers retain their existing defaults. Run `test:refinement --out-dir <build> --screenshots <scratch-directory>` for the exports, clipboard, tab-panel mapping, responsive image, footer and shader checks.
+
+## Git LFS assets
+
+Docs images, video/audio, vector graphics, fonts and downloadable media are tracked by the docs-scoped patterns in `.gitattributes`. Install Git LFS, run `git lfs install --local --skip-repo` once when using this repo's `.githooks` (or ordinary `git lfs install` with Git's default hooks), then `git lfs pull` after a checkout that skipped LFS downloads. The docs CI checkout enables LFS, and the build rejects unresolved pointer files before emitting output. S3 and CloudFront receive the full asset bytes; readers do not fetch from Git LFS.
+
+New asset revisions are stored in LFS. Conversion in this branch does not rewrite existing repository history, so historical binary blobs remain until a separately coordinated history migration.
+
+## Static search metadata
+
+Every page emits a canonical URL, description when provided, Open Graph/social metadata, a factual WebPage JSON-LD record, a Markdown alternate and an llms.txt discovery link during prerender. HTML aliases share one canonical URL; introduction uses the root URL. Client navigation updates the destination metadata together with its content. The custom 404 is marked noindex. Public OpenAPI documents are copied alongside the page exports.
+
+These are discoverability and sharing features, not ranking guarantees. Validate production status codes, redirects and response headers against the configured distribution; Markdown HTTP canonical/noindex response headers and production search analytics have not been configured here.

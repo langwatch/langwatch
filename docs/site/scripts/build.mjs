@@ -6,11 +6,13 @@ import { promisify } from "node:util";
 import { build } from "vite";
 
 import { writeCloudFrontFunction } from "../cloudfront/generate.mjs";
+import { assertMaterializedAssets } from "../docs-assets.mjs";
 import { createViteConfig } from "../vite.config.mjs";
 import { readBuildOptions } from "./options.mjs";
 import { writeServiceWorker } from "./service-worker-build.mjs";
 
 const { outDir } = readBuildOptions();
+await assertMaterializedAssets({ docsRoot: fileURLToPath(new URL("../..", import.meta.url)) });
 const run = promisify(execFile);
 const ssrDir = fileURLToPath(new URL("../dist-ssr", import.meta.url));
 await rm(ssrDir, { recursive: true, force: true });

@@ -44,3 +44,27 @@ enterprise/modules/*/browser/README.md  linguist-generated=true
 dev/docs/lint-rules.md                  linguist-generated=true
 # Unified diffs prefix upstream tab-indented context with a required space.
 patches/*.patch                        whitespace=-space-before-tab
+
+# Documentation images, video, fonts and downloads use Git LFS.
+docs/**/*.avif filter=lfs diff=lfs merge=lfs -text
+docs/**/*.eot filter=lfs diff=lfs merge=lfs -text
+docs/**/*.gif filter=lfs diff=lfs merge=lfs -text
+docs/**/*.ico filter=lfs diff=lfs merge=lfs -text
+docs/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+docs/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+docs/**/*.m4v filter=lfs diff=lfs merge=lfs -text
+docs/**/*.mov filter=lfs diff=lfs merge=lfs -text
+docs/**/*.mp3 filter=lfs diff=lfs merge=lfs -text
+docs/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+docs/**/*.ogg filter=lfs diff=lfs merge=lfs -text
+docs/**/*.otf filter=lfs diff=lfs merge=lfs -text
+docs/**/*.pdf filter=lfs diff=lfs merge=lfs -text
+docs/**/*.png filter=lfs diff=lfs merge=lfs -text
+docs/**/*.svg filter=lfs diff=lfs merge=lfs -text
+docs/**/*.ttf filter=lfs diff=lfs merge=lfs -text
+docs/**/*.wav filter=lfs diff=lfs merge=lfs -text
+docs/**/*.webm filter=lfs diff=lfs merge=lfs -text
+docs/**/*.webp filter=lfs diff=lfs merge=lfs -text
+docs/**/*.woff filter=lfs diff=lfs merge=lfs -text
+docs/**/*.woff2 filter=lfs diff=lfs merge=lfs -text
+docs/**/*.zip filter=lfs diff=lfs merge=lfs -text
