@@ -5,6 +5,7 @@
  */
 
 import { ListTable } from "@langwatch/design-system/list-table";
+import type { EmptyNext } from "@langwatch/design-system/no-data-info-block";
 import { Table, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
@@ -15,6 +16,8 @@ import type { ReactNode } from "react";
 export type ResultsColumn = {
   key: string;
   text: string;
+  /** The hidden name of a column whose heading is empty. */
+  label?: string;
   width?: string;
   align?: "end";
   action?: boolean;
@@ -59,37 +62,55 @@ export function ResultsTableHead({
   testId?: string;
 }) {
   return (
-    <Table.Header data-testid={testId}>
-      <Table.Row>
+    <ListTable.Header data-testid={testId}>
+      <ListTable.Row>
         {columns.map((column) =>
           column.action ? (
             <ListTable.ActionHeader key={column.key} />
           ) : (
-            <Table.ColumnHeader key={column.key} textAlign={column.align}>
+            <ListTable.ColumnHeader key={column.key} align={column.align} label={column.label}>
               {column.text}
-            </Table.ColumnHeader>
+            </ListTable.ColumnHeader>
           ),
         )}
-      </Table.Row>
-    </Table.Header>
+      </ListTable.Row>
+    </ListTable.Header>
   );
 }
 
-/** What a table says when the filters leave it nothing. */
-export function ResultsTableEmptyLine({ text, columns }: { text: string; columns: number }) {
+/** Where a table with nothing in it sends the reader. */
+const RESULTS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "Read about results",
+    href: "https://docs.langwatch.ai/agent-testing/results",
+  },
+];
+
+/** What a table says when it has nothing to draw, and where to go from there. */
+export function ResultsTableEmptyLine({
+  columns,
+  state,
+  title,
+  description,
+  onClearFilters,
+}: {
+  columns: number;
+  state: "empty" | "no-results";
+  title: string;
+  description?: string;
+  /** Offered beside the next step when filters left the table empty. */
+  onClearFilters?: () => void;
+}) {
   return (
-    <ListTable.SpanRow columns={columns}>
-      <Text
-        textStyle="bodySm"
-        color="fg.muted"
-        textAlign="center"
-        paddingX={4}
-        paddingY={10}
-        data-testid="results-table-empty"
-      >
-        {text}
-      </Text>
-    </ListTable.SpanRow>
+    <ListTable.EmptyRow
+      columns={columns}
+      state={state}
+      title={title}
+      description={description}
+      next={RESULTS_NEXT}
+      onClearFilters={onClearFilters}
+    />
   );
 }
 

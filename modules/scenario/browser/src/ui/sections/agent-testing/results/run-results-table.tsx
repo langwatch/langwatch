@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Table } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
@@ -77,7 +77,7 @@ export function RunResultsTable({
     <ResultsTable columns={columns} minWidth={minWidth} testId="run-results-table">
       <ResultsTableHead columns={columns} testId="run-results-table-header" />
 
-      <Table.Body>
+      <ListTable.Body>
         {scenarioRuns.map((scenarioRun) => (
           <RunResultRow
             key={scenarioRun.scenarioRunId}
@@ -93,7 +93,7 @@ export function RunResultsTable({
             onRerunCase={onRerunCase}
           />
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ResultsTable>
   );
 }

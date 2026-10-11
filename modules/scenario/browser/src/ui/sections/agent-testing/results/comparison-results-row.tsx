@@ -4,15 +4,8 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box, Button, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { Square } from "lucide-react";
@@ -176,27 +169,23 @@ export function MatrixRow({
   scenarioRuns: ScenarioRunData[];
 }) {
   return (
-    <Table.Row
-      _hover={{ bg: "transparent" }}
-      css={{ "& > td": { verticalAlign: "top" } }}
-      data-testid={`comparison-row-${scenario.scenarioId}`}
-    >
-      <Table.Cell>
+    <ListTable.Row data-testid={`comparison-row-${scenario.scenarioId}`}>
+      <ListTable.Cell valign="top">
         <Text textStyle="bodySm" fontWeight="medium" color="fg" paddingTop="5px" truncate>
           {scenario.name}
         </Text>
-      </Table.Cell>
+      </ListTable.Cell>
 
       {targets.map((target) => (
-        <Table.Cell key={target.key}>
+        <ListTable.Cell key={target.key} valign="top">
           <MatrixCell
             scenario={scenario}
             target={target}
             scenarioRuns={scenarioRuns}
             {...handlers}
           />
-        </Table.Cell>
+        </ListTable.Cell>
       ))}
-    </Table.Row>
+    </ListTable.Row>
   );
 }

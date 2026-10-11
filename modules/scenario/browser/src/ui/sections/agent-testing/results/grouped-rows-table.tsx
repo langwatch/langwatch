@@ -6,9 +6,8 @@
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Box, chakra, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ResultGroup } from "@langwatch/scenario-contract";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import { Fragment } from "react";
 
 import { useNow } from "../../../../behavior/use-now.ts";
@@ -31,7 +30,7 @@ import {
 /** The columns of a grouping: the chevron, the title on the free width, then the numbers. */
 function groupColumns({ isScenario }: { isScenario: boolean }): ResultsColumn[] {
   return [
-    { key: "chevron", text: "", width: "48px" },
+    { key: "chevron", text: "", label: "Show runs", width: "48px" },
     { key: "title", text: isScenario ? "Scenario" : "Target" },
     { key: "middle", text: isScenario ? "Labels" : "Scenarios covered", width: "194px" },
     { key: "runs", text: "Runs", width: "94px", align: "end" },
@@ -42,6 +41,11 @@ function groupColumns({ isScenario }: { isScenario: boolean }): ResultsColumn[] 
 
 /** Under this a grouping scrolls sideways, so the title keeps room to be read. */
 const GROUP_MIN_WIDTH = "776px";
+
+/** The id of the opened row that lists the runs behind a group. */
+function runListId(group: ResultGroup): string {
+  return `results-group-runs-${group.key}`;
+}
 
 /** How many runs an opened row lists before it says there are more. */
 const EXPANDED_RUN_LIMIT = 40;
@@ -149,19 +153,19 @@ function GroupSummaryRow({
   const title = isScenario ? group.title : resolveTargetName(group.key);
   const isCodeTarget = !isScenario && isCodeTargetKey({ targetKey: group.key });
   return (
-    <Table.Row
-      cursor="pointer"
-      aria-expanded={isOpen}
-      onClick={() => onToggleOpen(group.key)}
+    <ListTable.Row
+      expanded={isOpen}
+      onActivate={() => onToggleOpen(group.key)}
       data-testid={`results-group-row-${group.key}`}
     >
-      <Table.Cell color="fg.muted">
-        <Box display="flex" alignItems="center">
-          {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </Box>
-      </Table.Cell>
+      <ListTable.ExpandCell
+        expanded={isOpen}
+        onToggle={() => onToggleOpen(group.key)}
+        label={`Show runs for ${title}`}
+        panelId={runListId(group)}
+      />
 
-      <Table.Cell>
+      <ListTable.Cell>
         <HStack gap={1.5} minWidth={0}>
           {!isScenario ? (
             <TargetMark
@@ -174,28 +178,28 @@ function GroupSummaryRow({
           </Text>
           {isCodeTarget ? <FromCodeBadge /> : null}
         </HStack>
-      </Table.Cell>
+      </ListTable.Cell>
 
-      <Table.Cell>
+      <ListTable.Cell>
         <Text textStyle="caption" color="fg.muted" truncate>
           {middleColumnText({ group, isScenario })}
         </Text>
-      </Table.Cell>
+      </ListTable.Cell>
 
-      <Table.Cell textAlign="end">
+      <ListTable.Cell align="end">
         <Text textStyle="caption" color="fg.muted" fontVariantNumeric="tabular-nums">
           {group.runCount}
         </Text>
-      </Table.Cell>
+      </ListTable.Cell>
 
-      <Table.Cell textAlign="end">
+      <ListTable.Cell align="end">
         <PassRateText passRate={group.passRate} />
-      </Table.Cell>
+      </ListTable.Cell>
 
-      <Table.Cell>
+      <ListTable.Cell>
         <TrendSparkline bars={group.trend} per="execution" />
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
@@ -262,6 +266,8 @@ export type GroupedRowsTableProps = {
   resolveTargetName: (targetKey: string) => string;
   resolveTargetKind: (targetKey: string) => TargetKind;
   onOpenRun: (row: ResultRow) => void;
+  /** Offered in the empty line when filters left nothing to draw. */
+  onClearFilters?: () => void;
 };
 
 export function GroupedRowsTable({
@@ -273,6 +279,7 @@ export function GroupedRowsTable({
   resolveTargetName,
   resolveTargetKind,
   onOpenRun,
+  onClearFilters,
 }: GroupedRowsTableProps) {
   const now = useNow();
   const isScenario = kind === "scenario";
@@ -286,7 +293,7 @@ export function GroupedRowsTable({
     >
       <ResultsTableHead columns={columns} />
 
-      <Table.Body>
+      <ListTable.Body>
         {groups.map((group) => (
           <Fragment key={group.key}>
             <GroupSummaryRow
@@ -298,7 +305,7 @@ export function GroupedRowsTable({
               resolveTargetKind={resolveTargetKind}
             />
             {openedKeys.includes(group.key) ? (
-              <ListTable.SpanRow columns={columns.length}>
+              <ListTable.SpanRow columns={columns.length} id={runListId(group)}>
                 <GroupRunList
                   group={group}
                   rows={rowsByGroupKey.get(group.key) ?? []}
@@ -313,9 +320,14 @@ export function GroupedRowsTable({
         ))}
 
         {groups.length === 0 ? (
-          <ResultsTableEmptyLine columns={columns.length} text="No runs match these filters." />
+          <ResultsTableEmptyLine
+            columns={columns.length}
+            state="no-results"
+            title="No runs match these filters"
+            onClearFilters={onClearFilters}
+          />
         ) : null}
-      </Table.Body>
+      </ListTable.Body>
     </ResultsTable>
   );
 }
@@ -341,12 +353,20 @@ export type FlatRowsTableProps = {
   onOpenRun: (row: ResultRow) => void;
   /** True while more rows exist on the server than were loaded. */
   hasMore: boolean;
+  /** Offered in the empty line when filters left nothing to draw. */
+  onClearFilters?: () => void;
 };
 
 /**
  * The None grouping: one row per scenario, target and run.
  */
-export function FlatRowsTable({ rows, resolveTargetName, onOpenRun, hasMore }: FlatRowsTableProps) {
+export function FlatRowsTable({
+  rows,
+  resolveTargetName,
+  onOpenRun,
+  hasMore,
+  onClearFilters,
+}: FlatRowsTableProps) {
   const now = useNow();
   const ordered = [...rows].toSorted((a, b) => b.runAt - a.runAt);
   const drawn = ordered.slice(0, FLAT_ROW_LIMIT);
@@ -360,44 +380,45 @@ export function FlatRowsTable({ rows, resolveTargetName, onOpenRun, hasMore }: F
     >
       <ResultsTableHead columns={FLAT_COLUMNS} />
 
-      <Table.Body>
+      <ListTable.Body>
         {drawn.map((row) => (
-          <Table.Row
+          <ListTable.Row
             key={row.executionId}
-            cursor="pointer"
-            onClick={() => onOpenRun(row)}
+            onActivate={() => onOpenRun(row)}
             data-testid={`results-flat-row-${row.executionId}`}
           >
-            <Table.Cell>
+            <ListTable.Cell>
               <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
                 {row.scenarioName}
               </Text>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Text textStyle="caption" color="fg.muted" truncate>
                 {row.planName}
               </Text>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Text textStyle="caption" color="fg.muted" truncate>
                 {resolveTargetName(row.targetKey)}
               </Text>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Text textStyle="caption" color="fg.muted" whiteSpace="nowrap">
                 {formatTimeAgoCompact(row.runAt, now)}
               </Text>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Verdict row={row} />
-            </Table.Cell>
-          </Table.Row>
+            </ListTable.Cell>
+          </ListTable.Row>
         ))}
 
         {drawn.length === 0 ? (
           <ResultsTableEmptyLine
             columns={FLAT_COLUMNS.length}
-            text="No runs match these filters."
+            state="no-results"
+            title="No runs match these filters"
+            onClearFilters={onClearFilters}
           />
         ) : null}
 
@@ -407,7 +428,7 @@ export function FlatRowsTable({ rows, resolveTargetName, onOpenRun, hasMore }: F
             text={`Showing the newest ${drawn.length} runs. Add a filter or narrow the period to see the rest.`}
           />
         ) : null}
-      </Table.Body>
+      </ListTable.Body>
     </ResultsTable>
   );
 }

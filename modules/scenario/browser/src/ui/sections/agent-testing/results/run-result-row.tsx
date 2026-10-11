@@ -4,21 +4,14 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Box,
-  Button,
-  chakra,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { isTerminalStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { MessageSquare, MoreVertical, Pencil, Play, Square } from "lucide-react";
+import { MessageSquare, Pencil, Play, Square } from "lucide-react";
 
 import { isCancellableStatus } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import {
@@ -86,7 +79,7 @@ function ResultRowActionsMenu({
           aria-label={`Actions for ${displayName}`}
           onClick={stop}
         >
-          <MoreVertical size={14} />
+          <MoreVerticalIcon size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
@@ -238,19 +231,17 @@ export function RunResultRow({
   const canCancel = !!onCancelRun && isCancellableStatus(scenarioRun.status);
 
   return (
-    <Table.Row
-      cursor="pointer"
-      css={{ "& > td": { verticalAlign: "top" } }}
-      onClick={() => onScenarioRunClick(scenarioRun)}
+    <ListTable.Row
+      onActivate={() => onScenarioRunClick(scenarioRun)}
       data-testid={`run-result-row-${scenarioRun.scenarioRunId}`}
     >
-      <Table.Cell>
+      <ListTable.Cell valign="top">
         <Box paddingTop="1px">
           <LastResultLabel status={scenarioRun.status} results={scenarioRun.results ?? undefined} />
         </Box>
-      </Table.Cell>
+      </ListTable.Cell>
 
-      <Table.Cell>
+      <ListTable.Cell valign="top">
         <HStack gap={1.5} minWidth={0} flexWrap="wrap" paddingTop="1px">
           <chakra.button
             type="button"
@@ -268,27 +259,27 @@ export function RunResultRow({
             </Text>
           </chakra.button>
         </HStack>
-      </Table.Cell>
+      </ListTable.Cell>
 
       {hasEvaluators ? (
-        <Table.Cell>
+        <ListTable.Cell valign="top">
           <RowEvaluators scenarioRun={scenarioRun} />
-        </Table.Cell>
+        </ListTable.Cell>
       ) : null}
 
       {hasCaller ? (
-        <Table.Cell>
+        <ListTable.Cell valign="top">
           <Box paddingTop="1px" minWidth={0}>
             <RowCaller scenarioRun={scenarioRun} />
           </Box>
-        </Table.Cell>
+        </ListTable.Cell>
       ) : null}
 
-      <Table.Cell textAlign="end">
+      <ListTable.Cell align="end" valign="top">
         <Box paddingTop="1px">
           <RowMetrics scenarioRun={scenarioRun} />
         </Box>
-      </Table.Cell>
+      </ListTable.Cell>
 
       <ListTable.ActionCell>
         <HStack gap={1} justify="flex-end">
@@ -308,6 +299,6 @@ export function RunResultRow({
           />
         </HStack>
       </ListTable.ActionCell>
-    </Table.Row>
+    </ListTable.Row>
   );
 }

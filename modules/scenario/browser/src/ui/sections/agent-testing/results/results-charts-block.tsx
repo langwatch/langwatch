@@ -4,6 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { AtomCost, ResultTotals, SeriesBucket } from "@langwatch/scenario-contract";
@@ -29,36 +30,28 @@ function Stat({
   testId?: string;
 }) {
   return (
-    <VStack
-      align="stretch"
-      justify="center"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      paddingX={3.5}
-      paddingY={2.5}
-      data-testid={testId}
-    >
-      <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
-        {label}
-      </Text>
-      <Text
-        textStyle="metric"
-        lineHeight="1"
-        fontWeight="semibold"
-        marginTop={1}
-        fontVariantNumeric="tabular-nums"
-        color={color ?? "fg"}
-      >
-        {value}
-      </Text>
-      {note ? (
-        <Text textStyle="micro" color="fg.muted" marginTop={1.5}>
-          {note}
+    <Card variant="frame" padding="sm" bodyLayout="stack" data-testid={testId}>
+      <VStack align="stretch" justify="center" gap={0} flex={1}>
+        <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
+          {label}
         </Text>
-      ) : null}
-    </VStack>
+        <Text
+          textStyle="metric"
+          lineHeight="1"
+          fontWeight="semibold"
+          marginTop={1}
+          fontVariantNumeric="tabular-nums"
+          color={color ?? "fg"}
+        >
+          {value}
+        </Text>
+        {note ? (
+          <Text textStyle="micro" color="fg.muted" marginTop={1.5}>
+            {note}
+          </Text>
+        ) : null}
+      </VStack>
+    </Card>
   );
 }
 
@@ -68,16 +61,7 @@ const CHART_BAR_MAX = 30;
 /** The pass rate of the window, bucket by bucket, oldest first. */
 function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
   return (
-    <VStack
-      align="stretch"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      paddingX={3.5}
-      paddingY={3}
-      data-testid="results-pass-rate-chart"
-    >
+    <Card variant="frame" padding="sm" data-testid="results-pass-rate-chart">
       <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
         Pass rate over time
       </Text>
@@ -128,7 +112,7 @@ function PassRateOverTimeChart({ buckets }: { buckets: SeriesBucket[] }) {
           </Text>
         ))}
       </HStack>
-    </VStack>
+    </Card>
   );
 }
 

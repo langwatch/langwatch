@@ -112,11 +112,11 @@ export function ComparisonResultsTable(props: ComparisonResultsTableProps) {
 
       <MatrixHeader targets={targets} scenarioRuns={scenarioRuns} />
 
-      <Table.Body>
+      <ListTable.Body>
         {scenarios.map((scenario) => (
           <MatrixRow key={scenario.scenarioId} scenario={scenario} {...props} />
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }

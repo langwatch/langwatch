@@ -4,6 +4,7 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
@@ -189,57 +190,49 @@ export function RunSettingsBlock({
     isComparison ? (settings.parametersByTarget.get(target.key) ?? []) : overridesOf(target);
 
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      width="full"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      paddingX={3}
-      paddingY={2.5}
-      data-testid="run-settings-block"
-    >
-      {startedRow ? (
-        <SettingRow label="Started" testId="run-settings-started">
-          <Text textStyle="caption">{startedRow}</Text>
-        </SettingRow>
-      ) : null}
+    <Card variant="frame" padding="sm" data-testid="run-settings-block">
+      <VStack align="stretch" gap={2} width="full">
+        {startedRow ? (
+          <SettingRow label="Started" testId="run-settings-started">
+            <Text textStyle="caption">{startedRow}</Text>
+          </SettingRow>
+        ) : null}
 
-      {targets.length > 0 ? (
-        <TargetsRow
-          targets={targets}
-          isComparison={isComparison}
-          parametersOf={parametersOf}
-          instanceOf={(target) => settings.instanceByTarget.get(target.key)}
-        />
-      ) : null}
+        {targets.length > 0 ? (
+          <TargetsRow
+            targets={targets}
+            isComparison={isComparison}
+            parametersOf={parametersOf}
+            instanceOf={(target) => settings.instanceByTarget.get(target.key)}
+          />
+        ) : null}
 
-      {!isComparison && settings.parameters.length > 0 ? (
-        <SettingRow label="Parameters" testId="run-settings-parameters">
-          <HStack gap={2} flexWrap="wrap">
-            {settings.parameters.map((parameter) => (
-              <ParameterChip key={parameter.name} name={parameter.name} value={parameter.value} />
-            ))}
-          </HStack>
-        </SettingRow>
-      ) : null}
+        {!isComparison && settings.parameters.length > 0 ? (
+          <SettingRow label="Parameters" testId="run-settings-parameters">
+            <HStack gap={2} flexWrap="wrap">
+              {settings.parameters.map((parameter) => (
+                <ParameterChip key={parameter.name} name={parameter.name} value={parameter.value} />
+              ))}
+            </HStack>
+          </SettingRow>
+        ) : null}
 
-      {settings.repeatCount > 1 ? (
-        <SettingRow label="Repeat" testId="run-settings-repeat">
-          <Text textStyle="caption">{settings.repeatCount} times</Text>
-        </SettingRow>
-      ) : null}
+        {settings.repeatCount > 1 ? (
+          <SettingRow label="Repeat" testId="run-settings-repeat">
+            <Text textStyle="caption">{settings.repeatCount} times</Text>
+          </SettingRow>
+        ) : null}
 
-      {settings.simulatorModel ? (
-        <ModelRow
-          label="Simulator model"
-          testId="run-settings-simulator"
-          model={settings.simulatorModel}
-        />
-      ) : null}
+        {settings.simulatorModel ? (
+          <ModelRow
+            label="Simulator model"
+            testId="run-settings-simulator"
+            model={settings.simulatorModel}
+          />
+        ) : null}
 
-      <ModelRow label="Judge model" testId="run-settings-judge" model={settings.judgeModel} />
-    </VStack>
+        <ModelRow label="Judge model" testId="run-settings-judge" model={settings.judgeModel} />
+      </VStack>
+    </Card>
   );
 }

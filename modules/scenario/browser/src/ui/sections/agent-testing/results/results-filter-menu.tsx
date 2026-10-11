@@ -5,7 +5,8 @@
  */
 
 import { Menu } from "@langwatch/design-system/menu";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 
 import { TOOLBAR_BUTTON_PROPS } from "../../../elements/agent-testing/shared/toggle-button.tsx";
@@ -110,9 +111,19 @@ export function ResultsFilterMenu({ label, options, selected, onChange }: Result
 
       <Menu.Content minWidth="260px" maxHeight="300px" overflowY="auto">
         {options.length === 0 ? (
-          <Text textStyle="bodySm" color="fg.muted" paddingX={3} paddingY={2}>
-            Nothing to filter by yet.
-          </Text>
+          <Box paddingX={3}>
+            <NoDataInfoBlock
+              size="line"
+              title="Nothing to filter by yet."
+              next={[
+                {
+                  kind: "docs",
+                  label: "Learn more",
+                  href: "https://docs.langwatch.ai/agent-testing/results",
+                },
+              ]}
+            />
+          </Box>
         ) : (
           options.map((option) => (
             <Menu.CheckboxItem

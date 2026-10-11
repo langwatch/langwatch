@@ -5,11 +5,12 @@
  */
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Button, HStack, Icon, Table, Text } from "@langwatch/design-system/primitives";
+import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type { ResultGroup } from "@langwatch/scenario-contract";
-import { Archive, Crosshair, Folder, FolderCode, Layers, MoreVertical, Tag } from "lucide-react";
+import { Archive, Crosshair, Folder, FolderCode, Layers, Tag } from "lucide-react";
 import { useState } from "react";
 
 import type {
@@ -192,7 +193,7 @@ function PlanRowMenu({
           aria-label={`Actions for ${plan.name}`}
           onClick={(event) => event.stopPropagation()}
         >
-          <MoreVertical size={14} />
+          <MoreVerticalIcon size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
@@ -254,6 +255,8 @@ export type PlanRowsTableProps = {
   onArchivePlan: (plan: RunPlan) => void;
   /** True while the archive call is out, so the dialog holds its buttons. */
   isArchiving?: boolean;
+  /** Offered in the empty line when filters left no plan to draw. */
+  onClearFilters?: () => void;
 };
 
 export function PlanRowsTable({
@@ -266,6 +269,7 @@ export function PlanRowsTable({
   onEditPlan,
   onArchivePlan,
   isArchiving = false,
+  onClearFilters,
 }: PlanRowsTableProps) {
   const now = useNow();
   const [planToArchive, setPlanToArchive] = useState<RunPlan | null>(null);
@@ -285,15 +289,14 @@ export function PlanRowsTable({
       >
         <ResultsTableHead columns={PLAN_COLUMNS} />
 
-        <Table.Body>
+        <ListTable.Body>
           {rows.map(({ plan, group }) => (
-            <Table.Row
+            <ListTable.Row
               key={plan.slug}
-              cursor="pointer"
-              onClick={() => onSelectPlan(plan.slug)}
+              onActivate={() => onSelectPlan(plan.slug)}
               data-testid={`run-plan-row-${plan.slug}`}
             >
-              <Table.Cell>
+              <ListTable.Cell>
                 <HStack gap={1.5} minWidth={0}>
                   <Text
                     textStyle="bodySm"
@@ -306,35 +309,35 @@ export function PlanRowsTable({
                   </Text>
                   <PlanBadge kind={plan.kind} />
                 </HStack>
-              </Table.Cell>
+              </ListTable.Cell>
 
-              <Table.Cell>
+              <ListTable.Cell>
                 <LastRunCell group={group} days={days} now={now} />
-              </Table.Cell>
+              </ListTable.Cell>
 
-              <Table.Cell>
+              <ListTable.Cell>
                 <ScopeCell plan={plan} />
-              </Table.Cell>
+              </ListTable.Cell>
 
-              <Table.Cell>
+              <ListTable.Cell>
                 <TargetsCell
                   targetKeys={group?.targetKeys ?? []}
                   resolveTargetName={resolveTargetName}
                   resolveTargetKind={resolveTargetKind}
                 />
-              </Table.Cell>
+              </ListTable.Cell>
 
-              <Table.Cell textAlign="end">
+              <ListTable.Cell align="end">
                 <PassRateText passRate={group?.passRate ?? null} />
-              </Table.Cell>
+              </ListTable.Cell>
 
               {/* A plan with no run has no history to draw, and "no runs" here
                 would only repeat what the Last run column already says. */}
-              <Table.Cell>
+              <ListTable.Cell>
                 {group && group.trend.length > 0 ? (
                   <TrendSparkline bars={group.trend} per="run" />
                 ) : null}
-              </Table.Cell>
+              </ListTable.Cell>
 
               <ListTable.ActionCell>
                 <PlanRowMenu
@@ -345,20 +348,26 @@ export function PlanRowsTable({
                   onRequestArchive={setPlanToArchive}
                 />
               </ListTable.ActionCell>
-            </Table.Row>
+            </ListTable.Row>
           ))}
 
-          {rows.length === 0 ? (
+          {rows.length === 0 && hasRunsOutsidePlans ? (
             <ResultsTableEmptyLine
               columns={PLAN_COLUMNS.length}
-              text={
-                hasRunsOutsidePlans
-                  ? "These runs were started outside a run plan. Group by scenario or target to read them."
-                  : "No run plans match these filters."
-              }
+              state="empty"
+              title="These runs were started outside a run plan"
+              description="Group by scenario or target to read them."
             />
           ) : null}
-        </Table.Body>
+          {rows.length === 0 && !hasRunsOutsidePlans ? (
+            <ResultsTableEmptyLine
+              columns={PLAN_COLUMNS.length}
+              state="no-results"
+              title="No run plans match these filters"
+              onClearFilters={onClearFilters}
+            />
+          ) : null}
+        </ListTable.Body>
       </ResultsTable>
 
       <SuiteArchiveDialog

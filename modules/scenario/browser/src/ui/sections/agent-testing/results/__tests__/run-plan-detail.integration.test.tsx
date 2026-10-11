@@ -470,7 +470,7 @@ describe("<RunPlanDetail/>", () => {
 
     renderDetail();
 
-    const loadMore = screen.getByRole("button", { name: "Load More..." });
+    const loadMore = screen.getByRole("button", { name: "Load more" });
     await user.click(loadMore);
 
     expect(screen.getByTestId("runs-sidebar-item-batch_0")).toBeInTheDocument();

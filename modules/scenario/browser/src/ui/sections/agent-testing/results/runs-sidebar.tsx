@@ -5,6 +5,7 @@
  * @see specs/suites/run-notes.feature
  */
 
+import { LoadMore } from "@langwatch/design-system/load-more";
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
@@ -97,20 +98,14 @@ function RunsList({
         </Text>
       ) : null}
 
-      {hasMore ? (
-        <Button
-          size="xs"
-          variant="ghost"
-          height="26px"
-          textStyle="caption"
-          color="fg.muted"
-          justifyContent="flex-start"
-          paddingX={3}
-          onClick={loadMore}
-        >
-          Load More...
-        </Button>
-      ) : null}
+      <LoadMore
+        hasMore={hasMore}
+        loading={isLoading}
+        onLoadMore={loadMore}
+        shown={hasMore ? batchRuns.length : void 0}
+        total={totalBatchCount ?? void 0}
+        unitLabel="runs"
+      />
     </>
   );
 }
