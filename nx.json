@@ -10,6 +10,9 @@
       "!{projectRoot}/**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
       "!{projectRoot}/**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
       "!{projectRoot}/**/*.stories.{ts,tsx}",
+      "!{projectRoot}/**/__tests__/**/*",
+      "!{projectRoot}/**/__fixtures__/**/*",
+      "!{projectRoot}/**/*.md",
       "!{projectRoot}/tsconfig.test.json",
       "!{projectRoot}/vitest.config.*",
       "!{projectRoot}/vitest.integration.config.*"

@@ -81,7 +81,7 @@ The root `pnpm lint` is `dev/nx/lint.mjs`: `nx run-many -t lint` plus one oxlint
 the files outside every project. A project with a `lint` script of its own (the
 architecture enforcer, the SDK's eslint) keeps it, because Nx lets a package.json script
 outrank a plugin; the runner excludes those two from the target and the outside-files run
-covers them. `lint:changed` and CI's PR step run `nx affected` (`--files` from the
+covers them. `lint:types --changed` and CI's PR step run `nx affected` (`--files` from the
 working copy and branch, or `--base`); a changed-only run misses a finding that
 only appears when an unrelated file changes and no input above names it.
 
@@ -333,7 +333,7 @@ correctness tier off). `.oxlintrc.jsonc` extends all three for the editor,
 the last `categories` wins, and the root keeps `ignorePatterns` because `extends`
 does not carry them. `pnpm lint` (`dev/nx/lint.mjs`) runs native and plugin as two
 parallel processes over the tree; `--changed` and `--base` narrow both to the
-projects `nx show projects --affected` names plus the files no project owns. It no
+changed files (the tree when a `lintGlobals` file changed; only `--types` keeps dependants). It no
 longer runs the per-project `lint` target: cold, that was 213 to 280 s against
 about 35 s whole-tree; the `lint` and `lint:types` targets stay for cached
 per-project runs.
