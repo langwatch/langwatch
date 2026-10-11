@@ -5,10 +5,13 @@ import {
   IconButton,
   mergeRefs,
   Portal,
+  useDialogContext,
 } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
+import { firstFocusable } from "../../overlays/focusable.ts";
+import { registerOpenModal } from "../../overlays/modal-stack.ts";
 import { BOUNDED_BODY, OverlayBodyState } from "../../overlays/overlay-body.tsx";
 import { OverlayPortalTargetProvider } from "../../overlays/portal-target.ts";
 import { FieldLayoutProvider } from "../forms/field-layout.ts";
@@ -30,7 +33,7 @@ export function DialogRoot(props: DialogRootProps) {
 
 export interface DialogContentProps extends ChakraDialog.ContentProps {
   portalled?: boolean;
-  portalRef?: React.RefObject<HTMLElement>;
+  portalRef?: React.RefObject<HTMLElement | null>;
   backdrop?: boolean;
   backdropProps?: Omit<ChakraDialog.BackdropProps, "bg" | "background" | "backgroundColor">;
   positionerProps?: ChakraDialog.PositionerProps;
@@ -56,8 +59,10 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
     },
     ref,
   ) {
-    const portalTarget = React.useRef<HTMLDivElement>(null);
-    const guarded = withErrorBoundary && !contentProps.asChild;
+    const portalTarget = React.useRef<HTMLDivElement | null>(null);
+    const { open } = useDialogContext();
+    React.useEffect(() => (open ? registerOpenModal() : undefined), [open]);
+    const guarded = withErrorBoundary;
     return (
       <Portal disabled={!portalled} container={portalRef}>
         {backdrop && (
@@ -69,25 +74,50 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
           />
         )}
         <FieldLayoutProvider value="stacked">
-          <ChakraDialog.Positioner {...positionerProps}>
-            <ChakraDialog.Content ref={ref} {...contentProps}>
-              <OverlayPortalTargetProvider value={portalTarget}>
-                {guarded ? (
-                  <StudioIsolatedErrorBoundary scope={errorScope}>
-                    {children}
-                  </StudioIsolatedErrorBoundary>
-                ) : (
+          <OverlayPortalTargetProvider value={portalTarget}>
+            <ChakraDialog.Positioner {...positionerProps}>
+              <ChakraDialog.Content
+                ref={contentProps.asChild ? mergeRefs(ref, portalTarget) : ref}
+                {...contentProps}
+              >
+                {contentProps.asChild ? (
                   children
+                ) : (
+                  <>
+                    {guarded ? (
+                      <StudioIsolatedErrorBoundary
+                        scope={errorScope}
+                        recovery={<LegacyCrashShell scope={errorScope} />}
+                      >
+                        {children}
+                      </StudioIsolatedErrorBoundary>
+                    ) : (
+                      children
+                    )}
+                    <div ref={portalTarget} data-overlay-portal-target="" />
+                  </>
                 )}
-              </OverlayPortalTargetProvider>
-              {!contentProps.asChild && <div ref={portalTarget} data-overlay-portal-target="" />}
-            </ChakraDialog.Content>
-          </ChakraDialog.Positioner>
+              </ChakraDialog.Content>
+            </ChakraDialog.Positioner>
+          </OverlayPortalTargetProvider>
         </FieldLayoutProvider>
       </Portal>
     );
   },
 );
+
+/**
+ * A crash in a part-built dialog removes its title and X with the rest of the body. The fallback
+ * names the dialog again and offers a close request, which the caller's Root answers as for Escape.
+ */
+function LegacyCrashShell({ scope }: { scope?: string }) {
+  return (
+    <>
+      <ChakraDialog.Title srOnly>{scope ?? "Something went wrong"}</ChakraDialog.Title>
+      <DialogCloseTrigger />
+    </>
+  );
+}
 
 /** @deprecated The shape draws its own X. */
 export const DialogCloseTrigger = React.forwardRef<
@@ -168,9 +198,11 @@ export interface DialogProps {
   bodyScroll?: "frame" | "content";
   loading?: boolean;
   error?: { title: string; description?: string; onRetry?: () => void };
-  /** A save in flight: the X, Cancel, Escape, outside click and every action wait. */
+  /** A save in flight: the X, Cancel, Escape, outside click, form submit and every action wait. */
   busy?: boolean;
   errorScope?: string;
+  /** Names the entity shown: a crash clears when it changes, even if the title stays the same. */
+  entityKey?: string;
   contentRef?: React.Ref<HTMLDivElement>;
   /** Prefixes the slot ids: `<id>-close`, `<id>-back`, `<id>-body`. */
   "data-testid"?: string;
@@ -203,6 +235,7 @@ export function DialogShape({
   error,
   busy = false,
   errorScope,
+  entityKey,
   contentRef,
   "data-testid": testId,
 }: DialogProps) {
@@ -213,61 +246,63 @@ export function DialogShape({
     dismissible && !secondaryAction ? { label: cancelLabel, onClick: onClose } : undefined;
   const hasFooter = primaryAction ?? secondaryAction ?? cancel ?? note;
   const pickInitialFocus = () => {
-    const enabled = (selector: string) =>
-      ownRef.current?.querySelector<HTMLElement>(`${selector}:not([disabled])`) ?? null;
-    const requested = initialFocus ? enabled(`[data-frame-action="${initialFocus}"]`) : null;
-    return (
-      requested ?? enabled("input, textarea, select") ?? enabled('[data-frame-action="cancel"]')
-    );
+    const usable = (selector: string) => firstFocusable(ownRef.current, selector);
+    const requested = initialFocus ? usable(`[data-frame-action="${initialFocus}"]`) : null;
+    return requested ?? usable("input, textarea, select") ?? usable('[data-frame-action="cancel"]');
   };
+  const resetKeys = [title, entityKey];
   const frame = (
     <>
-      <ChakraDialog.Header>
-        <HStack gap={2} align="center" minWidth={0}>
-          {onBack && (
-            <IconButton
-              type="button"
-              aria-label="Back"
-              variant="ghost"
-              size="xs"
-              onClick={onBack}
-              disabled={busy}
-              marginStart={-1}
-              data-testid={slot("back")}
-            >
-              <ArrowLeft aria-hidden />
-            </IconButton>
+      <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
+        <ChakraDialog.Header>
+          <HStack gap={2} align="center" minWidth={0}>
+            {onBack && (
+              <IconButton
+                type="button"
+                aria-label="Back"
+                variant="ghost"
+                size="xs"
+                onClick={onBack}
+                disabled={busy}
+                marginStart={-1}
+                data-testid={slot("back")}
+              >
+                <ArrowLeft aria-hidden />
+              </IconButton>
+            )}
+            {icon != null && (
+              <chakra.span display="inline-flex" color="fg.muted" aria-hidden>
+                {icon}
+              </chakra.span>
+            )}
+            <ChakraDialog.Title>{title}</ChakraDialog.Title>
+          </HStack>
+          {description != null && (
+            <ChakraDialog.Description textStyle="sm" color="fg.muted">
+              {description}
+            </ChakraDialog.Description>
           )}
-          {icon != null && (
-            <chakra.span display="inline-flex" color="fg.muted" aria-hidden>
-              {icon}
-            </chakra.span>
-          )}
-          <ChakraDialog.Title>{title}</ChakraDialog.Title>
-        </HStack>
-        {description != null && (
-          <ChakraDialog.Description textStyle="sm" color="fg.muted">
-            {description}
-          </ChakraDialog.Description>
-        )}
-      </ChakraDialog.Header>
-      <ChakraDialog.Body
-        {...(bodyScroll === "content" ? BOUNDED_BODY : { overflowY: "auto" as const })}
-        data-testid={slot("body")}
-      >
-        <OverlayBodyState loading={loading} error={error}>
-          {children}
-        </OverlayBodyState>
-      </ChakraDialog.Body>
+        </ChakraDialog.Header>
+        <ChakraDialog.Body
+          {...(bodyScroll === "content" ? BOUNDED_BODY : { overflowY: "auto" as const })}
+          data-testid={slot("body")}
+        >
+          <OverlayBodyState loading={loading} error={error}>
+            {children}
+          </OverlayBodyState>
+        </ChakraDialog.Body>
+      </StudioIsolatedErrorBoundary>
       {hasFooter != null && (
         <ChakraDialog.Footer>
-          <ActionRow
-            primaryAction={primaryAction}
-            secondaryAction={secondaryAction}
-            cancel={cancel}
-            note={note}
-            busy={busy}
-          />
+          <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
+            <ActionRow
+              primaryAction={primaryAction}
+              secondaryAction={secondaryAction}
+              cancel={cancel}
+              note={note}
+              busy={busy}
+            />
+          </StudioIsolatedErrorBoundary>
         </ChakraDialog.Footer>
       )}
     </>
@@ -296,22 +331,20 @@ export function DialogShape({
         data-testid={testId}
       >
         {dismissible && <DialogCloseTrigger disabled={busy} data-testid={slot("close")} />}
-        <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={[title]}>
-          {onSubmit ? (
-            <chakra.form
-              id={formId}
-              display="contents"
-              onSubmit={(event) => {
-                event.preventDefault();
-                onSubmit(event);
-              }}
-            >
-              {frame}
-            </chakra.form>
-          ) : (
-            frame
-          )}
-        </StudioIsolatedErrorBoundary>
+        {onSubmit ? (
+          <chakra.form
+            id={formId}
+            display="contents"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!busy) onSubmit(event);
+            }}
+          >
+            {frame}
+          </chakra.form>
+        ) : (
+          frame
+        )}
       </DialogContent>
     </ChakraDialog.Root>
   );

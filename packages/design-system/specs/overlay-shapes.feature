@@ -70,3 +70,46 @@ Feature: Drawer and dialog shapes
   Scenario: The confirmation dialog keeps its old props while callers move
     Given a confirmation dialog given the deprecated onOpenChange and message
     Then it shows the message and Cancel requests onOpenChange(false)
+
+  @integration
+  Scenario: A busy overlay runs no action
+    Given an overlay with a save in flight
+    Then Enter in its form does not submit it
+    And a menu item chosen from a menu that was already open does not run
+    And Escape and an outside click do not request a close
+
+  @integration
+  Scenario: A drawer footer never draws Cancel
+    Given a drawer given a shared footer descriptor that carries a cancel
+    Then the drawer draws the other actions and no Cancel button
+
+  @integration
+  Scenario: A crashed overlay keeps a named shell and a working close control
+    Given a drawer built from parts, or a dialog, whose body throws while rendering
+    Then the overlay keeps its accessible name and an inline error
+    And its close control requests a close
+    And a dialog that cannot be dismissed keeps its own footer action
+
+  @integration
+  Scenario: A crashed overlay recovers when the entity it shows changes
+    Given a drawer whose content crashed for one entity
+    When another entity with the same title replaces it
+    Then the content renders again
+
+  @integration
+  Scenario: A dialog's initial focus skips what cannot take it
+    Given a dialog whose first fields are disabled or hidden
+    Then the first usable field has focus
+    And a disabled requested action falls back to Cancel
+    And closing the dialog returns focus to the control that opened it
+
+  @integration
+  Scenario: The retained Content parts still accept asChild
+    Given a drawer or dialog content part given asChild and its own element
+    Then the caller's element is the dialog and keeps its content
+
+  @integration
+  Scenario: A routed drawer opened from a modal dialog takes focus and gives it back
+    Given an open modal dialog and a drawer opened from inside it
+    Then the reader can type and tab inside the drawer
+    And closing the drawer returns focus to the dialog's opener control and the dialog's trap holds again

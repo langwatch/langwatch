@@ -103,6 +103,7 @@ export function FrameActionButton({
   const look = LOOK[kind];
   const palette = kind === "primary" && action.danger ? "red" : look.palette;
   const submits = action.type === "submit";
+  const blocked = busy || action.loading === true;
   const button = (
     <Button
       type={submits ? "submit" : "button"}
@@ -112,7 +113,13 @@ export function FrameActionButton({
       size={size}
       loading={action.loading}
       disabled={busy || action.disabledReason !== undefined}
-      onClick={action.items ? undefined : action.onClick}
+      onClick={
+        action.items
+          ? undefined
+          : () => {
+              if (!blocked) action.onClick?.();
+            }
+      }
       data-frame-action={kind}
       data-testid={action["data-testid"]}
     >
@@ -123,7 +130,9 @@ export function FrameActionButton({
   );
   const menu = action.items ? (
     <Menu.Root
-      onSelect={({ value }) => action.items?.find((item) => item.value === value)?.onSelect()}
+      onSelect={({ value }) => {
+        if (!blocked) action.items?.find((item) => item.value === value)?.onSelect();
+      }}
     >
       <Menu.Trigger asChild>{button}</Menu.Trigger>
       <Menu.Content>
@@ -131,7 +140,7 @@ export function FrameActionButton({
           <Menu.Item
             key={item.value}
             value={item.value}
-            disabled={item.disabledReason !== undefined}
+            disabled={blocked || item.disabledReason !== undefined}
             title={item.disabledReason}
           >
             {item.icon}
@@ -166,7 +175,7 @@ export function ActionRow({
   busy = false,
 }: ActionRowProps) {
   const row = (
-    <HStack width="full" gap={2} data-action-row="">
+    <HStack width="full" gap={2} flexWrap="wrap" data-action-row="">
       {destructiveAction && (
         <FrameActionButton action={destructiveAction} kind="destructive" busy={busy} />
       )}

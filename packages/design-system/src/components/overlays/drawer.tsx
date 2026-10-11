@@ -5,6 +5,7 @@ import {
   Drawer as ChakraDrawer,
   HStack,
   IconButton,
+  mergeRefs,
   Portal,
   Spacer,
   Text,
@@ -13,6 +14,7 @@ import {
 import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 
+import { useHasOpenModal } from "../../overlays/modal-stack.ts";
 import { BOUNDED_BODY, OverlayBodyState } from "../../overlays/overlay-body.tsx";
 import { OverlayPortalTargetProvider } from "../../overlays/portal-target.ts";
 import { FieldLayoutProvider } from "../forms/field-layout.ts";
@@ -58,7 +60,7 @@ export function useDrawerEndInset(): number {
  */
 export interface DrawerContentProps extends ChakraDrawer.ContentProps {
   portalled?: boolean;
-  portalRef?: React.RefObject<HTMLElement>;
+  portalRef?: React.RefObject<HTMLElement | null>;
   offset?: ChakraDrawer.ContentProps["padding"];
   /** `false` drops the inline error boundary: a render crash then closes the drawer. */
   withErrorBoundary?: boolean;
@@ -82,40 +84,62 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
   ) {
     const context = React.useContext(DrawerOffsetContext);
     const inset = useDrawerEndInset();
-    const guarded = withErrorBoundary && !contentProps.asChild;
-    const portalTarget = React.useRef<HTMLDivElement>(null);
+    const guarded = withErrorBoundary;
+    const portalTarget = React.useRef<HTMLDivElement | null>(null);
     return (
       <Portal disabled={!portalled} container={portalRef}>
         <FieldLayoutProvider value="stacked">
-          <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
-            <ChakraDrawer.Content
-              ref={ref}
-              margin={2}
-              pointerEvents="auto"
-              borderRadius="lg"
-              marginTop={
-                marginTop ?? (context.marginTop == null ? void 0 : `${context.marginTop}px`)
-              }
-              marginEnd={inset > 0 ? `${inset}px` : undefined}
-              {...contentProps}
-            >
-              <OverlayPortalTargetProvider value={portalTarget}>
-                {guarded ? (
-                  <StudioIsolatedErrorBoundary scope={errorScope}>
-                    {children}
-                  </StudioIsolatedErrorBoundary>
-                ) : (
+          <OverlayPortalTargetProvider value={portalTarget}>
+            <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
+              <ChakraDrawer.Content
+                ref={contentProps.asChild ? mergeRefs(ref, portalTarget) : ref}
+                margin={2}
+                pointerEvents="auto"
+                borderRadius="lg"
+                marginTop={
+                  marginTop ?? (context.marginTop == null ? void 0 : `${context.marginTop}px`)
+                }
+                marginEnd={inset > 0 ? `${inset}px` : undefined}
+                {...contentProps}
+              >
+                {contentProps.asChild ? (
                   children
+                ) : (
+                  <>
+                    {guarded ? (
+                      <StudioIsolatedErrorBoundary
+                        scope={errorScope}
+                        recovery={<LegacyCrashShell scope={errorScope} />}
+                      >
+                        {children}
+                      </StudioIsolatedErrorBoundary>
+                    ) : (
+                      children
+                    )}
+                    <div ref={portalTarget} data-overlay-portal-target="" />
+                  </>
                 )}
-              </OverlayPortalTargetProvider>
-              {!contentProps.asChild && <div ref={portalTarget} data-overlay-portal-target="" />}
-            </ChakraDrawer.Content>
-          </ChakraDrawer.Positioner>
+              </ChakraDrawer.Content>
+            </ChakraDrawer.Positioner>
+          </OverlayPortalTargetProvider>
         </FieldLayoutProvider>
       </Portal>
     );
   },
 );
+
+/**
+ * A crash in a part-built drawer removes its title and X with the rest of the body. The fallback
+ * names the drawer again and offers a close request, which the caller's Root answers as for Escape.
+ */
+function LegacyCrashShell({ scope }: { scope?: string }) {
+  return (
+    <>
+      <ChakraDrawer.Title srOnly>{scope ?? "Something went wrong"}</ChakraDrawer.Title>
+      <DrawerCloseTrigger />
+    </>
+  );
+}
 
 export const DrawerCloseTrigger = React.forwardRef<
   HTMLButtonElement,
@@ -197,11 +221,16 @@ export interface DrawerRootProps extends Omit<ChakraDrawer.RootProps, "size"> {
   size?: AppDrawerSize;
 }
 
-/** Non-modal by default so nested drawers and portalled popovers stay operable. */
+/**
+ * Non-modal by default so nested drawers and portalled popovers stay operable. Opened on top of a
+ * modal dialog it is modal itself: its focus trap pauses the dialog's and hands focus back on
+ * close.
+ */
 export const DrawerRoot = function DrawerRoot({ size, ...props }: DrawerRootProps) {
+  const overModal = useHasOpenModal();
   return (
     <ChakraDrawer.Root
-      modal={false}
+      modal={overModal}
       closeOnInteractOutside={false}
       preventScroll={false}
       size={size as ChakraDrawer.RootProps["size"]}
@@ -227,8 +256,11 @@ const DRAWER_WIDTH: Record<DrawerSize, string> = {
  */
 const DRAWER_GROUND = "bg";
 
-/** The drawer footer: an ActionRow without Cancel; the X and Escape close (ruling Q2). */
-export type DrawerFooterProps = Omit<ActionRowProps, "cancel">;
+/**
+ * The drawer footer: an ActionRow without Cancel; the X and Escape close (ruling Q2). A shared
+ * descriptor that carries `cancel` is a type error, and the drawer drops it at runtime anyway.
+ */
+export type DrawerFooterProps = Omit<ActionRowProps, "cancel"> & { cancel?: never };
 
 export interface DrawerProps {
   /** Default true: a routed drawer is mounted only while open. */
@@ -274,6 +306,8 @@ export interface DrawerProps {
   busy?: boolean;
   /** The error boundary's label; defaults to the title. */
   errorScope?: string;
+  /** Names the entity shown: a crash clears when it changes, even if the title stays the same. */
+  entityKey?: string;
   initialFocusEl?: () => HTMLElement | null;
   finalFocusEl?: () => HTMLElement | null;
   onExitComplete?: () => void;
@@ -307,6 +341,7 @@ export function DrawerShape({
   footer,
   busy = false,
   errorScope,
+  entityKey,
   initialFocusEl,
   finalFocusEl,
   onExitComplete,
@@ -315,76 +350,81 @@ export function DrawerShape({
 }: DrawerProps) {
   const inset = useDrawerEndInset();
   const slot = (name: string) => (testId ? `${testId}-${name}` : undefined);
+  const resetKeys = [title, entityKey];
   const frame = (
     <>
-      <ChakraDrawer.Header>
-        <HStack align="start" gap={2} width="full">
-          {onBack && (
-            <IconButton
-              type="button"
-              aria-label="Back"
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              disabled={busy}
-              marginStart={-2}
-              data-testid={slot("back")}
-            >
-              <ArrowLeft aria-hidden />
-            </IconButton>
-          )}
-          <VStack align="stretch" gap={1} flex={1} minWidth={0}>
-            {eyebrow && (
-              <HStack color="fg.muted" gap={2} textStyle="xs">
-                {eyebrow.icon}
-                <Text>{eyebrow.label}</Text>
+      <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
+        <ChakraDrawer.Header>
+          <HStack align="start" gap={2} width="full">
+            {onBack && (
+              <IconButton
+                type="button"
+                aria-label="Back"
+                variant="ghost"
+                size="sm"
+                onClick={onBack}
+                disabled={busy}
+                marginStart={-2}
+                data-testid={slot("back")}
+              >
+                <ArrowLeft aria-hidden />
+              </IconButton>
+            )}
+            <VStack align="stretch" gap={1} flex={1} minWidth={0}>
+              {eyebrow && (
+                <HStack color="fg.muted" gap={2} textStyle="xs">
+                  {eyebrow.icon}
+                  <Text>{eyebrow.label}</Text>
+                </HStack>
+              )}
+              <ChakraDrawer.Title overflowWrap="anywhere" srOnly={titleContent != null}>
+                {title}
+              </ChakraDrawer.Title>
+              {titleContent}
+              {subtitle != null && <ChakraDrawer.Description>{subtitle}</ChakraDrawer.Description>}
+              {badges != null && (
+                <HStack gap={2} flexWrap="wrap" paddingTop={1}>
+                  {badges}
+                </HStack>
+              )}
+            </VStack>
+            {headerAction && (
+              <FrameActionButton action={headerAction} kind="secondary" busy={busy} size="sm" />
+            )}
+            {headerTools != null && (
+              <HStack gap={1} flexShrink={0} flexWrap="wrap" justify="flex-end">
+                {headerTools}
               </HStack>
             )}
-            <ChakraDrawer.Title overflowWrap="anywhere" srOnly={titleContent != null}>
-              {title}
-            </ChakraDrawer.Title>
-            {titleContent}
-            {subtitle != null && <ChakraDrawer.Description>{subtitle}</ChakraDrawer.Description>}
-            {badges != null && (
-              <HStack gap={2} flexWrap="wrap" paddingTop={1}>
-                {badges}
-              </HStack>
-            )}
-          </VStack>
-          {headerAction && (
-            <FrameActionButton action={headerAction} kind="secondary" busy={busy} size="sm" />
-          )}
-          {headerTools != null && (
-            <HStack gap={1} flexShrink={0} flexWrap="wrap" justify="flex-end">
-              {headerTools}
-            </HStack>
-          )}
-        </HStack>
-      </ChakraDrawer.Header>
-      {toolbar != null && (
-        <Box
-          paddingX={6}
-          paddingY={3}
-          borderBottomWidth="1px"
-          borderColor="border.card"
-          flexShrink={0}
+          </HStack>
+        </ChakraDrawer.Header>
+        {toolbar != null && (
+          <Box
+            paddingX={6}
+            paddingY={3}
+            borderBottomWidth="1px"
+            borderColor="border.card"
+            flexShrink={0}
+          >
+            {toolbar}
+          </Box>
+        )}
+        <ChakraDrawer.Body
+          padding={body === "flush" ? 0 : undefined}
+          {...(bodyScroll === "content" ? BOUNDED_BODY : {})}
+          data-body={body}
+          data-testid={slot("body")}
         >
-          {toolbar}
-        </Box>
-      )}
-      <ChakraDrawer.Body
-        padding={body === "flush" ? 0 : undefined}
-        {...(bodyScroll === "content" ? BOUNDED_BODY : {})}
-        data-body={body}
-        data-testid={slot("body")}
-      >
-        <OverlayBodyState loading={loading} error={error}>
-          {children}
-        </OverlayBodyState>
-      </ChakraDrawer.Body>
+          <OverlayBodyState loading={loading} error={error}>
+            {children}
+          </OverlayBodyState>
+        </ChakraDrawer.Body>
+      </StudioIsolatedErrorBoundary>
       {footer && (
         <ChakraDrawer.Footer>
-          <ActionRow {...footer} busy={busy || footer.busy} />
+          <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
+            <ActionRow {...footer} cancel={undefined} busy={busy || footer.busy} />
+          </StudioIsolatedErrorBoundary>
         </ChakraDrawer.Footer>
       )}
     </>
@@ -412,22 +452,20 @@ export function DrawerShape({
         data-testid={testId}
       >
         <DrawerCloseTrigger disabled={busy} data-testid={slot("close")} />
-        <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={[title]}>
-          {onSubmit ? (
-            <chakra.form
-              id={formId}
-              display="contents"
-              onSubmit={(event) => {
-                event.preventDefault();
-                onSubmit(event);
-              }}
-            >
-              {frame}
-            </chakra.form>
-          ) : (
-            frame
-          )}
-        </StudioIsolatedErrorBoundary>
+        {onSubmit ? (
+          <chakra.form
+            id={formId}
+            display="contents"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!busy) onSubmit(event);
+            }}
+          >
+            {frame}
+          </chakra.form>
+        ) : (
+          frame
+        )}
       </DrawerContent>
     </DrawerRoot>
   );

@@ -7,7 +7,7 @@ import { CloseButton } from "./close-button.tsx";
 
 interface PopoverContentProps extends ChakraPopover.ContentProps {
   portalled?: boolean;
-  portalRef?: React.RefObject<HTMLElement>;
+  portalRef?: React.RefObject<HTMLElement | null>;
   positionerProps?: ChakraPopover.PositionerProps;
 }
 

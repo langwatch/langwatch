@@ -55,7 +55,7 @@ const SelectClearTrigger = React.forwardRef<HTMLButtonElement, ChakraSelect.Clea
 
 interface SelectContentProps extends ChakraSelect.ContentProps {
   portalled?: boolean;
-  portalRef?: React.RefObject<HTMLElement>;
+  portalRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(

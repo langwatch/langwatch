@@ -9,7 +9,7 @@ import { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
 
 interface MenuContentProps extends ChakraMenu.ContentProps {
   portalled?: boolean;
-  portalRef?: React.RefObject<HTMLElement>;
+  portalRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const MenuContent = React.forwardRef<HTMLDivElement, MenuContentProps>(

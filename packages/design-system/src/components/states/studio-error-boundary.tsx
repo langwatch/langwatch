@@ -21,6 +21,8 @@ interface StudioIsolatedErrorBoundaryProps {
   /** Overrides the provider's `isDevelopment`: whether the raw crash message shows. */
   isDevelopment?: boolean;
   resetKeys?: readonly unknown[];
+  /** A control the fallback offers beside "Try again": a legacy Content's close. */
+  recovery?: React.ReactNode;
   onError?: (error: Error, info: { componentStack?: string | null }) => void;
   children: React.ReactNode;
 }
@@ -33,6 +35,7 @@ export const StudioIsolatedErrorBoundary: React.FC<StudioIsolatedErrorBoundaryPr
   scope,
   isDevelopment: isDevelopmentOverride,
   resetKeys,
+  recovery,
   onError,
   children,
 }) => {
@@ -41,7 +44,7 @@ export const StudioIsolatedErrorBoundary: React.FC<StudioIsolatedErrorBoundaryPr
   return (
     <ErrorBoundary
       FallbackComponent={(props) => (
-        <InlineError {...props} scope={scope} isDevelopment={isDevelopment} />
+        <InlineError {...props} scope={scope} isDevelopment={isDevelopment} recovery={recovery} />
       )}
       resetKeys={resetKeys ? [...resetKeys] : undefined}
       onError={(error, info) => {
@@ -54,12 +57,9 @@ export const StudioIsolatedErrorBoundary: React.FC<StudioIsolatedErrorBoundaryPr
   );
 };
 
-const InlineError: React.FC<FallbackProps & { scope?: string; isDevelopment: boolean }> = ({
-  error,
-  resetErrorBoundary,
-  scope,
-  isDevelopment,
-}) => {
+const InlineError: React.FC<
+  FallbackProps & { scope?: string; isDevelopment: boolean; recovery?: React.ReactNode }
+> = ({ error, resetErrorBoundary, scope, isDevelopment, recovery }) => {
   const rawMessage = error instanceof Error ? error.message : String(error);
   const isRegistered = codeOfStudioError(error) !== undefined;
   const heading = isRegistered ? "Something went wrong" : (scope ?? "Something went wrong");
@@ -102,6 +102,7 @@ const InlineError: React.FC<FallbackProps & { scope?: string; isDevelopment: boo
           </Text>
         )}
         <HStack justify="flex-end">
+          {recovery}
           <Button size="xs" variant="outline" colorPalette="red" onClick={resetErrorBoundary}>
             <Icon boxSize="12px">
               <RotateCcw />

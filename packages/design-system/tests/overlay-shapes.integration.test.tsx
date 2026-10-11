@@ -2,9 +2,11 @@
 /** The drawer and dialog shapes (ADR-002): slots, close requests, forms, states, portals, focus. */
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Select } from "../src/components/forms/select.tsx";
+import type { ActionRowProps } from "../src/components/overlays/action-row.tsx";
 import { ConfirmDialog } from "../src/components/overlays/confirm-dialog.tsx";
 import { Dialog } from "../src/components/overlays/dialog.tsx";
 import { Drawer } from "../src/components/overlays/drawer.tsx";
@@ -17,6 +19,18 @@ afterEach(cleanup);
 
 function Crash(): never {
   throw new Error("boom: secret internals");
+}
+
+/** jsdom lays nothing out, so the focus trap would treat every element as hidden. */
+function stubLayout() {
+  const rect = new DOMRect(0, 0, 10, 10);
+  const rects: DOMRectList = {
+    0: rect,
+    length: 1,
+    item: (index: number) => (index === 0 ? rect : null),
+    [Symbol.iterator]: () => [rect][Symbol.iterator](),
+  };
+  vi.spyOn(Element.prototype, "getClientRects").mockReturnValue(rects);
 }
 
 describe("the Drawer shape", () => {
@@ -66,7 +80,7 @@ describe("the Drawer shape", () => {
       renderWithDesignSystem(<Drawer onClose={onClose} title="Budget" data-testid="budget" busy />);
 
       const close = await screen.findByTestId("budget-close");
-      expect((close as HTMLButtonElement).disabled).toBe(true);
+      expect(close.hasAttribute("disabled")).toBe(true);
       await user.click(screen.getByText("Budget"));
       await user.keyboard("{Escape}");
       expect(onClose).not.toHaveBeenCalled();
@@ -77,6 +91,7 @@ describe("the Drawer shape", () => {
     /** @scenario "A footer submit action submits the right form once" */
     it("submits once from the submit action and once from Enter", async () => {
       const onSubmit = vi.fn();
+      const user = userEvent.setup();
       renderWithDesignSystem(
         <Drawer
           onClose={vi.fn()}
@@ -88,9 +103,9 @@ describe("the Drawer shape", () => {
         </Drawer>,
       );
 
-      fireEvent.click(await screen.findByRole("button", { name: "Create budget" }));
+      await user.click(await screen.findByRole("button", { name: "Create budget" }));
       expect(onSubmit).toHaveBeenCalledTimes(1);
-      fireEvent.submit(screen.getByRole("textbox", { name: "Name" }));
+      await user.type(screen.getByRole("textbox", { name: "Name" }), "{Enter}");
       expect(onSubmit).toHaveBeenCalledTimes(2);
     });
 
@@ -114,6 +129,8 @@ describe("the Drawer shape", () => {
       expect(send.getAttribute("type")).toBe("submit");
       const others = screen.getAllByRole("button").filter((button) => button !== send);
       expect(others.every((button) => button.getAttribute("type") === "button")).toBe(true);
+      await userEvent.setup().click(send);
+      expect(childSubmit).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -271,17 +288,7 @@ describe("the Dialog shape", () => {
   });
 
   describe("given an initial focus request", () => {
-    // jsdom lays nothing out, so the focus trap would treat every element as hidden.
-    beforeEach(() => {
-      const rect = new DOMRect(0, 0, 10, 10);
-      const rects: DOMRectList = {
-        0: rect,
-        length: 1,
-        item: (index: number) => (index === 0 ? rect : null),
-        [Symbol.iterator]: () => [rect][Symbol.iterator](),
-      };
-      vi.spyOn(Element.prototype, "getClientRects").mockReturnValue(rects);
-    });
+    beforeEach(stubLayout);
     afterEach(() => {
       vi.restoreAllMocks();
     });
@@ -360,5 +367,353 @@ describe("ConfirmDialog", () => {
       fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
       expect(onOpenChange).toHaveBeenCalledWith(false);
     });
+  });
+});
+
+describe("a busy overlay", () => {
+  describe("given a save is in flight", () => {
+    /** @scenario "A busy overlay runs no action" */
+    it("ignores Enter in a field of its own form", async () => {
+      const onSubmit = vi.fn();
+      const user = userEvent.setup();
+      renderWithDesignSystem(
+        <Drawer onClose={vi.fn()} title="New budget" onSubmit={onSubmit} busy>
+          <input aria-label="Name" />
+        </Drawer>,
+      );
+
+      await user.type(await screen.findByRole("textbox", { name: "Name" }), "{Enter}");
+
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A busy overlay runs no action" */
+    it("ignores Enter in a field of a busy dialog's form", async () => {
+      const onSubmit = vi.fn();
+      const user = userEvent.setup();
+      renderWithDesignSystem(
+        <Dialog open onClose={vi.fn()} title="Copy dataset" onSubmit={onSubmit} busy>
+          <input aria-label="Name" />
+        </Dialog>,
+      );
+
+      await user.type(await screen.findByRole("textbox", { name: "Name" }), "{Enter}");
+
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A busy overlay runs no action" */
+    it("does not run a menu item chosen from a menu that was already open", async () => {
+      const onSelect = vi.fn();
+      const user = userEvent.setup();
+      const footer = (busy: boolean) => (
+        <Drawer
+          onClose={vi.fn()}
+          title="Export"
+          busy={busy}
+          footer={{
+            secondaryAction: {
+              label: "Export as",
+              items: [{ value: "csv", label: "CSV", onSelect }],
+            },
+          }}
+        />
+      );
+      const { rerender } = renderWithDesignSystem(footer(false));
+      await user.click(await screen.findByRole("button", { name: "Export as" }));
+      const item = await screen.findByRole("menuitem", { name: "CSV" });
+
+      rerender(footer(true));
+      await user.click(item);
+
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A busy overlay runs no action" */
+    it("keeps Escape and an outside click from closing a busy dialog", async () => {
+      const onClose = vi.fn();
+      const user = userEvent.setup();
+      renderWithDesignSystem(<Dialog open onClose={onClose} title="Saving" busy />);
+
+      await screen.findByRole("dialog", { name: "Saving" });
+      await user.keyboard("{Escape}");
+      fireEvent.pointerDown(document.body);
+      fireEvent.pointerUp(document.body);
+
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("a drawer footer", () => {
+  /** @scenario "A drawer footer never draws Cancel" */
+  it("drops a Cancel that arrives through a shared descriptor", async () => {
+    const shared: ActionRowProps = {
+      primaryAction: { label: "Save", onClick: vi.fn() },
+      cancel: { onClick: vi.fn() },
+    };
+    renderWithDesignSystem(
+      // @ts-expect-error a descriptor that carries `cancel` is not a drawer footer
+      <Drawer onClose={vi.fn()} title="Edit key" footer={shared} />,
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: "Edit key" });
+    expect(within(drawer).getByRole("button", { name: "Save" })).toBeTruthy();
+    expect(within(drawer).queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+});
+
+describe("when an overlay's content crashes", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** @scenario "A crashed overlay keeps a named shell and a working close control" */
+  it("keeps a close control that works when a legacy drawer body crashes", async () => {
+    const onOpenChange = vi.fn();
+    renderWithDesignSystem(
+      <Drawer.Root open onOpenChange={onOpenChange}>
+        <Drawer.Content errorScope="Edit agent">
+          <Drawer.Header>
+            <Drawer.Title>Edit agent</Drawer.Title>
+            <Drawer.CloseTrigger />
+          </Drawer.Header>
+          <Drawer.Body>
+            <Crash />
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>,
+    );
+
+    expect((await screen.findByRole("alert")).textContent).toContain("Edit agent");
+    expect(screen.getByRole("dialog", { name: "Edit agent" })).toBeTruthy();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Close" }));
+    expect(onOpenChange).toHaveBeenCalledWith(expect.objectContaining({ open: false }));
+  });
+
+  /** @scenario "A crashed overlay keeps a named shell and a working close control" */
+  it("keeps the dialog named with an X that closes it when its body crashes", async () => {
+    const onClose = vi.fn();
+    renderWithDesignSystem(
+      <Dialog open onClose={onClose} title="Copy dataset" data-testid="copy">
+        <Crash />
+      </Dialog>,
+    );
+
+    expect(await screen.findByRole("dialog", { name: "Copy dataset" })).toBeTruthy();
+    expect(screen.getByRole("alert")).toBeTruthy();
+    await userEvent.setup().click(screen.getByTestId("copy-close"));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A crashed overlay keeps a named shell and a working close control" */
+  it("keeps a must-acknowledge dialog's own action reachable after its body crashes", async () => {
+    const onDone = vi.fn();
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={vi.fn()}
+        title="Save your key"
+        role="alertdialog"
+        dismissible={false}
+        primaryAction={{ label: "Done", onClick: onDone }}
+      >
+        <Crash />
+      </Dialog>,
+    );
+
+    const dialog = await screen.findByRole("alertdialog", { name: "Save your key" });
+    expect(within(dialog).getByRole("alert")).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Close" })).toBeNull();
+    await userEvent.setup().click(within(dialog).getByRole("button", { name: "Done" }));
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A crashed overlay recovers when the entity it shows changes" */
+  it("recovers when another entity with the same title replaces the one that crashed", async () => {
+    function Agent({ id }: { id: string }) {
+      if (id === "a1") throw new Error("boom: agent one");
+      return <p>Agent two body</p>;
+    }
+    const show = (id: string) => (
+      <Drawer onClose={vi.fn()} title="Edit agent" entityKey={id}>
+        <Agent id={id} />
+      </Drawer>
+    );
+    const { rerender } = renderWithDesignSystem(show("a1"));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+
+    rerender(show("a2"));
+
+    expect(await screen.findByText("Agent two body")).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("a dialog's initial focus", () => {
+  beforeEach(stubLayout);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** @scenario "A dialog's initial focus skips what cannot take it" */
+  it("skips a disabled first field and a hidden one for the first usable field", async () => {
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={vi.fn()}
+        title="Rename"
+        primaryAction={{ label: "Save", onClick: vi.fn() }}
+      >
+        <input aria-label="Locked" disabled />
+        <input aria-label="Token" type="hidden" />
+        <fieldset disabled>
+          <input aria-label="Frozen" />
+        </fieldset>
+        <div hidden>
+          <input aria-label="Tucked away" />
+        </div>
+        <input aria-label="Name" />
+      </Dialog>,
+    );
+
+    const field = await screen.findByRole("textbox", { name: "Name" });
+    await waitFor(() => expect(document.activeElement).toBe(field));
+  });
+
+  /** @scenario "A dialog's initial focus skips what cannot take it" */
+  it("falls back to Cancel when a requested action is disabled and there are no fields", async () => {
+    renderWithDesignSystem(
+      <Dialog
+        open
+        onClose={vi.fn()}
+        title="Leave LangWatch?"
+        initialFocus="primary"
+        primaryAction={{ label: "Stay here", onClick: vi.fn(), disabledReason: "Checking" }}
+      />,
+    );
+
+    const cancel = await screen.findByRole("button", { name: "Cancel" });
+    await waitFor(() => expect(document.activeElement).toBe(cancel));
+  });
+
+  /** @scenario "A dialog's initial focus skips what cannot take it" */
+  it("returns focus to the control that opened it", async () => {
+    function Opener() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open rename
+          </button>
+          <Dialog open={open} onClose={() => setOpen(false)} title="Rename">
+            <input aria-label="Name" />
+          </Dialog>
+        </>
+      );
+    }
+    const user = userEvent.setup();
+    renderWithDesignSystem(<Opener />);
+    const opener = screen.getByRole("button", { name: "Open rename" });
+
+    await user.click(opener);
+    const field = await screen.findByRole("textbox", { name: "Name" });
+    await waitFor(() => expect(document.activeElement).toBe(field));
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+});
+
+describe("the retained Content parts", () => {
+  /** @scenario "The retained Content parts still accept asChild" */
+  it("renders a Drawer.Content asChild as the caller's element", async () => {
+    renderWithDesignSystem(
+      <Drawer.Root open>
+        <Drawer.Content asChild>
+          <section data-testid="custom">
+            <Drawer.Title>Custom drawer</Drawer.Title>
+          </section>
+        </Drawer.Content>
+      </Drawer.Root>,
+    );
+
+    const custom = await screen.findByTestId("custom");
+    expect(custom.tagName).toBe("SECTION");
+    expect(custom.getAttribute("role")).toBe("dialog");
+    expect(within(custom).getByText("Custom drawer")).toBeTruthy();
+  });
+
+  /** @scenario "The retained Content parts still accept asChild" */
+  it("renders a Dialog.Content asChild as the caller's element", async () => {
+    renderWithDesignSystem(
+      <Dialog.Root open>
+        <Dialog.Content asChild>
+          <section data-testid="custom">
+            <Dialog.Title>Custom dialog</Dialog.Title>
+          </section>
+        </Dialog.Content>
+      </Dialog.Root>,
+    );
+
+    const custom = await screen.findByTestId("custom");
+    expect(custom.tagName).toBe("SECTION");
+    expect(custom.getAttribute("role")).toBe("dialog");
+    expect(within(custom).getByText("Custom dialog")).toBeTruthy();
+  });
+});
+
+describe("a routed drawer opened from a modal dialog", () => {
+  beforeEach(stubLayout);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function DatasetFlow() {
+    const [drawer, setDrawer] = useState(false);
+    return (
+      <>
+        <Dialog open onClose={vi.fn()} title="Pick a dataset">
+          <button type="button" onClick={() => setDrawer(true)}>
+            Upload CSV
+          </button>
+          <button type="button">Browse datasets</button>
+        </Dialog>
+        <Drawer open={drawer} onClose={() => setDrawer(false)} title="Upload CSV" data-testid="up">
+          <input aria-label="File name" />
+        </Drawer>
+      </>
+    );
+  }
+
+  /** @scenario "A routed drawer opened from a modal dialog takes focus and gives it back" */
+  it("takes focus, keeps it while the reader types and tabs, and returns it on close", async () => {
+    const user = userEvent.setup();
+    renderWithDesignSystem(<DatasetFlow />);
+    const upload = await screen.findByRole("button", { name: "Upload CSV" });
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+
+    await user.click(upload);
+    const drawer = await screen.findByRole("dialog", { name: "Upload CSV" });
+    const field = within(drawer).getByRole("textbox", { name: "File name" });
+    await user.click(field);
+    await user.keyboard("data.csv");
+    expect((field as HTMLInputElement).value).toBe("data.csv");
+    for (let step = 0; step < 4; step += 1) {
+      await user.tab();
+      expect(drawer.contains(document.activeElement)).toBe(true);
+    }
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Upload CSV" })).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(upload));
+    const dialog = screen.getByRole("dialog", { name: "Pick a dataset" });
+    for (let step = 0; step < 4; step += 1) {
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
   });
 });
