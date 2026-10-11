@@ -633,6 +633,7 @@ export class ModelProviderModule implements ModelProviderApi {
 
     const saved = await this.upsert(
       {
+        id: input.modelProviderId,
         projectId: input.projectId,
         provider: "openai_codex",
         enabled: true,

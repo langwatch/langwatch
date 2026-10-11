@@ -26,6 +26,7 @@ import type { ScopeAssignment } from "../../model/scope-assignment.ts";
  */
 export function CodexSignIn({
   guided = false,
+  modelProviderId,
   projectId,
   scopes,
   setAsCodingDefaults,
@@ -34,6 +35,8 @@ export function CodexSignIn({
 }: {
   /** Onboarding's wording: the account is named ChatGPT, as the plan it runs on. */
   guided?: boolean;
+  /** The stored row this drawer edits: re-authenticating updates it rather than adding one. */
+  modelProviderId?: string;
   projectId: string;
   /** Where the provider row saves — callers pass the widest manageable scope. */
   scopes: ScopeAssignment[];
@@ -46,6 +49,7 @@ export function CodexSignIn({
 }) {
   const signIn = useCodexDeviceSignIn({
     projectId,
+    modelProviderId,
     scopes,
     setAsCodingDefaults,
     onConnected,

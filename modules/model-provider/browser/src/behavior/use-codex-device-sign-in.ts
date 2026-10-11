@@ -67,6 +67,7 @@ function connectedAccount({
 type PollRound = {
   attempt: number;
   attemptRef: { current: number };
+  modelProviderId: string | undefined;
   onConnected?: (account: { email: string; plan: string }) => void;
   pending: PendingPhase;
   poll: {
@@ -76,6 +77,7 @@ type PollRound = {
       userCode: string;
       scopes: ScopeAssignment[];
       setAsCodingDefaults: boolean;
+      modelProviderId?: string;
     }): Promise<{ status: "pending" } | { status: "complete"; email: string; plan: string }>;
   };
   projectId: string;
@@ -92,6 +94,7 @@ type PollRound = {
 async function runPollRound({
   attempt,
   attemptRef,
+  modelProviderId,
   onConnected,
   pending,
   poll,
@@ -121,6 +124,7 @@ async function runPollRound({
       userCode: pending.userCode,
       scopes,
       setAsCodingDefaults,
+      modelProviderId,
     });
     if (attempt !== attemptRef.current) return "stop";
     if (result.status !== "complete") return "again";
@@ -145,11 +149,14 @@ async function runPollRound({
 
 export function useCodexDeviceSignIn({
   projectId,
+  modelProviderId,
   scopes,
   setAsCodingDefaults,
   onConnected,
 }: {
   projectId: string;
+  /** The row being re-authenticated, which the sign-in updates; absent saves a new row. */
+  modelProviderId?: string;
   /** Where the provider row saves — callers pass the widest manageable scope. */
   scopes: ScopeAssignment[];
   /** Langy setup + onboarding pass true: also point Langy and the tiny
@@ -180,6 +187,7 @@ export function useCodexDeviceSignIn({
           const outcome = await runPollRound({
             attempt,
             attemptRef,
+            modelProviderId,
             onConnected,
             pending,
             poll,
@@ -195,7 +203,7 @@ export function useCodexDeviceSignIn({
         })();
       }, pending.intervalSeconds * 1000);
     },
-    [poll, projectId, scopes, setAsCodingDefaults, utils, onConnected],
+    [modelProviderId, poll, projectId, scopes, setAsCodingDefaults, utils, onConnected],
   );
 
   const begin = useCallback(async () => {

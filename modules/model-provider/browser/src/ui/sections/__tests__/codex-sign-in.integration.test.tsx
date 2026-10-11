@@ -64,6 +64,27 @@ describe("<CodexSignIn /> re-authenticating a connected Codex account", () => {
     });
   });
 
+  describe("when the drawer edits a stored Codex row", () => {
+    it("names that row on the poll, so the sign-in updates it instead of adding one", async () => {
+      poll.mockResolvedValue({ status: "complete", email: "dev@example.com", plan: "pro" });
+      const user = userEvent.setup();
+      renderWithModelProviderHost(
+        <CodexSignIn
+          projectId="proj-1"
+          modelProviderId="mp_codex"
+          scopes={[]}
+          setAsCodingDefaults={false}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: /Re-authenticate/ }));
+
+      await vi.waitFor(() =>
+        expect(poll).toHaveBeenCalledWith(expect.objectContaining({ modelProviderId: "mp_codex" })),
+      );
+    });
+  });
+
   describe("when the sign-in fails for another reason", () => {
     it("shows the registry's words and keeps the Re-authenticate action", async () => {
       poll.mockRejectedValue(new CodexAuthError("http", "HTTP 503: unavailable"));
