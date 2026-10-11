@@ -53,6 +53,13 @@ Feature: An aggregate project reads its member projects
     Then the row is marked revoked with a reason rather than deleted
     And the organisation's authorization epoch moves forward
 
+  @unit
+  Scenario: A shared grant's window is stored with its row
+    Given a project-reader grant attached with a condition starting today
+    When the grant's attach is projected into the grants table
+    Then the stored row carries that condition
+    And an own grant's row carries none
+
   # ── B. A proof is minted at the door ─────────────────────────────────────
 
   @unit
@@ -681,3 +688,9 @@ Feature: An aggregate project reads its member projects
     Then she lands on its Trace Explorer and never sees the home
     And the home is replaced in her history, so Back does not return to it
     And an ordinary project's home still opens as before
+
+  @unit
+  Scenario: A fenced read declared a full scan reaches the client declared
+    Given a repository reading through the proof-checked client
+    When it declares the read a full scan
+    Then the routed client receives the declaration, so it logs no cold-scan warning

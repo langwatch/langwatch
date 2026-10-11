@@ -2379,6 +2379,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           traceIds: ids,
         },
         format: "JSONEachRow",
+        // As on main: a trace's evaluations by id, kept unbounded so none is dropped.
+        SKIP_COLD_SCAN_CHECK: true,
       });
       return evaluationRunRowsSchema.parse(await result.json());
     };

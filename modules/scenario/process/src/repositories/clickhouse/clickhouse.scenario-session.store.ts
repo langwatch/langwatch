@@ -9,6 +9,7 @@ type ScenarioReadOnlyClickHouse = Readonly<{
     tenantIds?: readonly string[];
     sql: string;
     params?: Record<string, unknown>;
+    SKIP_COLD_SCAN_CHECK?: true | undefined;
   }): Promise<{ rows: Row[] }>;
   columns(input: { tenantId: string }): ClickHouseColumns;
 }>;
@@ -32,12 +33,14 @@ export class ClickHouseScenarioSession implements SimulationClickHouseClient {
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
     tenantIds?: readonly string[];
+    SKIP_COLD_SCAN_CHECK?: true | undefined;
   }): Promise<{ json<Result>(): Promise<Result[]> }> {
     const request = {
       tenantId: this.tenantId,
       ...(input.tenantIds ? { tenantIds: input.tenantIds } : {}),
       sql: input.query,
       params: input.query_params,
+      ...(input.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
     };
 
     return { json: async <Result>() => (await this.clickhouse.query<Result>(request)).rows };

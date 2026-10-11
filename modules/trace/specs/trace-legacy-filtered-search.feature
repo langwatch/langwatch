@@ -39,3 +39,10 @@ Feature: A filtered legacy trace search narrows by Trace's own filter grammar
     Given a legacy trace search filtered by span type and by evaluator
     When the trace list is read
     Then every statement it issues binds each table it reads to the project, so the tenant guard admits it
+
+  @unit
+  Scenario: A page's evaluations are read by trace id as on main, a declared full scan
+    Given a legacy trace list page
+    When its evaluations are read by the page's trace ids
+    Then the read carries no time bound, as on main, so no evaluation is dropped
+    And it is declared a full scan rather than warned about

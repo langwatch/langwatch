@@ -230,6 +230,8 @@ export type SimulationClickHouseClient = {
     format: "JSONEachRow";
     /** A declared tenant set: one organization's projects, bound by `TenantId IN (...)`. */
     tenantIds?: readonly string[];
+    /** Set when the read must walk every partition; see the member's cold-scan warning. */
+    SKIP_COLD_SCAN_CHECK?: true | undefined;
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
   /** Absent on a bare driver client (tests): every column is then named. */
   select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
@@ -337,12 +339,14 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   private async queryRows<T>(
     query: string,
     params: { tenantId: string } & Record<string, string | string[]>,
+    options: { declaresFullScan?: boolean } = {},
   ): Promise<T[]> {
     const client = await this.getClient(params.tenantId);
     const result = await client.query({
       query,
       query_params: params,
       format: "JSONEachRow",
+      ...(options.declaresFullScan === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
     });
     return result.json<T>();
   }
@@ -383,6 +387,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        GROUP BY NormalizedSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId, ...dateFilter.params },
+      // As on main: with no start date this lists every set the tenant ever ran.
+      { declaresFullScan: startDate === undefined },
     );
 
     return rows.map((row) => ({

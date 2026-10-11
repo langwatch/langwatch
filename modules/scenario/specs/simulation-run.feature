@@ -45,3 +45,10 @@ Feature: A simulation run reports its true state and never leaks secrets
     Given the ClickHouse target has the `Criteria.*` columns on simulation_runs
     When a run is read by id or listed
     Then the read selects the stored per-criterion columns
+
+  @unit
+  Scenario: The scenario-set list with no start date is a declared full scan
+    Given a tenant's scenario sets run across many weeks
+    When the set list is read with no start date
+    Then every set the tenant ever ran is listed, as on main, declared a full scan
+    And a list read from a start date declares nothing, so the date prunes
