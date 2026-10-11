@@ -257,7 +257,7 @@ describe("given the read of the caller's access fails", () => {
       await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
       expect(screen.getByRole("alert")).toHaveTextContent("Couldn't read your access");
       expect(createButton()).toBeDisabled();
-      expect(createButton()).toHaveAccessibleDescription(/Couldn't read your access/);
+      expect(screen.getByLabelText(/Couldn't read your access\. Retry above/)).toBeInTheDocument();
       expect(onCreate).not.toHaveBeenCalled();
     });
 
@@ -372,7 +372,9 @@ describe("given the caller's access is still loading", () => {
       renderDrawer({ bindingsLoading: true });
       expect(createButton()).toBeDisabled();
       expect(screen.getByText(/Reading your access/)).toBeInTheDocument();
-      expect(createButton()).toHaveAccessibleDescription(/Reading your access/);
+      expect(
+        screen.getByLabelText(/Reading your access\. Create is available/),
+      ).toBeInTheDocument();
     });
   });
 });

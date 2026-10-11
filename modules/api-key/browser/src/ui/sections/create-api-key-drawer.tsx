@@ -10,7 +10,6 @@ import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Box,
-  Button,
   createListCollection,
   HStack,
   Input,
@@ -177,6 +176,12 @@ function focusKeyField({
   const target = targets[field].current ?? fallback.current;
   if (field === "name") target?.focus();
   else focusWithin(target);
+}
+
+function accessReason(myBindings: MyBindings): string {
+  return myBindings.isError
+    ? "Couldn't read your access. Retry above, then create the key."
+    : "Reading your access. Create is available once it loads.";
 }
 
 function AccessNote({ myBindings }: { myBindings: MyBindings }) {
@@ -532,150 +537,134 @@ export function CreateApiKeyDrawer({
   const accessBlocked = myBindings.isLoading || myBindings.isError;
 
   return (
-    <Drawer.Root
-      placement="end"
+    <Drawer
       size="lg"
       open={isOpen}
-      onOpenChange={({ open }) => {
-        if (!open) {
-          onClose();
-          resetForm();
-        }
+      onClose={() => {
+        onClose();
+        resetForm();
+      }}
+      title="Create new secret key"
+      footer={{
+        cancel: { onClick: onClose },
+        busy: isCreating,
+        primaryAction: {
+          label: "Create secret key",
+          onClick: handleCreate,
+          loading: isCreating,
+          disabledReason: accessBlocked ? accessReason(myBindings) : void 0,
+          "data-testid": "api-key-create-submit",
+        },
       }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Create new secret key</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack gap={5} align="start">
-            {accessBlocked && <AccessNote myBindings={myBindings} />}
-            {/* Key type — only admins can create service keys */}
-            {isAdmin && (
-              <KeyTypeField
-                keyType={keyType}
-                onKeyTypeChange={setKeyType}
-                selectedUserId={selectedUserId}
-                onUserChange={setSelectedUserId}
-                memberCollection={memberCollection}
+      <VStack gap={5} align="start">
+        {accessBlocked && <AccessNote myBindings={myBindings} />}
+        {/* Key type — only admins can create service keys */}
+        {isAdmin && (
+          <KeyTypeField
+            keyType={keyType}
+            onKeyTypeChange={setKeyType}
+            selectedUserId={selectedUserId}
+            onUserChange={setSelectedUserId}
+            memberCollection={memberCollection}
+          />
+        )}
+
+        {/* Name */}
+        <SettingsField label="Name" error={showError("name")}>
+          <Input
+            ref={nameRef}
+            placeholder="e.g., CI Pipeline, Local Dev"
+            data-testid="api-key-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </SettingsField>
+
+        {/* Description */}
+        <SettingsField label="Description (optional)">
+          <Textarea
+            placeholder="What is this key used for?"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={500}
+            rows={3}
+            resize="vertical"
+          />
+        </SettingsField>
+
+        {/* Scope */}
+        <SettingsField label="Scope" error={showError("scope")}>
+          <Box ref={scopeRef} width="full">
+            <ScopeChipPicker
+              value={selectedScopes}
+              onChange={(next) => {
+                setSelectedScopes(next);
+                setCategorySelections({});
+              }}
+              organizationId={organizationId}
+              organizationName={organizationName}
+              availableTeams={orgTeams}
+              availableProjects={orgProjects}
+              label=""
+              showQuickPicks
+              currentOrganizationId={organizationId}
+              currentTeamId={currentTeamId}
+              currentProjectId={currentProjectId}
+            />
+          </Box>
+        </SettingsField>
+
+        {/* Permissions */}
+        <PermissionsField
+          error={showError("permissions")}
+          permissionMode={permissionMode}
+          onModeChange={(mode) => {
+            setPermissionMode(mode);
+            if (mode === "all") setCategorySelections({});
+          }}
+          selections={categorySelections}
+          userPermissions={userPermissions}
+          onSelectionsChange={setCategorySelections}
+          containerRef={permissionsRef}
+          listRef={permissionListRef}
+        />
+
+        {/* Expiration */}
+        <SettingsField label="Expiration">
+          <VStack ref={expirationRef} gap={1} align="start" width="full">
+            <Select.Root
+              collection={expirationCollection}
+              value={[expirationPreset]}
+              onValueChange={(details) => {
+                const val = details.value[0] ?? EXPIRATION_UNCHOSEN;
+                setExpirationPreset(val);
+                if (val !== "custom") setCustomDate("");
+              }}
+            >
+              <Select.Trigger width="full">
+                <Select.ValueText placeholder="Choose when this key expires" />
+              </Select.Trigger>
+              <Select.Content width="300px" paddingY={2}>
+                {EXPIRATION_OPTIONS.map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    {option.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+            {expirationPreset === "custom" && (
+              <Input
+                type="date"
+                value={customDate}
+                min={minCustomDate}
+                onChange={(e) => setCustomDate(e.target.value)}
               />
             )}
-
-            {/* Name */}
-            <SettingsField label="Name" error={showError("name")}>
-              <Input
-                ref={nameRef}
-                placeholder="e.g., CI Pipeline, Local Dev"
-                data-testid="api-key-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </SettingsField>
-
-            {/* Description */}
-            <SettingsField label="Description (optional)">
-              <Textarea
-                placeholder="What is this key used for?"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                maxLength={500}
-                rows={3}
-                resize="vertical"
-              />
-            </SettingsField>
-
-            {/* Scope */}
-            <SettingsField label="Scope" error={showError("scope")}>
-              <Box ref={scopeRef} width="full">
-                <ScopeChipPicker
-                  value={selectedScopes}
-                  onChange={(next) => {
-                    setSelectedScopes(next);
-                    setCategorySelections({});
-                  }}
-                  organizationId={organizationId}
-                  organizationName={organizationName}
-                  availableTeams={orgTeams}
-                  availableProjects={orgProjects}
-                  label=""
-                  showQuickPicks
-                  currentOrganizationId={organizationId}
-                  currentTeamId={currentTeamId}
-                  currentProjectId={currentProjectId}
-                />
-              </Box>
-            </SettingsField>
-
-            {/* Permissions */}
-            <PermissionsField
-              error={showError("permissions")}
-              permissionMode={permissionMode}
-              onModeChange={(mode) => {
-                setPermissionMode(mode);
-                if (mode === "all") setCategorySelections({});
-              }}
-              selections={categorySelections}
-              userPermissions={userPermissions}
-              onSelectionsChange={setCategorySelections}
-              containerRef={permissionsRef}
-              listRef={permissionListRef}
-            />
-
-            {/* Expiration */}
-            <SettingsField label="Expiration">
-              <VStack ref={expirationRef} gap={1} align="start" width="full">
-                <Select.Root
-                  collection={expirationCollection}
-                  value={[expirationPreset]}
-                  onValueChange={(details) => {
-                    const val = details.value[0] ?? EXPIRATION_UNCHOSEN;
-                    setExpirationPreset(val);
-                    if (val !== "custom") setCustomDate("");
-                  }}
-                >
-                  <Select.Trigger width="full">
-                    <Select.ValueText placeholder="Choose when this key expires" />
-                  </Select.Trigger>
-                  <Select.Content width="300px" paddingY={2}>
-                    {EXPIRATION_OPTIONS.map((option) => (
-                      <Select.Item key={option.value} item={option}>
-                        {option.label}
-                      </Select.Item>
-                    ))}
-                  </Select.Content>
-                </Select.Root>
-                {expirationPreset === "custom" && (
-                  <Input
-                    type="date"
-                    value={customDate}
-                    min={minCustomDate}
-                    onChange={(e) => setCustomDate(e.target.value)}
-                  />
-                )}
-                <ExpirationHint chosen={expirationChosen} attempted={attempted} />
-              </VStack>
-            </SettingsField>
+            <ExpirationHint chosen={expirationChosen} attempted={attempted} />
           </VStack>
-        </Drawer.Body>
-        <Drawer.Actions
-          onCancel={onClose}
-          busy={isCreating}
-          primary={
-            <Button
-              colorPalette="orange"
-              variant="solid"
-              onClick={handleCreate}
-              loading={isCreating}
-              disabled={accessBlocked}
-              aria-describedby={accessBlocked ? ACCESS_NOTE_ID : undefined}
-              data-testid="api-key-create-submit"
-            >
-              Create secret key
-            </Button>
-          }
-        />
-      </Drawer.Content>
-    </Drawer.Root>
+        </SettingsField>
+      </VStack>
+    </Drawer>
   );
 }
