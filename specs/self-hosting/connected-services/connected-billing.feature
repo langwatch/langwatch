@@ -237,17 +237,27 @@ Feature: Billing a connected self-hosted customer
     Then no second invoice is created
 
   @unit
-  Scenario: A seat invoice that failed at the payment provider is retried without doubling
+  Scenario: A seat invoice that failed at the payment provider is retried once a day
     Given the seat change recorded its intent and the payment provider call then failed
     When the next seat invoicing pass runs
+    Then it does not call the payment provider for that change again
+    When the next daily billing tick runs
     Then the invoice is created once
     And the admin console showed the change as pending until then
+
+  @unit
+  Scenario: A new seat change is invoiced within the minute while an older invoice keeps failing
+    Given a seat change whose invoice the payment provider refused
+    And licensing then records another seat change
+    When the next seat invoicing pass runs
+    Then the new change is invoiced
+    And the refused change waits for the daily billing tick
 
   @unit
   Scenario: A seat invoice raised but never recorded is found rather than raised again
     Given an earlier pass raised the seat invoice and failed before recording it
     And the payment provider's idempotency key for it has lapsed
-    When the next seat invoicing pass runs
+    When the next daily billing tick runs
     Then the invoice the payment provider already holds is recorded
     And no second invoice is raised
 

@@ -201,10 +201,11 @@ describe("invoicing the seat changes licensing recorded", () => {
   });
 
   describe("when the payment provider is down", () => {
-    /** @scenario "A seat invoice that failed at the payment provider is retried without doubling" */
-    it("keeps the intent and invoices it once on the next pass", async () => {
+    /** @scenario "A seat invoice that failed at the payment provider is retried once a day" */
+    it("keeps the intent, leaves it to the daily tick, and invoices it once there", async () => {
       const { invoicing, store, service } = harness();
-      vi.spyOn(invoicing, "createOneOffInvoice").mockRejectedValueOnce(new Error("provider down"));
+      const raise = vi.spyOn(invoicing, "createOneOffInvoice");
+      raise.mockRejectedValueOnce(new Error("provider down"));
 
       await expect(service.invoicePendingSeatChanges()).resolves.toEqual({
         decided: 1,
@@ -213,10 +214,36 @@ describe("invoicing the seat changes licensing recorded", () => {
       });
       expect(store.connectedSeatChanges.get("lic-2")?.state).toBe("intent");
 
-      await expect(service.invoicePendingSeatChanges()).resolves.toMatchObject({ invoiced: 1 });
-      await service.invoicePendingSeatChanges();
+      await expect(service.invoicePendingSeatChanges()).resolves.toEqual({
+        decided: 0,
+        invoiced: 0,
+        failed: 0,
+      });
+      expect(raise).toHaveBeenCalledTimes(1);
+
+      await expect(service.retryFailedSeatInvoices()).resolves.toEqual({ invoiced: 1, failed: 0 });
+      await service.retryFailedSeatInvoices();
       expect(invoicing.raised).toHaveLength(1);
       expect(store.connectedSeatChanges.get("lic-2")?.state).toBe("invoiced");
+    });
+
+    /** @scenario "A new seat change is invoiced within the minute while an older invoice keeps failing" */
+    it("invoices a new change on the next pass without retrying the failed one", async () => {
+      const { invoicing, recorded, store, service } = harness();
+      const raise = vi.spyOn(invoicing, "createOneOffInvoice");
+      raise.mockRejectedValueOnce(new Error("no such customer"));
+      await service.invoicePendingSeatChanges();
+
+      recorded.push({ ...addEightSeats, licenseRowId: "lic-3" });
+      await expect(service.invoicePendingSeatChanges()).resolves.toEqual({
+        decided: 1,
+        invoiced: 1,
+        failed: 0,
+      });
+
+      expect(raise).toHaveBeenCalledTimes(2);
+      expect(store.connectedSeatChanges.get("lic-2")?.state).toBe("intent");
+      expect(store.connectedSeatChanges.get("lic-3")?.state).toBe("invoiced");
     });
   });
 
@@ -245,7 +272,7 @@ describe("invoicing the seat changes licensing recorded", () => {
       });
       const raise = vi.spyOn(invoicing, "createOneOffInvoice");
 
-      await service.invoicePendingSeatChanges();
+      await service.retryFailedSeatInvoices();
 
       expect(raise).not.toHaveBeenCalled();
       expect(store.connectedSeatChanges.get("lic-2")).toMatchObject({
