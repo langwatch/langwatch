@@ -20,9 +20,11 @@ Rule: Grouping selector dropdown
     Given the user is authenticated with "traces:view" permission
     And the project has traces with varied models, services, users, and sessions
 
+  @integration
   Scenario: Grouping selector appears in the toolbar
     When the Observe page loads
-    Then a View menu (Layers icon, "View" label, chevron) appears on the right side of the toolbar
+    Then a "Group by: None" select (Layers icon, label, chevron) is visible in the toolbar
+    And it keeps only the icon and chevron while the toolbar is too narrow
 
   Scenario: Grouping selector defaults to flat for the All lens
     When the user views the "All" lens
@@ -30,23 +32,22 @@ Rule: Grouping selector dropdown
     And the trigger renders as an outline button (the visual cue for the flat state)
 
   Scenario: Grouping selector lists all grouping options
-    When the user opens the View menu
-    Then the options are "Flat", "By Conversation", "By Service", "By User", and "By Model"
+    When the user opens the grouping select
+    Then the options are "None", "Conversation", "Service", "User", and "Model"
 
   Scenario: Selecting a grouping transforms the table
-    When the user selects "By Model" from the View menu
+    When the user selects "Model" from the grouping select
     Then the table renders as grouped sections by model
     And the change is recorded as a draft on the active lens (orange dot appears)
 
   Scenario: Selector trigger reflects the active grouping
     When the user selects a non-flat grouping
     Then the trigger switches to the "subtle" button variant
-    And its `aria-label` reads "View options. Rows <Label>, <Density> density." (e.g. "By Service")
-    # The trigger shows the Layers icon, a "View" label and a chevron, not a "Group: by X" label.
+    And the trigger reads "Group by: <Label>" (e.g. "Group by: Service")
 
   Scenario: Selecting flat restores the ungrouped table
     Given the user has selected "By Model" grouping
-    When the user selects "Flat" from the View menu
+    When the user selects "None" from the grouping select
     Then the table renders as a flat list of traces
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ Rule: Grouping is editable on every lens (no lock today)
 
   Scenario: Saving a custom lens with a chosen grouping
     Given the user views the "All" lens
-    When the user selects "By Model" from the View menu
+    When the user selects "Model" from the grouping select
     And saves the changes as a new custom lens
     Then the new custom lens persists with grouping "by-model"
 

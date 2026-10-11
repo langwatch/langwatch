@@ -42,7 +42,10 @@ vi.mock("../../onboarding/spotlights/spotlight-overlay.tsx", () => ({
 vi.mock("../columns-dropdown.tsx", () => ({
   ColumnsDropdown: () => <div data-testid="columns" />,
 }));
-vi.mock("../view-menu.tsx", () => ({ ViewMenu: () => <div data-testid="view" /> }));
+vi.mock("../grouping-select.tsx", () => ({
+  GroupingSelect: () => <div data-testid="grouping" />,
+}));
+vi.mock("../density-toggle.tsx", () => ({ DensityToggle: () => <div data-testid="density" /> }));
 vi.mock("../toolbar-more-menu.tsx", () => ({
   ToolbarMoreMenu: () => <div data-testid="more" />,
 }));
@@ -64,7 +67,7 @@ describe("the toolbar row", () => {
       const { container, getByTestId } = renderWithDesignSystem(<Toolbar />);
 
       const timeCluster = getByTestId("live").parentElement as HTMLElement;
-      const viewCluster = getByTestId("view").parentElement as HTMLElement;
+      const viewCluster = getByTestId("columns").parentElement as HTMLElement;
       const tabs = container.querySelector('[data-scope="tabs"][data-part="root"]') as HTMLElement;
       const tabsBox = tabs.parentElement as HTMLElement;
 
@@ -80,7 +83,8 @@ describe("the toolbar row", () => {
         );
       }
       expect(getByTestId("time-range").parentElement).toBe(timeCluster);
-      expect(getByTestId("columns").parentElement).toBe(viewCluster);
+      expect(getByTestId("grouping").parentElement).toBe(timeCluster);
+      expect(getByTestId("density").parentElement).toBe(timeCluster);
     });
   });
 });

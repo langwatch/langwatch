@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The toolbar's view menu (grouping, density), time-range popover and columns picker.
+ * The toolbar's grouping select, density toggle, time-range popover and columns picker.
  * @see specs/traces-v2/trace-table.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -10,9 +10,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
+import { useDensityStore } from "../../../../../features/explorer/behavior/density.store.ts";
 import { ColumnPickerContent } from "../column-picker-content.tsx";
+import { DensityToggle } from "../density-toggle.tsx";
+import { GroupingSelect } from "../grouping-select.tsx";
 import { TimeRangePicker } from "../time-range-picker.tsx";
-import { ViewMenu } from "../view-menu.tsx";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
@@ -38,22 +40,46 @@ afterEach(() => {
   cleanup();
 });
 
-describe("the view menu", () => {
+describe("the grouping select", () => {
   /** @scenario "Grouping selector shows checkmark on selected item" */
   it("marks the selected grouping with a checkmark and no other grouping", async () => {
     useExplorerStore.getState().setGrouping("by-model");
-    renderWithDesignSystem(<ViewMenu />);
+    renderWithDesignSystem(<GroupingSelect />);
 
-    await userEvent.click(screen.getByRole("button", { name: /View options/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Group by: Model" }));
 
-    const group = await screen.findByRole("group", { name: "Group rows" });
-    const items = within(group).getAllByRole("menuitemradio");
+    const items = await screen.findAllByRole("menuitemradio");
     const selected = items.filter((item) => item.getAttribute("aria-checked") === "true");
-    expect(selected.map((item) => item.textContent)).toEqual(["By Model"]);
+    expect(selected.map((item) => item.textContent)).toEqual(["Model"]);
     expect(selected[0]?.querySelector("svg")).toBeVisible();
     for (const item of items.filter((i) => i !== selected[0])) {
       expect(item.querySelector("svg")).not.toBeVisible();
     }
+  });
+
+  /** @scenario "Grouping selector appears in the toolbar" */
+  it("names the active grouping on the trigger", () => {
+    renderWithDesignSystem(<GroupingSelect />);
+
+    const trigger = screen.getByRole("button", { name: "Group by: None" });
+    expect(trigger).toHaveTextContent("Group by:None");
+  });
+});
+
+describe("the density toggle", () => {
+  /** @scenario "Density toggle shows both densities at once" */
+  it("labels both densities and switches with one click", async () => {
+    useDensityStore.getState().setDensity("comfortable");
+    renderWithDesignSystem(<DensityToggle />);
+
+    const compact = screen.getByRole("radio", { name: "Compact" });
+    expect(screen.getByRole("radio", { name: "Comfortable" })).toBeChecked();
+    expect(screen.getByText("Compact")).toBeVisible();
+    expect(screen.getByText("Comfortable")).toBeVisible();
+
+    await userEvent.click(compact);
+
+    expect(useDensityStore.getState().density).toBe("compact");
   });
 });
 

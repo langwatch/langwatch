@@ -14,7 +14,7 @@ import { useDensityStore } from "../../../../features/explorer/behavior/density.
 import { tryParseChat } from "../../../../model/explorer/trace-table/chat-content.ts";
 import { useDensityTokens } from "../hooks/use-density-tokens.ts";
 
-const COMFORTABLE_LABEL_WIDTH = "60px";
+const COMFORTABLE_LABEL_WIDTH = "68px";
 
 interface IOPreviewProps {
   input: string | null;
@@ -551,8 +551,7 @@ const ComfortableIOPreview: React.FC<
     <VStack align="stretch" gap={2}>
       {inputRow && (
         <ComfortableRow
-          label="Input"
-          labelColor="fg.muted"
+          direction="input"
           textColor="fg.muted"
           text={inputRow.text}
           media={inputRow.media}
@@ -561,8 +560,7 @@ const ComfortableIOPreview: React.FC<
       {placeholders.input && <ComfortableMissingRow direction="input" />}
       {outputRow && (
         <ComfortableRow
-          label="Output"
-          labelColor="fg.muted"
+          direction="output"
           textColor="fg"
           text={outputRow.text}
           media={outputRow.media}
@@ -573,17 +571,32 @@ const ComfortableIOPreview: React.FC<
   );
 };
 
+/**
+ * "Input" / "Output" as a neutral label with the same up / down arrow the compact rows use,
+ * so the two sides tell apart by word and shape in both themes, never by a palette colour.
+ */
+const ComfortableLabel: React.FC<{ direction: "input" | "output"; muted?: boolean }> = ({
+  direction,
+  muted = false,
+}) => (
+  <HStack
+    gap={1}
+    flexShrink={0}
+    width={COMFORTABLE_LABEL_WIDTH}
+    height="20px"
+    color={muted ? "fg.subtle" : "fg"}
+    data-testid={`io-preview-label-${direction}`}
+  >
+    <Icon boxSize="12px" color={muted ? "fg.subtle" : "fg.muted"}>
+      {direction === "input" ? <ArrowUp /> : <ArrowDown />}
+    </Icon>
+    <Text textStyle="groupLabel">{direction === "input" ? "Input" : "Output"}</Text>
+  </HStack>
+);
+
 const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ direction }) => (
   <HStack align="flex-start" gap={2}>
-    <Text
-      textStyle="sm"
-      fontWeight="semibold"
-      color="fg.subtle"
-      flexShrink={0}
-      width={COMFORTABLE_LABEL_WIDTH}
-    >
-      {direction === "input" ? "Input" : "Output"}
-    </Text>
+    <ComfortableLabel direction={direction} muted />
     <Text
       data-testid={`io-preview-missing-${direction}`}
       textStyle="sm"
@@ -596,22 +609,13 @@ const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ di
 );
 
 const ComfortableRow: React.FC<{
-  label: string;
-  labelColor: string | { base: string; _dark: string };
+  direction: "input" | "output";
   textColor: string;
   text: string;
   media: RowMedia;
-}> = ({ label, labelColor, textColor, text, media }) => (
+}> = ({ direction, textColor, text, media }) => (
   <HStack align="flex-start" gap={2}>
-    <Text
-      textStyle="sm"
-      fontWeight="semibold"
-      color={labelColor}
-      flexShrink={0}
-      width={COMFORTABLE_LABEL_WIDTH}
-    >
-      {label}
-    </Text>
+    <ComfortableLabel direction={direction} />
     <VStack align="start" gap={1.5} flex={1} minWidth={0}>
       <HStack width="full" gap={1} align="flex-start">
         <RowMediaIndicators media={media} />

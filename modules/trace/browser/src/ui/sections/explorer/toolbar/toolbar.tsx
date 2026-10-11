@@ -27,15 +27,17 @@ import { useTraceExplorerTourPreference } from "../onboarding/hooks/use-trace-ex
 import { useTourEntryPoints } from "../onboarding/index.ts";
 import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay.tsx";
 import { ColumnsDropdown } from "./columns-dropdown.tsx";
+import { DensityToggle } from "./density-toggle.tsx";
+import { GroupingSelect } from "./grouping-select.tsx";
 import { LensTabs } from "./lens-tabs.tsx";
 import { LiveIndicator } from "./live-indicator.tsx";
 import { TimeRangePicker } from "./time-range-picker.tsx";
 import { ToolbarMoreMenu } from "./toolbar-more-menu.tsx";
-import { ViewMenu } from "./view-menu.tsx";
 
 // Toolbar widths (the bar's own measured width, not the viewport) below which the right
 // clusters shed labels, then chevrons, so the lens tabs keep the room. Lenses that still do
-// not fit move whole into the lens overflow menu.
+// not fit move whole into the lens overflow menu. Grouping and density keep their labels
+// longest: they are how people learn what the controls do.
 const TOOLBAR_LABELS_MIN_WIDTH = 960;
 const TOOLBAR_CHEVRONS_MIN_WIDTH = 720;
 // Room the optional controls take, so the thresholds hold when they are on the bar.
@@ -251,7 +253,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
       )}
       {/* Cluster 1: the lenses, which take every pixel the other two clusters leave. */}
       <LensTabs />
-      {/* Cluster 2: what the table holds: filters, saving them, the time window, freshness. */}
+      {/* Cluster 2: what the table holds and how its rows read: filters, saving them, the time
+          window, freshness, grouping and density. */}
       <HStack gap={1} flexShrink={0}>
         {sidebarCollapsed && (
           <Tooltip
@@ -322,11 +325,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
         )}
         <TimeRangePicker compact={labelsCompact} />
         <LiveIndicator />
+        <GroupingSelect compact={chevronsCompact} />
+        <DensityToggle compact={chevronsCompact} />
       </HStack>
       <ToolbarDivider />
-      {/* Cluster 3: how the table looks (view, columns), getting data out, and help. */}
+      {/* Cluster 3: which columns show, getting data out, and help. */}
       <HStack gap={1} flexShrink={0}>
-        <ViewMenu compact={labelsCompact} />
         <ColumnsDropdown compact={chevronsCompact} />
         {onExportAll && (
           <Tooltip
