@@ -51,6 +51,10 @@ every blocking step their image declares is `done` or `not-needed` (the serving
 gate). Background steps run on the worker and need no deploy step. The contract
 the private deploy must meet is `dev/docs/runbooks/upgrade-on-deploy.md`.
 
+Amended 2026-10-11 (Alex, slice 2): the worker runs the upgrade in its own process, over its
+installed modules booted in the tasks role, and `pnpm task upgrade` is a run-once worker that
+starts it to run the upgrade once and exits 0, 1 or 3. The deploy's Job runs that command as before.
+
 ### 2. One model, keyed by step id (D1)
 
 A step is identified by its id, never reused. What ran is the ledger, keyed by
@@ -160,7 +164,8 @@ F-6). The operator override of §3 is wired into `oldWritersGoneFor` (Alex, 2026
   by the database clock. Both live in the ledger schema, in the runner-owned
   `_langwatch_serving_roster_override` table.
 - **Who records it.** `pnpm task upgrade old-writers-gone` asserts and `pnpm task upgrade
-pre-roster-rollback` records a rollback and reopens done background steps. The cloud deploy
+pre-roster-rollback` records a rollback and reopens done background steps. Both stay reads and
+writes of the tasks app, not runs; only a run starts the worker (2026-10-11). The cloud deploy
   asserts after its rollout; the chart's post-upgrade hook does so once the rollout has finished,
   opt-in because it needs RBAC and its own ServiceAccount token; docker compose recreates the app
   and workers independently and relies on the grace. Ops' `assertSystemMigrationLegacyWritersDrained`

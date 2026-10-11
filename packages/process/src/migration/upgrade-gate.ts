@@ -12,6 +12,7 @@ import type { ListedWork } from "@langwatch/eventing";
 
 import type { ServerRole } from "../feature-installer.ts";
 import { UPGRADE_CONSOLE_TOKEN_TTL_MS, type UpgradeConsole } from "../lifecycle/liveness-thread.ts";
+import type { BootedApplication } from "../process-container.ts";
 import type { ServerComponent, ServerLogger } from "../server.ts";
 
 /** Tasks runs `upgrade` itself and is never gated. */
@@ -55,7 +56,17 @@ export type UpgradeGate = Readonly<{
   backgroundSteps?: UpgradeGateBackgroundSteps;
   /** The console's Retry: the ledger's failed steps back to `pending` for the worker's run. */
   retryFailedSteps?: () => Promise<void>;
+  /** Runs the upgrade once in this process and answers its exit code: `pnpm task upgrade`. */
+  runOnce?: () => Promise<number>;
 }>;
+
+/**
+ * Boots the installed list in the tasks role, in this process, hands it to `use` and closes it:
+ * the worker's upgrade reads the declared steps and module tasks from it (Alex, 2026-10-11).
+ */
+export type UpgradeGateModules = <Result>(
+  use: (app: BootedApplication) => Promise<Result>,
+) => Promise<Result>;
 
 /** Shows a failure's console (true on Retry, never settling after), writes its Retry, lifts it. */
 type OperatorConsole = Readonly<{

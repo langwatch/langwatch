@@ -106,6 +106,7 @@ describe("admitAfterFirstInstall", () => {
 
   describe("given a worker that lost the lease to a peer's run", () => {
     describe("when its upgrade ends lease_not_acquired after waiting for the lease", () => {
+      /** @scenario "The worker waits on the run's outcome, never on a process exit code" */
       it("never counts it as a failed run and runs again once the lease is free", async () => {
         const said: string[] = [];
         const exits: UpgradeOutcomeCode[] = ["lease_not_acquired", "done"];

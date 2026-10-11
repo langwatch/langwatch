@@ -16,10 +16,11 @@ import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
+import { writeUpgradeLine } from "../runner/image-upgrade.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
 import { isPrivateTarget } from "../runner/schema-applier.ts";
-import type { UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
+import { EXIT_CODES, type UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
 import { PreRosterRepository } from "../serving-roster/pre-roster.repository.ts";
@@ -28,9 +29,10 @@ import {
   type ServingRoster,
 } from "../serving-roster/serving-roster.service.ts";
 import { isDeclaredMigrationStep, isMigrationStep } from "../step/migration-step.ts";
-import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
+import type { FirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, imageRelease, readImageTree } from "./image-tree.ts";
+import { type BootUpgradeModules, inProcessUpgrade } from "./in-process-upgrade.ts";
 import {
   type ServingRole,
   type ServingVerdict,
@@ -600,33 +602,52 @@ export function servingImageTree({
   return readImageTree({ codeSteps: readImageCodeSteps({ file: codeStepsFile }) });
 }
 
+/** A gate that can also run the upgrade once and answer its exit code: `pnpm task upgrade`. */
+export type ServingUpgradeGate = UpgradeGate & Readonly<{ runOnce?: () => Promise<number> }>;
+
+/** Said by a run-once upgrade with no DATABASE_URL: there is no installation to upgrade. */
+const NO_DATABASE_LINE = {
+  level: "error",
+  message: "DATABASE_URL is required to upgrade",
+  fields: { phase: "preflight", next: "set DATABASE_URL, then run `pnpm task upgrade` again" },
+} as const;
+
 /**
- * `withUpgradeGate`'s factory for the api and worker (held question "mig-serving-gate data
- * source", default (a)): one connection of its own from the stores' `DATABASE_URL`, opened only
- * when the gate first asks. Specs: specs/upgrade/serving-gate.feature and entry-points.feature.
+ * `withUpgradeGate`'s factory for the api and worker: one connection of its own from the stores'
+ * `DATABASE_URL`, opened only when the gate first asks. The worker runs the upgrade in this process
+ * over `bootModules` (Alex, 2026-10-11). Specs: serving-gate.feature and entry-points.feature.
  */
 export async function servingUpgradeGate({
   secrets,
   role,
+  environment = {},
+  bootModules,
   warn,
 }: {
   secrets: ScopedSecrets;
   role: ServingRole;
+  /** The process environment, under the resolved store URLs, for the Prisma and goose programs. */
+  environment?: Readonly<Record<string, string | undefined>>;
+  /** Boots the installed list in the tasks role; the api is handed none and never runs a step. */
+  bootModules?: BootUpgradeModules;
   warn?: ServingGateWarn;
-}): Promise<UpgradeGate> {
+}): Promise<ServingUpgradeGate> {
   const tree = servingImageTree();
   const release = imageRelease({ manifests: loadReleases().manifests, tree });
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
         withCredentialKeys(secrets, (credentialKeys) => {
-          if (!database?.trim()) return NO_LEDGER_GATE;
-          if (!clickhouse?.trim() && routes.size === 0) return NO_CLICKHOUSE_GATE;
+          const databaseUrl = database?.trim();
+          if (!databaseUrl) return { ...NO_LEDGER_GATE, runOnce: refuseWithoutDatabase };
+          const upgrade = upgradeIn({ bootModules, databaseUrl, clickhouse, environment });
+          const runOnce = async () => EXIT_CODES[(await upgrade()).code];
+          if (!clickhouse?.trim() && routes.size === 0) return { ...NO_CLICKHOUSE_GATE, runOnce };
           const pool = guardGatePool({
-            pool: new pg.Pool(gatePoolConfig({ databaseUrl: database })),
+            pool: new pg.Pool(gatePoolConfig({ databaseUrl })),
             warn: warn ?? emitWarning,
           });
-          return upgradeGateOver({
+          const gate = upgradeGateOver({
             role,
             postgres: pool,
             close: () => pool.end(),
@@ -634,15 +655,53 @@ export async function servingUpgradeGate({
             release,
             withClickHouse: true,
             processId: `${hostname()}:${process.pid}:${role}`,
-            firstInstall: spawnFirstInstallUpgrade(),
+            firstInstall: upgrade,
             credentialKeys,
             warn,
           });
+          return { ...gate, runOnce };
         }),
       ),
     ),
   );
 }
+
+/** The upgrade this process runs: in-process over its modules, or a refusal where it has none. */
+function upgradeIn({
+  bootModules,
+  databaseUrl,
+  clickhouse,
+  environment,
+}: {
+  bootModules: BootUpgradeModules | undefined;
+  databaseUrl: string;
+  clickhouse: string | undefined;
+  environment: Readonly<Record<string, string | undefined>>;
+}): FirstInstallUpgrade {
+  if (!bootModules) return refuseWithoutModules;
+  const sharedUrl = clickhouse?.trim();
+  return inProcessUpgrade({
+    boot: bootModules,
+    databaseUrl,
+    environment: {
+      ...environment,
+      DATABASE_URL: databaseUrl,
+      ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
+    },
+    development: environment.NODE_ENV === "development",
+  });
+}
+
+async function refuseWithoutDatabase(): Promise<number> {
+  writeUpgradeLine(NO_DATABASE_LINE);
+  return EXIT_CODES.failed;
+}
+
+/** A process composed without its modules cannot run the upgrade; only the worker is given them. */
+const refuseWithoutModules: FirstInstallUpgrade = async () => ({
+  code: "failed",
+  logTail: ["this process was not handed its installed modules, so it cannot run the upgrade"],
+});
 
 /** Fingerprints of the keys this process seals and opens credentials with (Alex, 2026-10-09). */
 function withCredentialKeys<T>(

@@ -1393,12 +1393,15 @@ repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). P
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
 **Migrations are not the api's job.** The worker runs every upgrade step under the runner's lease:
-at boot, while the ledger is behind its image, its gate runs `pnpm task upgrade` (the tasks app's
-runner, in its own process), waits while another runner holds the lease, takes no job until the
-ledger is current, and after a failed run waits for a Retry that returns the step to `pending`
-(Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker never does"). `pnpm
-task upgrade` stays a runner under the same lease for development, CI and an operator (apps/api
-`start:prepare:db`: upgrade alone; no system-migrations pass); the root `prisma:migrate` and
+at boot, while the ledger is behind its image, its gate runs the upgrade in the worker's own
+process (Alex, 2026-10-11: the runner composed once in `packages/upgrade`, `runImageUpgrade`;
+Prisma and goose still run as their own programs), waits while another runner holds the lease,
+takes no job until the ledger is current, and after a failed run waits for a Retry that returns
+the step to `pending` (Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker
+never does"). `pnpm task upgrade` is a run-once worker (Alex, 2026-10-11): it starts the worker,
+which runs the same upgrade once under the same lease and exits 0, 1 or 3; `status`, `plan` and
+`steps` stay reads in the tasks app (apps/api `start:prepare:db`: upgrade alone; no
+system-migrations pass); the root `prisma:migrate` and
 `clickhouse:migrate` scripts are aliases of it, so no script applies schema outside the ledger
 (Alex, 2026-10-09); the Helm pre-roll Job renders only
 with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step,
@@ -1459,7 +1462,10 @@ tags fails the guards rather than passing (Alex, 2026-10-09).
   name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
   `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same upgrade
   lease, before serve, and the access-config render runs from env alone in its Helm job (Alex,
-  2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
+  2026-09-28). Before it serves, the worker boots its installed modules in the tasks role, in its
+  own process, to collect and run the blocking steps; it names no process package, and runs
+  LangWatchQL provisioning as the tasks app's `upgrade lwql-provision` under its own lease (Alex,
+  2026-10-11; the preamble hands the gate `bootModules`). SQL migrations stay central, and each is attributed to the owner of the table it
   touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
   migration main has released keeps main's bytes even when it touches two owners: installs hold its
   checksum, so a later idempotent migration carries the split instead, and the check names it as
@@ -1490,7 +1496,7 @@ steps only, for ops' targeted run, and ops builds the state repository in its ow
 accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
 tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A finished upgrade run asks ops for one
 system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
-2026-10-09, UPG-008 D2). A step that must read every tenant reads through its owner's repository with
+2026-10-09, UPG-008 D2); the request's queue jobs run ahead of any backlog (Alex, 2026-10-11). A step that must read every tenant reads through its owner's repository with
 raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1; the flag replaced the `-- @tenancy:` comment, Alex, 2026-10-10). Stored-object's ClickHouse import is a `project` tenant step with
 `needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the

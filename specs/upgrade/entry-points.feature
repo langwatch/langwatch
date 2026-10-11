@@ -1,5 +1,6 @@
-# No entry point runs the upgrade before serving any more: the new worker runs `pnpm task upgrade`
-# under the runner's lease while the api holds (in-app-upgrade.feature; UPGRADE-IN-WORKER, UIW-1..11,
+# No entry point runs the upgrade before serving any more: the new worker runs the upgrade in its own
+# process under the runner's lease while the api holds; `pnpm task upgrade` starts the worker to run
+# it once (Alex, 2026-10-11) (in-app-upgrade.feature; UPGRADE-IN-WORKER, UIW-1..11,
 # Alex 2026-10-09; dev/docs/plans/upgrade-in-worker-2026-10-09.md).
 #
 #   the image           CMD -> apps/api `start` -> the api alone; it never runs a step

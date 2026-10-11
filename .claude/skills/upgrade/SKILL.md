@@ -15,10 +15,12 @@ Record: `dev/docs/ARCHITECTURE.md` §7 ("Upgrades run on deploy", no required st
 
 ```
 new image ─► worker boot ─► gate.admit (behind or first install)
-                 │            lease `upgrade` free? ─► child `pnpm task upgrade`
+                 │            lease `upgrade` free? ─► the upgrade in this process (runImageUpgrade)
+                 │              over the installed modules booted in the tasks role (bootModules)
                  │            held by a peer / failed run ─► wait, re-ask every 10 s, wait for Retry
                  │              ledger schema, lease, seed, plan
-                 │              per release: schema (Prisma, goose) ─► blocking steps ─► reconcilers
+                 │              per release: schema (Prisma, goose programs) ─► blocking steps
+                 │              ─► reconcilers (TTL, `pnpm task upgrade lwql-provision`, pass request)
                  ▼
              ledger current ─► takes jobs ─► background steps (per-step leases)
 
@@ -29,8 +31,10 @@ new image ─► api boot (beside the worker, never after it) ─► never runs 
    ledger current (re-read every 10 s) ─► SERVING ─► roster row every 15 s
 ```
 
-Entry points (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER): the worker's gate is the
-one runner of an image; every entry point reaches it. Helm upgrade: new worker pods run it, new api
+Entry points (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER): the worker is the one
+runner of an image; every entry point reaches it. `pnpm task upgrade` is a run-once worker (Alex,
+2026-10-11): it starts `apps/worker` with `upgrade`, which runs the upgrade once in-process and
+exits 0, 1 or 3; `status`, `plan` and `steps` stay reads in the tasks app. Helm upgrade: new worker pods run it, new api
 pods hold not ready, and the pre-roll Job renders only with `serializeUpgrades` (never a
 pre-install or pre-rollback hook). Helm with `workers.enabled: false`: each app pod carries the
 worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). Compose has no
@@ -43,7 +47,9 @@ worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). 
 
 | Piece                                                           | File                                                                                                                                                 |
 | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Task, `status`, `plan`, `steps`, stepping applier               | `apps/tasks/src/upgrade.ts`                                                                                                                          |
+| Task (run-once worker), `status`, `plan`, `steps`               | `apps/tasks/src/upgrade.ts`; the run-once mode is `apps/worker/src/main.ts` (`upgradeOnce`)                                                           |
+| The composed runner: Prisma, goose, reconcilers, hints          | `packages/upgrade/src/runner/image-upgrade.ts`, `release-stepping-applier.ts`                                                                        |
+| The worker's in-process run and its modules                     | `packages/upgrade/src/gate/in-process-upgrade.ts`; `bootModules` from `packages/process/src/preamble.ts`                                            |
 | Runner, phases, outcome codes and exit codes                    | `packages/upgrade/src/runner/upgrade-runner.ts`, `upgrade-outcome.ts`, `run-phases.ts`                                                               |
 | Lease (ttl 60 s, heartbeat 15 s, wait 10 min)                   | `packages/upgrade/src/runner/runner-lease.ts` (`DEFAULT_LEASE_TIMING`)                                                                               |
 | Ledger kinds, modes, statuses                                   | `packages/upgrade/src/ledger.ts`                                                                                                                     |
@@ -54,7 +60,7 @@ worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). 
 | Manifests                                                       | `packages/upgrade/releases/*.json`, `packages/upgrade/src/manifest/`                                                                                 |
 | Step declaration                                                | `packages/upgrade/src/step/migration-step.ts`, `projection-replay-step.ts`                                                                           |
 | Collection over the installed list                              | `packages/process/src/migration/migration-steps.ts`                                                                                                  |
-| Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`; the child is `gate/first-install-upgrade.ts` |
+| Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`                                               |
 | Liveness door and the token console                             | `packages/process/src/lifecycle/liveness-thread.ts`                                                                                                  |
 | `upgrade_in_progress` mapping (all transports)                  | `packages/api/src/errors.ts` (`promoteStoreFailure`)                                                                                                 |
 | Defensive ClickHouse reads                                      | `packages/clickhouse-client/src/present-columns.ts` (`ClickHouseColumns`)                                                                            |

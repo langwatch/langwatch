@@ -2,7 +2,8 @@
 # (sections 6.4, 6.6, 6.7, 6.10 and 6.11) and dev/docs/plans/migrations-blitz-2026-10-06.md (section
 # 5.2, row mig-s3-runner; deltas D4 and D6).
 #
-# `pnpm task upgrade` is the one command that changes the schema. It takes the runner lease, plans
+# `pnpm task upgrade` is a run-once worker (Alex, 2026-10-11): it starts the worker, which runs the
+# same in-process upgrade its gate runs, and answers its exit code. The run takes the lease, plans
 # from the ledger and the shipped manifests, applies the plan release by release from whatever
 # release the installation is on (no required stop; Alex, 2026-10-11), records every step and every
 # ClickHouse target in the ledger, runs the reconcilers last and records the run. Exit codes: 0 done,
@@ -203,6 +204,20 @@ Feature: The upgrade command
     Given LangWatchQL is configured and its ClickHouse refuses the provisioning DDL
     When the upgrade runs
     Then the run is recorded failed naming the reconciler "langwatchql"
+
+  @unit
+  Scenario: pnpm task upgrade runs the upgrade as a run-once worker and answers its exit code
+    Given the tasks app is asked to run the upgrade
+    When it starts the worker with "upgrade"
+    Then the worker runs the upgrade once in its own process and exits 0, 1 or 3
+    And the tasks app answers that exit code; status, plan and steps stay reads in the tasks app
+
+  @unit
+  Scenario: The worker's upgrade provisions LangWatchQL through the tasks app under its own lease
+    Given the worker runs the upgrade in-process
+    When its reconcilers run
+    Then it runs "pnpm task upgrade lwql-provision", which takes no lease of its own
+    And a provisioning that exits non-zero fails the reconciler "langwatchql"
 
   @integration
   Scenario: Running an older image marks completed background steps pending again

@@ -16,16 +16,20 @@ export type WorkerStartOptions = Readonly<{
   ownsTelemetry?: boolean;
 }>;
 
-/** Boots the worker and starts consuming. The server it answers with drains it. */
-export async function startWorker(options: WorkerStartOptions = {}): Promise<ProcessServer> {
-  const preamble = Server.create("langwatch-worker")
+function workerPreamble({ ownsProcess }: { ownsProcess: boolean }) {
+  return Server.create("langwatch-worker")
     .withEnvironment(processEnvironment)
     .withConfig(processConfig(processModules, "worker"))
     .withSecrets((config, secrets) =>
       secrets.withEnv().withFile().withOnePassword(config.process.onePasswordAccount),
     )
-    .withProcessOwnership(options.ownsProcess ?? true)
+    .withProcessOwnership(ownsProcess)
     .withUpgradeGate({ role: "worker", gate: servingUpgradeGate });
+}
+
+/** Boots the worker and starts consuming. The server it answers with drains it. */
+export async function startWorker(options: WorkerStartOptions = {}): Promise<ProcessServer> {
+  const preamble = workerPreamble({ ownsProcess: options.ownsProcess ?? true });
   const server = await (
     (options.ownsTelemetry ?? true)
       ? preamble
@@ -43,4 +47,20 @@ export async function startWorker(options: WorkerStartOptions = {}): Promise<Pro
   return server;
 }
 
-if (import.meta.main) await startWorker();
+/** `pnpm task upgrade`: the worker runs the upgrade once, in-process, and answers 0, 1 or 3. */
+export function upgradeOnce(): Promise<number> {
+  return workerPreamble({ ownsProcess: true }).runUpgradeOnce();
+}
+
+/** How long a finished run-once upgrade waits for its last lines before it exits regardless. */
+const UPGRADE_ONCE_EXIT_GRACE_MS = 5_000;
+
+if (import.meta.main) {
+  if (process.argv[2] === "upgrade") {
+    const exitCode = await upgradeOnce();
+    process.exitCode = exitCode;
+    setTimeout(() => process.exit(exitCode), UPGRADE_ONCE_EXIT_GRACE_MS).unref();
+  } else {
+    await startWorker();
+  }
+}

@@ -1,5 +1,5 @@
 # The operator's only act is changing the image. The new worker runs every blocking upgrade step
-# under the runner's lease (`pnpm task upgrade` as a child process); the new api never runs a step
+# under the runner's lease, in its own process (Alex, 2026-10-11); the new api never runs a step
 # and holds no request: it serves every route from boot (NO-HOLDS, Alex 2026-10-09). A Postgres read
 # the schema is not ready for answers upgrade_in_progress (503, Retry-After); a ClickHouse read leaves
 # out a column a pending step has not added. Failures show on Ops > Upgrades with Retry; only a failed
@@ -18,7 +18,7 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
   Scenario: The worker on an installation behind its image runs the upgrade once, then takes jobs
     Given an installation whose ledger records a blocking step of this image as pending
     When the worker's gate asks
-    Then it takes the upgrade lease and runs `pnpm task upgrade` once as a child process
+    Then it takes the upgrade lease and runs the upgrade once in its own process
     And it takes no job before the ledger is current
     And it is admitted and starts its background steps when the upgrade succeeded
 
@@ -69,7 +69,7 @@ Feature: The new image's worker runs its blocking upgrade while the api serves, 
     Given the worker's gate runs the upgrade
     When the run ends done, lease_not_acquired or any failure
     Then the gate admits, waits for the lease holder, or waits for a Retry or the backoff
-    And a run in a child process maps its exit code 0, 3 and anything else to done, lease_not_acquired and failed
+    And the run happens in the worker's own process, so no exit code stands between them
 
   @unit
   Scenario: A restarted worker runs a failed upgrade once more
