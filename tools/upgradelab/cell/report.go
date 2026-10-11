@@ -141,6 +141,9 @@ var invariantNames = map[string]string{
 	"E8":  "a member who signed in through main's deployment-wide Auth0 signs in on head through it: same organization, same role, API keys answer",
 	"E9":  "a member signs in through their organization's own SAML connection before and after the upgrade",
 	"E10": "the seed account signs in with its password on head beside both SSO doors: same organization and role",
+	"E12": "email/password stays closed on a licensed SSO install: a password on an address an ACTIVE connection governs opens no session on head",
+	"E13": "a custom role made on main keeps its permissions and bindings on head",
+	"E14": "SCIM: users and a group provisioned on main keep their membership on head through main's token, and a push on head lands",
 	"E11": "an organization on main's old per-organization SSO (legacy columns, no connection) is grandfathered onto a connection, its member signs in on head and Ops shows the migration inventory",
 	"F1":  "empty origin: every data step ends done over zero rows (or not-needed)",
 	"R2":  "the oldest aged trace each organization keeps reads back through head's API",
@@ -160,7 +163,7 @@ var scenarioIDs = map[string][]string{
 	"I0": {"S6"}, "I2": {"S7", "F1"}, "I2b": {"S7"}, "I4": {"S8"}, "I6": {"S9"}, "I5": {"S10"}, "I7": {"S14"}, "I9": {"S11"}, "B1": {"S11"},
 	"O1": {"S12"}, "I8": {"S13", "F2"}, "D3": {"U3"},
 	"H1": {"H1"}, "H2": {"H2"}, "H3": {"H3"}, "H4": {"H4"}, "H5": {"H5"},
-	"E1": {"E1"}, "E2": {"E2"}, "E3": {"E3"}, "E4": {"E4"}, "E5": {"E5"}, "E6": {"E6"}, "E7": {"E7"},
+	"E1": {"E1"}, "E2": {"E2"}, "E3": {"E3"}, "E4": {"E4"}, "E5": {"E5"}, "E6": {"E6"}, "E7": {"E7"}, "E12": {"E12"}, "E13": {"E13"}, "E14": {"E14"},
 	"U1": {"U1"}, "U2": {"U2"}, "U3": {"U3"}, "U4": {"U4"}, "U5": {"U5"}, "U6": {"U6"},
 }
 

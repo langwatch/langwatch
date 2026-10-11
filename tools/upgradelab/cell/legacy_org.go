@@ -48,8 +48,8 @@ func (cell *run) seedLegacyOrganization(ctx context.Context) {
 			return fmt.Errorf("organization: %w", err)
 		}
 		seed.org, seed.team, seed.slug = made.org, made.team, made.slug
-		if _, err := cell.orgSQLFor(ctx, seed.org, `INSERT INTO mydb."Subscription" (id, "organizationId", plan, status, "startDate", "createdAt", "updatedAt") VALUES ('snap_sso_legacy_enterprise', %s, 'ENTERPRISE', 'ACTIVE', now(), now(), now())`); err != nil {
-			return fmt.Errorf("enterprise subscription (SQL): %w", err)
+		if err := cell.grantEnterprise(ctx, seed.org, "snap_sso_legacy_enterprise"); err != nil {
+			return err
 		}
 		if _, err := cell.orgSQLFor(ctx, seed.org, `UPDATE mydb."Organization" SET "ssoDomain" = '`+legacyOrgDomain+`', "ssoProvider" = '`+legacyOrgProvider+`' WHERE id = %s`); err != nil {
 			return fmt.Errorf("legacy columns (SQL): %w", err)

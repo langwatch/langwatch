@@ -88,6 +88,10 @@ type run struct {
 	retention          retentionState
 	legacy             legacySeed
 	legacyOrg          legacyOrgSeed
+	license            TestLicense
+	licensedOrgs       map[string]bool // organizations main licensed through license.upload
+	scim               scimSeed
+	extras             licensedSSOSeed
 	signups            []signupResult
 	signupUsersBefore  int
 	signupUsersErr     error
@@ -281,7 +285,13 @@ func (cell *run) freshStores(ctx context.Context) error {
 		return err
 	}
 	email, _ := generate.SeedAccount(cell.options.Seed)
-	cell.env, err = BuildEnv(EnvInput{Profile: cell.profile, Stores: cell.stores, APIPort: cell.apiPort, Admin: email})
+	cell.licensedOrgs = map[string]bool{}
+	if cell.licensed() {
+		if cell.license, err = ReadTestLicense(cell.options.FromDir); err != nil {
+			return fmt.Errorf("test license: %w", err)
+		}
+	}
+	cell.env, err = BuildEnv(EnvInput{Profile: cell.profile, Stores: cell.stores, APIPort: cell.apiPort, Admin: email, LicensePublicKey: cell.license.PublicKey})
 	return err
 }
 
@@ -419,6 +429,11 @@ func (cell *run) seed(ctx context.Context) error {
 	}
 	if err := cell.basePrompt(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
+	}
+	if cell.licensed() {
+		if err := cell.grantEnterprise(ctx, cell.seeder.Context.OrganizationID, ""); err != nil {
+			cell.report.Notes = append(cell.report.Notes, "seed organization license: "+err.Error())
+		}
 	}
 	if cell.profile.SSO {
 		cell.seedSSO(ctx)

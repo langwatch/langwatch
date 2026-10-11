@@ -156,6 +156,10 @@ func (cell *run) seedSSO(ctx context.Context) {
 	if len(cell.sso.members) > 0 {
 		cell.sso.before = cell.ssoSignIn(ctx, "main", cell.sso.members)
 	}
+	if cell.profile.SCIM {
+		cell.seedLicensedSSO(ctx)
+		cell.seedSCIM(ctx)
+	}
 	if cell.profile.LegacySSO {
 		cell.seedLegacyOrganization(ctx) // before main's standing is read, so E10 counts the seed account's membership of it
 		cell.legacyAtMain(ctx)
@@ -177,8 +181,8 @@ func (cell *run) orgSQLFor(ctx context.Context, org, statement string) (string, 
 // ignores SSO_DOMAIN_PROOF_DNS_SERVERS under NODE_ENV=production and its https-file fetch refuses loopback.
 func (cell *run) activateConnection(ctx context.Context, spec *connectionSpec) error {
 	org := spec.org
-	if _, err := cell.orgSQLFor(ctx, org, `INSERT INTO mydb."Subscription" (id, "organizationId", plan, status, "startDate", "createdAt", "updatedAt") VALUES (`+sqlQuote(spec.subscription)+`, %s, 'ENTERPRISE', 'ACTIVE', now(), now(), now())`); err != nil {
-		return fmt.Errorf("enterprise subscription (SQL): %w", err)
+	if err := cell.grantEnterprise(ctx, org, spec.subscription); err != nil {
+		return err
 	}
 	var registered struct{ ConnectionID string }
 	if err := cell.seeder.Call(ctx, true, "ssoSetup.register", map[string]any{"organizationId": org, "providerId": "idpsim-" + spec.tenant, "idp": spec.idp}, &registered); err != nil {

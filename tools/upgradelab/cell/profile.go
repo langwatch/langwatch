@@ -30,6 +30,9 @@ type Profile struct {
 	// LegacySSO: the deployment-wide provider is Auth0 (main's NEXTAUTH_PROVIDER), idpsim behind a TLS proxy;
 	// one organization adds a SAML connection beside the seed organization's OIDC one (E8 to E10, trial T3).
 	LegacySSO bool
+	// SCIM: idpsim provisions users and a group into the seed organization's connection on main (E14), plus a
+	// custom role (E13) and a governed password probe (E12); trial T5.
+	SCIM bool
 }
 
 // Profiles are the deployments a cell runs; a new deployment is one entry here.
@@ -41,7 +44,7 @@ var Profiles = map[string]Profile{
 	// Cloud on main's deployment-wide Auth0 (UM-26), plus per-organization OIDC and SAML connections.
 	"cloud-legacy-sso": {Shape: "saas", Extra: cloudBilling, SSO: true, LegacySSO: true},
 	// Self-hosted on the same legacy Auth0 and connections (UM-27, T5); SCIM is not driven yet.
-	"self-hosted-legacy-sso": {Shape: "sh-licensed", StopStart: true, SSO: true, LegacySSO: true},
+	"self-hosted-legacy-sso": {Shape: "sh-licensed", StopStart: true, SSO: true, LegacySSO: true, SCIM: true},
 	// Self-hosted from origin/main like the others; 3.20.1 stays a cell of its own (-from-dir a 3.20.1 tree).
 	"self-hosted":      {Shape: "sh-licensed", StopStart: true},
 	"self-hosted-free": {Shape: "sh-free", StopStart: true}, // the ADMIN_EMAILS-unset variant sets NoAdminEmails on it
@@ -65,6 +68,8 @@ type EnvInput struct {
 	Stores  Stores
 	APIPort int
 	Admin   string
+	// LicensePublicKey verifies the test license on both releases (licensed shapes only).
+	LicensePublicKey string
 }
 
 // BuildEnv is the whole environment of every process in a cell, both releases alike.
@@ -95,6 +100,9 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 	routePrivateTargets(env, input.Stores, shape.PrivateTargets())
 	routeObjects(env, input.Stores, shape.PrivateObjectTargets())
 	routeIdentityProvider(env, input.Stores, input.Profile)
+	if input.Profile.Shape == licensedShape && input.LicensePublicKey != "" {
+		env["LANGWATCH_LICENSE_PUBLIC_KEY"] = input.LicensePublicKey
+	}
 	return env, nil
 }
 
