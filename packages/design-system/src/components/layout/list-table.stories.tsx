@@ -17,7 +17,7 @@ const meta = {
   title: "Data display/List table",
   parameters: {
     usage: {
-      use: 'Every list of rows: the rounded card and sentence-case header are the one list look. Inside a Card or SettingsCard pass variant="embedded". Sortable columns: ListTable.SortHeader. Ids: ListTable.IdCell. Row menus: ListTable.ActionHeader + ListTable.ActionCell, pinned right. Loading: ListTable.LoadingRows. An opened row, an empty line or a note under the rows: ListTable.SpanRow.',
+      use: 'Every list of rows: the rounded card and sentence-case header are the one list look. Inside a Card or SettingsCard pass variant="embedded". Sortable columns: ListTable.SortHeader. Ids: ListTable.IdCell. Row menus: ListTable.ActionHeader + ListTable.ActionCell, pinned right. Loading: ListTable.LoadingRows. An opened row, an empty line or a note under the rows: ListTable.SpanRow. A wide table: scroll="x" with a scrollLabel (a focusable region); inside a virtual scroller: scroll="external".',
       avoid:
         "Never a bare Table.Root with its own borders (list-table.md), uppercase headers, a Spinner row while loading, or a second border around an embedded table. Facts about one thing: use Settings card rows.",
     },
@@ -291,3 +291,54 @@ function OpeningRows(args: Parameters<typeof ListTable>[0]) {
 
 /** Rows that open in place, and a note under the rows: ListTable.SpanRow spans every column. */
 export const OpenedRowsAndNote: Story = { render: (args) => <OpeningRows {...args} /> };
+
+const WIDE_COLUMNS = ["Request", "Model", "Route", "Latency", "Tokens in", "Tokens out", "Cost"];
+
+function wideTable(extra: { scroll: "x"; scrollLabel: string } | { scroll: "external" }) {
+  return (
+    <ListTable {...extra} tableLayout="fixed" minWidth="56rem" stickyHeader>
+      <Table.Header>
+        <Table.Row>
+          {WIDE_COLUMNS.map((name) => (
+            <Table.ColumnHeader key={name} width="8rem">
+              {name}
+            </Table.ColumnHeader>
+          ))}
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {ROWS.map((row) => (
+          <Table.Row key={row.name}>
+            <Table.Cell>{row.name}</Table.Cell>
+            <Table.Cell>{row.model}</Table.Cell>
+            {WIDE_COLUMNS.slice(2).map((name) => (
+              <Table.Cell key={name}>{row.version}</Table.Cell>
+            ))}
+          </Table.Row>
+        ))}
+      </Table.Body>
+    </ListTable>
+  );
+}
+
+/** Wider than its parent: the table scrolls inside a focusable region named by `scrollLabel`. */
+export const ScrollsSideways: Story = {
+  render: () => (
+    <Box maxWidth="40rem">{wideTable({ scroll: "x", scrollLabel: "Billing events" })}</Box>
+  ),
+};
+
+/** An outer scroller owns scrolling (a virtual list): the table never clips its header. */
+export const ExternalScroll: Story = {
+  render: () => (
+    <Box maxWidth="40rem" maxHeight="9rem" overflow="auto">
+      {wideTable({ scroll: "external" })}
+    </Box>
+  ),
+};
+
+export const NarrowScroll: Story = {
+  render: () => (
+    <Box maxWidth="320px">{wideTable({ scroll: "x", scrollLabel: "Billing events" })}</Box>
+  ),
+};

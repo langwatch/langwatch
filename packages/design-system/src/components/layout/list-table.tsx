@@ -31,15 +31,9 @@ const STICKY_HEADER = {
   boxShadow: "inset 0 -1px 0 var(--chakra-colors-border-muted)",
 } as const;
 
-function ListTableRoot({
-  children,
-  containerProps,
-  columnRules = false,
-  density = "default",
-  variant = "card",
-  stickyHeader = false,
-  ...props
-}: Omit<ComponentProps<typeof Table.Root>, "variant"> & {
+/** What every list table takes; the `Table.*` parts inside it are unchanged. */
+interface ListTableBaseProps {
+  children: ReactNode;
   /** `compact`: a shorter header and tighter cells, for dense logs. */
   density?: "default" | "compact";
   /**
@@ -51,16 +45,63 @@ function ListTableRoot({
   columnRules?: boolean;
   /**
    * Keeps the header row in view while its scroller moves, painting the table's ground under
-   * it. The scroller is the card (`containerProps` with a height and `overflow: auto`) or, with
-   * `overflow: visible` on the card, an element around it.
+   * it. Pair it with `scroll="external"` when an outer element owns the scrolling.
    */
   stickyHeader?: boolean;
-  /**
-   * Overrides on the container, for a page that needs the card itself to scroll rather
-   * than clip. The border and the radius are the look and are not meant to be overridden.
-   */
-  containerProps?: BoxProps;
-}) {
+  /** `fixed` makes the `width` set on column headers authoritative. */
+  tableLayout?: "auto" | "fixed";
+  /** The width below which a wide table stops shrinking and scrolls (with `scroll="x"`). */
+  minWidth?: string | number;
+  id?: string;
+  "data-testid"?: string;
+  "aria-label"?: string;
+  "aria-labelledby"?: string;
+  "aria-describedby"?: string;
+  "aria-rowcount"?: number;
+  "aria-colcount"?: number;
+}
+
+/**
+ * Scrolling is the design system's or the caller's, never improvised. `x`: a wide table
+ * scrolls sideways inside a keyboard-focusable region named by `scrollLabel`. `external`:
+ * an outer element (a virtual scroller, the page) scrolls; the table never clips.
+ */
+type ListTableScroll =
+  | { scroll?: undefined; scrollLabel?: never }
+  | { scroll: "external"; scrollLabel?: never }
+  | { scroll: "x"; scrollLabel: string };
+
+export type ListTableProps = ListTableBaseProps & ListTableScroll;
+
+/** @deprecated Open Table.Root and container props; pass `ListTableProps`. */
+export type LegacyListTableProps = Omit<ComponentProps<typeof Table.Root>, "variant"> &
+  Omit<ListTableBaseProps, "children" | "tableLayout" | "minWidth"> & {
+    /** @deprecated Use `scroll`. */
+    containerProps?: BoxProps;
+  };
+
+const SCROLL_REGION = {
+  overflowX: "auto",
+  overflowY: "hidden",
+  tabIndex: 0,
+  role: "region",
+  _focusVisible: { outline: "2px solid", outlineColor: "colorPalette.focusRing" },
+} as const;
+
+function ListTableRoot(props: ListTableProps): ReactNode;
+/** @deprecated Style props and `containerProps`; the table's look and scrolling are fixed. */
+function ListTableRoot(props: LegacyListTableProps): ReactNode;
+function ListTableRoot({
+  children,
+  containerProps,
+  columnRules = false,
+  density = "default",
+  variant = "card",
+  stickyHeader = false,
+  scroll,
+  scrollLabel,
+  ...props
+}: LegacyListTableProps & { scroll?: "x" | "external"; scrollLabel?: string }): ReactNode {
   const embedded = variant === "embedded";
   return (
     <Box
@@ -68,7 +109,9 @@ function ListTableRoot({
       bg={embedded ? "transparent" : "bg.card"}
       borderColor="border.card"
       borderRadius={embedded ? 0 : "md"}
-      overflow="hidden"
+      {...(scroll === "x"
+        ? { ...SCROLL_REGION, "aria-label": scrollLabel }
+        : { overflow: scroll === "external" ? "visible" : "hidden" })}
       data-variant={variant}
       css={{ [GROUND]: "var(--chakra-colors-bg-card)" }}
       {...containerProps}
