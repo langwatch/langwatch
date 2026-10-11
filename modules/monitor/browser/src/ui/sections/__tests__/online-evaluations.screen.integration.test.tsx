@@ -25,6 +25,7 @@ const calls = vi.hoisted(() => ({
   performanceQuery: vi.fn(),
   toggle: vi.fn(),
   remove: vi.fn(),
+  copy: vi.fn(),
 }));
 
 vi.mock("../../../behavior/monitor-api.ts", () => {
@@ -54,7 +55,7 @@ vi.mock("../../../behavior/monitor-api.ts", () => {
         },
         toggle: mutation(calls.toggle),
         delete: mutation(calls.remove),
-        copy: mutation(vi.fn()),
+        copy: mutation(calls.copy),
       },
       evaluations: {
         getMonitorPerformanceForProject: {
@@ -94,6 +95,7 @@ beforeEach(() => {
   calls.performanceQuery.mockReset();
   calls.toggle.mockReset();
   calls.remove.mockReset();
+  calls.copy.mockReset();
 });
 
 afterEach(cleanup);
@@ -213,6 +215,23 @@ describe("given a project with online evaluations and a guardrail", () => {
       await waitFor(() =>
         expect(host.successes.at(-1)).toEqual({ title: "Online evaluation deleted" }),
       );
+    });
+  });
+});
+
+describe("given a reader replicating an online evaluation", () => {
+  describe("when Replicate is chosen before a project", () => {
+    it("names the missing project, keeps the dialog open and sends nothing", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      renderWithMonitorHost(<OnlineEvaluationsScreen />);
+
+      await user.click(screen.getByRole("button", { name: /Actions for Relevancy on production/ }));
+      await user.click(await screen.findByText("Replicate to another project"));
+      await user.click(await screen.findByRole("button", { name: "Replicate" }));
+
+      expect(await screen.findByText("Choose a project to replicate into.")).toBeInTheDocument();
+      expect(calls.copy).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
     });
   });
 });

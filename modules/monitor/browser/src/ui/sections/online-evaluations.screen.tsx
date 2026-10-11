@@ -17,10 +17,9 @@ import { useMonitorHost } from "../../model/monitor-host.ts";
 import { onlineEvaluationListState } from "../../model/online-evaluation-list-state.ts";
 import { OnlineEvaluationsTable } from "../blocks/online-evaluations-table.tsx";
 import { FullWidthListPageContent } from "../elements/full-width-list-page-content.tsx";
-import { MonitorLink } from "../elements/monitor-link.tsx";
 import { MonitorReplicateDialog } from "./monitor-replicate-dialog.tsx";
 
-const DOCS_URL = "https://langwatch.ai/docs/evaluations/online-evaluation/overview";
+const DOCS_URL = "https://docs.langwatch.ai/evaluations/online-evaluation/overview";
 
 type MonitorRef = { id: string; name: string };
 
@@ -131,21 +130,8 @@ export default function OnlineEvaluationsScreen() {
           title="No online evaluations yet"
           description="Score live traces and threads as they arrive, or set up a synchronous guardrail that can block unsafe traffic."
           icon={<Activity size={24} />}
-          docsInfo={
-            <Text>
-              Learn more in the{" "}
-              <MonitorLink
-                href={DOCS_URL}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "inherit", textDecoration: "underline" }}
-              >
-                online evaluations documentation
-              </MonitorLink>
-              .
-            </Text>
-          }
-        ></NoDataInfoBlock>
+          docsHref={DOCS_URL}
+        />
       )}
       {listState === "list" && (
         <FullWidthListPageContent>

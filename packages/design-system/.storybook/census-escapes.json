@@ -488,5 +488,21 @@
     "reason": "A small icon-and-label chip inside the select trigger, not a surface (R2s1 review).",
     "owner": "data-privacy",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/monitor/browser/src/ui/elements/online-evaluation-performance-preview.tsx",
+    "rule": "empty-text",
+    "line": 62,
+    "reason": "No data yet beside a sparkline in a table cell, not an empty state (R2s2 review).",
+    "owner": "monitor",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/notification/browser/src/ui/sections/email-suppressions-screen.tsx",
+    "rule": "list-page-inference",
+    "line": 187,
+    "reason": "False positive: a settings page with a header, explanatory text and one card, not a filterable list page (R2s2 review).",
+    "owner": "notification",
+    "disposition": "reviewed"
   }
 ]
