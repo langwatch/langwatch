@@ -8,13 +8,7 @@ import { AnalyticsPeriodPicker } from "./analytics-period-picker.tsx";
 import { FilterToggle } from "./filter-toggle.tsx";
 
 /** The one analytics header: the area's title, its page tabs, then the controls at the right. */
-export function AnalyticsHeader({
-  tabs,
-  extraHeaderButtons,
-}: {
-  tabs: ReactNode;
-  extraHeaderButtons?: ReactNode;
-}) {
+export function AnalyticsHeader({ tabs }: { tabs: ReactNode }) {
   const host = useAnalyticsHost();
   const project = host.project();
   const {
@@ -44,7 +38,6 @@ export function AnalyticsHeader({
               );
             }}
           />
-          {extraHeaderButtons}
         </>
       }
     >

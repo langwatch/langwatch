@@ -22,13 +22,11 @@ export default function AnalyticsLayout({
   tab,
   activeDashboardId,
   dashboard,
-  extraHeaderButtons,
 }: PropsWithChildren<{
   tab?: AnalyticsTab;
   activeDashboardId?: string;
   /** A custom dashboard's own title row, under the header. */
   dashboard?: DashboardTitleRowProps;
-  extraHeaderButtons?: React.ReactNode;
 }>) {
   const host = useAnalyticsHost();
   const project = host.project();
@@ -56,7 +54,6 @@ export default function AnalyticsLayout({
                 />
               ) : null
             }
-            extraHeaderButtons={extraHeaderButtons}
           />
           <Box
             data-testid="analytics-content"

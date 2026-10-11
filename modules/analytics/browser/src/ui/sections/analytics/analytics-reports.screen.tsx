@@ -215,19 +215,22 @@ function ReportsContent() {
         dashboardId: isMissingDashboard ? void 0 : (activeDashboardId ?? void 0),
         isEditable: canRenameDashboard,
         onTitleSave: handleTitleSave,
-      }}
-      extraHeaderButtons={
-        <>
-          <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
-          {project && canAddChart ? (
-            <AddChartButton
-              opensDrawer={customChartPlaygroundEnabled}
-              href={addChartUrl}
-              onOpenDrawer={() => setIsAddChartOpen(true)}
+        actions: (
+          <>
+            <DashboardAutoRefreshMenu
+              option={autoRefresh.option}
+              onChange={autoRefresh.setOption}
             />
-          ) : null}
-        </>
-      }
+            {project && canAddChart ? (
+              <AddChartButton
+                opensDrawer={customChartPlaygroundEnabled}
+                href={addChartUrl}
+                onOpenDrawer={() => setIsAddChartOpen(true)}
+              />
+            ) : null}
+          </>
+        ),
+      }}
     >
       {/* The workbench builder's own save path is disabled while the
           custom-chart-playground is enabled (see DashboardWidgetService /
