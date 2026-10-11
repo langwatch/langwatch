@@ -1,3 +1,4 @@
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
@@ -12,10 +13,10 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
-import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
+import { type GatewayToaster, useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import {
   useOrganizationTeamProject,
   useCurrentUser,
@@ -75,12 +76,17 @@ import {
   type VirtualKeyBudgetValue,
 } from "./virtual-key-budget-section.tsx";
 
+type CreatedVirtualKey = { id: string; name: string; secret: string; model?: string };
+
 type VirtualKeyCreateDrawerProps = {
   organizationId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (result: { id: string; name: string; secret: string; model?: string }) => void;
+  onCreated: (result: CreatedVirtualKey) => void;
 };
+
+/** What is left to do once a key has been minted but the form is not yet out of the way. */
+type PostMintRecovery = { kind: "handoff"; key: CreatedVirtualKey } | { kind: "close" };
 
 /** On first open, own the key by the current project; a no-op seed keeps the state's identity. */
 function seededOwnership(
@@ -180,6 +186,145 @@ function createVirtualKeyInput(form: {
   };
 }
 
+/** A rejected date belongs on its field, where the reader is looking; the rest goes to a toast. */
+function reportCreateFailure({
+  error,
+  toaster,
+  setExpiryFieldError,
+}: {
+  error: unknown;
+  toaster: GatewayToaster;
+  setExpiryFieldError: (message: string) => void;
+}) {
+  const expiryError = expiryFieldErrorFrom(error);
+  if (expiryError) {
+    setExpiryFieldError(expiryError);
+    return;
+  }
+  toaster.create({
+    title: humanizeGatewayError(error, "Failed to create virtual key"),
+    type: "error",
+    error,
+  });
+}
+
+/**
+ * What happens once a key exists: the handoff to the secret reveal, then the form closing. A
+ * failure of either is kept as a recovery that retries only that step, never the create. The lock
+ * is held from the start of a submit until the key is out of the form's hands.
+ */
+function usePostMintRecovery({
+  onCreated,
+  onOpenChange,
+  reset,
+}: {
+  onCreated: (result: CreatedVirtualKey) => void;
+  onOpenChange: (open: boolean) => void;
+  reset: () => void;
+}) {
+  const submitLockRef = useRef(false);
+  const [recovery, setRecovery] = useState<PostMintRecovery | null>(null);
+
+  const closeForm = () => {
+    try {
+      reset();
+      onOpenChange(false);
+    } catch {
+      setRecovery({ kind: "close" });
+      return;
+    }
+    setRecovery(null);
+    submitLockRef.current = false;
+  };
+
+  const handOffKey = (key: CreatedVirtualKey) => {
+    try {
+      onCreated(key);
+    } catch {
+      setRecovery({ kind: "handoff", key });
+      return;
+    }
+    closeForm();
+  };
+
+  return { recovery, submitLockRef, handOffKey, closeForm };
+}
+
+/** Says the key exists, and offers the one step left: showing it, or closing the form. */
+function PostMintRecoveryBanner({
+  recovery,
+  onShowKey,
+  onClose,
+}: {
+  recovery: PostMintRecovery;
+  onShowKey: (key: CreatedVirtualKey) => void;
+  onClose: () => void;
+}) {
+  if (recovery.kind === "handoff") {
+    return (
+      <Banner
+        status="error"
+        title="Virtual key created, but we couldn't finish opening it."
+        data-testid="gateway-virtual-key-handoff-failed"
+        action={<BannerAction onClick={() => onShowKey(recovery.key)}>Show key</BannerAction>}
+      >
+        Show the key to finish. You don't need to create another one.
+      </Banner>
+    );
+  }
+  return (
+    <Banner
+      status="error"
+      title="Virtual key created, but we couldn't close this form."
+      data-testid="gateway-virtual-key-close-failed"
+      action={<BannerAction onClick={onClose}>Close</BannerAction>}
+    >
+      Close it to carry on. You don't need to create another one.
+    </Banner>
+  );
+}
+
+/** Create, held back with its reason until the form can issue, and for good once a key exists. */
+function CreateAction({
+  reason,
+  minted,
+  loading,
+  onCreate,
+}: {
+  reason: string | null | undefined;
+  minted: boolean;
+  loading: boolean;
+  onCreate: () => void;
+}) {
+  if (minted) {
+    return (
+      <Button colorPalette="orange" disabled>
+        Create
+      </Button>
+    );
+  }
+  if (reason) {
+    return (
+      <Tooltip content={reason}>
+        <Button colorPalette="orange" disabled>
+          Create
+        </Button>
+      </Tooltip>
+    );
+  }
+  return (
+    <Button
+      colorPalette="orange"
+      data-testid="gateway-virtual-key-create-submit"
+      data-tour="vk-create"
+      onClick={onCreate}
+      loading={loading}
+    >
+      Create
+    </Button>
+  );
+}
+
 export function VirtualKeyCreateDrawer({
   organizationId,
   open,
@@ -228,12 +373,7 @@ export function VirtualKeyCreateDrawer({
   }, [open, project?.id, availableProjects, availableTeams]);
 
   const utils = api.useUtils();
-  const createMutation = api.virtualKeys.create.useMutation({
-    // The secret is handed over as soon as the create answers; the list refreshes behind it.
-    onSuccess: () => {
-      void utils.virtualKeys.list.invalidate({ organizationId });
-    },
-  });
+  const createMutation = api.virtualKeys.create.useMutation();
   const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
     { organizationId },
     { enabled: open && !!organizationId },
@@ -306,8 +446,18 @@ export function VirtualKeyCreateDrawer({
     setExpiryFieldError(null);
   };
 
+  const { recovery, submitLockRef, handOffKey, closeForm } = usePostMintRecovery({
+    onCreated,
+    onOpenChange,
+    reset,
+  });
+
   const handleClose = () => {
-    if (createMutation.isPending) return;
+    if (recovery?.kind === "close") {
+      closeForm();
+      return;
+    }
+    if (createMutation.isPending || submitLockRef.current) return;
     reset();
     onOpenChange(false);
   };
@@ -331,9 +481,18 @@ export function VirtualKeyCreateDrawer({
       toaster.create({ title: cannotIssueReason, type: "error" });
       return;
     }
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setExpiryFieldError(null);
+    const model = firstEligibleDefaultModel({
+      scopes,
+      providers,
+      availableProjects,
+      organizationId,
+    });
+    let result: Awaited<ReturnType<typeof createMutation.mutateAsync>>;
     try {
-      const result = await createMutation.mutateAsync(
+      result = await createMutation.mutateAsync(
         createVirtualKeyInput({
           organizationId,
           name,
@@ -349,40 +508,31 @@ export function VirtualKeyCreateDrawer({
           revealOnce,
         }),
       );
-      if (revealOnce) {
-        await recordMintedKey({
-          organizationId,
-          name: result.virtualKey.name,
-          revealId: result.revealId,
-          preview: result.preview,
-        });
-      }
-      onCreated({
-        id: result.virtualKey.id,
-        name: result.virtualKey.name,
-        secret: result.secret,
-        model: firstEligibleDefaultModel({
-          scopes,
-          providers,
-          availableProjects,
-          organizationId,
-        }),
-      });
-      reset();
-      onOpenChange(false);
     } catch (error) {
-      // A rejected date belongs on the field the reader is still looking
-      // at; everything else has nowhere better to go than the toast.
-      const expiryError = expiryFieldErrorFrom(error);
-      if (expiryError) {
-        setExpiryFieldError(expiryError);
-        return;
-      }
-      toaster.create({
-        title: humanizeGatewayError(error, "Failed to create virtual key"),
-        type: "error",
-      });
+      submitLockRef.current = false;
+      reportCreateFailure({ error, toaster, setExpiryFieldError });
+      return;
     }
+    // From here the key exists. Nothing below may read as a failed create or invite another one.
+    const key: CreatedVirtualKey = {
+      id: result.virtualKey.id,
+      name: result.virtualKey.name,
+      secret: result.secret,
+      model,
+    };
+    // The list refreshes behind the handoff; a failed refresh costs a stale row, not the key.
+    void (async () => utils.virtualKeys.list.invalidate({ organizationId }))().catch(
+      () => undefined,
+    );
+    if (revealOnce) {
+      await recordMintedKey({
+        organizationId,
+        name: key.name,
+        revealId: result.revealId,
+        preview: result.preview,
+      }).catch(() => undefined);
+    }
+    handOffKey(key);
   };
 
   useVirtualKeyTourActions({ organizationId, setName, submit: handleSubmit });
@@ -395,12 +545,19 @@ export function VirtualKeyCreateDrawer({
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          <VStack align="stretch" gap={4}>
+          {recovery && (
+            <PostMintRecoveryBanner
+              recovery={recovery}
+              onShowKey={handOffKey}
+              onClose={closeForm}
+            />
+          )}
+          <VStack align="stretch" gap={4} inert={recovery ? true : undefined}>
             <Field.Root required>
               <Field.Label>
                 Name
                 <FieldInfoTooltip
-                  description="Human-readable identifier shown in the list and audit log. Typical pattern: 'prod-openai' or 'codex-cli-team-ml'. Must be unique within the organization."
+                  description="A name to help you recognize this key in the list and audit log. For example, 'prod-openai' or 'codex-cli-team-ml'."
                   docHref="/ai-gateway/virtual-keys#creating-a-vk"
                 />
               </Field.Label>
@@ -488,26 +645,19 @@ export function VirtualKeyCreateDrawer({
               </Text>
             )}
             <Spacer />
-            <Button variant="ghost" onClick={handleClose} disabled={createMutation.isPending}>
+            <Button
+              variant="ghost"
+              onClick={handleClose}
+              disabled={createMutation.isPending || recovery?.kind === "handoff"}
+            >
               Cancel
             </Button>
-            {cannotIssueReason ? (
-              <Tooltip content={cannotIssueReason}>
-                <Button colorPalette="orange" disabled>
-                  Create
-                </Button>
-              </Tooltip>
-            ) : (
-              <Button
-                colorPalette="orange"
-                data-testid="gateway-virtual-key-create-submit"
-                data-tour="vk-create"
-                onClick={() => handleSubmit()}
-                loading={createMutation.isPending}
-              >
-                Create
-              </Button>
-            )}
+            <CreateAction
+              reason={cannotIssueReason}
+              minted={recovery !== null}
+              loading={createMutation.isPending}
+              onCreate={() => handleSubmit()}
+            />
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
