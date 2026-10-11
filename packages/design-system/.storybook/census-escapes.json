@@ -574,5 +574,28 @@
     "reason": "False positive: an in-page Try it out section heading; the page title is in the page header. (R3e1 review)",
     "owner": "evaluator",
     "disposition": "reviewed"
+  },
+  {
+    "path": "modules/annotation/browser/src/ui/sections/annotation-queue-bar.tsx",
+    "rule": "hand-pagination",
+    "line": 118,
+    "reason": "Approved: Previous and Next step one queue item at a time and Next marks it done; a queue walker, not a pager (R4a1 review).",
+    "owner": "annotation"
+  },
+  {
+    "path": "modules/annotation/browser/src/ui/sections/annotation-queue-editor.tsx",
+    "rule": "empty-text",
+    "line": 367,
+    "reason": "False positive: the design system EmptyOptionsHint with an action link inside a picker (R4a1 review).",
+    "owner": "annotation",
+    "disposition": "reviewed"
+  },
+  {
+    "path": "modules/annotation/browser/src/ui/sections/annotation-queue-editor.tsx",
+    "rule": "empty-text",
+    "line": 380,
+    "reason": "False positive: the design system EmptyOptionsHint with an action link inside a picker (R4a1 review).",
+    "owner": "annotation",
+    "disposition": "reviewed"
   }
 ]
