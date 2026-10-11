@@ -8,10 +8,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeOpsHost, renderWithOpsHost, type FakeOpsHost } from "../../../testing.tsx";
 import { impersonateUser } from "../behavior/admin-client.ts";
-import { ImpersonateDialog } from "../ui/sections/users-view.tsx";
+import UsersView, { ImpersonateDialog } from "../ui/sections/users-view.tsx";
 
 vi.mock("../behavior/admin-client.ts", () => ({
   impersonateUser: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../behavior/use-admin-resource.ts", () => ({
+  useAdminList: () => ({
+    data: { total: 1, data: [rowUser] },
+    isLoading: false,
+    isFetching: false,
+    error: null,
+  }),
+  useAdminUpdate: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 /**
@@ -20,6 +30,34 @@ vi.mock("../behavior/admin-client.ts", () => ({
  * `OpsHostApi`, so the assertion reads the recording the fake host keeps.
  */
 let host: FakeOpsHost;
+
+/** jsdom lays nothing out, so the focus trap would treat every element as hidden. */
+function stubLayout() {
+  const rect = new DOMRect(0, 0, 10, 10);
+  const rects: DOMRectList = {
+    0: rect,
+    length: 1,
+    item: (index: number) => (index === 0 ? rect : null),
+    [Symbol.iterator]: () => [rect][Symbol.iterator](),
+  };
+  vi.spyOn(Element.prototype, "getClientRects").mockReturnValue(rects);
+}
+
+const { rowUser } = vi.hoisted(() => ({
+  rowUser: {
+    id: "user-1",
+    name: "Yoel Ernst",
+    email: "yoel@example.com",
+    image: null,
+    emailVerified: true,
+    pendingSsoSetup: false,
+    createdAt: "2026-04-01T10:00:00.000Z",
+    lastLoginAt: null,
+    deactivatedAt: null,
+    organizations: [],
+    projects: [],
+  },
+}));
 
 const user = {
   id: "user-1",
@@ -38,6 +76,7 @@ const user = {
 describe("Feature: Admin User Impersonation Reason", () => {
   beforeEach(() => {
     vi.mocked(impersonateUser).mockClear();
+    stubLayout();
     host = fakeOpsHost({ isOpsAdmin: true });
   });
 
@@ -98,5 +137,55 @@ describe("Feature: Admin User Impersonation Reason", () => {
         }),
       );
     });
+  });
+});
+
+describe("Feature: Impersonating from the row menu", () => {
+  beforeEach(() => {
+    vi.mocked(impersonateUser).mockClear();
+    stubLayout();
+    host = fakeOpsHost({ isOpsAdmin: true });
+  });
+
+  it("moves focus to the reason, keeps Tab inside, and returns to the row's menu trigger", async () => {
+    const testingUser = userEvent.setup();
+    renderWithOpsHost(<UsersView />, { host });
+
+    const trigger = document.querySelector<HTMLElement>("[aria-haspopup='menu']");
+    if (!trigger) throw new Error("expected the row menu trigger");
+    await testingUser.click(trigger);
+    await testingUser.click(await screen.findByRole("menuitem", { name: /Impersonate/ }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Impersonate user" });
+    const reason = screen.getByLabelText("Reason");
+    await waitFor(() => expect(document.activeElement).toBe(reason));
+    await testingUser.keyboard("ticket");
+    expect(reason).toHaveValue("ticket");
+    for (let step = 0; step < 5; step += 1) {
+      await testingUser.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+    await testingUser.tab({ shift: true });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    await testingUser.keyboard("{Escape}");
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Impersonate user" })).toBeNull(),
+    );
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("holds Cancel and the X while the impersonation is in flight", async () => {
+    vi.mocked(impersonateUser).mockReturnValueOnce(new Promise(() => undefined));
+    const onClose = vi.fn();
+    const testingUser = userEvent.setup();
+    renderWithOpsHost(<ImpersonateDialog user={rowUser} onClose={onClose} />, { host });
+
+    await testingUser.type(screen.getByLabelText("Reason"), "support");
+    await testingUser.click(screen.getByRole("button", { name: "Impersonate" }));
+    await testingUser.keyboard("{Escape}");
+
+    expect(impersonateUser).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

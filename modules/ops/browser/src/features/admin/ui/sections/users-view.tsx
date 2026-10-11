@@ -1,4 +1,5 @@
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -24,7 +25,6 @@ import { useDebounce } from "use-debounce";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
-import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import { impersonateUser } from "../../behavior/admin-client.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { AdminDate, EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
@@ -77,6 +77,9 @@ export default function UsersView() {
   // there's exactly one Dialog instance at a time — avoids the "mount a
   // Dialog per row" smell from the previous ImpersonateButton component.
   const [impersonating, setImpersonating] = useState<AdminUser | null>(null);
+  // The row menu closes and its item unmounts, so focus returns to the row's own trigger.
+  const menuTriggers = useRef(new Map<string, HTMLElement>());
+  const returnFocusTo = useRef<HTMLElement | null>(null);
 
   const list = useAdminList<AdminUser>("user", {
     pagination: { page, perPage: PAGE_SIZE },
@@ -151,7 +154,12 @@ export default function UsersView() {
                 <ListTable.Cell align="end">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
-                      <Menu.Trigger>
+                      <Menu.Trigger
+                        ref={(element) => {
+                          if (element) menuTriggers.current.set(user.id, element);
+                          else menuTriggers.current.delete(user.id);
+                        }}
+                      >
                         <MoreVertical size={16} />
                       </Menu.Trigger>
                       <Menu.Content>
@@ -160,7 +168,13 @@ export default function UsersView() {
                           Edit
                         </Menu.Item>
                         {!user.deactivatedAt && (
-                          <Menu.Item value="impersonate" onClick={() => setImpersonating(user)}>
+                          <Menu.Item
+                            value="impersonate"
+                            onClick={() => {
+                              returnFocusTo.current = menuTriggers.current.get(user.id) ?? null;
+                              setImpersonating(user);
+                            }}
+                          >
                             <UserCheck size={16} />
                             Impersonate
                           </Menu.Item>
@@ -176,7 +190,11 @@ export default function UsersView() {
       </AdminTable>
 
       <UserEditDrawer user={editing} onClose={() => setEditing(null)} />
-      <ImpersonateDialog user={impersonating} onClose={() => setImpersonating(null)} />
+      <ImpersonateDialog
+        user={impersonating}
+        onClose={() => setImpersonating(null)}
+        finalFocusEl={() => returnFocusTo.current}
+      />
     </>
   );
 }
@@ -214,9 +232,12 @@ function UserStatusBadge({ user }: { user: AdminUser }) {
 export function ImpersonateDialog({
   user,
   onClose,
+  finalFocusEl,
 }: {
   user: AdminUser | null;
   onClose: () => void;
+  /** Where focus lands on close; the opener's menu item has gone by then. */
+  finalFocusEl?: () => HTMLElement | null;
 }) {
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
@@ -263,58 +284,41 @@ export function ImpersonateDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={!!user}
+      onClose={onClose}
+      title="Impersonate user"
+      busy={loading}
       initialFocusEl={() => reasonRef.current}
-      onOpenChange={({ open }) => {
-        if (!open && !loading) onClose();
-      }}
+      finalFocusEl={finalFocusEl}
+      primaryAction={{ label: "Impersonate", onClick: submit, loading }}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Impersonate user</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger disabled={loading} />
-        <Dialog.Body>
-          <VStack gap={3} align="stretch">
-            <Text fontSize="sm" color="fg.muted">
-              You will sign in as{" "}
-              <Text as="span" fontWeight="semibold" color="fg">
-                {user?.name ?? user?.email ?? user?.id}
-              </Text>
-              . The reason below is saved to the audit log.
-            </Text>
-            <Field.Root required>
-              <Field.Label>Reason</Field.Label>
-              <Input
-                ref={reasonRef}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void submit();
-                  }
-                }}
-                placeholder="e.g. Debugging a stuck trace reported by support ticket #…"
-                disabled={loading}
-              />
-            </Field.Root>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
-            </Button>
-            <Button onClick={submit} loading={loading} colorPalette="orange">
-              Impersonate
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack gap={3} align="stretch">
+        <Text fontSize="sm" color="fg.muted">
+          You will sign in as{" "}
+          <Text as="span" fontWeight="semibold" color="fg">
+            {user?.name ?? user?.email ?? user?.id}
+          </Text>
+          . The reason below is saved to the audit log.
+        </Text>
+        <Field.Root required>
+          <Field.Label>Reason</Field.Label>
+          <Input
+            ref={reasonRef}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+            placeholder="e.g. Debugging a stuck trace reported by support ticket #…"
+            disabled={loading}
+          />
+        </Field.Root>
+      </VStack>
+    </Dialog>
   );
 }
 
