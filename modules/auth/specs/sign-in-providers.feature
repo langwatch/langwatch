@@ -69,6 +69,22 @@ Feature: The deployment's sign-in providers mount on Better Auth
     When the sign-in method policy is resolved
     Then no federated method is offered
 
+  # Main's platformSSOAllowed lives on as enterprise SSO's gate (ADR-027); auth
+  # keeps no second licence check beside it.
+  @unit
+  Scenario: Every sign-in decision asks enterprise SSO's licence gate
+    Given a self-hosted install that names auth0 and mounted it
+    When the sign-in method policy is resolved and the federation gate is asked
+    Then each answer comes from enterprise SSO's gate
+    And that gate's licence log lines, once-only email-mode warning and evaluation timeout apply to sign-in
+
+  @unit
+  Scenario: A gate that gave up on a silent licensing store leaves sign-in on email
+    Given a self-hosted install that names auth0 and mounted it
+    And enterprise SSO's gate refused because the licensing store did not answer in time
+    When the sign-in method policy is resolved
+    Then no federated method is offered
+
 
   @integration
   Scenario: The sign-in screen offers only the configured providers in every environment

@@ -1,6 +1,5 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
  * A signed-in caller's own confirmation link: refused without an address,
@@ -99,7 +98,6 @@ async function appFor(
       identity,
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
-      licensing: createApiFixture<LicensingApi>(),
       notifications: createApiFixture<NotificationService>({
         getMailDelivery: async () => ({
           misconfigured: false,
