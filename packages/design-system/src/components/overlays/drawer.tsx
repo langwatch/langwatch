@@ -256,11 +256,14 @@ const DRAWER_WIDTH: Record<DrawerSize, string> = {
  */
 const DRAWER_GROUND = "bg";
 
+/** The recipe's 16px footer padding, grown on a device whose home indicator would cover it. */
+const FOOTER_SAFE_AREA = "max(var(--chakra-spacing-4), env(safe-area-inset-bottom, 0px))";
+
 /**
- * The drawer footer: an ActionRow without Cancel; the X and Escape close (ruling Q2). A shared
- * descriptor that carries `cancel` is a type error, and the drawer drops it at runtime anyway.
+ * The drawer footer is an ActionRow. It draws no Cancel unless the descriptor carries `cancel`
+ * (ruling 2026-10-11: a drawer that has one keeps it); the X and Escape close either way.
  */
-export type DrawerFooterProps = Omit<ActionRowProps, "cancel"> & { cancel?: never };
+export type DrawerFooterProps = ActionRowProps;
 
 export interface DrawerProps {
   /** Default true: a routed drawer is mounted only while open. */
@@ -355,7 +358,7 @@ export function DrawerShape({
     <>
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
         <ChakraDrawer.Header>
-          <HStack align="start" gap={2} width="full">
+          <HStack align="start" gap={2} width="full" flexWrap="wrap">
             {onBack && (
               <IconButton
                 type="button"
@@ -370,7 +373,7 @@ export function DrawerShape({
                 <ArrowLeft aria-hidden />
               </IconButton>
             )}
-            <VStack align="stretch" gap={1} flex={1} minWidth={0}>
+            <VStack align="stretch" gap={1} flex="1 1 10rem" minWidth={0}>
               {eyebrow && (
                 <HStack color="fg.muted" gap={2} textStyle="xs">
                   {eyebrow.icon}
@@ -421,9 +424,9 @@ export function DrawerShape({
         </ChakraDrawer.Body>
       </StudioIsolatedErrorBoundary>
       {footer && (
-        <ChakraDrawer.Footer>
+        <ChakraDrawer.Footer paddingBottom={FOOTER_SAFE_AREA}>
           <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
-            <ActionRow {...footer} cancel={undefined} busy={busy || footer.busy} />
+            <ActionRow {...footer} busy={busy || footer.busy} />
           </StudioIsolatedErrorBoundary>
         </ChakraDrawer.Footer>
       )}

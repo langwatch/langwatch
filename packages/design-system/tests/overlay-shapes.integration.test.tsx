@@ -9,13 +9,34 @@ import { Select } from "../src/components/forms/select.tsx";
 import type { ActionRowProps } from "../src/components/overlays/action-row.tsx";
 import { ConfirmDialog } from "../src/components/overlays/confirm-dialog.tsx";
 import { Dialog } from "../src/components/overlays/dialog.tsx";
-import { Drawer } from "../src/components/overlays/drawer.tsx";
+import { Drawer, setDrawerEndInset } from "../src/components/overlays/drawer.tsx";
 import { Menu } from "../src/components/overlays/menu.tsx";
 import { createListCollection } from "../src/primitives.ts";
 import { DesignSystemProvider } from "../src/provider/index.tsx";
 import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 afterEach(cleanup);
+
+function parentOf(element: Element): Element {
+  const parent = element.parentElement;
+  if (!parent) throw new Error("expected the element to have a parent");
+  return parent;
+}
+
+/** jsdom resolves no cascade layers, so read the rules a node's classes were given. */
+function rulesOf(element: Element): string {
+  const css = Array.from(document.querySelectorAll("style"))
+    .map((style) => style.textContent ?? "")
+    .join("\n");
+  return Array.from(element.classList)
+    .flatMap((name) => css.match(new RegExp(`\\.${name}\\{[^}]*\\}`, "g")) ?? [])
+    .join("");
+}
+
+function found(element: Element | null): Element {
+  if (!element) throw new Error("expected the element to be in the document");
+  return element;
+}
 
 function Crash(): never {
   throw new Error("boom: secret internals");
@@ -446,20 +467,142 @@ describe("a busy overlay", () => {
 });
 
 describe("a drawer footer", () => {
-  /** @scenario "A drawer footer never draws Cancel" */
-  it("drops a Cancel that arrives through a shared descriptor", async () => {
-    const shared: ActionRowProps = {
-      primaryAction: { label: "Save", onClick: vi.fn() },
-      cancel: { onClick: vi.fn() },
-    };
+  /** @scenario "A drawer footer draws Cancel only when it is given one" */
+  it("draws no Cancel until the descriptor carries one", async () => {
     renderWithDesignSystem(
-      // @ts-expect-error a descriptor that carries `cancel` is not a drawer footer
-      <Drawer onClose={vi.fn()} title="Edit key" footer={shared} />,
+      <Drawer
+        onClose={vi.fn()}
+        title="Edit key"
+        footer={{ primaryAction: { label: "Save", onClick: vi.fn() } }}
+      />,
     );
 
     const drawer = await screen.findByRole("dialog", { name: "Edit key" });
     expect(within(drawer).getByRole("button", { name: "Save" })).toBeTruthy();
     expect(within(drawer).queryByRole("button", { name: "Cancel" })).toBeNull();
+  });
+
+  /** @scenario "A drawer footer draws Cancel only when it is given one" */
+  it("draws the Cancel a shared descriptor carries, once, before the primary action", async () => {
+    const onCancel = vi.fn();
+    const shared: ActionRowProps = {
+      primaryAction: { label: "Save", onClick: vi.fn() },
+      cancel: { label: "Discard", onClick: onCancel },
+    };
+    renderWithDesignSystem(<Drawer onClose={vi.fn()} title="Edit key" footer={shared} />);
+
+    const drawer = await screen.findByRole("dialog", { name: "Edit key" });
+    const buttons = within(drawer)
+      .getAllByRole("button")
+      .map((button) => button.textContent);
+    expect(buttons.filter((name) => name === "Discard")).toHaveLength(1);
+    expect(buttons.indexOf("Discard")).toBeLessThan(buttons.indexOf("Save"));
+    await userEvent.setup().click(within(drawer).getByRole("button", { name: "Discard" }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario "A drawer footer draws Cancel only when it is given one" */
+  it("waits on Cancel while a save is in flight", async () => {
+    const onCancel = vi.fn();
+    renderWithDesignSystem(
+      <Drawer
+        onClose={vi.fn()}
+        title="Edit key"
+        busy
+        footer={{
+          cancel: { onClick: onCancel },
+          primaryAction: { label: "Save", onClick: vi.fn() },
+        }}
+      />,
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: "Edit key" });
+    expect(within(drawer).getByRole("button", { name: "Cancel" }).hasAttribute("disabled")).toBe(
+      true,
+    );
+  });
+
+  /** @scenario "A drawer footer draws Cancel only when it is given one" */
+  it("keeps a Cancel with its own side effect separate from the close request", async () => {
+    const onClose = vi.fn();
+    const onDiscard = vi.fn();
+    renderWithDesignSystem(
+      <Drawer onClose={onClose} title="Edit key" footer={{ cancel: { onClick: onDiscard } }} />,
+    );
+
+    const drawer = await screen.findByRole("dialog", { name: "Edit key" });
+    await userEvent.setup().click(within(drawer).getByRole("button", { name: "Cancel" }));
+    expect(onDiscard).toHaveBeenCalledTimes(1);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("a drawer on a narrow screen", () => {
+  /** @scenario "A drawer header and footer give way on a narrow screen" */
+  it("lets the header row wrap its tools and keeps the footer actions wrapping", async () => {
+    renderWithDesignSystem(
+      <Drawer
+        onClose={vi.fn()}
+        title="Production key"
+        headerTools={<button type="button">Version v12 (latest published)</button>}
+        footer={{
+          cancel: { onClick: vi.fn() },
+          secondaryAction: { label: "Save as draft", onClick: vi.fn() },
+          primaryAction: { label: "Publish to production", onClick: vi.fn() },
+        }}
+        data-testid="narrow"
+      />,
+    );
+
+    const drawer = await screen.findByTestId("narrow");
+    const title = within(drawer).getByRole("heading", { name: "Production key" });
+    expect(getComputedStyle(parentOf(parentOf(title))).flexWrap).toBe("wrap");
+    expect(getComputedStyle(found(drawer.querySelector("[data-action-row]"))).flexWrap).toBe(
+      "wrap",
+    );
+  });
+});
+
+describe("a drawer beside a docked panel", () => {
+  /** @scenario "A drawer yields a docked panel's room and clears the home indicator" */
+  it("yields the docked panel's room and keeps its footer above the home indicator", async () => {
+    setDrawerEndInset(320);
+    try {
+      renderWithDesignSystem(
+        <Drawer
+          onClose={vi.fn()}
+          title="Production key"
+          size="lg"
+          footer={{ primaryAction: { label: "Save", onClick: vi.fn() } }}
+          data-testid="docked"
+        />,
+      );
+
+      const drawer = await screen.findByTestId("docked");
+      expect(rulesOf(drawer)).toContain("calc(100vw - 1rem - 320px)");
+      const save = within(drawer).getByRole("button", { name: "Save" });
+      const footer = found(save.closest(".chakra-drawer__footer"));
+      expect(rulesOf(footer)).toContain("env(safe-area-inset-bottom");
+    } finally {
+      setDrawerEndInset(0);
+    }
+  });
+});
+
+describe("a dialog's placement", () => {
+  /** @scenario "A dialog can stand centred and keeps its size" */
+  it("centres the frame on request and otherwise leaves the recipe's own place", async () => {
+    const { rerender } = renderWithDesignSystem(
+      <Dialog open onClose={vi.fn()} title="Rename" size="lg" placement="center" />,
+    );
+    const centred = await screen.findByRole("dialog", { name: "Rename" });
+    expect(centred.dataset.size).toBe("lg");
+    expect(rulesOf(parentOf(centred))).toContain("align-items:center");
+
+    rerender(<Dialog open onClose={vi.fn()} title="Rename" size="lg" />);
+    const top = await screen.findByRole("dialog", { name: "Rename" });
+    expect(top.dataset.size).toBe("lg");
+    expect(rulesOf(parentOf(top))).not.toContain("align-items:center");
   });
 });
 

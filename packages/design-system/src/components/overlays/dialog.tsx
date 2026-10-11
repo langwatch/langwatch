@@ -158,6 +158,9 @@ const DIALOG_WIDTH: Record<DialogSize, string> = {
   xl: "56rem",
 };
 
+/** The two places a dialog frame stands: near the top, or centred on the viewport. */
+export type DialogPlacement = "top" | "center";
+
 export interface DialogProps {
   open: boolean;
   /** A request to close (X, Escape, outside, Cancel): the dialog stays until `open` is false. */
@@ -170,6 +173,8 @@ export interface DialogProps {
   icon?: React.ReactNode;
   /** Default "sm"; the body scrolls inside the frame. */
   size?: DialogSize;
+  /** Where the frame sits. Omitted, it keeps the dialog recipe's own placement (top). */
+  placement?: DialogPlacement;
   /** Step two of a two-step dialog. */
   onBack?: () => void;
   /** The dialog owns the form: a `type: "submit"` action submits it. Never wrap a child form. */
@@ -216,6 +221,7 @@ export function DialogShape({
   description,
   icon,
   size = "sm",
+  placement,
   onBack,
   onSubmit,
   formId,
@@ -310,6 +316,7 @@ export function DialogShape({
   return (
     <ChakraDialog.Root
       open={open}
+      placement={placement}
       role={role}
       closeOnEscape={closable}
       closeOnInteractOutside={closable}

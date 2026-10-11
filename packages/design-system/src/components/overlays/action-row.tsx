@@ -71,7 +71,7 @@ export interface ActionRowProps {
   note?: ReactNode;
   /** A full-width block above the row: a totals breakdown. */
   summary?: ReactNode;
-  /** Dialogs only: drawers close by their X and Escape. */
+  /** Outline, left of the secondary. A dialog draws it by default; a drawer only when given. */
   cancel?: { label?: string; onClick: () => void };
   /** Every action waits. */
   busy?: boolean;

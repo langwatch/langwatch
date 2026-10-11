@@ -79,9 +79,29 @@ Feature: Drawer and dialog shapes
     And Escape and an outside click do not request a close
 
   @integration
-  Scenario: A drawer footer never draws Cancel
-    Given a drawer given a shared footer descriptor that carries a cancel
-    Then the drawer draws the other actions and no Cancel button
+  Scenario: A drawer footer draws Cancel only when it is given one
+    Given a drawer whose footer descriptor has no cancel
+    Then the footer draws its actions and no Cancel button
+    When the descriptor carries a cancel with its own label and handler
+    Then Cancel is drawn once before the primary action and runs its own handler
+    And while a save is in flight Cancel waits
+
+  @integration
+  Scenario: A drawer header and footer give way on a narrow screen
+    Given a drawer with header tools and a footer with three actions
+    Then the header row and the footer actions wrap instead of overflowing
+
+  @integration
+  Scenario: A drawer yields a docked panel's room and clears the home indicator
+    Given a docked side panel and a drawer opened beside it
+    Then the drawer's maximum width leaves the panel's room
+    And the footer keeps its padding above the device's safe area
+
+  @integration
+  Scenario: A dialog can stand centred and keeps its size
+    Given a dialog asking for a centred placement and a named size
+    Then the frame is centred and carries that size
+    And a dialog given no placement keeps the recipe's own place
 
   @integration
   Scenario: A crashed overlay keeps a named shell and a working close control
