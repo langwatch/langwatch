@@ -1,5 +1,6 @@
 import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 /**
  * BatchRunsSidebar - Sidebar component showing list of evaluation runs
  */
@@ -16,7 +17,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
-import { GitCompare, X } from "lucide-react";
+import { FlaskConical, GitCompare, X } from "lucide-react";
 import { useMemo } from "react";
 
 import { getRunDisplayName } from "../../../../model/experiment/batch-evaluation-results.run-display-name.ts";
@@ -366,9 +367,21 @@ export function BatchRunsSidebar({
 
       {/* Empty state */}
       {!isLoading && !error && runs.length === 0 && (
-        <Text paddingX={3} paddingY={4} color="fg.muted" fontSize="sm">
-          No runs yet
-        </Text>
+        <NoDataInfoBlock
+          size="inline"
+          bordered={false}
+          icon={<FlaskConical />}
+          title="No runs yet"
+          description="Run an evaluation from the studio and its results appear here."
+          next={[
+            {
+              kind: "docs",
+              label: "How experiments work",
+              href: "https://docs.langwatch.ai/evaluations/experiments/overview",
+            },
+          ]}
+          testId="batch-runs-empty"
+        />
       )}
 
       {/* Run list - Apple Notes style */}
