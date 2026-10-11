@@ -149,6 +149,15 @@ Feature: Prompt Playground conversation
     And no partial assistant reply is left behind
 
   @integration
+  Scenario: A model refused for the playground is named in the conversation
+    Given the prompt uses a model licensed for coding-assistant features only
+    When I send a message in the playground
+    And the server refuses the run with a named error
+    Then the conversation shows that error in the registry's words
+    And not the generic "We've been notified" line
+    And no partial assistant reply is left behind
+
+  @integration
   Scenario: Stopping a running execution cancels it
     Given an execution is in progress
     When I stop the execution
