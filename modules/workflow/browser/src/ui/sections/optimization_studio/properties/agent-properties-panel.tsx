@@ -4,6 +4,7 @@ import {
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "@langwatch/agent-contract/code-config";
+import { ActionRow } from "@langwatch/design-system/action-row";
 import {
   Badge,
   Box,
@@ -16,7 +17,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { PromptNodeOutput } from "@langwatch/prompt-client";
 import type {
   HttpAuth,
@@ -951,9 +951,8 @@ function AgentFooter({
   onApply: () => void;
 }) {
   return (
-    <Drawer.Actions
-      bare
-      start={
+    <ActionRow
+      note={
         hasLocalChanges && (
           <Button
             variant="outline"
@@ -965,28 +964,13 @@ function AgentFooter({
           </Button>
         )
       }
-      secondary={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onSave}
-          loading={isSaving}
-          data-testid="agent-save-button"
-        >
-          Save
-        </Button>
-      }
-      primary={
-        <Button
-          colorPalette="orange"
-          variant="solid"
-          size="sm"
-          onClick={onApply}
-          data-testid="agent-apply-button"
-        >
-          Apply
-        </Button>
-      }
+      secondaryAction={{
+        label: "Save",
+        onClick: onSave,
+        loading: isSaving,
+        "data-testid": "agent-save-button",
+      }}
+      primaryAction={{ label: "Apply", onClick: onApply, "data-testid": "agent-apply-button" }}
     />
   );
 }

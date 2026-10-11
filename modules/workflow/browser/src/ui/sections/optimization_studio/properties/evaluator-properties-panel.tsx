@@ -1,6 +1,6 @@
+import { ActionRow } from "@langwatch/design-system/action-row";
 import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { type EvaluatorEditorValues, type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
@@ -272,9 +272,8 @@ function DbEvaluatorForm({
   // Register footer with the drawer wrapper
   const footerContent = useMemo(
     () => (
-      <Drawer.Actions
-        bare
-        start={
+      <ActionRow
+        note={
           hasLocalChanges && (
             <Button
               variant="outline"
@@ -286,28 +285,17 @@ function DbEvaluatorForm({
             </Button>
           )
         }
-        secondary={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSave}
-            loading={updateMutation.isPending}
-            data-testid="evaluator-save-button"
-          >
-            Save
-          </Button>
-        }
-        primary={
-          <Button
-            colorPalette="orange"
-            variant="solid"
-            size="sm"
-            onClick={handleApply}
-            data-testid="evaluator-apply-button"
-          >
-            Apply
-          </Button>
-        }
+        secondaryAction={{
+          label: "Save",
+          onClick: handleSave,
+          loading: updateMutation.isPending,
+          "data-testid": "evaluator-save-button",
+        }}
+        primaryAction={{
+          label: "Apply",
+          onClick: handleApply,
+          "data-testid": "evaluator-apply-button",
+        }}
       />
     ),
     [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
