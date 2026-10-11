@@ -13,10 +13,8 @@ import {
   type AgentVoiceEditorDrawerProps,
   type VoiceAgentEditor,
 } from "../../behavior/use-voice-agent-editor.ts";
-import { addKeyHref } from "../../model/voice-talk.ts";
-import { VoiceAgentFooter } from "../blocks/voice-agent-footer.tsx";
+import { addKeyHref, talkTooltipFor } from "../../model/voice-talk.ts";
 import { VoiceAgentForm } from "../blocks/voice-agent-form.tsx";
-import { VoiceAgentHeader } from "../blocks/voice-agent-header.tsx";
 import { VoiceAgentTalkView } from "./voice-agent-talk-view.tsx";
 
 function VoiceAgentBody({ editor }: { editor: VoiceAgentEditor }) {
@@ -38,50 +36,49 @@ function VoiceAgentBody({ editor }: { editor: VoiceAgentEditor }) {
 
 export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
   const editor = useVoiceAgentEditor(props);
-  const header = (
-    <VoiceAgentHeader
-      canGoBack={editor.canGoBack}
-      onGoBack={editor.goBack}
-      isEditing={Boolean(editor.agentId)}
-    />
-  );
+  const prerequisites = {
+    transport: editor.form.transport,
+    voiceAgentId: editor.form.voiceAgentId,
+    hasElevenLabsKey: editor.hasElevenLabsKey,
+  };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={editor.isOpen}
-      onOpenChange={({ open }) => !open && editor.close()}
+      onClose={editor.close}
+      onBack={editor.canGoBack ? editor.goBack : void 0}
+      backButtonTestId="back-button"
       size="lg"
-      closeOnInteractOutside={!editor.isEnabled}
-      modal={false}
-      preventScroll={false}
+      title={editor.agentId ? "Edit Voice Agent" : "New Voice Agent"}
+      body={editor.isEnabled ? "flush" : "padded"}
+      bodyScroll={editor.isEnabled ? "content" : "frame"}
+      footer={
+        editor.isEnabled
+          ? {
+              cancel: { onClick: editor.close },
+              secondaryAction: {
+                label: "Talk to it",
+                onClick: editor.openTalk,
+                disabledReason: talkTooltipFor(prerequisites),
+                "data-testid": "voice-agent-talk",
+              },
+              primaryAction: {
+                label: editor.savedAgentId ? "Save Changes" : "Create Agent",
+                onClick: editor.save,
+                loading: editor.isSaving,
+                "data-testid": "save-agent-button",
+              },
+            }
+          : void 0
+      }
     >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        {header}
-        {editor.isEnabled ? (
-          <>
-            <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-              <VoiceAgentBody editor={editor} />
-            </Drawer.Body>
-            <VoiceAgentFooter
-              isSaved={Boolean(editor.savedAgentId)}
-              transport={editor.form.transport}
-              voiceAgentId={editor.form.voiceAgentId}
-              hasElevenLabsKey={editor.hasElevenLabsKey}
-              isSaving={editor.isSaving}
-              onCancel={editor.close}
-              onTalk={editor.openTalk}
-              onSave={editor.save}
-            />
-          </>
-        ) : (
-          <Drawer.Body padding={6}>
-            <Text data-testid="voice-agents-disabled-message">
-              Voice agents are not enabled for this project.
-            </Text>
-          </Drawer.Body>
-        )}
-      </Drawer.Content>
-    </Drawer.Root>
+      {editor.isEnabled ? (
+        <VoiceAgentBody editor={editor} />
+      ) : (
+        <Text data-testid="voice-agents-disabled-message">
+          Voice agents are not enabled for this project.
+        </Text>
+      )}
+    </Drawer>
   );
 }
