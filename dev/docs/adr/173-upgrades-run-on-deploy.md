@@ -193,6 +193,16 @@ image runs. So:
   step of the running version is unfinished, Home shows an "Action needed for updates" bar inside
   its card, in the slot pending join requests use, to whoever holds `ops:view`.
 
+### 8. Amendment 2026-10-11: nothing is deleted automatically
+
+2026-10-11: nothing is deleted automatically; a drop is an operator step confirmed in Ops once
+safe; every step runs after old writers are gone (Alex). The upgrade no longer runs background
+steps inline before a contract (which ran them while old pods could still serve): it runs schema
+and blocking steps only, registers operator steps pending and never runs them. The migration-safety
+guards refuse a new `DROP TABLE` or `DROP COLUMN` in a Prisma folder or goose file above the newest
+`langwatch@v*` tag; released history keeps its drops. Specs: `packages/upgrade/specs/contract-order.feature`,
+`specs/ops/migration-safety.feature`.
+
 ## Alternatives considered
 
 - **Number cloud builds** (a build counter beside the `git-<sha>`). Ordering builds

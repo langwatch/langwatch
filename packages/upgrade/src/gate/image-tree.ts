@@ -114,9 +114,6 @@ export function imageSteps({
 /** The note the migration-safety rules require above every destructive statement. */
 const CONTRACT_NOTE = /--[ \t]*contract:[ \t]*retired in[ \t]+\S+/i;
 
-/** A contract's `-- after: <step id>`: a background step that runs before it (STEP-AFTER-2). */
-const AFTER_NOTE = /^[ \t]*--[ \t]*after:[ \t]*(\S+)/gim;
-
 /** A contract's `-- archive: <table>`: a table it drops, archived first (Alex, 2026-10-09). */
 const ARCHIVE_NOTE = /^[ \t]*--[ \t]*archive:[ \t]*(?!none\b)(\S+)/gim;
 
@@ -145,21 +142,6 @@ function readContractSql({
 
 const notesOf = ({ sql, note }: { sql: string; note: RegExp }) =>
   [...sql.matchAll(note)].flatMap((match) => match[1] ?? []);
-
-/**
- * The schema steps whose SQL carries `-- contract: retired in <release>`, the destructive ones,
- * each with the background step ids its `-- after:` notes name.
- */
-export function imageContractSteps({
-  directories = IMAGE_MIGRATION_DIRECTORIES,
-  tree = readImageTree({ directories }),
-}: {
-  directories?: { prisma: string; goose: string };
-  tree?: ReleaseTreeSteps;
-} = {}): Map<string, string[]> {
-  const contracts = readContractSql({ directories, tree });
-  return new Map([...contracts].map(([id, sql]) => [id, notesOf({ sql, note: AFTER_NOTE })]));
-}
 
 /** The contract steps that archive, each with the tables its `-- archive:` notes name. */
 export function imageContractArchives({

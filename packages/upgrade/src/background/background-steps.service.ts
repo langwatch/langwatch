@@ -143,17 +143,6 @@ export class BackgroundStepsService {
     return { paused: false, ...sweep, retrying };
   }
 
-  /**
-   * Runs one step now, as `upgrade` does before a contract step (Alex, 2026-10-09): forced, so
-   * neither serving nor the serving roster is asked. A step not pending or running is skipped.
-   */
-  async runNow({ id, signal }: { id: string; signal: AbortSignal }): Promise<StepOutcome> {
-    const step = this.options.steps.find((each) => each.id === id);
-    const row = (await this.options.ledger.findSteps()).find((each) => each.id === id);
-    if (!step || !row || !RUNNABLE.has(row.status)) return "skipped";
-    return this.runLeased({ step, signal, forced: true });
-  }
-
   private now(): number {
     return (this.options.now ?? performance.now.bind(performance))();
   }
@@ -190,13 +179,10 @@ export class BackgroundStepsService {
     step,
     signal,
     deadlineMs,
-    forced = false,
   }: {
     step: MigrationStep;
     signal: AbortSignal;
     deadlineMs?: number;
-    /** `runNow`'s run before a contract, which asks no serving roster before or after. */
-    forced?: boolean;
   }): Promise<StepOutcome> {
     const { ledger, identity, log } = this.options;
     const ttlMs = this.options.leaseTtlMs ?? BACKGROUND_STEP_LEASE_TTL_MS;
@@ -234,7 +220,7 @@ export class BackgroundStepsService {
       });
       const report = await Promise.race([run, held.deadline]);
       if (held.signal.aborted) return await this.suspend({ step, runId, held });
-      if (!forced && (await this.reopenedByRollback({ step }))) return "waiting";
+      if (await this.reopenedByRollback({ step })) return "waiting";
       await ledger.setStatus({ ids: [step.id], status: "done", runId, report });
       this.failures.delete(step.id);
       log("info", "background step done", { step: step.id, module });

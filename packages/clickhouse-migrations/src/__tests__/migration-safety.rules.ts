@@ -13,6 +13,9 @@ export const GRACEFUL_RULES: ReadonlySet<string> = new Set([
   "materialized-view-populate",
 ]);
 
+/** Nothing is deleted automatically (Alex, 2026-10-11): refused above the newest release tag. */
+export const NOTHING_DELETED_RULES: ReadonlySet<string> = new Set(["drop-table-or-column"]);
+
 /** One refusal: what is wrong, and what to write instead. */
 export interface MigrationFinding {
   readonly migration: string;
@@ -106,6 +109,41 @@ function dropFindings({ up, liveUp }: { up: string; liveUp: string }): Finding[]
         fix: RETIREMENT_FIX,
       },
     ];
+  });
+}
+
+const NO_DROP_FIX =
+  "nothing is deleted automatically: leave it in place and stop reading and writing it, then " +
+  'declare an operator step (`mode: "operator"`) in the owning module that drops it, which an ' +
+  "operator confirms on Ops > Upgrades once it is safe. Dropping an index, a projection or a " +
+  "view holds no data of its own and is fine, and so is dropping a table this file creates.";
+
+/** A DROP TABLE or DROP COLUMN in the up half, the only drops that lose data (Alex, 2026-10-11). */
+function noDropFindings(liveUp: string): Finding[] {
+  const statements = statementsIn(liveUp);
+  const created = new Set(
+    statements.flatMap((statement) => {
+      const match =
+        /^CREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMPORARY\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)/i.exec(
+          statement,
+        );
+      return match ? [bareName(match[1]!)] : [];
+    }),
+  );
+  return statements.flatMap((statement): Finding[] => {
+    const table = /^DROP\s+(?:TEMPORARY\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?(\S+)/i.exec(statement)?.[1];
+    if (table) {
+      if (created.has(bareName(table))) return [];
+      return [{ rule: "drop-table-or-column", problem: `drops table ${table}`, fix: NO_DROP_FIX }];
+    }
+    const altered = /^ALTER\s+TABLE\s+(\S+)/i.exec(statement)?.[1];
+    if (!altered || created.has(bareName(altered))) return [];
+    const columns = /\bDROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?/gi;
+    return [...statement.matchAll(columns)].map((match) => ({
+      rule: "drop-table-or-column",
+      problem: `drops column ${altered}.${match[1]}`,
+      fix: NO_DROP_FIX,
+    }));
   });
 }
 
@@ -383,6 +421,7 @@ export function scanClickHouseMigration({
   const { up, down } = gooseHalves(sql);
   const liveUp = maskComments(up);
   return [
+    ...noDropFindings(liveUp),
     ...dropFindings({ up, liveUp }),
     ...typeChangeFindings({ up, liveUp }),
     ...variableSizeFindings(liveUp),

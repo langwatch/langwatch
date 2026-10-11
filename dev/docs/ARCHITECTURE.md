@@ -1427,8 +1427,8 @@ console. A blocking step never touches a table the sign-in or ingest doors read 
 model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
 (UIW-1..11). A blocking data step touches only tables created in its own release; anything older
 ships as a background step (Alex, 2026-10-09). A background step names the background steps it runs after by their step
-values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
-contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
+values (`after: [step]`, STEP-AFTER); the worker waits on them, and an unknown id or a cycle
+refuses the plan. A fact old images never recorded is
 recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
 runs after `instant-eval:copy-judge-spend` (ADR-174 decision 17). Prisma migrations live with the schema;
 ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
@@ -1541,6 +1541,7 @@ latest image and the worker rolls it through every step from the release it is o
 than the first manifest's `previous` (the 3.18.1 baseline) plans from the baseline. Only the latest
 release gets fixes. So every step, alias and upcast is kept: a DROP or contract waits until old
 writers are gone (`needsOldWritersGone`), and the step that drops is kept, like every step.
+2026-10-11: nothing is deleted automatically; a drop is an operator step confirmed in Ops once safe; every step runs after old writers are gone (ADR-173 amendment; the migration-safety guards refuse a new DROP TABLE or DROP COLUMN above the newest release tag).
 
 **A framework package takes module values by injection, never by import** (Alex, 2026-10-06, rounds 5
 and 6, Q211). `packages/group-queue` takes a `mintUri` function and a generic destination type for its

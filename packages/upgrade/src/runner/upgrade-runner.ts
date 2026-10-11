@@ -2,9 +2,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { generate } from "@langwatch/ksuid";
 
-import { BackgroundStepsService } from "../background/background-steps.service.ts";
 import { BLOCKING_STEP_DEADLINE_MS, stepDeadline } from "../background/step-deadline.ts";
-import { imageContractArchives, imageContractSteps } from "../gate/image-tree.ts";
+import { imageContractArchives } from "../gate/image-tree.ts";
 import { UpgradeLedgerSeedService, withReinferred } from "../ledger-seed.service.ts";
 import { LEDGER_LOCK_TIMEOUT_MS } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
@@ -12,11 +11,7 @@ import type { UpcastStepInput, UpgradeRun, UpgradeStep, UpgradeStepStatus } from
 import { compareReleases } from "../manifest/manifest.ts";
 import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import { planInstallation } from "../plan/plan-installation.ts";
-import {
-  inlineBeforeContracts,
-  type PlannedRelease,
-  type UpgradePlan,
-} from "../plan/plan-upgrade.ts";
+import { orderAfter, type PlannedRelease, type UpgradePlan } from "../plan/plan-upgrade.ts";
 import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
 import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
@@ -64,8 +59,6 @@ export interface UpgradeRunnerOptions {
   releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
   codeSteps?: readonly MigrationStep[];
-  /** Contract ids, each with the steps its SQL names `after`; read from the image if not given. */
-  contracts?: ReadonlyMap<string, readonly string[]>;
   /** Contract ids, each with the tables its `-- archive:` notes name; else read from the image. */
   archives?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
@@ -572,15 +565,11 @@ export class UpgradeRunnerService {
     await phases.end({ name: "preflight", outcome: "succeeded" });
     const recorded = new Map(before.steps.map((step) => [step.id, step]));
     const applied: string[] = [];
-    const inline = await this.inlineBeforeContracts({ plan });
+    await this.refuseMisorderedSteps();
     const declared = this.options.archives ?? imageContractArchives();
     const archived: ContractArchiveEntry[] = [];
     for (const [index, release] of plan.releases.entries()) {
       signal.throwIfAborted();
-      for (const id of inline[index] ?? []) {
-        await this.runBeforeContract({ id, signal, runId });
-        applied.push(id);
-      }
       if (release.schema.length > 0) {
         const ahead = plan.releases.slice(index);
         archived.push(...(await this.archiveContracts({ releases: ahead, runId, declared })));
@@ -1022,75 +1011,20 @@ export class UpgradeRunnerService {
     }
   }
 
-  /** Per planned release, the unfinished background steps its contract steps wait for. */
-  private async inlineBeforeContracts({ plan }: { plan: UpgradePlan }): Promise<string[][]> {
+  /**
+   * Refuses a background step that runs after an unknown step or in a cycle (STEP-AFTER). The
+   * upgrade runs none of them: every background step runs on the worker once old writers are gone.
+   */
+  private async refuseMisorderedSteps(): Promise<void> {
     const settled = (await this.ledger.findSteps())
       .filter((step) => step.status === "done" || step.status === "not-needed")
       .map((step) => step.id);
-    return inlineBeforeContracts({
-      releases: plan.releases,
-      contracts: this.options.contracts ?? imageContractSteps(),
-      background: this.shipped
+    orderAfter({
+      steps: this.shipped
         .filter((step) => step.mode === "background" && this.codeSteps.has(step.id))
-        .map((step) => ({ ...step, after: this.codeSteps.get(step.id)?.after })),
+        .map((step) => ({ id: step.id, after: this.codeSteps.get(step.id)?.after })),
       settled: new Set(settled),
     });
-  }
-
-  /**
-   * Runs one background step to its end before a contract step (Alex, 2026-10-09): forced and
-   * blocking, under the step's own lease, waiting while a worker holds it; a failure fails the run.
-   */
-  private async runBeforeContract({
-    id,
-    signal,
-    runId,
-  }: {
-    id: string;
-    signal: AbortSignal;
-    runId: string;
-  }): Promise<void> {
-    const steps = BackgroundStepsService.create({
-      ledger: {
-        findSteps: () => this.ledger.findSteps(),
-        acquireLease: (input) => this.ledger.acquireLease(input),
-        renewLease: (input) => this.ledger.renewLease(input),
-        releaseLease: (input) => this.ledger.releaseLease(input),
-        markRunning: (input) => this.runner.markRunning(input),
-        setStatus: (input) => this.runner.setStatus(input),
-        saveReport: (input) => this.runner.saveReport(input),
-        reopen: (input) => this.runner.reopenDoneSteps({ ...input, from: "running" }),
-      },
-      steps: [...this.codeSteps.values()],
-      serving: () => true,
-      oldWritersGoneFor: async () => true,
-      identity: { ...this.options.identity, owner: `upgrade:${runId}` },
-      log: (level, message, fields) =>
-        level === "warn" ? this.narrate.warn(message, fields) : undefined,
-      retry: { attempts: 1, firstBackoffMs: 0, maxBackoffMs: 0 },
-    });
-    const description = this.codeSteps.get(id)?.description ?? id;
-    this.narrate.stepStarted({ id, description, resuming: false });
-    for (;;) {
-      const outcome = await steps.runNow({ id, signal });
-      signal.throwIfAborted();
-      if (outcome === "held") {
-        await sleep(this.timing.pollMs, undefined, { signal });
-        continue;
-      }
-      const row = (await this.ledger.findSteps()).find((step) => step.id === id);
-      if (row?.status === "done" || row?.status === "not-needed") {
-        this.narrate.stepEnded({ id, error: null });
-        return;
-      }
-      const lastError = row?.lastError ?? `it is ${row?.status ?? "unrecorded"}`;
-      this.narrate.stepEnded({ id, error: lastError });
-      throw new UpgradeRunFailure(
-        "step_failed",
-        `background step ${id} must finish before a contract step: ${lastError}`,
-        { step: id },
-      );
-    }
   }
 
   /** Plan 2026-10-08 F-3: each run gives failed background steps another try on the worker. */

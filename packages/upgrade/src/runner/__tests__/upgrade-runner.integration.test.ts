@@ -781,14 +781,18 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
     });
   });
 
-  describe("when a later release drops what an earlier release's background step reads", () => {
+  describe("when a jump crosses a release with a background step and an operator step", () => {
     const manifests: ReleaseManifest[] = [
-      ...MANIFESTS.slice(0, 2),
+      MANIFESTS[0]!,
+      {
+        ...MANIFESTS[1]!,
+        steps: [...MANIFESTS[1]!.steps, step("identity:drop-legacy-key", "data", "operator")],
+      },
       {
         release: "3.22.0",
         previous: "3.21.0",
         cutAt: "2026-10-04T09:00:00+02:00",
-        steps: [step("prisma:20261003000000_drop_old", "postgres-schema")],
+        steps: [step("prisma:20261003000000_add_more", "postgres-schema")],
       },
     ];
     const upTo = (release: string | null) =>
@@ -812,17 +816,13 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
         ];
       },
     });
-    const upgradeTo = ({ release, order }: { release: string; order: string[] }) =>
+    const upgradeTo = ({ order }: { order: string[] }) =>
       run(
         runnerFor({
-          release,
+          release: "3.22.0",
           applier: recording(order),
-          image: {
-            release,
-            steps: manifests.filter((m) => m.release <= release).flatMap((m) => m.steps),
-          },
+          image: { release: "3.22.0", steps: manifests.flatMap((m) => m.steps) },
           releases: { manifests },
-          contracts: new Map([["prisma:20261003000000_drop_old", []]]),
           codeSteps: [
             defineMigrationStep({
               id: "dataset:copy-keys",
@@ -842,33 +842,41 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
                 return {};
               },
             }),
+            defineMigrationStep({
+              id: "identity:drop-legacy-key",
+              kind: "data",
+              mode: "operator",
+              description: "drops the legacy key once an operator confirms it is safe",
+              run: async () => {
+                order.push("step identity:drop-legacy-key");
+                return {};
+              },
+            }),
           ],
         }),
       );
 
-    /** @scenario "A jump runs the earlier release's unfinished background step before the contract release's schema" */
-    it("runs the background step between the two releases' schema", async () => {
+    let order: string[];
+    let outcome: Awaited<ReturnType<typeof upgradeTo>>;
+
+    beforeEach(async () => {
       await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
-      const order: string[] = [];
-      const outcome = await upgradeTo({ release: "3.22.0", order });
-      expect(outcome.code).toBe("done");
-      expect(order).toEqual(["schema 3.21.0", "step identity:backfill", "schema 3.22.0"]);
-      expect(await statusOf("identity:backfill")).toBe("done");
+      order = [];
+      outcome = await upgradeTo({ order });
     });
 
-    /** @scenario "A background step the worker finished is not run again before the contract release's schema" */
-    it("does not run the step the worker already finished", async () => {
-      await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
-      await upgradeTo({ release: "3.21.0", order: [] });
-      await UpgradeRunnerRepository.create({ postgres: scratch.postgres }).setStatus({
-        ids: ["identity:backfill"],
-        status: "done",
-        runId: "background:worker-1",
-      });
-      const order: string[] = [];
-      const outcome = await upgradeTo({ release: "3.22.0", order });
+    /** @scenario "An upgrade never runs a background step, even before a later release's schema" */
+    it("applies both releases' schema and leaves the background step to the worker", async () => {
       expect(outcome.code).toBe("done");
-      expect(order).toEqual(["schema 3.22.0"]);
+      expect(order).toEqual(["schema 3.21.0", "schema 3.22.0"]);
+      expect(await statusOf("identity:backfill")).toBe("pending");
+    });
+
+    /** @scenario "An operator step is registered pending and the upgrade never runs it" */
+    it("records the operator step pending and never runs it", async () => {
+      expect(outcome.code).toBe("done");
+      expect(order).not.toContain("step identity:drop-legacy-key");
+      expect(await statusOf("identity:drop-legacy-key")).toBe("pending");
     });
   });
 
@@ -910,7 +918,6 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
           applier: dropping(order),
           image: { release: "3.22.0", steps: ARCHIVE_MANIFESTS.flatMap((m) => m.steps) },
           releases: { manifests: ARCHIVE_MANIFESTS },
-          contracts: new Map([[ARCHIVE_DROP, []]]),
           archives: new Map([[ARCHIVE_DROP, [table]]]),
         }),
       );
