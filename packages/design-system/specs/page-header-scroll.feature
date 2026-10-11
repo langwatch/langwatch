@@ -46,6 +46,13 @@ Feature: Sticky glass page titles
     And a header without a description reserves no line for one
     And a description that wraps adds 20 pixels a line and is never clipped
 
+  @integration @browser
+  Scenario: A narrow described header wraps its actions below instead of overlapping the title
+    Given a described header with four actions in a 390 pixel container
+    Then the actions sit below the description and the title never overlaps them
+    And a long title is cut with an ellipsis rather than overflowing
+    And the same header at 1280 pixels keeps its actions beside the title at 77 pixels high
+
   @integration
   Scenario: Full-screen tools may use compact headers
     Given a standalone tool with no sidebar siblings

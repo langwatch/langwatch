@@ -194,14 +194,18 @@ function Header({
         paddingX={PAGE_INSET}
         paddingTop={paddingTop}
         paddingBottom={described ? 3 : 0}
-        flexWrap="nowrap"
+        flexWrap={described ? "wrap" : "nowrap"}
+        rowGap={described ? 2 : undefined}
         css={{
           "& h1": {
             textStyle: size === "lg" ? "pageTitle" : "pageTitleCompact",
             lineHeight: "28px",
             height: "28px",
             margin: 0,
-            flexShrink: 0,
+            flexShrink: described ? 1 : 0,
+            minWidth: described ? 0 : undefined,
+            overflow: described ? "hidden" : undefined,
+            textOverflow: described ? "ellipsis" : undefined,
             whiteSpace: "nowrap",
           },
           "& .chakra-button": {
@@ -212,7 +216,7 @@ function Header({
         }}
       >
         {described ? (
-          <VStack align="stretch" gap={1} flex={1} minWidth={0}>
+          <VStack align="stretch" gap={1} flex="1 1 16rem" minWidth={0}>
             <HStack gap={3} minWidth={0}>
               {children}
             </HStack>

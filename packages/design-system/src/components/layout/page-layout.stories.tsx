@@ -310,6 +310,28 @@ export const DescribedHeader: Story = {
   },
 };
 
+/** In a 390px container the actions wrap below the description and a long title is cut. */
+export const DescribedHeaderNarrow: Story = {
+  render: () => (
+    <PageHeaderSizeProvider size="lg">
+      <Box maxWidth="390px">
+        <PageLayout.Header
+          description="Lets the Support assistant call models through the gateway."
+          actions={
+            <>
+              <PageLayout.HeaderButton>Audit history</PageLayout.HeaderButton>
+              <PageLayout.HeaderButton>View traces</PageLayout.HeaderButton>
+              <PageLayout.HeaderButton>Revoke</PageLayout.HeaderButton>
+            </>
+          }
+        >
+          <PageLayout.Heading>Production support key for the payments gateway</PageLayout.Heading>
+        </PageLayout.Header>
+      </Box>
+    </PageHeaderSizeProvider>
+  ),
+};
+
 export const CompactTool: Story = {
   render: () => (
     <PageHeaderSizeProvider size="sm">

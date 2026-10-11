@@ -52,4 +52,70 @@ describe("page header geometry", () => {
       );
     });
   });
+
+  /** @scenario A narrow described header wraps its actions below instead of overlapping the title */
+  it("keeps the title clear of the actions at 390px and leaves desktop geometry alone", async () => {
+    const actions = (
+      <>
+        <PageLayout.HeaderButton>Audit history</PageLayout.HeaderButton>
+        <PageLayout.HeaderButton>View traces</PageLayout.HeaderButton>
+        <PageLayout.HeaderButton>Disable</PageLayout.HeaderButton>
+        <PageLayout.HeaderButton>Revoke</PageLayout.HeaderButton>
+      </>
+    );
+    renderWithDesignSystem(
+      <>
+        <div style={{ width: 390 }}>
+          <PageLayout.Header
+            data-testid="narrow"
+            description="Used by the support tools and the gateway."
+            actions={actions}
+          >
+            <PageLayout.Heading>
+              Production support key for the payments gateway in Frankfurt
+            </PageLayout.Heading>
+          </PageLayout.Header>
+        </div>
+        <div style={{ width: 1280 }}>
+          <PageLayout.Header
+            data-testid="wide"
+            description="Used by the support tools and the gateway."
+            actions={actions}
+          >
+            <PageLayout.Heading>Production support key</PageLayout.Heading>
+          </PageLayout.Header>
+        </div>
+      </>,
+    );
+
+    await waitFor(() => {
+      const narrow = screen.getByTestId("narrow");
+      const title = narrow.querySelector("h1");
+      const buttons = narrow.querySelector("[data-header-actions]");
+      const line = narrow.querySelector("[data-header-description]");
+      if (!title || !buttons || !line) throw new Error("narrow header missing its parts");
+      const header = narrow.getBoundingClientRect();
+      const t = title.getBoundingClientRect();
+      const a = buttons.getBoundingClientRect();
+      expect(a.top).toBeGreaterThanOrEqual(line.getBoundingClientRect().bottom);
+      expect(t.right).toBeLessThanOrEqual(header.right);
+      expect(a.right).toBeLessThanOrEqual(header.right);
+      expect(t.height).toBe(28);
+      expect(getComputedStyle(title).textOverflow).toBe("ellipsis");
+      expect(title.scrollWidth).toBeGreaterThan(title.clientWidth);
+      expect(t.bottom <= a.top || t.right <= a.left).toBe(true);
+
+      const wide = screen.getByTestId("wide");
+      const wideTitle = wide.querySelector("h1");
+      const wideButtons = wide.querySelector("[data-header-actions]");
+      if (!wideTitle || !wideButtons) throw new Error("wide header missing its parts");
+      expect(wideButtons.getBoundingClientRect().top).toBeLessThan(
+        wide.getBoundingClientRect().top + 48,
+      );
+      expect(wideTitle.getBoundingClientRect().right).toBeLessThanOrEqual(
+        wideButtons.getBoundingClientRect().left,
+      );
+      expect(height({ element: wide })).toBe(77);
+    });
+  });
 });
