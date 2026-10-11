@@ -125,3 +125,36 @@ describe("given a config for an adapter with no fixed destination", () => {
     });
   });
 });
+
+describe("given a configured Databricks workspace base", () => {
+  const configured = PullDestinationService.create({ configuredBase: "http://localhost:6970" });
+
+  /** @scenario "Databricks accepts the configured workspace base and nothing wider" */
+  it("accepts exactly that origin, and the real clouds still", () => {
+    expect(() => configured.assertAllowed(genie("http://localhost:6970"))).not.toThrow();
+    expect(() => configured.assertAllowed(genie("http://localhost:6970/"))).not.toThrow();
+    expect(() =>
+      configured.assertAllowed(genie("https://adb-1.4.azuredatabricks.net")),
+    ).not.toThrow();
+  });
+
+  /** @scenario "Databricks accepts the configured workspace base and nothing wider" */
+  it.each([
+    "http://localhost:6971",
+    "http://127.0.0.1:6970",
+    "https://localhost:6970",
+    "http://localhost:6970/api",
+    "http://user:pw@localhost:6970",
+    "http://localhost:6970.attacker.example",
+    "https://attacker.example.com",
+  ])("still refuses %s", (url) => {
+    expect(() => configured.assertAllowed(genie(url))).toThrow(GovernanceValidationError);
+  });
+
+  /** @scenario "A vendor base that is unset or blank reaches the real vendor" */
+  it("accepts no local origin when no base is configured", () => {
+    expect(() => pullDestination.assertAllowed(genie("http://localhost:6970"))).toThrow(
+      GovernanceValidationError,
+    );
+  });
+});

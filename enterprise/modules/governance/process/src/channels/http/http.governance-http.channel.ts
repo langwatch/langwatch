@@ -19,6 +19,7 @@ import {
   createSsrfUrlValidator,
   fetchValidatedDestination,
   type FencedFetchOptions,
+  type SsrfUrlValidator,
 } from "@langwatch/egress";
 
 export interface SsrfSafeResponse {
@@ -34,11 +35,44 @@ export interface SsrfSafeResponse {
 /** The local-address part of the fence; cloud metadata is refused whatever it says. */
 export type GovernanceEgressPolicy = Readonly<{ blockLocal: boolean; allowedHosts: string[] }>;
 
+/**
+ * A validator judged by `policy`, except that a URL whose origin equals one of `exemptOrigins`
+ * (a configured vendor base) may be local. Cloud metadata is refused for every origin.
+ */
+export function createGovernanceUrlValidator({
+  policy,
+  exemptOrigins = [],
+}: {
+  policy: GovernanceEgressPolicy;
+  exemptOrigins?: readonly string[];
+}): SsrfUrlValidator {
+  const judged = createSsrfUrlValidator(policy);
+  const exempt = createSsrfUrlValidator({ ...policy, blockLocal: false });
+  return (url) => {
+    return isExemptOrigin({ url, exemptOrigins }) ? exempt(url) : judged(url);
+  };
+}
+
+function isExemptOrigin({
+  url,
+  exemptOrigins,
+}: {
+  url: string;
+  exemptOrigins: readonly string[];
+}): boolean {
+  try {
+    return exemptOrigins.includes(new URL(url).origin);
+  } catch {
+    return false;
+  }
+}
+
 /** A fenced fetch judged by `policy`, as main's `ssrfSafeFetch` read BLOCK_LOCAL_HTTP_CALLS. */
 export function createSsrfSafeFetch(
   policy: GovernanceEgressPolicy,
+  { exemptOrigins }: { exemptOrigins?: readonly string[] } = {},
 ): (url: string, init: FencedFetchOptions) => Promise<SsrfSafeResponse> {
-  const validate = createSsrfUrlValidator(policy);
+  const validate = createGovernanceUrlValidator({ policy, exemptOrigins });
   return async (url, init) => {
     const validated = await validate(url);
     return fetchValidatedDestination(validated, init, { rejectUnauthorized: true });

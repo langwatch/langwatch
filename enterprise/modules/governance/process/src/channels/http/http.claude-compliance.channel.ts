@@ -3,6 +3,7 @@
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
 import type { IngestionPullDiagnosticsSink } from "../../features/ingestion-pull/services/ingestion-pull-log.service.ts";
+import { REAL_VENDOR_BASES, type VendorBases } from "../../rules/vendor-bases.rules.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 /**
  * Anthropic (Claude) Compliance reference puller — built on top of
@@ -60,28 +61,38 @@ export const CLAUDE_COMPLIANCE_PULL_CONFIG: HttpPollingConfig = {
   },
 };
 
+const AUDIT_LOG_PATH = "/v1/organizations/audit_log";
+
 export class ClaudeComplianceReferencePullerAdapter extends HttpPollingPullerAdapter {
   override readonly id: string = "claude_compliance";
+
+  private readonly pullConfig: HttpPollingConfig;
 
   private constructor(options: {
     http: GovernanceHttpClient;
     diagnostics?: IngestionPullDiagnosticsSink;
+    vendorBases?: VendorBases;
   }) {
     super(options.http, options.diagnostics);
+    this.pullConfig = {
+      ...CLAUDE_COMPLIANCE_PULL_CONFIG,
+      url: `${(options.vendorBases ?? REAL_VENDOR_BASES).anthropicAdmin}${AUDIT_LOG_PATH}`,
+    };
   }
 
   static override create(options: {
     http: GovernanceHttpClient;
     diagnostics?: IngestionPullDiagnosticsSink;
+    vendorBases?: VendorBases;
   }): ClaudeComplianceReferencePullerAdapter {
     return new ClaudeComplianceReferencePullerAdapter(options);
   }
 
   override validateConfig(_config: unknown): HttpPollingConfig {
-    return CLAUDE_COMPLIANCE_PULL_CONFIG;
+    return this.pullConfig;
   }
 
   override async runOnce(options: PullRunOptions, _config: HttpPollingConfig): Promise<PullResult> {
-    return super.runOnce(options, CLAUDE_COMPLIANCE_PULL_CONFIG);
+    return super.runOnce(options, this.pullConfig);
   }
 }
