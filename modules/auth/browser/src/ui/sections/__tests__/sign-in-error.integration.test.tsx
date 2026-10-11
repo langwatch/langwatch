@@ -228,6 +228,16 @@ describe("given one of the assertion refusals the boundary admits", () => {
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 
+  it.each([
+    ["identity_jit_disabled", "This workspace does not create accounts automatically"],
+    ["identity_link_proposed", "An administrator needs to confirm this sign-in"],
+  ])("tells a newcomer the arrival policy's answer for %s", (code, title) => {
+    renderError(code);
+
+    expect(screen.getByText(title)).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+
   it("still refuses a registered code the boundary would not admit", () => {
     renderError("validation_error");
 

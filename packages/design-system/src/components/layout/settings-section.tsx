@@ -54,7 +54,8 @@ export function SettingsSection({
     >
       <VStack width="full" align="stretch" gap={5}>
         <VStack width="full" align="stretch" gap={1}>
-          <HStack width="full" gap={2} align="center">
+          {/* Actions wider than the row's remainder wrap under the title, never over it. */}
+          <HStack width="full" gap={2} rowGap={2} align="center" flexWrap="wrap">
             {icon ? (
               <Box color="fg.muted" display="flex" flexShrink={0}>
                 {icon}
@@ -120,6 +121,8 @@ export function SettingsSectionRow({
     <HStack
       width="full"
       gap={3}
+      rowGap={2}
+      flexWrap="wrap"
       paddingX={4}
       paddingY={3}
       borderWidth="1px"

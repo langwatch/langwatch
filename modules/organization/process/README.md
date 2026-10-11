@@ -6,7 +6,7 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withMigrations(…).withTasks(…)`, `src/organization.module.ts:29`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…).withTasks(…)`, `src/organization.module.ts:30`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -234,6 +234,14 @@ createForProvisioning(input: { name: string; slug?: string }): Promise<{ organiz
 
 ```typescript
 listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
+```
+
+#### `ensureSystemOrganization`
+
+The install's hidden system organization, created with its one team on first ask; no fact.
+
+```typescript
+ensureSystemOrganization(): Promise<{ id: string }>;
 ```
 
 #### `findProvisioningSummary`
@@ -2262,6 +2270,14 @@ Declared at `src/eventing/organization-lifecycle.pipeline.ts:116`. Events: `orga
 | command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:155` |
 | command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:156` |
 
+### Pipeline `organization_private_dataplane_recorder` (aggregate `global`)
+
+Declared at `src/eventing/organization-private-dataplane.pipeline.ts:33`.
+
+| Kind            | Name                       | Handles                                                                                         | Declared at                                                  |
+| --------------- | -------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| process manager | `privateDataplaneRecorder` | every 5 min (`PRIVATE_DATAPLANE_RECORD_INTERVAL_MS = 5 * 60 * 1000`); intents `record` (outbox) | `src/eventing/organization-private-dataplane.pipeline.ts:38` |
+
 ### Pipeline `organization_seat_limit` (aggregate `organization_seat_limit`)
 
 Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedEventSchema`.
@@ -2282,7 +2298,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:300`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:301`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

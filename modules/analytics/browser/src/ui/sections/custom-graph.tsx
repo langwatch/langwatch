@@ -289,6 +289,7 @@ function useGraphTimeseries({
     ...queryOpts,
     enabled: queryOpts.enabled && load,
     refetchInterval,
+    trpc: { context: { background: refetchInterval !== false } },
   });
   const freshness = useReadFreshness({
     queryKey: trpcQueryKey("analytics.getTimeseries", { input: timeseriesInput, type: "query" }),
@@ -302,6 +303,7 @@ function useGraphTimeseries({
       ...queryOpts,
       enabled: queryOpts.enabled && load && input.graphType === "monitor_graph",
       refetchInterval,
+      trpc: { context: { background: refetchInterval !== false } },
     },
   );
   return { timeseries, monitorSummaryTimeseries, filterParams, freshness };

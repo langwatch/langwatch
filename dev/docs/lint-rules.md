@@ -76,7 +76,6 @@ one-line `why`, then `fix`.
 - [`langwatch/unbounded-loop`](#langwatchunboundedloop)
 - [`langwatch/unit-test-does-not-render`](#langwatchunittestdoesnotrender)
 - [`langwatch/unresolved-relative-import`](#langwatchunresolvedrelativeimport)
-- [`langwatch/upcast-drain-window`](#langwatchupcastdrainwindow)
 - [`langwatch/web-imports-server-shaped-value`](#langwatchwebimportsservershapedvalue)
 - [`langwatch/zod-internals`](#langwatchzodinternals)
 - [`langwatch/zod-object-composition`](#langwatchzodobjectcomposition)
@@ -1678,27 +1677,6 @@ Messages:
   - what: `{{specifier}}` names no file on disk.
   - fix: Point it at the file's new path, or delete the line if the file is gone; a move leaves these in batches, so resolve the whole file in one pass.
   - why: A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it. Read the `repo-tree` skill.
-
-## `langwatch/upcast-drain-window`
-
-- Kind: problem
-- Applies to: applies
-- Fixable: no
-- Spec: `specs/tooling/lint-upcast-drain-window.feature`
-- Enforced: yes, at `error`
-
-Options: none.
-
-Messages:
-
-- `drainPastWindow`
-  - what: This upcast drain outlived its window: `removeAfter` is {{removeAfter}} and {{newest}} has been cut.
-  - fix: Delete the `drain` from `.withUpcasts`; keep the `events` until their own contract step at the LTS floor. Read the `eventing-and-worker` skill.
-  - why: Every job the previous release queued has drained by now; the drain is dead routing.
-- `drainWithoutWindow`
-  - what: This upcast drain declares no `removeAfter` release.
-  - fix: Add `removeAfter: "<next release>"` (a literal `x.y.z`) to the `drain`, as `.withLaneAliases` does. Read the `eventing-and-worker` skill.
-  - why: A drain carries jobs a previous release queued, so it lives for one release and must say which.
 
 ## `langwatch/web-imports-server-shaped-value`
 

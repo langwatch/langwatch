@@ -19,12 +19,6 @@ export type ClickHouseMigrationEndpoint = {
 
 export type ClickHouseMigrationTaskConfig = {
   buildTime: boolean;
-  /**
-   * The operator's own opt-out, `SKIP_CLICKHOUSE_MIGRATE=true` — exactly
-   * that string, since a half-recognised value silently skipping schema
-   * work is the expensive direction: the process serves whatever schema was there.
-   */
-  skipped: boolean;
   sharedUrl?: string;
   privateEndpoints: readonly ClickHouseMigrationEndpoint[];
   settings?: ClickHouseMigrationSettings;
@@ -160,10 +154,6 @@ export class ClickHouseMigrateTask extends Task {
   }
 
   async execute(): Promise<void> {
-    if (this.config.skipped) {
-      logger.info("Skipping ClickHouse migrations");
-      return;
-    }
     if (this.config.buildTime) return;
 
     // Wait for a booting ClickHouse before queueing on the lock, so a process
@@ -261,7 +251,6 @@ export function resolveClickHouseMigrationTaskConfig(
   );
   return {
     buildTime: source.BUILD_TIME !== undefined,
-    skipped: source.SKIP_CLICKHOUSE_MIGRATE === "true",
     ...(source.CLICKHOUSE_URL === undefined ? {} : { sharedUrl: source.CLICKHOUSE_URL }),
     privateEndpoints,
     settings: {

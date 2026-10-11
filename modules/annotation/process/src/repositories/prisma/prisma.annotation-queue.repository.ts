@@ -4,6 +4,7 @@ import {
   type AnnotationQueueListEntry,
   type AnnotationQueueDetail,
 } from "@langwatch/annotation-contract";
+import { generate } from "@langwatch/ksuid";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { isRecordNotFoundError } from "@langwatch/prisma-client/errors";
 import type { Prisma } from "@langwatch/prisma-client/generated";
@@ -59,6 +60,7 @@ export class PrismaAnnotationQueueRepository
   }: QueueCreateInput): Promise<AnnotationQueueRecord> {
     const queue = await this.prisma.annotationQueue.create({
       data: {
+        id: generate("annotationqueue").toString(),
         projectId,
         name,
         slug,

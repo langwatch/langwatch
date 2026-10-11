@@ -1,12 +1,12 @@
 import type { UpgradeRun, UpgradeStep } from "../ledger.ts";
-import type { LtsFloor, ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
-import { highestRecordedFloor, inferInstalledRelease } from "../runner/installed-release.ts";
+import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
+import { inferInstalledRelease } from "../runner/installed-release.ts";
 import { planUpgrade, upgradePlanSchema, type UpgradePlan } from "./plan-upgrade.ts";
 
 /** What planning needs beside the ledger: the image and every release manifest it carries. */
 export interface UpgradePlanning {
   image: { release: string | null; steps: readonly ManifestStep[] };
-  releases: { manifests: readonly ReleaseManifest[]; floor: LtsFloor };
+  releases: { manifests: readonly ReleaseManifest[] };
 }
 
 /**
@@ -22,7 +22,7 @@ export function planInstallation({
   fresh = false,
 }: UpgradePlanning & {
   steps: readonly Pick<UpgradeStep, "id" | "status">[];
-  runs: readonly (Pick<UpgradeRun, "kind" | "outcome" | "release" | "startedAt" | "floor"> &
+  runs: readonly (Pick<UpgradeRun, "kind" | "outcome" | "release" | "startedAt"> &
     Partial<Pick<UpgradeRun, "plan">>)[];
   fresh?: boolean;
 }): { installed: string | null; plan: UpgradePlan } {
@@ -34,27 +34,10 @@ export function planInstallation({
   const resumesFresh =
     upgrades.some((run) => plannedFresh(run.plan)) &&
     !upgrades.some((run) => run.outcome === "succeeded");
-  const known =
+  const installed =
     (fresh && upgrades.length === 0) || resumesFresh
-      ? ({ known: true, installed: null } as const)
-      : inferInstalledRelease({ runs, steps, manifests: releases.manifests });
-  if (!known.known) {
-    const predates = known.predates ?? "every shipped release";
-    const message = `this installation predates ${predates}; upgrade to ${releases.floor.release} (LTS) first, then to this image`;
-    const plan: UpgradePlan = {
-      outcome: "refused",
-      code: "below_lts_floor",
-      stopAt: releases.floor.release,
-      message,
-    };
-    return { installed: null, plan };
-  }
-  const plan = planUpgrade({
-    installed: known.installed,
-    image,
-    floor: releases.floor,
-    manifests: releases.manifests,
-    ledger: { floor: highestRecordedFloor({ runs }), steps },
-  });
-  return { installed: known.installed, plan };
+      ? null
+      : inferInstalledRelease({ runs, steps, manifests: releases.manifests }).installed;
+  const plan = planUpgrade({ installed, image, manifests: releases.manifests, ledger: { steps } });
+  return { installed, plan };
 }

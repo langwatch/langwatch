@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient, PrivateRouteVariable } from "@langwatch/clickhouse-client";
 
 import { ClickHouseRoutesRepository } from "../clickhouse.routes.repository.ts";
 
@@ -18,5 +18,9 @@ export class ClickHouseClickHouseRoutesRepository extends ClickHouseRoutesReposi
 
   findPrivateRoutes(): ReadonlyMap<string, string> {
     return this.clickhouse.privateRoutes();
+  }
+
+  findPrivateRouteVariables(): readonly PrivateRouteVariable[] {
+    return this.clickhouse.privateRouteVariables();
   }
 }

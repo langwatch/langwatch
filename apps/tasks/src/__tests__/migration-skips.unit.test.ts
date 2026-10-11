@@ -3,12 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { resolveTasksConfig, type TaskInput } from "../config.ts";
 import { lwqlProvision } from "../lwql-provision.ts";
-import { prismaMigrate } from "../prisma-migrate.ts";
 
-const spawned = vi.hoisted(() => ({ spawn: vi.fn() }));
 const provisioned = vi.hoisted(() => ({ create: vi.fn() }));
 
-vi.mock("node:child_process", () => ({ spawn: spawned.spawn }));
 vi.mock("@langwatch/analytics-process", () => ({
   LwqlProvisionTask: { create: provisioned.create },
 }));
@@ -24,17 +21,6 @@ function skipping(environment: Record<string, string>): TaskInput {
 }
 
 describe("given a deploy that migrated elsewhere", () => {
-  describe("when SKIP_PRISMA_MIGRATE is true", () => {
-    /** @scenario An operator can skip a migration step that a deploy already applied */
-    it("starts no migration process and lets the boot continue", async () => {
-      await expect(
-        prismaMigrate(skipping({ SKIP_PRISMA_MIGRATE: "true" })),
-      ).resolves.toBeUndefined();
-
-      expect(spawned.spawn).not.toHaveBeenCalled();
-    });
-  });
-
   describe("when SKIP_LWQL_PROVISION is true", () => {
     /** @scenario An operator can skip a migration step that a deploy already applied */
     it("provisions nothing, and asks for no database either", async () => {

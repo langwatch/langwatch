@@ -7,6 +7,11 @@ export const organizationIdSchema = z.string().min(1);
 /** The KSUID resource every organization id is born under, whichever module mints it. */
 export const ORGANIZATION_KSUID_RESOURCE = "organization";
 
+/** A customer's organization, or the install's one hidden system organization (never listed). */
+export const ORGANIZATION_KIND = { CUSTOMER: "customer", SYSTEM: "system" } as const;
+export const organizationKindSchema = z.enum(ORGANIZATION_KIND);
+export type OrganizationKind = z.infer<typeof organizationKindSchema>;
+
 export const organizationIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
 export type OrganizationIntent = z.infer<typeof organizationIntentSchema>;
 

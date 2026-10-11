@@ -122,3 +122,11 @@ Feature: Postgres access through the Prisma driver adapter
     Given the exported client
     When raw SQL carries the "-- @tenancy:" opt-out marker
     Then the query reaches the database and returns rows
+
+  @unit
+  Scenario: An idle connection lost to Postgres is logged and never crashes the process
+    Given a pool the adapter created
+    When Postgres terminates an idle connection with "terminating connection due to administrator command"
+    Then a warning is logged and the process keeps running
+    When shutdown has begun and the pool is ending
+    Then the same loss is logged at debug level only

@@ -31,3 +31,23 @@ Feature: haven works with Nx
     When the haven daemon ticks
     Then that Nx daemon is stopped and the reap is recorded
     And a daemon whose worktree still exists is left alone
+
+  Scenario: Every task in an Nx run carries the run id and worktree
+    Given the haven Nx plugin is registered in nx.json
+    When an Nx run starts its tasks
+    Then each task's environment has HAVEN_NX_RUN, a time-first id that sorts by start
+    And HAVEN_NX_WORKTREE names the worktree the run is in
+
+  Scenario: An Nx run leaves one history row per task
+    Given an Nx run finished with a built task and a cache hit
+    When the run ends
+    Then haven's nx-history.jsonl gains one row per task with project, target, status, duration in ms, cache hit, run id and worktree
+    And a task restored from the cache is marked as a cache hit
+    And run-history.jsonl and the gate's wait estimates are untouched
+    And nx-history.jsonl keeps only its newest 5000 rows
+
+  Scenario: An Nx run never fails because haven is missing
+    Given haven is not on PATH, or its history command fails
+    When an Nx run ends
+    Then the run keeps its own exit status
+    And a missing haven prints nothing, a failing one prints one line

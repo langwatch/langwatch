@@ -245,3 +245,37 @@ describe("EventRepositoryClickHouse read projections", () => {
     });
   });
 });
+
+describe("EventRepositoryClickHouse full-scan declarations", () => {
+  const history = { tenantId: "tenant", aggregateType: "user", aggregateId: "id" };
+  const upTo = { ...history, upToTimestamp: 1700000000001, upToEventId: "evt" };
+  const declared = expect.objectContaining({ SKIP_COLD_SCAN_CHECK: true });
+
+  /** Runs the three aggregate-history reads, each with or without a lower bound. */
+  async function readAllThree({ occurredAtFromMs }: { occurredAtFromMs?: number }) {
+    const client = createMockClient({});
+    const repository = repositoryFor(client);
+    const bound = occurredAtFromMs === undefined ? {} : { occurredAtFromMs };
+    await repository.getEventRecords({ ...history, ...bound });
+    await repository.getEventRecordsUpTo({ ...upTo, ...bound });
+    await repository.getEventRecordsUpToPaged({ ...upTo, ...bound, after: undefined, limit: 10 });
+    return client.query;
+  }
+
+  describe("given a long-lived aggregate read with no lower bound", () => {
+    /** @scenario "An aggregate's unbounded history read is a declared full scan" */
+    it("declares every history read a full scan", async () => {
+      const query = await readAllThree({});
+      for (const call of [1, 2, 3]) expect(query).toHaveBeenNthCalledWith(call, declared);
+    });
+  });
+
+  describe("given a time-local aggregate read with a lower bound", () => {
+    /** @scenario "An aggregate's unbounded history read is a declared full scan" */
+    it("declares none of them, so the bound is what prunes", async () => {
+      const query = await readAllThree({ occurredAtFromMs: 1700000000000 });
+      expect(query).toHaveBeenCalledTimes(3);
+      expect(query).not.toHaveBeenCalledWith(declared);
+    });
+  });
+});

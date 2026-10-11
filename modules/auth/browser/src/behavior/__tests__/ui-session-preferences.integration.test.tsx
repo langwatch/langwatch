@@ -5,7 +5,6 @@
  */
 
 import type { UiAuthClient } from "@langwatch/auth-contract";
-import { UiFeedback } from "@langwatch/browser-host/capabilities";
 import { defineSlice } from "@langwatch/browser-host/global-store";
 import { clearReaderUiStorage } from "@langwatch/browser-host/storage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -30,16 +29,8 @@ const signedInAs = (id: string): UiAuthClient => ({
   signOut: () => Promise.resolve(),
 });
 
-class SilentFeedback extends UiFeedback {
-  succeeded(): void {}
-  warned(): void {}
-  informed(): void {}
-  failed(): void {}
-}
-
 function SessionProbe({ authClient }: { authClient: UiAuthClient }) {
   const reading = useUiSessionReading({
-    feedback: new SilentFeedback(),
     isPublicRoute: true,
     authClient,
   });

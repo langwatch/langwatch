@@ -1,6 +1,5 @@
 import {
   MigrationDrainProofRequiresMigratedError,
-  MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationPassAlreadyRunningError,
   MigrationRunRequiresEnrollmentError,
@@ -586,45 +585,33 @@ describe("SystemMigrationsService enrollment", () => {
 
   describe("given a self-hosted installation", () => {
     describe("when an operator tries to enroll or withdraw", () => {
-      /** @scenario "Enrollment does not apply to self-hosted installations" */
-      it("refuses both with migration_enrollment_cloud_only and touches nothing", async () => {
+      /** @scenario "Enrolment acts on a self-hosted installation as it does on cloud" */
+      it("records both and audits each, as on cloud", async () => {
         const { service, enrollments, audit } = serviceWith({
           record: null,
           isSaaS: false,
         });
 
-        // Thunks, not promises: an eagerly created second promise would
-        // reject before its handler attaches, tripping the unhandled-
-        // rejection watchdog even though the test passes.
-        for (const attempt of [
-          () =>
-            service.enroll({
-              organizationId: "org_acme",
-              migrationName: MIGRATION,
-              actorUserId: "user_alex",
-            }),
-          () =>
-            service.withdraw({
-              organizationId: "org_acme",
-              migrationName: MIGRATION,
-              actorUserId: "user_alex",
-            }),
-        ]) {
-          const rejection = attempt();
-          await expect(rejection).rejects.toBeInstanceOf(MigrationEnrollmentCloudOnlyError);
-          await expect(rejection).rejects.toMatchObject({
-            code: "migration_enrollment_cloud_only",
-          });
-        }
-        expect(enrollments.create).not.toHaveBeenCalled();
-        expect(enrollments.delete).not.toHaveBeenCalled();
-        expect(audit).not.toHaveBeenCalled();
+        await service.enroll({
+          organizationId: "org_acme",
+          migrationName: MIGRATION,
+          actorUserId: "user_alex",
+        });
+        await service.withdraw({
+          organizationId: "org_acme",
+          migrationName: MIGRATION,
+          actorUserId: "user_alex",
+        });
+
+        expect(enrollments.create).toHaveBeenCalledTimes(1);
+        expect(enrollments.delete).toHaveBeenCalledTimes(1);
+        expect(audit).toHaveBeenCalledTimes(2);
       });
     });
   });
 
   describe("when the ops page lists enrollments", () => {
-    it("answers every migration's rows, with the installation shape alongside", async () => {
+    it("answers every migration's rows", async () => {
       const createdAt = new Date("2026-08-19T10:00:00Z");
       const enrollments = enrollmentStoreStub();
       enrollments.findAll.mockResolvedValue([
@@ -643,7 +630,6 @@ describe("SystemMigrationsService enrollment", () => {
         requestedBy: "user_ops",
       });
 
-      expect(listing.isSaaS).toBe(true);
       expect(listing.enrollments).toHaveLength(1);
       expect(listing.enrollments[0]).toMatchObject({
         organizationId: "org_acme",

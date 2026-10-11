@@ -26,6 +26,7 @@ function journeyOf(connection: SsoSetupView["connection"]): SsoSetupView {
     record: null,
     goLive: null,
     legacyRoute: null,
+    legacyDomainsToMove: [],
     enterpriseRequired: false,
     migration: null,
   };

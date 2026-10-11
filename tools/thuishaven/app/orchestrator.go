@@ -74,12 +74,32 @@ type Orchestrator struct {
 	// know that half has finished.
 	isGoverning atomic.Bool
 	governance  sync.WaitGroup
+	// clickHouseFocus is the slug whose workload last got the focused weight.
+	// Daemon tick only.
+	clickHouseFocus string
 
 	// procActivity is the process watch's cross-tick idle clock (ADR-095),
 	// touched only from the daemon's monitor loop. procTel ships the watch's
 	// observations to the local observability stack; nil means unobserved.
 	procActivity map[int]tsgoSeen
-	procTel      ProcTelemetry
+	// browserActivity is the headless browser governor's cross-tick CPU clock.
+	browserActivity map[int]browserSeen
+	procTel         ProcTelemetry
+	// orphanTermed is every pid the orphan sweep has SIGTERMed and when, so a
+	// later sweep SIGKILLs the ones that ignored it; orphanSweptAt paces it.
+	orphanTermed  map[int]orphanTerm
+	orphanSweptAt time.Time
+	// orphanWorktrees is the repository's worktree list, re-read at most every
+	// worktreeIdleTTL: sibling checkouts sit outside the main root.
+	orphanWorktrees   []string
+	orphanWorktreesAt time.Time
+	// idleReadings caches each worktree's last-commit clock for the hub, which
+	// the TUI and the web dashboard read concurrently.
+	idleMu       sync.Mutex
+	idleReadings map[string]idleReading
+	// runtimeIdleSince is when the VM was first seen unused with auto-stop on;
+	// zero while something uses it. Daemon tick only.
+	runtimeIdleSince time.Time
 }
 
 // Deps is the injected object graph. A struct rather than a positional
@@ -575,6 +595,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	o.EnsureGateHookForUp(p.WorktreeDir)
 	opts.langyDockerHost = o.langyContainerHost(ctx, st, &opts)
 	o.ensureLangyWorkerBinary(ctx, st, &opts)
+	o.ensureLangyCLI(ctx, st, &opts)
 	isLangyDropped := !opts.Selection.Langy && dropLocalLangyAgent(&st)
 	children := o.planChildren(st, opts, p.WorktreeDir)
 	retireStaleSimsCapture(children)
@@ -1033,8 +1054,28 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	}
 	removeKeeperPlan(p.WorktreeDir, slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
+	o.keepProxyForOtherStacks()
 	o.stopColimaIfIdle(ctx)
 	return nil
+}
+
+// keepProxyForOtherStacks restarts the machine-wide portless proxy if it is
+// down while another stack is still registered. Down never stops the proxy
+// (only `down --all` does); this is the net for a proxy that went away with
+// the downed stack's process group.
+func (o *Orchestrator) keepProxyForOtherStacks() {
+	if o.cfg.PortlessDisabled || o.proxy.Running() {
+		return
+	}
+	for _, st := range o.store.Stacks() {
+		if st.PortlessDisabled {
+			continue
+		}
+		if err := o.proxy.EnsureReady(); err != nil {
+			o.log.Warn("down: could not restart the shared portless proxy", zap.Error(err))
+		}
+		return
+	}
 }
 
 // ensureClickHouse starts the shared managed clickhouse-server (if not already
@@ -1059,6 +1100,7 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	st.ClickHouseHTTPPort = port
 	st.ClickHouseDatabase = db
 	st.ClickHousePostgresHost = o.cfg.ClickHousePostgresHost
+	o.ensureClickHouseStackAccess(ctx, st)
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	scheme, epPort := o.serviceEndpoint(proxyScheme, proxyPort, port)
 	st.Services = append(st.Services, domain.Service{

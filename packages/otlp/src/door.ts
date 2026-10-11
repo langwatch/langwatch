@@ -4,6 +4,7 @@
  * diagnostics they log. See specs/otlp/endpoint-path-canonicalisation.feature.
  */
 import { HandledError } from "@langwatch/handled-error";
+import type { Named } from "@langwatch/module";
 import type { Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -43,6 +44,38 @@ export const otlpSourcePolicySchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("failed"), error: z.unknown() }),
 ]);
 export type OtlpSourcePolicy = z.infer<typeof otlpSourcePolicySchema>;
+
+export type OtlpIngestCredentialInput = Readonly<{
+  authorization: string | null;
+  xAuthToken: string | null;
+  xProjectId: string | null;
+}>;
+
+const otlpIngestProjectSchema = z.object({
+  id: z.string(),
+  teamId: z.string(),
+  organizationId: z.string(),
+});
+export type OtlpIngestProject = Readonly<z.infer<typeof otlpIngestProjectSchema>>;
+
+/** A resolved receiver credential, handed by the OTLP ingest door as the route's session. */
+const otlpIngestCredentialSchemaDefinition = z.object({
+  project: otlpIngestProjectSchema,
+  identity: z.object({
+    apiKeyId: z.string().nullable(),
+    organizationId: z.string(),
+    ingestSourceType: z.string().nullable(),
+    ingestionTemplateId: z.string().nullable(),
+    sourcePolicy: otlpSourcePolicySchema.optional(),
+  }),
+});
+export interface OtlpIngestCredentialSchema extends Named<
+  typeof otlpIngestCredentialSchemaDefinition
+> {}
+export const otlpIngestCredentialSchema: OtlpIngestCredentialSchema =
+  otlpIngestCredentialSchemaDefinition;
+/** A refusal is thrown, and the receiver renders it. */
+export type OtlpIngestCredential = Readonly<z.infer<typeof otlpIngestCredentialSchema>>;
 
 /** The credential refusals the ingestion doors answer in their own wire, and nothing else. */
 const DOOR_REFUSAL_CODES: ReadonlySet<string> = new Set([

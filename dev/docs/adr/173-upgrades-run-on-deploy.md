@@ -1,5 +1,10 @@
 # ADR-173: Upgrades run on deploy, and the serving roster says when old writers are gone
 
+> **Floor withdrawn (Alex, 2026-10-11).** There is no upgrade floor and no LTS. An install
+> of any version upgrades to the latest image and the worker rolls through every step; every
+> step, alias and upcast is kept. A drop or contract waits for `needsOldWritersGone`. The
+> floor text below is history.
+
 **Date:** 2026-10-06
 
 **Status:** Proposed
@@ -164,6 +169,29 @@ pre-roster-rollback` records a rollback and reopens done background steps. The c
 
 The pure rule is `preRosterWriters` in `packages/upgrade/src/serving-roster/pre-roster.ts`;
 scenarios in `specs/upgrade/cloud-automatic.feature` and `specs/upgrade/upgrade-command.feature`.
+
+### 7. The Upgrades surface shows only what an install can know (Alex, 2026-10-10, UPGRADE-UI-2)
+
+An install knows its own image and ledger; it cannot know what a later release holds until that
+image runs. So:
+
+- **No pre-upgrade preview page.** It could only describe the running image. A newer release is
+  named only from cloud's usage-report reply (`latest_release`, U8-Q-U3), with a release-notes link,
+  and hidden when usage reporting is off or the install is air-gapped. No new outbound call.
+- **Layout.** Tabs Overview, Runs, Steps, Organizations, plus Dataplanes when targets exist. The
+  Overview names the running version and one state (up to date, upgrading with "n of m", needs
+  attention with Retry, refused with its message) and the operator steps of this version. A run
+  opens as a drawer from Runs (Phases, Steps, Log); no back buttons, no command hints.
+- **Names.** A build that is not a release reads "Development build" with
+  `<newest contained release>+<short commit>`, never "unreleased". History imported from before
+  upgrade tracking reads "3.18.1 and earlier"; the seed run is "Imported history", raw JSON only
+  behind a details toggle.
+- **Organizations, not tenants.** Tenant steps are called organisations on every deployment. Run a
+  pass, run for an organisation and roll back show everywhere; enrolment is cloud only, since a
+  self-hosted pass already admits every organisation.
+- **Action needed, not a Done button.** Most upgrades need nothing from anyone. When an operator
+  step of the running version is unfinished, Home shows an "Action needed for updates" bar inside
+  its card, in the slot pending join requests use, to whoever holds `ops:view`.
 
 ## Alternatives considered
 

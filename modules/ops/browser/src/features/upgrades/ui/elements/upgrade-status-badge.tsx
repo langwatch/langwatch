@@ -11,7 +11,7 @@ export function UpgradeStatusBadge({
   size?: "sm" | "md" | "lg";
 }) {
   return (
-    <Badge colorPalette={tonePalette(label.tone)} size={size} variant="outline">
+    <Badge colorPalette={tonePalette(label.tone)} size={size} variant="subtle">
       {label.label}
     </Badge>
   );

@@ -21,14 +21,14 @@
 --     DROP COLUMN "lastReportAt", DROP COLUMN "reportedCostNanoUsd", DROP COLUMN "reportCount";
 
 ALTER TABLE "GatewayRealtimeSession"
-    ADD COLUMN "kind" TEXT,
-    ADD COLUMN "metering" TEXT,
-    ADD COLUMN "credentialExpiresAt" TIMESTAMP(3),
-    ADD COLUMN "transcriptionModel" TEXT,
-    ADD COLUMN "endUserId" TEXT,
-    ADD COLUMN "lastReportAt" TIMESTAMP(3),
-    ADD COLUMN "reportedCostNanoUsd" BIGINT NOT NULL DEFAULT 0,
-    ADD COLUMN "reportCount" INTEGER NOT NULL DEFAULT 0;
+    ADD COLUMN IF NOT EXISTS "kind" TEXT,
+    ADD COLUMN IF NOT EXISTS "metering" TEXT,
+    ADD COLUMN IF NOT EXISTS "credentialExpiresAt" TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "transcriptionModel" TEXT,
+    ADD COLUMN IF NOT EXISTS "endUserId" TEXT,
+    ADD COLUMN IF NOT EXISTS "lastReportAt" TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "reportedCostNanoUsd" BIGINT NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS "reportCount" INTEGER NOT NULL DEFAULT 0;
 
 -- Ops pre-build note: this index lands on an existing table, and a plain build
 -- blocks its writes while it runs. A deployment with real traffic builds it
@@ -39,7 +39,7 @@ ALTER TABLE "GatewayRealtimeSession"
 CREATE INDEX IF NOT EXISTS "GatewayRealtimeSession_status_metering_mintedAt_idx"
     ON "GatewayRealtimeSession"("status", "metering", "mintedAt");
 
-CREATE TABLE "GatewayRealtimeSessionReport" (
+CREATE TABLE IF NOT EXISTS "GatewayRealtimeSessionReport" (
     "id" TEXT NOT NULL,
     "sessionId" TEXT NOT NULL,
     "reportKey" TEXT NOT NULL,
@@ -52,8 +52,8 @@ CREATE TABLE "GatewayRealtimeSessionReport" (
     CONSTRAINT "GatewayRealtimeSessionReport_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "GatewayRealtimeSessionReport_sessionId_reportKey_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "GatewayRealtimeSessionReport_sessionId_reportKey_key"
     ON "GatewayRealtimeSessionReport"("sessionId", "reportKey");
 
-CREATE INDEX "GatewayRealtimeSessionReport_projectId_idx"
+CREATE INDEX IF NOT EXISTS "GatewayRealtimeSessionReport_projectId_idx"
     ON "GatewayRealtimeSessionReport"("projectId");

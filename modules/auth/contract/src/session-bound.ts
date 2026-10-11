@@ -88,12 +88,13 @@ export function sessionBoundVerdict({
 }
 
 /**
- * How often the last-seen stamp is worth rewriting: a quarter-window. Per
- * request taxes every signed-in request for a setting almost nobody set;
- * once a day cannot tell an idle hour from an idle minute.
+ * How often the last-seen stamp is worth rewriting: a quarter-window, at least a minute, never
+ * more than half the window. Per request taxes every signed-in request; a minute's floor under a
+ * one-minute window would never write before the window ran out, ending active sessions.
  */
 export function lastSeenWriteIntervalMs(bound: SessionBound): number {
   if (bound.idleTimeoutMinutes <= 0) return 0;
+  const windowMs = bound.idleTimeoutMinutes * 60_000;
 
-  return Math.max(60_000, (bound.idleTimeoutMinutes * 60_000) / 4);
+  return Math.min(windowMs / 2, Math.max(60_000, windowMs / 4));
 }

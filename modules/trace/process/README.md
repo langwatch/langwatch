@@ -6,7 +6,7 @@ The server half of [trace](../README.md). Traces: ingestion and canonicalisation
 
 ## Installation
 
-`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…)`, `src/trace.module.ts:35`.
+`defineProcessModule("trace").withRepositories(traceRepositories).withChannels(traceChannels).withApi(TraceModule).withTransports(tracesTrpcTransport, sharedTraceTrpcTransport, spansTrpcTransport, exportProgressTrpcTransport, traceEditOverlayTrpcTransport, traceExportRest, traceLegacyRest, tracesRest, trackedEventRest, trackedEventLegacyPathRest, collectorRest, otlpIngestRest).provideMiddlewareContext(…).withDoors(…).withEventing(traceProcessingEventing).withEventing(traceProjectMilestonesEventing).withEventing(traceCollectorEvaluationsEventing).withEventing(traceIngestSourceBillingEventing).withMigrations(…)`, `src/trace.module.ts:36`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Public Trace operations shared by process peers after boot composition.
 
-Peers call these through the token, declared at `../contract/src/trace.api.ts:166`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/trace.api.ts:168`; nothing else in this package is public.
 It extends `TraceOtlpIngestApi`.
 
 #### `extractInlineMediaFromEvent`
@@ -236,7 +236,7 @@ readTraceFacetsForApiKey(input: { projectId: string; query: TraceFacetsQuery; pr
 The discover vocabulary, or the facet counts under `query` when one is given.
 
 ```typescript
-readDiscoverForQuery(input: { projectId: string; timeRange: { from: number; to: number; live?: boolean }; query?: string | null; evalRuns?: Readonly<Record<string, InstantEvalRunReference>>; authorization: Authorization; }): Promise<DiscoverResult>;
+readDiscoverForQuery(input: { projectId: string; timeRange: { from: number; to: number; live?: boolean }; query?: string | null; evalRuns?: Readonly<Record<string, InstantEvalRunReference>>; authorization: Authorization; protections?: Protections; }): Promise<DiscoverResult>;
 ```
 
 #### `renameTrace`
@@ -636,7 +636,7 @@ readCustomersAndLabels(input: TraceLegacyListInput): Promise<unknown>;
 The trace query language's free-text filter, compiled to a parameterized ClickHouse WHERE fragment. Null for an empty query; throws `FilterParseError` on invalid syntax.
 
 ```typescript
-translateTraceFilter(input: { query: string; tenantId: string; timeRange: { from: number; to: number }; /** The Instant Eval runs registered for the query's `eval` chips. */ evalRuns?: readonly ResolvedInstantEvalRun[]; }): { sql: string; params: Record<string, unknown> } | null;
+translateTraceFilter(input: { query: string; tenantId: string; timeRange: { from: number; to: number }; /** The Instant Eval runs registered for the query's `eval` chips. */ evalRuns?: readonly ResolvedInstantEvalRun[]; /** The viewer's; under any content protection free text skips captured I/O. */ protections?: Protections; }): { sql: string; params: Record<string, unknown> } | null;
 ```
 
 #### `translateLegacyFilters`
@@ -652,7 +652,7 @@ translateLegacyFilters(input: { filters: Readonly<Record<string, unknown>>; wind
 The Explorer's own filter: the query compiled, hidden origins left out unless the query (or `originNamed`) names one; `dateField` refuses a span/event clause on the `updated` axis.
 
 ```typescript
-compileExplorerTraceFilter(input: { query: string; tenantId: string; timeRange: { from: number; to: number }; evalRuns?: readonly ResolvedInstantEvalRun[]; originNamed?: boolean; dateField?: TraceDateField; }): { sql: string; params: Record<string, unknown> };
+compileExplorerTraceFilter(input: { query: string; tenantId: string; timeRange: { from: number; to: number }; evalRuns?: readonly ResolvedInstantEvalRun[]; originNamed?: boolean; dateField?: TraceDateField; protections?: Protections; }): { sql: string; params: Record<string, unknown> };
 ```
 
 #### `compileLangWatchQLTraceFilter`
@@ -710,7 +710,7 @@ readSessionGroups(input: TraceSessionGroupsInput & { protections: Protections; a
 The sidebar's facets under the active query: descriptors counted in the window the list reads, each facet exempt from its own terms (ADR-139).
 
 ```typescript
-readFilteredFacets(input: { projectId: string; timeRange: { from: number; to: number; live?: boolean }; query: string; evalRuns?: readonly ResolvedInstantEvalRun[]; authorization: Authorization; }): Promise<unknown>;
+readFilteredFacets(input: { projectId: string; timeRange: { from: number; to: number; live?: boolean }; query: string; evalRuns?: readonly ResolvedInstantEvalRun[]; authorization: Authorization; protections?: Protections; }): Promise<unknown>;
 ```
 
 #### `readNewCount`
@@ -735,6 +735,30 @@ readDiscover(params: { authorization: Authorization; timeRange: { from: number; 
 
 ```typescript
 readFacetValues(params: { authorization: Authorization; timeRange: { from: number; to: number }; facetKey: string; prefix?: string; limit: number; offset: number; }): Promise<FacetValuesResult>;
+```
+
+#### `aiQuery`
+
+A sentence to a trace query, on the project's `traces.ai_search` model.
+
+```typescript
+aiQuery(input: { projectId: string; authorization: Authorization; prompt: string; timeRange: { from: number; to: number }; }): Promise<AiQueryResult>;
+```
+
+#### `aiAction`
+
+A sentence to an applied query or a new lens.
+
+```typescript
+aiAction(input: { projectId: string; authorization: Authorization; prompt: string; timeRange: { from: number; to: number }; }): Promise<AiActionResult>;
+```
+
+#### `routeSearch`
+
+Enter on a sentence: a filter, a judgement, a phrase or the assistant.
+
+```typescript
+routeSearch(input: RouteSearchInput & { authorization: Authorization }): Promise<RouteSearchResult>;
 ```
 
 #### `authorizationForTrace`
@@ -977,14 +1001,6 @@ readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClust
 readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
 ```
 
-#### `countTracesByProjects`
-
-This UTC billing month's distinct traces per project; refuses a foreign project.
-
-```typescript
-countTracesByProjects(input: { organizationId: string; projectIds: string[]; }): Promise<{ projectId: string; count: number }[]>;
-```
-
 #### `countTracesInLastDay`
 
 The project's distinct traces over the last 24 hours.
@@ -1037,20 +1053,20 @@ type Response = unknown;
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/otlp-ingest.rest.ts:270` |
+| Declared at | `src/transport/otlp-ingest.rest.ts:266` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | otlp_ingest                             |
 
 #### `POST /api/otel/v1/traces` · `ingestOtlpTraces`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:276`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-ingest.rest.ts:272`.
 
 Answers at `/api/otel/v1/traces`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:279)
-// Response: inline, src/transport/otlp-ingest.rest.ts:282
+// Rawbody: "bytes" (inline, src/transport/otlp-ingest.rest.ts:275)
+// Response: inline, src/transport/otlp-ingest.rest.ts:278
 type Response = unknown;
 ```
 
@@ -1168,7 +1184,7 @@ type Response = unknown;
 
 |             |                                      |
 | ----------- | ------------------------------------ |
-| Declared at | `src/transport/traces.rest.ts:306`   |
+| Declared at | `src/transport/traces.rest.ts:307`   |
 | Base URL    | `/api/traces`, twin `/api/v1/traces` |
 | Addressing  | dated                                |
 | Credential  | project                              |
@@ -1178,13 +1194,13 @@ type Response = unknown;
 
 Search traces for a project
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:310`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:311`.
 
 Answers at `/api/traces/search`, `/api/v1/traces/search`; also, undocumented, `/api/traces/2026-08-07/search`, `/api/v1/traces/2026-08-07/search`, `/api/traces/latest/search`, `/api/v1/traces/latest/search`.
 
 ```typescript
 type Body = z.infer<typeof traceSearchBodySchema>; // ../contract/src/trace-rest.schemas.ts:124
-// Response: inline, src/transport/traces.rest.ts:314
+// Response: inline, src/transport/traces.rest.ts:315
 type Response = unknown;
 ```
 
@@ -1192,7 +1208,7 @@ type Response = unknown;
 
 Discover what the trace filter fields hold
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:336`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:337`.
 
 Answers at `/api/traces/facets`, `/api/v1/traces/facets`; also, undocumented, `/api/traces/2026-08-07/facets`, `/api/v1/traces/2026-08-07/facets`, `/api/traces/latest/facets`, `/api/v1/traces/latest/facets`.
 
@@ -1214,7 +1230,7 @@ type Response = Record<string, unknown>;
 
 Derived coding-agent transcript for a trace: what the agent did, in order, with per-call token and cost economics. Empty entries for traces without coding-agent content.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:369`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:370`.
 
 Answers at `/api/traces/:traceId/transcript`, `/api/v1/traces/:traceId/transcript`; also, undocumented, `/api/traces/2026-08-07/:traceId/transcript`, `/api/v1/traces/2026-08-07/:traceId/transcript`, `/api/traces/latest/:traceId/transcript`, `/api/v1/traces/latest/:traceId/transcript`.
 
@@ -1230,7 +1246,7 @@ type Response = z.infer<typeof transcriptRestResponseSchema>; // ../contract/src
 
 Update metadata on a trace after creation. Inserts a synthetic span carrying the new attributes through the standard ingestion pipeline. New keys are added, existing keys are updated, missing keys are preserved. Labels replace entirely.
 
-Permission `traces:update`. Declared at `src/transport/traces.rest.ts:408`.
+Permission `traces:update`. Declared at `src/transport/traces.rest.ts:409`.
 
 Answers at `/api/traces/:traceId/metadata`, `/api/v1/traces/:traceId/metadata`; also, undocumented, `/api/traces/2026-08-07/:traceId/metadata`, `/api/v1/traces/2026-08-07/:traceId/metadata`, `/api/traces/latest/:traceId/metadata`, `/api/v1/traces/latest/:traceId/metadata`.
 
@@ -1250,7 +1266,7 @@ interface Response {
 
 Get a single trace by ID.
 
-Permission `traces:view`. Declared at `src/transport/traces.rest.ts:433`.
+Permission `traces:view`. Declared at `src/transport/traces.rest.ts:434`.
 
 Answers at `/api/traces/:traceId`, `/api/v1/traces/:traceId`; also, undocumented, `/api/traces/2026-08-07/:traceId`, `/api/v1/traces/2026-08-07/:traceId`, `/api/traces/latest/:traceId`, `/api/v1/traces/latest/:traceId`.
 
@@ -1343,7 +1359,7 @@ type Output = z.infer<typeof exportProgressEventSchema>; // ../contract/src/feat
 
 ### `sharedTrace`
 
-Contract `../contract/src/traces.trpc.ts:628`, router `src/transport/shared-trace.trpc.ts:30`.
+Contract `../contract/src/traces.trpc.ts:620`, router `src/transport/shared-trace.trpc.ts:30`.
 
 | Procedure         | Kind  | Gate                                                                                                                                                | Input                       | Output                 |
 | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ---------------------- |
@@ -1351,7 +1367,7 @@ Contract `../contract/src/traces.trpc.ts:628`, router `src/transport/shared-trac
 
 ```typescript
 // sharedTrace.get
-// Input: sharedTraceGetInputSchema, ../contract/src/traces.trpc.ts:626
+// Input: sharedTraceGetInputSchema, ../contract/src/traces.trpc.ts:618
 interface Input {
   token: string;
 }
@@ -1360,7 +1376,7 @@ type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-sha
 
 ### `spans`
 
-Contract `../contract/src/traces.trpc.ts:637`, router `src/transport/spans.trpc.ts:10`.
+Contract `../contract/src/traces.trpc.ts:629`, router `src/transport/spans.trpc.ts:10`.
 
 | Procedure                  | Kind  | Gate                     | Input              | Output                   |
 | -------------------------- | ----- | ------------------------ | ------------------ | ------------------------ |
@@ -1377,7 +1393,7 @@ interface Input {
 type Output = z.infer<typeof spansForTraceSchema>; // ../contract/src/trace.responses.ts:63
 
 // spans.getForPromptStudio
-// Input: inline, ../contract/src/traces.trpc.ts:644
+// Input: inline, ../contract/src/traces.trpc.ts:636
 interface Input {
   projectId: string;
   spanId: string;
@@ -1417,7 +1433,7 @@ type Input = z.infer<typeof traceScopeSchema>; // ../contract/src/features/edit-
 
 ### `traces`
 
-Contract `../contract/src/traces.trpc.ts:179`, router `src/transport/traces.trpc.ts:46`.
+Contract `../contract/src/traces.trpc.ts:179`, router `src/transport/traces.trpc.ts:45`.
 
 | Procedure                              | Kind         | Gate                       | Input                    | Output                             |
 | -------------------------------------- | ------------ | -------------------------- | ------------------------ | ---------------------------------- |
@@ -1684,7 +1700,7 @@ interface Output {
 }
 
 // traces.aiQuery
-// Input: inline, ../contract/src/traces.trpc.ts:412
+// Input: inline, ../contract/src/traces.trpc.ts:409
 interface Input {
   projectId: string;
   prompt: string;
@@ -1709,7 +1725,7 @@ type Output =
     };
 
 // traces.aiAction
-// Input: inline, ../contract/src/traces.trpc.ts:427
+// Input: inline, ../contract/src/traces.trpc.ts:420
 interface Input {
   projectId: string;
   prompt: string;
@@ -1738,7 +1754,7 @@ type Input = z.infer<typeof routeSearchInputSchema>; // ../contract/src/features
 type Output = z.infer<typeof routeSearchResultSchema>; // ../contract/src/features/query/trace-search-route.ts:134
 
 // traces.header
-// Input: inline, ../contract/src/traces.trpc.ts:447
+// Input: inline, ../contract/src/traces.trpc.ts:439
 interface Input {
   projectId: string;
   traceId: string;
@@ -1749,7 +1765,7 @@ interface Input {
 type Output = z.infer<typeof traceHeaderSchema>; // ../contract/src/trace-view.contract.ts:122
 
 // traces.changeName
-// Input: inline, ../contract/src/traces.trpc.ts:459
+// Input: inline, ../contract/src/traces.trpc.ts:451
 interface Input {
   projectId: string;
   traceId: string;
@@ -1762,7 +1778,7 @@ interface Output {
 }
 
 // traces.changeMetadata
-// Input: inline, ../contract/src/traces.trpc.ts:469
+// Input: inline, ../contract/src/traces.trpc.ts:461
 interface Input {
   projectId: string;
   traceId: string;
@@ -1771,7 +1787,7 @@ interface Input {
 type Output = z.infer<typeof traceMetadataResponseSchema>; // ../contract/src/trace-rest.schemas.ts:254
 
 // traces.evals
-// Input: inline, ../contract/src/traces.trpc.ts:479
+// Input: inline, ../contract/src/traces.trpc.ts:471
 interface Input {
   projectId: string;
   traceId: string;
@@ -1780,7 +1796,7 @@ interface Input {
 type Output = z.infer<typeof tracesEvaluationRunsSchema>; // ../contract/src/trace.responses.ts:216
 
 // traces.traceLogs
-// Input: inline, ../contract/src/traces.trpc.ts:489
+// Input: inline, ../contract/src/traces.trpc.ts:481
 interface Input {
   projectId: string;
   traceId: string;
@@ -1801,7 +1817,7 @@ type Output = {
 }[];
 
 // traces.spansPaginated
-// Input: inline, ../contract/src/traces.trpc.ts:499
+// Input: inline, ../contract/src/traces.trpc.ts:491
 interface Input {
   projectId: string;
   traceId: string;
@@ -1813,7 +1829,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpansPageSchema>; // ../contract/src/trace.responses.ts:203
 
 // traces.spansDelta
-// Input: inline, ../contract/src/traces.trpc.ts:511
+// Input: inline, ../contract/src/traces.trpc.ts:503
 interface Input {
   projectId: string;
   traceId: string;
@@ -1824,7 +1840,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpansDeltaSchema>; // ../contract/src/trace.responses.ts:208
 
 // traces.spanTreePaginated
-// Input: inline, ../contract/src/traces.trpc.ts:526
+// Input: inline, ../contract/src/traces.trpc.ts:518
 interface Input {
   projectId: string;
   traceId: string;
@@ -1839,7 +1855,7 @@ interface Input {
 type Output = z.infer<typeof spanTreePageSchema>; // ../contract/src/trace.ts:42
 
 // traces.spanTreeDelta
-// Input: inline, ../contract/src/traces.trpc.ts:535
+// Input: inline, ../contract/src/traces.trpc.ts:527
 interface Input {
   projectId: string;
   traceId: string;
@@ -1850,7 +1866,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpanTreeNodesSchema>; // ../contract/src/trace.responses.ts:224
 
 // traces.spanTree
-// Input: inline, ../contract/src/traces.trpc.ts:545
+// Input: inline, ../contract/src/traces.trpc.ts:537
 interface Input {
   projectId: string;
   traceId: string;
@@ -1860,7 +1876,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpanTreeNodesSchema>; // ../contract/src/trace.responses.ts:224
 
 // traces.spanLangwatchSignals
-// Input: inline, ../contract/src/traces.trpc.ts:560
+// Input: inline, ../contract/src/traces.trpc.ts:552
 interface Input {
   projectId: string;
   traceId: string;
@@ -1876,7 +1892,7 @@ type Output = {
 }[];
 
 // traces.spansFull
-// Input: inline, ../contract/src/traces.trpc.ts:575
+// Input: inline, ../contract/src/traces.trpc.ts:567
 interface Input {
   projectId: string;
   traceId: string;
@@ -1886,7 +1902,7 @@ interface Input {
 type Output = z.infer<typeof tracesSpanDetailsSchema>; // ../contract/src/trace.responses.ts:237
 
 // traces.spanDetail
-// Input: inline, ../contract/src/traces.trpc.ts:585
+// Input: inline, ../contract/src/traces.trpc.ts:577
 interface Input {
   projectId: string;
   traceId: string;
@@ -1897,7 +1913,7 @@ interface Input {
 type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:227
 
 // traces.resourceInfo
-// Input: inline, ../contract/src/traces.trpc.ts:601
+// Input: inline, ../contract/src/traces.trpc.ts:593
 interface Input {
   projectId: string;
   traceId: string;
@@ -1907,7 +1923,7 @@ interface Input {
 type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:286
 
 // traces.traceEvents
-// Input: inline, ../contract/src/traces.trpc.ts:615
+// Input: inline, ../contract/src/traces.trpc.ts:607
 interface Input {
   projectId: string;
   traceId: string;
@@ -1952,13 +1968,14 @@ Declared at `src/eventing/trace-processing-projections.pipeline.ts:104`. Events:
 
 ### Pipeline `trace_project_milestones` (aggregate `trace_project_milestone`)
 
-Declared at `src/eventing/trace-project-milestones.pipeline.ts:22`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`.
+Declared at `src/eventing/trace-project-milestones.pipeline.ts:24`. Events: `firstTraceRecordedEventSchema`, `traceReceivedEventSchema`, `monthTraceIdsListedEventSchema`.
 
 | Kind      | Name                  | Handles | Declared at                                            |
 | --------- | --------------------- | ------- | ------------------------------------------------------ |
-| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:27` |
-| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:28` |
-| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:29` |
+| command   | `recordFirstTrace`    | –       | `src/eventing/trace-project-milestones.pipeline.ts:33` |
+| command   | `recordTraceReceived` | –       | `src/eventing/trace-project-milestones.pipeline.ts:34` |
+| command   | `recordMonthTraceIds` | –       | `src/eventing/trace-project-milestones.pipeline.ts:35` |
+| retention | `≈ retention`         | –       | `src/eventing/trace-project-milestones.pipeline.ts:36` |
 
 ### Pipeline `trace_collector_evaluations` (aggregate `trace_collector_evaluation`)
 

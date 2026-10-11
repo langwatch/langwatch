@@ -79,17 +79,17 @@ function manifests({ hostile = false }: { hostile?: boolean } = {}): ReleaseMani
       step(`clickhouse:${version}`, "clickhouse-schema", "blocking"),
     ),
   ];
-  const [floor, next] = FIXTURE as [Release, Release];
+  const [base, next] = FIXTURE as [Release, Release];
   return [
     {
-      release: floor.release,
+      release: base.release,
       previous: null,
       cutAt: "2026-10-01T09:00:00+02:00",
-      steps: schemaSteps(floor),
+      steps: schemaSteps(base),
     },
     {
       release: next.release,
-      previous: floor.release,
+      previous: base.release,
       cutAt: "2026-10-02T09:00:00+02:00",
       steps: [
         ...schemaSteps(next),
@@ -99,7 +99,6 @@ function manifests({ hostile = false }: { hostile?: boolean } = {}): ReleaseMani
     },
   ];
 }
-const FLOOR = { release: "3.20.1", namedAt: "2026-10-06" };
 
 type Line = { level: "info" | "warn"; message: string; fields: Record<string, unknown> };
 
@@ -256,7 +255,7 @@ function runnerFor({
     postgres: scratch.postgres,
     clickhouse: reader(scratch.clickhouse),
     image: { release, steps: shipped },
-    releases: { manifests: all, floor: FLOOR },
+    releases: { manifests: all },
     applier: realApplier({ image: release }),
     identity: { image: release, host },
     log: {
@@ -362,14 +361,14 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade, end to end over live stores", 
     });
   });
 
-  describe("when the installation is at the LTS floor", () => {
+  describe("when the installation is on 3.20.1", () => {
     beforeEach(async () => {
       const installed = await run(runnerFor({ release: "3.20.1" }));
       if (installed.code !== "done")
         throw new Error(`installing 3.20.1 failed: ${installed.message}`);
     });
 
-    /** @scenario "An installation at the LTS floor upgrades to the next release" */
+    /** @scenario "An installation on an older release upgrades to the next release" */
     it("applies the next release on both stores and runs its blocking step once", async () => {
       expect(await columns("Alpha")).toEqual(["id"]);
       let runs = 0;

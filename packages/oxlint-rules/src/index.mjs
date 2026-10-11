@@ -82,7 +82,6 @@ import {
   resetUnresolvedImportCache,
   unresolvedRelativeImportRule,
 } from "./rules/unresolved-relative-import.rule.mjs";
-import { upcastDrainWindowRule } from "./rules/upcast-drain-window.rule.mjs";
 import { webImportsServerShapedValueRule } from "./rules/web-imports-server-shaped-value.rule.mjs";
 import { zodInternalsRule } from "./rules/zod-internals.rule.mjs";
 import { zodObjectCompositionRule } from "./rules/zod-object-composition.rule.mjs";
@@ -155,7 +154,6 @@ const HOUSE_RULES = [
   testDescriptionIsAnActionRule,
   unboundedLoopRule,
   unitTestDoesNotRenderRule,
-  upcastDrainWindowRule,
   webImportsServerShapedValueRule,
   zodInternalsRule,
   zodObjectCompositionRule,
@@ -256,7 +254,6 @@ export {
   testDescriptionIsAnActionRule,
   unboundedLoopRule,
   unitTestDoesNotRenderRule,
-  upcastDrainWindowRule,
   webImportsServerShapedValueRule,
   zodInternalsRule,
   zodObjectCompositionRule,

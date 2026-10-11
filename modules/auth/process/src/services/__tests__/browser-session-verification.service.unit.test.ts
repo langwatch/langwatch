@@ -8,7 +8,10 @@ import type * as observabilityModule from "@langwatch/observability";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BrowserSessionVerificationService } from "../browser-session-verification.service.ts";
+import {
+  BACKGROUND_READ_HEADER,
+  BrowserSessionVerificationService,
+} from "../browser-session-verification.service.ts";
 
 const loggerSpies = vi.hoisted(() => ({
   warn: vi.fn(),
@@ -131,6 +134,43 @@ describe("given a request carrying no session cookie", () => {
       expect(loggerSpies.warn).not.toHaveBeenCalled();
       expect(loggerSpies.error).not.toHaveBeenCalled();
       expect(loggerSpies.info).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a verified session on a polling read", () => {
+  describe("when the browser marks the request as a background read", () => {
+    /** @scenario "A page that polls on its own does not keep the session alive" */
+    it("asks for the session as a background read", async () => {
+      const resolveBrowserSession = vi.fn<AuthApi["resolveBrowserSession"]>(async () => ({
+        kind: "anonymous",
+      }));
+      const service = serviceOver({ verifyBrowserSession: verifiedSession, resolveBrowserSession });
+      const request = new Request("https://app.test/api/anything", {
+        headers: { cookie: `${COOKIE_NAME}=${COOKIE_VALUE}`, [BACKGROUND_READ_HEADER]: "1" },
+      });
+
+      await service.verify(request);
+
+      expect(resolveBrowserSession).toHaveBeenCalledWith(
+        expect.objectContaining({ background: true }),
+      );
+    });
+  });
+
+  describe("when the request carries no mark", () => {
+    /** @scenario "A page that polls on its own does not keep the session alive" */
+    it("asks for the session as a read the person caused", async () => {
+      const resolveBrowserSession = vi.fn<AuthApi["resolveBrowserSession"]>(async () => ({
+        kind: "anonymous",
+      }));
+      const service = serviceOver({ verifyBrowserSession: verifiedSession, resolveBrowserSession });
+
+      await service.verify(requestCarrying(`${COOKIE_NAME}=${COOKIE_VALUE}`));
+
+      expect(resolveBrowserSession).toHaveBeenCalledWith(
+        expect.objectContaining({ background: false }),
+      );
     });
   });
 });

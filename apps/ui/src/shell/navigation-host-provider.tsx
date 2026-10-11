@@ -145,6 +145,7 @@ function useNavigationHostReading({
     commandBar: palette,
     presenceMenuItem,
     impersonationBanner,
+    upgradeAttentionBanner,
   },
   process,
 }: {
@@ -161,9 +162,19 @@ function useNavigationHostReading({
   const rpc = useUiRpc();
   const { openDrawer } = useDrawer();
 
+  const uiDeployment = useUiDeployment();
+  const deployment = useMemo(
+    () => navigationDeploymentOf({ deployment: uiDeployment, process }),
+    [uiDeployment, process],
+  );
+  // The demo project sits in nobody's own graph: its address reads the graph that carries it.
+  const isDemo = Boolean(
+    deployment.demoProjectSlug && routeReading.projectParam === deployment.demoProjectSlug,
+  );
+
   const organizations = scopeHostService.useUiOrganizations({
     transport: rpc,
-    isDemo: false,
+    isDemo,
     enabled: true,
     userId: session.currentUser()?.id,
   });
@@ -214,12 +225,6 @@ function useNavigationHostReading({
         teamRules: scopeHostService,
       }),
     [organization, currentUser?.id, organizationRole, scopeHostService],
-  );
-
-  const uiDeployment = useUiDeployment();
-  const deployment = useMemo(
-    () => navigationDeploymentOf({ deployment: uiDeployment, process }),
-    [uiDeployment, process],
   );
 
   const flags = useUiFlags();
@@ -275,14 +280,18 @@ function useNavigationHostReading({
   const routePattern = routePatternOf(pathname, route.reading().params);
 
   // The header carries ops's impersonation banner whenever the session says so
-  // (specs/auth/impersonation-banner.feature), else nothing. Presence is offered only on the
-  // surface that broadcasts it, its switches off the graph already read.
+  // (specs/auth/impersonation-banner.feature) and ops's upgrade notice, which draws itself only
+  // when ops says so. Presence is offered only on the surface that broadcasts it.
   const graphicsQualityOverride = useGraphicsQualityOverrideStore();
   const accountMenu = useMemo<NavigationAccountMenu>(() => {
     const ImpersonationBanner = impersonationBanner.default;
-    const headerBanner = currentUser?.impersonator ? (
-      <ImpersonationBanner user={currentUser} />
-    ) : undefined;
+    const UpgradeAttentionBanner = upgradeAttentionBanner.default;
+    const headerBanner = (
+      <>
+        {currentUser?.impersonator && <ImpersonationBanner user={currentUser} />}
+        <UpgradeAttentionBanner />
+      </>
+    );
     const graphicsQuality = {
       value: graphicsQualityOverride,
       label: GRAPHICS_QUALITY_LABELS[graphicsQualityOverride],
@@ -304,6 +313,7 @@ function useNavigationHostReading({
     activeScope.projectId,
     presenceMenuItem,
     impersonationBanner,
+    upgradeAttentionBanner,
     currentUser,
   ]);
 

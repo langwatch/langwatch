@@ -3,9 +3,10 @@
 # 5.2, row mig-s3-runner; deltas D4 and D6).
 #
 # `pnpm task upgrade` is the one command that changes the schema. It takes the runner lease, plans
-# from the ledger and the shipped manifests, refuses an installation below the LTS floor, applies the
-# plan release by release, records every step and every ClickHouse target in the ledger, runs the
-# reconcilers last and records the run. Exit codes: 0 done, 1 failed, 2 refused, 3 lease not taken.
+# from the ledger and the shipped manifests, applies the plan release by release from whatever
+# release the installation is on (no required stop; Alex, 2026-10-11), records every step and every
+# ClickHouse target in the ledger, runs the reconcilers last and records the run. Exit codes: 0 done,
+# 1 failed, 3 lease not taken.
 # Every integration scenario runs in its own scratch Postgres schema; the schema applier is a fake
 # that records what it was asked to apply.
 
@@ -46,23 +47,56 @@ Feature: The upgrade command
     And its message names "20261001000000_broken"
     And its message gives the command "prisma migrate resolve --rolled-back 20261001000000_broken"
 
+  # Each ClickHouse target upgrades on its own (Alex, 2026-10-11, T7-F1): a private target that
+  # fails holds only its organizations; the shared target and the release go on.
   @integration
-  Scenario: A failing private ClickHouse target fails the run and is recorded per target
-    Given a ClickHouse step the image declares and two targets, "shared" and "private:org_1"
-    And the applier applies it on "shared" and fails on "private:org_1"
-    When the upgrade runs
-    Then it exits with code 1
-    And the ledger records the step on "shared" as done and on "private:org_1" as failed with the error
-    And the step itself is recorded failed
-    And the run is recorded failed
+  Scenario: A failing private ClickHouse target is held while the release goes on
+    Given two ClickHouse steps the image declares and two targets, "shared" and "private:org_1"
+    And the applier applies them on "shared" and fails on "private:org_1"
+    When the upgrade runs with retries allowed
+    Then it exits with code 0
+    And the ledger records both steps on "shared" as done
+    And on "private:org_1" the first step failed with the error and the second pending
+    And both steps themselves are recorded done, so the serving gate admits the image
+    And "private:org_1" was asked once, never retried in the same run
+    And the installation reads "needs attention" with one failed target
 
   @integration
-  Scenario: An installation below the LTS floor is refused before any schema change
-    Given the ledger records a succeeded upgrade to 3.16.0 and the LTS floor is 3.20.1
+  Scenario: A held private ClickHouse target catches up on the next pass
+    Given an upgrade that held "private:org_1"
+    And "private:org_1" answers again
+    When the upgrade runs again with nothing else to apply
+    Then it applies the image's ClickHouse steps on "private:org_1"
+    And every step reads done on both targets and no target is behind
+    And the installation no longer counts a failed target
+
+  @integration
+  Scenario: A held private ClickHouse target still down stays held and the pass succeeds
+    Given an upgrade that held "private:org_1", still down
+    When the upgrade runs again with nothing else to apply
+    Then it asks the applier once for every shipped step and exits with code 0
+    And the private target's rows stay failed
+
+  @integration
+  Scenario: A failing shared ClickHouse target fails the run
+    Given a ClickHouse step and two targets, "shared" and "private:org_1"
+    And the applier fails on "shared"
     When the upgrade runs
-    Then it exits with code 2
-    And its message says to upgrade to 3.20.1 (LTS) first
-    And the schema applier is never called
+    Then it exits with code 1
+    And the step and the run are recorded failed
+
+  @unit
+  Scenario: Every ClickHouse target failing fails the run as before
+    Given only private ClickHouse targets, every one failing
+    When the runner decides which targets to hold
+    Then it holds none, so the failure fails the run
+
+  @integration
+  Scenario: An installation on any older release rolls through every step to the image
+    Given the ledger records a succeeded upgrade to 3.16.0, older than every manifest
+    When the upgrade runs from a 3.21.0 image
+    Then it exits with code 0
+    And the schema applier applies every shipped release up to 3.21.0
 
   @integration
   Scenario: A fresh install applies the schema and marks every non-schema step not-needed
@@ -71,7 +105,7 @@ Feature: The upgrade command
     Then the schema applier is called once
     And every schema step is recorded done
     And every data and tenant step is recorded not-needed
-    And the run is recorded succeeded with the image's release and the LTS floor
+    And the run is recorded succeeded with the image's release
 
   # The ledger has its own Postgres schema, `<installation schema>_upgrade_ledger` (round 21), so
   # it exists before Prisma's first deploy, which refuses a non-empty schema it has no record of
@@ -173,7 +207,7 @@ Feature: The upgrade command
   @integration
   Scenario: Running an older image marks completed background steps pending again
     Given the ledger records a succeeded upgrade to 3.22.0 with a done background step of 3.22.0
-    When the upgrade runs from a 3.21.0 image at or above the floor
+    When the upgrade runs from a 3.21.0 image
     Then the 3.22.0 background step is recorded pending
 
   # Run phases (round 9, U2-PHASES): in the run report, a fixed shape the reader parses.
@@ -185,18 +219,18 @@ Feature: The upgrade command
     And every phase is succeeded with a start and a finish
 
   @integration
+  Scenario: A schema step recorded done carries the start and finish of its schema phase
+    Given an empty database and a 3.21.0 image
+    When the upgrade runs
+    Then each Prisma step row's start and finish are the Postgres schema phase's
+    And each ClickHouse step row's start and finish are the ClickHouse schema phase's
+
+  @integration
   Scenario: A run whose schema fails records the failed phase and no later one
     Given the ClickHouse target fails to apply
     When the upgrade runs
     Then the run's report ends with a failed ClickHouse schema phase
     And no reconcile phase is recorded
-
-  @integration
-  Scenario: A refused upgrade is recorded as a failed run whose report names the refusal
-    Given the ledger records a succeeded upgrade to 3.16.0 and the LTS floor is 3.20.1
-    When the upgrade runs
-    Then the run is recorded failed with the report's refused naming "below_lts_floor"
-    And its only phase is a failed preflight
 
   # Live status (round 8, U2-LIVE): the runner raises a read hint; the api relays it.
   @integration

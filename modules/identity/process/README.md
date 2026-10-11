@@ -86,7 +86,7 @@ Spec: `specs/identity/identifier-model.feature`,
 
 ## Installation
 
-`defineProcessModule("identity").withRepositories(identityRepositories).withChannels(identityChannels).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).provideMiddlewareBindings(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:25`.
+`defineProcessModule("identity").withRepositories(identityRepositories).withChannels(identityChannels).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).provideMiddlewareBindings(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withEventing(twoStepRequirementEventing).withMigrations(…)`, `src/identity.module.ts:26`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -673,6 +673,15 @@ Declared at `src/features/join-request/eventing/join-request.pipeline.ts:92`. Ev
 | process manager     | `joinRequestLifecycle`                                                              | –       | `src/features/join-request/eventing/join-request.pipeline.ts:137` |
 | Postgres projection | `≈ new JoinRequestStateFoldProjection({ store: deps.joinRequestProjectionStore, })` | –       | `src/features/join-request/eventing/join-request.pipeline.ts:105` |
 
+### Pipeline `identity_two_step_requirement` (aggregate `organization_two_step_requirement`)
+
+Declared at `src/features/mfa/eventing/two-step-requirement.pipeline.ts:31`. Events: `twoStepRequirementChangedEventSchema`.
+
+| Kind            | Name                              | Handles                          | Declared at                                                     |
+| --------------- | --------------------------------- | -------------------------------- | --------------------------------------------------------------- |
+| command         | `recordTwoStepRequirementChanged` | –                                | `src/features/mfa/eventing/two-step-requirement.pipeline.ts:36` |
+| process manager | `twoStepRequirementNotice`        | intents `notifyMembers` (outbox) | `src/features/mfa/eventing/two-step-requirement.pipeline.ts:37` |
+
 ### Pipeline `sso-connections` (aggregate `sso_connection`)
 
 Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:185`. Events: `connectionRegisteredEventSchema`, `domainClaimedEventSchema`, `domainClaimApprovedEventSchema`, `domainClaimRejectedEventSchema`, `connectionDiscardedEventSchema`, `verificationRequestedEventSchema`, `domainAttestedEventSchema`, `domainWithdrawnEventSchema`, `domainVerifiedEventSchema`, `domainProofWaveredEventSchema`, `domainProofLapsedEventSchema`, `domainProofRecoveredEventSchema`, `connectionActivatedEventSchema`, `connectionSuspendedEventSchema`, `connectionResumedEventSchema`, `teardownRequestedEventSchema`, `connectionTornDownEventSchema`, `connectionArrivalPolicySetEventSchema`, `connectionRenamedEventSchema`, `connectionIdpUpdatedEventSchema`, `replacementConnectionRegisteredEventSchema`, `migrationRouteSelectedEventSchema`, `migrationFinalizationStartedEventSchema`, `migrationFinalizedEventSchema`.
@@ -712,7 +721,7 @@ Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:185
 
 | Kind   | Leaf                          | Environment variable           | Declared at                             |
 | ------ | ----------------------------- | ------------------------------ | --------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:454`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:460`           |
 | config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:28` |
 | config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:30` |
 | config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:32` |

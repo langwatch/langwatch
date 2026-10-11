@@ -66,6 +66,12 @@ export type UiRequirementValue<
   Name extends string,
 > = Name extends keyof RequiredUiSupply<Modules> ? RequiredUiSupply<Modules>[Name] : unknown;
 
+/** A first `withModules` keeps the caller's own tuple, so its derived shapes stay identical. */
+export type AppendUiModules<
+  Modules extends readonly SupplyModule[],
+  Next extends readonly SupplyModule[],
+> = Modules extends readonly [] ? Next : [...Modules, ...Next];
+
 export type CheckedUiModules<Modules extends readonly SupplyModule[]> =
   number extends Modules["length"]
     ? never

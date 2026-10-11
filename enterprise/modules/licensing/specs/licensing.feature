@@ -379,3 +379,77 @@ Feature: Enterprise licensing lifecycle
       When a managed-key-retired fact arrives once and then again
       Then gateway revokes that key under the fact's organisation and actor, the same revoke each time
       And a managed-key-invalidated fact asks every gateway to resolve that key's licence again
+
+  Rule: The licence registry stores unlimited lite seats as a flag, never as a number
+
+    A licence signs unlimited lite seats as a stand-in number too large for the registry's seat
+    column, so the row records `liteSeatsUnlimited` instead and leaves the seat count empty.
+
+    @unit
+    Scenario: A purchased GROWTH licence is recorded with unlimited lite seats
+      Given billing hands licensing a purchased GROWTH licence, which sells unlimited lite seats
+      When licensing records it in the registry
+      Then the row is written with liteSeatsUnlimited true and no lite seat count
+
+    @unit
+    Scenario: A licence with capped lite seats records the number
+      Given a licence that sells 5 lite seats
+      When the registry stores its seats
+      Then the row holds 5 lite seats and liteSeatsUnlimited false
+
+    @unit
+    Scenario: A licence that allows no lite seats records zero
+      Given a licence that sells 0 lite seats
+      When the registry stores its seats
+      Then the row holds 0 lite seats and liteSeatsUnlimited false
+
+    @unit
+    Scenario: A licence that states no lite seats records none
+      Given a licence signed before lite seats existed, with no lite seat count
+      When the registry stores its seats
+      Then the row holds no lite seat count and liteSeatsUnlimited false
+
+    @unit
+    Scenario: A replacement for a licence with unlimited lite seats is signed unlimited
+      Given a recorded licence with unlimited lite seats
+      When an operator reissues it without naming lite seats
+      Then the replacement licence signs unlimited lite seats and its row reads unlimited
+
+    @unit
+    Scenario: An activation code for a GROWTH plan stores unlimited lite seats as the flag
+      Given an operator issues a GROWTH activation code with no lite seats given
+      When the code is stored and later redeemed
+      Then the code row holds liteSeatsUnlimited true and no lite seat count
+      And the licence it mints signs unlimited lite seats
+
+    @unit
+    Scenario: An operator's lite seats above the seat column's maximum are refused by name
+      Given an operator issuing a licence, reissuing one, or issuing an activation code
+      When they state more than 2147483647 lite seats
+      Then the request is refused as invalid, with a message naming the maximum
+      And nothing is signed or stored
+
+  # ADR-179: licensing keeps sso's sign-in provider fact with the id of the event it applied.
+  @unit
+  Scenario: The SSO gate status answers from sso's recorded sign-in provider
+    Given sso recorded that its configured provider "okta" did not mount
+    When an operator asks for the SSO gate status
+    Then it answers provider "okta", not mounted, and whether a licence permits single sign-on
+
+  @unit
+  Scenario: Before sso records a sign-in provider the gate status reports nothing to fix
+    Given no sign-in provider fact has been applied yet
+    When an operator asks for the SSO gate status
+    Then it answers no configured provider, licensed and mounted
+
+  @unit
+  Scenario: A redelivered or older sign-in provider fact never overwrites a newer one
+    Given licensing applied a sign-in provider fact
+    When the same fact is delivered again, or an older one arrives late
+    Then the stored provider, mount state and applied event id are unchanged
+
+  @unit
+  Scenario: The SSO scan before the license table exists logs no error
+    Given a self-hosted install whose worker has not created the license table yet
+    When the platform single sign-on gate scans for a license
+    Then it denies for now, logs no error and scans again on the next ask

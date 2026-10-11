@@ -6,7 +6,7 @@
 -- licensing to invoice the added seats (ARCHITECTURE.md section 9).
 
 -- AlterTable
-ALTER TABLE "IssuedLicense" ADD COLUMN "seatsRaisedFrom" INTEGER;
+ALTER TABLE "IssuedLicense" ADD COLUMN IF NOT EXISTS "seatsRaisedFrom" INTEGER;
 
 -- CreateIndex
-CREATE INDEX "IssuedLicense_seatsRaisedFrom_idx" ON "IssuedLicense"("seatsRaisedFrom");
+CREATE INDEX IF NOT EXISTS "IssuedLicense_seatsRaisedFrom_idx" ON "IssuedLicense"("seatsRaisedFrom");

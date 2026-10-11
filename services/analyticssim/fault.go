@@ -9,15 +9,19 @@ import (
 // forcedError is the status every capture call answers with; 0 is off.
 type forcedError struct{ status atomic.Int32 }
 
-// failing answers the forced status instead of h while one is set.
-func (s *Server) failing(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if status := int(s.fault.status.Load()); status != 0 {
-			writeError(w, status, "analyticssim: forced error")
-			return
-		}
-		h(w, r)
+// keep stores a call's records and answers ok; while a forced error is set it
+// stores them marked with that status and answers it, so the refused attempt shows.
+func (s *Server) keep(w http.ResponseWriter, records []Record, ok any) {
+	status := int(s.fault.status.Load())
+	for i := range records {
+		records[i].Status = status
 	}
+	s.records.add(records, s.now())
+	if status != 0 {
+		writeError(w, status, "analyticssim: forced error")
+		return
+	}
+	writeJSON(w, http.StatusOK, ok)
 }
 
 // handleSettings is GET and PUT /_sim/api/settings, {"forcedError": 0 | 4xx | 5xx}.

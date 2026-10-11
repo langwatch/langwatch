@@ -9,7 +9,8 @@ export interface ActivationCode {
   email: string;
   planType: string;
   maxMembers: number;
-  maxMembersLite: number;
+  maxMembersLite: number | null;
+  liteSeatsUnlimited: boolean;
   licenseTermDays: number;
   services: string[];
   expiresAt: string;

@@ -42,7 +42,5 @@ enterprise/modules/*/process/README.md  linguist-generated=true
 enterprise/modules/*/browser/README.md  linguist-generated=true
 # pnpm --filter @langwatch/architecture-enforcer docs
 dev/docs/lint-rules.md                  linguist-generated=true
-# pnpm sync:references writes the root build solution whole (package tsconfigs only in part).
-/tsconfig.build.json                    linguist-generated=true
 # Unified diffs prefix upstream tab-indented context with a required space.
 patches/*.patch                        whitespace=-space-before-tab

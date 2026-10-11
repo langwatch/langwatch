@@ -1,6 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
-import { Card } from "@langwatch/design-system/card";
-import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant } from "@langwatch/time";
 import { ArrowRight, Skull } from "lucide-react";
@@ -61,24 +61,26 @@ function DeadLetterBanner({
 }) {
   const oldest = Math.min(...byProcess.map((row) => row.oldestUpdatedAt));
   return (
-    <Card
-      status="bad"
-      icon={<Skull size={18} />}
+    <Banner
+      status="error"
+      icon={<Skull size={16} />}
       title={`${total} dead ${total === 1 ? "message" : "messages"}: this work will not run again until an operator redrives it`}
-      description={`Across ${byProcess
-        .slice(0, 3)
-        .map((row) => `${row.processName} (${row.count})`)
-        .join(
-          ", ",
-        )}${byProcess.length > 3 ? `, +${byProcess.length - 3} more` : ""} · oldest ${formatTimeAgo(oldest, now)}`}
-      actions={
-        <Button size="sm" variant="outline" asChild>
+      action={
+        <BannerAction asChild>
           <Link href="/ops/event-sourcing/dead-letters">
             View <ArrowRight size={12} />
           </Link>
-        </Button>
+        </BannerAction>
       }
-    />
+    >
+      Across{" "}
+      {byProcess
+        .slice(0, 3)
+        .map((row) => `${row.processName} (${row.count})`)
+        .join(", ")}
+      {byProcess.length > 3 ? `, +${byProcess.length - 3} more` : ""} · oldest{" "}
+      {formatTimeAgo(oldest, now)}
+    </Banner>
   );
 }
 
@@ -104,17 +106,19 @@ function HealthLine({
     );
   }
   return (
-    <Card
+    <Banner
       status="warning"
       title={`${troubledCount} of ${processCount} ${troubledCount === 1 ? "process is" : "processes are"} behind`}
-      description={`${troubledNames.slice(0, 4).join(", ")}${troubledNames.length > 4 ? `, +${troubledNames.length - 4} more` : ""}`}
-      actions={
-        <Button size="sm" variant="outline" asChild>
+      action={
+        <BannerAction asChild>
           <Link href="/ops/event-sourcing/processes">
             Inspect <ArrowRight size={12} />
           </Link>
-        </Button>
+        </BannerAction>
       }
-    />
+    >
+      {troubledNames.slice(0, 4).join(", ")}
+      {troubledNames.length > 4 ? `, +${troubledNames.length - 4} more` : ""}
+    </Banner>
   );
 }

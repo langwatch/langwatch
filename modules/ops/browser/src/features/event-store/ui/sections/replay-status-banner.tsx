@@ -1,5 +1,5 @@
-import { Card } from "@langwatch/design-system/card";
-import { Badge, Button, Status } from "@langwatch/design-system/primitives";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
+import { HStack } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
@@ -21,50 +21,39 @@ export function ReplayStatusBanner() {
 
   const activeProjectionNames = parseActiveProjections(status.currentProjection);
 
+  const projectionLabel = projectionLabelOf(activeProjectionNames);
+
   return (
-    <Card
-      padding="sm"
-      icon={
-        <Status.Root colorPalette="blue">
-          <Status.Indicator />
-        </Status.Root>
-      }
+    <Banner
+      status="info"
       title="Replay running"
-      badge={
-        activeProjectionNames.length > 0 ? (
-          <Badge size="sm" variant="subtle">
-            {activeProjectionNames.length === 1
-              ? activeProjectionNames[0]
-              : `${activeProjectionNames.length} projections`}
-          </Badge>
-        ) : (
-          void 0
-        )
+      action={
+        status.runId || hasAccess ? (
+          <HStack gap={2}>
+            {status.runId && (
+              <BannerAction onClick={() => router.push(`/ops/projections/${status.runId}`)}>
+                View Progress
+              </BannerAction>
+            )}
+            {hasAccess && (
+              <BannerAction
+                loading={cancelMutation.isPending}
+                onClick={() => cancelMutation.mutate()}
+              >
+                Cancel
+              </BannerAction>
+            )}
+          </HStack>
+        ) : undefined
       }
-      actions={
-        <>
-          {status.runId && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => router.push(`/ops/projections/${status.runId}`)}
-            >
-              View Progress
-            </Button>
-          )}
-          {hasAccess && (
-            <Button
-              size="sm"
-              colorPalette="red"
-              variant="outline"
-              loading={cancelMutation.isPending}
-              onClick={() => cancelMutation.mutate()}
-            >
-              Cancel
-            </Button>
-          )}
-        </>
-      }
-    />
+    >
+      {projectionLabel}
+    </Banner>
   );
+}
+
+/** The one projection replaying, or how many are. */
+function projectionLabelOf(names: string[]): string | null {
+  if (names.length > 1) return `${names.length} projections`;
+  return names[0] ?? null;
 }

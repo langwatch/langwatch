@@ -142,7 +142,7 @@ class StubRepository implements ProjectRepository {
   findLiveBySlugInOrganization = vi.fn(async (): Promise<Project[]> => []);
   countUsage = vi.fn(async () => ({ projects: 0, updatedProjects: 0 }));
   countWithTraces = vi.fn(async () => 0);
-  findSharedProjectSlugs = vi.fn(async () => []);
+  findSharedProjectSlugs = vi.fn(async (): Promise<string[]> => []);
   listAllIds = vi.fn(async () => ({ ids: [], next: null }));
   listAllWithOrganization = vi.fn(async () => ({ projects: [], next: null }));
   listAllWithPrivateS3 = vi.fn(async () => ({ projects: [], next: null }));
@@ -408,6 +408,29 @@ class FixedCredentials extends ProjectCredentials {
 
 const MEMBER = { type: "user", id: "user_1" } as const;
 
+type UserBinding = Awaited<ReturnType<AuthzApi["listUserBindings"]>>[number];
+const listUserBindings = vi.fn(async (): Promise<UserBinding[]> => []);
+
+const userBinding = ({
+  scopeType,
+  scopeId,
+}: Pick<UserBinding, "scopeType" | "scopeId">): UserBinding => ({
+  id: `binding-${scopeId}`,
+  organizationId: "org",
+  userId: "user_1",
+  groupId: null,
+  apiKeyId: null,
+  role: "CUSTOM",
+  customRoleId: "role_1",
+  scopeType,
+  scopeId,
+  createdAt: new Date(0),
+  user: null,
+  group: null,
+  apiKey: null,
+  customRole: null,
+});
+
 const createService = (
   repository: StubRepository,
   organizations = new StubOrganizationService(),
@@ -428,6 +451,7 @@ const createService = (
         allowed: granted(permission),
         organizationRole: null,
       }),
+      listUserBindings,
     }),
     repository,
     credentials: new FixedCredentials(),
@@ -454,6 +478,48 @@ const createService = (
   });
 
 describe("ProjectService", () => {
+  /** @scenario "A member's landing projects come from their grants" */
+  it("finds a member's shared projects through their team and project grants", async () => {
+    const repository = new StubRepository();
+    repository.findSharedProjectSlugs.mockResolvedValue(["acme"]);
+    listUserBindings.mockResolvedValueOnce([
+      userBinding({ scopeType: "TEAM", scopeId: "team_1" }),
+      userBinding({ scopeType: "PROJECT", scopeId: "project_1" }),
+      userBinding({ scopeType: "ORGANIZATION", scopeId: "org" }),
+    ]);
+
+    await expect(
+      createService(repository).findSharedProjectSlugs({
+        organizationId: "org",
+        memberUserId: "user_1",
+        limit: 1,
+      }),
+    ).resolves.toEqual(["acme"]);
+    expect(listUserBindings).toHaveBeenCalledWith({ organizationId: "org", userId: "user_1" });
+    expect(repository.findSharedProjectSlugs).toHaveBeenCalledWith({
+      organizationId: "org",
+      member: { teamIds: ["team_1"], projectIds: ["project_1"] },
+      limit: 1,
+    });
+  });
+
+  /** @scenario "A member's landing projects come from their grants" */
+  it("offers no project to a member with no team or project grant", async () => {
+    const repository = new StubRepository();
+    listUserBindings.mockResolvedValueOnce([
+      userBinding({ scopeType: "ORGANIZATION", scopeId: "org" }),
+    ]);
+
+    await expect(
+      createService(repository).findSharedProjectSlugs({
+        organizationId: "org",
+        memberUserId: "user_1",
+        limit: 1,
+      }),
+    ).resolves.toEqual([]);
+    expect(repository.findSharedProjectSlugs).not.toHaveBeenCalled();
+  });
+
   it("resolves a live explicit trace destination without falling back", async () => {
     const repository = new StubRepository();
     repository.findLiveTraceDestination.mockResolvedValue(traceDestination);
@@ -560,7 +626,31 @@ describe("ProjectService", () => {
       slug: "governance-org",
       apiKey: "secret-api-key",
       teamId: "oldest-team",
+      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      framework: "governance",
     });
+  });
+
+  /** @scenario "A feature ensures an internal project" */
+  it("creates the checkup project under its own slug and kind", async () => {
+    const repository = new StubRepository();
+
+    await createService(repository).ensureInternal({
+      organizationId: "org",
+      kind: PROJECT_KIND.INTERNAL_CHECKUP,
+    });
+
+    expect(repository.findInternalByOrganization).toHaveBeenCalledWith({
+      organizationId: "org",
+      kind: PROJECT_KIND.INTERNAL_CHECKUP,
+    });
+    expect(repository.createInternalOrFindWinner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slug: "checkup-org",
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+        framework: "checkup",
+      }),
+    );
   });
 
   /** @scenario "A feature ensures an internal project" */

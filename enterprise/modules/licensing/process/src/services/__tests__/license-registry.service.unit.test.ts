@@ -13,6 +13,7 @@ import {
   type IssuedLicenseCustomerRecord,
 } from "@langwatch/enterprise-licensing-contract";
 import { registryHashForToken } from "@langwatch/gateway-contract";
+import { UNLIMITED } from "@langwatch/plans";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -462,6 +463,36 @@ describe("licenses another flow signed", () => {
       issuedById: null,
       maxMembers: 10,
     });
+  });
+
+  /** @scenario A purchased GROWTH licence is recorded with unlimited lite seats */
+  it("records a purchased GROWTH license's unlimited lite seats as the flag", async () => {
+    const { registry, repository } = harness();
+
+    const license = await registry.record({ licenseKey: purchased(), source: "PURCHASE" });
+
+    expect(license).toMatchObject({ maxMembersLite: null, liteSeatsUnlimited: true });
+    expect(await repository.findById(license.id)).toMatchObject({
+      maxMembersLite: null,
+      liteSeatsUnlimited: true,
+    });
+  });
+
+  /** @scenario A replacement for a licence with unlimited lite seats is signed unlimited */
+  it("signs a replacement for an unlimited license with unlimited lite seats", async () => {
+    const { registry, cryptography } = harness();
+    const license = await registry.record({ licenseKey: purchased(), source: "PURCHASE" });
+
+    const reissued = await registry.reissue({
+      id: license.id,
+      expiresAt: Temporal.Instant.from("2028-01-01T00:00:00.000Z"),
+      operatorId: "operator-3",
+    });
+
+    expect(cryptography.parseLicenseKey(reissued.licenseKey)?.data.plan.maxMembersLite).toBe(
+      UNLIMITED,
+    );
+    expect(reissued.license).toMatchObject({ maxMembersLite: null, liteSeatsUnlimited: true });
   });
 
   /** @scenario "A license minted by the command line script is recorded" */

@@ -7,6 +7,7 @@ import {
   type DatasetStoragePageInput,
   type DatasetSummary,
 } from "@langwatch/dataset-contract";
+import { generate } from "@langwatch/ksuid";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { type Instant, toDate } from "@langwatch/time";
@@ -108,6 +109,7 @@ export class PrismaDatasetRepository
   async create(input: DatasetCreateInput): Promise<Dataset> {
     const row = await this.database.dataset.create({
       data: {
+        id: generate("dataset").toString(),
         projectId: input.projectId,
         name: input.name,
         slug: input.slug,

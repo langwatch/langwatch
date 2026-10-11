@@ -149,7 +149,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.test.json tsconfig.type-tests.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

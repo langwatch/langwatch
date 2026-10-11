@@ -6,7 +6,6 @@
  */
 
 import type { UiAuthClient } from "@langwatch/auth-contract";
-import { UiFeedback } from "@langwatch/browser-host/capabilities";
 import type { UiActiveScopeReading } from "@langwatch/browser-host/session";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
@@ -62,13 +61,6 @@ const signedOut: UiAuthClient = {
   signOut: refusesToSignOut,
 };
 
-class SilentFeedback extends UiFeedback {
-  succeeded(): void {}
-  warned(): void {}
-  informed(): void {}
-  failed(): void {}
-}
-
 /** What the scope host service publishes while it is still resolving. */
 const RESOLVING: UiActiveScopeReading = {
   status: "loading",
@@ -110,7 +102,6 @@ function SessionProbe({
   asks?: readonly string[];
 }) {
   const reading = useUiSessionReading({
-    feedback: new SilentFeedback(),
     isPublicRoute: true,
     authClient,
   });
@@ -189,7 +180,7 @@ describe("given a screen mounted in a composition that reads the deployment's se
     expect(view.getByTestId("user").textContent).toBe("nobody");
   });
 
-  it("keeps an auth refusal distinct from an offline session read", async () => {
+  it("reads a 401 as nobody signed in, distinct from an offline session read", async () => {
     const { transport } = recordingTransport();
     const refused: UiAuthClient = {
       $fetch: () => Promise.resolve({ error: { code: "session_refused", status: 401 } }),
@@ -198,7 +189,7 @@ describe("given a screen mounted in a composition that reads the deployment's se
 
     const refusedView = renderSession({ transport, authClient: refused });
     await waitFor(() =>
-      expect(refusedView.getByTestId("session-status").textContent).toBe("error"),
+      expect(refusedView.getByTestId("session-status").textContent).toBe("anonymous"),
     );
     dispose?.();
 

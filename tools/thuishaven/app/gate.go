@@ -97,7 +97,8 @@ func (o *Orchestrator) decodeGateContext(stdin io.Reader) (gateContext, hookRepl
 		return gateContext{}, deferReply()
 	}
 	kind, heavy := domain.ClassifyCommand(command)
-	if !heavy {
+	if !heavy || domain.RushOwned(command, rushOwnsFunc()) {
+		// Rush's gate admits what it owns; its own hook already holds the call.
 		return gateContext{}, deferReply()
 	}
 	return gateContext{payload: p, command: command, kind: kind, ready: true}, hookReply{}
@@ -179,6 +180,10 @@ func (o *Orchestrator) decideHeavyMessage(p hookPayload, command string, kind do
 		CanBackground: false,
 	})
 
+	if decision != domain.Refuse && domain.LauncherOwned(command) {
+		// The tsc and vitest launchers take their own slot; only red refusal stays here.
+		return deferReply()
+	}
 	if decision == domain.Refuse {
 		var hint *domain.RetryHint
 		if h, ok := domain.NewRetryHint(queueDepth, o.observedDuration(command), caller); ok {

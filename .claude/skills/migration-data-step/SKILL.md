@@ -112,7 +112,8 @@ event seen or a flag set. Old pods keep writing the old place during the rollout
 rollback; a rollback reopens the step with its checkpoint cleared, so the re-run is whole.
 
 **Copy, never move.** Write only to new places and leave the source intact; readers switch in a
-later release. Deleting the old copy is a contract step under the floor rule, with
+later release. Deleting the old copy is a contract step that waits until old writers are gone
+(`needsOldWritersGone`) and is kept, like every step, with
 `-- contract: retired in <release>` (the `postgres-migration` skill).
 
 **Archive-or-fail** (record, ARCHIVE-OR-FAIL). A contract never drops unarchived data: its SQL

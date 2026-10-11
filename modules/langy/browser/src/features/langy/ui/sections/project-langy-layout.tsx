@@ -1,12 +1,17 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { UiRouteOutlet } from "@langwatch/browser/route-objects";
+import { setDrawerEndInset } from "@langwatch/design-system/drawer";
 import { Box } from "@langwatch/design-system/primitives";
-import { memo, type ReactNode, useEffect } from "react";
+import { memo, type ReactNode, useEffect, useLayoutEffect } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationDeepLink } from "../../../../behavior/use-langy-conversation-deep-link.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { LANGY_DOCKED_OFFSET, LANGY_TRANSITION } from "../../../../model/langy-panel-layout.ts";
+import {
+  LANGY_DOCK_GAP,
+  LANGY_DOCKED_OFFSET,
+  LANGY_TRANSITION,
+} from "../../../../model/langy-panel-layout.ts";
 import { LangyProvider, useLangy } from "../../../tools/ui/sections/langy-page-context.tsx";
 import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
 import { useLangyWebPush } from "../../behavior/use-langy-web-push.ts";
@@ -86,6 +91,14 @@ function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; childre
     return () => setDockShifted(false);
   }, [shifted, setDockShifted]);
   const reservation = dockReservation({ shifted, shellClaimed });
+  // Without a claiming shell (the Studio), a drawer still opens beside the docked panel,
+  // as on main.
+  const yieldsToDock = showLangy && isOpen && panelMode === "sidebar" && !shellClaimed;
+  useLayoutEffect(() => {
+    if (!yieldsToDock) return;
+    setDrawerEndInset(LANGY_DOCKED_OFFSET + LANGY_DOCK_GAP + 8);
+    return () => setDrawerEndInset(0);
+  }, [yieldsToDock]);
   // The box sits in the shell's page body and passes its flex height on,
   // or full-height pages (the prompt studio) collapse to their content.
   return (

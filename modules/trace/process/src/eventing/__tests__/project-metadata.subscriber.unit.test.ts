@@ -15,10 +15,10 @@ vi.mock("@langwatch/observability", () => ({
 const mockRecordSignal = vi.fn(async () => undefined);
 
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import { type OtlpSpan } from "@langwatch/otlp/trace-request";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-  type OtlpSpan,
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";

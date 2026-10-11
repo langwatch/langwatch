@@ -64,10 +64,14 @@ func limitMachine() domain.LimitMachine {
 
 // limitsReport resolves every limit through the same layers the readers use.
 func limitsReport() domain.LimitsReport {
-	return domain.ResolveLimits(limitMachine(), envOr("HAVEN_COLIMA_PROFILE", "default"),
+	report := domain.ResolveLimits(limitMachine(), envOr("HAVEN_COLIMA_PROFILE", "default"),
 		func(key string) (string, string, bool) {
 			return resolveKnobSource(key, processKnobs())
 		})
+	chRuntime, _ := domain.ResolveClickHouseRuntime(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
+	_, pinned := domain.ClickHouseNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
+	report.NativeClickHouse = pinned && chRuntime == domain.ClickHouseRuntimeNative
+	return report
 }
 
 func limitValue(report domain.LimitsReport, name string) domain.LimitValue {

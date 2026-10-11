@@ -28,22 +28,14 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "composite": true
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "./dist/**/*", "./example/**/*"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "../../modules/evaluator/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/egress/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/redaction/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }

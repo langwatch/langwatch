@@ -62,7 +62,8 @@ const webhookStoredActionParamsSchema = z
     previousSigningSecretEncrypted: z.string().optional(),
     previousSigningSecretExpiresAt: z.number().int().optional(),
   })
-  .strict();
+  // An alert or report row keeps its rule (threshold, schedule) beside the delivery.
+  .loose();
 
 type WebhookStoredActionParams = AutomationWebhookStoredParams;
 

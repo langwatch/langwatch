@@ -66,12 +66,11 @@ import type {
   OpsMigrationTargetedRunResult,
 } from "./features/migrations/ops-system-migration.ts";
 import type {
+  OpsUpgradeAttentionNotice,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
   OpsUpgradeListTenantsInput,
-  OpsUpgradePreview,
-  OpsUpgradePreviewInput,
   OpsUpgradeReleasePage,
   OpsUpgradeRun,
   OpsUpgradeRunPage,
@@ -698,6 +697,8 @@ export interface OpsApi {
   runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;
   // -- Ops, Upgrades: the upgrade ledger through UpgradeReader, read only (round 8, U2-API) ---
   getUpgradeStatus(): Promise<OpsUpgradeStatus>;
+  /** Self-hosted: whether every signed-in user sees the upgrade needs attention. */
+  getUpgradeAttentionNotice(): Promise<OpsUpgradeAttentionNotice>;
   listUpgradeReleases(): Promise<OpsUpgradeReleasePage>;
   listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage>;
   /** Refuses with `upgrade_not_found` when the ledger and the image hold no such step. */
@@ -705,8 +706,6 @@ export interface OpsApi {
   listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
   /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
-  /** The plan narrowed to `to`, beside the preflight; `upgrade_plan_unavailable` when unwired. */
-  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview>;
   listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
   /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;

@@ -131,7 +131,6 @@ describe("given a read that recorded part of a period and then failed", () => {
           await ClickHouseMigrateTask.createFromConfig({
             config: {
               buildTime: false,
-              skipped: false,
               sharedUrl: endpoint.url,
               privateEndpoints: [],
               settings: {

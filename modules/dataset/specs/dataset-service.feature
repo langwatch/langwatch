@@ -62,6 +62,12 @@ Feature: Shared Dataset service
     When the row is recorded
     Then the experiment's batch-evaluation records hold it beside the dataset it ran over
 
+  @unit
+  Scenario: A dataset created in Postgres is stored under a strict dataset KSUID
+    Given a dataset created from the datasets page, a trace's Add to dataset or the API
+    When the Postgres store writes the row
+    Then its id is a dataset KSUID, as the memory store and an uploaded file's dataset mint
+
   @integration
   Scenario: The memory and Postgres dataset repositories answer alike
     Given the same datasets and entries written to each backend

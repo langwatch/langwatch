@@ -3683,6 +3683,15 @@
           "documentation": ""
         },
         {
+          "name": "kind",
+          "columnName": "kind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "`customer` for every organization a person founds or an operator provisions; `system` for\nthe install's one hidden organization the Ops checkup canaries run in, never listed to a person.\nSpec: modules/ops/specs/checkup-canary-project.feature."
+        },
+        {
           "name": "phoneNumber",
           "columnName": "phoneNumber",
           "type": "String",
@@ -4543,8 +4552,17 @@
           "type": "Int",
           "kind": "scalar",
           "isList": false,
+          "isOptional": true,
+          "documentation": "The lite seats sold: null when not stated or when unlimited. Never a stand-in number."
+        },
+        {
+          "name": "liteSeatsUnlimited",
+          "columnName": "liteSeatsUnlimited",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "True when the license sells unlimited lite seats; maxMembersLite is then null."
         },
         {
           "name": "issuedAt",
@@ -4923,8 +4941,17 @@
           "type": "Int",
           "kind": "scalar",
           "isList": false,
+          "isOptional": true,
+          "documentation": "The lite seats the minted license carries: null when unlimited. Never a stand-in number."
+        },
+        {
+          "name": "liteSeatsUnlimited",
+          "columnName": "liteSeatsUnlimited",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "True when the minted license carries unlimited lite seats; maxMembersLite is then null."
         },
         {
           "name": "licenseTermDays",
@@ -24832,6 +24859,61 @@
         {
           "name": "createdAt",
           "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "SignInProviderMount",
+      "tableName": "SignInProviderMount",
+      "documentation": "",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Fixed, so this table holds one row: licensing's copy of sso's sign-in\nprovider fact (ADR-179)."
+        },
+        {
+          "name": "provider",
+          "columnName": "provider",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The configured provider's name; null when the deployment signs in by email."
+        },
+        {
+          "name": "mounted",
+          "columnName": "mounted",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastAppliedEventId",
+          "columnName": "lastAppliedEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The last sso event applied: the row's idempotency guard and its version."
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

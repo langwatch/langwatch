@@ -1,4 +1,7 @@
-import { isUnprovenAccount } from "../../rules/unproven-account.rules.ts";
+import {
+  carriesPreProofSignInMethod,
+  isUnprovenAccount,
+} from "../../rules/unproven-account.rules.ts";
 import { IdentityMigrationRepository } from "../identity-migration.repository.ts";
 import type { MemoryIdentityStore } from "./memory.identity.store.ts";
 
@@ -21,6 +24,11 @@ export class MemoryIdentityMigrationRepository extends IdentityMigrationReposito
         isUnprovenAccount({
           emailVerified: row.emailVerified,
           lastLoginAtMs: row.lastLoginAtMs ?? null,
+        }) &&
+        carriesPreProofSignInMethod({
+          accounts: this.store.accounts.get(userId)?.length ?? 0,
+          passkeys: this.store.passkeyCounts.get(userId) ?? 0,
+          passkeySignupPending: row.passkeySignupPending ?? false,
         })
       );
     });

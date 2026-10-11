@@ -331,6 +331,7 @@ export interface LwqlPrismaRows {
   readonly Organization: {
     readonly id: "String";
     readonly name: "String";
+    readonly kind: "String";
     readonly phoneNumber: "String?";
     readonly slug: "String";
     readonly createdAt: "DateTime";
@@ -386,7 +387,8 @@ export interface LwqlPrismaRows {
     readonly email: "String";
     readonly planType: "String";
     readonly maxMembers: "Int";
-    readonly maxMembersLite: "Int";
+    readonly maxMembersLite: "Int?";
+    readonly liteSeatsUnlimited: "Boolean";
     readonly issuedAt: "DateTime";
     readonly expiresAt: "DateTime";
     readonly source: "IssuedLicenseSource";
@@ -430,7 +432,8 @@ export interface LwqlPrismaRows {
     readonly email: "String";
     readonly planType: "String";
     readonly maxMembers: "Int";
-    readonly maxMembersLite: "Int";
+    readonly maxMembersLite: "Int?";
+    readonly liteSeatsUnlimited: "Boolean";
     readonly licenseTermDays: "Int";
     readonly services: "String[]";
     readonly expiresAt: "DateTime";
@@ -2342,5 +2345,12 @@ export interface LwqlPrismaRows {
     readonly publicKey: "String";
     readonly privateKeyEncrypted: "String";
     readonly createdAt: "DateTime";
+  };
+  readonly SignInProviderMount: {
+    readonly id: "String";
+    readonly provider: "String?";
+    readonly mounted: "Boolean";
+    readonly lastAppliedEventId: "String";
+    readonly updatedAt: "DateTime";
   };
 }

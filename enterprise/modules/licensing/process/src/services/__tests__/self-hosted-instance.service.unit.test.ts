@@ -94,6 +94,7 @@ async function bindLicense(licenses: MemoryIssuedLicenseRepository) {
     planType: "ENTERPRISE",
     maxMembers: 50,
     maxMembersLite: 0,
+    liteSeatsUnlimited: false,
     issuedAt: NOW.subtract({ hours: 24 * 300 }),
     expiresAt: NOW.add({ hours: 24 * 30 }),
     source: "BACKOFFICE",

@@ -66,7 +66,7 @@ export const observabilityOwner = {
       prometheusHost: c.env("OTEL_EXPORTER_PROMETHEUS_HOST", optionalString),
       prometheusPort: c.env("OTEL_EXPORTER_PROMETHEUS_PORT", optionalPort),
     },
-    /** main's names, read through `telemetryAliases` with a warning until the LTS floor passes. */
+    /** main's names, read through `telemetryAliases` with a warning until 3.23. */
     deprecated: Object.fromEntries(
       telemetryAliases.map(({ deprecated }) => [
         deprecated,

@@ -1,10 +1,10 @@
 import type {
+  OpsUpgradeAttentionNotice,
   OpsUpgradeDeprecation,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
-  OpsUpgradePreview,
-  OpsUpgradePreviewInput,
+  OpsUpgradeLatestRelease,
   OpsUpgradeRelease,
   OpsUpgradeReleasePage,
   OpsUpgradeRun,
@@ -21,7 +21,7 @@ import type {
 import { UpgradeStepNotFailedError } from "@langwatch/ops-contract";
 import type { Deprecation } from "@langwatch/upgrade/manifest";
 import type {
-  UpgradePreview,
+  UpgradeImageVersion,
   UpgradeReleaseSummary,
   UpgradeRunDetail,
   UpgradeRunPhaseView,
@@ -32,12 +32,19 @@ import type {
   UpgradeTargetSummary,
   UpgradeTargetView,
 } from "@langwatch/upgrade/reader";
+import { orderReleases } from "@langwatch/upgrade/reader";
 
+import type { ClickHouseRoutesRepository } from "../repositories/clickhouse.routes.repository.ts";
+import type { CloudLatestRelease } from "../repositories/cloud-latest-release.repository.ts";
 import type { UpgradeLedgerRepository } from "../repositories/upgrade-ledger.repository.ts";
+import type { UsageReportService } from "./usage-report.service.ts";
+
+/** The reader's state for a failed step, target or run: Ops › Upgrades' "Needs attention". */
+const NEEDS_ATTENTION = "needs-attention";
 
 function runSummaryOf(run: UpgradeRunSummary): OpsUpgradeRunSummary {
-  const { id, kind, release, floor, startedAt, finishedAt, outcome } = run;
-  return { id, kind, release, floor, startedAt, finishedAt, outcome };
+  const { id, kind, release, startedAt, finishedAt, outcome } = run;
+  return { id, kind, release, startedAt, finishedAt, outcome };
 }
 
 function deprecationOf(entry: Deprecation): OpsUpgradeDeprecation {
@@ -45,7 +52,9 @@ function deprecationOf(entry: Deprecation): OpsUpgradeDeprecation {
   return { id, what, kind, deprecatedIn, removedIn, successor: entry.successor ?? null, notice };
 }
 
-function statusOf(status: UpgradeStatus): Omit<OpsUpgradeStatus, "deprecations"> {
+function statusOf(
+  status: UpgradeStatus,
+): Omit<OpsUpgradeStatus, "deprecations" | "version" | "latestRelease"> {
   const { lease, lastRun } = status;
   return {
     state: status.state,
@@ -56,8 +65,6 @@ function statusOf(status: UpgradeStatus): Omit<OpsUpgradeStatus, "deprecations">
     installed: status.installed,
     origin: status.origin,
     image: status.image,
-    floor: status.floor,
-    ledgerFloor: status.ledgerFloor,
     lease: lease && {
       name: lease.name,
       owner: lease.owner,
@@ -127,33 +134,63 @@ function runOf(run: UpgradeRunDetail): OpsUpgradeRun {
   };
 }
 
-function previewOf(preview: UpgradePreview): OpsUpgradePreview {
-  const { plan } = preview;
-  return {
-    installed: preview.installed,
-    plan:
-      plan.outcome === "planned"
-        ? {
-            outcome: "planned",
-            fresh: plan.fresh,
-            releases: plan.releases.map((release) => ({ ...release })),
-            notNeeded: [...plan.notNeeded],
-          }
-        : { outcome: "refused", code: plan.code, stopAt: plan.stopAt, message: plan.message },
-    preflight: preview.preflight.map((row) => ({
-      id: row.id,
-      name: row.name,
-      outcome: row.outcome,
-      detail: row.detail ?? null,
-      fix: row.fix ?? null,
-      docsPath: row.docsPath ?? null,
-    })),
-  };
+/** The release page every LangWatch release is tagged with: `langwatch@v<release>`. */
+function releaseNotesUrl({ release }: { release: string }): string {
+  return `https://github.com/langwatch/langwatch/releases/tag/langwatch@v${release}`;
 }
 
-function targetSummaryOf(summary: UpgradeTargetSummary): OpsUpgradeTargetSummary {
+/** Cloud's latest release, kept only when newer than the release this image is or holds. */
+function newerReleasesOf({
+  version,
+  held,
+}: {
+  version: UpgradeImageVersion;
+  held: readonly CloudLatestRelease[];
+}): OpsUpgradeLatestRelease[] {
+  const running = version.kind === "release" ? version.release : version.containsRelease;
+  return held
+    .filter(
+      (latest) =>
+        running === null || orderReleases({ left: latest.release, right: running }) === "newer",
+    )
+    .map(({ release }) => ({ release, notesUrl: releaseNotesUrl({ release }) }));
+}
+
+/** The ledger's prefix for a private ClickHouse target: `private:<organizationId>`. */
+const PRIVATE_TARGET_PREFIX = "private:";
+
+/** The routes this process holds, read to tell a reachable private target from a refused one. */
+type TargetRoutes = Pick<
+  ClickHouseRoutesRepository,
+  "findPrivateRoutes" | "findPrivateRouteVariables"
+>;
+
+/** Whether this process reaches a target: shared always; a private one by its variable. */
+function routeOf({
+  target,
+  routes,
+}: {
+  target: string;
+  routes: TargetRoutes | undefined;
+}): OpsUpgradeTargetSummary["route"] {
+  if (!target.startsWith(PRIVATE_TARGET_PREFIX)) return "present";
+  const organizationId = target.slice(PRIVATE_TARGET_PREFIX.length);
+  if (routes?.findPrivateRoutes().has(organizationId)) return "present";
+  const malformed = routes
+    ?.findPrivateRouteVariables()
+    .some((each) => each.organizationId === organizationId && each.state === "malformed");
+  return malformed ? "malformed" : "missing";
+}
+
+function targetSummaryOf({
+  summary,
+  routes,
+}: {
+  summary: UpgradeTargetSummary;
+  routes: TargetRoutes | undefined;
+}): OpsUpgradeTargetSummary {
   const { target, version, outstanding, lastError } = summary;
-  return { target, version, outstanding, lastError };
+  return { target, version, outstanding, lastError, route: routeOf({ target, routes }) };
 }
 
 /**
@@ -162,15 +199,56 @@ function targetSummaryOf(summary: UpgradeTargetSummary): OpsUpgradeTargetSummary
  * Spec: modules/ops/specs/upgrades.feature
  */
 export class OpsUpgradeService {
-  static create({ ledger }: { ledger: UpgradeLedgerRepository }): OpsUpgradeService {
-    return new OpsUpgradeService(ledger);
+  static create({
+    ledger,
+    cloudReleases,
+    isSaas,
+    routes,
+  }: {
+    ledger: UpgradeLedgerRepository;
+    /** The private routes this process holds; absent, every private target reads as missing. */
+    routes?: TargetRoutes;
+    /** Cloud tells no member about its upgrades; only ops:view holders see them. */
+    isSaas: boolean;
+    /** The usage report's held reply; a process without one names no latest release. */
+    cloudReleases?: Pick<UsageReportService, "findLatestRelease">;
+  }): OpsUpgradeService {
+    return new OpsUpgradeService({ ledger, cloudReleases, isSaas, routes });
   }
 
-  private constructor(private readonly ledger: UpgradeLedgerRepository) {}
+  private readonly ledger: UpgradeLedgerRepository;
+  private readonly cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined;
+  private readonly isSaas: boolean;
+  private readonly routes: TargetRoutes | undefined;
+
+  private constructor(parts: {
+    ledger: UpgradeLedgerRepository;
+    cloudReleases: Pick<UsageReportService, "findLatestRelease"> | undefined;
+    isSaas: boolean;
+    routes: TargetRoutes | undefined;
+  }) {
+    this.ledger = parts.ledger;
+    this.cloudReleases = parts.cloudReleases;
+    this.isSaas = parts.isSaas;
+    this.routes = parts.routes;
+  }
+
+  /** A failed step, target or run on self-hosted; held organizations leave the state up to date. */
+  async getAttentionNotice(): Promise<OpsUpgradeAttentionNotice> {
+    if (this.isSaas) return { show: false };
+    const status = await this.ledger.findStatus();
+    return { show: status.state === NEEDS_ATTENTION };
+  }
 
   async getStatus(): Promise<OpsUpgradeStatus> {
     const deprecations = this.ledger.findDeprecations().map(deprecationOf);
-    return { ...statusOf(await this.ledger.findStatus()), deprecations };
+    const version = this.ledger.findImageVersion();
+    const [status, held] = await Promise.all([
+      this.ledger.findStatus(),
+      this.cloudReleases?.findLatestRelease() ?? [],
+    ]);
+    const [latestRelease = null] = newerReleasesOf({ version, held });
+    return { ...statusOf(status), deprecations, version: { ...version }, latestRelease };
   }
 
   async listReleases(): Promise<OpsUpgradeReleasePage> {
@@ -196,12 +274,10 @@ export class OpsUpgradeService {
     return runOf(await this.ledger.getRun({ id }));
   }
 
-  async preview({ to }: OpsUpgradePreviewInput): Promise<OpsUpgradePreview> {
-    return previewOf(await this.ledger.findPreview({ to }));
-  }
-
   async listTargets(): Promise<OpsUpgradeTargetSummary[]> {
-    return (await this.ledger.findTargets()).map(targetSummaryOf);
+    return (await this.ledger.findTargets()).map((summary) =>
+      targetSummaryOf({ summary, routes: this.routes }),
+    );
   }
 
   /** Reopens a failed step for the worker's next sweep, its checkpoint kept (D6). */

@@ -54,6 +54,22 @@ export async function buildOrb({ uiRoot }: { uiRoot: string }): Promise<OrbBuild
   return { entry, files };
 }
 
+/** RFC 9110 7.6.1: headers about one connection; each hop sets its own, so none is relayed. */
+const HOP_BY_HOP = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-connection",
+  "transfer-encoding",
+  "te",
+  "trailer",
+  "upgrade",
+]);
+
+/** The headers that describe the message, not the connection it travelled on. */
+function endToEnd(headers: http.IncomingHttpHeaders): http.IncomingHttpHeaders {
+  return Object.fromEntries(Object.entries(headers).filter(([name]) => !HOP_BY_HOP.has(name)));
+}
+
 const isPage = (answer: http.IncomingMessage): boolean =>
   answer.statusCode === 200 &&
   /^text\/html/iu.test(answer.headers["content-type"] ?? "") &&
@@ -104,7 +120,7 @@ function answerPage({
         "transfer-encoding": __,
         etag: ___,
         ...headers
-      } = answer.headers;
+      } = endToEnd(answer.headers);
       response.writeHead(200, { ...headers, "content-length": Buffer.byteLength(body) });
       response.end(body);
     });
@@ -182,12 +198,12 @@ function proxy({
     port: target,
     method: request.method,
     path: request.url ?? "/",
-    headers: request.headers,
+    headers: endToEnd(request.headers),
     agent,
   };
   const upstream = http.request(options, (answer) => {
     if (isPage(answer)) return answerPage({ ...page, answer, response });
-    response.writeHead(answer.statusCode ?? 502, answer.headers);
+    response.writeHead(answer.statusCode ?? 502, endToEnd(answer.headers));
     answer.pipe(response);
   });
   upstream.on("error", () => response.destroy());

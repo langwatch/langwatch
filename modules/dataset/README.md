@@ -19,15 +19,15 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Kind            | Name                        | Declared at                                                                     |
 | --------------- | --------------------------- | ------------------------------------------------------------------------------- |
 | Postgres table  | `BatchEvaluation`           | `process/src/repositories/prisma/prisma.batch-evaluation.repository.ts:19`      |
-| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:61`       |
-| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:61`       |
+| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:62`       |
+| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-content.repository.ts:62`       |
 | Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
 | Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
 | Postgres table  | `BatchEvaluation`           | `process/src/repositories/prisma/prisma.dataset-count.repository.ts:8`          |
 | Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-record-content.repository.ts:8` |
 | Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset-record.repository.ts:19`        |
-| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset.repository.ts:27`               |
-| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset.repository.ts:27`               |
+| Postgres table  | `Dataset`                   | `process/src/repositories/prisma/prisma.dataset.repository.ts:28`               |
+| Postgres table  | `DatasetRecord`             | `process/src/repositories/prisma/prisma.dataset.repository.ts:28`               |
 | Stores required | prisma, objectStorage       | `process/src/repositories/prisma/prisma.dataset.repositories.ts:25`             |
 | Config          | `publicBaseUrl` (BASE_HOST) | `contract/src/dataset.config.ts:5`                                              |
 

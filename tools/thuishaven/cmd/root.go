@@ -63,6 +63,42 @@ func tsgoLimits(ram uint64) domain.TsgoLimits {
 	return l
 }
 
+// browserLimits resolves the headless browser governor's knobs with env
+// overrides; 0 disables a rule, HAVEN_BROWSER_SHELL_MAX_RSS_MB=0 the governor.
+func browserLimits() domain.BrowserLimits {
+	l := domain.DefaultBrowserLimits()
+	if mb := envInt("HAVEN_BROWSER_SHELL_MAX_RSS_MB", -1); mb >= 0 {
+		l.MaxRSS = int64(mb) << 20
+	}
+	if pct := envInt("HAVEN_BROWSER_SHELL_MAX_CPU_PCT", -1); pct >= 0 {
+		l.MaxCPU = float64(pct)
+	}
+	l.CPUSustain = envDuration("HAVEN_BROWSER_SHELL_CPU_SUSTAIN", l.CPUSustain)
+	l.MaxAge = envDuration("HAVEN_BROWSER_SHELL_MAX_AGE", l.MaxAge)
+	l.IdleTTL = envDuration("HAVEN_BROWSER_SHELL_IDLE_TTL", l.IdleTTL)
+	return l
+}
+
+// browserOwnerRoots is the main checkout holding root: a worktree under
+// .worktrees resolves to its main checkout, whose prefix covers every worktree.
+func browserOwnerRoots(root string) []string {
+	if root == "" {
+		return nil
+	}
+	if main, _, found := strings.Cut(root, "/.worktrees/"); found {
+		root = main
+	}
+	return []string{root}
+}
+
+// orphanLimits are the orphan sweep's defaults, each overridable (0 disables).
+func orphanLimits() domain.OrphanLimits {
+	l := domain.DefaultOrphanLimits()
+	l.Grace = envDuration("HAVEN_ORPHAN_GRACE", l.Grace)
+	l.TypecheckMaxAge = envDuration("HAVEN_TYPECHECK_MAX_AGE", l.TypecheckMaxAge)
+	return l
+}
+
 // Root parses the global flags, wires the object graph, and dispatches. The three
 // steps are separate so none of them grows the others: meta commands answer
 // before anything is built, wire() is the only place adapters are constructed,
@@ -97,6 +133,13 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	if len(args) > 0 {
 		name = args[0]
 	}
+	// The slot wraps every check start; it needs no worktree, so no git and no wiring.
+	if isSlotCommand(args) {
+		if _, _, err := resolveTarget(name, stackFlag, "", isAgent); err != nil {
+			return err
+		}
+		return (deps{isAgent: isAgent}).dispatch(ctx, args[0], args[1:])
+	}
 	cwd, _ := os.Getwd()
 	worktree, target, err := resolveTarget(name, stackFlag, gitTopLevel(cwd), isAgent)
 	if err != nil {
@@ -109,6 +152,12 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		return printBareHaven(d)
 	}
 	return d.dispatch(ctx, args[0], args[1:])
+}
+
+// isSlotCommand reports `haven machine slot …`, the one machine-wide command on
+// the start path of every check, which runs against no stack.
+func isSlotCommand(args []string) bool {
+	return len(args) > 1 && args[0] == "machine" && args[1] == "slot"
 }
 
 // runMetaCommand answers the subcommands that need no wiring at all, so `haven
@@ -214,9 +263,14 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 		// old default) meant a dozen dead stacks' databases sat on the shared
 		// ClickHouse's small memory cap before the first prune ever fired.
 		DBIdleTTL:               envDuration("HAVEN_DB_TTL", 4*24*time.Hour),
+		ClickHousePressure:      app.DefaultClickHousePressure(),
 		TestContainerTTL:        envDuration("HAVEN_TESTCONTAINER_TTL", domain.DefaultTestContainerTTL),
 		RunningTestContainerTTL: envDuration("HAVEN_TESTCONTAINER_RUNNING_TTL", domain.DefaultRunningTestContainerTTL),
 		Tsgo:                    tsgoLimits(ram),
+		Browser:                 browserLimits(),
+		BrowserOwnerRoots:       browserOwnerRoots(trustedRepoRoot()),
+		Orphans:                 orphanLimits(),
+		Duplicates:              app.DuplicateLimitsFromEnv(devEnv),
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),
@@ -288,17 +342,17 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 				Start:   orch.StartWorktreeStack,
 				Down:    orch.DownStack,
 				Destroy: orch.DestroyStack,
-				// Add one service to a live stack; reset a stack's databases.
-				StartService:   orch.StartStackService,
-				ResetDatabases: orch.ResetStackDatabases,
-				Seed:           orch.SeedStack,
-				SeedReport:     orch.SeedReport,
+				// Add one service to a live stack.
+				StartService: orch.StartStackService,
+				Seed:         orch.SeedStack,
+				SeedReport:   orch.SeedReport,
 				// The up's hand-over: the daemon is the one place keepers start.
 				StartKeeper: orch.StartKeeper,
 			},
-			Limits:   dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
-			CLIReads: dashboardCLIReads(orch),
-			Browser:  dashboardBrowser(),
+			Limits:          dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
+			MachineSettings: dashboard.MachineSettings{Report: orch.MachineSettingsView, Set: orch.SetMachineSetting},
+			CLIReads:        dashboardCLIReads(orch),
+			Browser:         dashboardBrowser(),
 		}),
 		params:   app.UpParams{WorktreeDir: worktree, Branch: gitBranch(worktree), ExplicitSlug: explicitSlug(target), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
@@ -1069,9 +1123,34 @@ func resolveKnobSource(key string, layers knobLayers) (string, string, bool) {
 func dotenvKnobs() map[string]string {
 	dotenvOnce.Do(func() {
 		cwd, _ := os.Getwd()
-		dotenvVars = domain.LoadDotenv(gitTopLevel(cwd))
+		dotenvVars = domain.LoadDotenv(dotenvRoot(cwd))
 	})
 	return dotenvVars
+}
+
+// dotenvRoot finds the workspace root .env lives in without spawning git: the
+// nearest ancestor holding a .git entry (a linked worktree's is a file).
+// Outside any checkout, git itself answers.
+func dotenvRoot(dir string) string {
+	if root, ok := nearestGitAncestor(dir); ok {
+		return root
+	}
+	return gitTopLevel(dir)
+}
+
+// nearestGitAncestor walks up from dir to the first directory with a .git entry.
+func nearestGitAncestor(dir string) (string, bool) {
+	for dir != "" {
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+	return "", false
 }
 
 var (

@@ -27,7 +27,7 @@ function lastFinishedUpgrade({ runs }: { runs: readonly RollbackLedgerRun[] }) {
 /**
  * Whether a step is newer than the image a row names: a release build lacks a later release's
  * steps and every unreleased one; a `git-<sha>` build only the unreleased ones. A step retired
- * below the floor is never newer, so it is never reopened.
+ * at or below the image's release is never reopened.
  */
 function newerThanImage({ step, row }: { step: RollbackLedgerStep; row: RollbackRosterEntry }) {
   if (step.release === null) return true;

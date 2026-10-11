@@ -4,7 +4,15 @@
     "module": "ESNext",
     "lib": ["ES2023"],
     "types": ["node"],
-    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"]
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    }
+  ]
 }

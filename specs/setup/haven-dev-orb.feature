@@ -28,6 +28,14 @@ Feature: Haven dev orb
     And a page is served as it is when the orb could not be built
 
   @integration
+  Scenario: the api's port relays no connection headers
+    Given haven runs the stack "feat-x" with the UI built
+    And the api answers an event stream with "Connection: keep-alive"
+    When a caller sends that request with "Connection: close", then another
+    Then the api's port keeps its own connection to the api
+    And both requests are answered, with none refused by the api's parser
+
+  @integration
   Scenario: absent from a built-UI stack haven does not run
     Given the dev runtime serves the api without haven's stack slug, or beside the dev server
     Then the api's port adds no orb

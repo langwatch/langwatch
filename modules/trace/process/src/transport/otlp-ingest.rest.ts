@@ -27,13 +27,9 @@ import {
   readOtlpBody,
   OTLP_REFUSED_MEDIA_TYPES,
 } from "@langwatch/otlp";
+import { otlpIngestCredentialSchema, type OtlpIngestCredential } from "@langwatch/otlp/door";
 import { resolveRequestBound } from "@langwatch/plans";
-import {
-  otlpIngestCredentialSchema,
-  TraceApi,
-  type OtlpIngestCredential,
-  type TraceOtlpIngestApi,
-} from "@langwatch/trace-contract";
+import { TraceApi, type TraceOtlpIngestApi } from "@langwatch/trace-contract";
 import { SpanKind, type Span } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

@@ -74,6 +74,40 @@ describe("explainHandledError", () => {
       expect(description).toBe('There\'s no field called "trace.durationn".');
     });
 
+    /** @scenario "An Auth0 misconfiguration names the setting an administrator must change" */
+    it.each([
+      ["insufficient_scope", "enable the update:users scope"],
+      ["password_grant_not_enabled", "Advanced Settings → Grant Types"],
+      ["not_configured", "Set AUTH0_ISSUER"],
+      ["failed", "check the sign-in configuration"],
+      [42, "check the sign-in configuration"],
+    ])("names the Auth0 fix for reason %s", (reason, fix) => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "federated_password_change_unavailable",
+          meta: { reason },
+          httpStatus: 502,
+          fault: "platform",
+        }),
+      );
+
+      expect(title).toBe("We couldn't change your password");
+      expect(description).toContain(fix);
+    });
+
+    /** @scenario "meta is read only where the client knows its shape" */
+    it("titles a refused test fire as not sent, its reason naming the fix", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "test_fire_unavailable",
+          meta: { channel: "slack", reason: "Slack no longer accepts this webhook." },
+        }),
+      );
+
+      expect(title).toBe("Test message not sent");
+      expect(description).toBe("Slack no longer accepts this webhook.");
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("falls back cleanly when the declared meta is absent", () => {
       const { title, description } = explainHandledError(

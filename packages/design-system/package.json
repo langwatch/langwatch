@@ -511,6 +511,10 @@
       "types": "./dist/components/layout/resource-tile.d.ts",
       "default": "./src/components/layout/resource-tile.tsx"
     },
+    "./scroll-fade": {
+      "types": "./dist/components/layout/scroll-fade.d.ts",
+      "default": "./src/components/layout/scroll-fade.tsx"
+    },
     "./section-navigation-frame": {
       "types": "./dist/components/layout/section-navigation-frame.d.ts",
       "default": "./src/components/layout/section-navigation-frame.tsx"
@@ -599,7 +603,7 @@
   "scripts": {
     "storybook": "storybook dev --port 6006",
     "build:storybook": "storybook build",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },

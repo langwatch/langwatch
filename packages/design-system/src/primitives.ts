@@ -8,7 +8,6 @@ export {
   Alert,
   Badge,
   Box,
-  Card,
   Center,
   chakra,
   Circle,
@@ -75,7 +74,6 @@ export type {
   AvatarRootProps,
   BoxProps,
   ButtonProps,
-  CardRootProps,
   CheckboxGroupProps,
   CollectionItem,
   ContainerProps,
@@ -95,3 +93,4 @@ export type {
   Tokens,
 } from "@chakra-ui/react";
 export { keyframes } from "@emotion/react";
+export { CardParts as Card, type CardRootProps } from "./components/layout/card-parts.tsx";

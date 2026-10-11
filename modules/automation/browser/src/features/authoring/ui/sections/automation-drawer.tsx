@@ -1429,9 +1429,8 @@ function DrawerBodyContent({
 
 /**
  * The footer. Mid-wizard it moves between steps: an edit returns to the overview, a create walks
- * forward. On the overview Send test sits beside Save: once a channel is set up, fire the real
- * message before committing. Save stays pressable while incomplete: a click toasts what is missing,
- * and the footer note says the same without a hover.
+ * forward. On the overview Send test sits beside Save once a channel is set up. Save stays
+ * pressable while incomplete: a click toasts what is missing.
  */
 function footerOf({
   step,

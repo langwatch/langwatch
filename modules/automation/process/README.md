@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable automation capability shared by transports and process peers.
 
-Peers call these through the token, declared at `../contract/src/automation.api.ts:72`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/automation.api.ts:78`; nothing else in this package is public.
 
 #### `getAllForProject`
 
@@ -418,6 +418,14 @@ The operator-facing suppression list, audited because it reads addresses.
 
 ```typescript
 listSuppressions(input: { projectId: string; actorId: string }): Promise<EmailSuppressionRow[]>;
+```
+
+#### `listSuppressionsPage`
+
+One audited page of the same list, newest first; `nextCursor` is null on the last page.
+
+```typescript
+listSuppressionsPage(input: EmailSuppressionPageInput & { actorId: string }): Promise<EmailSuppressionPage>;
 ```
 
 #### `removeSuppression`
@@ -886,18 +894,19 @@ type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:87
 
 ### `emailSuppression`
 
-Contract `../contract/src/email-suppression.trpc.ts:30`, router `src/transport/email-suppression.trpc.ts:22`.
+Contract `../contract/src/email-suppression.trpc.ts:32`, router `src/transport/email-suppression.trpc.ts:22`.
 
-| Procedure                                  | Kind     | Gate                                                                                                                                                                            | Input                           | Output                               |
-| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------ |
-| `emailSuppression.resolveUnsubscribeToken` | query    | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `resolveUnsubscribeInputSchema` | `unsubscribeViewSchema`              |
-| `emailSuppression.confirmUnsubscribe`      | mutation | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `confirmUnsubscribeInputSchema` | `emailSuppressionAcknowledgedSchema` |
-| `emailSuppression.getAll`                  | query    | Permission `triggers:view`                                                                                                                                                      | `suppressionProjectScopeSchema` | inline                               |
-| `emailSuppression.remove`                  | mutation | Permission `triggers:manage`                                                                                                                                                    | `removeSuppressionInputSchema`  | `emailSuppressionAcknowledgedSchema` |
+| Procedure                                  | Kind     | Gate                                                                                                                                                                            | Input                             | Output                               |
+| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------ |
+| `emailSuppression.resolveUnsubscribeToken` | query    | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `resolveUnsubscribeInputSchema`   | `unsubscribeViewSchema`              |
+| `emailSuppression.confirmUnsubscribe`      | mutation | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `confirmUnsubscribeInputSchema`   | `emailSuppressionAcknowledgedSchema` |
+| `emailSuppression.getAll`                  | query    | Permission `triggers:view`                                                                                                                                                      | `suppressionProjectScopeSchema`   | inline                               |
+| `emailSuppression.getPage`                 | query    | Permission `triggers:view`                                                                                                                                                      | `emailSuppressionPageInputSchema` | `emailSuppressionPageSchema`         |
+| `emailSuppression.remove`                  | mutation | Permission `triggers:manage`                                                                                                                                                    | `removeSuppressionInputSchema`    | `emailSuppressionAcknowledgedSchema` |
 
 ```typescript
 // emailSuppression.resolveUnsubscribeToken
-// Input: resolveUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:16
+// Input: resolveUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:18
 interface Input {
   token: string;
 }
@@ -909,22 +918,22 @@ interface Output {
 }
 
 // emailSuppression.confirmUnsubscribe
-// Input: confirmUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:19
+// Input: confirmUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:21
 interface Input {
   token: string;
   scope: "trigger" | "project";
 }
-// Output: emailSuppressionAcknowledgedSchema, ../contract/src/automation.ts:73
+// Output: emailSuppressionAcknowledgedSchema, ../contract/src/automation.ts:114
 interface Output {
   ok: boolean;
 }
 
 // emailSuppression.getAll
-// Input: suppressionProjectScopeSchema, ../contract/src/email-suppression.trpc.ts:25
+// Input: suppressionProjectScopeSchema, ../contract/src/email-suppression.trpc.ts:27
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/email-suppression.trpc.ts:41
+// Output: inline, ../contract/src/email-suppression.trpc.ts:43
 type Output = {
   id: string;
   email: string;
@@ -934,13 +943,25 @@ type Output = {
   triggerName: string | null;
 }[];
 
+// emailSuppression.getPage
+// Input: emailSuppressionPageInputSchema, ../contract/src/automation.ts:93
+interface Input {
+  projectId: string;
+  limit?: number;
+  cursor?: {
+    createdAt: unknown;
+    id: string;
+  } | null;
+}
+type Output = z.infer<typeof emailSuppressionPageSchema>; // ../contract/src/automation.ts:105
+
 // emailSuppression.remove
-// Input: removeSuppressionInputSchema, ../contract/src/email-suppression.trpc.ts:28
+// Input: removeSuppressionInputSchema, ../contract/src/email-suppression.trpc.ts:30
 interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof emailSuppressionAcknowledgedSchema>; // ../contract/src/automation.ts:73
+type Output = z.infer<typeof emailSuppressionAcknowledgedSchema>; // ../contract/src/automation.ts:114
 ```
 
 ## Sockets
@@ -988,7 +1009,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                        | Environment variable                   | Declared at                               |
 | ------ | --------------------------- | -------------------------------------- | ----------------------------------------- |
-| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:410`           |
+| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:428`           |
 | config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:18` |
 | config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:19` |
 | config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:20` |

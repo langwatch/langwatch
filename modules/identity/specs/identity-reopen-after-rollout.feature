@@ -15,3 +15,12 @@ Feature: Unproven accounts an older image finalized are reopened once it is gone
     When the after-rollout step runs
     Then it reports no account reopened
     And a dry run reports no account it would reopen
+
+  # Only an account carrying a sign-in method set before the proof is reopened: one
+  # carrying only its address has nothing for adoption to wipe (Alex, 2026-10-11).
+  @unit
+  Scenario: The reopen sweep leaves an unproven account carrying only its address finalized
+    Given an unproven account carrying a password and one carrying only its address are finalized
+    When the reopen sweep runs
+    Then the one carrying a password is reopened
+    And the one carrying only its address stays finalized

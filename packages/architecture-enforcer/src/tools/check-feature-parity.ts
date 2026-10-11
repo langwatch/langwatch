@@ -165,6 +165,8 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // scans this directory for `.bats` files; this is the `.test.mjs`
   // counterpart. Without it, dev-tooling scenarios could only ever be @unimplemented.
   "dev/scripts/__tests__",
+  // dev/nx plugins' own logic is tested with `node --test` beside them.
+  "dev/nx/__tests__",
   "dev/scripts/upgrade-rehearsal/__tests__",
 ];
 
@@ -355,7 +357,6 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "modules/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
   "specs/ai-gateway/budgets-principal-cascade.feature",
@@ -632,7 +633,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/editable-trace-name-alignment.feature",
   "specs/traces-v2/facet-perspectives.feature",
   "modules/trace/specs/flame-graph.feature",
-  "specs/traces-v2/grouping-engine.feature",
   "specs/traces-v2/io-pretty-markdown.feature",
   "specs/traces-v2/lens-preset-groups.feature",
   "specs/traces-v2/light-mode-contrast.feature",
@@ -678,6 +678,9 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the grouping relabel scenario was bound.
+  // The other grouping scenarios describe the engine and stay untagged.
+  "specs/traces-v2/grouping-engine.feature",
   // Reason: left LEGACY_INERT when sub-cent costs stopped reading as zero;
   // the "Cost formatting" rule is enforced. The pills, duration, token and
   // span tab rules are described here and stay untagged.

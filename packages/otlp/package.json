@@ -19,14 +19,19 @@
     "./door": {
       "types": "./dist/door.d.ts",
       "default": "./src/door.ts"
+    },
+    "./trace-request": {
+      "types": "./dist/trace-request.d.ts",
+      "default": "./src/trace-request.ts"
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/otlp-transformer": "catalog:",

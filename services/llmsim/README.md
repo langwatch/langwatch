@@ -26,6 +26,9 @@ Azure's `/openai/deployments/{d}/chat/completions` all answer.
 | `/messages/count_tokens` | Anthropic token count                                                           |
 | `/embeddings`            | OpenAI embeddings, float or base64, at `dimensions` (default 1536)              |
 | `GET /models`            | model list, in Anthropic's shape when `anthropic-version` is sent               |
+| `:generateContent`       | Gemini (`/v1beta/models/<m>`) or Vertex (`/projects/.../models/<m>`), JSON      |
+| `:streamGenerateContent` | the same, as SSE with `?alt=sse` or else a JSON array of chunks                 |
+| `/model/<id>/converse`   | Bedrock Converse; `/converse-stream` answers an AWS event stream                |
 
 The OpenAI Responses API is not served: the gateway turns a Responses call to
 an OpenAI provider with a base URL into chat completions before it leaves.

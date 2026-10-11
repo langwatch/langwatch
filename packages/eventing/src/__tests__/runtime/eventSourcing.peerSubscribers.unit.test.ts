@@ -227,6 +227,7 @@ describe("a peer subscriber", () => {
           tenantId: "project-1",
           aggregateId: "owner-3",
           occurredAt: 1,
+          createdAt: 1,
           eventId: "event-owner-3",
         },
       );

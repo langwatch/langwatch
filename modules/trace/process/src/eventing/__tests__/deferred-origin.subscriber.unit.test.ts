@@ -153,11 +153,14 @@ describe("the deferredOriginResolution subscriber on trace_processing", () => {
     it("asks for the trace's deferred origin resolution", async () => {
       const { definition, resolveDeferredOrigin } = registration();
 
-      await definition.handle(spanEvent(), dispatchContext(foldState()));
+      const event = spanEvent();
+
+      await definition.handle(event, dispatchContext(foldState()));
 
       expect(resolveDeferredOrigin).toHaveBeenCalledWith({
         tenantId: "tenant-1",
         traceId: "trace-1",
+        occurredAtMs: event.occurredAt,
       });
     });
   });

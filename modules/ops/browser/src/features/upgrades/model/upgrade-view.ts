@@ -3,7 +3,6 @@
  * them. Nothing here restates a shape.
  */
 import type {
-  OpsUpgradePreview,
   OpsUpgradeRelease,
   OpsUpgradeRun,
   OpsUpgradeRunPhase,
@@ -25,7 +24,9 @@ export type UpgradeStepView = OpsUpgradeStep;
 export type UpgradeTargetView = OpsUpgradeTarget;
 export type UpgradeStepDetailView = OpsUpgradeStepDetail;
 export type UpgradeRunDetailView = OpsUpgradeRun;
-/** W5: the plan narrowed to a target release, or the reader's refusal, and the preflight rows. */
-export type UpgradePreviewView = OpsUpgradePreview;
+/** What the running image is: a release, or a development build (UPGRADE-UI-2). */
+export type UpgradeVersionView = OpsUpgradeStatus["version"];
+/** The newest release cloud's usage-report reply names; null when it names none. */
+export type UpgradeLatestReleaseView = OpsUpgradeStatus["latestRelease"];
 /** W7: one ClickHouse target's latest done version, outstanding steps and latest error. */
 export type UpgradeTargetSummaryView = OpsUpgradeTargetSummary;

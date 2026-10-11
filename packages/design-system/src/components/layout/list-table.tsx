@@ -24,6 +24,7 @@ import {
 } from "./list-table-parts/pinned.tsx";
 import { RowAction } from "./list-table-parts/row-action.tsx";
 import { SortHeader } from "./list-table-parts/sort-header.tsx";
+import { ScrollEdgeFade, useScrollEdges } from "./scroll-fade.tsx";
 
 export type { ColumnWidth } from "./list-table-parts/shared.ts";
 export type { ListTableEmptyRowProps } from "./list-table-parts/empty-row.tsx";
@@ -186,8 +187,61 @@ function ListTableRoot({
   loadingLabel?: string;
 }): ReactNode {
   const embedded = variant === "embedded";
+  const scroller = useScrollEdges();
+  // Left alone, a table wider than its card scrolls sideways inside it behind an edge fade. A
+  // caller that sets `overflow` itself, or picks a `scroll` mode, owns the scrolling.
+  const ownsScroll = scroll === undefined && containerProps?.overflow === undefined;
+  const table = (
+    <Table.Root
+      borderRadius="inherit"
+      variant="line"
+      aria-busy={loading || undefined}
+      css={{
+        "& thead th": {
+          ...HEADER,
+          height: HEADER_HEIGHT[density],
+          ...(headerLayout === "content" ? CONTENT_HEADER : {}),
+          ...(stickyHeader ? STICKY_HEADER : {}),
+        },
+        ...(density === "compact" ? COMPACT_CELLS : {}),
+        ...(rowHeight === undefined
+          ? {}
+          : {
+              "& tbody tr:not([data-span-row]):not([data-padding-row]) td": {
+                height: `${rowHeight}px`,
+                boxSizing: "border-box",
+                paddingY: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              },
+            }),
+        // Quiet row rules in the softer separator token.
+        "& th, & td": { borderColor: "border.muted" },
+        ...(columnRules
+          ? {
+              "& th:not(:last-of-type), & td:not(:last-of-type)": {
+                borderRightWidth: "1px",
+                borderRightColor: "border.muted",
+              },
+            }
+          : {}),
+        // 16px outer columns so content does not hug the border; inside a card the
+        // card's own padding lines up with them.
+        "& th:first-of-type, & td:first-of-type": { paddingLeft: "4" },
+        "& th:last-of-type, & td:last-of-type": { paddingRight: "4" },
+        // A spanning cell is flush: what it holds pads itself.
+        "& td[data-span-cell]": { padding: "0" },
+        ...PINNED,
+      }}
+      {...props}
+    >
+      {children}
+    </Table.Root>
+  );
   return (
     <Box
+      position="relative"
       borderWidth={embedded ? 0 : "1px"}
       bg={embedded ? "transparent" : "bg.card"}
       borderColor="border.card"
@@ -200,52 +254,23 @@ function ListTableRoot({
       {...containerProps}
     >
       <VisuallyHidden as="output">{loading ? loadingLabel : ""}</VisuallyHidden>
-      <Table.Root
-        borderRadius="inherit"
-        variant="line"
-        aria-busy={loading || undefined}
-        css={{
-          "& thead th": {
-            ...HEADER,
-            height: HEADER_HEIGHT[density],
-            ...(headerLayout === "content" ? CONTENT_HEADER : {}),
-            ...(stickyHeader ? STICKY_HEADER : {}),
-          },
-          ...(density === "compact" ? COMPACT_CELLS : {}),
-          ...(rowHeight === undefined
-            ? {}
-            : {
-                "& tbody tr:not([data-span-row]):not([data-padding-row]) td": {
-                  height: `${rowHeight}px`,
-                  boxSizing: "border-box",
-                  paddingY: 0,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                },
-              }),
-          // Quiet row rules in the softer separator token.
-          "& th, & td": { borderColor: "border.muted" },
-          ...(columnRules
-            ? {
-                "& th:not(:last-of-type), & td:not(:last-of-type)": {
-                  borderRightWidth: "1px",
-                  borderRightColor: "border.muted",
-                },
-              }
-            : {}),
-          // 16px outer columns so content does not hug the border; inside a card the
-          // card's own padding lines up with them.
-          "& th:first-of-type, & td:first-of-type": { paddingLeft: "4" },
-          "& th:last-of-type, & td:last-of-type": { paddingRight: "4" },
-          // A spanning cell is flush: what it holds pads itself.
-          "& td[data-span-cell]": { padding: "0" },
-          ...PINNED,
-        }}
-        {...props}
-      >
-        {children}
-      </Table.Root>
+      {ownsScroll ? (
+        <Box ref={scroller.ref} data-list-table-scroller overflowX="auto" borderRadius="inherit">
+          {table}
+        </Box>
+      ) : (
+        table
+      )}
+      <ScrollEdgeFade
+        edge="start"
+        visible={ownsScroll && scroller.start}
+        color={embedded ? undefined : "bg.card"}
+      />
+      <ScrollEdgeFade
+        edge="end"
+        visible={ownsScroll && scroller.end}
+        color={embedded ? undefined : "bg.card"}
+      />
     </Box>
   );
 }

@@ -7,7 +7,6 @@ import { z } from "zod";
 
 import {
   compareReleases,
-  LTS_FLOOR_FILE,
   manifestStepSchema,
   ownerFromTables,
   parseManifests,
@@ -137,9 +136,7 @@ const tableOwners = new Map(
 const out = resolve(options.out ?? RELEASES_DIRECTORY);
 const earlier = parseManifests({
   files: (existsSync(out) ? readdirSync(out) : [])
-    .filter(
-      (name) => name.endsWith(".json") && name !== LTS_FLOOR_FILE && name !== `${release}.json`,
-    )
+    .filter((name) => name.endsWith(".json") && name !== `${release}.json`)
     .map((name) => ({ name, text: readFileSync(join(out, name), "utf8") })),
 }).filter((manifest) => compareReleases({ left: manifest.release, right: release }) < 0);
 

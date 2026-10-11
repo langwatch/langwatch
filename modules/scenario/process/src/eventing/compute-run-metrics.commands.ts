@@ -111,6 +111,7 @@ class ComputeRunMetricsAdapter implements CommandHandler<
       const summaryRead = await this.deps.traceSummaryStore.get(traceId, {
         tenantId,
         aggregateId: traceId,
+        occurredAtMs: data.occurredAt,
       });
 
       if (summaryRead.kind === "empty") {

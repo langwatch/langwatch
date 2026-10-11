@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -121,6 +122,12 @@ func (s Stack) OverlayEnv() []string {
 		// shipped preset loads data old enough to need it (see db.go).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
+	// The gateway spools unsent spend under os.TempDir() by default, which every stack's
+	// gateway on this machine shares: one stack would ship another's spend to its own
+	// control plane. Each stack spools beside its own run state instead.
+	if s.WorktreeDir != "" {
+		env = append(env, "LW_GATEWAY_SPEND_SPOOL_DIR="+GatewaySpendSpoolDir(s.WorktreeDir, s.Slug))
+	}
 	// The IdP simulator is an opt-in lane; only a worktree actually running (or
 	// falling back to) one gets the pointer, so nothing reads a dead URL.
 	if idp := s.svc("idp"); idp.Port != 0 && idp.URL != "" {
@@ -235,8 +242,9 @@ func (s Stack) OverlayEnv() []string {
 	// database on it. The app connects straight to loopback (HTTP, no proxy) at
 	// the per-slug database, so migration counts are always this worktree's own.
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
+		user, password := s.ClickHouseLogin()
 		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://%s:%s@127.0.0.1:%d/%s",
-			ClickHouseUser, ClickHousePassword, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
+			user, password, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
 		// Backup-status gauges query system.backup_log, which only exists once
 		// backups are configured, a production concern. The app collects them by
 		// default (unset must not disarm the production alerts that read them), so
@@ -306,15 +314,8 @@ func (s Stack) observabilityEnv() []string {
 		"OTEL_METRICS_EXPORTER=otlp",
 		"LOG_OTEL_LEVEL=debug",
 		"OTEL_RESOURCE_ATTRIBUTES=" + ObservabilityWorktreeAttr + "=" + s.Slug,
-		// Browser telemetry (ADR-058). Tied to the collector rather than flagged
-		// separately: the app proxies the browser's OTLP to the same endpoint, so
-		// without a collector the exporter would post to a route with nowhere to
-		// forward to. The frontend half of a trace is exactly what a developer
-		// debugging their own worktree wants, so it is on whenever the stack is.
-		"RUM_ENABLED=true",
-		// Named explicitly so the rum module does not fall back to the deprecated OTEL endpoint and warn.
-		"RUM_COLLECTOR_ENDPOINT=" + otlp,
 	}
+	env = append(env, RUMEnv(os.LookupEnv, otlp)...)
 	// The Grafana base URL, so the app can build clickable trace/log deep links.
 	// The proxied hostname when the portless proxy carries the route (stable,
 	// matches every other haven surface); loopback otherwise — either way the
@@ -339,6 +340,25 @@ func (s Stack) observabilityEnv() []string {
 	// Quiet the console to warn+ (the full stream is in Grafana). Empty = opt-out.
 	if s.ObservabilityConsoleLevel != "" {
 		env = append(env, "LOG_CONSOLE_LEVEL="+s.ObservabilityConsoleLevel)
+	}
+	return env
+}
+
+// RUMEnv turns browser telemetry (ADR-058) on with the collector, which the
+// app's OTLP proxy forwards to. A key the operator already exports when running
+// `haven up` (lookup, even set empty) is left to them, so a tester can boot
+// with RUM off or pointed elsewhere; haven never set RUM_SAMPLE_RATIO.
+func RUMEnv(lookup func(string) (string, bool), otlp string) []string {
+	var env []string
+	for _, kv := range []string{
+		"RUM_ENABLED=true",
+		// Named so the rum module does not fall back to the deprecated OTEL endpoint and warn.
+		"RUM_COLLECTOR_ENDPOINT=" + otlp,
+	} {
+		key, _, _ := strings.Cut(kv, "=")
+		if _, isSet := lookup(key); !isSet {
+			env = append(env, kv)
+		}
 	}
 	return env
 }
@@ -580,6 +600,10 @@ func LLMProviderEnv(resolved map[string]string, port int) []string {
 	if resolved["ALLOWED_PROXY_HOSTS"] == "" {
 		env = append(env, "ALLOWED_PROXY_HOSTS=127.0.0.1")
 	}
+	// The seed adds Gemini and Vertex rows at llmsim unless .env names a real account.
+	if resolved["HAVEN_SEED_LLMSIM_BASE_URL"] == "" {
+		env = append(env, "HAVEN_SEED_LLMSIM_BASE_URL="+base)
+	}
 	for _, p := range []struct{ key, url, value string }{
 		{"OPENAI_API_KEY", "OPENAI_BASE_URL", base + "/v1"},
 		{"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", base},
@@ -641,4 +665,13 @@ func LaneDatabaseEnv(env []string, lane string) []string {
 		out[i] = "DATABASE_URL=" + u.String()
 	}
 	return out
+}
+
+// ClickHouseLogin is the login the stack's app connects as: its own once haven
+// provisioned one, the shared admin login before that.
+func (s Stack) ClickHouseLogin() (user, password string) {
+	if s.ClickHouseUser != "" && s.ClickHousePassword != "" {
+		return s.ClickHouseUser, s.ClickHousePassword
+	}
+	return ClickHouseUser, ClickHousePassword
 }

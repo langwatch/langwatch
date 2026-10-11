@@ -6,7 +6,7 @@ The server half of [entitlement](../README.md). What a plan allows, and what has
 
 ## Installation
 
-`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing).withMigrations(…)`, `src/entitlement.module.ts:24`.
+`defineProcessModule("entitlement").withRepositories(entitlementRepositories).withApi(EntitlementModule).withTransports(planTrpcTransport, usageLimitsTrpcTransport, organizationSpendTrpcTransport).withEventing(entitlementUsageWarningEventing).withEventing(usageEventing)`, `src/entitlement.module.ts:17`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -151,20 +151,21 @@ Declared at `src/eventing/entitlement-usage-warning.pipeline.ts:31`.
 
 ### Pipeline `entitlement` (aggregate `entitlement_organization`)
 
-Declared at `src/eventing/usage.pipeline.ts:80`. Events: `monthCountedEventSchema`, `limitReachedEventSchema`, `limitClearedEventSchema`, `usageThresholdCrossedEventSchema`.
+Declared at `src/eventing/usage.pipeline.ts:85`. Events: `monthCountedEventSchema`, `limitReachedEventSchema`, `limitClearedEventSchema`, `usageThresholdCrossedEventSchema`.
 
-The chain builds early when `!billableEventsMeter` (`src/eventing/usage.pipeline.ts:126`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
+The chain builds early when `!billableEventsMeter` (`src/eventing/usage.pipeline.ts:132`); the rows built only past that return say so. The caller's arguments decide which role gets which build.
 
-| Kind                  | Name                                                                                           | Handles                                     | Declared at                          | Built                |
-| --------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------ | -------------------- |
-| command               | –                                                                                              | –                                           | `src/eventing/usage.pipeline.ts:108` | always               |
-| command               | `recordLimitDecision`                                                                          | –                                           | `src/eventing/usage.pipeline.ts:120` | always               |
-| command               | `recordUsageWarning`                                                                           | –                                           | `src/eventing/usage.pipeline.ts:121` | always               |
-| process manager       | `refusedOrganizations`                                                                         | intents `countMonth`, `recordLimitDecision` | `src/eventing/usage.pipeline.ts:129` | past the early build |
-| upcasts               | –                                                                                              | –                                           | `src/eventing/usage.pipeline.ts:91`  | always               |
-| peer map projection   | –                                                                                              | –                                           | `src/eventing/usage.pipeline.ts:122` | always               |
-| global map projection | `≈ BillableEventsMeterProjection.create(billableEventsMeter).build()`                          | –                                           | `src/eventing/usage.pipeline.ts:140` | past the early build |
-| lane aliases          | `≈ [ { from: "global:reactor:billingMeterDispatch", to: { jobType: "reactor", lane: "usageMe…` | –                                           | `src/eventing/usage.pipeline.ts:144` | past the early build |
+| Kind                  | Name                                                                                           | Handles                                                               | Declared at                          | Built                |
+| --------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------ | -------------------- |
+| command               | –                                                                                              | –                                                                     | `src/eventing/usage.pipeline.ts:113` | always               |
+| command               | `recordLimitDecision`                                                                          | –                                                                     | `src/eventing/usage.pipeline.ts:125` | always               |
+| command               | `recordUsageWarning`                                                                           | –                                                                     | `src/eventing/usage.pipeline.ts:126` | always               |
+| process manager       | `refusedOrganizations`                                                                         | intents `countMonth`, `recordLimitDecision`                           | `src/eventing/usage.pipeline.ts:135` | past the early build |
+| peer subscriber       | `traceUsageSpan`                                                                               | `lw.obs.trace.span_received` from [trace](../../trace/README.md)      | `src/eventing/usage.pipeline.ts:127` | always               |
+| peer subscriber       | `traceUsageMonthIds`                                                                           | `lw.trace.month_trace_ids_listed` from [trace](../../trace/README.md) | `src/eventing/usage.pipeline.ts:128` | always               |
+| upcasts               | –                                                                                              | –                                                                     | `src/eventing/usage.pipeline.ts:96`  | always               |
+| global map projection | `≈ BillableEventsMeterProjection.create(billableEventsMeter).build()`                          | –                                                                     | `src/eventing/usage.pipeline.ts:146` | past the early build |
+| lane aliases          | `≈ [ { from: "global:reactor:billingMeterDispatch", to: { jobType: "reactor", lane: "usageMe…` | –                                                                     | `src/eventing/usage.pipeline.ts:150` | past the early build |
 
 ## Configuration
 

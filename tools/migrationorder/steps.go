@@ -19,9 +19,6 @@ const ReleasesDirectory = "packages/upgrade/releases"
 // StepRoots are where modules declare their code steps (.withMigrations).
 var StepRoots = []string{"modules", "enterprise/modules"}
 
-// floorManifest is the LTS floor file beside the manifests; it names no steps.
-const floorManifest = "lts-floor.json"
-
 // manifest is the part of a release manifest this check reads.
 type manifest struct {
 	Release string `json:"release"`
@@ -126,7 +123,7 @@ func (r Repo) readManifests(ctx context.Context, ref string, releaseOf map[strin
 		return err
 	}
 	for _, file := range files {
-		if path.Ext(file) != ".json" || file == floorManifest {
+		if path.Ext(file) != ".json" {
 			continue
 		}
 		m, err := r.readManifest(ctx, ref, file)

@@ -12,7 +12,7 @@ Run from the workspace root. `make haven <sub>` forwards to the CLI (`dev/haven.
 ```bash
 haven up --agent -d               # start; bare `haven up` without a TTY never returns and dies with your shell
 haven status --agent              # every stack, service health, shared servers, RAM (--json, --reveal)
-haven down                        # stop this stack, keep databases
+haven down                        # stop this stack, keep databases; never stops the shared portless proxy (only --all does); up starts a missing one
 haven down --all                  # every stack, shared servers, daemon and proxy; --force kills hard
 haven restart sims                # bounce one lane; nothing else restarts (--rebuild for an image)
 haven reload                      # apply changes to a held stack; waits for "reload finished"
@@ -48,7 +48,8 @@ worker are one process: see `dev-runtime`. The `go` lane also hosts the simulato
 `sims` lane runs; `LANGWATCH_DEV_ONE_PROCESS=0` splits both, Go and sims only (`LANGWATCH_GO_ONE_PROCESS` is a
 deprecated alias). The Go lane rebuilds and swaps its child on a Go change
 only under `--watch` or `--hmr`, and `LANGWATCH_GO_WATCH=0` keeps it off; `haven logs <sim>` still reads
-each one. Langy stays its own lane.
+each one. Langy stays its own lane. On the host tier its `langwatch`/`lw` run this checkout's built CLI
+(`sdks/typescript/dist/cli`, shims in `.bin/langwatch-cli`), built on `haven up` when missing.
 
 ```bash
 haven restart api                 # restart the whole lane

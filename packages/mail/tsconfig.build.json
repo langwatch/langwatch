@@ -1,30 +1,40 @@
 {
-  // The emitting half of the package. Node cannot load `.tsx`, so the three
-  // server processes import `dist` while the studio and the tests read `src`.
-  // tsc is the whole build: `rewriteRelativeImportExtensions` turns the `.ts`
-  // and `.tsx` specifiers into `.js`, so no bundler has to learn the shape of
-  // the package and `dist` mirrors `src` file for file.
-  // Declaration preparation uses tsconfig.declarations.json and dist/typecheck;
-  // this config emits the JavaScript used by the server processes.
-  "extends": "./tsconfig.json",
+  "extends": ["./tsconfig.json", "../../tsconfig.emit.json"],
   "compilerOptions": {
-    "noEmit": false,
-    "outDir": "dist",
     "rootDir": "src",
-    "paths": {
-      "@langwatch/mail": ["./src/index.ts"]
-    },
-    "declaration": false,
-    "sourceMap": true,
-    "types": ["node"],
-    // Inside `dist` on purpose: the build clears `dist` first, and an
-    // incremental tsc with its build info elsewhere sees an up-to-date project
-    // and emits nothing into the directory that was just deleted.
-    "tsBuildInfoFile": "dist/.tsbuildinfo",
-
-    "customConditions": [],
-
-    "rewriteRelativeImportExtensions": true
+    "outDir": "dist/typecheck",
+    "tsBuildInfoFile": "dist/typecheck/tsconfig.build.tsbuildinfo"
   },
-  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.test.tsx"]
+  "files": ["./src/index.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    }
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/design-system",
+        "@langwatch/design-system-internal",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

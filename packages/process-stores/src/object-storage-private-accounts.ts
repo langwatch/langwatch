@@ -3,11 +3,12 @@
  * from the stores' secret family as the ClickHouse routes are (ARCHITECTURE.md §7). The JSON holds
  * credentials: an unusable entry is logged by its variable name, never its value.
  */
+import { privateRouteNameOf } from "@langwatch/clickhouse-client";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { z } from "zod";
 
 import { DATAPLANE_S3_ENV_PREFIX } from "./config-owner.ts";
-import type { ObjectStoragePrivateAccount } from "./config.ts";
+import type { MalformedPrivateVariable, ObjectStoragePrivateAccount } from "./config.ts";
 
 const dataplaneS3Schema = z.object({
   endpoint: z.string().min(1, "endpoint must not be empty"),
@@ -31,11 +32,9 @@ export class DuplicatePrivateStorageAccountError extends Error {
   }
 }
 
-/** The label is ignored: the organisation is whatever follows the last `__`. */
-function organizationOf(envVar: string): string {
-  const suffix = envVar.slice(DATAPLANE_S3_ENV_PREFIX.length);
-  const separator = suffix.lastIndexOf("__");
-  return separator >= 0 ? suffix.slice(separator + 2) : suffix;
+/** The organisation is whatever follows the last `__`; the label is what precedes it. */
+function nameOf(envVar: string): { label: string; organizationId: string } {
+  return privateRouteNameOf({ prefix: DATAPLANE_S3_ENV_PREFIX, variable: envVar });
 }
 
 function parsedJson(value: string): unknown {
@@ -53,33 +52,71 @@ export function objectStoragePrivateAccountsOf(options: {
   region?: string;
   logger?: Pick<Logger, "warn">;
 }): readonly ObjectStoragePrivateAccount[] {
+  return objectStoragePrivateFamilyOf(options).accounts;
+}
+
+/** One entry's parsed config, or undefined when it is unusable (warned by its name). */
+function configOf({
+  envVar,
+  value,
+  organizationId,
+  logger,
+}: {
+  envVar: string;
+  value: string;
+  organizationId: string;
+  logger: Pick<Logger, "warn">;
+}): z.infer<typeof dataplaneS3Schema> | undefined {
+  const parsed = value ? parsedJson(value) : undefined;
+  if (parsed === undefined) {
+    logger.warn({ organizationId, envVar }, "Skipping private S3 config: invalid JSON");
+    return undefined;
+  }
+  const result = dataplaneS3Schema.safeParse(parsed);
+  if (!result.success) {
+    const fields = Object.keys(result.error.flatten().fieldErrors);
+    logger.warn({ organizationId, envVar, fields }, "Skipping private S3 config: invalid fields");
+    return undefined;
+  }
+  return result.data;
+}
+
+/** The private accounts, and the variables present but unusable: those are refused. */
+export function objectStoragePrivateFamilyOf(options: {
+  family: ReadonlyMap<string, string>;
+  region?: string;
+  logger?: Pick<Logger, "warn">;
+}): {
+  accounts: readonly ObjectStoragePrivateAccount[];
+  malformed: readonly MalformedPrivateVariable[];
+} {
   const { family, region, logger = storesLogger } = options;
   const accounts = new Map<string, ObjectStoragePrivateAccount>();
+  const malformed = new Map<string, MalformedPrivateVariable>();
 
   for (const [envVar, value] of [...family].toSorted(([left], [right]) =>
     left.localeCompare(right),
   )) {
-    const organizationId = organizationOf(envVar);
-    if (!organizationId || !value) continue;
+    const { label, organizationId } = nameOf(envVar);
+    if (!organizationId) continue;
 
-    const parsed = parsedJson(value);
-    if (parsed === undefined) {
-      logger.warn({ organizationId, envVar }, "Skipping private S3 config: invalid JSON");
-      continue;
-    }
-    const result = dataplaneS3Schema.safeParse(parsed);
-    if (!result.success) {
-      const fields = Object.keys(result.error.flatten().fieldErrors);
-      logger.warn({ organizationId, envVar, fields }, "Skipping private S3 config: invalid fields");
+    const config = configOf({ envVar, value, organizationId, logger });
+    if (config === undefined) {
+      if (!accounts.has(organizationId)) {
+        malformed.set(organizationId, { organizationId, label, variable: envVar });
+      }
       continue;
     }
     if (accounts.has(organizationId)) {
       throw new DuplicatePrivateStorageAccountError(organizationId, envVar);
     }
 
-    const { endpoint, bucket, accessKeyId, secretAccessKey } = result.data;
+    const { endpoint, bucket, accessKeyId, secretAccessKey } = config;
+    malformed.delete(organizationId);
     accounts.set(organizationId, {
       organizationId,
+      label,
+      variable: envVar,
       bucket,
       endpoint,
       ...(region ? { region } : {}),
@@ -88,5 +125,5 @@ export function objectStoragePrivateAccountsOf(options: {
     });
   }
 
-  return [...accounts.values()];
+  return { accounts: [...accounts.values()], malformed: [...malformed.values()] };
 }

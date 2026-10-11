@@ -63,7 +63,8 @@ function Container({
   return (
     <ChakraContainer
       data-page-container
-      maxW={width === "fill" ? "full" : `calc(100vw - ${sidebarWidth}px)`}
+      // A phone has no sidebar beside the page, so the page takes the full width.
+      maxW={width === "fill" ? "full" : { base: "full", md: `calc(100vw - ${sidebarWidth}px)` }}
       paddingX={PAGE_INSET}
       paddingY={3}
       width={named ? undefined : width}
@@ -188,25 +189,27 @@ function Header({
         background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 65%), transparent)"
         backdropFilter="var(--lw-backdrop-blur, blur(16px))"
         {...props}
-        height={described ? "auto" : `pageHeader.${size}`}
+        // A phone wraps the actions under the title instead of squeezing the title.
+        height={described ? "auto" : { base: `pageHeader.${size}`, mdDown: "auto" }}
         minHeight={`pageHeader.${size}`}
-        maxHeight={described ? "none" : `pageHeader.${size}`}
+        maxHeight={described ? "none" : { base: `pageHeader.${size}`, mdDown: "none" }}
         paddingX={PAGE_INSET}
         paddingTop={paddingTop}
-        paddingBottom={described ? 3 : 0}
-        flexWrap={described ? "wrap" : "nowrap"}
-        rowGap={described ? 2 : undefined}
+        paddingBottom={described ? 3 : { base: 0, mdDown: 2 }}
+        flexWrap={described ? "wrap" : { base: "wrap", md: "nowrap" }}
+        rowGap={2}
         css={{
           "& h1": {
             textStyle: size === "lg" ? "pageTitle" : "pageTitleCompact",
             lineHeight: "28px",
-            height: "28px",
+            height: described ? "28px" : { base: "28px", mdDown: "auto" },
             margin: 0,
             flexShrink: described ? 1 : 0,
             minWidth: described ? 0 : undefined,
             overflow: described ? "hidden" : undefined,
             textOverflow: described ? "ellipsis" : undefined,
-            whiteSpace: "nowrap",
+            whiteSpace: described ? "nowrap" : { base: "nowrap", mdDown: "normal" },
+            overflowWrap: "break-word",
           },
           "& .chakra-button": {
             height: size === "lg" ? "36px" : "28px",
@@ -233,6 +236,8 @@ function Header({
             marginStart={described ? 0 : "auto"}
             marginTop={described && size === "lg" ? "-1" : 0}
             minWidth={0}
+            maxWidth="full"
+            flexWrap={{ base: "wrap", md: "nowrap" }}
             overflowX="auto"
             gap={2}
           >
@@ -261,10 +266,14 @@ function Heading({ children, ...props }: PropsWithChildren<LegacyHeadingProps>):
       as="h1"
       textStyle={size === "lg" ? "pageTitle" : "pageTitleCompact"}
       lineHeight="28px"
-      height="28px"
+      height={{ base: "28px", mdDown: "auto" }}
       flexShrink={0}
       minWidth={0}
-      truncate
+      overflow={{ base: "hidden", mdDown: "visible" }}
+      textOverflow={{ base: "ellipsis", mdDown: "clip" }}
+      whiteSpace={{ base: "nowrap", mdDown: "normal" }}
+      // break-word, not anywhere: a title shrinks to its longest word, never to one letter.
+      overflowWrap="break-word"
       {...props}
     >
       {children}

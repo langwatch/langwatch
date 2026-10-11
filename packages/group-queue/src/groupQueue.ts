@@ -2133,9 +2133,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     dispatch: BisectionDispatchState;
     err: unknown;
   }): Promise<void> {
-    // Fails the same way at every size, so splitting only multiplies the work
-    // before reaching the identical verdict.
-    if (!this.failureDecision(err).retryable) {
+    // Non-retryable fails the same way at every size. A named retry delay means
+    // the server is overloaded: a split re-runs the work on it at once, so the
+    // whole batch backs off through the retry path instead.
+    const decision = this.failureDecision(err);
+    if (!decision.retryable || decision.retryAfterMs !== undefined) {
       throw err;
     }
 

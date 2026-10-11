@@ -3,7 +3,12 @@
 import type { UiAuthClient } from "@langwatch/auth-contract";
 import { describe, expect, it } from "vitest";
 
-import { readUiActor, toUiActor, UI_SESSION_PATH } from "../ui-session-client";
+import {
+  keepAnsweredReaderOnFailedReread,
+  readUiActor,
+  toUiActor,
+  UI_SESSION_PATH,
+} from "../ui-session-client";
 
 /**
  * An auth client that answers a read and refuses to end the session.
@@ -93,29 +98,27 @@ describe("given the client the session is read with", () => {
     });
   });
 
-  describe("when the endpoint refuses the read", () => {
-    /** @scenario "A genuine refusal still goes to sign in" */
-    it("reads nobody, and names the refusal rather than losing it", async () => {
+  describe("when the endpoint answers 401", () => {
+    /** @scenario "A session endpoint answering 401 means nobody is signed in" */
+    it("reads nobody, as an answer rather than a wait", async () => {
       const reading = await readUiActor(
         readingClient(() => Promise.resolve({ error: { status: 401, code: "unauthenticated" } })),
       );
 
       expect(reading.actor).toBeNull();
       expect(reading.unreachable).toBe(false);
-      expect(reading.failure?.code).toBe("session_read_failed");
     });
   });
 
-  describe("when nothing answered on the API's address", () => {
+  describe("when nothing answered who is here", () => {
     /** @scenario "The API is not listening yet" */
-    it("reads nobody and names no refusal when the read never reached the endpoint", async () => {
+    it("reads unreachable when the read never reached the endpoint", async () => {
       const reading = await readUiActor(
         readingClient(() => Promise.reject(new Error("Failed to fetch"))),
       );
 
       expect(reading.actor).toBeNull();
       expect(reading.unreachable).toBe(true);
-      expect(reading.failure).toBeNull();
     });
 
     /** @scenario "The API is not listening yet" */
@@ -125,7 +128,16 @@ describe("given the client the session is read with", () => {
       );
 
       expect(reading.unreachable).toBe(true);
-      expect(reading.failure).toBeNull();
+    });
+
+    /** @scenario "A failed session read is not read as signed out" */
+    it("reads a proxy's 4xx that names no session as nothing having answered", async () => {
+      const reading = await readUiActor(
+        readingClient(() => Promise.resolve({ error: { status: 400, code: "bad_request" } })),
+      );
+
+      expect(reading.actor).toBeNull();
+      expect(reading.unreachable).toBe(true);
     });
   });
 });
@@ -145,5 +157,54 @@ describe("given an impersonated session", () => {
 
   it("carries no operator for a normal session", () => {
     expect(toUiActor({ user: { id: "user-jane" } })?.impersonator).toBeUndefined();
+  });
+});
+
+describe("given the session already answered who is here", () => {
+  const answered = {
+    actor: { id: "user-jane", name: "Jane", email: null, image: null },
+    unreachable: false,
+    cacheKey: "key",
+    previousCacheKey: null,
+  };
+
+  describe("when a re-read fails", () => {
+    /** @scenario "A failed re-read keeps the reader who was already signed in" */
+    it("keeps the reader who was already signed in", async () => {
+      const failed = await readUiActor(
+        readingClient(() => Promise.resolve({ data: null, error: { status: 400, code: "x" } })),
+      );
+
+      expect(failed.unreachable).toBe(true);
+      expect(keepAnsweredReaderOnFailedReread({ reading: failed, previous: answered })).toBe(
+        answered,
+      );
+    });
+  });
+
+  describe("when the re-read answers that nobody is signed in", () => {
+    /** @scenario "A failed re-read keeps the reader who was already signed in" */
+    it("takes the new answer", async () => {
+      const signedOut = await readUiActor(
+        readingClient(() => Promise.resolve({ data: null, error: null })),
+      );
+
+      expect(keepAnsweredReaderOnFailedReread({ reading: signedOut, previous: answered })).toBe(
+        signedOut,
+      );
+    });
+  });
+
+  describe("when a first read fails", () => {
+    /** @scenario "A failed re-read keeps the reader who was already signed in" */
+    it("holds it as unanswered, never as signed out", async () => {
+      const failed = await readUiActor(
+        readingClient(() => Promise.resolve({ data: null, error: { status: 400, code: "x" } })),
+      );
+
+      expect(keepAnsweredReaderOnFailedReread({ reading: failed, previous: undefined })).toBe(
+        failed,
+      );
+    });
   });
 });

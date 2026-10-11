@@ -8,21 +8,18 @@
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "jsx": "react-jsx",
-    "types": ["vitest/globals"]
+    "types": [],
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

@@ -5,7 +5,6 @@
 
 import { moduleApi } from "@langwatch/module";
 import { Hono } from "hono";
-import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -15,6 +14,8 @@ import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { producerFor, type RestEvent } from "../response-kind.ts";
 import { createRestRuntime } from "../runtime.ts";
+import { generateSpecs } from "./generate-specs.ts";
+import { routeFamily } from "./route-family.ts";
 
 const VERSION = "2026-09-08";
 const SCIM_REASON = "SCIM's own envelope is RFC 7644's, not ours";
@@ -202,7 +203,7 @@ function proxyApp(): Hono {
 
   const host = new Hono();
 
-  host.route("/", family);
+  routeFamily({ host, family });
   host.all("/api/v1/proxy/other", (context) => context.text("fell through"));
 
   return host;

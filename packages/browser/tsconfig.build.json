@@ -13,19 +13,28 @@
 
   "references": [
     {
-      "path": "../api/tsconfig.build.json"
-    },
-    {
-      "path": "../browser-host/tsconfig.build.json"
-    },
-    {
-      "path": "../config/tsconfig.build.json"
+      "path": "../error-views/tsconfig.build.json"
     },
     {
       "path": "../design-system/tsconfig.build.json"
     },
     {
-      "path": "../error-views/tsconfig.build.json"
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
+      "path": "../module/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
+    }
+  }
 }

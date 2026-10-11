@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The project's conversation topics, and what the last clustering run did.
 
-Peers call these through the token, declared at `../contract/src/topic.ts:134`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/topic.ts:177`; nothing else in this package is public.
 
 #### `getAll`
 
@@ -40,6 +40,14 @@ getClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatus>;
 getClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]>;
 ```
 
+#### `getClusteringRunHistoryPage`
+
+The same retained history a page at a time, newest first, beside the full read.
+
+```typescript
+getClusteringRunHistoryPage(input: TopicClusteringRunHistoryPageInput): Promise<TopicClusteringRunHistoryPage>;
+```
+
 #### `requestClustering`
 
 Asks the project's clustering process for a run; ports main's `requestClustering`.
@@ -56,23 +64,24 @@ None: this module declares no REST family.
 
 ### `topics`
 
-Contract `../contract/src/topic.trpc.ts:25`, router `src/transport/topic.trpc.ts:33`.
+Contract `../contract/src/topic.trpc.ts:27`, router `src/transport/topic.trpc.ts:33`.
 
-| Procedure                        | Kind     | Gate                        | Input                     | Output                               |
-| -------------------------------- | -------- | --------------------------- | ------------------------- | ------------------------------------ |
-| `topics.getAll`                  | query    | Permission `traces:view`    | `topicProjectScopeSchema` | inline                               |
-| `topics.getTopicCounts`          | query    | Permission `traces:view`    | `traceFilterInputSchema`  | `namedTopicCountsSchema`             |
-| `topics.getClusteringStatus`     | query    | Permission `project:view`   | `topicProjectScopeSchema` | `topicClusteringStatusSchema`        |
-| `topics.getClusteringRunHistory` | query    | Permission `project:view`   | `topicProjectScopeSchema` | inline                               |
-| `topics.triggerTopicClustering`  | mutation | Permission `project:update` | `topicProjectScopeSchema` | `topicClusteringTriggerResultSchema` |
+| Procedure                            | Kind     | Gate                        | Input                                      | Output                                |
+| ------------------------------------ | -------- | --------------------------- | ------------------------------------------ | ------------------------------------- |
+| `topics.getAll`                      | query    | Permission `traces:view`    | `topicProjectScopeSchema`                  | inline                                |
+| `topics.getTopicCounts`              | query    | Permission `traces:view`    | `traceFilterInputSchema`                   | `namedTopicCountsSchema`              |
+| `topics.getClusteringStatus`         | query    | Permission `project:view`   | `topicProjectScopeSchema`                  | `topicClusteringStatusSchema`         |
+| `topics.getClusteringRunHistory`     | query    | Permission `project:view`   | `topicProjectScopeSchema`                  | inline                                |
+| `topics.getClusteringRunHistoryPage` | query    | Permission `project:view`   | `topicClusteringRunHistoryPageInputSchema` | `topicClusteringRunHistoryPageSchema` |
+| `topics.triggerTopicClustering`      | mutation | Permission `project:update` | `topicProjectScopeSchema`                  | `topicClusteringTriggerResultSchema`  |
 
 ```typescript
 // topics.getAll
-// Input: topicProjectScopeSchema, ../contract/src/topic.trpc.ts:23
+// Input: topicProjectScopeSchema, ../contract/src/topic.trpc.ts:25
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/topic.trpc.ts:28
+// Output: inline, ../contract/src/topic.trpc.ts:30
 type Output = {
   id: string;
   name: string;
@@ -82,19 +91,28 @@ type Output = {
 
 // topics.getTopicCounts
 type Input = z.infer<typeof traceFilterInputSchema>; // ../../trace/contract/src/traces.trpc.ts:101
-type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:130
+type Output = z.infer<typeof namedTopicCountsSchema>; // ../contract/src/topic.ts:173
 
 // topics.getClusteringStatus
-type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:23
-type Output = z.infer<typeof topicClusteringStatusSchema>; // ../contract/src/topic.ts:74
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:25
+type Output = z.infer<typeof topicClusteringStatusSchema>; // ../contract/src/topic.ts:77
 
 // topics.getClusteringRunHistory
-type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:23
-// Output: topicClusteringRunHistoryEntrySchema.array() (inline, ../contract/src/topic.trpc.ts:41)
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:25
+// Output: topicClusteringRunHistoryEntrySchema.array() (inline, ../contract/src/topic.trpc.ts:43)
+
+// topics.getClusteringRunHistoryPage
+// Input: topicClusteringRunHistoryPageInputSchema, ../contract/src/topic.ts:120
+interface Input {
+  projectId: string;
+  cursor?: string;
+  limit?: number;
+}
+type Output = z.infer<typeof topicClusteringRunHistoryPageSchema>; // ../contract/src/topic.ts:145
 
 // topics.triggerTopicClustering
-type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:23
-// Output: topicClusteringTriggerResultSchema, ../contract/src/topic.ts:114
+type Input = z.infer<typeof topicProjectScopeSchema>; // ../contract/src/topic.trpc.ts:25
+// Output: topicClusteringTriggerResultSchema, ../contract/src/topic.ts:157
 type Output =
   | {
       started: true;

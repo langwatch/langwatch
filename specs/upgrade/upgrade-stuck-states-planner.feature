@@ -6,22 +6,21 @@
 Feature: The upgrade resumes from a cut run instead of refusing or skipping work
   As an operator
   I want an upgrade that stopped part-way to carry on when I run it again
-  So that a crash or an outage costs a rerun, never a false floor refusal or a skipped step
+  So that a crash or an outage costs a rerun, never a refusal or a skipped step
 
   @unit
-  Scenario: A partial first install resumes as a fresh install instead of refusing below the floor
+  Scenario: A partial first install resumes as a fresh install
     Given a first install planned fresh recorded some Prisma migrations older than every manifest
     And no upgrade has succeeded yet
     When the upgrade plans again
     Then it plans a fresh install of what is left
-    And it does not refuse below the LTS floor
 
   @unit
-  Scenario: Settled schema that no fresh run applied still refuses below the floor
+  Scenario: Settled schema that no fresh run applied rolls through every shipped release
     Given the ledger settles schema no manifest names
     And no upgrade run ever planned a fresh install
     When the upgrade plans
-    Then it refuses below the LTS floor
+    Then it plans every shipped release from the 3.18.1 baseline, not a fresh install
 
   @unit
   Scenario: A released blocking step left unfinished runs on the next upgrade

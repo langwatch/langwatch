@@ -5,8 +5,6 @@ import type { ContractArchiveEntry } from "./contract-archive/contract-archive.s
 
 export const upgradeOutcomeCodeSchema = z.enum([
   "done",
-  "refused_below_floor",
-  "refused_image_below_floor",
   "lease_not_acquired",
   "lease_lost",
   "failed_prisma_migration",
@@ -18,13 +16,8 @@ export const upgradeOutcomeCodeSchema = z.enum([
 ]);
 export type UpgradeOutcomeCode = z.infer<typeof upgradeOutcomeCodeSchema>;
 
-/** Exit codes of `pnpm task upgrade`: 0 done, 1 failed, 2 refused (floor), 3 lease not acquired. */
-export const upgradeExitCodeSchema = z.union([
-  z.literal(0),
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-]);
+/** Exit codes of `pnpm task upgrade`: 0 done, 1 failed, 3 lease not acquired. */
+export const upgradeExitCodeSchema = z.union([z.literal(0), z.literal(1), z.literal(3)]);
 export type UpgradeExitCode = z.infer<typeof upgradeExitCodeSchema>;
 
 export const upgradeOutcomeSchema = z.object({
@@ -38,8 +31,6 @@ export type UpgradeOutcome = z.infer<typeof upgradeOutcomeSchema>;
 
 export const EXIT_CODES: Record<UpgradeOutcomeCode, UpgradeExitCode> = {
   done: 0,
-  refused_below_floor: 2,
-  refused_image_below_floor: 2,
   lease_not_acquired: 3,
   lease_lost: 1,
   failed_prisma_migration: 1,
@@ -86,7 +77,6 @@ export function formatPlan({
   plan: UpgradePlan;
   archives?: readonly ContractArchiveEntry[];
 }): string {
-  if (plan.outcome === "refused") return `Refused (${plan.code}): ${plan.message}`;
   const lines = [
     plan.fresh
       ? "Fresh install: every schema step applies at once."

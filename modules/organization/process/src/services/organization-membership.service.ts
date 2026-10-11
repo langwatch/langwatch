@@ -163,6 +163,12 @@ export class OrganizationMembershipService {
     return this.provisioning.createForProvisioning(params);
   }
 
+  ensureSystemOrganization(): ReturnType<
+    OrganizationProvisioningService["ensureSystemOrganization"]
+  > {
+    return this.provisioning.ensureSystemOrganization();
+  }
+
   createSelfHostedCustomer(
     params: Parameters<OrganizationProvisioningService["createSelfHostedCustomer"]>[0],
   ): ReturnType<OrganizationProvisioningService["createSelfHostedCustomer"]> {

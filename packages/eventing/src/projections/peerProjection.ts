@@ -1,12 +1,16 @@
 import type { z } from "zod";
 
+import type { ParsingSchema } from "../domain/eventSchemas.ts";
 import type { Event } from "../domain/types.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
 import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
 import type { MapProjectionDefinition, MapProjectionOptions } from "./mapProjection.types.ts";
 
 /** One owner event a peer projection consumes: the owner contract's type and data schema. */
-export interface PeerEventSchema<Type extends string = string, Data extends z.ZodType = z.ZodType> {
+export interface PeerEventSchema<
+  Type extends string = string,
+  Data extends ParsingSchema = ParsingSchema,
+> {
   readonly type: Type;
   readonly data: Data;
 }
@@ -96,7 +100,7 @@ function peerParser<Events extends readonly PeerEventSchema[]>({
   events: Events;
   eventTypes: readonly string[];
 }): PeerParser<Events> {
-  const schemas = new Map<string, z.ZodType>(events.map(({ type, data }) => [type, data]));
+  const schemas = new Map<string, ParsingSchema>(events.map(({ type, data }) => [type, data]));
   const unnamed = eventTypes.filter((type) => !schemas.has(type));
   if (eventTypes.length === 0 || unnamed.length > 0) {
     throw new ConfigurationError(

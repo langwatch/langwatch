@@ -114,6 +114,13 @@ Feature: The worker runs declared background steps
     Then the step does not run and is reported as waiting
 
   @unit
+  Scenario: A step is stamped started only once old writers are gone
+    Given a pending background step that needs old writers gone
+    And the serving roster says an old writer is live on the first sweep and gone on the second
+    When the worker sweeps twice
+    Then the step is marked running only on the second sweep, so its start excludes the wait
+
+  @unit
   Scenario: A worker that stopped serving runs no background step
     Given a worker whose gate stopped serving
     When the worker sweeps its declared background steps
@@ -124,3 +131,32 @@ Feature: The worker runs declared background steps
     Given a worker composed with the serving gate
     When its application starts and later stops
     Then its background steps start after the application and stop before it
+
+  # Gate review, 2026-10-10: a cut run never runs twice, and a rollback mid-run is caught.
+  @unit
+  Scenario: A step cut at its deadline keeps its lease until its run settles
+    Given a background step whose run ignores its signal past its deadline
+    When the deadline passes
+    Then the step is pending again and the sweep moves on
+    And its lease is still renewed, so no other worker starts a second copy
+    And the lease is released once the cut run settles
+
+  @unit
+  Scenario: A step resumes from the checkpoint read after taking its lease
+    Given a pending background step whose checkpoint moved after the sweep read it
+    When the worker takes its lease and runs it
+    Then the run resumes from the checkpoint read after the lease
+
+  @unit
+  Scenario: A background step whose renewal never answers is stopped
+    Given a running background step whose lease renewal hangs
+    When the lease's time to live less one renewal interval passes with no renewal
+    Then the step's signal is aborted and it is not recorded done
+
+  @unit
+  Scenario: A step that needs old writers gone is reopened when an old writer starts during its run
+    Given a running background step that needs old writers gone
+    And an older image starts serving before the run finishes
+    When the run finishes
+    Then the step is not recorded done
+    And it is pending again with its checkpoint cleared, naming why

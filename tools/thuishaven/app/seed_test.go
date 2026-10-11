@@ -102,7 +102,7 @@ func TestSeedDrivesSeedgenAgainstTheStack(t *testing.T) {
 	if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "/wt/feat-x/cmd/seedgen' run '--size' 'small'") {
 		t.Fatalf("shells = %v", sup.shells)
 	}
-	if !strings.Contains(strings.Join(sup.envs[0], " "), "LANGWATCH_TASK_MODULES=@langwatch/seedgen-runner") {
+	if !strings.Contains(strings.Join(sup.envs[0], " "), "LANGWATCH_TASK_MODULES=/wt/feat-x/tools/seedgen/runner/src/index.ts") {
 		t.Error("the task child is not told to load the runner")
 	}
 	if line := o.SeedStatusLine("feat-x"); !strings.Contains(line, "done") {

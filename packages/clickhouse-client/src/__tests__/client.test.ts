@@ -322,4 +322,29 @@ describe("ClickHouseQueryClient", () => {
       });
     });
   });
+
+  describe("given a read naming a column a pending step adds", () => {
+    describe("when a tenant's column list is asked for", () => {
+      it("reads system.columns routed by that tenant, unscoped, and keeps one list per tenant", async () => {
+        const execute = vi.fn(async (_read: QueryRequest) => ({
+          rows: [{ table: "experiment_runs", name: "RunId" }],
+        }));
+        const client = new ClickHouseQueryClient({
+          tenantGuard: new TenantGuard(),
+          driver: { execute, insert: unusedInsert, command: unusedCommand },
+        });
+
+        const columns = client.columns({ tenantId: "project_abc" });
+        const select = await columns.select({
+          table: "experiment_runs",
+          columns: { RunId: "''", ExpectedTargetResults: "CAST(NULL AS Nullable(UInt32))" },
+        });
+
+        expect(client.columns({ tenantId: "project_abc" })).toBe(columns);
+        expect(select).toBe("`RunId`, CAST(NULL AS Nullable(UInt32)) AS `ExpectedTargetResults`");
+        const [read] = execute.mock.calls[0] ?? [];
+        expect(read).toMatchObject({ tenantId: "project_abc", table: "system.columns" });
+      });
+    });
+  });
 });

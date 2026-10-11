@@ -95,6 +95,7 @@ export interface GroupQueueActivity<Payload> {
 
 export interface GroupQueueFailureDecision {
   retryable: boolean;
+  /** A floor over the queue's backoff. Present means overloaded: a batch backs off whole. */
   retryAfterMs?: number;
 }
 

@@ -3,6 +3,7 @@ import {
   type ClickHouseEventRow,
   EventingClickHouseReplayEventSource,
   type EventingClickHouseReplayClient,
+  getAggregateOccurredAtBounds,
 } from "@langwatch/eventing/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -89,6 +90,24 @@ describe("EventingClickHouseReplayEventSource", () => {
       });
 
       expect(client.query).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "project_a" }));
+    });
+  });
+
+  describe("when a batch's occurred-at bounds are read", () => {
+    /** @scenario "Replay's bounds read over a batch's aggregates is a declared full scan" */
+    it("declares a full scan, since later reads in the batch prune by its answer", async () => {
+      const { client } = member();
+
+      await getAggregateOccurredAtBounds({
+        client,
+        tenantId: "project_a",
+        aggregateTypes: ["trace"],
+        aggregateIds: ["trace_1"],
+      });
+
+      expect(client.query).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "project_a", SKIP_COLD_SCAN_CHECK: true }),
+      );
     });
   });
 

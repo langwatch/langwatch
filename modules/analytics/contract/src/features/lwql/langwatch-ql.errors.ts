@@ -153,6 +153,39 @@ export class LangWatchQLParameterMissingError extends HandledError {
 }
 
 /**
+ * A bound parameter's value the server could not read as the type its placeholder
+ * declares, such as an ISO `…Z` string on `{start:DateTime64(3)}`. Without this it
+ * reached the caller as an unknown 500 for a one-edit fix (WEB-18301).
+ */
+export class LangWatchQLParameterInvalidError extends HandledError {
+  declare readonly code: "lwql_parameter_invalid";
+
+  constructor({
+    parameter,
+    ...options
+  }: {
+    /** The placeholder's name, when it could be read from the server's refusal. */
+    parameter: string | undefined;
+    reasons?: readonly Error[];
+  }) {
+    super(
+      "lwql_parameter_invalid",
+      parameter === undefined
+        ? "A bound parameter's value does not match the type the query declares for it."
+        : `The value of parameter ${parameter} does not match the type the query declares for it.`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...(parameter === undefined ? {} : { meta: { parameter } }),
+        ...remediation("lwql_parameter_invalid"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLParameterInvalidError";
+  }
+}
+
+/**
  * The refusal sentence for exactly the names the request carried, agreeing in number so one
  * name doesn't read as plural. Built from the names, not a fixed phrase, since one code covers
  * two window bounds and the granularity step -- naming the wrong one misdirects the caller.

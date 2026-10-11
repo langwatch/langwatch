@@ -225,6 +225,38 @@ describe("testFireTrigger", () => {
       expect(body.name).toBe(TRIGGER.name);
     });
 
+    /** @scenario "A webhook test fire the endpoint or the fence refuses names why" */
+    it("refuses with the reason when the endpoint or the fence refuses", async () => {
+      const { notifier } = makeNotifier();
+      notifier.sendWebhook = async () => {
+        throw new DispatchError({
+          message: 'Webhook for trigger "t": the destination is not allowed.',
+          retryable: false,
+          customerMessage: "The endpoint answered HTTP 410.",
+        });
+      };
+
+      await expect(
+        makeService(notifier).testFire({
+          channel: "webhook",
+          trigger: TRIGGER,
+          project: PROJECT,
+          draft: {},
+          recipients: [],
+          webhook: null,
+          webhookDestination: {
+            url: "https://example.com/hook",
+            method: "POST",
+            headers: {},
+            bodyTemplate: null,
+          },
+        }),
+      ).rejects.toMatchObject({
+        code: "test_fire_unavailable",
+        meta: { channel: "webhook", reason: "The endpoint answered HTTP 410." },
+      });
+    });
+
     describe("when no destination is supplied", () => {
       it("throws a TestFireUnavailableError", async () => {
         const { notifier } = makeNotifier();
@@ -552,6 +584,34 @@ describe("testFireTrigger", () => {
         expect(sentSlack).toHaveLength(1);
         expect(sentSlack[0]!.webhook).toBe("https://hooks.slack.com/services/T/B/X");
         expect(JSON.stringify(sentSlack[0]!.payload)).toContain(TEST_FIRE_NOTICE);
+      });
+    });
+
+    describe("when Slack refuses the incoming webhook", () => {
+      /** @scenario "A test fire to a revoked Slack webhook names the remediation" */
+      it("refuses with the remediation, not an internal error", async () => {
+        const { notifier } = makeNotifier();
+        notifier.sendSlack = async () => {
+          throw new DispatchError({
+            message: 'Slack webhook dispatch failed for trigger "t"',
+            retryable: false,
+            customerMessage: "Slack no longer accepts this webhook.",
+          });
+        };
+
+        await expect(
+          makeService(notifier).testFire({
+            channel: "slack",
+            trigger: TRIGGER,
+            project: PROJECT,
+            draft: {},
+            recipients: [],
+            webhook: "https://hooks.slack.com/services/T/B/X",
+          }),
+        ).rejects.toMatchObject({
+          code: "test_fire_unavailable",
+          meta: { channel: "slack", reason: "Slack no longer accepts this webhook." },
+        });
       });
     });
 

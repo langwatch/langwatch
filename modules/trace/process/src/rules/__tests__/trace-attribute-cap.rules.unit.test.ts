@@ -1,5 +1,5 @@
+import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
-import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {

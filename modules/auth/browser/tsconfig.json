@@ -16,57 +16,18 @@
       "@better-auth/passkey/client": [
         "../../../packages/browser-types/better-auth-passkey-client.d.ts"
       ]
-    }
+    },
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "vitest.setup.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../feature-flag/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../identity/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../identity/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../organization/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../user/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

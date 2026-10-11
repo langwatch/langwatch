@@ -29,25 +29,34 @@
   ],
   "references": [
     {
-      "path": "../authorization/tsconfig.build.json"
+      "path": "../../sdks/typescript"
     },
     {
-      "path": "../group-queue/tsconfig.build.json"
-    },
-    {
-      "path": "../handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../ksuid/tsconfig.build.json"
-    },
-    {
-      "path": "../observability/tsconfig.build.json"
+      "path": "../time/tsconfig.build.json"
     },
     {
       "path": "../prisma-client/tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../group-queue/tsconfig.build.json"
+    },
+    {
+      "path": "../authorization/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/test-harness", "@langwatch/vitest-config"]
+    }
+  }
 }

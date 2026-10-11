@@ -87,9 +87,9 @@ Feature: An upgrade never sticks in the gate, the background runner or the statu
   @integration
   Scenario: The preview plans a cut first install as fresh, as the runner does
     Given a seeded ledger whose only upgrade run planned a fresh install and failed
-    And the ledger records schema below the LTS floor
+    And the ledger records schema no manifest names
     When the Upgrades page previews the upgrade
-    Then the plan is a fresh install, not a refusal below the floor
+    Then the plan is a fresh install, not a roll through every release
 
   @integration
   Scenario: The preview reads the tools' records until a seed run has succeeded
@@ -97,3 +97,42 @@ Feature: An upgrade never sticks in the gate, the background runner or the statu
     And Prisma's history records every migration of the image's release
     When the Upgrades page previews the upgrade
     Then the installed release is read from Prisma's history
+
+  @unit
+  Scenario: A first install whose ledger seed succeeded still opens the console
+    Given an installation whose only succeeded run is the ledger seed
+    And the worker's first upgrade run failed on a blocking step
+    When the api asks the gate
+    Then the verdict carries the failed run for the console
+
+  @unit
+  Scenario: The gate's connection gives up on a statement that never answers
+    Given the gate's own Postgres connection
+    Then every statement on it carries a server-side and a client-side timeout
+
+  # Alex, 2026-10-10 (option a): the gate asks Postgres whether its role may create the ledger.
+  @unit
+  Scenario: A database role that cannot create the upgrade ledger is refused by name
+    Given a database with no upgrade ledger
+    And a role with neither CREATE on the database nor a ledger schema it may create tables in
+    When the api or the worker asks its gate
+    Then it refuses to serve, naming the missing privilege, the ledger schema and the upgrade docs
+    And the worker runs no upgrade
+
+  @unit
+  Scenario: A missing upgrade ledger the role can create is upgrading, not refused
+    Given a database with no upgrade ledger and a role that may create it
+    When the api asks its gate
+    Then it reports the installation as upgrading
+
+  @unit
+  Scenario: An upgrading api keeps its gate connection through a refusal or an unreadable ledger
+    Given an api whose gate answered that the installation is upgrading
+    When a later ask is refused or cannot read the ledger
+    Then the gate keeps its connection, so the api's next ask can still read the ledger
+
+  @unit
+  Scenario: The gate's connection survives Postgres terminating it while idle
+    Given the gate's own Postgres connection
+    When Postgres terminates it with "terminating connection due to administrator command"
+    Then the loss is reported as a warning and the process does not crash

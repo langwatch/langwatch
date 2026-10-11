@@ -31,6 +31,7 @@ vi.mock("../../../../behavior/home-api.ts", () => ({
 }));
 vi.mock("../../../../behavior/lent-peers.tsx", () => ({
   PendingJoinRequests: () => null,
+  UpgradeActionNeeded: () => null,
   GuidedOnboardingOffer: () => null,
 }));
 vi.mock("../components/langy-home-hero.tsx", () => ({

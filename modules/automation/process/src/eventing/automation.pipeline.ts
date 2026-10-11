@@ -488,7 +488,6 @@ function triggerLaneAliases({
     from,
     to: { jobType: "subscriber", lane },
     eventTypes: [eventType],
-    removeAfter: "3.21.0",
   }));
 }
 

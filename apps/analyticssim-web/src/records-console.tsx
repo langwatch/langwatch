@@ -138,7 +138,7 @@ export const RecordsConsole = () => {
                     <span data-testid="record-row">{record.name || record.kind}</span>
                   )}
                   rowDescription={(record) =>
-                    `${providerLabel[record.provider]} · ${record.kind} · ${record.distinctId || "(no id)"}`
+                    `${record.status ? `Refused ${record.status} · ` : ""}${providerLabel[record.provider]} · ${record.kind} · ${record.distinctId || "(no id)"}`
                   }
                   rowMeta={(record) => <SimTime at={record.receivedAt} />}
                   empty={

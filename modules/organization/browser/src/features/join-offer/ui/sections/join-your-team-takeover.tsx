@@ -1,5 +1,6 @@
+import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import type { JoinOfferProps } from "@langwatch/organization-client";
 import type { ReactNode } from "react";
 
@@ -123,7 +124,8 @@ export function JoinYourTeamTakeover({
 
 /**
  * A cover that a backdrop click cannot dismiss: "not now" is right there, and a
- * stray click is not an answer — treating it as one asks them again tomorrow.
+ * stray click is not an answer. Inside it, the branded page and card every
+ * standalone page uses.
  */
 function Takeover({
   title,
@@ -145,20 +147,18 @@ function Takeover({
       closeOnEscape={false}
       onOpenChange={() => void 0}
     >
-      <Dialog.Content data-testid={testId} borderRadius={0}>
-        <Dialog.Body display="flex" alignItems="center" justifyContent="center" padding={6}>
-          <VStack width="full" maxWidth="420px" align="stretch" gap="4.5">
-            <Box>
-              <Dialog.Title textAlign="center">{title}</Dialog.Title>
-              {intro !== undefined && (
-                <Text textStyle="body" color="fg.muted" textAlign="center" paddingTop="1.5">
-                  {intro}
-                </Text>
-              )}
-            </Box>
+      <Dialog.Content
+        data-testid={testId}
+        aria-label={title}
+        borderRadius={0}
+        padding={0}
+        overflowY="auto"
+      >
+        <BrandedCardPage>
+          <BrandedCard title={title} intro={intro}>
             {children}
-          </VStack>
-        </Dialog.Body>
+          </BrandedCard>
+        </BrandedCardPage>
       </Dialog.Content>
     </Dialog.Root>
   );

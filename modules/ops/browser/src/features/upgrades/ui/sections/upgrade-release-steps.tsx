@@ -1,4 +1,3 @@
-import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Badge,
@@ -14,6 +13,7 @@ import {
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
+import { api } from "../../../../behavior/ops-api.ts";
 import { formatDuration } from "../../../../model/ops-formatters.ts";
 import {
   isFinished,
@@ -26,6 +26,7 @@ import type { UpgradeStepView } from "../../model/upgrade-view.ts";
 import { UpgradeErrorSummary } from "../elements/upgrade-error-summary.tsx";
 import { UpgradeStatusBadge } from "../elements/upgrade-status-badge.tsx";
 import { UpgradeStepState } from "../elements/upgrade-step-state.tsx";
+import { UpgradeReadState } from "./upgrade-read-state.tsx";
 
 /** How many steps fall under each value of one field, largest first. */
 function countBy(steps: readonly UpgradeStepView[], field: "status" | "kind"): [string, number][] {
@@ -49,7 +50,7 @@ function StepSummary({ steps }: { steps: readonly UpgradeStepView[] }) {
           <Badge
             key={status}
             size="md"
-            variant="outline"
+            variant="subtle"
             colorPalette={tonePalette(statusTone(status))}
           >
             {count} {statusWords(status)}
@@ -106,9 +107,6 @@ function UnfinishedTable({
               <Button
                 variant="plain"
                 size="sm"
-                height="auto"
-                minHeight="28px"
-                paddingX={0}
                 whiteSpace="normal"
                 textAlign="start"
                 onClick={(event) => {
@@ -116,7 +114,7 @@ function UnfinishedTable({
                   onOpenStep(step.id);
                 }}
               >
-                <InlineCode variant="neutral">{step.id}</InlineCode>
+                {step.id}
               </Button>
               <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap">
                 {step.kind}
@@ -182,9 +180,6 @@ function FinishedTable({
               <Button
                 variant="plain"
                 size="sm"
-                height="auto"
-                minHeight="28px"
-                paddingX={0}
                 whiteSpace="normal"
                 textAlign="start"
                 onClick={(event) => {
@@ -192,7 +187,7 @@ function FinishedTable({
                   onOpenStep(step.id);
                 }}
               >
-                <InlineCode variant="neutral">{step.id}</InlineCode>
+                {step.id}
               </Button>
             </Table.Cell>
             <Table.Cell whiteSpace="nowrap">{step.kind}</Table.Cell>
@@ -225,7 +220,9 @@ export function UpgradeReleaseSteps({
   if (steps.length === 0) {
     return (
       <Text color="fg.muted">
-        {release ? `Release ${release} declared no steps.` : "No unreleased steps."}
+        {release
+          ? `Release ${release} declared no steps.`
+          : "The development build declares no steps."}
       </Text>
     );
   }
@@ -235,7 +232,7 @@ export function UpgradeReleaseSteps({
     <Stack gap={8}>
       <StepSummary steps={steps} />
       <Stack gap={3}>
-        <Heading textStyle="cardTitle">Still to do ({unfinished.length})</Heading>
+        <Heading size="sm">Still to do ({unfinished.length})</Heading>
         {unfinished.length > 0 ? (
           <UnfinishedTable steps={unfinished} onOpenStep={onOpenStep} />
         ) : (
@@ -254,7 +251,7 @@ export function UpgradeReleaseSteps({
             <Button variant="ghost" size="sm" paddingX={1}>
               <HStack gap={2}>
                 {showApplied ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <Heading textStyle="cardTitle">Applied ({finished.length})</Heading>
+                <Heading size="sm">Applied ({finished.length})</Heading>
               </HStack>
             </Button>
           </Collapsible.Trigger>
@@ -264,5 +261,23 @@ export function UpgradeReleaseSteps({
         </Collapsible.Root>
       )}
     </Stack>
+  );
+}
+
+/** W2 inside the Steps tab: one version's steps, read when its group opens. */
+export function UpgradeReleaseStepsRead({
+  release,
+  onOpenStep,
+}: {
+  release: string | null;
+  onOpenStep: (stepId: string) => void;
+}) {
+  const steps = api.ops.upgrade.listSteps.useQuery({ release });
+  return (
+    <UpgradeReadState read={steps} failedTitle="The steps could not load">
+      {(page) => (
+        <UpgradeReleaseSteps release={release} steps={page.items} onOpenStep={onOpenStep} />
+      )}
+    </UpgradeReadState>
   );
 }

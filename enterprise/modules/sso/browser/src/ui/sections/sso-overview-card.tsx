@@ -28,6 +28,7 @@ import { updateChipFor } from "../../model/migration-route.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import { domainClaimsOf, goLiveFactsOf, routedDomainEvidenceOf } from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
+import { LegacyDomainToMoveNotice } from "../elements/legacy-domain-to-move-notice.tsx";
 import { AvailabilityRefusalNotice, LoadFailure } from "../elements/refusals.tsx";
 import { TestSignInFailureNotice } from "../elements/test-sign-in-failure-notice.tsx";
 
@@ -55,6 +56,9 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
   return (
     <VStack align="stretch" gap={3} width="full" height="full">
       {refusal && <AvailabilityRefusalNotice refusal={refusal} />}
+      {canManage && view && view.legacyDomainsToMove.length > 0 && (
+        <LegacyDomainToMoveNotice domains={view.legacyDomainsToMove} settingsHref={PROVIDER_PAGE} />
+      )}
       {view && connection?.state === "ACTIVE" ? (
         <SingleSignOnCard view={view} connection={connection} canManage={canOffer} />
       ) : (

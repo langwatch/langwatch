@@ -26,8 +26,9 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
-    "test": "vitest run"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run",
+    "test:repo": "vitest run --config vitest.repo.config.ts"
   },
   "dependencies": {
     "croner": "catalog:",

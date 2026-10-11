@@ -32,7 +32,7 @@ func testSP(s *Server) *saml.ServiceProvider {
 // ssoResponse runs one SP-initiated sign-in at tenant 1 and returns the SAML response XML.
 func ssoResponse(t *testing.T, s *Server) []byte {
 	t.Helper()
-	target := testBase + "/t/1/saml/sso?SAMLRequest=" + url.QueryEscape(samlRedirectRequest(t))
+	target := testBase + "/t/1/saml/sso?login_hint=admin%40acme1.test&SAMLRequest=" + url.QueryEscape(samlRedirectRequest(t))
 	rec := do(s, httptest.NewRequest(http.MethodGet, target, nil))
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	match := regexp.MustCompile(`name="SAMLResponse" value="([^"]+)"`).FindStringSubmatch(rec.Body.String())

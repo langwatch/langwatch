@@ -4,12 +4,13 @@ import { dirname, join, matchesGlob } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { mergeDiagnostics } from "../../packages/oxlint-rules/src/unused-directives.mjs";
-import { memberRoots, ownLintMembers } from "./workspace-members.mjs";
+import { memberRoots } from "./workspace-members.mjs";
 
 // `pnpm lint`: oxlint's native rules and the langwatch plugin as two parallel
 // processes over the tree; `--types` adds the type-aware rules as a third, over the
 // TypeScript projects. One unused-directive check spans the processes. `--changed`
-// and `--base <sha>` narrow to the projects a change reached. ADR-150, TOOLING.md.
+// and `--base <sha>` narrow a plain run to the changed files, a `--types` run to the
+// projects a change reached. ADR-150, TOOLING.md.
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const OXLINT = join(root, "node_modules/.bin/oxlint");
 const LINTABLE = /\.(?:[cm]?[jt]sx?)$/;
@@ -95,26 +96,25 @@ function lintGlobals() {
   return expand("lintGlobals").map((glob) => glob.replace("{workspaceRoot}/", ""));
 }
 
-/** What each process lints: projects, plus the files no Nx `lint` target owns. */
+/** A plain run's scope: the changed lintable files, or the tree when a lint global changed. */
+export function plainScope({ files, globals }) {
+  const isGlobal = (file) => globals.some((glob) => matchesGlob(file, glob));
+  const globalChanged = files.some(isGlobal);
+  if (globalChanged) return ["."];
+
+  return files.filter((file) => LINTABLE.test(file) && existsSync(join(root, file)));
+}
+
+/** What each process lints: typed projects a change reached, or the plain scope. */
 function scopes({ types, files, base }) {
-  const own = new Set(ownLintMembers(root).map((member) => member.root));
-  const members = memberRoots(root).filter((member) => !own.has(member));
   if (types) {
     const typed = memberRoots(root).filter((m) => existsSync(join(root, m, "tsconfig.json")));
     return [{ paths: affectedRoots({ roots: typed, files, base }), ignores: [] }];
   }
   if (files === undefined && base === undefined) return [{ paths: ["."], ignores: [] }];
-  const outside = (file) => !members.some((member) => file.startsWith(`${member}/`));
-  const lintable = files?.filter((file) => LINTABLE.test(file) && existsSync(join(root, file)));
-  const globals = lintGlobals();
-  const global = files?.some((file) => globals.some((glob) => matchesGlob(file, glob)));
-  const residual = lintable === undefined || global ? ["."] : lintable.filter(outside);
-  const ignores = members.flatMap((member) => ["--ignore-pattern", `${member}/**`]);
+  const changed = files ?? changedFiles(base);
 
-  return [
-    { paths: affectedRoots({ roots: members, files, base }), ignores: [] },
-    { paths: residual, ignores },
-  ];
+  return [{ paths: plainScope({ files: changed, globals: lintGlobals() }), ignores: [] }];
 }
 
 /** The diagnostics of a `-f json` run; undefined when oxlint printed an error instead. */
@@ -154,43 +154,48 @@ function print(diagnostic) {
   return `${diagnostic.filename}:${line}:${column}: ${diagnostic.message}${rule}${help}`;
 }
 
-const flags = process.argv.slice(2);
-const baseFlag = flags.indexOf("--base");
-const types = flags.includes("--types");
-const base = baseFlag === -1 ? undefined : flags[baseFlag + 1];
-const files = flags.includes("--changed") ? changedFiles(mergeBase()) : undefined;
-if (files?.length === 0) process.exit(0);
+async function main() {
+  const flags = process.argv.slice(2);
+  const baseFlag = flags.indexOf("--base");
+  const types = flags.includes("--types");
+  const base = baseFlag === -1 ? undefined : flags[baseFlag + 1];
+  const files = flags.includes("--changed") ? changedFiles(mergeBase()) : undefined;
+  if (files?.length === 0) process.exit(0);
 
-const ignored = ignoreArgs();
-const configs = types ? TYPES : PLAIN;
-const runs = scopes({ types, files, base })
-  .filter((scope) => scope.paths.length > 0)
-  .map(async ({ paths, ignores }) => {
-    const args = [...ignored, ...ignores, ...paths];
-    const reports = await Promise.all(configs.map((config) => oxlint({ config, args })));
+  const ignored = ignoreArgs();
+  const configs = types ? TYPES : PLAIN;
+  const runs = scopes({ types, files, base })
+    .filter((scope) => scope.paths.length > 0)
+    .map(async ({ paths, ignores }) => {
+      const args = [...ignored, ...ignores, ...paths];
+      const reports = await Promise.all(configs.map((config) => oxlint({ config, args })));
 
-    return reports.includes(undefined) ? undefined : mergeDiagnostics({ reports });
-  });
-const results = await Promise.all(runs);
-const judged = types ? () => true : judgedWithoutTypes();
-const diagnostics = results.flatMap((result) => result ?? []).filter(judged);
-const position = (d) => [
-  d.filename,
-  d.labels?.[0]?.span.line ?? 0,
-  d.labels?.[0]?.span.column ?? 0,
-];
-const byPosition = (a, b) => {
-  const [fa, la, ca] = position(a);
-  const [fb, lb, cb] = position(b);
+      return reports.includes(undefined) ? undefined : mergeDiagnostics({ reports });
+    });
+  const results = await Promise.all(runs);
+  const judged = types ? () => true : judgedWithoutTypes();
+  const diagnostics = results.flatMap((result) => result ?? []).filter(judged);
+  const position = (d) => [
+    d.filename,
+    d.labels?.[0]?.span.line ?? 0,
+    d.labels?.[0]?.span.column ?? 0,
+  ];
+  const byPosition = (a, b) => {
+    const [fa, la, ca] = position(a);
+    const [fb, lb, cb] = position(b);
 
-  return fa.localeCompare(fb) || la - lb || ca - cb;
-};
-process.stdout.write(
-  diagnostics
-    .toSorted(byPosition)
-    .map((d) => `${print(d)}\n`)
-    .join(""),
-);
-process.stdout.write(`\n${diagnostics.length} problem(s)\n`);
+    return fa.localeCompare(fb) || la - lb || ca - cb;
+  };
+  process.stdout.write(
+    diagnostics
+      .toSorted(byPosition)
+      .map((d) => `${print(d)}\n`)
+      .join(""),
+  );
+  process.stdout.write(`\n${diagnostics.length} problem(s)\n`);
 
-process.exit(diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1);
+  process.exit(diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1);
+}
+
+const runDirectly = process.argv[1] === fileURLToPath(import.meta.url);
+if (runDirectly) await main();

@@ -144,14 +144,14 @@ None: this module declares no REST family.
 
 ### `featureFlag`
 
-Contract `../contract/src/feature-flag.trpc.ts:51`, router `src/transport/feature-flag.trpc.ts:32`.
+Contract `../contract/src/feature-flag.trpc.ts:51`, router `src/transport/feature-flag.trpc.ts:34`.
 
 | Procedure                                  | Kind     | Gate                                                                                                                                                 | Input                                 | Output                              |
 | ------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------- |
-| `featureFlag.isEnabled`                    | query    | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `featureFlagReadInputSchema`          | `enabledOutputSchema`               |
+| `featureFlag.isEnabled`                    | query    | Service-authorized: FLAG_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written          | `featureFlagReadInputSchema`          | `enabledOutputSchema`               |
 | `featureFlag.isEnabledForAnyOrganization`  | query    | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `organizationFeatureFlagsInputSchema` | `enabledOutputSchema`               |
 | `featureFlag.isEnabledForEachOrganization` | query    | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `organizationFeatureFlagsInputSchema` | `enabledByOrganizationOutputSchema` |
-| `featureFlag.resolve`                      | query    | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `featureFlagTargetRequestSchema`      | `resolvedFlagsOutputSchema`         |
+| `featureFlag.resolve`                      | query    | Service-authorized: FLAG_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written          | `featureFlagTargetRequestSchema`      | `resolvedFlagsOutputSchema`         |
 | `featureFlag.experiments`                  | query    | Service-authorized: EXPERIMENT_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written         | `featureFlagTargetRequestSchema`      | `experimentsOutputSchema`           |
 | `featureFlag.setExperimentEnrolment`       | mutation | Service-authorized: TENANT_READ_PERMISSIONS; the feature's own resolver authorizes the exact tenant target before any flag is read or written        | `experimentEnrolmentInputSchema`      | `experimentWriteOutputSchema`       |
 | `featureFlag.setExperimentTenantPolicy`    | mutation | Service-authorized: featureFlags:manageExperiments; the feature's own resolver authorizes the exact tenant target before any flag is read or written | `experimentTenantPolicyInputSchema`   | `experimentWriteOutputSchema`       |

@@ -370,8 +370,8 @@ Run by the tasks process, before serve.
 | config | `hubspotReachedLimitFormId`         | `HUBSPOT_REACHED_LIMIT_FORM_ID`                | `../contract/src/billing.config.ts:25` |
 | config | `bankDetails`                       | `LANGWATCH_BILLING_BANK_DETAILS`               | `../contract/src/billing.config.ts:26` |
 | config | `stripeApiBase`                     | `STRIPE_API_BASE`                              | `../contract/src/billing.config.ts:28` |
-| config | `isSaas`                            | `IS_SAAS`                                      | `../contract/src/billing.config.ts:30` |
-| config | `publicBaseUrl`                     | `BASE_HOST`                                    | `../contract/src/billing.config.ts:32` |
-| config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:34` |
+| config | `isSaas`                            | `IS_SAAS`                                      | `../contract/src/billing.config.ts:36` |
+| config | `publicBaseUrl`                     | `BASE_HOST`                                    | `../contract/src/billing.config.ts:38` |
+| config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:40` |
 
 <!-- readme:generated:end -->

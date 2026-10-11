@@ -140,6 +140,27 @@ Feature: Running system migrations across organizations
     And the first pass that advances nothing ends the run
     And nothing waits for that run before serving
 
+  # The worker's pass is a run too, so a kick or re-drive does not stop at one
+  # pass while the fleet still moves. A tenant a run newly holds is often
+  # waiting on a fold the run itself started, so one follow-up pass comes a
+  # minute later instead of the hourly re-drive (Alex, 2026-10-11).
+  @unit
+  Scenario: A worker's pass keeps running while a pass still advances something
+    When the worker runs a pass and that pass advances an organization
+    Then another pass follows after a short gap
+    And the first pass that advances nothing ends the run
+
+  @unit
+  Scenario: A run that newly holds a tenant asks for one follow-up pass a minute later
+    When the worker's run advances a tenant and ends with a tenant held
+    Then one follow-up pass is requested about 60 seconds later
+
+  @unit
+  Scenario: Tenants that stay held never loop the follow-up pass
+    When the follow-up pass runs and still ends with a tenant held
+    Then it asks for no further pass
+    And a run that advanced nothing asks for no follow-up either
+
   # The barrier's deadline is the one refusal a booting fleet cannot answer:
   # every replica runs this preflight before it starts consuming, so work it
   # queues drains only if some other process already serves that queue, and a
@@ -627,19 +648,15 @@ Feature: Running system migrations across organizations
   # ═══ Self-hosted installations ════════════════════════════════════════
   # Cloud decides WHO by the migration's cohort; self-hosted decides WHETHER
   # by the migration declaring itself released for self-hosting. Two axes,
-  # two declarations, and self-hosted never reads the cohort one.
+  # two declarations, and self-hosted never reads the cohort one. Enrolment is
+  # therefore cloud only: the self-hosted console offers no enrol, cohort or
+  # withdraw (modules/ops/specs/upgrades.feature).
 
   @unit
   Scenario: Enrollment does not apply to self-hosted installations
     Given a self-hosted installation
     When a pass runs
     Then organizations are processed without consulting enrollment
-
-  @unit
-  Scenario: Cohort enrollment does not apply to self-hosted installations
-    Given a self-hosted installation
-    When a cohort enrollment is attempted
-    Then it is refused
 
   @integration
   Scenario: A self-hosted installation migrates every organization

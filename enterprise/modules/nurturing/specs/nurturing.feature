@@ -169,3 +169,24 @@ Feature: Nurturing sends the signals its owners record
     Given user's seed step records "lw.user.created" with backfilled set for an older account
     When the fact is delivered
     Then nothing is sent to PostHog or Customer.io
+
+  @unit
+  Scenario: Simulation sync jobs the previous release queued reach nurturing's finished-run lane
+    Given the previous release queued "lw.simulation_run.finished" jobs under "simulation_processing:reactor:customerIoSimulationSync"
+    When nurturing's pipeline is built
+    Then it aliases that key to its peer lane "simulationRunFinished" for one release
+    And the run is counted once, since the lane claims each run before it counts
+
+  @unit
+  Scenario: Evaluation sync jobs the previous release queued reach nurturing as a settled evaluation
+    Given the previous release queued a completed evaluation's job under "evaluation_processing:reactor:customerIoEvaluationSync" with its fold state
+    When nurturing's pipeline is built and the job's body is read through the alias
+    Then the body is the settled-evaluation fact for the evaluation's project, keyed like the one evaluation now records
+    And nurturing's "evaluationCompleted" lane parses it, so the evaluation is counted once
+
+  @unit
+  Scenario: Trace sync jobs the previous release queued are acknowledged, not sent twice
+    Given the previous release queued jobs under "trace_processing:reactor:customerIoTraceSync"
+    When nurturing's pipeline is built
+    Then it tombstones that key for one release
+    And the first-trace and trace-received signals still reach nurturing through trace's "projectMetadata" lane, queued beside it under its unchanged key

@@ -39,6 +39,20 @@ Feature: Post-login first-trace watch on the CLI authorize page
     And the page does not navigate away
 
   @bdd @cli-onboarding @first-trace @integration
+  Scenario: The watch follows the organization the approval was granted for
+    Given the page was opened in one organization and the user approves for another
+    And the approved organization's personal project has never received a trace
+    When the user approves the device session
+    Then the waiting status line watches the approved organization's personal project
+    And the first trace there takes the user to that project's traces page
+
+  @bdd @cli-onboarding @first-trace @integration
+  Scenario: The page's organization list names who owns each personal workspace
+    Given the signed-in user owns a personal workspace in an organization
+    When the page reads the organizations the user belongs to
+    Then that workspace's team names the user as its owner, so the watch can find it
+
+  @bdd @cli-onboarding @first-trace @integration
   Scenario: Sending a project API key keeps the success card still, with no waiting line and no redirect
     Given the CLI requested a project API key instead of a device session
     When the user sends the key to the CLI
@@ -59,9 +73,10 @@ Feature: Post-login first-trace watch on the CLI authorize page
     Then the watch's read has no refetch interval
     And it does not refetch when the window regains focus
 
-  @bdd @cli-onboarding @first-trace @integration @unimplemented
+  @bdd @cli-onboarding @first-trace @integration
   Scenario: The watch updates when the project's first trace is received
     Given the watch confirmed the project has never synced a trace
     When the project's first trace is received
-    Then the page learns of it from a server event, with no timer
+    Then the page learns of it from a server event, with no timer and without waiting for the stored flag
     And the redirect starts
+    And the traces page it lands on shows the trace, not the empty state

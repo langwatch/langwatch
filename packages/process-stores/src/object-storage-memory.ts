@@ -65,5 +65,9 @@ export function memoryObjectStorage(): ObjectStorage {
       slot({ projectId, key: "" });
       return Promise.resolve();
     },
+    // The twin holds every project itself: no organization has its own account.
+    privateAccountVariables() {
+      return [];
+    },
   };
 }

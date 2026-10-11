@@ -11,7 +11,12 @@ import {
   type UiFeedback,
 } from "@langwatch/browser-host/capabilities";
 import { hostingOf } from "@langwatch/browser-host/deployment";
-import { useMemo, type ReactNode } from "react";
+import { useLent } from "@langwatch/browser-host/lent";
+import {
+  SsoReplacementImportToken,
+  type SsoReplacementImportProps,
+} from "@langwatch/enterprise-sso-contract";
+import { useMemo, type ComponentType, type ReactNode } from "react";
 import { useLocation } from "react-router";
 
 import {
@@ -43,6 +48,7 @@ class CapabilityOpsHost extends OpsHostApi {
       ) => void;
       navigate: (to: string) => void;
       feedback: UiFeedback;
+      replacementImport: ComponentType<SsoReplacementImportProps> | undefined;
     },
   ) {
     super();
@@ -107,6 +113,10 @@ class CapabilityOpsHost extends OpsHostApi {
   failed(failure: OpsFailureNotice): void {
     this.deps.feedback.failed(failure);
   }
+
+  ssoReplacementImport(): ComponentType<SsoReplacementImportProps> | undefined {
+    return this.deps.replacementImport;
+  }
 }
 
 /**
@@ -123,6 +133,7 @@ export default function OpsHostMount({ children }: { children?: ReactNode }) {
   const location = useLocation();
   const reading = route.reading();
   const asPath = `${location.pathname}${location.search}${location.hash}`;
+  const replacementImport = useLent(SsoReplacementImportToken);
 
   const host = useMemo(
     () =>
@@ -137,6 +148,7 @@ export default function OpsHostMount({ children }: { children?: ReactNode }) {
         setQuery: (next, options) => route.setQuery(next, options),
         navigate: (to) => navigation.navigate(to),
         feedback,
+        replacementImport,
       }),
     [
       session,
@@ -149,6 +161,7 @@ export default function OpsHostMount({ children }: { children?: ReactNode }) {
       route,
       navigation,
       feedback,
+      replacementImport,
     ],
   );
 

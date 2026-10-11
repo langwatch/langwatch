@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 import type { TraceAttributeMatch } from "@langwatch/trace-contract";
 
 import { TraceUsageCountRepository } from "../trace-usage-count.repository.ts";
@@ -13,7 +13,7 @@ type CountedTrace = {
   attributes?: Readonly<Record<string, string>>;
 };
 
-/** Exact where ClickHouse's `uniq` is approximate, so small test data stays deterministic. */
+/** In-memory twin of the trace count reads, exact over the rows a test records. */
 export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
   readonly #traces: CountedTrace[] = [];
 
@@ -30,21 +30,29 @@ export class MemoryTraceUsageCountRepository extends TraceUsageCountRepository {
     this.#traces.push(trace);
   }
 
-  async countDistinctTraces(input: {
+  async findTraceIdsFirstSeen(input: {
     tenantId: string;
-    startDate: string;
-    endDate: string;
-  }): Promise<number> {
-    const traceIds = this.#traces
+    fromMs: number;
+    toMs: number;
+    afterTraceId: string;
+    limit: number;
+  }): Promise<string[]> {
+    const firstSeen = new Map<string, number>();
+    for (const trace of this.#traces) {
+      if (trace.tenantId !== input.tenantId) continue;
+      const createdAtMs = Temporal.Instant.from(
+        `${trace.createdAt.replace(" ", "T")}Z`,
+      ).epochMilliseconds;
+      const known = firstSeen.get(trace.traceId);
+      if (known === undefined || createdAtMs < known) firstSeen.set(trace.traceId, createdAtMs);
+    }
+    return [...firstSeen]
       .filter(
-        (trace) =>
-          trace.tenantId === input.tenantId &&
-          trace.createdAt >= input.startDate &&
-          trace.createdAt < input.endDate,
+        ([traceId, at]) => traceId > input.afterTraceId && at >= input.fromMs && at < input.toMs,
       )
-      .map((trace) => trace.traceId);
-
-    return new Set(traceIds).size;
+      .map(([traceId]) => traceId)
+      .toSorted()
+      .slice(0, input.limit);
   }
 
   async countTracesInLastDay(input: { tenantId: string }): Promise<number> {

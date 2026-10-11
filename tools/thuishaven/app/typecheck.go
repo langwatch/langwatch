@@ -31,16 +31,16 @@ func (o *Orchestrator) Typecheck(ctx context.Context, r TypecheckRun) error {
 	if o.sem == nil {
 		return fmt.Errorf("semaphore not wired")
 	}
-	slots := o.checkSlots()
+	units := o.checkUnits()
 	if r.SlotsOverride > 0 {
-		slots = r.SlotsOverride
+		units = r.SlotsOverride * domain.UnitsPerCheck
 	}
-	release, slot, err := o.holdTypecheckSlot(ctx, slots)
+	release, err := o.holdTypecheckSlot(ctx, units)
 	if err != nil {
 		return err
 	}
 	defer release()
-	note := fmt.Sprintf("haven: typecheck slot %d/%d", slot, slots)
+	note := fmt.Sprintf("haven: typecheck holds %d of %d check units", domain.UnitsPerCheck, units)
 	if !o.cfg.IsAgent {
 		note = "\x1b[2m" + note + "\x1b[0m"
 	}
@@ -59,21 +59,21 @@ func (o *Orchestrator) Typecheck(ctx context.Context, r TypecheckRun) error {
 	return o.sup.RunOnceBounded(ctx, "typecheck", r.RepoDir, shell, env, ReapLimits(rl))
 }
 
-// holdTypecheckSlot waits for one "checks" slot, the counter `haven machine slot run`
-// shares (ADR-064, ADR-095). slots == 0 is the gate turned off.
-func (o *Orchestrator) holdTypecheckSlot(ctx context.Context, slots int) (release func(), slot int, err error) {
-	if slots <= 0 {
-		return func() {}, 0, nil
+// holdTypecheckSlot waits for two units of the "checks" budget, the counter
+// `haven machine slot run` shares (ADR-064, ADR-095). budget == 0 is the gate off.
+func (o *Orchestrator) holdTypecheckSlot(ctx context.Context, budget int) (release func(), err error) {
+	if budget <= 0 {
+		return func() {}, nil
 	}
-	return o.sem.Acquire(ctx, "checks", slots)
+	return o.acquireUnits(ctx, budget, o.checkClaim(domain.ClassTypecheck, "haven machine typecheck"))
 }
 
-// takeFreeCheckSlots takes up to n more of the pool's check slots that are
+// takeFreeCheckSlots takes up to n more two-unit checks of the budget that are
 // free right now, without waiting, and returns how many it got plus their release.
-func (o *Orchestrator) takeFreeCheckSlots(pool, n int) (release func(), got int) {
+func (o *Orchestrator) takeFreeCheckSlots(budget, n int) (release func(), got int) {
 	var releases []func()
 	for range n {
-		rel, _, ok, err := o.sem.TryAcquire("checks", pool)
+		rel, ok, err := o.sem.TryAcquireUnits("checks", budget, o.checkClaim(domain.ClassCheck, "nx parallel probe"))
 		if err != nil || !ok {
 			break
 		}
@@ -93,11 +93,11 @@ func (o *Orchestrator) nxParallelEnv() []string {
 	if o.sem == nil {
 		return nil
 	}
-	slots := o.checkSlots()
-	if slots == 0 {
+	units := o.checkUnits()
+	if units == 0 {
 		return nil
 	}
-	release, free := o.takeFreeCheckSlots(slots, slots)
+	release, free := o.takeFreeCheckSlots(units, max(1, units/domain.UnitsPerCheck))
 	release()
 	return []string{"NX_PARALLEL=" + strconv.Itoa(max(1, free))}
 }

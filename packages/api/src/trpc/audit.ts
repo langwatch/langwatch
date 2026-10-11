@@ -416,6 +416,8 @@ function failedCallLogLevel({
 
   // An upgrade in progress is an expected, self-healing 503: warn, not an incident.
   if (handledCause.code === "upgrade_in_progress") return "warn";
+  // A refused private dataplane: the stores log it once at error, never per call.
+  if (handledCause.code === "private_dataplane_unavailable") return "warn";
 
   return handledCause.fault === "customer" ? "warn" : "error";
 }

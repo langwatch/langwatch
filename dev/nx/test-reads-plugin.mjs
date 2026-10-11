@@ -7,19 +7,9 @@ import { memberPatterns } from "./workspace-members.mjs";
 // package that its tests read from disk (measured, not guessed: ADR-150). The
 // test targets take it, so editing one of those files misses the cache and
 // makes the reader affected. A member absent from the table reads nothing.
-const sourceRoots = [
-  "modules/**/*",
-  "enterprise/**/*",
-  "packages/**/*",
-  "apps/**/*",
-  "sdks/**/*",
-  "mcp/**/*",
-  "services/**/*",
-];
+// Suites that walk the whole tree run uncached as `test:repo` and need no row.
 export const reads = {
-  "@langwatch/time": sourceRoots,
   "@langwatch/handled-error": [
-    ...sourceRoots,
     "docs/agent-testing/**/*",
     "docs/api-reference/**/*",
     "docs/evaluations/**/*",
@@ -28,8 +18,6 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
   ],
-  "@langwatch/csv": sourceRoots,
-  "@langwatch/scenario-contract": sourceRoots,
   "@langwatch/agent-process": [
     "modules/agent/**/*",
     "modules/workflow/process/src/**/*",
@@ -71,8 +59,6 @@ export const reads = {
   "@langwatch/internal-slack": ["modules/automation/**/*", ".oxlintrc.native.jsonc"],
   "@langwatch/identity-process": ["modules/auth/**/*"],
   "@langwatch/clickhouse-client": ["packages/clickhouse-migrations/**/*"],
-  "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/lts-floor.json"],
-  "@langwatch/prisma-client": ["packages/upgrade/releases/lts-floor.json"],
   "@langwatch/upgrade": ["packages/clickhouse-migrations/**/*"],
   "@langwatch/evaluator-contract": [
     "skills/**/*",

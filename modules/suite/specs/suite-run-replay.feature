@@ -63,3 +63,9 @@ Feature: Open suite runs are caught up with scenario's runs after the cut
     When the worker collects its modules' migration steps
     Then it holds suite's replay step, background and run after old writers are gone
     And a second pass over it changes nothing
+
+  @unit
+  Scenario: A tenant's open suite-run sweep is a declared full scan
+    Given a tenant's suite runs started in many weeks
+    When the replay sweep reads the tenant's open runs
+    Then the read is declared a full scan, since a run started in any week can still be open

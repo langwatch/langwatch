@@ -38,6 +38,7 @@ export type ApiKeyOrganizationTeam = {
   id: string;
   name: string;
   isPersonal?: boolean | null;
+  ownerUserId?: string | null;
   projects?: ApiKeyOrganizationProject[] | null;
 };
 

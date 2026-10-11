@@ -667,20 +667,20 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `suite_run_processing` (aggregate `suite_run`)
 
-Declared at `src/eventing/suite-run-processing.pipeline.ts:103`. Events: `SuiteRunStartedEventSchema`, `SuiteRunItemStartedEventSchema`, `SuiteRunItemCompletedEventSchema`, `SuiteRunItemRegradedEventSchema`.
+Declared at `src/eventing/suite-run-processing.pipeline.ts:102`. Events: `SuiteRunStartedEventSchema`, `SuiteRunItemStartedEventSchema`, `SuiteRunItemCompletedEventSchema`, `SuiteRunItemRegradedEventSchema`.
 
 | Kind                       | Name                                                                            | Handles                                                                 | Declared at                                         |
 | -------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------- |
-| command                    | `startSuiteRun`                                                                 | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:124` |
-| command                    | `recordSuiteRunItemStarted`                                                     | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:130` |
-| command                    | `completeSuiteRunItem`                                                          | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:136` |
-| command                    | `regradeSuiteRunItem`                                                           | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:142` |
-| peer subscriber            | `scenarioRunStarted`                                                            | `lw.simulation_run.started` from [scenario](../../scenario/README.md)   | `src/eventing/suite-run-processing.pipeline.ts:148` |
-| peer subscriber            | `scenarioRunFinished`                                                           | `lw.simulation_run.finished` from [scenario](../../scenario/README.md)  | `src/eventing/suite-run-processing.pipeline.ts:154` |
-| peer subscriber            | `scenarioRunEvaluated`                                                          | `lw.simulation_run.evaluated` from [scenario](../../scenario/README.md) | `src/eventing/suite-run-processing.pipeline.ts:160` |
-| ClickHouse fold projection | `≈ SuiteRunStateFoldProjection.create({ store: deps.suiteRunStateFoldStore, })` | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:115` |
-| lane aliases               | `≈ MAIN_SUITE_RUN_SYNC_ALIASES`                                                 | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:166` |
-| retention                  | `≈ deps.retention`                                                              | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:167` |
+| command                    | `startSuiteRun`                                                                 | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:123` |
+| command                    | `recordSuiteRunItemStarted`                                                     | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:129` |
+| command                    | `completeSuiteRunItem`                                                          | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:135` |
+| command                    | `regradeSuiteRunItem`                                                           | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:141` |
+| peer subscriber            | `scenarioRunStarted`                                                            | `lw.simulation_run.started` from [scenario](../../scenario/README.md)   | `src/eventing/suite-run-processing.pipeline.ts:147` |
+| peer subscriber            | `scenarioRunFinished`                                                           | `lw.simulation_run.finished` from [scenario](../../scenario/README.md)  | `src/eventing/suite-run-processing.pipeline.ts:153` |
+| peer subscriber            | `scenarioRunEvaluated`                                                          | `lw.simulation_run.evaluated` from [scenario](../../scenario/README.md) | `src/eventing/suite-run-processing.pipeline.ts:159` |
+| ClickHouse fold projection | `≈ SuiteRunStateFoldProjection.create({ store: deps.suiteRunStateFoldStore, })` | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:114` |
+| lane aliases               | `≈ MAIN_SUITE_RUN_SYNC_ALIASES`                                                 | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:165` |
+| retention                  | `≈ deps.retention`                                                              | –                                                                       | `src/eventing/suite-run-processing.pipeline.ts:166` |
 
 ## Configuration
 

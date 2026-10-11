@@ -2,6 +2,7 @@
 
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
+import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -331,6 +332,7 @@ export function SidebarContent({
   isFullWidth?: boolean;
 }) {
   const scrollRegionRef = useRef<HTMLDivElement>(null);
+  const scrollEdges = useScrollEdges({ axis: "y" });
   // Keyed by surface: each product's menu keeps its own place, and moving
   // between products never restores the place of the menu left behind.
   useMenuScrollPosition({ regionRef: scrollRegionRef, menuKey: surface });
@@ -370,37 +372,45 @@ export function SidebarContent({
       {/* Padding lives on this region, not its children, so the scrollbar
           runs against the content panel and entries are cut exactly at
           the rules above and below rather than a few pixels short. */}
-      <VStack
-        ref={scrollRegionRef}
-        data-testid="sidebar-scroll-region"
-        data-tour="sidebar"
-        width="full"
-        paddingX={3}
-        paddingTop={0}
-        paddingBottom={2}
-        gap={0.5}
-        align="start"
-        flex={1}
-        minHeight={0}
-        overflowY="auto"
-        overflowX="hidden"
-        css={{
-          // No standard scrollbar-width here: Chromium treats it as an
-          // opt out of the ::-webkit-scrollbar styling below, and the
-          // native bar it falls back to is a wide one with a track.
-          // Firefox takes its default scrollbar instead.
-          "&::-webkit-scrollbar": { width: "10px" },
-          "&::-webkit-scrollbar-thumb": {
-            background: "var(--chakra-colors-border-emphasized)",
-            backgroundClip: "padding-box",
-            border: "3px solid transparent",
-            borderRadius: "999px",
-          },
-          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "1.5" },
-        }}
-      >
-        <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
-      </VStack>
+      {/* The fades say the menu scrolls: entries hide under the rules above and below. */}
+      <Box position="relative" flex={1} minHeight={0} width="full" display="flex">
+        <VStack
+          ref={(node: HTMLDivElement | null) => {
+            scrollRegionRef.current = node;
+            scrollEdges.ref(node);
+          }}
+          data-testid="sidebar-scroll-region"
+          data-tour="sidebar"
+          width="full"
+          paddingX={3}
+          paddingTop={0}
+          paddingBottom={2}
+          gap={0.5}
+          align="start"
+          flex={1}
+          minHeight={0}
+          overflowY="auto"
+          overflowX="hidden"
+          css={{
+            // No standard scrollbar-width here: Chromium treats it as an
+            // opt out of the ::-webkit-scrollbar styling below, and the
+            // native bar it falls back to is a wide one with a track.
+            // Firefox takes its default scrollbar instead.
+            "&::-webkit-scrollbar": { width: "10px" },
+            "&::-webkit-scrollbar-thumb": {
+              background: "var(--chakra-colors-border-emphasized)",
+              backgroundClip: "padding-box",
+              border: "3px solid transparent",
+              borderRadius: "999px",
+            },
+            "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "1.5" },
+          }}
+        >
+          <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
+        </VStack>
+        <ScrollEdgeFade edge="top" visible={scrollEdges.start} color="bg.page" />
+        <ScrollEdgeFade edge="bottom" visible={scrollEdges.end} color="bg.page" />
+      </Box>
 
       <Box width="full" paddingX={2}>
         <SidebarBottomBlock

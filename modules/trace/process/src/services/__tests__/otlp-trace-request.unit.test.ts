@@ -1,4 +1,4 @@
-import type { OtlpAnyValue } from "@langwatch/trace-contract";
+import type { OtlpAnyValue } from "@langwatch/otlp/trace-request";
 import { OtlpTraceRequestService } from "@langwatch/trace-contract/otlp-decoding";
 import { describe, expect, it } from "vitest";
 

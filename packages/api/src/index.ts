@@ -25,6 +25,7 @@ export {
   formatError,
   ProjectInputMismatchError,
   InvalidApiVersionError,
+  isUpgradeInProgress,
   KeyKindRefusedError,
   MediaTypeMalformedRequestError,
   PayloadTooLargeError,

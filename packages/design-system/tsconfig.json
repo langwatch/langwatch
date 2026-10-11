@@ -10,29 +10,19 @@
 
     "rootDir": ".",
 
-    "outDir": "dist"
+    "outDir": "dist",
+    "composite": true,
+    "noEmit": false
   },
-  "include": [
-    ".storybook/**/*.ts",
-    ".storybook/**/*.tsx",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "tests/**/*.ts",
-    "tests/**/*.tsx"
-  ],
+  "files": [],
+  "include": [],
 
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../design-system-internal/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

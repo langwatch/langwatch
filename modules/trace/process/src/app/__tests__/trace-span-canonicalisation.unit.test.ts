@@ -1,5 +1,5 @@
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { OtlpSpan } from "@langwatch/trace-contract";
 import { decodeOtlpSpan } from "@langwatch/trace-contract/otlp-decoding";
 import { describe, expect, it } from "vitest";
 

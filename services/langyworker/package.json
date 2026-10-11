@@ -7,9 +7,9 @@
   "type": "module",
   "main": "dist/src/main.js",
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.js.json",
     "build:binary": "bun run scripts/build-binary.ts",
     "smoke": "bun run scripts/smoke.ts"
   },

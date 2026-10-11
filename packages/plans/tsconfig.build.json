@@ -11,5 +11,11 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
 
-  "references": []
+  "references": [],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
+    }
+  }
 }

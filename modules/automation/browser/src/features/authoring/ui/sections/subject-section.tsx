@@ -6,6 +6,7 @@ import { Link } from "@langwatch/browser-host/link";
 import { Card } from "@langwatch/design-system/card";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -326,28 +327,21 @@ function NoGraphsYet({ projectSlug }: { projectSlug?: string }) {
 function GraphsLoadFailed({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const describeError = useDescribeError();
   return (
-    <VStack
-      // The failure can replace the picker mid-session on a refetch, so
-      // announce the swap to assistive technology.
-      role="alert"
-      align="start"
-      gap={2}
-      padding={3}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      bg="bg.subtle"
-    >
-      <Text textStyle="sm">
-        {describeError({
-          error,
-          fallbackTitle: "Your custom graphs couldn't be loaded right now.",
-        })}
-      </Text>
-      <Button size="xs" variant="outline" onClick={onRetry}>
-        Try again
-      </Button>
-    </VStack>
+    // role="alert": the failure can replace the picker mid-session on a refetch.
+    <Alert.Root status="error" size="sm" role="alert">
+      <Alert.Indicator />
+      <Alert.Content gap={2} alignItems="start">
+        <Alert.Description>
+          {describeError({
+            error,
+            fallbackTitle: "Your custom graphs couldn't be loaded right now.",
+          })}
+        </Alert.Description>
+        <Button size="xs" variant="outline" onClick={onRetry}>
+          Try again
+        </Button>
+      </Alert.Content>
+    </Alert.Root>
   );
 }
 

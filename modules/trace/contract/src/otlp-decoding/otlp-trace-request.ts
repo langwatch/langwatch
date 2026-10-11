@@ -1,7 +1,7 @@
+import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { TraceState } from "@opentelemetry/core";
 import { match } from "ts-pattern";
 
-import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "../trace.otlp.ts";
 import {
   type NormalizedAttributes,
   NormalizedSpanKind,

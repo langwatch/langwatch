@@ -51,7 +51,7 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 haven sim analytics status        # record count + activity (last 5 min, distinct ids, last call)
 haven sim analytics list [--provider] [--kind] [--event|--name] [--id] | clear
 haven sim analytics get <id>   # one record: facts, properties, raw call
-haven sim analytics fault --error <0|4xx|5xx>   # the next capture calls fail with that status; 0 clears it
+haven sim analytics fault <4xx|5xx|off>        # the next capture calls fail with that status; off clears it
 haven sim analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]   # exit 66 on timeout
 ```
 

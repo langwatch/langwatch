@@ -19,6 +19,7 @@ import {
   type PricingModel,
   type SignInSecurityPolicy,
   type OrganizationCurrency,
+  ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
@@ -57,7 +58,9 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
   }
 
   async listAllIds({ after, limit }: OrganizationIdPageInput = {}): Promise<OrganizationIdPage> {
-    const ids = [...this.memory.organizations.keys()]
+    const ids = [...this.memory.organizations.values()]
+      .filter((row) => row.kind !== ORGANIZATION_KIND.SYSTEM)
+      .map((row) => row.id)
       .filter((id) => after === undefined || id > after)
       .toSorted();
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
@@ -222,6 +225,17 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
 
   async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {
     return !!this.memory.organizations.get(organizationId)?.instantEvalsEnabledAt;
+  }
+
+  async recordPrivateDataplaneSeen(input: {
+    organizationId: string;
+    clickhouseLabel: string | null;
+    s3Label: string | null;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) return;
+    organization.privateClickHouseLabel ??= input.clickhouseLabel;
+    organization.privateS3Label ??= input.s3Label;
   }
 
   async recordInstantEvalsOptIn(input: {

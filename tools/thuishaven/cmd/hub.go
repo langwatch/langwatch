@@ -13,6 +13,7 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hubtui"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // runHub is bare `haven` in a terminal: the interactive hub. Opening a stack's
@@ -116,6 +117,7 @@ func hubView(v app.HubView) hubtui.View {
 		out.Worktrees = append(out.Worktrees, hubtui.WorktreeRow{
 			Slug: wt.Slug, Branch: wt.Branch, Dir: wt.Dir,
 			IsPrimary: wt.IsPrimary, IsCurrent: wt.IsCurrent,
+			StaleDays: staleDays(wt.IdleFor),
 		})
 	}
 	for _, ev := range v.Events {
@@ -175,4 +177,13 @@ func openInBrowser(url string) error {
 	// the hub stays up.
 	go func() { _ = cmd.Wait() }()
 	return nil
+}
+
+// staleDays is the whole days a worktree has gone without a commit, or 0 while
+// it is younger than domain.StaleWorktreeAge.
+func staleDays(idle time.Duration) int {
+	if idle < domain.StaleWorktreeAge {
+		return 0
+	}
+	return int(idle / (24 * time.Hour))
 }

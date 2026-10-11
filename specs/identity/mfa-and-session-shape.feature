@@ -330,6 +330,29 @@ Feature: Two-step verification - one setup per person, and organizations that re
     Then the change is audited with "ana" named as the actor
     And every member of "acme" is told the requirement now applies
 
+  # The notices go out on the worker, from the recorded change: an organization
+  # with thousands of members must not hold the administrator's request open.
+
+  @unit
+  Scenario: Changing the requirement answers without waiting for the notices
+    When "ana" turns the requirement on for "acme"
+    Then the request answers once the setting is saved
+    And the change is recorded for the worker to tell the members
+    And no notice has been sent by the request itself
+
+  @unit
+  Scenario: Every member gets one notice of a recorded change
+    Given "acme" has two active members with an email address
+    When the worker handles the recorded change
+    Then each member is sent exactly one notice naming who changed it
+
+  @unit
+  Scenario: A redelivered change sends no duplicate notice
+    Given the worker has handled a recorded change for "acme"
+    When the same change is delivered again
+    Then it asks for the same notice delivery as before
+    And no member is sent a second notice
+
   @integration
   Scenario: Turning the requirement off lets the held members straight back in
     Given members of "acme" are held at the enrollment gate

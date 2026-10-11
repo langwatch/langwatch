@@ -180,6 +180,41 @@ local function reconcileParked(readyKey, keyPrefix, tenantCap, nowMs)
     unparkUpTo(readyKey, tenantId, slots)
   end
 end
+
+-- Lane pause parks like a tenant pause: out of ready, keyed by the matched pause
+-- entry, so a paused lane's backlog cannot fill the bounded dispatch scan.
+-- Returns 1 when the group left ready, so the scan offset stays aligned.
+local function parkLaneGroup(readyKey, groupId, pauseKey)
+  local score = redis.call("ZSCORE", readyKey, groupId)
+  if not score then return 0 end
+  local kp = parkKeyPrefixOf(readyKey)
+  redis.call("ZREM", readyKey, groupId)
+  redis.call("ZADD", kp .. "parked-lane:" .. pauseKey, score, groupId)
+  redis.call("SADD", kp .. "parked-lanes", pauseKey)
+  return 1
+end
+
+-- Restores, at their parked scores, the groups of every lane whose pause entry is
+-- gone, whoever removed it; bounded per key per eval like unparkUpTo. LT keeps an
+-- earlier score a stage wrote meanwhile; an active group's score is COMPLETE's.
+local function restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey)
+  for _, pauseKey in ipairs(redis.call("SMEMBERS", keyPrefix .. "parked-lanes")) do
+    if redis.call("SISMEMBER", pausedJobKey, pauseKey) == 0 then
+      local parkedKey = keyPrefix .. "parked-lane:" .. pauseKey
+      local members = redis.call("ZRANGE", parkedKey, 0, ${PARK_RECONCILE_MAX_DRAIN} - 1, "WITHSCORES")
+      for i = 1, #members, 2 do
+        local groupId = members[i]
+        redis.call("ZREM", parkedKey, groupId)
+        if redis.call("EXISTS", keyPrefix .. "group:" .. groupId .. ":active") == 0 then
+          addToReadyOrParked(readyKey, groupId, tonumber(members[i + 1]), true)
+        end
+      end
+      if redis.call("ZCARD", parkedKey) == 0 then
+        redis.call("SREM", keyPrefix .. "parked-lanes", pauseKey)
+      end
+    end
+  end
+end
 `;
 
 /** How long (ms) a tenant is treated as a claimant (prevents newcomer starvation). */
@@ -796,6 +831,11 @@ if (nowMs - lastReconcile) >= ${RECONCILE_INTERVAL_MS} then
   end
 end
 
+-- Not on the reconcile cadence: an unpause restores its lane on the next dispatch.
+if redis.call("SCARD", keyPrefix .. "parked-lanes") > 0 then
+  restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey)
+end
+
 -- Effective per-tenant cap: dynamic water-level when a budget is configured,
 -- else the static cap. staticCap=0 (kill switch) wins and disables parking.
 local tenantCap = staticCap
@@ -912,29 +952,27 @@ local function scanBatch(effCap, bypassPark, dispatched)
             local stagedJobId = jobResults[1]
             local originalScore = jobResults[2]
 
-            -- Check pause status before dequeuing
+            -- Check pause status before dequeuing. A paused lane parks the group
+            -- out of ready under the matched entry (specs/queue-pausing).
             local paused = false
             if hasPauses then
-              local slashIdx = string.find(groupId, "/", 1, true)
-              local tenantId = slashIdx and string.sub(groupId, 1, slashIdx - 1) or groupId
-              if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. tenantId) == 1 then
-                paused = true
-              end
-
-              if not paused then
-                local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
-                local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
-                if jobDataJson then
-                  local p, t, n = gqRoutingMeta(jobDataJson)
-                  local pIsStr = type(p) == "string"
-                  local tIsStr = type(t) == "string"
-                  local nIsStr = type(n) == "string"
-                  if pIsStr then
-                    if redis.call("SISMEMBER", pausedJobKey, p) == 1 then paused = true
-                    elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then paused = true
-                    elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then paused = true
-                    end
+              local dataKey = keyPrefix .. "group:" .. groupId .. ":data"
+              local jobDataJson = redis.call("HGET", dataKey, stagedJobId)
+              if jobDataJson then
+                local p, t, n = gqRoutingMeta(jobDataJson)
+                local pIsStr = type(p) == "string"
+                local tIsStr = type(t) == "string"
+                local nIsStr = type(n) == "string"
+                local pausedBy = nil
+                if pIsStr then
+                  if redis.call("SISMEMBER", pausedJobKey, p) == 1 then pausedBy = p
+                  elseif tIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t) == 1 then pausedBy = p .. "/" .. t
+                  elseif tIsStr and nIsStr and redis.call("SISMEMBER", pausedJobKey, p .. "/" .. t .. "/" .. n) == 1 then pausedBy = p .. "/" .. t .. "/" .. n
                   end
+                end
+                if pausedBy then
+                  paused = true
+                  removed = removed + parkLaneGroup(readyKey, groupId, pausedBy)
                 end
               end
             end

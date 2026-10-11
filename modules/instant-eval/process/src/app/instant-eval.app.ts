@@ -223,11 +223,15 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       judgments: repositories.judgments,
     });
     const dispatcher = InstantEvalCommandDispatcherService.create();
-    const rowSource = InstantEvalRowSourceService.create({ analytics });
-    // The extraction half of a judged plan, which is Analytics' own: this
-    // module judges the texts it answers with and never the rows behind them.
+    const rowSource = InstantEvalRowSourceService.create({ analytics, access });
+    // The extraction half of a judged plan, which is Analytics' own: this module judges the
+    // texts it answers with, and states the eval gate Analytics takes from its caller.
     const textSource: InstantEvalTextSource = {
-      texts: (input) => analytics.hydrateLangWatchQLTexts(input),
+      texts: async (input) =>
+        analytics.hydrateLangWatchQLTexts({
+          ...input,
+          isInstantEvalsEnabled: await access.isEnabled({ projectId: input.project.id }),
+        }),
     };
     const cancellations = repositories.cancellations;
     // A hold one process keeps to itself admits the same organization's runs

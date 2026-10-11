@@ -235,7 +235,7 @@ describe("given ops's system-migrations declaration", () => {
         {
           messageKey: `operator:user_operator:${NOW}`,
           intentType: "runPass",
-          payload: { redrive: false, requestedAt: NOW },
+          payload: { redrive: false, followUp: false, requestedAt: NOW },
         },
       ]);
     });

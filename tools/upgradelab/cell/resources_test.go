@@ -145,3 +145,29 @@ func TestMainPageAcrossSwitchIsWindowedAssetNotFound(t *testing.T) {
 		}
 	}
 }
+
+func TestMainClientOutdatedIsWindowedEnvelopeRefusal(t *testing.T) {
+	enveloped := "http://x/api/trpc/featureFlag.isEnabled?input=%7B%22json%22%3A%7B%22flag%22%3A%22f%22%7D%7D"
+	for _, record := range []BrowserRecord{
+		{Kind: "http", AtMs: 1_010, URL: enveloped, Status: 400},
+		{Kind: "http", AtMs: 1_010, URL: "http://x/api/trpc-ws", Status: 404},
+		{Kind: "console", AtMs: 1_010, URL: "http://x/settings", Text: "Failed to load resource: the server responded with a status of 400 (Bad Request)"},
+	} {
+		if !mainClientOutdated(record, 1_000) {
+			t.Errorf("%s %s just after the switch not tolerated", record.Kind, record.URL)
+		}
+		if mainClientOutdated(record, -1) {
+			t.Errorf("%s tolerated before the switch is known", record.Kind)
+		}
+	}
+	for name, record := range map[string]BrowserRecord{
+		"head's own plain input": {Kind: "http", AtMs: 1_010, URL: "http://x/api/trpc/featureFlag.isEnabled?input=%7B%22flag%22%3A%22f%22%7D", Status: 400},
+		"a minute after":         {Kind: "http", AtMs: 61_001, URL: enveloped, Status: 400},
+		"before the switch":      {Kind: "http", AtMs: 900, URL: enveloped, Status: 400},
+		"another status":         {Kind: "http", AtMs: 1_010, URL: enveloped, Status: 500},
+	} {
+		if mainClientOutdated(record, 1_000) {
+			t.Errorf("%s tolerated", name)
+		}
+	}
+}

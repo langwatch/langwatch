@@ -895,17 +895,15 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
       { path: "/ops/foundry", page: "pages/ops/foundry" },
       {
-        // Tenant migrations are a tab of the Upgrades page now.
+        // Organization steps are the Organizations tab of the Upgrades page.
         path: "/ops/migrations",
-        redirect: { from: "/ops/migrations", to: "/ops/upgrades", pinParams: { tab: "tenants" } },
+        redirect: {
+          from: "/ops/migrations",
+          to: "/ops/upgrades",
+          pinParams: { tab: "organizations" },
+        },
       },
       { path: "/ops/upgrades", page: "pages/ops/upgrades" },
-      { path: "/ops/upgrades/preview", page: "pages/ops/upgrades/preview" },
-      {
-        path: "/ops/upgrades/releases/:release",
-        page: "pages/ops/upgrades/releases/[release]",
-      },
-      { path: "/ops/upgrades/runs/:runId", page: "pages/ops/upgrades/runs/[runId]" },
       {
         // Projection replay is a drawer on the event-sourcing page now, so the
         // old address has to open the drawer as well as land on the page. Per-run

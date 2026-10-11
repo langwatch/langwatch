@@ -1,4 +1,4 @@
-import type { OtlpIngestCredentialInput } from "@langwatch/trace-contract";
+import type { OtlpIngestCredentialInput } from "@langwatch/otlp/door";
 
 /** A token read off a request, and the project it named where one was given. */
 export type TraceLegacyRequestCredentials = Readonly<{

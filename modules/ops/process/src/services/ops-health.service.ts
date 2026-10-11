@@ -84,7 +84,6 @@ function upgradeOf({
   return {
     state: status.state,
     release: status.installed,
-    floor: status.floor,
     failed_steps: status.failedStepIds.length,
     failed_targets: status.failedTargets,
     held_tenants: migrations

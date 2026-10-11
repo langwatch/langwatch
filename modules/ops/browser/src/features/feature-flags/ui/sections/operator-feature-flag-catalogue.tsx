@@ -261,7 +261,7 @@ function FlagRow({
       <ListTable.Cell>
         <VStack align="start" gap={2}>
           <HStack gap={2} wrap="wrap">
-            <Text textStyle="monoSm" overflowWrap="anywhere">
+            <Text textStyle="monoSm" whiteSpace="nowrap" title={row.key}>
               {row.key}
             </Text>
             <ScopeBadge scope={row.scope} />

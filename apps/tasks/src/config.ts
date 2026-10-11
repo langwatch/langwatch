@@ -14,7 +14,6 @@ import { z } from "zod";
 /** The migration runner's own controls. Connection strings are not among them. */
 export const tasksConfig = Config.define((c) => ({
   isSaaS: c.env("IS_SAAS", environmentOneOrTrueSchema),
-  skipPrismaMigrate: c.env("SKIP_PRISMA_MIGRATE", environmentOneOrTrueSchema),
   skipLwqlProvision: c.env("SKIP_LWQL_PROVISION", environmentOneOrTrueSchema),
   nodeEnvironment: c.env("NODE_ENV", nodeEnvironmentSchema),
   /** Routing, not a secret: which 1Password account the secrets chain asks. */

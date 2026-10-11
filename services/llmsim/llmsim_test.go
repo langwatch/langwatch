@@ -548,3 +548,69 @@ func TestModelsListNamesTheSeededModels(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "Any model makes the tool calls a scripted message names"
+func TestScriptedToolCallsOnAnyModel(t *testing.T) {
+	srv := newTestServer(t)
+	body := `{"model":"gpt-5-mini","tools":[` + weatherTool + `,{"type":"function","function":{"name":"search_traces","parameters":{"type":"object"}}}],` +
+		`"messages":[{"role":"user","content":"Reading.\n/tool search_traces {\"traceId\":\"abc\"}"}]}`
+	out := chat(t, srv, body, nil)
+	calls := out.Choices[0].Message.ToolCalls
+	if len(calls) != 1 || calls[0].Function.Name != "search_traces" || calls[0].Function.Arguments != `{"traceId":"abc"}` {
+		t.Fatalf("chat got %+v", out.Choices[0])
+	}
+	tools := `"tools":[{"type":"function","name":"bash","parameters":{"type":"object"}}]`
+	call := responses(t, srv.URL, `{"model":"gpt-5-mini","input":"/tool bash {\"command\":\"ls\"}",`+tools+`}`)
+	if len(call.Output) != 1 || call.Output[0].Type != "function_call" || call.Output[0].Name != "bash" || call.Output[0].Arguments != `{"command":"ls"}` {
+		t.Fatalf("responses got %+v", call.Output)
+	}
+	plain := chat(t, srv, `{"model":"gpt-5-mini","tools":[`+weatherTool+`],"messages":[{"role":"user","content":"no script here"}],"tool_choice":"none"}`, nil)
+	if len(plain.Choices[0].Message.ToolCalls) != 0 {
+		t.Fatalf("an unscripted message was scripted: %+v", plain.Choices[0])
+	}
+}
+
+// @scenario "A JSON request answers the object a scripted message names"
+func TestScriptedJSONObject(t *testing.T) {
+	srv := newTestServer(t)
+	script := `"messages":[{"role":"user","content":"traces with errors\n/json {\"kind\":\"apply_query\",\"query\":\"status:error\"}"}]`
+	out := chat(t, srv, `{"model":"gpt-5-mini","response_format":{"type":"json_object"},`+script+`}`, nil)
+	if got := *out.Choices[0].Message.Content; got != `{"kind":"apply_query","query":"status:error"}` {
+		t.Fatalf("json_object got %q", got)
+	}
+	plain := chat(t, srv, `{"model":"gpt-5-mini",`+script+`}`, nil)
+	if strings.HasPrefix(*plain.Choices[0].Message.Content, `{"kind"`) {
+		t.Fatalf("a text request was scripted: %q", *plain.Choices[0].Message.Content)
+	}
+}
+
+// @scenario "A queued JSON answer is the next JSON request's answer, once"
+func TestNextJSONSettingAnswersOnce(t *testing.T) {
+	srv := newTestServer(t)
+	put := func(body string) int {
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodPut, srv.URL+"/_sim/api/settings", strings.NewReader(body))
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("PUT settings: %v", err)
+		}
+		_ = resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := put(`{"nextJson":"not an object"}`); code != http.StatusBadRequest {
+		t.Fatalf("a non-object nextJson was accepted: %d", code)
+	}
+	if code := put(`{"nextJson":{"route":"free_text"}}`); code != http.StatusOK {
+		t.Fatalf("PUT nextJson: %d", code)
+	}
+	text := chat(t, srv, `{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}`, nil)
+	if strings.Contains(*text.Choices[0].Message.Content, "free_text") {
+		t.Fatal("a text request took the queued JSON answer")
+	}
+	jsonReq := `{"model":"gpt-5-mini","response_format":{"type":"json_object"},"messages":[{"role":"user","content":"route this"}]}`
+	if got := *chat(t, srv, jsonReq, nil).Choices[0].Message.Content; got != `{"route":"free_text"}` {
+		t.Fatalf("first JSON request got %q", got)
+	}
+	if got := *chat(t, srv, jsonReq, nil).Choices[0].Message.Content; got == `{"route":"free_text"}` {
+		t.Fatal("the queued JSON answer was used twice")
+	}
+}

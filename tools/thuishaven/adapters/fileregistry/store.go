@@ -554,6 +554,10 @@ type WaiterClaim struct {
 	AgentID         string            `json:"agentId,omitempty"`
 	QueuedAt        time.Time         `json:"queuedAt"`
 	OverrideHonored bool              `json:"overrideHonored,omitempty"`
+	// Class, Units and Worktree name what the run will take of the unit budget.
+	Class    string `json:"class,omitempty"`
+	Units    int    `json:"units,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 }
 
 // WaiterSnapshot is one currently-queued run, as WaiterClaim plus the pid it
@@ -589,6 +593,16 @@ func (s *Store) ClaimWaiter(pid int, name string, claim WaiterClaim) (func(), er
 // dead pid or an expired marker is swept as it is found rather than reported,
 // and a marker this cannot parse is dropped rather than reaching code that
 // assumes its fields.
+// WaiterClaims is WaiterSnapshots as unit claims, for `haven status`.
+func (s *Store) WaiterClaims(name string) []domain.SlotClaim {
+	snaps := s.WaiterSnapshots(name)
+	out := make([]domain.SlotClaim, 0, len(snaps))
+	for _, w := range snaps {
+		out = append(out, domain.SlotClaim{PID: w.PID, Class: w.Class, Units: w.Units, Worktree: w.Worktree, Label: w.Command, StartedAt: w.QueuedAt})
+	}
+	return out
+}
+
 func (s *Store) WaiterSnapshots(name string) []WaiterSnapshot {
 	dir := s.waitersDir(name)
 	entries, err := os.ReadDir(dir)
@@ -650,6 +664,10 @@ func (s *Store) holdersDir(name string) string { return filepath.Join(s.home, "h
 type HolderClaim struct {
 	Label     string    `json:"label"`
 	StartedAt time.Time `json:"startedAt"`
+	// Class, Units and Worktree name what the run holds of the unit budget.
+	Class    string `json:"class,omitempty"`
+	Units    int    `json:"units,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 }
 
 // HolderSnapshot is one live slot holder, with the pid it registered under.

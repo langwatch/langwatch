@@ -610,12 +610,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `license_sync` (aggregate `global`)
 
-Declared at `src/eventing/license-sync.pipeline.ts:57`.
+Declared at `src/eventing/license-sync.pipeline.ts:78`.
 
 | Kind            | Name                        | Handles                                                                                     | Declared at                                |
 | --------------- | --------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| process manager | `licenseSync`               | every 2 min (`LICENSE_SYNC_FIRST_DELAY_MS = 2 * 60 * 1000`); intents `sync` (outbox)        | `src/eventing/license-sync.pipeline.ts:63` |
-| peer subscriber | `configuredLicenseOnSignUp` | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/license-sync.pipeline.ts:62` |
+| process manager | `licenseSync`               | every 2 min (`LICENSE_SYNC_FIRST_DELAY_MS = 2 * 60 * 1000`); intents `sync` (outbox)        | `src/eventing/license-sync.pipeline.ts:85` |
+| peer subscriber | `configuredLicenseOnSignUp` | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/license-sync.pipeline.ts:83` |
+| peer subscriber | `ssoSignInProviderRecorded` | `lw.sso.sign_in_provider.recorded` from [sso](../../sso/README.md)                          | `src/eventing/license-sync.pipeline.ts:84` |
 
 ### Pipeline `licensing_customer` (aggregate `licensing_customer`)
 
@@ -650,8 +651,8 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:166`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:167`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:157`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:158`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
 | config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
 | config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |

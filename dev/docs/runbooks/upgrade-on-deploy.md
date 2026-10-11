@@ -12,7 +12,7 @@
 
 The contract is fixed now; the pieces it names land in slices. All five have landed:
 the workers run `upgrade` at start (the chart's pre-roll Job does too, when upgrades are serialised), and every admitted api and worker writes its roster entry
-(15 s refresh, 60 s stale).
+(15 s refresh, 10 minutes stale).
 
 | Piece                                                                          | Lands with                                                   |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------ |
@@ -53,8 +53,10 @@ the workers run `upgrade` at start (the chart's pre-roll Job does too, when upgr
    (`public_upgrade_ledger` by default), created on its first run. A role without `CREATE` on the
    database needs that schema created for it beforehand, owned by the role.
 
-If the deploy applies the chart, items 1 to 4 need nothing beyond the chart's
-Job, which `mig-entry-points` repoints to `upgrade`.
+If the deploy applies the chart with `serializeUpgrades` on, items 1 to 4 need nothing
+beyond the chart's pre-roll Job, which runs `upgrade`
+(`charts/langwatch/templates/app/migrate-pre-roll-job.yaml:22-23`). Without
+`serializeUpgrades` the Job does not render, and the deploy must cover items 1 to 4 itself.
 
 ## What happens during a rollout
 
@@ -115,6 +117,16 @@ A background step that fails does not fail a deploy, because it runs on the
 worker after the rollout. It surfaces through metrics and alerts, and the step
 stays `failed` in the ledger until a later build fixes it.
 
+A private ClickHouse target that fails or cannot be reached does not fail the run
+either (Alex, 2026-10-11). Each ClickHouse target upgrades on its own: the shared
+target and every healthy private target finish their steps and the release becomes
+ready. The run waits for the failing target once, then holds it: its target rows
+stay `failed` or `pending`, and Ops > Upgrades reads "Needs attention" with the
+target on the Dataplanes tab. Only that target's organizations wait. Once it
+answers, an admitted worker runs the upgrade again (every minute, slowing to every
+five while it stays down) and the target catches up with no operator action. A
+failing shared target still fails the run.
+
 ## Reading the console
 
 Every line `pnpm task upgrade` writes names its `phase`, what it is waiting on
@@ -149,8 +161,12 @@ Two migrations are heavy on a cloud-sized table (plan items P05 and C03).
 
 - **`AuditLog` unique index (P05).** The plain build holds a SHARE lock and blocks
   audit writes. With the 2 second `lock_timeout` it can fail below the marker and
-  then needs a manual `prisma migrate resolve`. Run `CREATE UNIQUE INDEX
-CONCURRENTLY IF NOT EXISTS` ahead of the deploy so the migration finds it.
+  then needs a manual `prisma migrate resolve`. Ahead of the deploy, add the
+  column with `ADD COLUMN IF NOT EXISTS` first (an index cannot be built before its
+  column exists), then run `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS`, then
+  check `indisvalid` in `pg_index`; drop and rebuild an invalid index. The migration
+  then finds both. The `GatewayRealtimeSession` index (migration `20261006180001`)
+  takes the same steps.
 - **`trace_summaries` index (C03).** `MATERIALIZE INDEX` starts a mutation over
   every part at deploy. It competes with merges, and later `ALTER`s queue behind
   it. Watch `system.mutations`; if the cloud measurement says it is too heavy,
@@ -163,8 +179,9 @@ The cloud size measurement is an operator task, not part of this lane.
 The rolled-back image writes roster entries without the newer steps, so "old
 writers gone" turns false again and any step waiting on it waits again. Blocking
 steps the newer build applied stay applied and are harmless to the older one.
-Contract steps wait for the LTS floor on cloud as on self-hosted (ADR-173,
-decision 4), so a rollback within the supported window always finds its schema.
+Contract steps wait until old writers are gone (`needsOldWritersGone`) on cloud as
+on self-hosted, and no release is a required stop (Alex, 2026-10-11), so a rollback
+always finds its schema.
 
 **A rollback to an image before the roster** (`origin/main` or 3.20.1) writes no roster row, so
 nothing sees it, and level-triggered steps would never re-run over what it wrote. Before rolling
@@ -172,3 +189,56 @@ forward again, run `pnpm task upgrade pre-roster-rollback` from the new image. I
 rollback, so steps that need old writers gone wait again for the assertion or the grace after the
 next upgrade run, and reopens every done background step so it re-runs over the rollback's writes.
 It answers the ids it reopened; running it twice reopens nothing more.
+
+## One runner at a time
+
+Only one process runs the upgrade at once, because of the runner lease: a row lease in the
+ledger schema, with a heartbeat and a TTL, that every worker, the pre-roll Job and a manual
+`pnpm task upgrade` must take (`packages/upgrade/src/runner/runner-lease.ts`). Prisma's own
+advisory lock is a second guard for the schema. A runner that does not get the lease waits,
+asks again every few seconds, names the holder every 30 s, and gives up after 10 minutes.
+
+## First cutover from a release before the upgrade ledger (cloud)
+
+### Why it is different
+
+- The old pods run `prisma migrate deploy`, goose and their own system migrations at every
+  start, under their own lock, not the upgrade lease.
+- A failed `_prisma_migrations` row makes every old pod, and any rollback, crash-loop with
+  P3009.
+- 28 new migrations alter hot tables (ApiKey, User, Organization, VirtualKey, AuditLog,
+  RoleBinding indexes) under a 2 s `lock_timeout`, without automatic retry.
+
+Under the UPGRADE-FACE ruling (`dev/docs/ARCHITECTURE.md` §7), cloud users see only the
+branded page while an upgrade blocks, so the operator signals below are the only signal.
+
+### Checklist
+
+1. Freeze deploys of the old line. Confirm no goose or Prisma number collides: diff
+   `_prisma_migrations` and `goose_db_version` against the image. Expect only new ids and no
+   failed rows.
+2. Rehearse on a snapshot clone and time each step.
+3. Grant on-call staff the platform-operator role (`pnpm task grant-platform-operator <email>`)
+   so Ops > Upgrades and the upgrade alert email reach someone.
+4. Pre-build the `AuditLog` and `GatewayRealtimeSession` indexes concurrently, as under "Long
+   blocking steps". Pre-apply the hot-table `ALTER`s in a quiet window.
+5. Check that the database role can `CREATE` the `<schema>_upgrade_ledger` schema, that every
+   private ClickHouse target answers (one that does not is held, so only its organizations
+   wait), and that the ClickHouse migration user's
+   `mutations_sync` is 0, because migration 00103 runs a `MATERIALIZE INDEX` mutation.
+6. On the OLD image's Deployment, for the window, set the old image's own skip switches
+   (`SKIP_PRISMA_MIGRATE`, `SKIP_CLICKHOUSE_MIGRATE`, `SKIP_LWQL_PROVISION`) so restarting old
+   pods do not race the upgrade. These are switches of the old image only; the new image does
+   not read them.
+7. Confirm `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the old line, so jobs the old api
+   enqueues are readable by new workers.
+8. Cut over at low traffic with no long transactions open. Keep
+   `prisma migrate resolve --rolled-back <name>` ready.
+9. Finish rolling api and workers inside the 30-minute pre-roster grace, then run
+   `pnpm task upgrade old-writers-gone`.
+10. Watch `pnpm task upgrade status`, `system.mutations` and the background steps for hours.
+    Alert on `waitingOn: "a Retry"`, `phase: upgrade-wait`, and api `/readyz` down for more
+    than 10 minutes.
+11. Rollback: the previous image with its skip switches set, after resolving any failed
+    `_prisma_migrations` row. Then run `pnpm task upgrade pre-roster-rollback` before rolling
+    forward again.

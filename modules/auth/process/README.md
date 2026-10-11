@@ -98,10 +98,10 @@ verifyBrowserSession(input: { headers: Headers }): Promise<BrowserSessionVerific
 
 #### `resolveBrowserSession`
 
-A missing, revoked, expired, or unusable session resolves as anonymous.
+A missing, revoked, expired, or unusable session resolves as anonymous. `background`: the browser's own polling read, judged against the idle window but never counted as use.
 
 ```typescript
-resolveBrowserSession(input: { verified: VerifiedBrowserSession; }): Promise<BrowserSessionResolution>;
+resolveBrowserSession(input: { verified: VerifiedBrowserSession; background?: boolean; }): Promise<BrowserSessionResolution>;
 ```
 
 #### `getCliAccessSession`
@@ -925,7 +925,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:275`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:272`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -935,8 +935,8 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET`                | `src/app/auth.app.ts:278`                            |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:280`                            |
+| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET`                | `src/app/auth.app.ts:275`                            |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:277`                            |
 | config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:21`                  |
 | config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:23`                  |
 | config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:24`                  |

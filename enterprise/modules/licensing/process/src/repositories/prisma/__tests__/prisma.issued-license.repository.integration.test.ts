@@ -97,6 +97,25 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect((await repository.findByTokenHash(stored?.tokenHash ?? ""))?.id).toBe(license.id);
   });
 
+  /** @scenario A purchased GROWTH licence is recorded with unlimited lite seats */
+  it("stores a GROWTH license's unlimited lite seats as the flag, not an overflowing count", async () => {
+    const organization = await prisma.organization.create({
+      data: { name: `ACME Growth ${RUN}`, slug: `--${RUN}-${organizationIds.length}` },
+    });
+    organizationIds.push(organization.id);
+    const { license } = await registry.issue({
+      customer: { organizationId: organization.id },
+      email: "ops@acme.test",
+      planType: "GROWTH",
+      maxMembers: 5,
+      expiresAt: nowInstant().add({ hours: 24 * 365 }),
+      operatorId: "user_operator",
+    });
+    const stored = await prisma.issuedLicense.findUnique({ where: { id: license.id } });
+
+    expect(stored).toMatchObject({ maxMembersLite: null, liteSeatsUnlimited: true });
+  });
+
   it("records a raised seat change in the replacement's own insert and reads it back", async () => {
     const { license } = await issue("ACME Seats");
     const changed = await registry.changeSeats({

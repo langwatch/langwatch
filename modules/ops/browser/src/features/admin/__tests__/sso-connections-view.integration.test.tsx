@@ -6,7 +6,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithOpsHost } from "../../../testing.tsx";
+import { fakeOpsHost, renderWithOpsHost } from "../../../testing.tsx";
 import { useAdminOne } from "../behavior/use-admin-resource.ts";
 import SsoConnectionsView from "../ui/sections/sso-connections-view.tsx";
 
@@ -610,6 +610,28 @@ describe("the admin single sign-on list", () => {
 
       await waitFor(() => {
         expect(screen.getByText(/No replacement is registered/)).toBeTruthy();
+      });
+    });
+
+    /** @scenario "The back office imports a replacement for a carried-over connection" */
+    it("draws the import sso lends, for that organization and connection", async () => {
+      byIdState.current = {
+        data: { ...ATTESTED, source: "legacy-grandfathered" },
+        error: null,
+      };
+      const LentImport = ({
+        organizationId,
+        replacesConnectionId,
+      }: {
+        organizationId: string;
+        replacesConnectionId: string;
+      }) => <div data-testid="lent-import">{`${organizationId}:${replacesConnectionId}`}</div>;
+      renderWithOpsHost(<SsoConnectionsView />, {
+        host: fakeOpsHost({ ssoReplacementImport: LentImport }),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("lent-import").textContent).toBe("org_acme:ssoc_1");
       });
     });
   });

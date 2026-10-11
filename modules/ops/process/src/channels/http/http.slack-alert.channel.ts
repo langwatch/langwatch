@@ -1,6 +1,6 @@
 import type { OpsSlackAlertTransport } from "../slack/slack.bug-report-notifier.channel.ts";
 
-const CHAT_POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage";
+const SLACK_API_BASE = "https://slack.com/api";
 /** Long enough for a slow Slack, short enough that a blackholed one does not hold intake. */
 const POST_TIMEOUT_MS = 10_000;
 
@@ -16,10 +16,19 @@ export type SlackAlertFetch = (
  * A redirect is refused: a 3xx would carry the bearer token somewhere else.
  */
 export class HttpSlackAlertChannel implements OpsSlackAlertTransport {
-  private constructor(private readonly send: SlackAlertFetch) {}
+  private constructor(
+    private readonly send: SlackAlertFetch,
+    private readonly apiBase: string,
+  ) {}
 
-  static create({ fetch: send }: { fetch?: SlackAlertFetch } = {}): HttpSlackAlertChannel {
-    return new HttpSlackAlertChannel(send ?? ((url, init) => fetch(url, init)));
+  static create({
+    fetch: send,
+    apiBase,
+  }: { fetch?: SlackAlertFetch; apiBase?: string } = {}): HttpSlackAlertChannel {
+    return new HttpSlackAlertChannel(
+      send ?? ((url, init) => fetch(url, init)),
+      (apiBase ?? SLACK_API_BASE).replace(/\/+$/, ""),
+    );
   }
 
   async post({
@@ -29,7 +38,7 @@ export class HttpSlackAlertChannel implements OpsSlackAlertTransport {
     triggerName,
   }: Parameters<OpsSlackAlertTransport["post"]>[0]): Promise<void> {
     const label = `Slack Web API dispatch for "${triggerName}"`;
-    const response = await this.send(CHAT_POST_MESSAGE_URL, {
+    const response = await this.send(`${this.apiBase}/chat.postMessage`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

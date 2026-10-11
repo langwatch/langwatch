@@ -314,22 +314,18 @@ const MAIN_FACTS_DISPATCH_ALIASES: readonly LaneAlias[] = [
       const lifted = parseSpanFactsLiftedPayload(stored);
       return lifted ? { ...lifted.data, tenantId: lifted.tenantId } : stored;
     },
-    removeAfter: "3.21.0",
   },
   {
     from: "trace_processing:subscriber:codingAgentSpanFactsDispatch",
     to: { jobType: "subscriber", lane: "codingAgentSpanFactsDispatch" },
     eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    removeAfter: "3.21.0",
   },
   {
     from: "log_processing:subscriber:codingAgentLogFactsDispatch",
     to: { jobType: "subscriber", lane: "codingAgentLogFactsDispatch" },
-    removeAfter: "3.21.0",
   },
   {
     from: "metric_processing:subscriber:codingAgentMetricFactsDispatch",
     to: { jobType: "subscriber", lane: "codingAgentMetricFactsDispatch" },
-    removeAfter: "3.21.0",
   },
 ];

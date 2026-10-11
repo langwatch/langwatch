@@ -159,7 +159,8 @@ describe("area-owned header geometry", () => {
       expect(style.maxHeight).toBe(style.height);
       expect(style.paddingInline).toBe("var(--page-inset, var(--chakra-spacing-6))");
       expect(style.paddingTop).toBe("1px");
-      expect(style.flexWrap).toBe("nowrap");
+      // jsdom shows the phone layout, which wraps; from `md` up the row stays single-line.
+      expect(style.flexWrap).toBe("wrap");
       const title = getComputedStyle(screen.getByRole("heading", { name: `Title ${count}` }));
       expect(title.fontSize).toBe("20px");
       expect(title.height).toBe("28px");

@@ -246,6 +246,22 @@ describe("PrismaAuthzProjectionRepository", () => {
       expect(updateClause).not.toContain('"revokedReason"');
     });
 
+    /** @scenario "A shared grant's window is stored with its row" */
+    it("writes and restates a shared read's condition as JSON", async () => {
+      const { repository, executeRaw } = build();
+      const condition = { type: "trace", from: "2026-10-10T10:37:55.584Z" };
+
+      await repository.append({
+        kind: "grant.upsert",
+        row: grantRow({ principalType: "PROJECT", roleKey: "project-reader", condition }),
+      } as GrantProjectionWrite);
+
+      const [insert, update] = sqlFrom(executeRaw).split("DO UPDATE SET");
+      expect(insert).toContain('"condition"');
+      expect(update).toContain('"condition" = EXCLUDED."condition"');
+      expect(executeRaw.mock.calls[0]).toContain(JSON.stringify(condition));
+    });
+
     /** @scenario "The insert is fenced on the lifetime the fact was stamped against" */
     it("fences a stamped USER insert on the live membership row", async () => {
       const { repository, executeRaw } = build();

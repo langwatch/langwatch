@@ -469,7 +469,7 @@ function RefChipList({
   }
   if (!Array.isArray(refs) || refs.length === 0) return <EmptyCell />;
   return (
-    <Wrap gap={1} minWidth="44" maxWidth="60">
+    <Wrap gap={1} minWidth={0} maxWidth="60">
       {refs.slice(0, 2).map((ref) => (
         <Badge key={ref.id} variant="outline" asChild maxWidth="full">
           <RoutedLink href={`/ops/${resource}?q=${encodeURIComponent(ref.id)}`}>

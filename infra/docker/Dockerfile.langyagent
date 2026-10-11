@@ -128,7 +128,7 @@ COPY sdks/typescript ./sdks/typescript
 # src/ + the pi SDK from node_modules, so manifests alone are not enough.
 COPY services/langyworker/package.json ./services/langyworker/
 COPY services/langyworker/tsconfig.json ./services/langyworker/
-COPY services/langyworker/tsconfig.build.json ./services/langyworker/
+COPY services/langyworker/tsconfig.js.json ./services/langyworker/
 COPY services/langyworker/src ./services/langyworker/src
 COPY services/langyworker/scripts ./services/langyworker/scripts
 # Full source for every workspace package the CLI and the worker reach

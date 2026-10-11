@@ -3,8 +3,9 @@
  * this module creates nothing: a connection exists only because a method was
  * called (ADR-093).
  */
-import IORedis, { Cluster, type Redis } from "ioredis";
+import type { Redis } from "ioredis";
 
+import { FamilyCluster, FamilyRedis, RedisClientFamily } from "./client-family.ts";
 import {
   RedisConfigService,
   type RedisConfigResolution,
@@ -111,17 +112,18 @@ export class RedisConnectionService {
     if (!config.configured) return null;
 
     if (config.mode === "cluster") {
-      const connection = new Cluster(config.endpoints, {
+      const context = { mode: "cluster", endpoints: config.endpoints.length };
+      const family = this.familyFor({ context });
+      const connection = new FamilyCluster(config.endpoints, {
         redisOptions: { ...SHARED_OPTIONS },
         dnsLookup: (address, callback) => callback(null, address),
         scaleReads: "all",
+        clusterRetryStrategy: family.clusterRetryStrategy,
       });
+      connection.family = family;
       // A node's error reaches the cluster as "node error", on the same object.
       connection.on("node error", (error: unknown) => redactCommandCredentials(error));
-      this.attachLifecycleLogging({
-        connection,
-        context: { mode: "cluster", endpoints: config.endpoints.length },
-      });
+      this.attachLifecycleLogging({ connection, context, family });
       return connection;
     }
 
@@ -152,24 +154,54 @@ export class RedisConnectionService {
   }
 
   private connectStandaloneResolved({ config }: { config: RedisStandaloneConfig }): Redis {
-    const connection = new IORedis(config.url, {
+    const context = { mode: "standalone", db: config.db };
+    const family = this.familyFor({ context });
+    const connection = new FamilyRedis(config.url, {
       ...SHARED_OPTIONS,
       db: config.db,
       tls: config.tls,
+      retryStrategy: family.retryStrategy,
     });
-    this.attachLifecycleLogging({
-      connection,
-      context: { mode: "standalone", db: config.db },
-    });
+    connection.family = family;
+    this.attachLifecycleLogging({ connection, context, family });
     return connection;
+  }
+
+  /** Every duplicate gets the error listener a bare ioredis copy lacks. */
+  private familyFor({ context }: { context: object }): RedisClientFamily {
+    const family: RedisClientFamily = new RedisClientFamily((client) =>
+      this.attachErrorListener({ connection: client, context, family }),
+    );
+    return family;
   }
 
   private attachLifecycleLogging({
     connection,
     context,
+    family,
   }: {
     connection: RedisConnection;
     context: object;
+    family: RedisClientFamily;
+  }): void {
+    const logger = this.logger;
+    this.attachErrorListener({ connection, context, family });
+    if (!logger) return;
+
+    connection.on("connect", () => logger.info(context, "connected"));
+    connection.on("ready", () => logger.info(context, "ready to accept commands"));
+    connection.on("close", () => logger.info(context, "connection closed"));
+    connection.on("reconnecting", () => logger.info(context, "reconnecting..."));
+  }
+
+  private attachErrorListener({
+    connection,
+    context,
+    family,
+  }: {
+    connection: RedisConnection;
+    context: object;
+    family: RedisClientFamily;
   }): void {
     const logger = this.logger;
 
@@ -178,22 +210,46 @@ export class RedisConnectionService {
     // same error object are handled.
     connection.on("error", (error: unknown) => {
       redactCommandCredentials(error);
-      if (logger) {
-        logger.error({ ...context, error }, "error");
-      } else if (connection.listenerCount("error") === 1) {
-        // Keeps ioredis's own report for a connection nobody else listens on;
-        // registering a listener at all is what turns that report off.
-        console.error(
-          "[ioredis] Unhandled error event:",
-          error instanceof Error ? error.stack : error,
-        );
-      }
+      if (family.closing) reportLossAfterClosing({ error, logger, context, family });
+      else reportError({ error, logger, context, connection });
     });
-    if (!logger) return;
+  }
+}
 
-    connection.on("connect", () => logger.info(context, "connected"));
-    connection.on("ready", () => logger.info(context, "ready to accept commands"));
-    connection.on("close", () => logger.info(context, "connection closed"));
-    connection.on("reconnecting", () => logger.info(context, "reconnecting..."));
+/** Expected while the process goes down: one line per family, never one per retry. */
+function reportLossAfterClosing({
+  error,
+  logger,
+  context,
+  family,
+}: {
+  error: unknown;
+  logger: RedisLogger | undefined;
+  context: object;
+  family: RedisClientFamily;
+}): void {
+  if (!family.firstLossAfterClosing()) return;
+  const message = "connection lost after shutdown began; not reconnecting";
+  if (logger) logger.info({ ...context, error }, message);
+  else console.info(`[ioredis] ${message}:`, error instanceof Error ? error.message : error);
+}
+
+function reportError({
+  error,
+  logger,
+  context,
+  connection,
+}: {
+  error: unknown;
+  logger: RedisLogger | undefined;
+  context: object;
+  connection: RedisConnection;
+}): void {
+  if (logger) {
+    logger.error({ ...context, error }, "error");
+  } else if (connection.listenerCount("error") === 1) {
+    // Keeps ioredis's own report for a connection nobody else listens on;
+    // registering a listener at all is what turns that report off.
+    console.error("[ioredis] Unhandled error event:", error instanceof Error ? error.stack : error);
   }
 }

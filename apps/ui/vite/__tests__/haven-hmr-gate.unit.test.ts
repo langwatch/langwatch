@@ -60,4 +60,19 @@ describe("havenHmrGate", () => {
       expect(sentMessages).toEqual([{ type: "full-reload" }]);
     });
   });
+
+  describe("when a burst of saves touches no browser module", () => {
+    it("sends no reload, so backend and test edits leave the page alone", () => {
+      const handleHotUpdate = build();
+
+      for (let i = 0; i < 5; i++) {
+        expect(handleHotUpdate([])).toEqual([]);
+        vi.advanceTimersByTime(50);
+      }
+      vi.advanceTimersByTime(600);
+
+      expect(sentMessages).toHaveLength(0);
+      expect(handleHotUpdate(fakeCtx())).toEqual(["mod"]);
+    });
+  });
 });

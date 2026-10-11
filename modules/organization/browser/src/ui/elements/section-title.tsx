@@ -13,8 +13,15 @@ export function SectionTitle({
   right?: ReactNode;
 }) {
   return (
-    <HStack width="full" align="start" gap={3} paddingBottom={hint ? 2 : 1} as="header">
-      <VStack align="start" gap={0.5} minWidth={0} flex={1}>
+    <HStack
+      width="full"
+      align="start"
+      gap={3}
+      flexWrap="wrap"
+      paddingBottom={hint ? 2 : 1}
+      as="header"
+    >
+      <VStack align="start" gap={0.5} minWidth={0} flex="1 1 14rem">
         <Text textStyle="cardTitle" as="h3">
           {title}
         </Text>
@@ -24,7 +31,11 @@ export function SectionTitle({
           </Text>
         )}
       </VStack>
-      {right && <Box flexShrink={0}>{right}</Box>}
+      {right && (
+        <Box flexShrink={0} maxWidth="full">
+          {right}
+        </Box>
+      )}
     </HStack>
   );
 }

@@ -17,6 +17,7 @@ const { state, calls } = vi.hoisted(() => ({
     request: [] as unknown[],
     admit: [] as unknown[],
     accept: [] as unknown[],
+    invalidated: [] as string[],
   },
 }));
 
@@ -30,9 +31,10 @@ vi.mock("@langwatch/identity-client", () => {
   });
   const idle = { useMutation: () => ({ mutate: () => {}, isPending: false, isError: false }) };
   const invalidating = { invalidate: () => {} };
+  const mine = { invalidate: () => calls.invalidated.push("joinRequests.mine") };
   return {
     identityClient: {
-      useUtils: () => ({ identity: { joinRequests: { mine: invalidating, offer: invalidating } } }),
+      useUtils: () => ({ identity: { joinRequests: { mine, offer: invalidating } } }),
       identity: {
         joinRequests: {
           offer: { useQuery: () => ({ data: state.offer, isPending: false }) },
@@ -60,7 +62,9 @@ vi.mock("../../../../../behavior/organization-api.ts", () => {
     api: {
       useUtils: () => ({
         invite: { pendingForMe: invalidating },
-        organization: { getAll: invalidating },
+        organization: {
+          getAll: { invalidate: () => calls.invalidated.push("organization.getAll") },
+        },
       }),
       invite: {
         pendingForMe: { useQuery: () => state.invitations },
@@ -88,6 +92,7 @@ beforeEach(() => {
   calls.request.length = 0;
   calls.admit.length = 0;
   calls.accept.length = 0;
+  calls.invalidated.length = 0;
 });
 
 afterEach(cleanup);
@@ -134,6 +139,18 @@ describe("given a person with a pending request to join an organization", () => 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
 
     expect(host.signedOut).toBe(true);
+  });
+
+  /** @scenario "Checking again after an approval re-reads the organizations as well as the request" */
+  it("re-reads the request and the organizations when asked to check again", () => {
+    state.mine = [{ joinRequestId: "jr_1", organizationId: "org_current" }];
+
+    renderWithOrganizationHost(
+      <JoinYourTeamTakeover currentOrganizationId="org_current" fallback={<div />} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+
+    expect(calls.invalidated).toEqual(["joinRequests.mine", "organization.getAll"]);
   });
 
   it("leaves the dashboard alone once it has resolved to a different organization", () => {

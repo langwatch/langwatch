@@ -9,7 +9,8 @@ export interface License {
   email: string;
   planType: string;
   maxMembers: number;
-  maxMembersLite: number;
+  maxMembersLite: number | null;
+  liteSeatsUnlimited: boolean;
   issuedAt: string;
   expiresAt: string;
   source: string;

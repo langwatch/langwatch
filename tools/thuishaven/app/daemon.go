@@ -204,10 +204,16 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.reapReclaimableWorktrees(ctx)
 				o.reapJobScratch()
 			}
+			if cycles%clickHousePressureCycles == 0 {
+				o.pruneUnderClickHousePressure(ctx)
+			}
 			o.reapDeadStacks()
 			o.governPressure()
+			o.weightFocusedWorkload(ctx)
 			o.governProcesses()
 			o.reapOrphanNxDaemons()
+			o.sweepRepoOrphans()
+			o.sweepDuplicates(ctx)
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 			o.stopColimaIfIdle(ctx)
@@ -237,9 +243,28 @@ func (o *Orchestrator) reapDeadStacks() {
 		}
 		dead := s.LauncherPID != 0 && !o.launcherIsOurs(s)
 		if stale := s.Stale(now, o.cfg.IdleTTL); dead || stale {
-			o.reapStack(s, dead, stale)
+			o.reapIfUnchanged(s, dead, stale)
 		}
 	}
+}
+
+// reapIfUnchanged reaps s only while no up or down holds its slug and the
+// record still names the launcher this tick judged. The tick's list can predate
+// an up that re-registered the slug, and removal is by slug, so reaping the old
+// record would take the new stack's entry and plan ("unknown stack" at hand-over).
+func (o *Orchestrator) reapIfUnchanged(s domain.Stack, dead, stale bool) {
+	if o.sem != nil {
+		release, _, ok, err := o.sem.TryAcquire("up-"+s.Slug, 1)
+		if err != nil || !ok {
+			return
+		}
+		defer release()
+	}
+	cur, ok := o.stackBySlug(s.Slug)
+	if !ok || cur.LauncherPID != s.LauncherPID || cur.LauncherStart != s.LauncherStart {
+		return
+	}
+	o.reapStack(cur, dead, stale)
 }
 
 // reapStack takes one stack off the machine: its routes first, then its
@@ -545,6 +570,10 @@ func (o *Orchestrator) reapClickHouse() {
 // (`haven observability up|down`) long after the daemon started.
 func (o *Orchestrator) refreshObservability(ctx context.Context) {
 	if o.obs == nil {
+		return
+	}
+	if o.isObservabilityOff() {
+		o.stopObservabilitySwitchedOff(ctx)
 		return
 	}
 	if o.obs.IsRunning(ctx) {

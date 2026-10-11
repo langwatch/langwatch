@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "NurturingProject" (
+CREATE TABLE IF NOT EXISTS "NurturingProject" (
     "projectId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
 
@@ -7,7 +7,7 @@ CREATE TABLE "NurturingProject" (
 );
 
 -- CreateTable
-CREATE TABLE "NurturingOrganization" (
+CREATE TABLE IF NOT EXISTS "NurturingOrganization" (
     "organizationId" TEXT NOT NULL,
     "adminUserId" TEXT,
     "seeded" BOOLEAN NOT NULL DEFAULT false,
@@ -18,4 +18,4 @@ CREATE TABLE "NurturingOrganization" (
 );
 
 -- CreateIndex
-CREATE INDEX "NurturingProject_organizationId_idx" ON "NurturingProject"("organizationId");
+CREATE INDEX IF NOT EXISTS "NurturingProject_organizationId_idx" ON "NurturingProject"("organizationId");

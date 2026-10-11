@@ -15,6 +15,7 @@ import { traceCollectorEvaluationsEventing } from "./features/ingestion/eventing
 import { traceIngestSourceBillingEventing } from "./features/ingestion/eventing/trace-ingest-source-billing.pipeline.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { TraceIndexMaterialisationService } from "./services/trace-index-materialisation.service.ts";
+import { traceMonthIdsReportSchema } from "./services/trace-month-ids-migration.service.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { exportProgressTrpcTransport } from "./transport/export-progress.trpc.ts";
 import { otlpIngestDoor, otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
@@ -79,7 +80,7 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
     .withEventing(traceProjectMilestonesEventing)
     .withEventing(traceCollectorEvaluationsEventing)
     .withEventing(traceIngestSourceBillingEventing)
-    .withMigrations(({ repositories }) => [
+    .withMigrations(({ app, repositories }) => [
       defineMigrationStep({
         id: "trace:track-updated-at-index-materialisation",
         kind: "data",
@@ -95,5 +96,23 @@ export const traceProcessModule: PublishedProcessModule<"trace", TraceApi, Trace
             signal,
             onPoll: (progress) => checkpoint.save({ report: progress }),
           }),
+      }),
+      defineMigrationStep({
+        id: "trace:send-month-trace-ids",
+        kind: "data",
+        mode: "background",
+        description:
+          "Sends each project's trace ids seen so far this month, so plan trace limits count from a complete month.",
+        // An old worker counts no trace live, so the step lists traces until the last is gone.
+        needsOldWritersGone: true,
+        run: ({ checkpoint, dryRun, signal }) => {
+          const resumed = traceMonthIdsReportSchema.safeParse(checkpoint.resumeFrom);
+          return app.sendMonthTraceIds({
+            resumeFrom: resumed.success ? resumed.data : null,
+            dryRun,
+            signal,
+            onPage: (report) => checkpoint.save({ report }),
+          });
+        },
       }),
     ]);

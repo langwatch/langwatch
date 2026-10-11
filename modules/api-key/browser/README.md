@@ -25,7 +25,7 @@ None.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/organization-client`, `@langwatch/project-client`.
+- Client packages (package.json): `@langwatch/organization-client`, `@langwatch/project-client`, `@langwatch/trace-client`.
 - Host APIs it requires: `ApiKeyHostApi`, `AuthorizeHostApi`.
 
 <!-- readme:generated:end -->

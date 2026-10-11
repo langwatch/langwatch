@@ -6,7 +6,7 @@ import ts from "typescript";
 import type { ArchitectureViolation } from "../../types.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import { readWorkspaceMembers } from "../../workspace/tsconfig-references.ts";
+import { readWorkspaceMembers } from "../../workspace/workspace-members.ts";
 
 const POLICY = "default-test-lane";
 const TIMEOUT_CEILING_MS = 120_000;

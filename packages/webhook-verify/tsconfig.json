@@ -5,14 +5,20 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
-    "lib": ["es2023", "dom"],
+    "lib": ["es2023"],
     "verbatimModuleSyntax": true,
-    "types": ["node"]
+    "types": ["node"],
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
+    },
+    {
+      "path": "./tsconfig.test.json"
     }
   ]
 }

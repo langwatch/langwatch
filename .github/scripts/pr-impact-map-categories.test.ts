@@ -44,7 +44,6 @@ void describe("pr-impact-map categories", () => {
     ["apps/api/src/process-modules.generated.ts", "Generated"],
     ["sdks/typescript/src/internal/generated/openapi/api-client.ts", "Generated"],
     ["dev/docs/lint-rules.md", "Generated"],
-    ["tsconfig.build.json", "Generated"],
     ["sdks/go/client/go.sum", "Deps"],
     ["enterprise/packages/licence/src/index.ts", "Framework"],
     ["plugins/langwatch/hooks/a.ts", "SDKs"],

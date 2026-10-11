@@ -1,9 +1,10 @@
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 /**
  * @vitest-environment node
  * Spec: modules/trace/specs/span-command-sharding.feature
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { OtlpSpan, RecordSpanCommandData } from "@langwatch/trace-contract";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";

@@ -205,7 +205,7 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
 
   # Judged by: I2
   @e2e @unimplemented
-  Scenario: F1: Fresh install: every data step is not-needed and the api serves
+  Scenario: F1: Empty origin: every data step ends done over zero rows and the api serves
     When the run cuts over to the branch and settles
     Then scenario F1 holds
 

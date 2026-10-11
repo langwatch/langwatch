@@ -81,6 +81,7 @@ func (cell *run) retryFailedStep(ctx context.Context) error {
 	if cell.options.Shots {
 		cell.shoot(ctx, "drill-failed")
 		cell.drills.failedShot = cell.lastShotState("drill-failed")
+		cell.memberNoticeShot(ctx)
 	}
 	cell.drills.retryStatus, cell.drills.retryBody = cell.operatorMutation(ctx, "ops.upgrade.retryStep", map[string]any{"id": step})
 	_ = waitFor(ctx, 3*time.Minute, func() bool {

@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
   "dependencies": {
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",

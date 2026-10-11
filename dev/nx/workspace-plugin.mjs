@@ -1,11 +1,11 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 
 // Project `workspace` (at dev/nx: no project owns the root) holds the repo-wide builds:
-// `build:types` (`tsc -b`, declarations into the dist of every project the solution references,
-// read from those references) plus `lint:rules` and `test:scripts`, which run the
-// Makefile recipes as `lint:go` does. ADR-150 records why.
-const solution = "tsconfig.build.json";
+// `build:types` (`tsc -b` over every module contract's build config, declarations into the dist of
+// every project those reference) plus `lint:rules` and `test:scripts`, which run the Makefile
+// recipes as `lint:go` does. Keyed on nx.json, which every workspace has. ADR-150 records why.
+const contracts = "modules/*/contract/tsconfig.build.json";
 
 // Declarations only: a project whose own `build` emits its published `.d.ts`
 // (ksuid) keeps those, and this target owns just its maps and build info.
@@ -19,7 +19,9 @@ const declarationOutputs = (root, dir) => {
   );
 };
 
-const referenced = (root, file, seen) => {
+// A reference names a config or, for a package with no build config, its directory.
+const referenced = (root, reference, seen) => {
+  const file = reference.endsWith(".json") ? reference : join(reference, "tsconfig.json");
   if (seen.has(file)) return seen;
   seen.add(file);
   const config = JSON.parse(readFileSync(join(root, file), "utf8").replace(/^\s*\/\/.*$/gm, ""));
@@ -28,13 +30,19 @@ const referenced = (root, file, seen) => {
   return seen;
 };
 
+const contractBuilds = (root) =>
+  readdirSync(join(root, "modules"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `modules/${entry.name}/contract/tsconfig.build.json`)
+    .filter((file) => existsSync(join(root, file)));
+
 export const createNodes = [
-  solution,
+  "nx.json",
   (files, _options, { workspaceRoot }) =>
     files.map((file) => {
-      const dirs = [...referenced(workspaceRoot, file, new Set())]
-        .filter((f) => f !== file)
-        .map(dirname);
+      const seen = new Set();
+      for (const build of contractBuilds(workspaceRoot)) referenced(workspaceRoot, build, seen);
+      const dirs = [...new Set([...seen].map(dirname))];
       const inputs = [
         "{workspaceRoot}/tsconfig.*json",
         "{workspaceRoot}/pnpm-lock.yaml",
@@ -52,7 +60,7 @@ export const createNodes = [
         executor: "nx:run-commands",
         options: {
           cwd: "{workspaceRoot}",
-          command: "GOMEMLIMIT=2GiB tsc -b --builders 1 tsconfig.build.json",
+          command: `GOMAXPROCS=2 GOMEMLIMIT=2GiB sh dev/scripts/with-build-slot.sh build:types tsc -b --builders 1 ${contracts}`,
         },
         cache: true,
         inputs,
@@ -72,14 +80,16 @@ export const createNodes = [
         "!{workspaceRoot}/.nx/**/*",
       ];
       // The one root `tsc -b` (`pnpm typecheck`, bare `nx typecheck`): its tsbuildinfo
-      // is the incremental cache, so Nx caches nothing (ADR-150, 2026-10-10).
+      // is the incremental cache, so Nx caches nothing. `nx sync` writes every project
+      // reference first (ADR-150, 2026-10-10).
       const typecheck = {
         executor: "nx:run-commands",
         options: {
           cwd: "{workspaceRoot}",
-          command: "GOMEMLIMIT=2GiB tsc -b --builders 1 --checkers 1",
+          command: "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b --builders 1 --checkers 1",
         },
         cache: false,
+        syncGenerators: ["@nx/js:typescript-sync"],
         dependsOn: [
           "@langwatch/prisma-client:prisma:generate",
           ...["langwatch", "@langwatch/mcp-server", "@langwatch/ksuid", "@langwatch/mail"].map(
@@ -87,8 +97,14 @@ export const createNodes = [
           ),
         ],
       };
+      // Local default: the same root build without the test programs; CI runs `typecheck`.
+      const sourceTypecheck = {
+        ...typecheck,
+        options: { cwd: "{workspaceRoot}", command: "node dev/scripts/typecheck-src.mjs" },
+      };
       const targets = {
         typecheck,
+        "typecheck:src": sourceTypecheck,
         "build:types": target,
         "lint:rules": make("lint-rules-run", "uvx --version", everything),
         "test:scripts": make("test-scripts-run", "bats --version", [

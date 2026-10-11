@@ -7,7 +7,6 @@
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioFormDrawer } from "../../../scenarios/scenario-form-drawer.tsx";
@@ -19,8 +18,9 @@ const mocks = vi.hoisted(() => ({
   mockGetById: vi.fn(),
   mockGetByIdRefetch: vi.fn(async () => ({})),
   mockListVersions: vi.fn(),
-  versionListeners: new Set<() => void>(),
-  versionTick: 0,
+  /** What a live query is: a subscription the data changing re-renders. */
+  versionsListeners: new Set<() => void>(),
+  versionsTick: 0,
   mockListVersionsRefetch: vi.fn(),
   mockGetVersion: vi.fn(),
   mockRestoreVersion: vi.fn(),
@@ -56,82 +56,84 @@ vi.mock("@langwatch/prompt-client", () => ({
   },
 }));
 
-vi.mock("@langwatch/scenario-client", () => ({
-  scenarioClient: {
-    useUtils: () => ({
+vi.mock("@langwatch/scenario-client", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const subscribe = (listener: () => void) => {
+    mocks.versionsListeners.add(listener);
+    return () => mocks.versionsListeners.delete(listener);
+  };
+  const tick = () => mocks.versionsTick;
+  return {
+    scenarioClient: {
+      useUtils: () => ({
+        scenarios: {
+          getAll: { invalidate: vi.fn() },
+          getById: { invalidate: vi.fn(), setData: vi.fn() },
+          getByIdIncludingArchived: { invalidate: vi.fn() },
+          listVersions: { invalidate: vi.fn() },
+        },
+      }),
       scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn(), setData: vi.fn() },
-        getByIdIncludingArchived: { invalidate: vi.fn() },
-        listVersions: { invalidate: vi.fn() },
-      },
-    }),
-    scenarios: {
-      // The run dialog reads the configurations its scope already ran with.
-      getRunConfigurations: {
-        useQuery: () => ({ data: [], isLoading: false }),
-      },
-      create: {
-        useMutation: () => ({
-          mutateAsync: mocks.mockCreateMutateAsync,
-          isPending: false,
-        }),
-      },
-      update: {
-        useMutation: ({
-          onSuccess,
-          onError,
-        }: {
-          onSuccess?: (data: unknown) => void;
-          onError?: (error: unknown) => void;
-        }) => ({
-          mutateAsync: vi.fn(async (input: unknown) => {
-            try {
-              const result = await mocks.mockUpdateMutateAsync(input);
-              onSuccess?.(result);
-              return result;
-            } catch (error) {
-              onError?.(error);
-              throw error;
-            }
+        // The run dialog reads the configurations its scope already ran with.
+        getRunConfigurations: {
+          useQuery: () => ({ data: [], isLoading: false }),
+        },
+        create: {
+          useMutation: () => ({
+            mutateAsync: mocks.mockCreateMutateAsync,
+            isPending: false,
           }),
-          isPending: false,
-        }),
-      },
-      getById: { useQuery: mocks.mockGetById },
-      listVersions: {
-        useQuery: (...args: unknown[]) => {
-          useSyncExternalStore(
-            (listener) => {
-              mocks.versionListeners.add(listener);
-              return () => void mocks.versionListeners.delete(listener);
+        },
+        update: {
+          useMutation: ({
+            onSuccess,
+            onError,
+          }: {
+            onSuccess?: (data: unknown) => void;
+            onError?: (error: unknown) => void;
+          }) => ({
+            mutateAsync: vi.fn(async (input: unknown) => {
+              try {
+                const result = await mocks.mockUpdateMutateAsync(input);
+                onSuccess?.(result);
+                return result;
+              } catch (error) {
+                onError?.(error);
+                throw error;
+              }
+            }),
+            isPending: false,
+          }),
+        },
+        getById: { useQuery: mocks.mockGetById },
+        listVersions: {
+          useQuery: (...args: unknown[]) => {
+            useSyncExternalStore(subscribe, tick);
+            return mocks.mockListVersions(...args);
+          },
+        },
+        getVersion: { useQuery: mocks.mockGetVersion },
+        restoreVersion: {
+          useMutation: ({
+            onSuccess,
+            onSettled,
+          }: {
+            onSuccess?: (data: unknown, variables: unknown) => void;
+            onSettled?: () => void;
+          }) => ({
+            mutate: (variables: unknown) => {
+              mocks.mockRestoreVersion(variables);
+              onSuccess?.({}, variables);
+              onSettled?.();
             },
-            () => mocks.versionTick,
-          );
-          return mocks.mockListVersions(...args);
+            isPending: false,
+            variables: undefined,
+          }),
         },
       },
-      getVersion: { useQuery: mocks.mockGetVersion },
-      restoreVersion: {
-        useMutation: ({
-          onSuccess,
-          onSettled,
-        }: {
-          onSuccess?: (data: unknown, variables: unknown) => void;
-          onSettled?: () => void;
-        }) => ({
-          mutate: (variables: unknown) => {
-            mocks.mockRestoreVersion(variables);
-            onSuccess?.({}, variables);
-            onSettled?.();
-          },
-          isPending: false,
-          variables: undefined,
-        }),
-      },
     },
-  },
-}));
+  };
+});
 
 vi.mock("../../../scenarios/save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: () => null,
@@ -512,8 +514,8 @@ describe("the History drawer", () => {
       refetch: mocks.mockListVersionsRefetch,
     });
     act(() => {
-      mocks.versionTick += 1;
-      mocks.versionListeners.forEach((listener) => listener());
+      mocks.versionsTick += 1;
+      for (const listener of mocks.versionsListeners) listener();
     });
 
     const rows = screen.getAllByTestId(/^version-row-\d+$/);

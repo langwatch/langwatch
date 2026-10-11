@@ -29,10 +29,12 @@ import { useDebounce } from "use-debounce";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { useOpsHost } from "../../../../model/ops-host.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { Currency, PRICING_MODEL_LABELS, PricingModel } from "../../model/admin-enums.ts";
 import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
+import { LegacySsoDomainNotice } from "./legacy-sso-domain-notice.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
  * admin Hono route strips them from every list/getOne response; the edit
@@ -375,7 +377,7 @@ export function OrganizationEditDrawer({
           <IdentityFields form={form} setField={setField} />
           <BillingFields form={form} setField={setField} />
           <LimitFields form={form} setField={setField} error={fieldErrors.datasetAttachmentMaxMb} />
-          <AuthenticationSection />
+          <AuthenticationSection organization={organization} />
           <LicenseFields form={form} setField={setField} />
           <CustomS3Fields form={form} setField={setField} />
           <Separator my={2} />
@@ -504,10 +506,18 @@ function LimitFields({ form, setField, error }: SectionProps & { error: string |
   );
 }
 
-function AuthenticationSection() {
+function AuthenticationSection({ organization }: { organization: AdminOrganization }) {
+  // Cloud staff only: on self-hosted the organization's administrators see it in settings.
+  const cloudOps = useOpsHost().cloudOps();
   return (
     <>
       <SectionHeading>Authentication</SectionHeading>
+      {cloudOps && organization.ssoDomain && (
+        <LegacySsoDomainNotice
+          organizationId={organization.id}
+          legacySsoDomain={organization.ssoDomain}
+        />
+      )}
       {/* SSO is a guarded connection lifecycle now, not a free-text
           field; editing one here is refused once routing is enforced. */}
       <Text fontSize="sm" color="fg.muted">

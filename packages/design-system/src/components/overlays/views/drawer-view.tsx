@@ -80,9 +80,11 @@ export const DrawerContent = React.forwardRef<HTMLDivElement, DrawerContentProps
             <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
               <ChakraDrawer.Content
                 ref={contentProps.asChild ? mergeRefs(ref, portalTarget) : ref}
-                margin={2}
+                // A phone shows every drawer as a full-screen sheet; wider screens float it.
+                margin={{ base: 0, md: 2 }}
+                maxWidth={{ mdDown: "100%" }}
                 pointerEvents="auto"
-                borderRadius="lg"
+                borderRadius={{ base: 0, md: "lg" }}
                 marginTop={
                   marginTop ?? (context.marginTop == null ? void 0 : `${context.marginTop}px`)
                 }
@@ -739,7 +741,10 @@ export function Drawer({
         {...(topInset === "studio-header"
           ? { marginTop: "14", height: `calc(100dvh - ${STUDIO_HEADER_TOP} - 0.5rem)` }
           : {})}
-        maxWidth={`min(${DRAWER_WIDTH[size]}, calc(100vw - 1rem - ${inset}px))`}
+        maxWidth={{
+          base: "100%",
+          md: `min(${DRAWER_WIDTH[size]}, calc(100vw - 1rem - ${inset}px))`,
+        }}
         width="full"
         withErrorBoundary={false}
         aria-label={title}

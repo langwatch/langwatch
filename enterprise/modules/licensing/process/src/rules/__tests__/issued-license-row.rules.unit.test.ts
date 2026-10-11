@@ -25,6 +25,7 @@ const current: IssuedLicenseRecord = {
   planType: "ENTERPRISE",
   maxMembers: 10,
   maxMembersLite: 5,
+  liteSeatsUnlimited: false,
   issuedAt: at,
   expiresAt: at,
   source: "BACKOFFICE",
