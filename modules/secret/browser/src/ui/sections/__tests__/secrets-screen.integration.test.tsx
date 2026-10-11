@@ -185,6 +185,44 @@ describe("given the reader may manage secrets", () => {
   });
 });
 
+describe("given the reader saves before filling the dialog", () => {
+  /** @scenario Saving an incomplete secret says what is missing and sends nothing */
+  it("names the missing name, then the missing value, focusing each and sending nothing", async () => {
+    const user = userEvent.setup();
+    renderWithSecretHost(<SecretsScreen />);
+    await user.click(screen.getByRole("button", { name: /Add secret/ }));
+    const name = await screen.findByPlaceholderText("e.g., OPENAI_API_KEY");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Enter a name for the secret.")).toBeInTheDocument();
+    expect(name).toHaveFocus();
+
+    await user.type(name, "TOKEN");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Enter the secret's value.")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Enter secret value")).toHaveFocus();
+    expect(calls.create).not.toHaveBeenCalled();
+  });
+
+  /** @scenario Saving an incomplete secret says what is missing and sends nothing */
+  it("names the missing new value on update, focusing it and sending nothing", async () => {
+    const user = userEvent.setup();
+    state.secrets = [secretRow()];
+    renderWithSecretHost(<SecretsScreen />);
+    await user.click(screen.getByRole("button", { name: "Actions for OPENAI_API_KEY" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Update value/ }));
+    const value = await screen.findByPlaceholderText("Enter new secret value");
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Enter the new value.")).toBeInTheDocument();
+    expect(value).toHaveFocus();
+    expect(calls.update).not.toHaveBeenCalled();
+  });
+});
+
 describe("given the application lends a project switcher", () => {
   it("shows it in the header, just before Add secret", () => {
     const host = new FakeSecretHost({ projectSwitcher: <button>Web App project</button> });
