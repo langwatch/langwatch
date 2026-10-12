@@ -83,10 +83,11 @@ override-dependencies = [
     # security: GHSA-f4xh-w4cj-qxq8 — LangSmith SDK TracingMiddleware arbitrary
     # server-side file read; patched in 0.8.18.
     "langsmith>=0.8.18",
-    # Force a patched strawberry-graphql (GHSA-fr49-mhgj-crfc, GHSA-qfwv-87qj-98xq,
-    # GHSA-x97m-qp5c-w9xj, all of which top out at 0.315.6). arize-phoenix pins
-    # strawberry exactly, so without this the pin decides the version.
-    "strawberry-graphql>=0.316.0",
+    # Force a patched strawberry-graphql. The highest fix across its advisories
+    # is 0.327.2 (a HIGH covering <=0.326.0 and a LOW below 0.327.2).
+    # arize-phoenix pins strawberry exactly, so without this the pin decides
+    # the version.
+    "strawberry-graphql>=0.327.2",
     "pydantic-settings>=2.14.2",  # security: pydantic-settings advisory (#1517)
     # security: GHSA circular JSON Schema $ref unbounded-CPU DoS; patched in 0.60.1.
     "json-repair>=0.60.1",
