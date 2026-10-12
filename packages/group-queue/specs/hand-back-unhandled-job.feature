@@ -32,6 +32,13 @@ Feature: GroupQueue hands back a job the worker has no handler for
     And the queue logs at error that no worker has run it
 
   @unit
+  Scenario: A job whose event type the worker does not declare is handed back too
+    Given a worker that has the job's pipeline but does not declare the queued event's type
+    When the group queue runs the job on that worker
+    Then the refusal reaches the queue as a hand-back that keeps its cause
+    And it is handed back under the same window as a job with no handler
+
+  @unit
   Scenario: The hand-back window starts at the first hand-back
     Given a job that has never been handed back
     When a worker hands it back

@@ -2295,11 +2295,11 @@ through the framework; no module scans queues or reads the `gq:parked-tenants` k
 2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
 
-A dequeued event whose type no pipeline on that worker declares is retried, not refused (Alex,
-2026-10-08, round 24): mid rolling deploy an older worker can take a newer release's event, and the
-queue's retry budget (25 attempts with backoff) is the drain window in which a worker declaring it
-takes the job. Still undeclared once spent, it exhausts on its lane's outcome with a reason naming
-the type; a job with no type is still refused (`packages/eventing/specs/undeclared-event-drain.feature`).
+A dequeued event whose type no pipeline on that worker declares is handed back without using an
+attempt, not refused (Alex, 2026-10-08, round 24; 2026-10-12, G1-F1): mid rolling deploy an older
+worker can take a newer release's event, and a worker declaring it takes the job. Handed back for
+over 30 minutes it spends attempts; still undeclared once spent, it exhausts on its lane's outcome
+with a reason naming the type; a job with no type is still refused (`packages/eventing/specs/undeclared-event-drain.feature`).
 
 **A spent trace job dead-letters instead of blocking its group** (Alex, 2026-09-30): order within
 a trace is not load-bearing, so trace registrations set `onExhausted: "dead-letter"`; every other

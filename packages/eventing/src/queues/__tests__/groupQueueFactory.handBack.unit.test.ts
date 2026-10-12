@@ -1,10 +1,16 @@
 import { HandBackGroupQueueError } from "@langwatch/group-queue";
 import { describe, expect, it } from "vitest";
 
-import { UnroutableQueuedJobError } from "../../services/errorHandling.ts";
+import {
+  UndeclaredQueuedEventTypeError,
+  UnroutableQueuedJobError,
+} from "../../services/errorHandling.ts";
 import { handBackUnroutable } from "../groupQueueFactory.ts";
 
-/** Spec: packages/eventing/specs/lane-alias.feature */
+/**
+ * Specs: packages/eventing/specs/lane-alias.feature,
+ * packages/group-queue/specs/hand-back-unhandled-job.feature
+ */
 
 const failed = (run: () => Promise<void>) =>
   handBackUnroutable({ run }).catch((error: unknown) => error);
@@ -16,6 +22,19 @@ describe("handBackUnroutable", () => {
       queueName: "{event-sourcing/jobs}",
       jobPath: "gateway_spend_processing:command:confirmSpend",
       context: {},
+    });
+
+    const error = await failed(() => Promise.reject(cause));
+
+    expect(error).toBeInstanceOf(HandBackGroupQueueError);
+    expect(error).toMatchObject({ cause });
+  });
+
+  /** @scenario "A job whose event type the worker does not declare is handed back too" */
+  it("turns an undeclared event type into a hand-back that keeps the cause", async () => {
+    const cause = new UndeclaredQueuedEventTypeError({
+      eventType: "lw.gateway.spend_confirmed.v2",
+      declaredBy: 'pipeline "gateway_spend_processing"',
     });
 
     const error = await failed(() => Promise.reject(cause));

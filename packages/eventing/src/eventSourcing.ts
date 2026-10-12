@@ -957,7 +957,7 @@ export class EventSourcing {
     });
   }
 
-  /** Reads a dequeued job; an event type this worker does not declare is logged, then retried. */
+  /** Reads a dequeued job; an event type this worker does not declare is logged, handed back. */
   private readDequeued<T>({
     read,
     payload,
@@ -978,7 +978,7 @@ export class EventSourcing {
             declaredBy: error.declaredBy,
             attempt: delivery?.attempt ?? null,
           },
-          "Queued event type is not declared on this worker; retrying so a worker that declares it takes the job",
+          "Queued event type is not declared on this worker; handing it back so a worker that declares it takes the job",
         );
       }
       throw error;

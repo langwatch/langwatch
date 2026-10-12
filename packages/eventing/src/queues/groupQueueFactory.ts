@@ -14,6 +14,7 @@ import {
 import {
   classifyClickHouseError,
   ErrorCategory,
+  UndeclaredQueuedEventTypeError,
   UnroutableQueuedJobError,
 } from "../services/errorHandling.ts";
 import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types.ts";
@@ -44,12 +45,17 @@ export async function refuseInvalidValueOnce<T>({
   }
 }
 
-/** A job this worker has no handler for goes back to the queue without using an attempt. */
+/**
+ * A job this worker has no handler for, or whose event type it does not declare, goes back to
+ * the queue without using an attempt (Alex, 2026-10-12).
+ */
 export async function handBackUnroutable<T>({ run }: { run: () => Promise<T> }): Promise<T> {
   try {
     return await run();
   } catch (error) {
-    if (!(error instanceof UnroutableQueuedJobError)) throw error;
+    const unhandled =
+      error instanceof UnroutableQueuedJobError || error instanceof UndeclaredQueuedEventTypeError;
+    if (!unhandled) throw error;
     throw new HandBackGroupQueueError(error.message, { cause: error });
   }
 }
