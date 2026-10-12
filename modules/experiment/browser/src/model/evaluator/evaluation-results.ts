@@ -5,7 +5,7 @@ import type { ParsedEvaluationResult } from "@langwatch/evaluator-contract";
  * the trace list, drawer header, Evals accordion, and evaluator chips.
  */
 export const EVALUATION_STATUS_COLORS = {
-  pending: "fg.subtle",
+  pending: "fg.pending",
   running: "blue.fg",
   passed: "green.fg",
   failed: "red.fg",

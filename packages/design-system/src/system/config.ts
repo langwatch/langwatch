@@ -650,6 +650,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          // A status dot with nothing to report yet (an evaluator that has not run).
+          pending: { value: "{colors.gray.400}" },
           // Text on a saturated fill in both modes: avatar initials, the development badge.
           onColor: { value: "white" },
           // Status text, one per meaning.

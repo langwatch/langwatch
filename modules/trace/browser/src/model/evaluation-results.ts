@@ -109,7 +109,7 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
  * trace views and evaluator renderings.
  */
 export const EVALUATION_STATUS_COLORS = {
-  pending: "fg.subtle",
+  pending: "fg.pending",
   running: "blue.fg",
   passed: "green.fg",
   failed: "red.fg",
