@@ -2,6 +2,7 @@ import {
   ApiKeyPermissionDeniedError,
   WORKFLOW_RUN_API_KEY_NAME,
   mintRunKeyInputSchema,
+  type CreateApiKeyInput,
   type MintRunKeyInput,
 } from "@langwatch/api-key-contract";
 import {
@@ -9,7 +10,14 @@ import {
   type AuthzApi,
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import {
+  SharedCredentialPendingError,
+  mintOnce,
+  type SharedCredentialHold,
+  type SharedCredentialStore,
+} from "@langwatch/secrets/shared-credential";
+import { Temporal, nowInstant, toDate, type Instant } from "@langwatch/time";
+import { z } from "zod";
 
 import {
   isRunKeyReusable,
@@ -21,9 +29,7 @@ import type { DisabledApiKey } from "./api-key-lifecycle.service.ts";
 import type { ApiKeyService } from "./api-key.service.ts";
 
 type HeldRunKey = { token: string; expiresAtMs: number };
-type WrittenRunKey = { key: DisabledApiKey; expiresAtMs: number };
-type RunKeyWriter = {
-  writeDisabled: ApiKeyService["writeDisabled"];
+type RunKeyWriter = Pick<ApiKeyService, "writeDisabled" | "reopenDisabled"> & {
   grantAndActivate(key: DisabledApiKey): Promise<{ token: string }>;
 };
 
@@ -36,19 +42,19 @@ export class RunKeyMintService {
   static create(options: {
     apiKeys: RunKeyWriter;
     authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
+    held: SharedCredentialStore;
   }): RunKeyMintService {
     return new RunKeyMintService(options);
   }
 
   // ponytail: one entry per user, project and permission set, replaced on re-mint; no eviction.
   readonly #held = new Map<string, Promise<HeldRunKey>>();
-  // A key written whose grants had not landed: the next request grants it again, not a new one.
-  readonly #written = new Map<string, WrittenRunKey>();
 
   private constructor(
     private readonly options: {
       apiKeys: RunKeyWriter;
       authz: Pick<AuthzApi, "getScope" | "effectivePermissions">;
+      held: SharedCredentialStore;
     },
   ) {}
 
@@ -99,56 +105,139 @@ export class RunKeyMintService {
     return scope.organizationId;
   }
 
+  /**
+   * Minted once across every server (`mintOnce`): the claimant writes the key, shares it sealed
+   * while its grants fold, then shares it active; every other server waits for that same token. A
+   * key whose grants have not landed is granted again by the next attempt, never written anew.
+   */
   private async mint(
     input: MintRunKeyInput & { organizationId: string; cacheKey: string },
   ): Promise<HeldRunKey> {
-    const written = await this.writtenKey(input);
+    const { minRemainingMs } = input;
+    const reusable = (shared: SharedRunKey) =>
+      isRunKeyReusable({
+        expiresAtMs: shared.expiresAtMs,
+        nowMs: nowInstant().epochMilliseconds,
+        minRemainingMs,
+      });
     try {
-      const { token } = await this.options.apiKeys.grantAndActivate(written.key);
-      this.forgetWritten({ cacheKey: input.cacheKey, written });
-      return { token, expiresAtMs: written.expiresAtMs };
+      const value = await mintOnce({
+        store: this.options.held,
+        address: { tenantId: input.projectId, contentKey: input.cacheKey },
+        isReady: (held) =>
+          sharedRunKeys([held]).some((shared) => shared.active && reusable(shared)),
+        mint: async ({ earlier, hold }) => {
+          const [pending] = sharedRunKeys(earlier).filter(
+            (shared) => !shared.active && reusable(shared),
+          );
+          const { shared, key } = pending
+            ? await this.reopenShared({ input, pending })
+            : await this.writeShared({ input, hold });
+          await this.options.apiKeys.grantAndActivate(key);
+          const ttlMs = shared.expiresAtMs - nowInstant().epochMilliseconds;
+          return { value: JSON.stringify({ ...shared, active: true }), ttlMs };
+        },
+      });
+      const [shared] = sharedRunKeys([value]);
+      if (!shared) throw new Error("The shared run key could not be read back");
+      return { token: shared.token, expiresAtMs: shared.expiresAtMs };
     } catch (error) {
-      // Still folding: the caller is told so, and its retry waits on this key's grants.
-      if (!AuthzGrantNotConfirmedError.is(error)) this.forgetWritten({ ...input, written });
+      if (
+        error instanceof SharedCredentialPendingError ||
+        (AuthzGrantNotConfirmedError.is(error) && !error.retryable)
+      ) {
+        throw new AuthzGrantNotConfirmedError({ retryable: true });
+      }
       throw error;
     }
   }
 
-  /** The key an earlier request wrote for this run while it still has the life, else a new one. */
-  private async writtenKey(
-    input: MintRunKeyInput & { organizationId: string; cacheKey: string },
-  ): Promise<WrittenRunKey> {
-    const earlier = this.#written.get(input.cacheKey);
-    const nowMs = nowInstant().epochMilliseconds;
-    const { minRemainingMs } = input;
-    if (earlier && isRunKeyReusable({ expiresAtMs: earlier.expiresAtMs, nowMs, minRemainingMs })) {
-      return earlier;
-    }
+  /** Writes the run's key revoked and shares it before its grants, so a retry resumes it. */
+  private async writeShared({
+    input,
+    hold,
+  }: {
+    input: MintRunKeyInput & { organizationId: string };
+    hold: (held: SharedCredentialHold) => Promise<void>;
+  }): Promise<{ shared: SharedRunKey; key: DisabledApiKey }> {
+    const lifetimeMs = runKeyLifetimeMs(input.minRemainingMs);
+    const expiresAt = nowInstant().add({ milliseconds: lifetimeMs });
+    const key = await this.options.apiKeys.writeDisabled(createInput({ input, expiresAt }));
+    const shared = {
+      apiKeyId: key.id,
+      token: key.token,
+      expiresAtMs: expiresAt.epochMilliseconds,
+      active: false,
+    };
+    await hold({ value: JSON.stringify(shared), ttlMs: lifetimeMs });
+    return { shared, key };
+  }
 
-    const expiresAt = nowInstant().add({ milliseconds: runKeyLifetimeMs(minRemainingMs) });
-    const key = await this.options.apiKeys.writeDisabled({
-      isSystemManaged: true,
-      name: WORKFLOW_RUN_API_KEY_NAME,
-      description:
-        "Short-lived key for one run's calls back into LangWatch. Carries only what the run " +
-        "uses and expires by itself.",
-      userId: input.userId,
-      createdByUserId: input.userId,
-      // A child of the key that started the run: it dies with it, and is never the system's.
-      parentApiKeyId: input.callerApiKeyId ?? null,
-      organizationId: input.organizationId,
-      permissionMode: "restricted",
-      permissions: [...input.permissions],
-      bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
-      expiresAt: toDate(expiresAt),
+  /** The key an earlier attempt wrote and shared, to be granted again with the same token. */
+  private async reopenShared({
+    input,
+    pending,
+  }: {
+    input: MintRunKeyInput & { organizationId: string };
+    pending: SharedRunKey;
+  }): Promise<{ shared: SharedRunKey; key: DisabledApiKey }> {
+    const expiresAt = Temporal.Instant.fromEpochMilliseconds(pending.expiresAtMs);
+    const key = await this.options.apiKeys.reopenDisabled({
+      id: pending.apiKeyId,
+      token: pending.token,
+      input: createInput({ input, expiresAt }),
     });
-    const written = { key, expiresAtMs: expiresAt.epochMilliseconds };
-    this.#written.set(input.cacheKey, written);
-
-    return written;
+    return { shared: pending, key };
   }
+}
 
-  private forgetWritten({ cacheKey, written }: { cacheKey: string; written: WrittenRunKey }) {
-    if (this.#written.get(cacheKey) === written) this.#written.delete(cacheKey);
+/** A run's key as every server shares it, sealed: its token and whether its grants have landed. */
+const sharedRunKeySchema = z.object({
+  apiKeyId: z.string(),
+  token: z.string(),
+  expiresAtMs: z.number(),
+  active: z.boolean(),
+});
+type SharedRunKey = z.infer<typeof sharedRunKeySchema>;
+
+/** The held values that read as a run key; one written in another shape is minted over. */
+function sharedRunKeys(values: readonly string[]): SharedRunKey[] {
+  return values.flatMap((value) => {
+    const parsed = sharedRunKeySchema.safeParse(parseJson(value));
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
   }
+}
+
+/** The run's key: restricted to what the run needs, bound to its project, expiring by itself. */
+function createInput({
+  input,
+  expiresAt,
+}: {
+  input: MintRunKeyInput & { organizationId: string };
+  expiresAt: Instant;
+}): CreateApiKeyInput {
+  return {
+    isSystemManaged: true,
+    name: WORKFLOW_RUN_API_KEY_NAME,
+    description:
+      "Short-lived key for one run's calls back into LangWatch. Carries only what the run " +
+      "uses and expires by itself.",
+    userId: input.userId,
+    createdByUserId: input.userId,
+    // A child of the key that started the run: it dies with it, and is never the system's.
+    parentApiKeyId: input.callerApiKeyId ?? null,
+    organizationId: input.organizationId,
+    permissionMode: "restricted",
+    permissions: [...input.permissions],
+    bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: input.projectId }],
+    expiresAt: toDate(expiresAt),
+  };
 }

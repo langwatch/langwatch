@@ -5590,6 +5590,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -6147,6 +6150,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../ops/contract
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -6168,6 +6174,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/upgrade':
+        specifier: workspace:*
+        version: link:../../../packages/upgrade
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../user/contract
@@ -17737,6 +17746,9 @@ importers:
 
   packages/redis-client:
     dependencies:
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../secrets
       '@langwatch/time':
         specifier: workspace:*
         version: link:../time
@@ -17762,6 +17774,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*

@@ -380,6 +380,18 @@ model Identifier {
   @@index([accountId])
 }
 
+/// Whether a user signs in on the identifier path: identity's own switch, set when the
+/// identifier backfill proves the user and pinned off by an operator's rollback. No row is the
+/// legacy path. Spec: modules/identity/specs/sign-in-switch.feature. Column refs only, no FK.
+model IdentitySignInSwitch {
+  userId        String   @id
+  onIdentifiers Boolean
+  pinned        Boolean  @default(false)
+  switchedAt    DateTime
+  lastAppliedEventId String?
+  updatedAt     DateTime @default(now()) @updatedAt
+}
+
 // The address lock (ADR-116 §6). ROW-TRUTH, and deliberately not a projection:
 // it is a lock, not a record of who holds what. `Identifier` answers that.
 //
@@ -4274,6 +4286,18 @@ model AuthzUserStanding {
   deactivatedAt     DateTime?
   erasedAt          DateTime?
   standingChangedAt DateTime
+}
+
+/// Whether an organization's permission checks run on the authorization engine: authz's own
+/// switch, set when the engine migration proves the organization and pinned off by an operator's
+/// rollback. No row is the legacy path. Spec: modules/authz/specs/engine-switch.feature.
+model AuthzEngineSwitch {
+  organizationId String   @id
+  onEngine       Boolean
+  pinned         Boolean  @default(false)
+  switchedAt     DateTime
+  lastAppliedEventId String?
+  updatedAt      DateTime @default(now()) @updatedAt
 }
 
 model RoleBinding {

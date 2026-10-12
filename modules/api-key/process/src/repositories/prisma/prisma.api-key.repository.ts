@@ -6,7 +6,7 @@ import {
 } from "@langwatch/api-key-contract";
 import { type PrismaModelClient, prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
+import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import type {
   ApiKeyCreateRecord,
@@ -36,7 +36,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       data: {
         ...data,
         expiresAt: expiresAt ? toDate(expiresAt) : null,
-        ...(startsDisabled ? { revokedAt: new Date() } : {}),
+        ...(startsDisabled ? { revokedAt: toDate(nowInstant()) } : {}),
       },
     });
   }

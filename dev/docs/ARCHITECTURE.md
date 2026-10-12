@@ -1602,6 +1602,18 @@ stays. `packages/architecture-enforcer/tests/redis-cache-ttl.unit.test.ts` refus
 A deployment may split cache from durable queues when measured pressure warrants it: expiry bounds a
 key's age, not the key count or memory, so headroom alerts are required either way (Alex, 2026-10-01).
 
+**A credential every server hands out is minted once and shared sealed** (Alex, 2026-10-12: "exactly one
+key per run across all api servers, never an extra key", "make this a shared design thing"). `mintOnce` in
+`@langwatch/secrets/shared-credential` is the one way: the first caller claims the address (`SET NX PX`,
+held longer than any mint runs), mints, and holds the value sealed with the stores' `encryption` client under
+`<prefix><tenantId>[:<contentKey>]`, never longer than the credential lives; every other caller on every
+server waits up to the 10 s read-your-writes window (§9) for that same value, then answers pending. A
+half-done value (a key whose grants have not folded) is held before the slow step, so a retry on any server
+resumes it instead of minting another. A module reaches it only as a repository: its `repositories/redis/`
+builds `RedisSharedCredentialStore` (`@langwatch/redis-client/shared-credential`) from `redis` and
+`encryption`, `MemorySharedCredentialStore` is the twin, and a service passes that repository to `mintOnce`,
+never seeing Redis. Api-key's agent sandbox keys and run keys use it; a table of pending mints is not the way.
+
 **Object storage is a store, like the other three** (ruled 2026-09-24,
 ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
 local filesystem. It routes per project inside the client, as the ClickHouse

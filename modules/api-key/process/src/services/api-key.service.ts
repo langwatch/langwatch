@@ -101,6 +101,12 @@ export class ApiKeyService {
     return this.lifecycle.writeDisabled(input);
   }
 
+  async reopenDisabled(
+    input: Parameters<ApiKeyLifecycleService["reopenDisabled"]>[0],
+  ): Promise<DisabledApiKey> {
+    return this.lifecycle.reopenDisabled(input);
+  }
+
   async grantAndActivate(key: DisabledApiKey): Promise<{ token: string; apiKey: ApiKey }> {
     return this.lifecycle.grantAndActivate(key);
   }

@@ -1,6 +1,6 @@
 ---
 name: platform-primitives
-description: "The shared building blocks module code uses instead of rolling its own: ids (@langwatch/ksuid generate, strict KSUIDs, never derived from another id), time (@langwatch/time nowInstant and Temporal, no new Date or Date.now), logging (createLogger, no console), errors (contract HandledError subclasses vs a plain Error), config and secrets (Config.define, Secret.load, no process.env), outbound calls (SSRF-validated egress: createSsrfUrlValidator, fetchValidatedDestination), Redis and rate limits (through a repository; @langwatch/limiter), and plans, entitlements vs permissions. Use when someone says 'generate an id', 'new id', 'randomUUID', 'nanoid', 'current time', 'Date.now', 'new Date', 'Temporal', 'logger', 'console.log', 'throw an error', 'HandledError or Error', 'read an env var', 'process.env', 'add a secret', 'Secret.load', 'call an external URL', 'SSRF', 'webhook destination', 'fetch with a timeout', 'rate limit', 'redis cache', 'cache TTL', 'plan limit', or 'entitlement'."
+description: "The shared building blocks module code uses instead of rolling its own: ids (@langwatch/ksuid generate, strict KSUIDs, never derived from another id), time (@langwatch/time nowInstant and Temporal, no new Date or Date.now), logging (createLogger, no console), errors (contract HandledError subclasses vs a plain Error), config and secrets (Config.define, Secret.load, no process.env), outbound calls (SSRF-validated egress: createSsrfUrlValidator, fetchValidatedDestination), Redis and rate limits (through a repository; @langwatch/limiter), and plans, entitlements vs permissions. Use when someone says 'generate an id', 'new id', 'randomUUID', 'nanoid', 'current time', 'Date.now', 'new Date', 'Temporal', 'logger', 'console.log', 'throw an error', 'HandledError or Error', 'read an env var', 'process.env', 'add a secret', 'Secret.load', 'call an external URL', 'SSRF', 'webhook destination', 'fetch with a timeout', 'rate limit', 'redis cache', 'cache TTL', 'share a minted key across servers', 'mintOnce', 'sealed token in Redis', 'plan limit', or 'entitlement'."
 user-invocable: true
 ---
 
@@ -78,6 +78,13 @@ Self-hosted calls leave through the proxy helpers in the same package.
 - Every key a cache repository writes expires in the same atomic command (`SET ... EX`, `SETEX`, a Lua script); at most
   60 s for anything that authorises, 5 minutes for folds and analytics. A test refuses a write without a TTL
   (`packages/architecture-enforcer/tests/redis-cache-ttl.unit.test.ts`).
+- A credential every server hands out (a run's key, a project's sandbox key) is minted once and shared sealed:
+  the service calls `mintOnce({ store, address: { tenantId, contentKey }, mint, isReady })` from
+  `@langwatch/secrets/shared-credential` with its repository as `store`. The live repository is a
+  `RedisSharedCredentialStore` (`@langwatch/redis-client/shared-credential`; prefix, `redis`, the stores'
+  `encryption`) built in `repositories/redis/`; `MemorySharedCredentialStore` is its twin. One caller claims and
+  mints, the rest wait up to 10 s for the same value, then answer pending. Never a per-process map, never a
+  table of pending mints (record section 7; `modules/api-key/process/src/services/run-key-mint.service.ts`).
 - `@langwatch/limiter` holds bounded concurrency (`ConcurrencyLimiter`, sheds when the wait queue is full) and the
   per-tenant ClickHouse statement limiter. A request-rate window is the store's `rateLimiter`, not this package.
 

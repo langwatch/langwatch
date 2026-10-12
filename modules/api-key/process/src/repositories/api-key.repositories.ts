@@ -1,4 +1,5 @@
-import type { AgentSandboxKeyRepository } from "./agent-sandbox-key.repository.ts";
+import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential";
+
 import type { ApiKeyAnswerCacheRepository } from "./api-key-answer-cache.repository.ts";
 import type { ApiKeyRepository } from "./api-key.repository.ts";
 
@@ -12,5 +13,7 @@ export interface ApiKeyRepositories {
   /** The token answers every pod shares; Postgres stays the truth. */
   readonly answers: ApiKeyAnswerCacheRepository;
   /** The token each project's code agent runs share, sealed at rest on the live tier. */
-  readonly sandboxKeys: AgentSandboxKeyRepository;
+  readonly sandboxKeys: SharedCredentialStore;
+  /** Each run's key, minted once across every server and shared sealed until it expires. */
+  readonly runKeys: SharedCredentialStore;
 }
