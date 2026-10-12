@@ -88,6 +88,51 @@ describe("the boot splash", () => {
     });
   });
 
+  describe("given the theme provider writes into the root before the app draws", () => {
+    /** @scenario "The theme provider's style and script do not count as a drawn page" */
+    it("holds the screen until a real page is in the root", async () => {
+      const html = await transform('<html><head></head><body><div id="root"></div></body></html>');
+      const script = [...html.matchAll(/<script data-boot-splash>([\s\S]*?)<\/script>/g)]
+        .map((match) => match[1])
+        .find((code) => code?.includes("MutationObserver"));
+      if (!script) throw new Error("expected the hand-off script");
+      const children: { tagName: string }[] = [];
+      const root = {
+        children,
+        get firstElementChild() {
+          return children[0];
+        },
+        querySelector: () => null,
+      };
+      let removed = false;
+      let mutated = () => undefined as void;
+      runInNewContext(script, {
+        document: {
+          getElementById: (id: string) =>
+            ({ "lw-boot": { isConnected: true, remove: () => (removed = true) }, root })[id],
+          dispatchEvent: () => true,
+        },
+        Event: class {},
+        MutationObserver: class {
+          constructor(callback: () => void) {
+            mutated = callback;
+          }
+          observe() {}
+          disconnect() {}
+        },
+        matchMedia: () => ({ matches: true }),
+        setTimeout: () => 0,
+        clearInterval: () => undefined,
+      });
+      children.push({ tagName: "STYLE" }, { tagName: "SCRIPT" });
+      mutated();
+      expect(removed).toBe(false);
+      children.push({ tagName: "DIV" });
+      mutated();
+      expect(removed).toBe(true);
+    });
+  });
+
   describe("given Vite's bundling page", () => {
     it("swaps its body for the loading screen and keeps the reload scripts", () => {
       const html = brandFallbackPage({ html: VITE_FALLBACK, ground: GROUND });
