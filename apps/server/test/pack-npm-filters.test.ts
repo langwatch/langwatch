@@ -312,13 +312,64 @@ describe("npm pack staging filters", () => {
     });
   });
 
-  describe("when resolving a workspace: dependency", () => {
+  describe("when apps/server declares workspace members and devDependencies", () => {
+    /** Writes the server manifest's dependencies and the member they name, then re-stages. */
+    function declareDependencies({
+      root,
+      dependencies,
+      devDependencies,
+    }: {
+      root: string;
+      dependencies: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    }): void {
+      const manifestPath = join(root, "apps/server/package.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<string, unknown>;
+      manifest.dependencies = dependencies;
+      if (devDependencies) manifest.devDependencies = devDependencies;
+      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+      write({
+        root,
+        relPath: "packages/config/package.json",
+        content: `${JSON.stringify({ name: "@langwatch/config", version: "0.1.0", private: true }, null, 2)}\n`,
+      });
+      execFileSync("git", ["add", "-A"], { cwd: root });
+    }
+
+    it("publishes only the registry dependencies", () => {
+      const root = buildFixture(["apps/api/src/config.ts"]);
+      declareDependencies({
+        root,
+        dependencies: { "@langwatch/config": "workspace:*", execa: "^9.6.0" },
+        devDependencies: { vitest: "^4.1.0" },
+      });
+      const stageDir = join(root, "_stage");
+
+      const { code, output } = runCheck({ root, extraArgs: ["--stage-to", stageDir] });
+
+      expect(code, output).toBe(0);
+      const published = JSON.parse(readFileSync(join(stageDir, "package.json"), "utf8")) as {
+        dependencies?: Record<string, string>;
+        devDependencies?: unknown;
+      };
+      expect(published.dependencies).toEqual({ execa: "^9.6.0" });
+      expect(published.devDependencies).toBeUndefined();
+    });
+
+    it("refuses a workspace member named by a plain version", () => {
+      const root = buildFixture(["apps/api/src/config.ts"]);
+      declareDependencies({ root, dependencies: { "@langwatch/config": "^0.1.0" } });
+
+      const { code, output } = runCheck({ root });
+
+      expect(code).toBe(1);
+      expect(output).toContain("dependencies.@langwatch/config (a workspace member)");
+    });
+  });
+
+  describe("when packing a manifest with workspace: dependencies", () => {
     /** @scenario "The self-host command remains compatible" */
-    it("resolves every workspace: dependency apps/server declares", () => {
-      // pnpm's pack resolves a `workspace:` specifier for a
-      // node_modules-less package by reading <cwd>/node_modules/<dep>'s
-      // manifest — a REAL pack (not --check-filters) proves the script's
-      // symlink shim covers the staged, install-less tree (ADR-076).
+    it("packs a tarball whose manifest names no workspace member", () => {
       const root = buildFixture(["apps/api/src/config.ts"]);
       const serverManifestPath = join(root, "apps/server/package.json");
       const serverManifest = JSON.parse(readFileSync(serverManifestPath, "utf8")) as Record<
@@ -366,6 +417,7 @@ describe("npm pack staging filters", () => {
         { encoding: "utf8" },
       );
       expect(packageJson).not.toContain("workspace:");
+      expect(packageJson).not.toContain("@langwatch/config");
     }, 20_000);
   });
 

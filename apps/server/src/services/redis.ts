@@ -37,6 +37,7 @@ export async function startRedis(ctx: RuntimeContext, bus: EventBus): Promise<Su
 
   const redisCli = resolvedPath.replace(/redis-server$/, "redis-cli");
   const ready = await pollUntilHealthy({
+    handle,
     check: execCheck(redisCli, ["-h", "127.0.0.1", "-p", String(ctx.ports.redis), "ping"], {
       expectStdoutContains: "PONG",
     }),

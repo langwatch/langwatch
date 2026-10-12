@@ -193,11 +193,17 @@ export async function ensureLangwatchDeps(
   return rootDir;
 }
 
-// Link external members'' peerDependencies to app-resolved instances; idempotent.
+// Link external members' peerDependencies to app-resolved instances; idempotent.
 export function linkExternalMemberPeers(appRootDir: string): string[] {
-  const appNodeModules = join(appRootDir, "apps", "api", "node_modules");
+  // The api's own links first; then pnpm's hoisted copy of the install, since the
+  // api declares no @opentelemetry/api of its own and the SDK's dist imports it.
+  const appNodeModules = [
+    join(appRootDir, "apps", "api", "node_modules"),
+    join(appRootDir, "node_modules", ".pnpm", "node_modules"),
+  ];
   const memberDirs = [
     join(appRootDir, "mcp", "typescript"),
+    join(appRootDir, "sdks", "typescript"),
     ...listDirs(join(appRootDir, "packages")),
   ];
   const linked: string[] = [];
@@ -233,10 +239,12 @@ function linkPeer({
 }: {
   memberDir: string;
   name: string;
-  appNodeModules: string;
+  appNodeModules: string[];
 }): boolean {
-  const target = join(appNodeModules, ...name.split("/"));
-  if (!existsSync(target)) return false;
+  const target = appNodeModules
+    .map((dir) => join(dir, ...name.split("/")))
+    .find((candidate) => existsSync(candidate));
+  if (!target) return false;
   const linkPath = join(memberDir, "node_modules", ...name.split("/"));
   // existsSync follows symlinks, so it says false for a dangling link whose entry is still there,
   // and symlinkSync would then die with EEXIST. lstat sees the entry: keep it when it resolves.
