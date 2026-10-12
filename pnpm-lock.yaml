@@ -8436,6 +8436,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -8603,6 +8606,9 @@ importers:
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -16228,6 +16234,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -16356,6 +16365,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
+      '@langwatch/instant-eval-judge-contract':
+        specifier: workspace:*
+        version: link:../../instant-eval-judge/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client

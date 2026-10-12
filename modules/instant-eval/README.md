@@ -41,6 +41,6 @@ Anything else instant-eval needs belongs to another module and is reached throug
 
 ## Who depends on instant-eval
 
-[connect](../../enterprise/modules/connect/README.md), [ops](../ops/README.md) (as a peer).
+[connect](../../enterprise/modules/connect/README.md), [evaluator](../evaluator/README.md), [ops](../ops/README.md) (as a peer).
 
 <!-- readme:generated:end -->

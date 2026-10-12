@@ -226,7 +226,7 @@ Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:161`.
 Answers at `/api/v1/run-plans`.
 
 ```typescript
-// Query: runPlanListQuerySchema, ../contract/src/suite-rest.schemas.ts:53
+// Query: runPlanListQuerySchema, ../contract/src/suite-rest.schemas.ts:54
 interface Query {
   includeArchived?: string;
 }
@@ -255,11 +255,11 @@ Permission `scenarios:view`. Declared at `src/transport/run-plans.rest.ts:201`.
 Answers at `/api/v1/run-plans/:id`.
 
 ```typescript
-// Params: runPlanIdParamsSchema, ../contract/src/suite-rest.schemas.ts:45
+// Params: runPlanIdParamsSchema, ../contract/src/suite-rest.schemas.ts:46
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof runPlanWireSchema>; // ../contract/src/suite-rest.schemas.ts:443
+type Response = z.infer<typeof runPlanWireSchema>; // ../contract/src/suite-rest.schemas.ts:446
 ```
 
 #### `POST /:id/run` · `rerunRunPlan`
@@ -271,7 +271,7 @@ Permission `scenarios:create`. Declared at `src/transport/run-plans.rest.ts:216`
 Answers at `/api/v1/run-plans/:id/run`.
 
 ```typescript
-type Params = z.infer<typeof runPlanIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:45
+type Params = z.infer<typeof runPlanIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:46
 // Body: rerunInputSchema, src/rules/suite-wire-v1.rules.ts:128
 interface Body {
   idempotencyKey?: string;
@@ -290,8 +290,8 @@ Permission `scenarios:manage`. Declared at `src/transport/run-plans.rest.ts:241`
 Answers at `/api/v1/run-plans/:id`.
 
 ```typescript
-type Params = z.infer<typeof runPlanIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:45
-// Response: runPlanArchiveResultSchema, ../contract/src/suite-rest.schemas.ts:63
+type Params = z.infer<typeof runPlanIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:46
+// Response: runPlanArchiveResultSchema, ../contract/src/suite-rest.schemas.ts:64
 interface Response {
   id: string;
   archived: true;
@@ -318,7 +318,7 @@ Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:418
 Answers at `/api/suites`, `/api/v1/suites`; also, undocumented, `/api/suites/2026-08-07`, `/api/v1/suites/2026-08-07`, `/api/suites/latest`, `/api/v1/suites/latest`.
 
 ```typescript
-// Query: listSuitesQuerySchema, ../contract/src/suite-rest.schemas.ts:244
+// Query: listSuitesQuerySchema, ../contract/src/suite-rest.schemas.ts:245
 interface Query {
   kind?: "custom" | "folder";
 }
@@ -334,11 +334,11 @@ Permission `scenarios:view`. Declared at `src/transport/suites-alias.rest.ts:437
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
 ```typescript
-// Params: suiteAliasIdParamsSchema, ../contract/src/suite-rest.schemas.ts:340
+// Params: suiteAliasIdParamsSchema, ../contract/src/suite-rest.schemas.ts:343
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:145
+type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:146
 ```
 
 #### `POST /` · `postApiSuites`
@@ -350,8 +350,8 @@ Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:4
 Answers at `/api/suites`, `/api/v1/suites`; also, undocumented, `/api/suites/2026-08-07`, `/api/v1/suites/2026-08-07`, `/api/suites/latest`, `/api/v1/suites/latest`.
 
 ```typescript
-type Body = z.infer<typeof createSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:233
-type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:145
+type Body = z.infer<typeof createSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:234
+type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:146
 ```
 
 #### `PATCH /:id` · `patchApiSuitesById`
@@ -363,9 +363,9 @@ Permission `scenarios:update`. Declared at `src/transport/suites-alias.rest.ts:4
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:340
-type Body = z.infer<typeof updateSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:256
-type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:145
+type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:343
+type Body = z.infer<typeof updateSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:257
+type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:146
 ```
 
 #### `POST /:id/duplicate` · `postApiSuitesByIdDuplicate`
@@ -377,10 +377,10 @@ Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:4
 Answers at `/api/suites/:id/duplicate`, `/api/v1/suites/:id/duplicate`; also, undocumented, `/api/suites/2026-08-07/:id/duplicate`, `/api/v1/suites/2026-08-07/:id/duplicate`, `/api/suites/latest/:id/duplicate`, `/api/v1/suites/latest/:id/duplicate`.
 
 ```typescript
-type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:340
-// Body: duplicateSuiteBodySchema, ../contract/src/suite-rest.schemas.ts:348
+type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:343
+// Body: duplicateSuiteBodySchema, ../contract/src/suite-rest.schemas.ts:351
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:145
+type Response = z.infer<typeof suiteResponseWithPlatformUrlSchema>; // ../contract/src/suite-rest.schemas.ts:146
 ```
 
 #### `POST /:id/run` · `postApiSuitesByIdRun`
@@ -392,9 +392,9 @@ Permission `scenarios:create`. Declared at `src/transport/suites-alias.rest.ts:5
 Answers at `/api/suites/:id/run`, `/api/v1/suites/:id/run`; also, undocumented, `/api/suites/2026-08-07/:id/run`, `/api/v1/suites/2026-08-07/:id/run`, `/api/suites/latest/:id/run`, `/api/v1/suites/latest/:id/run`.
 
 ```typescript
-type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:340
-type Body = z.infer<typeof runSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:306
-type Response = z.infer<typeof suiteRunResultSchema>; // ../contract/src/suite-rest.schemas.ts:333
+type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:343
+type Body = z.infer<typeof runSuiteInputSchema>; // ../contract/src/suite-rest.schemas.ts:309
+type Response = z.infer<typeof suiteRunResultSchema>; // ../contract/src/suite-rest.schemas.ts:336
 ```
 
 #### `DELETE /:id` · `deleteApiSuitesById`
@@ -406,8 +406,8 @@ Permission `scenarios:manage`. Declared at `src/transport/suites-alias.rest.ts:5
 Answers at `/api/suites/:id`, `/api/v1/suites/:id`; also, undocumented, `/api/suites/2026-08-07/:id`, `/api/v1/suites/2026-08-07/:id`, `/api/suites/latest/:id`, `/api/v1/suites/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:340
-// Response: archivedSuiteSchema, ../contract/src/suite-rest.schemas.ts:351
+type Params = z.infer<typeof suiteAliasIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:343
+// Response: archivedSuiteSchema, ../contract/src/suite-rest.schemas.ts:354
 interface Response {
   id: string;
   archived: boolean;
@@ -432,7 +432,7 @@ Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:226`
 Answers at `/api/v1/test-suites`.
 
 ```typescript
-// Query: testSuiteListQuerySchema, ../contract/src/suite-rest.schemas.ts:81
+// Query: testSuiteListQuerySchema, ../contract/src/suite-rest.schemas.ts:82
 interface Query {
   includeArchived?: string;
 }
@@ -461,7 +461,7 @@ Permission `scenarios:view`. Declared at `src/transport/test-suites.rest.ts:267`
 Answers at `/api/v1/test-suites/:id`.
 
 ```typescript
-// Params: testSuiteIdParamsSchema, ../contract/src/suite-rest.schemas.ts:70
+// Params: testSuiteIdParamsSchema, ../contract/src/suite-rest.schemas.ts:71
 interface Params {
   id: string;
 }
@@ -477,7 +477,7 @@ Permission `scenarios:update`. Declared at `src/transport/test-suites.rest.ts:28
 Answers at `/api/v1/test-suites/:id`.
 
 ```typescript
-type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:70
+type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:71
 type Body = z.infer<typeof testSuiteUpdateInputSchema>; // src/rules/suite-wire-v1.rules.ts:257
 type Response = z.infer<typeof testSuiteWireSchema>; // src/rules/suite-wire-v1.rules.ts:201
 ```
@@ -491,8 +491,8 @@ Permission `scenarios:manage`. Declared at `src/transport/test-suites.rest.ts:31
 Answers at `/api/v1/test-suites/:id`.
 
 ```typescript
-type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:70
-// Response: testSuiteArchiveResultSchema, ../contract/src/suite-rest.schemas.ts:91
+type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:71
+// Response: testSuiteArchiveResultSchema, ../contract/src/suite-rest.schemas.ts:92
 interface Response {
   id: string;
   archived: true;
@@ -508,7 +508,7 @@ Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:32
 Answers at `/api/v1/test-suites/:id/run`.
 
 ```typescript
-type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:70
+type Params = z.infer<typeof testSuiteIdParamsSchema>; // ../contract/src/suite-rest.schemas.ts:71
 type Body = z.infer<typeof testSuiteRunInputSchema>; // src/rules/suite-wire-v1.rules.ts:131
 type Response = z.infer<typeof runPlanRunResultSchema>; // src/rules/suite-wire-v1.rules.ts:171
 ```
