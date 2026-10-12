@@ -29,7 +29,7 @@ type midStepOptions struct {
 	factEvent     string // the event the step records, one per row
 }
 
-var defaultMidStep = midStepOptions{step: "user:record-created-facts", checkpointKey: "afterUserId", countKey: "users", pageSize: 500, plantUsers: 40000, factEvent: "lw.user.created"}
+var defaultMidStep = midStepOptions{step: "user:record-created-facts", checkpointKey: "afterUserId", countKey: "users", pageSize: 2000, plantUsers: 40000, factEvent: "lw.user.created"}
 
 // stepRow is one ledger row's status and report, read straight from Postgres.
 type stepRow struct {

@@ -18,10 +18,10 @@ import { UserService } from "../user.service.ts";
 function lifecyclePeers() {
   const lifecycle = UserLifecycleNoticeService.create();
   lifecycle.connect({
-    recordUserDeactivated: { send: async () => undefined },
-    recordUserReactivated: { send: async () => undefined },
+    recordUserDeactivated: { send: async () => undefined, sendBatch: async () => undefined },
+    recordUserReactivated: { send: async () => undefined, sendBatch: async () => undefined },
     recordUserRegistered: { send: async () => undefined },
-    recordUserCreated: { send: async () => undefined },
+    recordUserCreated: { send: async () => undefined, sendBatch: async () => undefined },
     recordUserErased: { send: async () => undefined },
   });
 
@@ -55,8 +55,7 @@ class StubRepository implements UserRepository {
   countUsageAmong = vi.fn(async () => ({ emailDomains: {} }));
   hasAccountOnDomain = vi.fn(async () => false);
   hasAnyAccount = vi.fn(async () => true);
-  findCreatedPage = vi.fn(async () => []);
-  findStandingPage = vi.fn(async () => []);
+  findBackfillPage = vi.fn(async () => []);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async (): Promise<UserFullProfile | null> => user);
   findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
@@ -616,14 +615,16 @@ describe("the lifecycle facts' clock", () => {
         send: async ({ occurredAt }) => {
           sent.push({ type: "deactivated", occurredAt });
         },
+        sendBatch: async () => undefined,
       },
       recordUserReactivated: {
         send: async ({ occurredAt }) => {
           sent.push({ type: "reactivated", occurredAt });
         },
+        sendBatch: async () => undefined,
       },
       recordUserRegistered: { send: async () => undefined },
-      recordUserCreated: { send: async () => undefined },
+      recordUserCreated: { send: async () => undefined, sendBatch: async () => undefined },
       recordUserErased: { send: async () => undefined },
     });
     const service = UserService.create({

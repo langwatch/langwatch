@@ -120,58 +120,60 @@ Feature: Canonical user lifecycle
     Then each is recorded once on user_lifecycle with the data its write committed
     And a delivery while the bus is down throws, so the outbox retries it
 
+  # One pass over accounts in id order; each page is read once, its history read once, and its
+  # commands sent as batches, created before standing. ARCHITECTURE.md, "Platform operators are a grant".
   @unit
   Scenario: The seed step records a created fact for every existing account
     Given accounts stored before user recorded created facts
     When the background step "user:record-created-facts" runs, or resumes from its checkpoint
     Then each account after the checkpoint is recorded once as created, marked backfilled, at its row's creation time
-    And the step waits until no older image that mints accounts without the fact still serves
+    And the step waits until no older image that mints accounts or changes their standing without the fact still serves
 
-  # A retried or restarted attempt resumes from the checkpoint; its report keeps the total, so an
+  @unit
+  Scenario: The seed step sends each page as batches, every created fact before the page's standing facts
+    Given stored accounts, some deactivated
+    When the step runs
+    Then each page of accounts is read once and sent as one batch of created facts followed by its batches of standing facts
+    And an account's created fact is sent before its own deactivation or reactivation
+
+  @unit
+  Scenario: The seed step catches up a missed deactivation
+    Given an account an older image deactivated without recording the fact
+    When the step runs
+    Then the account is recorded deactivated at its stored deactivation time
+
+  @unit
+  Scenario: The seed step repairs a missed reactivation
+    Given an active account whose latest fact on user's own log is a deactivation
+    When the step runs
+    Then the account is recorded reactivated at the run's start
+    And an active account whose log ends in a reactivation, or holds no deactivation, records nothing
+
+  @unit
+  Scenario: Running the seed step twice records once
+    Given the step has run
+    When it runs again
+    Then no further created, deactivation or reactivation fact is recorded
+
+  # A retried or restarted attempt resumes from the checkpoint; its report keeps the totals, so an
   # attempt that resumes at the end of the table reports every account, not none.
   @unit
   Scenario: A resumed seed step reports every account its attempts counted
     Given the seed step's checkpoint counted some accounts before its attempt stopped
     When the step resumes from that checkpoint
-    Then each checkpoint it saves and the report it finishes with count on from that number
+    Then each checkpoint it saves and the report it finishes with count on from those numbers
+
+  @unit
+  Scenario: The seed step resumes after the saved user id
+    Given the step saved a checkpoint after a user id
+    When it resumes
+    Then it records only the accounts after that id
+    And it saves the last id of each page it finishes
 
   @unit
   Scenario: The seed step's dry run records nothing
     When the step runs as a dry run
-    Then it reports how many accounts it would record, records no fact and saves no checkpoint
-
-  # Standing changes an old image made record no fact; ARCHITECTURE.md, "Platform operators are a grant".
-  @unit
-  Scenario: The standing step catches up a missed deactivation
-    Given an account an older image deactivated without recording the fact
-    When the background step "user:record-standing-facts" runs
-    Then the account is recorded deactivated at its stored deactivation time
-    And the step waits until no older image that changes standing without the fact still serves
-
-  @unit
-  Scenario: The standing step repairs a missed reactivation
-    Given an active account whose latest fact on user's own log is a deactivation
-    When the standing step runs
-    Then the account is recorded reactivated at the run's start
-    And an active account whose log ends in a reactivation, or holds no deactivation, records nothing
-
-  @unit
-  Scenario: Running the standing step twice records once
-    Given the standing step has run
-    When it runs again
-    Then no further deactivation or reactivation fact is recorded
-
-  @unit
-  Scenario: The standing step's dry run writes nothing
-    When the standing step runs as a dry run
-    Then it reports how many accounts it would re-state, records no fact and saves no checkpoint
-
-  @unit
-  Scenario: The standing step resumes after the saved user id
-    Given the standing step saved a checkpoint after a user id
-    When it resumes
-    Then it re-states only the accounts after that id
-    And it saves the last id of each page it finishes
+    Then it reports how many accounts it would record or re-state, sends no fact and saves no checkpoint
 
   @unit
   Scenario: Changing an email stores the normalized address

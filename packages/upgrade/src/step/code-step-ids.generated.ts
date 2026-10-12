@@ -35,6 +35,5 @@ export type CodeStepId =
   | "trace:track-updated-at-index-materialisation"
   | "trace:send-month-trace-ids"
   | "user:record-created-facts"
-  | "user:record-standing-facts"
   | "workflow:record-current-version-fields"
   | "workflow:move-http-credentials-to-secrets";

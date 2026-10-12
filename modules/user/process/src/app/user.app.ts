@@ -86,11 +86,6 @@ import {
 import { UserOrganizationDirectoryService } from "../services/user-organization-directory.service.ts";
 import { type UserPasswordHasher, UserPasswordService } from "../services/user-password.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
-import {
-  UserStandingFactBackfillService,
-  type UserStandingFactBackfillReport,
-  type UserStandingFactBackfillRun,
-} from "../services/user-standing-fact-backfill.service.ts";
 import { UserService } from "../services/user.service.ts";
 
 const logger = createLogger("langwatch:user-app");
@@ -213,14 +208,10 @@ export class UserModule implements UserApi {
       lifecycle,
       createdFactBackfill: UserCreatedFactBackfillService.create({
         users: repositories.users,
-        lifecycle,
-      }),
-      lifecycleLog,
-      standingFactBackfill: UserStandingFactBackfillService.create({
-        users: repositories.users,
         standings: lifecycleLog,
         lifecycle,
       }),
+      lifecycleLog,
       credentials: UserCredentialService.create({
         repository: repositories.credentials,
         passwords,
@@ -243,7 +234,6 @@ export class UserModule implements UserApi {
   readonly #lifecycle: UserLifecycleNoticeService;
   readonly #createdFactBackfill: UserCreatedFactBackfillService;
   readonly #lifecycleLog: EventingUserStandingRepository;
-  readonly #standingFactBackfill: UserStandingFactBackfillService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
@@ -261,7 +251,6 @@ export class UserModule implements UserApi {
     lifecycle: UserLifecycleNoticeService;
     createdFactBackfill: UserCreatedFactBackfillService;
     lifecycleLog: EventingUserStandingRepository;
-    standingFactBackfill: UserStandingFactBackfillService;
     credentials: UserCredentialService;
     directory: UserOrganizationDirectoryService;
     avatarObjects: UserAvatarObjectService;
@@ -277,7 +266,6 @@ export class UserModule implements UserApi {
     this.#lifecycle = input.lifecycle;
     this.#createdFactBackfill = input.createdFactBackfill;
     this.#lifecycleLog = input.lifecycleLog;
-    this.#standingFactBackfill = input.standingFactBackfill;
     this.#credentials = input.credentials;
     this.#account = UserAccountService.create();
     this.#peers = input.dependencies;
@@ -533,7 +521,7 @@ export class UserModule implements UserApi {
     this.#lifecycle.connect(senders);
   }
 
-  /** The `user:record-created-facts` step's body: every stored account recorded as created. */
+  /** The `user:record-created-facts` step's body: each account's created fact and standing. */
   recordExistingCreatedFacts(
     input: UserCreatedFactBackfillRun,
   ): Promise<UserCreatedFactBackfillReport> {
@@ -546,13 +534,6 @@ export class UserModule implements UserApi {
     eventStore: Pick<OwnEventStore, "read"> | undefined;
   }): void {
     this.#lifecycleLog.keep(input);
-  }
-
-  /** The `user:record-standing-facts` step's body: each account's standing re-stated. */
-  recordExistingStandingFacts(
-    input: UserStandingFactBackfillRun,
-  ): Promise<UserStandingFactBackfillReport> {
-    return this.#standingFactBackfill.recordExisting(input);
   }
 
   /** The fact outbox's delivery, on the worker: one committed fact recorded on user_lifecycle. */

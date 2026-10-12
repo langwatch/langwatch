@@ -31,8 +31,7 @@ import type {
   CreatedCredentialUser,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
-  UserCreatedRow,
-  UserStandingRow,
+  UserBackfillRow,
   UserDeactivationOutcome,
   UserRepository,
   StoredProfileChange,
@@ -77,34 +76,19 @@ export class MemoryUserRepository implements UserRepository {
     return this.#database.rows().length > 0;
   }
 
-  async findCreatedPage({
+  async findBackfillPage({
     afterId,
     limit,
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<UserCreatedRow[]> {
+  }): Promise<UserBackfillRow[]> {
     return this.#database
       .rows()
       .filter((row) => afterId === null || row.id > afterId)
       .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
       .slice(0, limit)
-      .map((row) => ({ id: row.id, createdAt: row.createdAt }));
-  }
-
-  async findStandingPage({
-    afterId,
-    limit,
-  }: {
-    afterId: string | null;
-    limit: number;
-  }): Promise<UserStandingRow[]> {
-    return this.#database
-      .rows()
-      .filter((row) => afterId === null || row.id > afterId)
-      .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
-      .slice(0, limit)
-      .map((row) => ({ id: row.id, deactivatedAt: row.deactivatedAt }));
+      .map((row) => ({ id: row.id, createdAt: row.createdAt, deactivatedAt: row.deactivatedAt }));
   }
 
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {

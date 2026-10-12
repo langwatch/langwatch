@@ -190,13 +190,8 @@
     "user:record-created-facts": {
       "status": "seeded",
       "seed": "tenancy-sql",
+      "note": "also re-states standing: 400 users in active, deactivated, unconfirmed and never-signed-in states",
       "cells": ["C1", "C2", "C3", "C4"]
-    },
-    "user:record-standing-facts": {
-      "status": "seeded",
-      "seed": "tenancy-sql:users",
-      "note": "400 users in active, deactivated, unconfirmed and never-signed-in states",
-      "cells": ["C1", "C3"]
     },
     "workflow:move-http-credentials-to-secrets": {
       "status": "pending",

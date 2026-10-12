@@ -269,15 +269,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "user",
-    "description": "Records every existing account as user's created fact, for peers to read.",
-    "needsOldWritersGone": true
-  },
-  {
-    "id": "user:record-standing-facts",
-    "kind": "data",
-    "mode": "background",
-    "owner": "user",
-    "description": "Re-states each account's deactivation, and a reactivation its log still misses, for peers.",
+    "description": "Records every existing account's created fact and re-states its standing, for peers to read.",
     "needsOldWritersGone": true
   },
   {
