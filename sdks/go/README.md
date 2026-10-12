@@ -105,6 +105,33 @@ exporter, err := langwatch.NewExporter(ctx,
 exporter, err := langwatch.NewDefaultExporter(ctx)
 ```
 
+The exporter sends gzipped OTLP/JSON to `<endpoint>/api/otel/v1/traces`,
+retrying throttled (429) and failed (5xx) requests with exponential backoff
+(honouring `Retry-After`) for up to a minute, bounded by the export context.
+Wrap it in `sdktrace.NewBatchSpanProcessor` (or `sdktrace.WithBatcher`) to
+batch spans. It is built on the standard library, so importing the root
+package does not link gRPC or the generated OTLP protobuf packages.
+
+### OTLP/protobuf transport
+
+To send through the official `otlptracehttp` exporter instead (OTLP/protobuf,
+honouring the `OTEL_EXPORTER_OTLP_*` environment variables), use the
+`exporter/otlp` package. It links gRPC and protobuf, as `otlptracehttp` does:
+
+```go
+import lwotlp "github.com/langwatch/langwatch/sdks/go/exporter/otlp"
+
+exporter, err := lwotlp.NewExporter(ctx, langwatch.WithFilters(langwatch.ExcludeHTTPRequests()))
+
+// or as an option on any langwatch constructor, with extra otlptracehttp options
+exporter, err := langwatch.NewDefaultExporter(ctx,
+	lwotlp.WithTransport(otlptracehttp.WithTimeout(5*time.Second)),
+)
+```
+
+`langwatch.WithTransport` accepts any `func(ctx, endpointURL, headers) (sdktrace.SpanExporter, error)`,
+so a custom exporter keeps LangWatch's auth headers, filters and data capture.
+
 ### Filtering Spans
 
 Control which spans are exported to LangWatch:
@@ -485,6 +512,14 @@ langwatch.WithEndpoint(url string)
 langwatch.WithFilters(filters ...Filter)
 langwatch.WithDataCapture(mode DataCaptureMode)            // none | input | output | all
 langwatch.WithDataCaptureFunc(predicate DataCapturePredicate)
+langwatch.WithProjectID(projectID string)                  // required for pat-lw-* tokens
+langwatch.WithHTTPClient(client *http.Client)              // default transport only
+langwatch.WithCompression(enabled bool)                    // gzip, on by default
+langwatch.WithTransport(transport ExporterTransport)       // replace the OTLP/JSON transport
+
+// OTLP/protobuf via otlptracehttp (links gRPC)
+lwotlp.NewExporter(ctx, opts...)
+lwotlp.WithTransport(extra ...otlptracehttp.Option)
 
 // Wrap any exporter with filtering
 langwatch.NewFilteringExporter(wrapped, filters...)
