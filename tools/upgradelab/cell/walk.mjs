@@ -20,6 +20,8 @@ const phase = () => {
     return "main";
   }
 };
+// unreadBody marks a failed response whose body was gone (the page navigated); observe.go matches it.
+const unreadBody = "body unread";
 const stopped = () => existsSync(join(runDir, "walk.stop"));
 const dismissNudge = (page) =>
   page
@@ -98,7 +100,7 @@ async function openPage() {
     if (response.status() < 400) return;
     const text =
       response.status() === 503 || response.status() === 400
-        ? (await response.text().catch(() => "")).slice(0, 300)
+        ? (await response.text().catch((error) => `${unreadBody}: ${error?.message ?? error}`)).slice(0, 300)
         : "";
     log({
       kind: "http",

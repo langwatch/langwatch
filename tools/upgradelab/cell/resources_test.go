@@ -202,3 +202,16 @@ func TestConsoleTwinOfAnExpected503IsCappedByThe503s(t *testing.T) {
 		t.Errorf("expected %d tolerated %v findings %+v err %v", expected, tolerated, findings, err)
 	}
 }
+
+func TestAnUnreadUpgrade503CountsOnlyWhereTheSamePathAnsweredUpgradeInProgress(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "browser.jsonl")
+	unread := `{"atMs":40,"kind":"http","url":"http://x/api/trpc/user.updateLastLogin","status":503,"retryAfter":"10","text":"body unread: No resource with given identifier"}`
+	readable := `{"atMs":45,"kind":"http","url":"http://x/api/trpc/user.updateLastLogin","status":503,"retryAfter":"10","text":"{\"error\":{\"message\":\"upgrade_in_progress\"}}"}`
+	other := `{"atMs":46,"kind":"http","url":"http://x/api/trpc/other","status":503,"retryAfter":"5","text":"body unread: gone"}`
+	echo := `{"atMs":60,"kind":"console","text":"Failed to load resource: the server responded with a status of 503 (Service Unavailable)"}`
+	_ = os.WriteFile(path, []byte(unread+"\n"+readable+"\n"+other+"\n"+echo+"\n"+echo+"\n"), 0o600)
+	_, expected, _, findings, err := BrowserFindings(path, 10, 100, false)
+	if err != nil || expected != 2 || len(findings) != 1 || findings[0].URL != "http://x/api/trpc/other" {
+		t.Errorf("expected %d findings %+v err %v", expected, findings, err)
+	}
+}

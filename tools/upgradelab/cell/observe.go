@@ -360,6 +360,22 @@ func expectedWhileStepsRun(record BrowserRecord, switched, ready int64) bool {
 		strings.Contains(record.Text, "upgrade_in_progress") && switched >= 0 && ready >= 0 && record.AtMs >= switched && record.AtMs <= ready
 }
 
+// unreadBody prefixes a walk record's text when the page navigated before its body could be read (walk.mjs).
+const unreadBody = "body unread"
+
+// unreadUpgrade503: a 503 with Retry-After in the window whose body was gone, on a path that answered a
+// readable upgrade_in_progress in the same window: the same answer, read too late.
+func unreadUpgrade503(record BrowserRecord, switched, ready int64, upgrading map[string]bool) bool {
+	return record.Kind == "http" && record.Status == http.StatusServiceUnavailable && record.RetryAfter != "" &&
+		strings.HasPrefix(record.Text, unreadBody) && switched >= 0 && ready >= 0 && record.AtMs >= switched &&
+		record.AtMs <= ready && upgrading[pathOf(record.URL)]
+}
+
+func pathOf(raw string) string {
+	path, _, _ := strings.Cut(raw, "?")
+	return path
+}
+
 // consoleTwinOf503: the console line Chromium writes for a failed load names no url or code, so it is
 // matched by status and window only, and capped at the number of expected 503s it echoes.
 func consoleTwinOf503(record BrowserRecord, switched, ready int64) bool {
@@ -427,7 +443,8 @@ func BrowserFindings(path string, switched, ready int64, stopStart bool) (walks,
 	}
 	tolerated = map[string]int{}
 	var records []BrowserRecord
-	twins := 0 // the browser echoes each failed load as a console line naming no url: one per expected 503
+	upgrading := map[string]bool{} // paths that answered a readable upgrade_in_progress in the window
+	twins := 0                     // the browser echoes each failed load as a console line naming no url: one per expected 503
 	for _, line := range strings.Split(string(data), "\n") {
 		var record BrowserRecord
 		if strings.TrimSpace(line) == "" || json.Unmarshal([]byte(line), &record) != nil {
@@ -436,13 +453,19 @@ func BrowserFindings(path string, switched, ready int64, stopStart bool) (walks,
 		records = append(records, record)
 		if expectedWhileStepsRun(record, switched, ready) {
 			twins++
+			upgrading[pathOf(record.URL)] = true
+		}
+	}
+	for _, record := range records {
+		if unreadUpgrade503(record, switched, ready, upgrading) {
+			twins++
 		}
 	}
 	for _, record := range records {
 		switch {
 		case record.Kind == "walk":
 			walks++
-		case expectedWhileStepsRun(record, switched, ready):
+		case expectedWhileStepsRun(record, switched, ready), unreadUpgrade503(record, switched, ready, upgrading):
 			expected++
 		case twins > 0 && consoleTwinOf503(record, switched, ready):
 			twins--
