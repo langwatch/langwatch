@@ -447,7 +447,7 @@ type Hygiene interface {
 	LastActivity(worktreeDir string) (t time.Time, ok bool)
 	// LastTouched is when the worktree DIRECTORY itself was last written — its own
 	// mtime, not its HEAD's committer date. LastActivity answers "how long has this
-	// branch sat", which for a diff drive checked out at an old ref reads as months
+	// branch sat", which for a scratch worktree checked out at an old ref reads as months
 	// idle the moment it is created; this answers "when did anything happen here",
 	// which is the only safe clock for deleting a tool's scratch out from under it.
 	LastTouched(worktreeDir string) (t time.Time, ok bool)

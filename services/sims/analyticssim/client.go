@@ -8,8 +8,8 @@ import (
 	"net/url"
 )
 
-// Client reads a running analyticssim's query API; apidiff and visualdiff
-// assert through it that a call reached a provider.
+// Client reads a running analyticssim's query API, so a caller can assert that
+// a call reached a provider.
 type Client struct {
 	// BaseURL is the sim's origin, e.g. https://analytics.<slug>.langwatch.localhost.
 	BaseURL string

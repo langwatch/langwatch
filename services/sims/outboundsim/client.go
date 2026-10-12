@@ -11,7 +11,7 @@ import (
 )
 
 // Client reads and steers a running outboundsim through its control API;
-// haven's CLI and the diff tools assert through it that a call arrived.
+// haven's CLI and tests assert through it that a call arrived.
 type Client struct {
 	// BaseURL is the sim's origin, e.g. https://outbound.<slug>.langwatch.localhost.
 	BaseURL string

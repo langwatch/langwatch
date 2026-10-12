@@ -7,7 +7,7 @@ import (
 
 // A stack needs a few credentials no checkout should have to hand-write: the
 // keys that sign sessions and seal stored credentials, the instance-admin key
-// and a SCIM token the diff tools authenticate with. haven generates them per
+// and a SCIM token local tools authenticate with. haven generates them per
 // stack, keeps them beside its other per-stack state so they survive down/up,
 // and injects each one only where the developer has not set it (ruling
 // 2026-09-30: diff runs must never fail on stack setup).
@@ -85,7 +85,7 @@ func anySet(resolved map[string]string, keys []string) bool {
 	return false
 }
 
-// ToolPassthroughKeys are keys the diff tools and the interaction simulator
+// ToolPassthroughKeys are keys the fuzzer and the interaction simulator
 // read that haven does not mint: `haven env` passes them through from the
 // stack's own resolution so a tool needs no second copy of them.
 var ToolPassthroughKeys = []string{"ANTHROPIC_API_KEY", "JEV_API_KEY", "JEV_BASE_URL"}

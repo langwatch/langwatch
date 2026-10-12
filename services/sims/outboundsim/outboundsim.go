@@ -1,7 +1,7 @@
 // Package outboundsim is a local stand-in for the things the product sends
 // messages to: Slack incoming webhooks and the Slack Web API, customer webhook
 // endpoints and customer SQS queues. Every call is kept in memory as a Record,
-// listed under /_sim/api/records for the console, haven's CLI and the diff tools.
+// listed under /_sim/api/records for the console, haven's CLI and tests.
 //
 // ponytail: credentials are accepted, never checked. It is a dev shim; never expose it.
 package outboundsim

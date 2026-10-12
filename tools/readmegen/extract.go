@@ -18,8 +18,7 @@ var extractorScripts embed.FS
 
 // extractorHome is where the scripts are written for the run: inside the
 // architecture enforcer, so `@langwatch/architecture-enforcer` resolves as a
-// self-reference and `typescript` from its node_modules, as apidiff writes its
-// inventory into packages/api.
+// self-reference and `typescript` from its node_modules.
 const extractorHome = "packages/architecture-enforcer"
 
 // extractorParts run as two node processes at once; each writes its half of the manifest.

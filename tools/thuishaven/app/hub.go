@@ -56,9 +56,9 @@ func (o *Orchestrator) DownStack(ctx context.Context, slug string) error {
 // DestroyStack is DownStack plus the data: it stops the stack named by slug
 // and drops the ClickHouse + Postgres databases haven created for it. The
 // worktree is left alone - a stack is not a checkout, and a tool that boots a
-// throwaway stack inside a checkout it does not own (apidiff, one stack per
-// instance under its own run-scoped slug) must be able to take its own stack
-// and its own data away without touching the directory it borrowed.
+// throwaway stack inside a checkout it does not own, under its own slug, must
+// be able to take its own stack and its own data away without touching the
+// directory it borrowed.
 //
 // Naming the slug is the whole safety story: nothing here is derived from a
 // directory, so a run can only ever destroy the slugs it started. The shared

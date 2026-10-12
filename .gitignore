@@ -174,10 +174,9 @@ server.log
 # .bin/<name>/<name> (haven, the Go services under `make service-watch`, the
 # bun-compiled langy-worker and langwatch CLIs). Release pipelines still pass
 # their own --outfile; this is the default so a stray build can never be
-# committed the way a 9.8 MB `apidiff` once was.
+# committed by accident.
 /.bin/
 # A bare `go build ./cmd/<name>` drops its binary at the root; these are those names.
-/apidiff
 /ciguard
 /docscheck
 /haven
@@ -185,14 +184,7 @@ server.log
 /importext
 /linkcheck
 /migrationorder
-/openapidiff
 /service
-
-# apidiff scratch: worktrees, instance logs, generated compose overrides
-.apidiff/
-
-# diff tool binaries a bare `go build ./cmd/<tool>` drops at the root (build into .bin/ instead)
-/apidiff
 
 # Prisma client output: prepare regenerates it (pnpm start:prepare:files), never commit it
 packages/prisma-client/src/generated/

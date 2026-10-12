@@ -8,17 +8,17 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// DestroyStack is the slug-addressed wipe apidiff's teardown runs. What these
+// DestroyStack is the slug-addressed wipe a tool's teardown runs. What these
 // cases pin is the blast radius: one slug in, one stack down, one database
 // pair dropped, every neighbor untouched.
 func TestDestroyStack(t *testing.T) {
 	ctx := context.Background()
-	const mine, neighbor = "apidiff-20260909t2230-branch", "feat-strict-feature-layout-v0"
+	const mine, neighbor = "run-20260909t2230-branch", "feat-strict-feature-layout-v0"
 
 	newOrch := func(stacks []domain.Stack) (*fakeDBServer, *fakeDBServer, *fakeStore, *Orchestrator) {
 		store := &fakeStore{stacks: stacks}
-		ch := &fakeDBServer{databases: []string{"lw_apidiff_20260909t2230_branch", "lw_feat_strict_feature_layout_v0", "lw_main"}}
-		pg := &fakeDBServer{databases: []string{"lw_apidiff_20260909t2230_branch", "lw_feat_strict_feature_layout_v0", "lw_main"}}
+		ch := &fakeDBServer{databases: []string{"lw_run_20260909t2230_branch", "lw_feat_strict_feature_layout_v0", "lw_main"}}
+		pg := &fakeDBServer{databases: []string{"lw_run_20260909t2230_branch", "lw_feat_strict_feature_layout_v0", "lw_main"}}
 		return ch, pg, store, pruneOrch(store, &fakeSystem{alive: map[int]bool{}}, ch, pg, &fakeHygiene{})
 	}
 
@@ -31,7 +31,7 @@ func TestDestroyStack(t *testing.T) {
 			if err := o.DestroyStack(ctx, mine); err != nil {
 				t.Fatalf("DestroyStack: %v", err)
 			}
-			want := []string{"lw_apidiff_20260909t2230_branch"}
+			want := []string{"lw_run_20260909t2230_branch"}
 			if !slices.Equal(ch.dropped, want) || !slices.Equal(pg.dropped, want) {
 				t.Errorf("dropped ch=%v pg=%v, want %v on each", ch.dropped, pg.dropped, want)
 			}

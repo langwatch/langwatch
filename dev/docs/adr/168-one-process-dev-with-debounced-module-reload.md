@@ -17,7 +17,7 @@ processes, and reload worker and api on backend changes without dying from AI wr
 
 ### Today, measured 2026-09-30
 
-The live check stack (`visualdiff-check`, haven, watch off) is the only stack running.
+The live check stack (haven, watch off) is the only stack running.
 
 | Process (haven stack)                                            | RSS           |
 | ---------------------------------------------------------------- | ------------- |

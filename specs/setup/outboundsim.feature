@@ -3,8 +3,8 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
   and the Slack Web API, customer webhook endpoints (signed, retried) and
   customer SQS queues. outboundsim accepts those calls, records each one
   (channel, target, headers with credentials redacted, body, signature verdict,
-  the answer it gave, received time) and keeps them in memory, so a developer,
-  an agent, apidiff and visualdiff can read what was sent. It answers in each
+  the answer it gave, received time) and keeps them in memory, so a developer
+  or an agent can read what was sent. It answers in each
   vendor's own shape and can be told to fail, stall or drop. It checks no
   credential: it is a dev shim. haven runs it from the bundled simulator binary.
 

@@ -387,7 +387,7 @@ func (f *fakeHygiene) MergedIntoMain(dir, _ string) bool { return f.mergedDirs[d
 
 // LastTouched is the directory's own mtime. The fake keeps a separate map so a
 // test can make a worktree's HEAD look ancient while the directory is fresh —
-// the exact shape a diff drive has, and the one the temporary rule must survive.
+// the exact shape a scratch worktree at an old ref has, and the one the temporary rule must survive.
 func (f *fakeHygiene) LastTouched(dir string) (time.Time, bool) {
 	if f.lastTouched == nil {
 		return f.LastActivity(dir)

@@ -47,9 +47,9 @@ func TestGoVersionAcceptsAnAgreeingRepo(t *testing.T) {
 
 func TestGoVersionIgnoresScratchTreesAndLinkedWorktrees(t *testing.T) {
 	problems, err := ciguard.GoVersion(agreeingRepo(t, map[string]string{
-		".apidiff/x/go.mod": "module y\n\ngo 1.20.0\n",
-		"linked/go.mod":     "module z\n\ngo 1.20.0\n",
-		"linked/.git":       "gitdir: elsewhere\n",
+		".fuzz/x/go.mod": "module y\n\ngo 1.20.0\n",
+		"linked/go.mod":  "module z\n\ngo 1.20.0\n",
+		"linked/.git":    "gitdir: elsewhere\n",
 	}))
 
 	require.NoError(t, err)

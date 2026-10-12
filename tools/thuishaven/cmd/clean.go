@@ -82,7 +82,7 @@ func decideCleanOutput(isAgent, isTTY, unattended bool) cleanOutput {
 // "Safe categories" is literal: what is reclaimed unattended is regenerable.
 // Build artifacts and orphaned dev processes have always been. Two more join
 // them, and they qualify for the same reason:
-//   - temporary and merged worktrees. A temporary one is scratch a diff tool or
+//   - temporary and merged worktrees. A temporary one is scratch a tool or
 //     an agent made on demand and will make again; a merged one's commits are
 //     already on origin/main. Neither is ever dirty, live, the primary checkout,
 //     or the worktree haven runs from — the classification refuses all four.

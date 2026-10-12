@@ -1819,7 +1819,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   publishes in `docs/api-reference/openapiLangWatch.json` keeps the names it published (Alex, 2026-09-23),
   `{id}` included: a semantic rename of a main route is drift and is reverted (Alex, 2026-09-25).
   The rest-route rule reads that docs copy as it stands after a spec sync; drift against main is
-  apidiff's to catch, not a frozen copy's (Alex, 2026-09-29).
+  checked against main itself, not a frozen copy (Alex, 2026-09-29).
 - `/api/<x>` is the main path; `/v1` is optional; `/latest/` and `/<version>/` are supported but hidden from the
   published docs (Alex, 2026-09-25).
 - A REST namespace (the first segment after `/api/` or `/api/v1/`) has one owner, named in

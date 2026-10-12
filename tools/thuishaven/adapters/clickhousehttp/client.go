@@ -123,12 +123,12 @@ func (c Client) Databases(ctx context.Context) ([]string, error) {
 	return splitLines(body), nil
 }
 
-// StrayDatabases lists test, apidiff and bare langwatch databases whose newest
+// StrayDatabases lists test and bare langwatch databases whose newest
 // table change is older than olderThan (a database with no tables counts as old).
 func (c Client) StrayDatabases(ctx context.Context, olderThan time.Duration) ([]string, error) {
 	body, err := c.Query(ctx, fmt.Sprintf(`SELECT d.name FROM system.databases d
 LEFT JOIN (SELECT database, max(metadata_modification_time) AS m FROM system.tables GROUP BY database) t ON t.database = d.name
-WHERE (d.name LIKE 'test\_%%' OR d.name LIKE 'lw\_apidiff\_%%' OR d.name = 'langwatch' OR d.name LIKE 'langwatch\_%%')
+WHERE (d.name LIKE 'test\_%%' OR d.name = 'langwatch' OR d.name LIKE 'langwatch\_%%')
 AND t.m < now() - INTERVAL %d SECOND ORDER BY d.name FORMAT TabSeparated`, int64(olderThan.Seconds())))
 	if err != nil {
 		return nil, err

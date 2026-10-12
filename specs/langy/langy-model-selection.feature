@@ -169,7 +169,7 @@ Feature: Langy runs on the model the project chose
     When the user starts a new conversation or switches to another
     Then the pick does not follow to the other conversation
 
-  # Resolution itself (apidiff parity with main's getVercelAIModel for langy.chat):
+  # Resolution itself (parity with main's getVercelAIModel for langy.chat):
   # the model the Langy feature key resolves to, on a provider that is present
   # and enabled. Anything else refuses, and the turn answers model-not-configured.
 
