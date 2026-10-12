@@ -28,6 +28,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 import type { ModelProviderConnectionPingService } from "../features/credential-probe/services/model-provider-connection-ping.service.ts";
 import type { ModelProviderConnectionRateLimiter } from "../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
 import type { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
+import { ModelProviderUpsertDefaultsService } from "../features/defaults/services/model-provider-upsert-defaults.service.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import {
@@ -56,10 +57,16 @@ type ModelProviderCommandOptions = {
 };
 
 export class ModelProviderCommandService {
-  private constructor(private readonly options: ModelProviderCommandOptions) {}
+  private constructor(
+    private readonly options: ModelProviderCommandOptions,
+    private readonly upsertDefaults: ModelProviderUpsertDefaultsService,
+  ) {}
 
   static create(options: ModelProviderCommandOptions): ModelProviderCommandService {
-    return new ModelProviderCommandService(options);
+    return new ModelProviderCommandService(
+      options,
+      ModelProviderUpsertDefaultsService.create(options),
+    );
   }
 
   async upsert(input: ModelProviderWriteInput): Promise<ModelProvider> {
@@ -83,8 +90,12 @@ export class ModelProviderCommandService {
     });
     const saved = await this.saveProvider(provider, existing, routingHandle);
 
-    await this.seedOnboardingDefaults(existing, saved);
-    await this.saveProjectDefault({ projectId: parsed.projectId, model: projectDefault });
+    await this.upsertDefaults.apply({
+      existing,
+      saved,
+      projectId: parsed.projectId,
+      projectDefault,
+    });
 
     return this.withMaskedCredentials(saved);
   }
@@ -459,42 +470,9 @@ export class ModelProviderCommandService {
     }
   }
 
-  /** A row created disabled, or turned off and back on, is seeded on the enable flip. */
-  private async seedOnboardingDefaults(
-    existing: ModelProvider | null,
-    saved: ModelProvider,
-  ): Promise<void> {
-    if (!existing || (saved.enabled && !existing.enabled)) {
-      await this.options.onboardingDefaults.seed({
-        provider: saved.provider,
-        scopes: saved.scopes,
-      });
-    }
-  }
-
   /** Through the same gate as the default-models settings, before anything is stored. */
   private allowedProjectDefault(input: ModelProviderWriteInput): string | undefined {
     if (input.defaultModel === undefined) return undefined;
     return this.options.catalog.sanitizeDefaultConfig({ DEFAULT: input.defaultModel }).DEFAULT;
-  }
-
-  private async saveProjectDefault(input: {
-    projectId: string | undefined;
-    model: string | undefined;
-  }): Promise<void> {
-    if (input.model !== undefined && input.projectId) {
-      const organizationId = await this.options.scopes.getOrganizationIdForScope({
-        scopeType: "PROJECT",
-        scopeId: input.projectId,
-      });
-      await this.options.defaults.set({
-        id: this.options.ids.generate({ type: "default" }),
-        organizationId,
-        scope: { scopeType: "PROJECT", scopeId: input.projectId },
-        key: "DEFAULT",
-        model: input.model,
-        authorId: null,
-      });
-    }
   }
 }
