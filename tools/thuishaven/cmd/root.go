@@ -779,7 +779,26 @@ func runSwitch(d deps, inv invocation) error {
 	if err != nil {
 		return err
 	}
+	d.orch.FocusWorktree(dir)
 	fmt.Println(dir)
+	return nil
+}
+
+// runFocus prints the focused stack, or with a slug makes that stack the focus.
+func runFocus(_ context.Context, d deps, inv invocation) error {
+	if len(inv.args) == 0 {
+		if slug := d.orch.FocusedSlug(); slug != "" {
+			fmt.Printf("focus: %s\n", slug)
+		} else {
+			fmt.Println("focus: none")
+		}
+		return nil
+	}
+	slug, err := d.orch.SetFocus(inv.args[0])
+	if err != nil {
+		return err
+	}
+	fmt.Printf("focus: %s\n", slug)
 	return nil
 }
 

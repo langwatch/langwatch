@@ -86,6 +86,16 @@ Old chunks stay loadable for 24 h after a swap. `pnpm dev` runs the Vite dev ser
 - Old assets pile up in `apps/ui/dist/client/assets`; `rm -rf apps/ui/dist` clears them.
 - A build peaks at about 4.8 GB.
 
+## focus
+
+One stack is the focused one: under memory pressure the others are slowed and it gets the larger ClickHouse share. It changes only on `haven up`, `haven switch` into a worktree with a stack, and `haven focus <slug>`; heartbeats never move it. If it goes down there is no focus until one of those runs again.
+
+```bash
+haven focus              # prints "focus: <slug>" or "focus: none"
+haven focus <slug>       # make a registered stack the focus (a unique prefix works)
+haven status             # shows the same "focus:" line
+```
+
 ## install, setup, switch, clean
 
 ```bash

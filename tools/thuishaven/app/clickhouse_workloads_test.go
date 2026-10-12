@@ -72,7 +72,7 @@ func TestWeightFocusedWorkload(t *testing.T) {
 	}
 
 	t.Run("given two provisioned stacks and one on the shared login", func(t *testing.T) {
-		store := &fakeStore{stacks: []domain.Stack{
+		store := &fakeStore{focus: "feat-a", stacks: []domain.Stack{
 			provisioned("feat-a", "lw_feat_a"),
 			provisioned("feat-b", "lw_feat_b"),
 			{Slug: "feat-c", ClickHouseDatabase: "lw_feat_c"},
@@ -99,7 +99,7 @@ func TestWeightFocusedWorkload(t *testing.T) {
 		})
 
 		t.Run("when the focus moves, the weights swap", func(t *testing.T) {
-			store.stacks[0], store.stacks[1] = store.stacks[1], store.stacks[0]
+			store.focus = "feat-b"
 			o.weightFocusedWorkload(ctx)
 			if ch.weights["lw_feat_b"] != domain.FocusedStackWorkloadWeight || ch.weights["lw_feat_a"] != domain.StackWorkloadWeight {
 				t.Errorf("weights = %v", ch.weights)
@@ -107,9 +107,36 @@ func TestWeightFocusedWorkload(t *testing.T) {
 		})
 	})
 
+	t.Run("given heartbeats reorder the stacks", func(t *testing.T) {
+		store := &fakeStore{focus: "feat-a", stacks: []domain.Stack{
+			provisioned("feat-b", "lw_feat_b"), provisioned("feat-a", "lw_feat_a"),
+		}}
+		ch := &fakeDBServer{}
+		o := workloadOrchestrator(t, store, ch)
+		o.weightFocusedWorkload(ctx)
+
+		t.Run("when the head changes but the focus does not, nothing is written", func(t *testing.T) {
+			ch.weights = nil
+			store.stacks[0], store.stacks[1] = store.stacks[1], store.stacks[0]
+			o.weightFocusedWorkload(ctx)
+			if ch.weights != nil {
+				t.Errorf("weights = %v, want no writes", ch.weights)
+			}
+		})
+
+		t.Run("when the focused stack goes, every stack gets the plain weight", func(t *testing.T) {
+			store.RemoveStack("feat-a")
+			store.stacks = append(store.stacks, provisioned("feat-c", "lw_feat_c"))
+			o.weightFocusedWorkload(ctx)
+			if ch.weights["lw_feat_b"] != domain.StackWorkloadWeight || ch.weights["lw_feat_c"] != domain.StackWorkloadWeight {
+				t.Errorf("weights = %v", ch.weights)
+			}
+		})
+	})
+
 	t.Run("given a server that refuses the write", func(t *testing.T) {
 		ch := &fakeDBServer{weightErr: errors.New("down")}
-		o := workloadOrchestrator(t, &fakeStore{stacks: []domain.Stack{provisioned("feat-a", "lw_feat_a")}}, ch)
+		o := workloadOrchestrator(t, &fakeStore{focus: "feat-a", stacks: []domain.Stack{provisioned("feat-a", "lw_feat_a")}}, ch)
 
 		t.Run("when the tick fails, the next one tries again", func(t *testing.T) {
 			o.weightFocusedWorkload(ctx)

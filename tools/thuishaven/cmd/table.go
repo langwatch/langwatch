@@ -653,6 +653,13 @@ var baseTable = []commandSpec{
 		},
 	},
 	{
+		name:    "focus",
+		summary: "the stack kept at full speed under memory pressure: bare prints it, focus <slug> sets it",
+		args:    "[slug]",
+		maxArgs: 1,
+		run:     runFocus,
+	},
+	{
 		name:    "switch",
 		summary: "cd to a worktree by name (the shell function comes from haven self setup)",
 		args:    "[name]",

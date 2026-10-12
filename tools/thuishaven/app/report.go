@@ -49,6 +49,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 			"nxDaemons":     r.nxDaemons,
 			"duplicates":    duplicates,
 			"slots":         r.slots,
+			"focus":         o.FocusedSlug(),
 		})
 	}
 	r := o.collectStatus(worktreeDir)
@@ -59,6 +60,11 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) erro
 	fmt.Println()
 	o.printShared(r)
 	printSlots(r.slots)
+	if focus := o.FocusedSlug(); focus != "" {
+		fmt.Printf("focus: %s\n", focus)
+	} else {
+		fmt.Println("focus: none")
+	}
 	o.printWorktreeOverlay(worktreeDir, reveal)
 	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
 		len(r.stacks), r.live, domain.HumanBytes(int64(r.rss)), r.shared(domain.HubService), o.cfg.Naming.TLD)

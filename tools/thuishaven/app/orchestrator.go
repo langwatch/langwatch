@@ -77,6 +77,8 @@ type Orchestrator struct {
 	// clickHouseFocus is the slug whose workload last got the focused weight.
 	// Daemon tick only.
 	clickHouseFocus string
+	// clickHouseWeighted is whether clickHouseFocus has been written at all.
+	clickHouseWeighted bool
 
 	// procActivity is the process watch's cross-tick idle clock (ADR-095),
 	// touched only from the daemon's monitor loop. procTel ships the watch's
@@ -350,6 +352,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err := o.store.SaveStack(st); err != nil {
 		return domain.Stack{}, nil, err
 	}
+	_ = o.store.WriteFocus(slug)
 	cleanup := func() {
 		if !o.cfg.PortlessDisabled {
 			var removals []func()

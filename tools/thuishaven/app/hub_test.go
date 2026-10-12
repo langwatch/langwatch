@@ -36,6 +36,13 @@ type fakeStore struct {
 	prereqSkips        map[string]bool
 	containerPosture   string
 	machineSettings    domain.MachineSettings
+	focus              string
+}
+
+func (f *fakeStore) ReadFocus() string { return f.focus }
+func (f *fakeStore) WriteFocus(slug string) error {
+	f.focus = slug
+	return nil
 }
 
 func (f *fakeStore) ReadMachineSettings() domain.MachineSettings { return f.machineSettings }

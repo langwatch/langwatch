@@ -74,6 +74,9 @@ type Store interface {
 	WriteContainerPosture(string) error
 	// The machine settings (observability on/off, VM auto-stop), saved in
 	// haven's home. Absent or corrupt reads as the defaults.
+	// The focused stack's slug, persisted so heartbeats cannot move it.
+	ReadFocus() string
+	WriteFocus(slug string) error
 	ReadMachineSettings() domain.MachineSettings
 	WriteMachineSettings(domain.MachineSettings) error
 	// TouchDBActivity records "slug's databases were in use now" — the clock the

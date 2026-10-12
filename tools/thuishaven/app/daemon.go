@@ -401,12 +401,14 @@ func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
 	}
 }
 
-// demoteUnfocused slows every live stack except the head of Stacks(), which is
-// ordered most-recently-updated first — the head is the worktree being worked
-// in, and demoting that one would slow down exactly the thing the developer is
-// watching.
+// demoteUnfocused slows every live stack except the focused one (FocusedSlug),
+// the worktree being worked in; demoting it would slow exactly the thing the
+// developer is watching. With no focus nobody is demoted.
 func (o *Orchestrator) demoteUnfocused(stacks []domain.Stack) {
-	focused := stacks[0].Slug
+	focused := o.FocusedSlug()
+	if focused == "" {
+		return
+	}
 	for _, s := range stacks {
 		if s.Slug == focused || !o.governable(s) {
 			continue
