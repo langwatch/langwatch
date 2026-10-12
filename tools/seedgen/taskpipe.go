@@ -37,7 +37,7 @@ const RunnerModule = "@langwatch/seedgen-runner"
 // seed:apply's own options, such as --password-hash-file.
 func StartTaskPipe(ctx context.Context, repo string, log io.Writer, extra ...string) (*TaskPipe, error) {
 	args := append([]string{"--silent", "task", "seed:apply", "--concurrency", strconv.Itoa(WindowCeil)}, extra...)
-	cmd := exec.CommandContext(ctx, "pnpm", args...) //nolint:gosec // a fixed program; extra are seedgen's own options
+	cmd := exec.CommandContext(ctx, "pnpm", args...)
 	cmd.Dir = repo
 	cmd.Env = os.Environ()
 	if os.Getenv("LANGWATCH_TASK_MODULES") == "" {

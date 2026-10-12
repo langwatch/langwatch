@@ -182,6 +182,9 @@ jobs:
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
       - run: go test -count=1 -race $GO_PKGS
       - run: go test -count=1 -tags dev ./cmd/service/...
+      # Memory ceilings skip under -race (it multiplies memory and time), so
+      # they run here in a plain build.
+      - run: go test -count=1 -run 'TestLargePlanWalkStaysUnder256MB' ./tools/seedgen/
 
   lint:
     needs: changes
