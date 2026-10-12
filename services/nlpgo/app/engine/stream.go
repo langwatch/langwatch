@@ -53,7 +53,7 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 	if err != nil {
 		return nil, err
 	}
-	state := newRunState(req.Workflow)
+	state := newRunState(req.Workflow, requireEndNode(req))
 	applyManualInputs(state, req)
 	// execute_component (req.NodeID set) must dispatch ONLY the
 	// requested node. Validate target exists before starting the
@@ -157,7 +157,23 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 				return
 			}
 		}
-		emit(ctx, out, workflowSuccessEvent(req, traceID, state, started, isEval))
+		// The terminal verdict is finalize's to make, not the loop's. A run can
+		// produce no result without any node FAILING — an End node skipped by
+		// branch gating sets no firstError — so choosing the frame on
+		// firstError alone emitted execution_state_change{status:"success",
+		// result:null}, which is #3198 itself, on Studio's own execute_flow
+		// surface, and then contradicted it with an error `done` frame. Two
+		// terminal states for one run is the reducer confusion evaluation.go
+		// cites CodeRabbit flagging on PR #3607.
+		//
+		// finalize is a pure read over runState, so calling it here and again
+		// inside the two frame builders costs nothing and keeps their
+		// signatures — and the house argument-limit rule — untouched.
+		if res := finalize(state, traceID, started, nil); res.Error != nil {
+			emit(ctx, out, workflowErrorEvent(req, traceID, res.Error, isEval))
+		} else {
+			emit(ctx, out, workflowSuccessEvent(req, traceID, state, started, isEval))
+		}
 		emit(ctx, out, doneEvent(traceID, state, started))
 	}()
 	return out, nil

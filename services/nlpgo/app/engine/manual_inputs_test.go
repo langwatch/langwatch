@@ -33,7 +33,7 @@ func TestResolveInputs_ManualInputsForTargetNode(t *testing.T) {
 			{ID: "code-1", Type: dsl.ComponentCode},
 		},
 	}
-	state := newRunState(wf)
+	state := newRunState(wf, false)
 	state.manualInputsTarget = "code-1"
 	state.manualInputs = map[string]any{"input": "asdf", "extra": 42}
 
@@ -53,7 +53,7 @@ func TestResolveInputs_ManualInputsScopedToTarget(t *testing.T) {
 			{ID: "code-2", Type: dsl.ComponentCode},
 		},
 	}
-	state := newRunState(wf)
+	state := newRunState(wf, false)
 	state.manualInputsTarget = "code-1"
 	state.manualInputs = map[string]any{"input": "for-code-1"}
 
@@ -73,7 +73,7 @@ func TestResolveInputs_ManualInputsReturnsCopy(t *testing.T) {
 			{ID: "code-1", Type: dsl.ComponentCode},
 		},
 	}
-	state := newRunState(wf)
+	state := newRunState(wf, false)
 	original := map[string]any{"input": "asdf"}
 	state.manualInputsTarget = "code-1"
 	state.manualInputs = original
