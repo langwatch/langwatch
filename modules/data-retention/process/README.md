@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable server boundary for retention policy, pins, and metering.
 
-Peers call these through the token, declared at `../contract/src/data-retention.api.ts:27`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/data-retention.api.ts:28`; nothing else in this package is public.
 
 #### `getPlatformDefaultRetentionDays`
 
@@ -102,6 +102,14 @@ getPinnedTraceIds(input: { projectId: string }): Promise<string[]>;
 
 ```typescript
 getRetroactiveMutationProgress(input: RetroactiveMutationProjectInput): Promise<RetroactiveMutationProgress[]>;
+```
+
+#### `raiseIdIndexRetention`
+
+Raises one ClickHouse target's id index rows to each tenant's current retention, never lowering one; run per target after its index is filled and before its marker is written, so a retention lengthened mid-fill leaves no short-lived row (Q4, id-index-2026-10-10.md).
+
+```typescript
+raiseIdIndexRetention(input: IdIndexRetentionRaiseInput): Promise<{ tables: string[] }>;
 ```
 
 #### `getTotalStorageBytes`
@@ -203,7 +211,7 @@ interface Input {
   category: "traces" | "scenarios" | "experiments";
   retentionDays: 0 | number;
 }
-// Output: retentionPolicySchema, ../contract/src/data-retention.ts:222
+// Output: retentionPolicySchema, ../contract/src/data-retention.ts:237
 interface Output {
   id: string;
   organizationId: string;
@@ -225,7 +233,7 @@ interface Input {
   };
   organizationId?: string;
 }
-// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:245
+// Output: resolvedRetentionSchema, ../contract/src/data-retention.ts:260
 interface Output {
   traces: number;
   scenarios: number;
@@ -250,7 +258,7 @@ interface Input {
   projectId: string;
   category: "traces" | "scenarios" | "experiments";
 }
-// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:314
+// Output: retroactiveRetentionUpdateResultSchema, ../contract/src/data-retention.ts:329
 interface Output {
   tables: string[];
   appliedRetentionDays: number;
