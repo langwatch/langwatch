@@ -4,6 +4,7 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
   ExperimentNotFoundError,
   ExperimentDspyStepNotFoundError,
+  createInitialState,
   type ExperimentDspyStep,
   type Experiment,
   type ExperimentRun,
@@ -20,6 +21,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentExecution } from "../../features/run/services/experiment-run-command-dispatcher.service.ts";
 import { NoopExperimentWorkbenchUpdates } from "../../features/workbench/services/experiment-workbench.service.ts";
+import { ExperimentCarriedBoardService } from "../../services/experiment-carried-board.service.ts";
+import { ExperimentResultDispatchService } from "../../services/experiment-result-dispatch.service.ts";
 import { ExperimentService } from "../../services/experiment.service.ts";
 import type { ExperimentDspyRetentionRepository } from "../experiment-dspy-retention.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
@@ -680,6 +683,52 @@ describe("ExperimentService", () => {
     expect(execution.recordTargetResult).toHaveBeenCalledWith(target);
     expect(execution.recordEvaluatorResult).toHaveBeenCalledWith(evaluator);
     expect(execution.completeExperimentRun).toHaveBeenCalledWith(complete);
+  });
+
+  describe("given a run that carries a board cell with a verdict", () => {
+    describe("when the carried target result and verdict are recorded", () => {
+      /** @scenario "A carried cell keeps its carried mark when it is recorded" */
+      it("records both as carried over, so neither is streamed to the page", async () => {
+        const { service, execution } = build();
+        const board = ExperimentCarriedBoardService.create({
+          commands: service,
+          dispatches: ExperimentResultDispatchService.create(),
+        });
+
+        await board.recordCarriedOverBoard({
+          projectId: "project_1",
+          runId: "run_1",
+          experimentId: "experiment_1",
+          cells: [
+            {
+              rowIndex: 1,
+              targetId: "target_1",
+              output: "carried answer",
+              evaluatorResults: [
+                {
+                  evaluatorId: "evaluator_1",
+                  result: {
+                    status: "error",
+                    error_type: "EvaluatorError",
+                    details: "Evaluator cannot be reached",
+                    traceback: [],
+                  },
+                },
+              ],
+            },
+          ],
+          datasetRows: [{ input: "zero" }, { input: "one" }],
+          state: createInitialState(),
+        });
+
+        expect(execution.recordTargetResult).toHaveBeenCalledWith(
+          expect.objectContaining({ index: 1, carriedOver: true }),
+        );
+        expect(execution.recordEvaluatorResult).toHaveBeenCalledWith(
+          expect.objectContaining({ index: 1, evaluatorId: "evaluator_1", carriedOver: true }),
+        );
+      });
+    });
   });
 
   describe("given a project that holds no such experiment", () => {

@@ -60,6 +60,12 @@ Feature: A run carries a snapshot of the board
     When I run one column
     Then the run carries no cells from the board
 
+  @unit
+  Scenario: A carried cell keeps its carried mark when it is recorded
+    Given a run that carries a board cell with a verdict
+    When the carried target result and verdict are recorded
+    Then both are recorded as carried over, so neither is streamed to the page
+
   # ==========================================================================
   # A carried cell cost nothing and took no time in this run
   # ==========================================================================
