@@ -130,6 +130,18 @@ Feature: Moving an organization onto the grants projection
     And the first pass over an organization still states everything
     And the held report is unchanged by what the pass skipped
 
+  # One cloud organization can hold tens of thousands of members, and every
+  # grant fans out into more jobs. Pacing between organizations alone let one
+  # organization fill the queue with every command it had (2026-10-12).
+  @unit
+  Scenario: One large organization sends its grants a page at a time
+    Given an organization whose legacy rows state 20,000 grants
+    When a pass on a queue list runs it
+    Then it waits for the pass's queue room between pages of commands
+    And no more than the pass's limit plus one page of its jobs are ever outstanding
+    And every grant is stated
+    And the check runs once, after the last page
+
   @unit
   Scenario: A pass that failed partway is safe to repeat
     Given a pass that failed after stating some facts

@@ -124,7 +124,7 @@ export interface EventingHost {
   readonly participation: EventingParticipation;
   readonly processStore: unknown;
   /** Read at call time: a runtime opens its event store only once it initialises. */
-  readonly eventStore?: Pick<EventStore, "getEvents" | "storeEvents">;
+  readonly eventStore?: Pick<EventStore, "getEvents" | "findEventsOfAggregates" | "storeEvents">;
   register(definition: unknown): unknown;
   /** Lists a definition without starting it; absent on a runtime that cannot describe. */
   describe?(definition: unknown): void;

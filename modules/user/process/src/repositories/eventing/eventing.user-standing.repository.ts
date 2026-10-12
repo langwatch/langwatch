@@ -8,7 +8,7 @@ import type {
 import type { UserStandingFact } from "../../rules/user-standing.rules.ts";
 import type { UserStandingRepository } from "../user-standing.repository.ts";
 
-type UserLifecycleEventReads = Pick<OwnEventStore, "read">;
+type UserLifecycleEventReads = Pick<OwnEventStore, "findAggregates">;
 type UserStandingEvent = UserDeactivatedEvent | UserReactivatedEvent;
 
 const USER_STANDING_EVENT_TYPES: ReadonlySet<unknown> = new Set([
@@ -38,21 +38,28 @@ export class EventingUserStandingRepository implements UserStandingRepository {
     this.#eventStore = input.eventStore;
   }
 
-  /** The account's deactivated and reactivated facts, oldest first. */
-  async findStandingFacts({ userId }: { userId: string }): Promise<UserStandingFact[]> {
-    if (!this.#eventStore) {
+  /** Each account's deactivated and reactivated facts, oldest first, in one read of the log. */
+  async findStandingFactsOf({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<{ userId: string; facts: UserStandingFact[] }[]> {
+    const eventStore = this.#eventStore;
+    if (!eventStore) {
       // A plain Error on purpose (error doctrine): the caller cannot act on an absent log.
       throw new Error("user's user_lifecycle pipeline cannot read: never built over a store");
     }
-    const events = await this.#eventStore.read({
-      tenantId: userId,
-      aggregateId: userId,
+    if (userIds.length === 0) return [];
+    const found = await eventStore.findAggregates({
+      aggregates: userIds.map((userId) => ({ tenantId: userId, aggregateId: userId })),
       accepts: isUserStandingEvent,
     });
-
-    return events.map((event): UserStandingFact => ({
-      type: event.type === USER_DEACTIVATED_EVENT_TYPE ? "deactivated" : "reactivated",
-      occurredAt: event.data.occurredAt,
+    return found.map(({ aggregateId, events }) => ({
+      userId: aggregateId,
+      facts: events.map((event): UserStandingFact => ({
+        type: event.type === USER_DEACTIVATED_EVENT_TYPE ? "deactivated" : "reactivated",
+        occurredAt: event.data.occurredAt,
+      })),
     }));
   }
 }

@@ -26,36 +26,25 @@ export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServ
         id: "user:record-created-facts",
         kind: "data",
         mode: "background",
-        description: "Records every existing account as user's created fact, for peers to read.",
-        // An old image still minting accounts records no created fact: wait until none serves.
+        description:
+          "Records every existing account's created fact and re-states its standing, for peers to read.",
+        // An old image still minting or changing accounts records no fact: wait until none serves.
         needsOldWritersGone: true,
         run: async ({ checkpoint, dryRun, signal }) => {
           const resumed = checkpoint.resumeFrom?.afterUserId;
-          const counted = checkpoint.resumeFrom?.users;
+          const count = (key: "users" | "deactivated" | "reactivated"): number => {
+            const counted = checkpoint.resumeFrom?.[key];
+            return typeof counted === "number" ? counted : 0;
+          };
           return app.recordExistingCreatedFacts({
             dryRun,
             signal,
             afterUserId: typeof resumed === "string" ? resumed : null,
-            countedBefore: typeof counted === "number" ? counted : 0,
-            onPageDone: ({ afterUserId, report }) =>
-              checkpoint.save({ report: { afterUserId, ...report } }),
-          });
-        },
-      }),
-      defineMigrationStep({
-        id: "user:record-standing-facts",
-        kind: "data",
-        mode: "background",
-        description:
-          "Re-states each account's deactivation, and a reactivation its log still misses, for peers.",
-        // An old image changes standing without recording the fact: wait until none serves.
-        needsOldWritersGone: true,
-        run: async ({ checkpoint, dryRun, signal }) => {
-          const resumed = checkpoint.resumeFrom?.afterUserId;
-          return app.recordExistingStandingFacts({
-            dryRun,
-            signal,
-            afterUserId: typeof resumed === "string" ? resumed : null,
+            countedBefore: {
+              users: count("users"),
+              deactivated: count("deactivated"),
+              reactivated: count("reactivated"),
+            },
             onPageDone: ({ afterUserId, report }) =>
               checkpoint.save({ report: { afterUserId, ...report } }),
           });

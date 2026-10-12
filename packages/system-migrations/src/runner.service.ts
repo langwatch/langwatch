@@ -29,6 +29,8 @@ const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
  *  large import from holding the rest of the fleet behind it. */
 const DEFAULT_TENANT_CONCURRENCY = 25;
 const DEFAULT_PACING_WAIT_MS = 5_000;
+/** On a queue list, a migration declaring no `pauseWhileQueuedAbove` waits at this many jobs. */
+export const DEFAULT_PAUSE_WHILE_QUEUED_ABOVE = 5_000;
 /** How long a paced pass's own queue work may stand still before the pass stops waiting on it. */
 const PASS_QUEUE_WAIT_MS = 60_000;
 
@@ -152,17 +154,15 @@ export class SystemMigrationRunnerService {
   }
 
   /**
-   * A paced pass with a queue runs on a list of its own; one whose work stops draining keeps what
-   * it recorded and leaves the rest to the next pass, which is level-triggered.
+   * A pass with a queue runs on a list of its own, paced by default; one whose work stops draining
+   * keeps what it recorded and leaves the rest to the next pass, which is level-triggered.
    */
   private async driveOnOwnList(args: {
     summary: MigrationPassSummary;
     signal?: AbortSignal;
   }): Promise<void> {
     const { runListedWork } = this.deps;
-    if (this.pacingLimit() === undefined || runListedWork === undefined) {
-      return this.driveTenants(args);
-    }
+    if (runListedWork === undefined) return this.driveTenants(args);
     const names = this.deps.migrations.map((migration) => migration.name).join(",");
     // Only the queue's own refusals (its wait for room, its closing wait) leave the rest to the
     // next pass; a failed tenant read or claim fails the pass as it does off the list.
@@ -196,12 +196,21 @@ export class SystemMigrationRunnerService {
     }
   }
 
-  /** The strictest pacing limit among the pass's migrations; undefined when none is paced. */
+  /** The strictest declared pacing limit among the pass's migrations; undefined when none does. */
   private pacingLimit(): number | undefined {
     const limits = this.deps.migrations.flatMap((migration) =>
       migration.pauseWhileQueuedAbove === undefined ? [] : [migration.pauseWhileQueuedAbove],
     );
     return limits.length === 0 ? undefined : Math.min(...limits);
+  }
+
+  /** On a queue list every migration is paced: one that declares no limit takes the default. */
+  private listPacingLimit(): number {
+    return Math.min(
+      ...this.deps.migrations.map(
+        (migration) => migration.pauseWhileQueuedAbove ?? DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+      ),
+    );
   }
 
   /** Every cohort tenant, a page at a time, until abort. */
@@ -224,8 +233,8 @@ export class SystemMigrationRunnerService {
   }
 
   /**
-   * Holds the next page while more of the pass's own jobs wait than the strictest paced migration
-   * allows; with no list, while the whole queue holds that many. False means it was aborted.
+   * Holds the next page while more of the pass's own jobs wait than its strictest migration allows;
+   * with no list, while the whole queue holds more than a declared limit. False means aborted.
    */
   private async waitForQueueRoom({
     signal,
@@ -234,11 +243,12 @@ export class SystemMigrationRunnerService {
     signal?: AbortSignal;
     list?: PassQueueRun;
   }): Promise<boolean> {
-    const limit = this.pacingLimit();
-    if (limit !== undefined && list) {
-      await list.waitForRoom({ maxOutstanding: limit, ...(signal ? { signal } : {}) });
+    if (list) {
+      const maxOutstanding = this.listPacingLimit();
+      await list.waitForRoom({ maxOutstanding, ...(signal ? { signal } : {}) });
       return !signal?.aborted;
     }
+    const limit = this.pacingLimit();
     const { queuedJobs } = this.deps;
     if (limit === undefined || queuedJobs === undefined) return !signal?.aborted;
     for (;;) {
@@ -264,10 +274,12 @@ export class SystemMigrationRunnerService {
     page,
     summary,
     signal,
+    list,
   }: {
     page: string[];
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    list?: PassQueueRun;
   }): Promise<boolean> {
     // A failed read only costs the shortcut: every tenant then takes its claim, as before.
     const finished = await this.readFinished({ page }).catch((error: unknown) => {
@@ -285,7 +297,7 @@ export class SystemMigrationRunnerService {
         const tenantId = pending.shift();
         if (tenantId === undefined) return;
         try {
-          await this.driveTenant({ tenantId, summary, signal, finished });
+          await this.driveTenant({ tenantId, summary, signal, finished, list });
         } catch (error) {
           // Contained here, not just around migrateTenant: a throw outside
           // that inner net (the state read, the cohort read) would reject
@@ -362,11 +374,13 @@ export class SystemMigrationRunnerService {
     summary,
     signal,
     finished,
+    list,
   }: {
     tenantId: string;
     summary: MigrationPassSummary;
     signal?: AbortSignal;
     finished: FinishedOnPage;
+    list?: PassQueueRun;
   }): Promise<void> {
     const { lease, cohort, migrations } = this.deps;
     summary.tenantsSeen += 1;
@@ -403,6 +417,7 @@ export class SystemMigrationRunnerService {
           tenantId,
           signal,
           summary,
+          list,
         });
       }
     } finally {
@@ -442,11 +457,13 @@ export class SystemMigrationRunnerService {
     tenantId,
     signal,
     summary,
+    list,
   }: {
     migration: SystemMigration;
     tenantId: string;
     signal?: AbortSignal;
     summary: MigrationPassSummary;
+    list?: PassQueueRun;
   }): Promise<void> {
     const { state } = this.deps;
     const existing = await state
@@ -469,6 +486,10 @@ export class SystemMigrationRunnerService {
         // A migration that writes before it records anything needs to know
         // its last attempt died, so it can finish work the crash stranded.
         previous: existing,
+        // The bound the pass holds between pages of tenants, offered between pages of commands.
+        waitForRoom: async () => {
+          await this.waitForQueueRoom({ signal, list });
+        },
       });
       // Compare-and-set, not a blind upsert: an operator may have pinned the
       // row `rolled_back` while `migrateTenant` ran, and that pin outranks

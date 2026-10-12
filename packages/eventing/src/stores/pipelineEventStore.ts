@@ -1,5 +1,8 @@
 import { createTenantId } from "../domain/tenantId.ts";
 import type {
+  OwnAggregateEvents,
+  OwnAggregatesFind,
+  OwnAggregatesQuery,
   OwnEventStore,
   OwnEventsAppend,
   PriorEventsRead,
@@ -8,7 +11,9 @@ import { ConfigurationError } from "../services/errorHandling.ts";
 import type { EventStore } from "./eventStore.types.ts";
 
 /** The runtime's log, read at call time: a runtime opens its store only once it initialises. */
-export type OwnEventLog = () => Pick<EventStore, "getEvents" | "storeEvents"> | undefined;
+export type OwnEventLog = () => OwnEventLogReads | undefined;
+
+type OwnEventLogReads = Pick<EventStore, "getEvents" | "findEventsOfAggregates" | "storeEvents">;
 
 /** Which operation a refusal names. */
 type OwnEventOperation = "append" | "read";
@@ -58,9 +63,34 @@ export class PipelineEventStore implements OwnEventStore {
     return events.filter(accepts);
   };
 
+  readonly findAggregates: OwnAggregatesFind = async <Accepted>({
+    aggregates,
+    accepts,
+  }: OwnAggregatesQuery<Accepted>): Promise<readonly OwnAggregateEvents<Accepted>[]> => {
+    const { aggregateType, log } = this.#open("read");
+    const asked = new Map(
+      aggregates.map(({ tenantId, aggregateId }) => [
+        streamKeyOf({ tenantId, aggregateId }),
+        { tenantId, aggregateId, events: new Array<Accepted>() },
+      ]),
+    );
+    const stored = await log.findEventsOfAggregates({
+      aggregates: [...asked.values()].map(({ tenantId, aggregateId }) => ({
+        tenantId: createTenantId(tenantId),
+        aggregateId,
+      })),
+      aggregateType,
+    });
+    for (const event of stored) {
+      const stream = asked.get(streamKeyOf(event));
+      if (stream && accepts(event)) stream.events.push(event);
+    }
+    return [...asked.values()];
+  };
+
   #open(operation: OwnEventOperation): {
     aggregateType: string;
-    log: Pick<EventStore, "getEvents" | "storeEvents">;
+    log: OwnEventLogReads;
   } {
     const aggregateType = this.#aggregateType;
     if (aggregateType === void 0) {
@@ -103,4 +133,9 @@ function aggregateTypeOf(definition: unknown): string | undefined {
   const aggregate = definition.aggregate;
   if (typeof aggregate !== "object" || aggregate === null || !("type" in aggregate)) return void 0;
   return typeof aggregate.type === "string" ? aggregate.type : void 0;
+}
+
+/** One stream's key in a many-aggregate read: its tenant and aggregate id together. */
+function streamKeyOf({ tenantId, aggregateId }: { tenantId: string; aggregateId: string }): string {
+  return `${tenantId}\n${aggregateId}`;
 }

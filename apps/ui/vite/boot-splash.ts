@@ -97,8 +97,12 @@ const HAND_OFF_SCRIPT = `<script data-boot-splash>(function () {
       setTimeout(function () { splash.remove(); }, 720);
     }); });
   }
+  // The theme provider writes a <style> and a <script> into the root before any page: not drawn.
   function drawn() {
-    return root.firstElementChild && !root.querySelector('[data-testid="loading-screen"]');
+    var page = Array.prototype.some.call(root.children, function (child) {
+      return child.tagName !== "STYLE" && child.tagName !== "SCRIPT";
+    });
+    return page && !root.querySelector('[data-testid="loading-screen"]');
   }
   // A slow start says what it is doing: it asks the API's health route, easing from 2s to 10s,
   // and counts down to each retry, so a server that never answers never looks like a stuck page.

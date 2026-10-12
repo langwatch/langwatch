@@ -27,6 +27,7 @@ import {
   AUTHZ_ENGINE_MIGRATION_NAME,
   type AuthzEngineLedger,
   LegacyImportAuthzGrantMigration,
+  SEND_PAGE_SIZE,
 } from "../legacy-import.authz-grant.migration.ts";
 
 const ORG_ID = "org_acme";
@@ -1546,6 +1547,53 @@ describe("given a cloud installation", () => {
           now: () => 0,
         }).enrolledAutomatically,
       ).toBe(true);
+    });
+  });
+});
+
+describe("given an organization whose legacy rows state 20,000 grants", () => {
+  describe("when a pass on a queue list runs it", () => {
+    /** @scenario "One large organization sends its grants a page at a time" */
+    it("waits for room between pages, never exceeds the limit plus a page, and states every grant", async () => {
+      const limit = 5_000;
+      const own = { outstanding: 0, peak: 0, waits: 0 };
+      const userIds = Array.from(
+        { length: 20_000 },
+        (_, i) => `user_${String(i).padStart(5, "0")}`,
+      );
+      const { migration, sent, reads } = harness({
+        members: userIds.map((userId) => member({ userId })),
+        bindings: userIds.map((userId) => binding({ id: `binding_${userId}`, userId })),
+        // Each send is one job on the pass's own list until the worker drains it.
+        wrapLedger: (ledger) => ({
+          ...ledger,
+          attachGrant: async (args) => {
+            own.outstanding += 1;
+            own.peak = Math.max(own.peak, own.outstanding);
+            await ledger.attachGrant(args);
+          },
+        }),
+      });
+      // The worker drains the list down to the room asked for before the wait returns.
+      const waitForRoom = async () => {
+        own.waits += 1;
+        own.outstanding = Math.min(own.outstanding, limit);
+      };
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID, waitForRoom });
+
+      const attached = attachedFacts(sent);
+      const bound = new Set(
+        attached.flatMap((fact) => (fact.principal.type === "user" ? [fact.principal.id] : [])),
+      );
+      expect(bound.size).toBe(20_000);
+      expect(own.waits).toBeGreaterThanOrEqual(attached.length / SEND_PAGE_SIZE - 1);
+      expect(own.peak).toBeGreaterThan(limit);
+      expect(own.peak).toBeLessThanOrEqual(limit + SEND_PAGE_SIZE);
+      // The proof is still the one read, after the last page: what was sent is outstanding.
+      expect(reads.grantHeads).toBe(1);
+      expect(outcome.status).toBe("migrated");
+      expect((outcome.report as { outstanding: number }).outstanding).toBe(attached.length);
     });
   });
 });

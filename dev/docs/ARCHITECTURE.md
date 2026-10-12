@@ -1761,7 +1761,7 @@ Only ops and identity grant or revoke; listing takes no caller, and user reads i
 seed runs once behind a marker, never again because the live list is empty. Authz learns who is
 deactivated or erased from user's and identity's facts into its own table, never from the User table
 (Alex, 2026-10-01). A standing change an old image made without its fact is repaired by user's
-`user:record-standing-facts` step: each deactivated account re-stated at its stored stamp, and each
+`user:record-created-facts` step: each deactivated account re-stated at its stored stamp, and each
 active account its own log still holds deactivated recorded reactivated at the run's start
 (Alex, 2026-10-09). The page reaches them through three OpsApi pass-throughs (`listPlatformOperators`,
 `grantPlatformOperator`, `revokePlatformOperator`) gated `ops:manage`; the seed does not latch while the

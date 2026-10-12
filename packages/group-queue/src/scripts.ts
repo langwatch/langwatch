@@ -25,7 +25,7 @@ export const PARK_RECONCILE_MAX_DRAIN = 1000;
 /** Reconcile cadence (ms); defines dynamic-cap TTL and claimant window multiples. */
 export const RECONCILE_INTERVAL_MS = 2000;
 
-/** How far back a listed run's settled group goes in its candidates, behind every waiting one. */
+/** How far back a listed run's jobless group that stays (a failure, say) goes in its candidates. */
 const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
 
 /** Dynamic cap TTL (5x RECONCILE_INTERVAL_MS); fails safe to static cap if stale. */
@@ -540,6 +540,47 @@ local function gqRecoverClaimedJobs(claimedKey, jobsKey, dataKey, totalPendingKe
 end
 `;
 
+/**
+ * A group's failure state as one token: its error timestamp and whether it is blocked.
+ * Stored at registration and compared at inspection, which separates this preflight's own
+ * damage from an earlier release's wedge (specs/event-sourcing/migration-preflight-barrier).
+ */
+const PREFLIGHT_GROUP_STATE_LUA = `
+local function gqPreflightGroupState(keyPrefix, blockedKey, groupId)
+  local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
+  local stamp = ""
+  if redis.call("EXISTS", errorKey) == 1 then
+    stamp = redis.call("HGET", errorKey, "timestamp") or "present"
+  end
+  return stamp .. "|" .. redis.call("SISMEMBER", blockedKey, groupId)
+end
+`;
+
+/**
+ * Forgets a target holding nothing the barrier counts: no job, no claim, no new failure, never
+ * blocked. Staging re-registers it, so a list keeps only its outstanding groups however long it
+ * runs (specs/listed-run-memory.feature). Its keys sit beside `targetKey`, in the same slot.
+ */
+const SETTLED_TARGET_HELPER_LUA =
+  PREFLIGHT_GROUP_STATE_LUA +
+  `
+local function gqForgetSettledTarget(keyPrefix, blockedKey, targetKey, groupId)
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  if redis.call("ZCARD", groupPrefix .. ":jobs") > 0 then return false end
+  if redis.call("EXISTS", groupPrefix .. ":active", groupPrefix .. ":claimed") > 0 then return false end
+  local baselineKey = targetKey .. ":baseline"
+  local baseStamp, baseBlocked = string.match(redis.call("HGET", baselineKey, groupId) or "|0", "^(.*)|([01])$")
+  if baseBlocked ~= "0" then return false end
+  local stamp, isBlocked = string.match(gqPreflightGroupState(keyPrefix, blockedKey, groupId), "^(.*)|([01])$")
+  if isBlocked ~= "0" or (stamp ~= "" and stamp ~= baseStamp) then return false end
+  redis.call("SREM", targetKey, groupId)
+  redis.call("HDEL", baselineKey, groupId)
+  redis.call("ZREM", targetKey .. ":candidates", groupId)
+  redis.call("SREM", targetKey .. ":live", groupId)
+  return true
+end
+`;
+
 const STAGE_LUA =
   PENDING_INDEX_HELPER_LUA +
   BLOB_LEASE_HELPER_LUA +
@@ -838,6 +879,7 @@ const DISPATCH_BATCH_LUA =
   WATER_LEVEL_HELPER_LUA +
   ROUTING_META_HELPER_LUA +
   CLAIMED_RECORD_HELPER_LUA +
+  SETTLED_TARGET_HELPER_LUA +
   `
 local function gqCandidateScore(keyPrefix, groupId, readyScore, nowMs)
   local groupPrefix = keyPrefix .. "group:" .. groupId
@@ -867,6 +909,9 @@ local staticCap      = tonumber(ARGV[5]) or 0
 -- 0 = dynamic disabled, dispatch uses the static cap unchanged (back-compat).
 local globalBudget   = tonumber(ARGV[6]) or 0
 local restrictedDispatch = ARGV[7] == "1"
+-- A listed run's group set, whose settled groups leave it as the scan meets them.
+local settledTargetKey = nil
+if restrictedDispatch and ARGV[8] and ARGV[8] ~= "" then settledTargetKey = ARGV[8] end
 
 local hasPauses = redis.call("SCARD", pausedJobKey) > 0
 local activeUntil = nowMs + activeTtlSec * 1000
@@ -954,19 +999,20 @@ local function scanBatch(effCap, bypassPark, dispatched)
     for _, groupId in ipairs(groups) do
       if dispatched >= maxJobs then break end
 
-      -- A preflight's complete target set is registered before its root command.
-      -- Keep every target in the candidate index until the preflight key expires:
-      -- an older worker may enqueue a downstream job without knowing how to add
-      -- it back. Moving examined targets to the tail gives pending targets a
-      -- bounded path through a set that also contains not-yet-enqueued groups.
+      -- A listed run's target holding nothing leaves it (staging a job re-registers it); moving
+      -- the other examined ones to the tail gives waiting targets a bounded path through them.
       local readyScore = nil
       local groupDue = true
       if restrictedDispatch then
         readyScore = redis.call("ZSCORE", readyKey, groupId)
         groupDue = readyScore and tonumber(readyScore) <= nowMs
-        -- Re-queued by when it can next run: a waiting group at its due time, a settled one an
-        -- hour back, so a retried job is not stuck behind every group the run already finished.
-        redis.call("ZADD", allowedGroupsKey, gqCandidateScore(keyPrefix, groupId, readyScore, nowMs), groupId)
+        if settledTargetKey and gqForgetSettledTarget(keyPrefix, blockedKey, settledTargetKey, groupId) then
+          groupDue = false
+        else
+          -- Re-queued by when it can next run: a waiting group at its due time, a failed one an
+          -- hour back, so a retried job is not stuck behind every group the run already finished.
+          redis.call("ZADD", allowedGroupsKey, gqCandidateScore(keyPrefix, groupId, readyScore, nowMs), groupId)
+        end
         removedAllowed = removedAllowed + 1
       end
       if groupDue then
@@ -1757,22 +1803,6 @@ const stageScript = new CachedLuaScript(STAGE_LUA);
 const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
 const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
 
-/**
- * A group's failure state as one token: its error timestamp and whether it is blocked.
- * Stored at registration and compared at inspection, which separates this preflight's own
- * damage from an earlier release's wedge (specs/event-sourcing/migration-preflight-barrier).
- */
-const PREFLIGHT_GROUP_STATE_LUA = `
-local function gqPreflightGroupState(keyPrefix, blockedKey, groupId)
-  local errorKey = keyPrefix .. "group:" .. groupId .. ":error"
-  local stamp = ""
-  if redis.call("EXISTS", errorKey) == 1 then
-    stamp = redis.call("HGET", errorKey, "timestamp") or "present"
-  end
-  return stamp .. "|" .. redis.call("SISMEMBER", blockedKey, groupId)
-end
-`;
-
 const REGISTER_PREFLIGHT_TARGETS_LUA =
   PREFLIGHT_GROUP_STATE_LUA +
   `
@@ -1882,9 +1912,12 @@ return {pending, active, failed, blocked, #groups, held, pendingGroups, failedId
 const inspectPreflightPageScript = new CachedLuaScript(INSPECT_PREFLIGHT_PAGE_LUA);
 
 /** One slice of a list's live groups: their waiting and running jobs; settled groups leave. */
-const COUNT_LISTED_OUTSTANDING_LUA = `
+const COUNT_LISTED_OUTSTANDING_LUA =
+  SETTLED_TARGET_HELPER_LUA +
+  `
 local liveKey = KEYS[1]
 local blockedKey = KEYS[2]
+local targetKey = KEYS[3]
 local keyPrefix = ARGV[1]
 local outstanding = 0
 for index = 2, #ARGV do
@@ -1894,6 +1927,7 @@ for index = 2, #ARGV do
   local active = redis.call("EXISTS", groupPrefix .. ":active")
   if pending == 0 and active == 0 then
     redis.call("SREM", liveKey, groupId)
+    gqForgetSettledTarget(keyPrefix, blockedKey, targetKey, groupId)
   elseif redis.call("SISMEMBER", blockedKey, groupId) == 0 then
     outstanding = outstanding + pending + active
   end
@@ -2199,11 +2233,14 @@ export class GroupStagingScripts {
     activeTtlSec,
     maxJobs,
     allowedGroupsKey,
+    listKey,
   }: {
     nowMs: number;
     activeTtlSec: number;
     maxJobs: number;
     allowedGroupsKey?: string;
+    /** The listed run whose candidates these are: the scan forgets its settled groups. */
+    listKey?: string;
   }): Promise<DispatchResult[]> {
     const readyKey = `${this.keyPrefix}ready`;
     const blockedKey = `${this.keyPrefix}blocked`;
@@ -2230,6 +2267,7 @@ export class GroupStagingScripts {
       String(tenantCap),
       String(this.globalConcurrencyBudget),
       allowedGroupsKey ? "1" : "",
+      listKey ?? "",
     );
 
     // The script returns [flatResults, overrideDispatched]. The count rides
@@ -2853,9 +2891,10 @@ export class GroupStagingScripts {
       for (let start = 0; start < members.length; start += PREFLIGHT_GROUPS_PER_CALL) {
         const reply: unknown = await countListedOutstandingScript.run(
           this.redis,
-          2,
+          3,
           liveKey,
           `${this.keyPrefix}blocked`,
+          listKey,
           this.keyPrefix,
           ...members.slice(start, start + PREFLIGHT_GROUPS_PER_CALL),
         );

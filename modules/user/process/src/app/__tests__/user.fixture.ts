@@ -95,10 +95,16 @@ export function createUserTestLifecycle() {
       send: async (data) => {
         recorded.push({ type: "deactivated", data });
       },
+      sendBatch: async (batch) => {
+        for (const data of batch) recorded.push({ type: "deactivated", data });
+      },
     },
     recordUserReactivated: {
       send: async (data) => {
         recorded.push({ type: "reactivated", data });
+      },
+      sendBatch: async (batch) => {
+        for (const data of batch) recorded.push({ type: "reactivated", data });
       },
     },
     recordUserRegistered: {
@@ -109,6 +115,9 @@ export function createUserTestLifecycle() {
     recordUserCreated: {
       send: async (data) => {
         recorded.push({ type: "created", data });
+      },
+      sendBatch: async (batch) => {
+        for (const data of batch) recorded.push({ type: "created", data });
       },
     },
     recordUserErased: {
