@@ -27,12 +27,12 @@ export function isVariablePriceRouter({ pricing }: { pricing: LLMModelPricing })
 
 let routerIds: ReadonlySet<string> | null = null;
 
-/** True when the catalog lists this id as a router. */
+/** True when the catalog lists this id as a router, in any letter case. */
 export function isVariablePriceRouterId(modelId: string): boolean {
   routerIds ??= new Set(
     Object.entries(llmModels.models)
       .filter(([, entry]) => isVariablePriceRouter(entry))
-      .map(([id]) => id),
+      .map(([id]) => id.toLowerCase()),
   );
-  return routerIds.has(modelId);
+  return routerIds.has(modelId.toLowerCase());
 }

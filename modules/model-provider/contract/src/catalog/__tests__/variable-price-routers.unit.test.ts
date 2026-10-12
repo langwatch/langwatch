@@ -78,6 +78,13 @@ describe("given the committed catalog", () => {
       expect(findMatchingModelCost(id, getStaticModelCostRates())).toEqual([]);
     });
 
+    it("finds no borrowed rule when the router id arrives in another letter case", () => {
+      // The case-insensitive fallbacks lent `OpenRouter/Pareto-Code` the `unbiased/pareto` price.
+      for (const id of catalogRouterIds.map((routerId) => routerId.toUpperCase())) {
+        expect(findMatchingModelCost(id, getStaticModelCostRates())).toEqual([]);
+      }
+    });
+
     it("still takes a rule that names the router itself", () => {
       const [router] = catalogRouterIds;
       const own: ModelCostRate = {
@@ -87,6 +94,9 @@ describe("given the committed catalog", () => {
         outputCostPerToken: 2e-6,
       };
       expect(findMatchingModelCost(router!, [own, ...getStaticModelCostRates()])).toEqual([own]);
+      expect(
+        findMatchingModelCost(router!.toUpperCase(), [own, ...getStaticModelCostRates()]),
+      ).toEqual([own]);
     });
   });
 });

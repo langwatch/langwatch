@@ -176,7 +176,10 @@ export const findMatchingModelCost = (
   // A router has no price of its own, so no fallback may lend it another model's rule:
   // `openrouter/pareto-code` would prefix-match `unbiased/pareto`. Only a rule naming it counts.
   if (isVariablePriceRouterId(model)) {
-    const own = costs.find((cost) => buildSafeRegex(cost.regex)?.test(model));
+    const own = costs.find((cost) => {
+      const regex = buildSafeRegex(cost.regex);
+      return regex?.test(model) || regex?.test(model.toLowerCase());
+    });
     return own ? [own] : [];
   }
   const match =
