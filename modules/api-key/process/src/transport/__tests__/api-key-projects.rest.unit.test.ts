@@ -216,7 +216,7 @@ describe("the projects collection, served by api-key", () => {
       expect([declaration.credential, declaration.addressing, declaration.v1Twin]).toEqual([
         "organization",
         "literal",
-        false,
+        true,
       ]);
     });
   });
@@ -236,6 +236,18 @@ describe("the projects collection, served by api-key", () => {
       const { send } = mount();
 
       expect((await send("/api/projects", { credential: "sk-lw-invalid_token" })).status).toBe(401);
+    });
+  });
+
+  describe("when the caller uses the /api/v1 path", () => {
+    it.each(["/api/projects", "/api/v1/projects"])("lists at %s the same", async (path) => {
+      const listByOrganization = vi.fn(async () => page([]));
+      const { send } = mount({ projects: { listByOrganization } });
+
+      const response = await send(path);
+
+      expect(response.status).toBe(200);
+      expect(listByOrganization).toHaveBeenCalledTimes(1);
     });
   });
 

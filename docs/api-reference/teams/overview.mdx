@@ -64,7 +64,7 @@ curl -X POST https://app.langwatch.ai/api/v1/teams \
   -d '{"name": "Engineering"}'
 
 # Use team ID to create a project
-curl -X POST https://app.langwatch.ai/api/projects \
+curl -X POST https://app.langwatch.ai/api/v1/projects \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"name": "My Project", "teamId": "<team_id>", "language": "python", "framework": "langchain"}'

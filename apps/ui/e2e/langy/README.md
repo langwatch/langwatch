@@ -523,7 +523,7 @@ Three handles, in increasing order of what they prove:
 | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | `langy.*`, `experiments.saveEvaluationsV3`, `experiments.getEvaluationsV3BySlug`, `langy.messages`, `POST /api/experiments/execute` | the session cookie (`trpc.ts`)                          |
 | `GET/PUT /api/experiments/:slug/workbench-state`, `GET /api/experiments/runs*`, `POST /api/experiments`                             | `X-Auth-Token: LANGWATCH_API_KEY` (`workbench-rest.ts`) |
-| `POST /api/langy/ui/actions`                                                                                                        | the agent worker's own session key, never the suite's   |
+| `POST /api/v1/langy/ui/actions`                                                                                                        | the agent worker's own session key, never the suite's   |
 
 `LANGY_PROJECT_ID` is the project's real id, not its slug: the tRPC procedures
 resolve permissions on the id, and a slug there is refused as `no-grant` on
@@ -1297,7 +1297,7 @@ act as a signed-in user rather than as an API key.
   below carries `langy.*`, `experiments.saveEvaluationsV3`,
   `experiments.getEvaluationsV3BySlug` and `POST /api/experiments/execute`;
   `X-Auth-Token` (`workbench-rest.ts`) carries the `/workbench-state` and
-  runs/experiments REST surface; `POST /api/langy/ui/actions` uses the agent
+  runs/experiments REST surface; `POST /api/v1/langy/ui/actions` uses the agent
   worker's own session key, never the suite's. Wire format (`{"json":
 input}` in, `{"result":{"data":{"json": output}}}` out) was confirmed
   against a live haven stack.

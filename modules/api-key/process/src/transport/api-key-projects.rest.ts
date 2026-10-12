@@ -86,7 +86,7 @@ export const apiKeyProjectsRest = defineRestRouter(ApiKeyProjectsDoorApi)
   .withNamespace("projects")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")
-  .withAddressing("literal", { v1Twin: false })
+  .withAddressing("literal", { v1Twin: true })
 
   .get("/api/projects", "listProjects")
   .withSharedPath(PROJECTS_SHARED_PATH)

@@ -96,6 +96,20 @@ function buildApi(options: { keyed?: boolean; own?: boolean; actor?: RestCaller[
 }
 
 describe("given the worker's Langy session key, which never carries langy:create", () => {
+  describe("when the worker calls the local surface at the /api/v1 path", () => {
+    it.each(["/api/langy/local/workspace", "/api/v1/langy/local/workspace"])(
+      "serves the same workspace at %s",
+      async (path) => {
+        const api = buildApi();
+
+        const response = await api.send(`${path}?conversationId=${CONVERSATION_ID}`);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(WORKSPACE);
+      },
+    );
+  });
+
   describe("when the worker calls the local surface with it", () => {
     /** @scenario "Langy's own session key reaches the local surface" */
     it("serves the workspace to the key's owner in the door's project, asking no permission", async () => {

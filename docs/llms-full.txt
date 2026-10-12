@@ -73845,7 +73845,7 @@ The slug is optional and is derived from the name when you leave it out. It is a
 
 ---
 title: "Archive project"
-openapi: "DELETE /api/projects/{id}"
+openapi: "DELETE /api/v1/projects/{id}"
 ---
 
 ---
@@ -73854,7 +73854,7 @@ openapi: "DELETE /api/projects/{id}"
 
 ---
 title: "Create project"
-openapi: "POST /api/projects"
+openapi: "POST /api/v1/projects"
 ---
 
 ---
@@ -73863,7 +73863,7 @@ openapi: "POST /api/projects"
 
 ---
 title: "Get project API key"
-openapi: "GET /api/projects/{id}/api-key"
+openapi: "GET /api/v1/projects/{id}/api-key"
 ---
 
 ---
@@ -73872,7 +73872,7 @@ openapi: "GET /api/projects/{id}/api-key"
 
 ---
 title: "Get project"
-openapi: "GET /api/projects/{id}"
+openapi: "GET /api/v1/projects/{id}"
 ---
 
 ---
@@ -73881,7 +73881,7 @@ openapi: "GET /api/projects/{id}"
 
 ---
 title: "List projects"
-openapi: "GET /api/projects"
+openapi: "GET /api/v1/projects"
 ---
 
 ---
@@ -73911,22 +73911,22 @@ Project API keys (`X-Auth-Token`) cannot be used here, because they lack organiz
 
 ## Endpoints
 
-| Method   | Path                                    | Description                                                  |
-| -------- | --------------------------------------- | ------------------------------------------------------------ |
-| `GET`    | `/api/projects`                         | List all projects in the organization                        |
-| `POST`   | `/api/projects`                         | Create a new project (returns a service API key)             |
-| `GET`    | `/api/projects/{id}`                    | Get project details                                          |
-| `PATCH`  | `/api/projects/{id}`                    | Update project fields (including moving to a different team) |
-| `DELETE` | `/api/projects/{id}`                    | Archive a project                                            |
-| `GET`    | `/api/projects/{id}/api-key`            | Get the project's API key                                    |
-| `POST`   | `/api/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
+| Method   | Path                                       | Description                                                  |
+| -------- | ------------------------------------------ | ------------------------------------------------------------ |
+| `GET`    | `/api/v1/projects`                         | List all projects in the organization                        |
+| `POST`   | `/api/v1/projects`                         | Create a new project (returns a service API key)             |
+| `GET`    | `/api/v1/projects/{id}`                    | Get project details                                          |
+| `PATCH`  | `/api/v1/projects/{id}`                    | Update project fields (including moving to a different team) |
+| `DELETE` | `/api/v1/projects/{id}`                    | Archive a project                                            |
+| `GET`    | `/api/v1/projects/{id}/api-key`            | Get the project's API key                                    |
+| `POST`   | `/api/v1/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
 
 ## Moving a Project to Another Team
 
 You can move a project to a different team by including `teamId` in the `PATCH` request:
 
 ```bash
-curl -X PATCH https://app.langwatch.ai/api/projects/<project_id> \
+curl -X PATCH https://app.langwatch.ai/api/v1/projects/<project_id> \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"teamId": "<destination_team_id>"}'
@@ -73941,7 +73941,7 @@ curl -X PATCH https://app.langwatch.ai/api/projects/<project_id> \
 ## Typical Flow
 
 1. Create an admin API key in Settings > API Keys with `organization:manage` permission
-2. Call `POST /api/projects` with the project name and either an existing `teamId` or a `newTeamName`
+2. Call `POST /api/v1/projects` with the project name and either an existing `teamId` or a `newTeamName`
 3. Store the returned `serviceApiKey` and project `id`
 4. Use both values in your application:
 
@@ -73961,7 +73961,7 @@ LANGWATCH_PROJECT_ID=<project id>
 
 ---
 title: "Regenerate project API key"
-openapi: "POST /api/projects/{id}/regenerate-api-key"
+openapi: "POST /api/v1/projects/{id}/regenerate-api-key"
 ---
 
 ---
@@ -73970,7 +73970,7 @@ openapi: "POST /api/projects/{id}/regenerate-api-key"
 
 ---
 title: "Update project"
-openapi: "PATCH /api/projects/{id}"
+openapi: "PATCH /api/v1/projects/{id}"
 ---
 
 ---
@@ -75845,7 +75845,7 @@ curl -X POST https://app.langwatch.ai/api/v1/teams \
   -d '{"name": "Engineering"}'
 
 # Use team ID to create a project
-curl -X POST https://app.langwatch.ai/api/projects \
+curl -X POST https://app.langwatch.ai/api/v1/projects \
   -H "Authorization: Bearer sk-lw-..." \
   -H "Content-Type: application/json" \
   -d '{"name": "My Project", "teamId": "<team_id>", "language": "python", "framework": "langchain"}'

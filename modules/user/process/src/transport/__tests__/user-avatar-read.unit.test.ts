@@ -30,6 +30,20 @@ describe("given the avatar route", () => {
     });
   });
 
+  describe("when the caller uses the /api/v1 path", () => {
+    it.each(["/api/user-avatar/project-9/object-1", "/api/v1/user-avatar/project-9/object-1"])(
+      "serves the same bytes at %s",
+      async (path) => {
+        const api = mountAvatars({ read: async () => available() });
+
+        const response = await api.fetch(path);
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("Content-Type")).toBe("image/png");
+      },
+    );
+  });
+
   describe("when the module refuses the object", () => {
     it("answers the avatar not-found code, serving no bytes", async () => {
       const api = mountAvatars({

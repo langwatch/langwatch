@@ -23,7 +23,7 @@ export const elevenLabsSignature = defineMiddlewareContext(
 export const elevenLabsWebhookRest = defineRestRouter(GatewayApi)
   .withNamespace("elevenlabs-webhook")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withAddressing("literal", { v1Twin: false })
+  .withAddressing("literal", { v1Twin: true })
   .post("/api/elevenlabs/webhook/:modelProviderId", "receiveElevenLabsWebhook")
   .withoutAudit("ElevenLabs webhook")
   .withParams(gatewayElevenLabsWebhookParamsSchema)
