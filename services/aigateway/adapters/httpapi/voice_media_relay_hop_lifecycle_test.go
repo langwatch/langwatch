@@ -1,11 +1,8 @@
 package httpapi
 
-// How the cross-pod hop of the Twilio media relay ends and what it refuses to
-// follow (langwatch#8397): redirects, line breaks in ids, a client that gives
-// up mid-dial, sockets that outlive their peer, the drain, and the close
-// codes that cross the hop. It reuses the two-pod fixtures of
-// voice_media_relay_hop_test.go; a scripted owner stands in for pod A where
-// the test needs control over what the owner sends.
+// How the cross-pod hop ends and what it refuses to follow (langwatch#8397):
+// redirects, line breaks in ids, abandoned dials, the drain, close codes.
+// Reuses the two-pod fixtures of voice_media_relay_hop_test.go.
 //
 // Binds specs/ai-gateway/voice-media-relay.feature.
 
@@ -146,10 +143,9 @@ func podHoppingTo(t *testing.T, owner *mrFakeOwner, hub func(*mediarelay.Options
 // The hop client follows no redirect and uses no proxy
 // ---------------------------------------------------------------------------
 
-// The owner address is private, but whatever answers on it is not trusted to
-// choose where the signed request goes next. The no-proxy half is asserted on
-// the transport in mediarelay's hop_test.go: Go never proxies a loopback
-// address, so an HTTP_PROXY test against these loopback owners could not fail.
+// Whatever answers on the owner address is not trusted to choose where the
+// signed request goes next. The no-proxy half is asserted in mediarelay's
+// hop_test.go, since Go never proxies loopback.
 //
 // @scenario "A hop owner that answers with a redirect refuses Twilio"
 func TestOwnerRedirectIsNotFollowed(t *testing.T) {
@@ -226,7 +222,7 @@ func TestRelayIDWithALineBreakInsertedIsRefusedWithoutADial(t *testing.T) {
 // Twilio giving up during the hop dial
 // ---------------------------------------------------------------------------
 
-// A Twilio request that is cancelled while the pod dials the owner is Twilio's
+// A Twilio request that is canceled while the pod dials the owner is Twilio's
 // doing, not the owner's. It is not logged as relay_owner_unreachable and not
 // counted at all: refused_owner_unreachable stays a count of owners that failed.
 //
@@ -323,6 +319,34 @@ func TestDrainOnThePodTwilioReachedWaitsForTheHopAndClosesItWith1012(t *testing.
 	})
 	t.Run("Stop waited for the hop through the budget", func(t *testing.T) {
 		assert.GreaterOrEqual(t, time.Duration(stoppedAfter.Load()), budget-200*time.Millisecond)
+	})
+}
+
+// A call that ends the normal way leaves no pump behind. A pump that stays
+// blocked holds the Twilio pod's Stop until its context ends.
+//
+// @scenario "A hopped call that ends normally leaves nothing for the drain to wait on"
+func TestHoppedCallThatEndsNormallyLeavesNothingForStopToWaitOn(t *testing.T) {
+	t.Parallel()
+	a, b := newHopPair(t, nil)
+	relay, ready := a.open()
+	twilio := b.join(ready.RelayID)
+	fromRelay := inbox(relay)
+	require.NoError(t, twilio.Close(websocket.StatusNormalClosure, ""))
+	fromRelay.ended(t, 3*time.Second)
+	a.waitForNoRelays()
+
+	started := time.Now()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	err := b.hub.Stop(ctx)
+	took := time.Since(started)
+
+	t.Run("Stop returns without an error", func(t *testing.T) {
+		require.NoError(t, err)
+	})
+	t.Run("Stop returns well inside its budget", func(t *testing.T) {
+		assert.Less(t, took, time.Second)
 	})
 }
 

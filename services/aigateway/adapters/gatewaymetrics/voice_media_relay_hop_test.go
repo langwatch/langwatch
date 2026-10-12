@@ -93,3 +93,22 @@ func TestVoiceMediaRelayDrainedUnpairedIsInTheMetricHelp(t *testing.T) {
 
 	assert.Contains(t, help, "drained_unpaired")
 }
+
+// A Twilio that gives up during the dial is not the owner's failure, so it has
+// no outcome; the page says so next to the outcomes it lists.
+//
+// @scenario "The observability page says an abandoned hop dial is not counted"
+func TestVoiceMediaRelayAbandonedHopDialIsDocumentedAsNotCounted(t *testing.T) {
+	t.Parallel()
+	body, err := os.ReadFile(filepath.Join(repoRoot(t), "docs", "ai-gateway", "observability.mdx"))
+	require.NoError(t, err)
+	var row string
+	for _, line := range strings.Split(string(body), "\n") {
+		if strings.Contains(line, "gateway_voice_media_relay_total") {
+			row = line
+		}
+	}
+	require.NotEmpty(t, row)
+
+	assert.Regexp(t, `(?i)abandoned by Twilio[^|]*not counted`, row)
+}

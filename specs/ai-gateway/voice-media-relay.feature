@@ -3,8 +3,7 @@ Feature: Twilio media relay on the AI Gateway
   I want a worker to dial out to the gateway and have Twilio dial the gateway
   So that Twilio media reaches the worker with no tunnel and no inbound port on the worker
 
-  # https://github.com/langwatch/langwatch/issues/8397, slice 1 (one gateway pod),
-  # slice 2 (the cross-pod hop, last Rules of this file).
+  # https://github.com/langwatch/langwatch/issues/8397.
   # The worker opens GET /v1/voice/relay (or the signed GET /v1/voice/relay/{orgId}),
   # is told a relay id, and places the Twilio call with
   # <Stream url="wss://gateway/v1/voice/twilio/{id}">. Twilio then dials the
@@ -500,7 +499,7 @@ Feature: Twilio media relay on the AI Gateway
       And a negative value is refused
 
   # ============================================================
-  # Slice 2. Twilio dials the gateway through an L4 load balancer, so its
+  # Twilio dials the gateway through an L4 load balancer, so its
   # socket can land on a pod that does not hold the relay. Pods are named by
   # the address sealed into the relay id. The pod Twilio landed on dials the
   # owner's hop listener (GATEWAY_RELAY_HOP_ADDR, :5564), which is a second
@@ -580,6 +579,18 @@ Feature: Twilio media relay on the AI Gateway
       Given a Twilio socket hopped to an owner
       When Twilio's socket drops
       Then the owner's hop socket is closed
+
+    @unit
+    Scenario: A hop pump returns when one side ends normally
+      Given two connected sockets pumped into each other
+      When one side closes with 1000
+      Then the pump returns promptly
+
+    @integration
+    Scenario: A hopped call that ends normally leaves nothing for the drain to wait on
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When Twilio closes its socket with 1000 and the relay ends
+      Then pod B stops within its stop budget without an error
 
     @integration
     Scenario: An owner whose drain budget ends closes the hopped relay with 1012
@@ -738,6 +749,7 @@ Feature: Twilio media relay on the AI Gateway
       Then its transport has no proxy function
       And its redirect policy returns the last response
       And the same client serves every dial of the hub
+      And its transport does not keep connections alive
 
     @integration
     Scenario: Twilio giving up during the hop dial is not counted as an unreachable owner
@@ -903,6 +915,16 @@ Feature: Twilio media relay on the AI Gateway
       And its values are from the fixed outcome set, hop outcomes included
 
     @unit
+    Scenario: A signature built from parts equals the one the signer stamps
+      Given a method, a path and a body, empty or not
+      When the signer signs a request and the signature is rebuilt from the stamped timestamp
+      Then the two signatures are identical
+
+    @unit
+    Scenario: The observability page says an abandoned hop dial is not counted
+      Then the relay counter row says a hop dial abandoned by Twilio is not counted
+
+    @unit
     Scenario: The hop outcomes are documented
       Then the counter's help text names hop_joined, refused_owner_unreachable, refused_owner_invalid and refused_hop_busy
       And the observability page lists the same four outcomes
@@ -942,11 +964,13 @@ Feature: Twilio media relay on the AI Gateway
       Then the error text does not contain the key
 
     @unit
-    Scenario: A pod address outside the private ranges is refused at start
-      When the pod address is public, a host name, has a port, is link-local or is an IPv4-mapped public address
-      Then the gateway refuses to start and names GATEWAY_POD_IP
-      And 10/8, 172.16/12, 192.168/16, 100.64/10 and fc00::/7 addresses are accepted
-      And an unset pod address is accepted
+    Scenario: A pod address outside the private ranges is warned about and the hop is disabled
+      When the pod address is public, global IPv6, a host name, has a port, is link-local or is an IPv4-mapped public address
+      Then the gateway starts without an error
+      And the configuration carries a warning that names GATEWAY_POD_IP
+      And the configured pod address is empty, so the hop is disabled
+      And 10/8, 172.16/12, 192.168/16, 100.64/10 and fc00::/7 addresses are accepted with no warning
+      And an unset pod address is accepted with no warning
 
     @unit
     Scenario: The media relay hub is built from the configuration

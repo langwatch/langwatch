@@ -46,6 +46,8 @@ type Config struct {
 	// goes into Twilio relay ids so any pod can tell which pod owns one.
 	// Empty means a single-pod gateway.
 	PodIP string `env:"GATEWAY_POD_IP"`
+	// Warnings are notes LoadConfig leaves for Serve to log at startup.
+	Warnings []string
 	// RelayHopAddr is where the owner side of a cross-pod relay hop listens
 	// (GATEWAY_RELAY_HOP_ADDR). Only the gateway's own pods may reach it.
 	RelayHopAddr string `env:"GATEWAY_RELAY_HOP_ADDR"`
@@ -315,7 +317,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, fmt.Errorf("GATEWAY_RELAY_HOP_ADDR: %w", err)
 	}
 	if cfg.PodIP != "" && !mediarelay.PrivateOwnerIP(cfg.PodIP) {
-		return Config{}, fmt.Errorf("GATEWAY_POD_IP %q is not a private pod-network address", cfg.PodIP)
+		cfg.Warnings = append(cfg.Warnings, fmt.Sprintf(
+			"GATEWAY_POD_IP %q is not a private pod-network address: the cross-pod relay hop is off", cfg.PodIP))
+		cfg.PodIP = ""
 	}
 	if err := validateCodexAPIBase(cfg.CodexAPIBase); err != nil {
 		return Config{}, err

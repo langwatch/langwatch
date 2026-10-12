@@ -49,14 +49,12 @@ func PrivateOwnerIP(s string) bool {
 // owner's own cap before this pod ends it.
 const hopMargin = time.Second
 
-// HopHTTPClient is the client the hop dials with. Its transport reads no
-// proxy variable and its redirects are never followed, so the signed request
+// newHopClient builds the hop dial client. Its transport reads no proxy
+// variable and its redirects are never followed, so the signed request
 // reaches only the owner address the id named.
-func (h *Hub) HopHTTPClient() *http.Client { return h.hopClient }
-
 func newHopClient() *http.Client {
 	return &http.Client{
-		Transport:     &http.Transport{Proxy: nil, DialContext: (&net.Dialer{}).DialContext},
+		Transport:     &http.Transport{Proxy: nil, DisableKeepAlives: true, DialContext: (&net.Dialer{}).DialContext},
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 }
@@ -157,19 +155,19 @@ func (h *Hub) pump(a, b *websocket.Conn) {
 	ctx, cancel := context.WithTimeout(context.Background(), h.maxDuration+hopMargin)
 	defer cancel()
 	p := &framePump{ctx: ctx, done: make(chan struct{}, 2)}
-	done := p.done
 	go p.copy(a, b)
 	go p.copy(b, a)
 	select {
-	case <-done:
+	case <-p.done:
 	case <-h.drainOver:
+		// Goroutines, so a peer that never answers its close blocks neither.
 		go func() { _ = a.Close(CloseDrain, "relay_drain") }()
-		_ = b.Close(CloseDrain, "relay_drain")
+		go func() { _ = b.Close(CloseDrain, "relay_drain") }()
+		<-p.done
 	}
-	// A close handshake that the peer never answers ends with the context.
-	<-done
+	// The first end closed the other side; the context bounds a silent peer.
 	cancel()
-	<-done
+	<-p.done
 }
 
 // framePump is the two copy loops of one hopped socket pair.

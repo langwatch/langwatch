@@ -13,10 +13,9 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/mediarelay"
 )
 
-// The hop listener has to serve through the whole voice drain: a Twilio socket
-// that lands on another pod while this pod drains still hops here. Stop runs in
+// The hop listener must serve through the whole voice drain. Stop runs in
 // reverse registration order, so the hop is registered before the relay hub
-// (which waits for its relays to end) and before the public listener.
+// and before the public listener.
 //
 // @scenario "The hop listener stops after the media relay hub and the public listener"
 func TestServe_ManagedServices_RelayHopStopsAfterTheHubAndThePublicListener(t *testing.T) {
@@ -78,9 +77,8 @@ func TestServe_HopServer_NeverHasAnEmptyAddress(t *testing.T) {
 
 	srv := hopServer(&Deps{MediaRelay: hub}, Config{PodIP: "10.1.2.3"})
 
-	if srv != nil {
-		assert.NotEmpty(t, srv.Addr, "an empty address would bind a random port")
-	}
+	require.NotNil(t, srv)
+	assert.NotEmpty(t, srv.Addr, "an empty address would bind a random port")
 }
 
 // @scenario "The hop listener never has an empty address"

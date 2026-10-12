@@ -73,11 +73,9 @@ func TestPrivateOwnerIP_RefusesEverythingElse(t *testing.T) {
 	}
 }
 
-// The hop client carries a signed request to a pod address read from an id.
-// It must neither follow a redirect, which would send the signature to a host
-// the owner address did not name, nor route through an environment proxy. The
-// proxy half is asserted on the transport: Go never proxies a loopback
-// address, so a proxy-env test against a local owner would pass with the bug.
+// The hop client must follow no redirect (the signature would reach another
+// host) and use no environment proxy. The proxy half is asserted on the
+// transport, because Go never proxies a loopback address.
 //
 // @scenario "The hop client follows no redirect and uses no proxy"
 func TestHopHTTPClient_UsesNoProxy(t *testing.T) {
@@ -109,4 +107,18 @@ func TestHopHTTPClient_IsOnePerHub(t *testing.T) {
 
 	//nolint:testifylint // two calls returning one pointer is the property under test.
 	assert.Same(t, hub.HopHTTPClient(), hub.HopHTTPClient())
+}
+
+// A hop is one signed request to one pod, so a kept-alive connection to an
+// owner only holds a socket (and an idle pool) for nothing.
+//
+// @scenario "The hop client follows no redirect and uses no proxy"
+func TestHopHTTPClient_KeepsNoConnectionsAlive(t *testing.T) {
+	t.Parallel()
+	client := mediarelay.NewHub(mediarelay.Options{Secret: "hop-client-secret"}).HopHTTPClient()
+
+	require.NotNil(t, client)
+	transport, ok := client.Transport.(*http.Transport)
+	require.True(t, ok, "the hop client needs its own *http.Transport, got %T", client.Transport)
+	assert.True(t, transport.DisableKeepAlives)
 }

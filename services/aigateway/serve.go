@@ -26,6 +26,9 @@ import (
 func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) error {
 	deps.Logger.Info("aigateway_starting", zap.String("addr", cfg.Server.Addr))
 	warnIfGracefulShutdownTooShort(deps.Logger, cfg)
+	for _, warning := range cfg.Warnings {
+		deps.Logger.Warn("aigateway_config_warning", zap.String("warning", warning))
+	}
 	if !cfg.ControlPlane.BaseURLExplicit {
 		deps.Logger.Warn("aigateway_control_plane_base_url_not_explicit",
 			zap.String("control_plane_base_url", cfg.ControlPlane.BaseURL),

@@ -135,28 +135,45 @@ func TestRelayHopPort(t *testing.T) {
 	}
 }
 
-// The pod address goes into every id and is dialed by peers, so an address the
-// hop would refuse at the other end is a mistake to catch at start.
-//
-// @scenario "A pod address outside the private ranges is refused at start"
-func TestLoadConfig_PodAddressOutsideThePrivateRangesIsRefused(t *testing.T) {
-	for name, ip := range map[string]string{
-		"a public address":         "8.8.8.8",
-		"a host name":              "gateway-0",
-		"an address with a port":   "10.1.2.3:5564",
-		"a link-local address":     "169.254.1.1",
-		"just above shared space":  "100.128.0.1",
-		"an IPv4-mapped public ip": "::ffff:8.8.8.8",
-	} {
-		t.Run(name, func(t *testing.T) {
-			_, err := loadWithHopEnv(t, map[string]string{"GATEWAY_POD_IP": ip})
+// The pod address goes into every id and is dialed by peers. A pod whose
+// address the peers would refuse still serves its own calls, so the gateway
+// starts, warns through cfg.Warnings and runs with the hop disabled (an empty
+// PodIP) rather than going down at start.
+var podAddressesOutsideThePrivateRanges = map[string]string{
+	"a public address":         "8.8.8.8",
+	"a global IPv6 address":    "2001:4860:4860::8888",
+	"a host name":              "gateway-0",
+	"an address with a port":   "10.1.2.3:5564",
+	"a link-local address":     "169.254.1.1",
+	"just above shared space":  "100.128.0.1",
+	"an IPv4-mapped public ip": "::ffff:8.8.8.8",
+}
 
-			assert.ErrorContains(t, err, "GATEWAY_POD_IP")
+// @scenario "A pod address outside the private ranges is warned about and the hop is disabled"
+func TestLoadConfig_PodAddressOutsideThePrivateRangesDisablesTheHop(t *testing.T) {
+	for name, ip := range podAddressesOutsideThePrivateRanges {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := loadWithHopEnv(t, map[string]string{"GATEWAY_POD_IP": ip})
+
+			t.Run("loads without an error", func(t *testing.T) { require.NoError(t, err) })
+			t.Run("leaves the pod address empty", func(t *testing.T) { assert.Empty(t, cfg.PodIP) })
 		})
 	}
 }
 
-// @scenario "A pod address outside the private ranges is refused at start"
+// @scenario "A pod address outside the private ranges is warned about and the hop is disabled"
+func TestLoadConfig_PodAddressOutsideThePrivateRangesIsWarnedAbout(t *testing.T) {
+	for name, ip := range podAddressesOutsideThePrivateRanges {
+		t.Run(name, func(t *testing.T) {
+			cfg, _ := loadWithHopEnv(t, map[string]string{"GATEWAY_POD_IP": ip})
+
+			require.Len(t, cfg.Warnings, 1)
+			assert.Contains(t, cfg.Warnings[0], "GATEWAY_POD_IP")
+		})
+	}
+}
+
+// @scenario "A pod address outside the private ranges is warned about and the hop is disabled"
 func TestLoadConfig_PodAddressInThePrivateRangesIsAccepted(t *testing.T) {
 	for name, ip := range map[string]string{
 		"a ten address":          "10.1.2.3",
@@ -171,6 +188,7 @@ func TestLoadConfig_PodAddressInThePrivateRangesIsAccepted(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, ip, cfg.PodIP)
+			assert.Empty(t, cfg.Warnings)
 		})
 	}
 }
