@@ -36,6 +36,8 @@ COPY services/go.* services/
 COPY tools/go.* tools/
 COPY sdks/go/go.* sdks/go/
 COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
+# services/go.mod replaces the Go scenario SDK with this vendored copy.
+COPY services/third_party/scenario-go/ services/third_party/scenario-go/
 COPY sdks/go ./sdks/go
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
