@@ -12,34 +12,29 @@ import { createLogger } from "@langwatch/observability";
 import type {
   ScenarioChildEnvironment,
   ScenarioChildExecutionSession,
-} from "../../../app/scenario.app.ts";
-import type {
-  ExecutionJobData,
-  ScenarioExecutionPoolService,
-} from "../../../services/scenario-execution-pool.service.ts";
+} from "../app/scenario.app.ts";
+import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import type { ScenarioChildRunPool, ScenarioGoChildChannel } from "./scenario-child.channel.ts";
 import {
-  NodeScenarioChildService,
+  buildChildEnvironment,
   type ScenarioChildProcessConfig,
-} from "./node-scenario-child.service.ts";
-import type { ScenarioGoRunner } from "./scenario-child-choice.service.ts";
-import { ScenarioChildSupervisorService } from "./scenario-child-supervisor.service.ts";
+} from "./scenario-child.node.channel.ts";
+import { superviseScenarioChild } from "./scenario-child.supervisor.channel.ts";
 
 const logger = createLogger("langwatch:scenarios:go-child-process");
 
-export class GoScenarioChildService implements ScenarioGoRunner {
+export class GoScenarioChildChannel implements ScenarioGoChildChannel {
   static create(options: {
     config: ScenarioChildProcessConfig;
     binaryPath: string | undefined;
-    pool: ScenarioExecutionPoolService;
-  }): GoScenarioChildService {
-    return new GoScenarioChildService(options);
+  }): GoScenarioChildChannel {
+    return new GoScenarioChildChannel(options);
   }
 
   private constructor(
     private readonly options: {
       config: ScenarioChildProcessConfig;
       binaryPath: string | undefined;
-      pool: ScenarioExecutionPoolService;
     },
   ) {
     this.binaryPath = options.binaryPath;
@@ -50,6 +45,7 @@ export class GoScenarioChildService implements ScenarioGoRunner {
   start = async (input: {
     jobData: ExecutionJobData;
     environment: ScenarioChildEnvironment;
+    pool: ScenarioChildRunPool;
   }): Promise<ScenarioChildExecutionSession> => {
     const { binaryPath } = this;
     if (binaryPath === undefined || input.jobData.target.type === "voice") {
@@ -70,7 +66,7 @@ export class GoScenarioChildService implements ScenarioGoRunner {
     ) => childLogger[level](extra ?? {}, message);
 
     const child = spawn(binaryPath, [], {
-      env: NodeScenarioChildService.buildEnvironment({
+      env: buildChildEnvironment({
         config: this.options.config,
         jobData: input.jobData,
         labels: input.environment.labels,
@@ -81,11 +77,6 @@ export class GoScenarioChildService implements ScenarioGoRunner {
     });
     log("info", "Go scenario runner spawned", { pid: child.pid });
 
-    return ScenarioChildSupervisorService.supervise({
-      child,
-      jobData: input.jobData,
-      pool: this.options.pool,
-      log,
-    });
+    return superviseScenarioChild({ child, jobData: input.jobData, pool: input.pool, log });
   };
 }

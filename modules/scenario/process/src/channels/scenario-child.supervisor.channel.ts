@@ -14,11 +14,9 @@ import {
 } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
-import type { ScenarioChildExecutionSession } from "../../../app/scenario.app.ts";
-import type {
-  ExecutionJobData,
-  ScenarioExecutionPoolService,
-} from "../../../services/scenario-execution-pool.service.ts";
+import type { ScenarioChildExecutionSession } from "../app/scenario.app.ts";
+import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import type { ScenarioChildRunPool } from "./scenario-child.channel.ts";
 
 export type ChildLog = (
   level: "info" | "warn" | "error",
@@ -44,16 +42,11 @@ const scenarioChildProcessResultSchema = z.object({
   isCutAtLimit: z.boolean().optional(),
 });
 
-export class ScenarioChildSupervisorService {
-  static readonly supervise = superviseChildValue;
-  static readonly parseResult = parseChildProcessResultValue;
-}
-
 /** Registers a spawned child with the pool and reads its exit, whichever runner it is. */
-function superviseChildValue(input: {
+export function superviseScenarioChild(input: {
   child: ChildProcess;
   jobData: ExecutionJobData;
-  pool: ScenarioExecutionPoolService;
+  pool: ScenarioChildRunPool;
   log: ChildLog;
 }): ScenarioChildExecutionSession {
   input.pool.registerChild(input.jobData.scenarioRunId, input.child);
@@ -68,7 +61,7 @@ function superviseChildValue(input: {
 function observeChild(input: {
   child: ChildProcess;
   jobData: ExecutionJobData;
-  pool: ScenarioExecutionPoolService;
+  pool: ScenarioChildRunPool;
   log: ChildLog;
 }): Promise<ScenarioExecutionResult> {
   return new Promise((resolve) => {
@@ -175,7 +168,8 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
   }
 }
 
-function parseChildProcessResultValue(stdout: string): ScenarioChildProcessResult | null {
+/** The last result line a child wrote, Node or Go alike, or null when it wrote none. */
+export function parseChildProcessResult(stdout: string): ScenarioChildProcessResult | null {
   for (const line of stdout.split("\n").reverse()) {
     const result = parseResultLine(line);
     if (result) return result;
@@ -221,7 +215,7 @@ function childExitResult({
     return { success: false, error: "Job was cancelled", cancelled: true };
   }
   if (code !== 0) {
-    const childResult = parseChildProcessResultValue(stdout);
+    const childResult = parseChildProcessResult(stdout);
     const error = childResult?.error?.trim()
       ? childResult.error
       : `Child process exited with code ${code}: ${stderr}`;
@@ -236,7 +230,7 @@ function childExitResult({
   // The last JSON line the child wrote is the only place the connected
   // agent instance that answered the run is named; without reading it
   // here a finished run records no instance at all.
-  const childResult = parseChildProcessResultValue(stdout);
+  const childResult = parseChildProcessResult(stdout);
   return {
     success: true,
     ...(childResult?.reasoning ? { reasoning: childResult.reasoning } : {}),

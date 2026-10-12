@@ -7,11 +7,16 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ScenarioChildBootstrap, ScenarioChildExecutionSession } from "../app/scenario.app.ts";
+import type { ScenarioChildExecutionSession } from "../app/scenario.app.ts";
+import type {
+  ScenarioChildChannel,
+  ScenarioChildNonceRegistry,
+  ScenarioChildRunPool,
+  ScenarioGoChildChannel,
+} from "../channels/scenario-child.channel.ts";
 import {
   SCENARIO_GO_RUNNER_FLAG_KEY,
   ScenarioChildChoiceService,
-  type ScenarioGoRunner,
 } from "../features/child/services/scenario-child-choice.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
@@ -46,13 +51,17 @@ function harness({
     return flag;
   });
   const binaryExists = vi.fn(() => binaryOnDisk);
+  const pool = createApiFixture<ScenarioChildRunPool>({}, "Pool");
+  const nonces = createApiFixture<ScenarioChildNonceRegistry>({}, "Nonces");
   const choice = ScenarioChildChoiceService.create({
-    node: createApiFixture<ScenarioChildBootstrap>({ start: nodeStart }, "Node child"),
-    go: createApiFixture<ScenarioGoRunner>({ start: goStart, binaryPath }, "Go runner"),
+    node: createApiFixture<ScenarioChildChannel>({ start: nodeStart }, "Node child"),
+    go: createApiFixture<ScenarioGoChildChannel>({ start: goStart, binaryPath }, "Go runner"),
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled }, "FeatureFlags"),
     binaryExists,
+    pool,
+    nonces,
   });
-  return { choice, nodeStart, goStart, isEnabled, binaryExists };
+  return { choice, nodeStart, goStart, isEnabled, binaryExists, pool, nonces };
 }
 
 describe("ScenarioChildChoiceService", () => {
@@ -75,12 +84,18 @@ describe("ScenarioChildChoiceService", () => {
   describe("given the project's Go runner flag is on and the binary is on disk", () => {
     /** @scenario "A run starts on the Go runner while the flag is on" */
     it("spawns the Go runner with the same job data and environment", async () => {
-      const { choice, nodeStart, goStart } = harness({ flag: true });
+      const { choice, nodeStart, goStart, pool, nonces } = harness({ flag: true });
       const jobData = job("http");
 
       await choice.start({ jobData, environment });
 
-      expect(goStart).toHaveBeenCalledWith({ jobData, environment });
+      expect(goStart).toHaveBeenCalledWith({
+        jobData,
+        environment,
+        pool,
+        nonces,
+        voicePublicUrl: undefined,
+      });
       expect(nodeStart).not.toHaveBeenCalled();
     });
 

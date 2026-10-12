@@ -11,8 +11,8 @@ import {
 } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../features/child/services/child-process-spawn.service.ts", () => ({
-  ChildProcessSpawnService: {
+vi.mock("../scenario-child.spawn.channel.ts", () => ({
+  ScenarioChildSpawn: {
     create: () => ({
       resolve: () => ({ command: "node", args: ["/dist/bundle.cjs"] }),
     }),
@@ -41,15 +41,15 @@ vi.mock("node:child_process", () => ({
 
 import { spawn } from "node:child_process";
 
-import { type ScenarioExecutionRunner } from "../app/scenario.app.ts";
+import { type ScenarioExecutionRunner } from "../../app/scenario.app.ts";
+import { VoiceNonceRegistryService } from "../../features/voice/services/voice-nonce-registry.service.ts";
+import { MemoryVoiceNonceRepository } from "../../repositories/memory/memory.voice-nonce.repository.ts";
+import { ScenarioExecutionPoolService } from "../../services/scenario-execution-pool.service.ts";
+import type { ExecutionJobData } from "../../services/scenario-execution-pool.service.ts";
 import {
-  NodeScenarioChildService,
+  NodeScenarioChildChannel,
   type ScenarioChildProcessConfig,
-} from "../features/child/services/node-scenario-child.service.ts";
-import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
-import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
-import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
-import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+} from "../scenario-child.node.channel.ts";
 
 /** A runner that never actually executes — the pool only needs the job
  * marked active so `registerChild` below finds it. */
@@ -113,7 +113,7 @@ function poolWith(
   return pool;
 }
 
-describe("NodeScenarioChildService", () => {
+describe("NodeScenarioChildChannel", () => {
   beforeEach(() => {
     stdinWrite.mockClear();
     stdinEnd.mockClear();
@@ -131,14 +131,15 @@ describe("NodeScenarioChildService", () => {
     /** @scenario "A worker boots without waiting for the voice tunnel" */
     it("never asks for it when a non-voice child starts", async () => {
       const voicePublicUrl = vi.fn(async () => ({ url: "https://tunnel.test" }));
-      const adapter = NodeScenarioChildService.create({
-        config: childConfig,
-        voicePublicUrl,
+      const adapter = NodeScenarioChildChannel.create({ config: childConfig });
+
+      await adapter.start({
+        jobData: job(),
+        environment,
         pool: poolWith(job()),
         nonces: nonces(),
+        voicePublicUrl,
       });
-
-      await adapter.start({ jobData: job(), environment });
 
       expect(voicePublicUrl).not.toHaveBeenCalled();
     });
@@ -149,14 +150,15 @@ describe("NodeScenarioChildService", () => {
         ...job(),
         target: { type: "voice", referenceId: "agent-1" },
       };
-      const adapter = NodeScenarioChildService.create({
-        config: childConfig,
-        voicePublicUrl: async () => ({ unavailable: "spawn cloudflared ENOENT" }),
+      const adapter = NodeScenarioChildChannel.create({ config: childConfig });
+
+      await adapter.start({
+        jobData: voiceJob,
+        environment,
         pool: poolWith(voiceJob, new HeldRunner()),
         nonces: nonces(),
+        voicePublicUrl: async () => ({ unavailable: "spawn cloudflared ENOENT" }),
       });
-
-      await adapter.start({ jobData: voiceJob, environment });
 
       expect(spawnedEnvironment()).toMatchObject({
         VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON: "spawn cloudflared ENOENT",
@@ -174,13 +176,11 @@ describe("NodeScenarioChildService", () => {
         ...job(),
         target: { type: "voice", referenceId: "agent-1" },
       };
-      const adapter = NodeScenarioChildService.create({
-        config: childConfig,
-        pool: poolWith(voiceJob),
-        nonces,
-      });
+      const adapter = NodeScenarioChildChannel.create({ config: childConfig });
       const session = await adapter.start({
         jobData: voiceJob,
+        pool: poolWith(voiceJob),
+        nonces,
         environment: { labels: [], telemetry: { endpoint: "https://x.test", apiKey: "key" } },
       });
       void session.execute({
@@ -223,7 +223,7 @@ describe("NodeScenarioChildService", () => {
   describe("given a child process spawned from the pre-compiled bundle", () => {
     /** @scenario "Child process receives job data via stdin" */
     it("writes the job data to the child's stdin as JSON", async () => {
-      const adapter = NodeScenarioChildService.create({
+      const adapter = NodeScenarioChildChannel.create({
         config: {
           packageRoot: "/app",
           sourcePath: "/app/src/adapter.ts",
@@ -233,17 +233,12 @@ describe("NodeScenarioChildService", () => {
           egress: { blockLocal: true, allowedHosts: [] },
           parentEnvironment: {},
         },
-        pool: (() => {
-          const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
-          pool.connect(new NoopRunner());
-          pool.submit(job());
-          return pool;
-        })(),
-        nonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
       });
 
       const session = await adapter.start({
         jobData: job(),
+        pool: poolWith(job()),
+        nonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
         environment: { labels: [], telemetry: { endpoint: "https://x.test", apiKey: "key" } },
       });
       void session.execute(jobData);

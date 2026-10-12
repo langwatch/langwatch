@@ -1,3 +1,9 @@
+/**
+ * Starts a scenario run in a Node child (apps/scenario-child) and builds the allow-listed
+ * environment every scenario child, Node or Go, is started with.
+ * @see specs/scenarios/pre-compiled-child-process.feature
+ */
+
 import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
@@ -13,24 +19,25 @@ import {
   VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV,
   type ScenarioEgressPolicy,
   type ScenarioLogContext,
+  type ScenarioServerConfig,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
-import {
-  type ScenarioChildBootstrap,
-  type ScenarioChildExecutionSession,
-  type ScenarioChildEnvironment,
-} from "../../../app/scenario.app.ts";
-import { handleVoiceNonceRegisterMessage } from "../../../channels/voice-nonce-handoff.channels.ts";
-import { resolveChildTlsEnv } from "../../../rules/child-tls-env.rules.ts";
 import type {
-  ExecutionJobData,
-  ScenarioExecutionPoolService,
-} from "../../../services/scenario-execution-pool.service.ts";
-import type { VoiceNonceRegistryService } from "../../voice/services/voice-nonce-registry.service.ts";
-import type { VoicePublicUrl } from "../../voice/services/voice-public-url.service.ts";
-import { ChildProcessSpawnService } from "./child-process-spawn.service.ts";
-import { ScenarioChildSupervisorService } from "./scenario-child-supervisor.service.ts";
+  ScenarioChildEnvironment,
+  ScenarioChildExecutionSession,
+} from "../app/scenario.app.ts";
+import type { VoicePublicUrl } from "../features/voice/services/voice-public-url.service.ts";
+import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
+import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
+import type {
+  ScenarioChildChannel,
+  ScenarioChildNonceRegistry,
+  ScenarioChildRunPool,
+} from "./scenario-child.channel.ts";
+import { ScenarioChildSpawn } from "./scenario-child.spawn.channel.ts";
+import { superviseScenarioChild } from "./scenario-child.supervisor.channel.ts";
+import { handleVoiceNonceRegisterMessage } from "./voice-nonce-handoff.channels.ts";
 
 const logger = createLogger("langwatch:scenarios:child-process");
 
@@ -78,31 +85,44 @@ interface ScenarioChildTelemetry {
   apiKey: string;
 }
 
-export class NodeScenarioChildService implements ScenarioChildBootstrap {
-  static readonly parseResult = ScenarioChildSupervisorService.parseResult;
-  static readonly buildEnvironment = buildChildEnvironmentValue;
-  static readonly buildBaseEnvironment = buildBaseEnvironmentValue;
-  static readonly buildOtelResourceAttributes = buildOtelResourceAttributesValue;
+/** The repository root: this file sits five folders below it, in source and in dist alike. */
+const WORKSPACE_ROOT = path.join(import.meta.dirname, "..", "..", "..", "..", "..");
+const CHILD_PACKAGE_ROOT = path.join(WORKSPACE_ROOT, "apps", "scenario-child");
 
-  static create(options: {
-    config: ScenarioChildProcessConfig;
-    /** Acquires the worker's public media origin, asked only when a voice child starts. */
-    voicePublicUrl?: () => Promise<VoicePublicUrl>;
-    pool: ScenarioExecutionPoolService;
-    /** Where a voice child registers the media nonce the worker's door will be dialled with. */
-    nonces: VoiceNonceRegistryService;
-  }): NodeScenarioChildService {
-    return new NodeScenarioChildService(options);
+/** How a scenario child is started here, whether it runs a simulation or one agent-test turn. */
+export function scenarioChildProcessConfig({
+  config,
+  nlpInternalSecret,
+}: {
+  config: ScenarioServerConfig;
+  nlpInternalSecret: string | undefined;
+}): ScenarioChildProcessConfig {
+  return {
+    packageRoot: CHILD_PACKAGE_ROOT,
+    sourcePath: path.join(CHILD_PACKAGE_ROOT, "src", "main.ts"),
+    sourceRoots: [
+      path.join(CHILD_PACKAGE_ROOT, "src"),
+      path.join(WORKSPACE_ROOT, "modules", "scenario", "contract", "src"),
+      path.join(WORKSPACE_ROOT, "modules", "scenario", "process", "src", "channels"),
+    ],
+    nodeEnv: config.nodeEnvironment,
+    isSaas: config.isSaas,
+    baseHost: config.publicBaseUrl,
+    egress: {
+      blockLocal: config.blockLocalHttpCalls,
+      allowedHosts: [...config.allowedProxyHosts],
+    },
+    nlpInternalSecret,
+    parentEnvironment: config.childParentEnvironment,
+  };
+}
+
+export class NodeScenarioChildChannel implements ScenarioChildChannel {
+  static create(options: { config: ScenarioChildProcessConfig }): NodeScenarioChildChannel {
+    return new NodeScenarioChildChannel(options.config);
   }
 
-  private constructor(
-    private readonly options: {
-      config: ScenarioChildProcessConfig;
-      voicePublicUrl?: () => Promise<VoicePublicUrl>;
-      pool: ScenarioExecutionPoolService;
-      nonces: VoiceNonceRegistryService;
-    },
-  ) {}
+  private constructor(private readonly config: ScenarioChildProcessConfig) {}
 
   // An arrow instance property, not a prototype method: tests hold a bare
   // Object.create(prototype) instance and monkey-patch this directly to
@@ -110,6 +130,9 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
   start = async (input: {
     jobData: ExecutionJobData;
     environment: ScenarioChildEnvironment;
+    pool: ScenarioChildRunPool;
+    nonces: ScenarioChildNonceRegistry;
+    voicePublicUrl?: () => Promise<VoicePublicUrl>;
   }): Promise<ScenarioChildExecutionSession> => {
     const childLogger = logger.child({
       scenarioId: input.jobData.scenarioId,
@@ -128,21 +151,21 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
     // A voice child needs the public origin in its environment; nothing else waits for it.
     const isVoiceChild = input.jobData.target.type === "voice";
     const voicePublicUrl =
-      isVoiceChild && this.options.voicePublicUrl
-        ? await this.options.voicePublicUrl()
-        : this.options.config.voicePublicUrl;
-    const childEnvironment = buildChildEnvironmentValue({
-      config: { ...this.options.config, voicePublicUrl },
+      isVoiceChild && input.voicePublicUrl
+        ? await input.voicePublicUrl()
+        : this.config.voicePublicUrl;
+    const childEnvironment = buildChildEnvironment({
+      config: { ...this.config, voicePublicUrl },
       jobData: input.jobData,
       labels: input.environment.labels,
       telemetry: input.environment.telemetry,
       callerEnv: input.environment.callerEnv,
     });
-    const spawnConfig = ChildProcessSpawnService.create().resolve({
-      packageRoot: this.options.config.packageRoot,
-      nodeEnv: this.options.config.nodeEnv,
-      sourcePath: this.options.config.sourcePath,
-      sourceRoots: this.options.config.sourceRoots,
+    const spawnConfig = ScenarioChildSpawn.create().resolve({
+      packageRoot: this.config.packageRoot,
+      nodeEnv: this.config.nodeEnv,
+      sourcePath: this.config.sourcePath,
+      sourceRoots: this.config.sourceRoots,
     });
     const spawnStartedAt = nowInstant().epochMilliseconds;
     log("info", "Spawning scenario child process", {
@@ -155,7 +178,7 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
     const child = spawn(spawnConfig.command, spawnConfig.args, {
       env: childEnvironment,
       stdio: isVoiceChild ? ["pipe", "pipe", "pipe", "ipc"] : ["pipe", "pipe", "pipe"],
-      cwd: this.options.config.packageRoot,
+      cwd: this.config.packageRoot,
     });
     if (isVoiceChild) {
       child.on("message", (message: unknown) => {
@@ -163,7 +186,7 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
         void handleVoiceNonceRegisterMessage({
           message,
           child,
-          registry: this.options.nonces,
+          registry: input.nonces,
         }).then((ack) => child.send?.(ack));
       });
     }
@@ -172,16 +195,12 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
       spawnMs: nowInstant().epochMilliseconds - spawnStartedAt,
     });
 
-    return ScenarioChildSupervisorService.supervise({
-      child,
-      jobData: input.jobData,
-      pool: this.options.pool,
-      log,
-    });
+    return superviseScenarioChild({ child, jobData: input.jobData, pool: input.pool, log });
   };
 }
 
-function buildChildEnvironmentValue(input: {
+/** A run child's environment: the base every child gets, plus a voice child's origin and keys. */
+export function buildChildEnvironment(input: {
   config: ScenarioChildProcessConfig;
   jobData: ExecutionJobData;
   labels: string[];
@@ -189,7 +208,7 @@ function buildChildEnvironmentValue(input: {
   /** The caller's provider keys; forwarded to a voice child only, whatever the caller passes. */
   callerEnv?: Record<string, string> | undefined;
 }): NodeJS.ProcessEnv {
-  return buildBaseEnvironmentValue({
+  return buildBaseEnvironment({
     config: input.config,
     labels: input.labels,
     telemetry: input.telemetry,
@@ -212,7 +231,7 @@ function buildChildEnvironmentValue(input: {
 }
 
 /** What every scenario child is started with, whichever job it runs. */
-function buildBaseEnvironmentValue(input: {
+export function buildBaseEnvironment(input: {
   config: ScenarioChildProcessConfig;
   labels: string[];
   telemetry: ScenarioChildTelemetry;
@@ -228,7 +247,7 @@ function buildBaseEnvironmentValue(input: {
     LANGWATCH_API_KEY: input.telemetry.apiKey,
     LANGWATCH_ENDPOINT: input.telemetry.endpoint,
     SCENARIO_HEADLESS: "true",
-    OTEL_RESOURCE_ATTRIBUTES: buildOtelResourceAttributesValue(input.labels),
+    OTEL_RESOURCE_ATTRIBUTES: buildOtelResourceAttributes(input.labels),
     [SCENARIO_EGRESS_POLICY_ENV]: encodeScenarioEgressPolicy(input.config.egress),
     ...input.extra,
     [SCENARIO_LOG_CONTEXT_ENV]: encodeScenarioLogContext(input.logContext),
@@ -236,7 +255,7 @@ function buildBaseEnvironmentValue(input: {
   });
 }
 
-function buildOtelResourceAttributesValue(labels: string[]): string {
+export function buildOtelResourceAttributes(labels: string[]): string {
   const parts = ["langwatch.origin.source=platform"];
   if (labels.length > 0) {
     const escaped = labels.map((label) => label.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"));
@@ -278,10 +297,6 @@ function buildChildProcessEnvironment(
   }
   return environment;
 }
-
-export const parseChildProcessResult = NodeScenarioChildService.parseResult;
-export const buildChildEnvironment = NodeScenarioChildService.buildEnvironment;
-export const buildOtelResourceAttributes = NodeScenarioChildService.buildOtelResourceAttributes;
 
 /** The public origin a voice child dials back through, or the reason the phone run names. */
 function voicePublicUrlEnvironment(publicUrl: VoicePublicUrl | undefined): NodeJS.ProcessEnv {
