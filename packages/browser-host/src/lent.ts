@@ -5,6 +5,7 @@
  */
 
 import { type ComponentType, createElement, lazy, type ReactNode, Suspense, useMemo } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
 import { useUiDeclarations } from "./capabilities.ts";
 import type {
@@ -77,7 +78,12 @@ export function Lent<Props extends object>({
 }): ReactNode {
   const Component = useLent(of);
   if (Component === undefined) return fallback;
-  return createElement(Suspense, { fallback }, createElement(Component, props));
+  // A lent piece whose code will not load shows its fallback; the page around it stays usable.
+  return createElement(
+    ErrorBoundary,
+    { fallbackRender: () => fallback },
+    createElement(Suspense, { fallback }, createElement(Component, props)),
+  );
 }
 
 function lentComponents<Props>({
