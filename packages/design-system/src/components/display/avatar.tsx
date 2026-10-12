@@ -44,11 +44,13 @@ const AvatarFallback = React.forwardRef<HTMLDivElement, AvatarFallbackProps>(
 const AVATAR_SHEEN =
   "linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.06) 55%, transparent 100%)";
 
-/** The hue a style prop names: a token like "cyan.400" becomes its CSS variable. */
+/** The hue a style prop names: a token ("cyan.400", "blue.emphasized") becomes its CSS variable. */
 function hueOf(props: AvatarRootProps): string {
   const named = props.background ?? props.backgroundColor ?? props.bg;
   if (typeof named !== "string") return "var(--chakra-colors-color-palette-solid)";
-  return /^[a-z]+\.\d+$/.test(named) ? `var(--chakra-colors-${named.replace(".", "-")})` : named;
+  return /^[a-z]+\.[a-zA-Z0-9]+$/.test(named)
+    ? `var(--chakra-colors-${named.replace(".", "-").replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)})`
+    : named;
 }
 
 type AvatarRootExtras = { lifted?: boolean };

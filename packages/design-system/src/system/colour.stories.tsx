@@ -48,6 +48,7 @@ const semanticColours = [
   "fg",
   "fg.muted",
   "fg.subtle",
+  "fg.onColor",
   "border",
   "border.muted",
   "border.subtle",

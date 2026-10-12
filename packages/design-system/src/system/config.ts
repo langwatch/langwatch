@@ -634,6 +634,8 @@ export const designSystemConfig = defineConfig({
           scrim: {
             value: { _light: "{colors.blackAlpha.500}", _dark: "{colors.blackAlpha.700}" },
           },
+          // The development badge: a dark pill over the top bar's glow, in both modes.
+          devBadge: { value: "{colors.blackAlpha.600}" },
         },
 
         // Foreground semantic tokens - proper contrast in dark mode
@@ -648,6 +650,8 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          // Text on a saturated fill in both modes: avatar initials, the development badge.
+          onColor: { value: "white" },
           // Status text, one per meaning.
           error: { value: { _light: "{colors.red.500}", _dark: "{colors.red.400}" } },
           success: { value: { _light: "{colors.green.600}", _dark: "{colors.green.300}" } },
