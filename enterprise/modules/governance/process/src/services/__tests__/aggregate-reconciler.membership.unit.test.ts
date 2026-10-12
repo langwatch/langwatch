@@ -4,7 +4,7 @@
  * outbox, the real reconcile intent runs, and the ledger double keeps revoked rows as main does.
  * @see specs/governance/aggregate-project.feature
  */
-import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi, AuthzSharedProjectGrant } from "@langwatch/authz-contract";
 import type { JsonValue, ProcessStore } from "@langwatch/eventing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { AggregateRule, ProjectApi } from "@langwatch/project-contract";
@@ -27,7 +27,12 @@ import { AggregateReconcilerService } from "../aggregate-reconciler.service.ts";
 const ORG = "org_1";
 const AGG = "agg_1";
 
-type GrantRow = { id: string; memberProjectId: string; revokedAt: string | null };
+type GrantRow = {
+  id: string;
+  memberProjectId: string;
+  revokedAt: string | null;
+  condition: AuthzSharedProjectGrant["condition"];
+};
 
 /** One organisation: personal projects by owner, members by department, one aggregate. */
 function world({ rule }: { rule: AggregateRule }) {
@@ -78,12 +83,21 @@ function world({ rule }: { rule: AggregateRule }) {
     | "revokeSharedProjectGrants"
   > = {
     findLiveSharedProjectGrants: async () =>
-      live().map((row) => ({ memberProjectId: row.memberProjectId, grantId: row.id })),
+      live().map((row) => ({
+        memberProjectId: row.memberProjectId,
+        grantId: row.id,
+        condition: row.condition,
+      })),
     attachSharedProjectGrant: vi.fn<AuthzApi["attachSharedProjectGrant"]>(
-      async ({ memberProjectId }) => {
+      async ({ memberProjectId, condition }) => {
         const held = live().find((row) => row.memberProjectId === memberProjectId);
         if (held) return { grantId: held.id, wasAttached: false };
-        const row = { id: `grant_${state.rows.length}`, memberProjectId, revokedAt: null };
+        const row = {
+          id: `grant_${state.rows.length}`,
+          memberProjectId,
+          revokedAt: null,
+          condition: condition ?? null,
+        };
         state.rows.push(row);
         return { grantId: row.id, wasAttached: true };
       },
@@ -255,7 +269,13 @@ describe("the reconciler keeps an aggregate's members current", () => {
 
         const again = await reconciler.reconcile({ aggregateProjectId: AGG });
 
-        expect(again).toEqual({ attached: [], revoked: [], unchanged: ["p_a", "p_b"], failed: [] });
+        expect(again).toEqual({
+          attached: [],
+          reattached: [],
+          revoked: [],
+          unchanged: ["p_a", "p_b"],
+          failed: [],
+        });
         expect(state.rows).toEqual(before);
         expect(grants.attachSharedProjectGrant).toHaveBeenCalledTimes(2);
       });

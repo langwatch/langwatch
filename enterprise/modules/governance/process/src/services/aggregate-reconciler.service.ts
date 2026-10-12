@@ -13,7 +13,6 @@ import type { Instant } from "@langwatch/time";
 
 import type { AggregateReconcileLockRepository } from "../repositories/aggregate-reconcile-lock.repository.ts";
 import {
-  type AggregateMembershipDecision,
   type AggregateReadWindow,
   aggregateReadStart,
   aggregateReadWindowOf,
@@ -194,7 +193,7 @@ export class AggregateReconcilerService {
   }: {
     organizationId: string;
     aggregateProjectId: string;
-    decision: AggregateMembershipDecision;
+    decision: ReturnType<typeof decideAggregateMembership>;
   }): Promise<void> {
     const batches = [
       { memberProjectIds: decision.revoke, reason: AGGREGATE_RULE_NO_LONGER_MATCHES },
