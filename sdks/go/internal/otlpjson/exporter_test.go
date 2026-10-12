@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -181,6 +182,44 @@ func TestExporter_StopsRetryingWhenContextEnds(t *testing.T) {
 	err := exp.ExportSpans(ctx, oneSpan())
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.EqualValues(t, 1, rec.calls.Load())
+}
+
+func TestExporter_RetriesRefusedConnection(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	url := srv.URL
+	srv.Close() // nothing listens on the port any more
+	exp := New(Config{
+		URL:   url,
+		Retry: RetryConfig{InitialInterval: time.Millisecond, MaxInterval: time.Millisecond, MaxElapsedTime: 50 * time.Millisecond},
+	})
+
+	err := exp.ExportSpans(context.Background(), oneSpan())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "retry budget", "a refused connection is transient")
+}
+
+func TestExporter_DoesNotRetryPermanentNetworkErrors(t *testing.T) {
+	tlsSrv := httptest.NewTLSServer(http.NotFoundHandler())
+	t.Cleanup(tlsSrv.Close)
+	redirects := httptest.NewServer(http.RedirectHandler("/elsewhere", http.StatusTemporaryRedirect))
+	t.Cleanup(redirects.Close)
+	noRedirects := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return errors.New("redirects are refused")
+	}}
+
+	for name, cfg := range map[string]Config{
+		"unsupported scheme":      {URL: "ftp://example.test/v1/traces"},
+		"untrusted certificate":   {URL: tlsSrv.URL},
+		"refused redirect":        {URL: redirects.URL, HTTPClient: noRedirects},
+		"unparseable request url": {URL: "http://[::1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg.Retry = RetryConfig{InitialInterval: time.Second, MaxElapsedTime: time.Minute}
+			start := time.Now()
+			require.Error(t, New(cfg).ExportSpans(context.Background(), oneSpan()))
+			assert.Less(t, time.Since(start), time.Second, "a permanent error is not retried")
+		})
+	}
 }
 
 func TestExporter_RetryDisabledSendsOnce(t *testing.T) {
