@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/cenkalti/backoff/v5"
 )
 
 // Retry defaults, matching the official OTLP exporter.
@@ -22,7 +23,7 @@ const (
 type RetryConfig struct {
 	// Disabled sends each export once.
 	Disabled bool
-	// InitialInterval is the wait before the first retry; it doubles per
+	// InitialInterval is the wait before the first retry; it grows 1.5x per
 	// attempt, with jitter, up to MaxInterval.
 	InitialInterval time.Duration
 	// MaxInterval caps one wait.
@@ -54,50 +55,51 @@ type retryableError struct {
 func (e *retryableError) Error() string { return e.err.Error() }
 func (e *retryableError) Unwrap() error { return e.err }
 
-// do runs attempt until it succeeds, fails permanently, or the retry budget
-// or ctx is exhausted. The last attempt's error is returned unwrapped.
-func (c RetryConfig) do(ctx context.Context, attempt func(context.Context) error) error {
-	deadline := time.Now().Add(c.MaxElapsedTime)
-	interval := c.InitialInterval
-	for {
-		err := attempt(ctx)
-		var retryable *retryableError
-		if err == nil || !errors.As(err, &retryable) {
-			return err
-		}
-		if c.Disabled {
-			return retryable.err
-		}
-
-		wait := jitter(interval)
-		if retryable.retryAfter > wait {
-			wait = retryable.retryAfter
-		}
-		if time.Now().Add(wait).After(deadline) {
-			return fmt.Errorf("otlpjson: retry budget of %s exhausted: %w", c.MaxElapsedTime, retryable.err)
-		}
-
-		timer := time.NewTimer(wait)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return fmt.Errorf("%w (last attempt: %v)", ctx.Err(), retryable.err)
-		case <-timer.C:
-		}
-
-		interval *= 2
-		if interval > c.MaxInterval {
-			interval = c.MaxInterval
-		}
+// As hands backoff.Retry the server's Retry-After, so it waits that long.
+func (e *retryableError) As(target any) bool {
+	t, ok := target.(**backoff.RetryAfterError)
+	if !ok || e.retryAfter <= 0 {
+		return false
 	}
+	*t = &backoff.RetryAfterError{Duration: e.retryAfter}
+	return true
 }
 
-// jitter spreads d over [d/2, 3d/2) so parallel exporters don't retry in step.
-func jitter(d time.Duration) time.Duration {
-	if d <= 0 {
-		return 0
+// do runs attempt until it succeeds, fails permanently, or the retry budget
+// or ctx is exhausted. Only a *retryableError is retried.
+func (c RetryConfig) do(ctx context.Context, attempt func(context.Context) error) error {
+	var last *retryableError
+	op := func() (struct{}, error) {
+		err := attempt(ctx)
+		if err == nil {
+			return struct{}{}, nil
+		}
+		if !errors.As(err, &last) || c.Disabled {
+			return struct{}{}, backoff.Permanent(err)
+		}
+		return struct{}{}, last
 	}
-	return d/2 + rand.N(d)
+	b := &backoff.ExponentialBackOff{
+		InitialInterval:     c.InitialInterval,
+		RandomizationFactor: backoff.DefaultRandomizationFactor,
+		Multiplier:          backoff.DefaultMultiplier,
+		MaxInterval:         c.MaxInterval,
+	}
+	_, err := backoff.Retry(ctx, op, backoff.WithBackOff(b), backoff.WithMaxElapsedTime(c.MaxElapsedTime))
+
+	var retryable *retryableError
+	switch {
+	case err == nil:
+		return nil
+	case errors.As(err, &retryable) && c.Disabled:
+		return retryable.err
+	case errors.As(err, &retryable):
+		return fmt.Errorf("otlpjson: retry budget of %s exhausted: %w", c.MaxElapsedTime, retryable.err)
+	case last != nil && errors.Is(err, context.Cause(ctx)):
+		return fmt.Errorf("%w (last attempt: %v)", err, last.err)
+	default:
+		return err
+	}
 }
 
 // parseRetryAfter reads a Retry-After header in either of its forms, delay
