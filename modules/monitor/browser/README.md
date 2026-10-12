@@ -22,6 +22,7 @@ None.
 
 ## Calls
 
+- Client packages (package.json): `@langwatch/trace-client`.
 - Host APIs it requires: `MonitorHostApi`.
 
 <!-- readme:generated:end -->

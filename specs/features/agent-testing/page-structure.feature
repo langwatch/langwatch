@@ -5,7 +5,7 @@ Feature: The Agent Testing page
 
   Background: the shape of the page.
     Agent Testing is one page behind a release flag. Its header holds the page
-    title on the left and the tabs in the middle, on one line. The content of
+    title on the far left and the tabs in the middle, on one line. The content of
     the selected tab starts directly under that line. With a run plan open the
     title reads the name of that plan instead.
 

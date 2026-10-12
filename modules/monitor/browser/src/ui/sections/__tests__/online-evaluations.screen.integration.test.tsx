@@ -4,6 +4,8 @@
  * Tests the online evaluations page: live scoring actions and edit destinations.
  */
 
+import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
+import { SetupWithAgentButtonToken } from "@langwatch/trace-client";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +22,19 @@ const { state } = vi.hoisted(() => ({
     experiments: [] as Record<string, unknown>[],
   },
 }));
+
+const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
+  current: undefined,
+}));
+
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
+  const { uiDeclarations: none } = await import("@langwatch/browser-host/declarations");
+  const nothingLent = none([]);
+  return {
+    ...(await importOriginal<object>()),
+    useUiDeclarations: () => declarations.current ?? nothingLent,
+  };
+});
 
 const calls = vi.hoisted(() => ({
   performanceQuery: vi.fn(),
@@ -98,7 +113,29 @@ beforeEach(() => {
   calls.copy.mockReset();
 });
 
-afterEach(cleanup);
+const traceLends = uiDeclarations([
+  {
+    name: "trace",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: SetupWithAgentButtonToken,
+          load: async () => ({
+            default: ({ surface }: { surface: string }) => (
+              <button>Setup via Agent ({surface})</button>
+            ),
+          }),
+        },
+      ],
+    },
+  },
+]);
+
+afterEach(() => {
+  cleanup();
+  declarations.current = undefined;
+});
 
 describe("given a project with no online evaluations", () => {
   describe("when the page is opened", () => {
@@ -111,6 +148,17 @@ describe("given a project with no online evaluations", () => {
         screen.getByRole("heading", { name: "No online evaluations yet" }),
       ).toBeInTheDocument();
       expect(screen.queryByRole("table")).toBeNull();
+    });
+
+    /** @scenario Every empty surface offers its own skill */
+    it("offers trace's set-up-with-AI control for online evaluations", async () => {
+      state.monitors = [];
+      declarations.current = traceLends;
+      renderWithMonitorHost(<OnlineEvaluationsScreen />);
+
+      expect(
+        await screen.findByRole("button", { name: "Setup via Agent (onlineEvaluations)" }),
+      ).toBeInTheDocument();
     });
   });
 });
