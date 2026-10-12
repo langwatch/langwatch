@@ -6,6 +6,12 @@
 import { llmModels } from "./model-catalog.ts";
 import type { LLMModelPricing } from "./model-catalog.types.ts";
 
+/**
+ * What a router's input and output rates are written as. The schema needs a number there, so the
+ * catalog keeps one marker value that `isVariablePriceRouter` reads and every cost reader drops.
+ */
+export const VARIABLE_PRICE_MARKER = -1;
+
 /** The pricing with every negative rate dropped: a negative rate means "no price". */
 export function withoutNegativeRates(pricing: LLMModelPricing): Partial<LLMModelPricing> {
   return Object.fromEntries(

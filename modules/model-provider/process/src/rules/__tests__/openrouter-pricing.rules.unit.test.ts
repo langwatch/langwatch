@@ -1,7 +1,7 @@
-import { isVariablePriceRouter } from "@langwatch/model-provider-contract";
+import { isVariablePriceRouter, VARIABLE_PRICE_MARKER } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
-import { toCatalogPricing, VARIABLE_PRICE_MARKER } from "../openrouter-pricing.rules.ts";
+import { toCatalogPricing } from "../openrouter-pricing.rules.ts";
 
 describe("toCatalogPricing", () => {
   describe("given a priced model", () => {
@@ -30,7 +30,7 @@ describe("toCatalogPricing", () => {
     });
 
     it("writes any other negative price as the same marker", () => {
-      const pricing = toCatalogPricing({ pricing: { prompt: "-0.5", completion: -2 } });
+      const pricing = toCatalogPricing({ pricing: { prompt: "-0.5", completion: "-2" } });
       expect(pricing.inputCostPerToken).toBe(VARIABLE_PRICE_MARKER);
       expect(pricing.outputCostPerToken).toBe(VARIABLE_PRICE_MARKER);
     });
@@ -38,7 +38,7 @@ describe("toCatalogPricing", () => {
 
   describe("given a model with no stated price", () => {
     it("writes zero, which is not a router", () => {
-      const pricing = toCatalogPricing({ pricing: {} });
+      const pricing = toCatalogPricing({ pricing: { prompt: "", completion: "" } });
       expect(pricing).toEqual({ inputCostPerToken: 0, outputCostPerToken: 0 });
       expect(isVariablePriceRouter({ pricing })).toBe(false);
     });

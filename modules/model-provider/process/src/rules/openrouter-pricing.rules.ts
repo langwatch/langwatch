@@ -1,33 +1,17 @@
-import type { LLMModelPricing } from "@langwatch/model-provider-contract";
+import { type LLMModelPricing, VARIABLE_PRICE_MARKER } from "@langwatch/model-provider-contract";
+import type { Model } from "@openrouter/sdk/models";
 
 /** Raw pricing keys the OpenRouter SDK's generated schema drops. */
 export type RawPricing = Record<string, string | number | undefined>;
-
-/** The per-token prices OpenRouter states for one model, as its SDK reads them. */
-type OpenRouterPricing = {
-  prompt?: string | number;
-  completion?: string | number;
-  inputCacheRead?: string | number;
-  inputCacheWrite?: string | number;
-  image?: string | number;
-  imageOutput?: string | number;
-  audio?: string | number;
-  internalReasoning?: string | number;
-  webSearch?: string | number;
-};
-
-/**
- * What a router's input and output rates are written as. OpenRouter states -1 for a model whose
- * price depends on what it routes to. The schema needs a number there, so the catalog keeps one
- * marker value that `isVariablePriceRouter` reads and every cost reader drops.
- */
-export const VARIABLE_PRICE_MARKER = -1;
 
 function parsePrice(value: string | number | undefined): number {
   return value ? parseFloat(String(value)) || 0 : 0;
 }
 
-/** A required rate: a negative price becomes the router marker, never a refund. */
+/**
+ * A required rate. OpenRouter states -1 for a router, whose price depends on what it routes to;
+ * any negative price becomes the catalog's router marker, never a refund.
+ */
 function requiredRate(value: string | number | undefined): number {
   const rate = parsePrice(value);
   return rate < 0 ? VARIABLE_PRICE_MARKER : rate;
@@ -38,7 +22,7 @@ export function toCatalogPricing({
   pricing,
   raw,
 }: {
-  pricing: OpenRouterPricing;
+  pricing: Model["pricing"];
   raw?: RawPricing;
 }): LLMModelPricing {
   const result: LLMModelPricing = {
