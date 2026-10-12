@@ -125,7 +125,6 @@ export function emptyContent({
   return isAggregate ? { ...content, note: AGGREGATE_HISTORY_NOTE } : content;
 }
 
-/** What the lens, the filter and the window say about an empty table. */
 function lensEmptyContent({
   activeLensId,
   hasFilters,
