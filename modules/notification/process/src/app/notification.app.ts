@@ -68,15 +68,16 @@ export class NotificationModule implements NotificationApiContract {
   private constructor(
     repositories: NotificationRepositories,
     mailDelivery: MailDeliveryService,
-    webPushSettings: VapidSettings,
+    webPush: { settings: VapidSettings; pushServiceBase: string | undefined },
   ) {
     this.#notifications = NotificationService.create({ repository: repositories.notifications });
     this.#mailDelivery = mailDelivery;
     this.#webPush = WebPushService.create({
       subscriptions: repositories.webPushSubscriptions,
       vapidKeys: repositories.webPushVapidKeys,
-      gateway: HttpWebPushGatewayChannel.create(),
-      settings: webPushSettings,
+      gateway: HttpWebPushGatewayChannel.create({ pushServiceBase: webPush.pushServiceBase }),
+      settings: webPush.settings,
+      pushServiceBase: webPush.pushServiceBase,
       queue: () => this.#webPushQueue,
     });
   }
@@ -109,7 +110,8 @@ export class NotificationModule implements NotificationApiContract {
     resources.own("Notification mail gateway", () => delivery.close());
     const mailDelivery = MailDeliveryService.create({ settings: async () => settings, delivery });
     return new NotificationModule(repositories, mailDelivery, {
-      publicBaseUrl: config.publicBaseUrl,
+      settings: { publicBaseUrl: config.publicBaseUrl },
+      pushServiceBase: config.webPushServiceBase,
     });
   }
 

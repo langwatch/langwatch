@@ -121,10 +121,10 @@ export function BatchSummaryFooter({
         {Object.entries(run.summary.evaluations).map(([id, evaluation]) => (
           <HStack key={id} gap={5}>
             <VStack align="start" gap={1}>
-              <Text fontWeight="500" fontSize="14px" lineClamp={2}>
+              <Text fontWeight="500" textStyle="body" lineClamp={2}>
                 {evaluation.name}
               </Text>
-              <Text fontSize="14px">{formatEvalSummary(evaluation)}</Text>
+              <Text textStyle="body">{formatEvalSummary(evaluation)}</Text>
             </VStack>
             <Separator orientation="vertical" height="48px" />
           </HStack>
@@ -132,33 +132,33 @@ export function BatchSummaryFooter({
 
         {/* Total Cost */}
         <VStack align="start" gap={1}>
-          <Text fontWeight="500" fontSize="14px">
+          <Text fontWeight="500" textStyle="body">
             Total Cost
           </Text>
           <Tooltip
             content={
               <VStack align="start" gap={0}>
-                <Text fontSize="12px">
+                <Text textStyle="caption">
                   Target cost: {formatCost(run.summary.datasetCost ?? null)}
                 </Text>
-                <Text fontSize="12px">
+                <Text textStyle="caption">
                   Evaluation cost: {formatCost(run.summary.evaluationsCost ?? null)}
                 </Text>
               </VStack>
             }
             positioning={{ placement: "top" }}
           >
-            <Text fontSize="14px">{formatCost(totalCost)}</Text>
+            <Text textStyle="body">{formatCost(totalCost)}</Text>
           </Tooltip>
         </VStack>
         <Separator orientation="vertical" height="48px" />
 
         {/* Runtime */}
         <VStack align="start" gap={1}>
-          <Text fontWeight="500" fontSize="14px">
+          <Text fontWeight="500" textStyle="body">
             Runtime
           </Text>
-          <Text fontSize="14px">{numeral(runtime / 1000).format("00:00:00")}</Text>
+          <Text textStyle="body">{numeral(runtime / 1000).format("00:00:00")}</Text>
         </VStack>
 
         {/* Stopped indicator */}
@@ -185,7 +185,7 @@ export function BatchSummaryFooter({
               </Progress.Track>
             </Progress.Root>
           </Box>
-          <Text fontSize="12px" color="fg.muted" whiteSpace="nowrap">
+          <Text textStyle="caption" color="fg.muted" whiteSpace="nowrap">
             {progress}/{total}
           </Text>
           {onStop && (

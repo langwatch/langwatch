@@ -192,7 +192,7 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
           flex={1}
           minWidth={0}
           fontSize="xs"
-          fontWeight="500"
+          fontWeight="medium"
           letterSpacing="-0.005em"
           truncate
           css={shimmerCss}
@@ -218,7 +218,7 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
           size="xs"
           paddingX={0}
           fontSize="xs"
-          fontWeight="500"
+          fontWeight="medium"
           letterSpacing="-0.005em"
           border="none"
           bg="transparent"

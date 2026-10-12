@@ -47,7 +47,15 @@ const surface = ({ slug, seed }: { slug: string; seed: SurfaceSeed }): Surface =
     detail: "",
     restart: "",
     start: seed.status === "not-selected" ? (seed.hint ?? "").replace("haven up +", "") : "",
+    switch: switchOf({ name: seed.name }),
   };
+};
+
+const SWITCHLESS = new Set(["api", "worker", "observability"]);
+
+const switchOf = ({ name }: { name: string }) => {
+  if (SWITCHLESS.has(name)) return "";
+  return name === "langyagent" ? "langy" : name;
 };
 
 const LIVE_SEEDS: SurfaceSeed[] = [
@@ -140,6 +148,7 @@ export const liveHome = ({ now, surfaces }: { now: number; surfaces?: Surface[] 
     canStart: false,
     startDir: factsFor({ slug: "feat-x", live: true, now }).worktreeDir,
     canStartService: true,
+    canStopService: true,
   },
   seed: {
     canSeed: true,
@@ -172,6 +181,7 @@ export const stoppedHome = ({ now }: { now: number }): StackHome => {
       canStart: true,
       startDir: facts.worktreeDir,
       canStartService: false,
+      canStopService: false,
     },
     seed: { canSeed: false, sizes: ["tiny"], personas: ["all"], status: "", log: [] },
   };
@@ -208,6 +218,7 @@ export const hub = ({ now }: { now: number }): Hub => {
       canStart: false,
       startDir: "",
       canStartService: false,
+      canStopService: false,
     },
   };
   return {

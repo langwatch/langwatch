@@ -554,3 +554,22 @@ Feature: Machine-wide slots for whole-repo checks
     When it decides whether to yield this poll tick
     Then it never yields
     And it behaves exactly as the queue did before priority scheduling existed
+
+  @unit
+  Scenario: A quiet machine grows the check budget and run widths
+    Given the 1-minute load is at most 0.35 of the cores and a quarter of RAM is available
+    When a typecheck is admitted
+    Then the budget is every core and the run takes twice its usual units, up to the idle cores
+
+  @unit
+  Scenario: The capacity tier does not flap
+    Given the machine is quiet
+    When the load rises to half the cores
+    Then it stays quiet until the load reaches 0.6 of the cores or available RAM falls under 15%
+
+  @unit
+  Scenario: A check gives way to a boot someone is waiting on
+    Given a haven wait --for ready is blocked on a stack boot
+    When an agent's check is admitted
+    Then it takes at most half the budget, runs under taskpolicy -b, and its queued line says a boot is ahead of it
+    And once the stack answers, new checks get the full budget and utility again

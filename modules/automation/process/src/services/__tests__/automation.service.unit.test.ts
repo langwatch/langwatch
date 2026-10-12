@@ -97,6 +97,9 @@ class Suppressions extends EmailSuppressionRepository {
   findAll() {
     return Promise.resolve(this.rows);
   }
+  findPage() {
+    return Promise.resolve(this.rows);
+  }
   findMatching(input: { triggerId: string }) {
     return Promise.resolve(
       this.rows.filter((row) => row.triggerId === null || row.triggerId === input.triggerId),

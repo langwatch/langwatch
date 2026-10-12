@@ -25,7 +25,7 @@ only the part you need.
 | reset, seed presets, connection strings, prune                                                  | `haven-db`                  |
 | seeded data, logins, auto-seed                                                                  | `haven-seed`                |
 | a signed-in storage state (`browser login`)                                                     | `haven-auth`                |
-| a signed-in headless browser, record and replay                                                 | `haven-browser`             |
+| a signed-in headless browser (one per machine): diffs, network, console, profile, lean, replay  | `haven-browser`             |
 | the haven orb: feedback, page console and network                                               | `haven-orb`                 |
 | try a PR: `haven pr`, `haven pr --throwaway`                                                    | `haven-play`                |
 | slots, `haven machine typecheck`, the agent gate, `haven self upgrade`                          | `haven-machine`             |
@@ -88,7 +88,7 @@ Every haven web console is a build served by Go; none runs Vite, Storybook dev o
 | Console                                                                             | Where                                                                    | Served by                                                                                                                                                           |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hub, stack home, seed console                                                       | `hub.langwatch.localhost`, `<slug>.langwatch.localhost`                  | the haven daemon (`apps/haven-web`, embedded)                                                                                                                       |
-| Simulators: idp, mail, storage, voice, llm, analytics, outbound, payment, telemetry | `<sim>.<slug>.langwatch.localhost`                                       | the sim's Go binary in the `go` lane (`apps/<sim>sim-web`, embedded)                                                                                                |
+| Simulators: idp, mail, storage, voice, llm, analytics, outbound, payment, telemetry | `<sim>.<slug>.langwatch.localhost`                                       | the sim's Go binary in the `go` lane (its page of `apps/sims`, embedded)                                                                                                |
 | Design system Storybook (`+design-system`)                                          | `design-system.<slug>` (or `ds.<slug>`), and `/design-system` in the app | the `design-system` lane: `storybook build`, then `haven static`                                                                                                    |
 | Mail studio (`+mail-room`)                                                          | `mail-room.<slug>`                                                       | the `mail-room` lane: `build:studio` renders every fixture at build time, then `haven static`; props are read-only (`pnpm --filter @langwatch/mail dev` edits live) |
 

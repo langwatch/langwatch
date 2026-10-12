@@ -22,7 +22,7 @@ export function CommandBarTrigger() {
       paddingLeft={3}
       paddingRight={3}
       height="32px"
-      fontSize="13px"
+      textStyle="bodySm"
       color="fg.muted"
       fontWeight="normal"
       gap={2}

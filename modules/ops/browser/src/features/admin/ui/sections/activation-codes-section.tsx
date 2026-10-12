@@ -1,12 +1,5 @@
-import {
-  Box,
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Spacer,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Button, Heading, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -29,7 +22,7 @@ export function ActivationCodesSection() {
   return (
     <VStack gap={4} width="full" align="start">
       <HStack width="full">
-        <Heading size="md">Activation codes</Heading>
+        <Heading size="sm">Activation codes</Heading>
         <Spacer />
         <Button size="sm" variant="outline" onClick={() => setIssuing(true)}>
           <Plus size={16} />
@@ -37,25 +30,20 @@ export function ActivationCodesSection() {
         </Button>
       </HStack>
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0}>
-          {list.error ? (
-            <Box paddingY={10} paddingX={4}>
-              <HandledErrorAlert
-                error={list.error}
-                fallbackTitle="Couldn't load activation codes"
-              />
-            </Box>
-          ) : (
-            <ActivationCodesTable
-              codes={list.data?.codes ?? []}
-              isLoading={list.isLoading}
-              isRevoking={commands.revoke.isPending}
-              onRevoke={(code) => commands.revoke.mutate({ id: code.id })}
-            />
-          )}
-        </Card.Body>
-      </Card.Root>
+      <Card padding="none">
+        {list.error ? (
+          <Box paddingY={10} paddingX={4}>
+            <HandledErrorAlert error={list.error} fallbackTitle="Couldn't load activation codes" />
+          </Box>
+        ) : (
+          <ActivationCodesTable
+            codes={list.data?.codes ?? []}
+            isLoading={list.isLoading}
+            isRevoking={commands.revoke.isPending}
+            onRevoke={(code) => commands.revoke.mutate({ id: code.id })}
+          />
+        )}
+      </Card>
 
       <IssueActivationCodeDrawer open={issuing} onClose={() => setIssuing(false)} />
     </VStack>

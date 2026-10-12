@@ -82,7 +82,8 @@ export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
               />
               <Button
                 size="sm"
-                colorPalette="blue"
+                colorPalette="orange"
+                variant="solid"
                 onClick={submit}
                 disabled={!name.trim()}
                 data-testid="trace-lens-name-submit"

@@ -9,7 +9,6 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LayoutGrid, Table2 } from "lucide-react";
 
 import type { AgentTestingViewMode } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 export type ViewModeToggleProps = {
   viewMode: AgentTestingViewMode;
@@ -44,7 +43,7 @@ export function ViewModeToggle({ viewMode, onChange }: ViewModeToggleProps) {
             height="26px"
             borderRadius="md"
             background={viewMode === value ? "bg.muted" : undefined}
-            color={viewMode === value ? "fg" : FG_MUTED}
+            color={viewMode === value ? "fg" : "fg.muted"}
             aria-label={label}
             aria-pressed={viewMode === value}
             onClick={() => onChange(value)}

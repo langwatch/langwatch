@@ -4,10 +4,10 @@
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, Field, HStack, Input, Stack, Text } from "@langwatch/design-system/primitives";
+import { Field, Input, Stack, Text } from "@langwatch/design-system/primitives";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
 import { authoredMessage, fieldProblems, formProblems } from "../../model/handled-error.ts";
@@ -18,6 +18,8 @@ type PasswordFields = {
   newPassword: string;
   confirmPassword: string;
 };
+
+const FIELD_ORDER: (keyof PasswordFields)[] = ["currentPassword", "newPassword", "confirmPassword"];
 
 const EMPTY: PasswordFields = { currentPassword: "", newPassword: "", confirmPassword: "" };
 
@@ -91,6 +93,9 @@ export function ChangePasswordDialog({
   const [values, setValues] = useState<PasswordFields>(EMPTY);
   const [problems, setProblems] = useState<Partial<Record<keyof PasswordFields, string>>>({});
   const [formErrors, setFormErrors] = useState<string[]>([]);
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
+  const newPasswordRef = useRef<HTMLInputElement>(null);
+  const confirmPasswordRef = useRef<HTMLInputElement>(null);
   const pending = isSetting ? setPassword.isPending : changePassword.isPending;
 
   // Reset whenever the dialog opens, so values typed in a previous attempt do
@@ -121,7 +126,16 @@ export function ChangePasswordDialog({
     const found = validatePasswordForm(values, { isSetting });
     setProblems(found);
     setFormErrors([]);
-    if (Object.keys(found).length > 0) return;
+    const firstInvalid = FIELD_ORDER.find((field) => found[field] !== void 0);
+    if (firstInvalid) {
+      const target = {
+        currentPassword: currentPasswordRef,
+        newPassword: newPasswordRef,
+        confirmPassword: confirmPasswordRef,
+      }[firstInvalid];
+      target.current?.focus();
+      return;
+    }
 
     try {
       await savePassword();
@@ -157,111 +171,89 @@ export function ChangePasswordDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(details) => {
-        if (!details.open) onClose();
-      }}
+      onClose={onClose}
+      title={copy.title}
       placement="center"
+      busy={pending}
+      onSubmit={() => void submit()}
+      primaryAction={{ label: copy.submit, type: "submit", loading: pending }}
     >
-      <Dialog.Content bg="bg">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            {copy.title}
-          </Dialog.Title>
-        </Dialog.Header>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submit();
-          }}
-        >
-          <Dialog.Body>
-            <Stack gap={4}>
-              {/* The slot a form-level rejection lands in. The two ship
-                  together: claiming one without somewhere to render it shows
-                  nothing at all, and Save appears to do nothing (#3785). */}
-              {formErrors.length > 0 && (
-                <Stack gap={1} role="alert">
-                  {formErrors.map((message) => (
-                    <Text key={message} fontSize="sm" color="red.fg">
-                      {message}
-                    </Text>
-                  ))}
-                </Stack>
-              )}
-              {isSetting && (
-                <Text fontSize="sm" color="fg.muted">
-                  You sign in without a password today. Setting one gives you a way in from a device
-                  that does not hold your passkey.
-                </Text>
-              )}
-              <Text fontSize="sm" color="fg.muted">
-                {PASSWORD_REQUIREMENTS_HINT}.
+      <Stack gap={4}>
+        {/* The slot a form-level rejection lands in. The two ship
+            together: claiming one without somewhere to render it shows
+            nothing at all, and Save appears to do nothing (#3785). */}
+        {formErrors.length > 0 && (
+          <Stack gap={1} role="alert">
+            {formErrors.map((message) => (
+              <Text key={message} fontSize="sm" color="red.fg">
+                {message}
               </Text>
-              {!isSetting && (
-                <Field.Root invalid={!!problems.currentPassword}>
-                  <Field.Label>Current Password</Field.Label>
-                  <Input
-                    type="password"
-                    autoComplete="current-password"
-                    value={values.currentPassword}
-                    onChange={(event) =>
-                      setValues((previous) => ({
-                        ...previous,
-                        currentPassword: event.target.value,
-                      }))
-                    }
-                  />
-                  {problems.currentPassword && (
-                    <Field.ErrorText>{problems.currentPassword}</Field.ErrorText>
-                  )}
-                </Field.Root>
-              )}
-              <Field.Root invalid={!!problems.newPassword}>
-                <Field.Label>{copy.newPasswordLabel}</Field.Label>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  value={values.newPassword}
-                  onChange={(event) =>
-                    setValues((previous) => ({ ...previous, newPassword: event.target.value }))
-                  }
-                />
-                {problems.newPassword && <Field.ErrorText>{problems.newPassword}</Field.ErrorText>}
-              </Field.Root>
-              <Field.Root invalid={!!problems.confirmPassword}>
-                <Field.Label>{copy.confirmLabel}</Field.Label>
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  value={values.confirmPassword}
-                  onChange={(event) =>
-                    setValues((previous) => ({
-                      ...previous,
-                      confirmPassword: event.target.value,
-                    }))
-                  }
-                />
-                {problems.confirmPassword && (
-                  <Field.ErrorText>{problems.confirmPassword}</Field.ErrorText>
-                )}
-              </Field.Root>
-            </Stack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack gap={3} justify="end" width="full">
-              <Button variant="outline" onClick={onClose} disabled={pending}>
-                Cancel
-              </Button>
-              <Button type="submit" colorPalette="orange" disabled={pending} loading={pending}>
-                {copy.submit}
-              </Button>
-            </HStack>
-          </Dialog.Footer>
-        </form>
-      </Dialog.Content>
-    </Dialog.Root>
+            ))}
+          </Stack>
+        )}
+        {isSetting && (
+          <Text fontSize="sm" color="fg.muted">
+            You sign in without a password today. Setting one gives you a way in from a device that
+            does not hold your passkey.
+          </Text>
+        )}
+        <Text fontSize="sm" color="fg.muted">
+          {PASSWORD_REQUIREMENTS_HINT}.
+        </Text>
+        {!isSetting && (
+          <Field.Root invalid={!!problems.currentPassword}>
+            <Field.Label>Current Password</Field.Label>
+            <Input
+              ref={currentPasswordRef}
+              type="password"
+              autoComplete="current-password"
+              value={values.currentPassword}
+              onChange={(event) =>
+                setValues((previous) => ({
+                  ...previous,
+                  currentPassword: event.target.value,
+                }))
+              }
+            />
+            {problems.currentPassword && (
+              <Field.ErrorText>{problems.currentPassword}</Field.ErrorText>
+            )}
+          </Field.Root>
+        )}
+        <Field.Root invalid={!!problems.newPassword}>
+          <Field.Label>{copy.newPasswordLabel}</Field.Label>
+          <Input
+            ref={newPasswordRef}
+            type="password"
+            autoComplete="new-password"
+            value={values.newPassword}
+            onChange={(event) =>
+              setValues((previous) => ({ ...previous, newPassword: event.target.value }))
+            }
+          />
+          {problems.newPassword && <Field.ErrorText>{problems.newPassword}</Field.ErrorText>}
+        </Field.Root>
+        <Field.Root invalid={!!problems.confirmPassword}>
+          <Field.Label>{copy.confirmLabel}</Field.Label>
+          <Input
+            ref={confirmPasswordRef}
+            type="password"
+            autoComplete="new-password"
+            value={values.confirmPassword}
+            onChange={(event) =>
+              setValues((previous) => ({
+                ...previous,
+                confirmPassword: event.target.value,
+              }))
+            }
+          />
+          {problems.confirmPassword && (
+            <Field.ErrorText>{problems.confirmPassword}</Field.ErrorText>
+          )}
+        </Field.Root>
+      </Stack>
+    </Dialog>
   );
 }

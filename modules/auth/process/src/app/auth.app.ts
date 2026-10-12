@@ -35,9 +35,8 @@ import {
   type SignUpEnrollment,
   type SignUpVerificationRequest,
   type PriorSession,
-  type AuthFederatedPasswordChange,
-  type AuthFederatedPasswordOutcome,
   isEmailPasswordEnabled,
+  type SocialProviderBases,
 } from "@langwatch/auth-contract";
 import { AuthzApi, type AuthzGrantsService } from "@langwatch/authz-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
@@ -87,7 +86,6 @@ import {
 } from "@langwatch/user-contract";
 
 import type { AuthChannels } from "../channels/auth.channels.ts";
-import { auth0ManagementSecret } from "../channels/auth0-password.channel.ts";
 import {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -148,7 +146,6 @@ import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CredentialRegistrationService } from "../services/credential-registration.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
-import { FederatedPasswordService } from "../services/federated-password.service.ts";
 import {
   LegacySsoAccessService,
   type LegacySsoAccessConnections,
@@ -271,8 +268,6 @@ export class AuthModule implements AuthApiContract {
   static readonly secrets = {
     session: sessionSecret,
     ...signInProviderSecrets,
-    /** Read by the live channel tier, which scopes to this module's declared secrets. */
-    auth0ManagementSecret,
     /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and identity. */
     internalSlackSignupsWebhook,
   } as const;
@@ -316,8 +311,6 @@ export class AuthModule implements AuthApiContract {
   readonly #registrations: CredentialRegistrationService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
-  /** The Auth0 tenant's password change; set by {@link AuthModule.create}. */
-  #federatedPasswords: FederatedPasswordService | null = null;
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
    * the SSO peer, which construction may not), or nothing where it named no
@@ -661,10 +654,6 @@ export class AuthModule implements AuthApiContract {
       baseUrl: config.sessionUrl ?? "",
     });
     app.#mountedSocialMethodIds = mountedSocialMethodIds({ configuration: signInProviders });
-    app.#federatedPasswords = FederatedPasswordService.create({
-      accounts: accountRows,
-      auth0: channels.auth0Passwords,
-    });
     app.#authProviders = AuthProviderService.create({
       configuredProvider: configuredAuthProvider(config.signInProviders).provider,
       providerMounted: isNamedProviderMounted(signInProviders),
@@ -743,6 +732,7 @@ export class AuthModule implements AuthApiContract {
             localPasswords: config.localPasswords,
             trustedIdpOrigins: config.trustedIdpOrigins,
             idpSimulatorUrl: config.idpSimulatorUrl,
+            socialProviderBases: config.socialProviderBases,
             isProduction: config.nodeEnvironment === "production",
             logger,
           });
@@ -791,19 +781,6 @@ export class AuthModule implements AuthApiContract {
     actorUserId: string;
   }): Promise<ReleaseHeldAccountResult> {
     return this.#signInSecurity.release(input);
-  }
-
-  changeFederatedPassword(
-    input: AuthFederatedPasswordChange,
-  ): Promise<AuthFederatedPasswordOutcome> {
-    const federatedPasswords = this.#federatedPasswords;
-    if (!federatedPasswords) {
-      throw new AuthUnavailableError({
-        capability: "identity-provider password change",
-        processName: this.#processName,
-      });
-    }
-    return federatedPasswords.changePassword(input);
   }
 
   findFederatedAccountProviders(input: { userId: string }): Promise<string[]> {
@@ -1653,6 +1630,7 @@ type BuildBetterAuthOptions = Readonly<{
    *  static ways an origin is trusted without a registered connection. */
   trustedIdpOrigins: string | undefined;
   idpSimulatorUrl: string | undefined;
+  socialProviderBases: SocialProviderBases;
   /** Whether this is a production deployment — the simulator is trusted
    *  nowhere else, because it signs whatever it is asked to sign. */
   isProduction: boolean;
@@ -1711,6 +1689,7 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
       passkeyHandleSecret: identity.passkeyHandleSecret,
       trustedIdpOrigins: options.trustedIdpOrigins,
       idpSimulatorUrl: options.idpSimulatorUrl,
+      socialProviderBases: options.socialProviderBases,
       isProduction: options.isProduction,
       socialProviders: capturingProfileEmails({
         providers: socialProviders,

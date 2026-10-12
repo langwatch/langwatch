@@ -1,11 +1,9 @@
-import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
-import { Drawer } from "@langwatch/design-system/drawer";
+import { Card } from "@langwatch/design-system/card";
+import { Drawer, type DrawerFooterProps } from "@langwatch/design-system/drawer";
 import { ListPageSkeleton } from "@langwatch/design-system/list-page";
 import {
   Badge,
   Alert,
-  Card,
-  Button,
   HStack,
   Progress,
   Separator,
@@ -24,6 +22,8 @@ import { formatDuration } from "../../../../model/ops-formatters.ts";
 import { useReplayStatus } from "../../behavior/use-replay-status.ts";
 import { parseActiveProjections } from "../../model/replay-presentation.ts";
 import { PHASE_ICONS, PHASE_LABELS, PhaseTimeline } from "../elements/phase-timeline.tsx";
+
+type FooterAction = NonNullable<DrawerFooterProps["secondaryActions"]>[number];
 
 /** The tint each terminal replay state carries; anything running stays blue. */
 const STATE_COLORS: Record<string, string> = {
@@ -47,55 +47,43 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
 
   const stateColor = STATE_COLORS[status?.state ?? ""] ?? "blue";
 
+  const fullPage: FooterAction | undefined = status?.runId
+    ? {
+        label: "Full Page View",
+        onClick: () => {
+          router.push(`/ops/projections/${status.runId}`);
+          onClose();
+        },
+      }
+    : void 0;
+  const cancel: FooterAction | undefined =
+    isRunning && hasAccess
+      ? {
+          label: "Cancel",
+          tone: "danger",
+          loading: cancelMutation.isPending,
+          onClick: () => cancelMutation.mutate(),
+        }
+      : void 0;
+
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      onOpenChange={(e) => {
-        if (!e.open) onClose();
-      }}
-      placement="end"
+      onClose={onClose}
       size="sm"
+      eyebrow={{ label: "Event replay" }}
+      title={`Replay ${status?.state ?? "idle"}`}
+      badges={<Badge colorPalette={stateColor}>{status?.state ?? "idle"}</Badge>}
+      footer={
+        status?.runId || (isRunning && hasAccess)
+          ? {
+              secondaryActions: [...(fullPage ? [fullPage] : []), ...(cancel ? [cancel] : [])],
+            }
+          : void 0
+      }
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <DetailDrawerHeader kind="Event replay" title={`Replay ${status?.state ?? "idle"}`}>
-            <Badge colorPalette={stateColor}>{status?.state ?? "idle"}</Badge>
-          </DetailDrawerHeader>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <ReplayReadState query={statusQuery} stateColor={stateColor} />
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack gap={2} width="full">
-            {status?.runId && (
-              <Button
-                size="sm"
-                variant="outline"
-                flex={1}
-                onClick={() => {
-                  router.push(`/ops/projections/${status.runId}`);
-                  onClose();
-                }}
-              >
-                Full Page View
-              </Button>
-            )}
-            {isRunning && hasAccess && (
-              <Button
-                size="sm"
-                colorPalette="red"
-                variant="outline"
-                loading={cancelMutation.isPending}
-                onClick={() => cancelMutation.mutate()}
-              >
-                Cancel
-              </Button>
-            )}
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      <ReplayReadState query={statusQuery} stateColor={stateColor} />
+    </Drawer>
   );
 }
 
@@ -199,21 +187,19 @@ function ReplayStatusDetail({ status, stateColor }: { status: ReplayStatus; stat
 
       <Separator />
 
-      <Card.Root variant="subtle">
-        <Card.Body>
-          <HStack gap={4} wrap="wrap">
-            <CompactStat label="Events" value={status.eventsProcessed.toLocaleString()} />
-            <CompactStat label="Projections" value={String(status.projectionNames.length)} />
-            {throughputRate !== null && (
-              <CompactStat label="Events/s" value={throughputRate.toLocaleString()} />
-            )}
-            <CompactStat
-              label="Elapsed"
-              value={status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
-            />
-          </HStack>
-        </Card.Body>
-      </Card.Root>
+      <Card variant="nested" padding="lg">
+        <HStack gap={4} wrap="wrap">
+          <CompactStat label="Events" value={status.eventsProcessed.toLocaleString()} />
+          <CompactStat label="Projections" value={String(status.projectionNames.length)} />
+          {throughputRate !== null && (
+            <CompactStat label="Events/s" value={throughputRate.toLocaleString()} />
+          )}
+          <CompactStat
+            label="Elapsed"
+            value={status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
+          />
+        </HStack>
+      </Card>
 
       {/* Projection list */}
       <VStack align="stretch" gap={1}>

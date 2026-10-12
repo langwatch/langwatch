@@ -130,7 +130,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
                 alignItems: "baseline",
                 gap: "6px",
                 fontSize: "var(--chakra-font-sizes-md)",
-                fontWeight: 600,
+                fontWeight: "semibold",
                 letterSpacing: "-0.01em",
               }}
             >
@@ -189,7 +189,7 @@ export function ViaMcpClientScreen(): React.ReactElement {
                     alignItems="center"
                     justifyContent="center"
                     fontSize="2xs"
-                    fontWeight="bold"
+                    fontWeight="semibold"
                   >
                     {i + 1}
                   </Box>

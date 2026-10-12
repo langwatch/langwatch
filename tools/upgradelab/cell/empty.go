@@ -48,6 +48,11 @@ func (cell *run) emptyAccount(ctx context.Context) {
 	cell.seeder.PlainWire = true
 	if err := cell.emptyOrganization(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "organization for the seed account after ready (O1 needs one): "+err.Error())
+		return
+	}
+	if cell.options.Shots { // the account and its organization exist only now, so the walk (B1) starts here
+		cell.walker, _ = StartWalker(ctx, WalkSpec{Dir: filepath.Join(cell.options.HeadDir, "apps", "ui"), RunDir: cell.options.RunDir,
+			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: cell.options.WalkEvery})
 	}
 }
 
@@ -58,7 +63,38 @@ func (cell *run) emptyOrganization(ctx context.Context) error {
 		return err
 	}
 	label := "Upgradelab " + cell.options.Name()
-	return cell.seeder.Call(ctx, true, "onboarding.initializeOrganization", map[string]any{"orgName": label, "projectName": label}, nil)
+	cell.emptyOrg.Called = true
+	return cell.seeder.Call(ctx, true, "onboarding.initializeOrganization", map[string]any{"orgName": label, "projectName": label}, &cell.emptyOrg)
+}
+
+// emptyOrgAnswer is head's sign-up answer; grantsConfirmed is false while the founder's grants still land (T0-F11).
+type emptyOrgAnswer struct {
+	Called          bool   `json:"-"`
+	OrganizationID  string `json:"organizationId"`
+	GrantsConfirmed *bool  `json:"grantsConfirmed"`
+}
+
+// emptyOrgVerdict (F3, T0-F11): after settle the organization still stands, the founder is its member and holds bindings.
+func (cell *run) emptyOrgVerdict(ctx context.Context) Verdict {
+	answer := cell.emptyOrg
+	if !answer.Called || answer.OrganizationID == "" {
+		return verdict("F3", false, fmt.Sprintf("no organization made after ready (called %v)", answer.Called))
+	}
+	confirmed := "absent"
+	if answer.GrantsConfirmed != nil {
+		confirmed = fmt.Sprint(*answer.GrantsConfirmed)
+	}
+	email, _ := generate.SeedAccount(cell.options.Seed)
+	id := strings.ReplaceAll(answer.OrganizationID, "'", "")
+	rows, err := cell.legacyOrgStanding(ctx, `SELECT 'org:' || count(*) FROM mydb."Organization" WHERE id = '`+id+`'
+UNION ALL SELECT 'member:' || coalesce(string_agg(ou.role::text, ','), '-') FROM mydb."OrganizationUser" ou JOIN mydb."User" u ON u.id = ou."userId" WHERE ou."organizationId" = '`+id+`' AND u.email = '`+email+`'
+UNION ALL SELECT 'bindings:' || count(*) FROM mydb."RoleBinding" b JOIN mydb."User" u ON u.id = b."userId" WHERE b."organizationId" = '`+id+`' AND u.email = '`+email+`'`)
+	if err != nil {
+		return verdict("F3", false, "standing read: "+err.Error())
+	}
+	detail := fmt.Sprintf("organization %s, grantsConfirmed %s in the answer; after settle %v", answer.OrganizationID, confirmed, rows)
+	stands := len(rows) == 3 && rows[0] == "org:1" && rows[1] != "member:-" && rows[2] != "bindings:0"
+	return verdict("F3", stands, detail)
 }
 
 func (cell *run) emptyChecks(ctx context.Context) error {
@@ -69,9 +105,9 @@ func (cell *run) emptyChecks(ctx context.Context) error {
 	}
 	cell.report.Queue = cell.queueSummary(ctx)
 	cell.report.Verdicts = append(cell.report.Verdicts,
-		cell.holdingVerdict(), ledgerVerdict(final), notNeededVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
+		cell.holdingVerdict(), ledgerVerdict(final), notNeededVerdict(final), reopenedVerdict(cell.atReady, final, cell.drills.retried), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(),
-		queueVerdict(cell.report.Queue), cell.opsVerdict(final), cell.storedEventsVerdict(ctx))
+		queueVerdict(cell.report.Queue), cell.opsVerdict(final), cell.storedEventsVerdict(ctx), cell.emptyOrgVerdict(ctx), cell.browserVerdict())
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.signupVerdicts(ctx)...)
 	for index := range cell.report.Verdicts {
 		cell.report.Verdicts[index].Scenarios = scenarioIDs[cell.report.Verdicts[index].ID]

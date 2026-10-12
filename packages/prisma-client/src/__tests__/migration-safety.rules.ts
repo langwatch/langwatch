@@ -23,6 +23,9 @@ export const GRACEFUL_RULES: ReadonlySet<string> = new Set([
   "lock-timeout-above-ceiling",
 ]);
 
+/** Nothing is deleted automatically (Alex, 2026-10-11): refused above the newest release tag. */
+export const NOTHING_DELETED_RULES: ReadonlySet<string> = new Set(["drop-table-or-column"]);
+
 /** The runner's lock_timeout; a migration never waits longer for a lock. */
 export const LOCK_TIMEOUT_CEILING_MS = 2_000;
 
@@ -167,6 +170,33 @@ function dropFindings({ sql, live }: { sql: string; live: string }): Finding[] {
     return [];
   });
   return [...retirements, ...unarchived];
+}
+
+const NO_DROP_FIX =
+  "nothing is deleted automatically: leave it in place and stop reading and writing it, then " +
+  'declare an operator step (`mode: "operator"`) in the owning module that drops it, which an ' +
+  "operator confirms on Ops > Upgrades once it is safe. Dropping an index, a constraint, a " +
+  "default or a type holds no data and is fine, and so is dropping a table this migration creates.";
+
+/** A DROP TABLE or DROP COLUMN, the only drops that lose data (Alex, 2026-10-11). */
+function noDropFindings({ live, created }: Scoped): Finding[] {
+  const dropTable = new RegExp(`^\\s*DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(${IDENT})`, "i");
+  const dropColumn =
+    /\bDROP\s+(?!CONSTRAINT\b|DEFAULT\b|NOT\s+NULL\b|IDENTITY\b|EXPRESSION\b)(?:COLUMN\s+)?(?:IF\s+EXISTS\s+)?"?(\w+)"?/gi;
+  return statementsOf(live).flatMap(({ text }): Finding[] => {
+    const table = dropTable.exec(text)?.[1];
+    if (table) {
+      if (created.has(bareName(table))) return [];
+      return [{ rule: "drop-table-or-column", problem: `drops table ${table}`, fix: NO_DROP_FIX }];
+    }
+    const altered = alteredTable(text);
+    if (!altered || created.has(altered)) return [];
+    return [...text.matchAll(dropColumn)].map((match) => ({
+      rule: "drop-table-or-column",
+      problem: `drops column ${altered}.${match[1]}`,
+      fix: NO_DROP_FIX,
+    }));
+  });
 }
 
 function notNullFindings(live: string): Finding[] {
@@ -452,6 +482,7 @@ export function scanPostgresMigration({ name, sql }: MigrationSource): Migration
   const live = maskComments(sql);
   const created = createdTables(live);
   return [
+    ...noDropFindings({ live, created }),
     ...dropFindings({ sql, live }),
     ...notNullFindings(live),
     ...setNotNullFindings({ live, created }),

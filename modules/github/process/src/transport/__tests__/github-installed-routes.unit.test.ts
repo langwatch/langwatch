@@ -41,7 +41,15 @@ async function installedGithub(
 
   return createApp({ role: "api", secrets: githubSecrets() })
     .withModules([githubProcessModule])
-    .withConfig({ github: { appId: undefined, host: undefined, appSlug: undefined } })
+    .withConfig({
+      github: {
+        appId: undefined,
+        host: undefined,
+        appSlug: undefined,
+        apiBase: undefined,
+        webBase: undefined,
+      },
+    })
     .withStores(memoryStores())
     .provide({
       organization: createApiFixture<OrganizationApi>({ isMember: async () => true }),

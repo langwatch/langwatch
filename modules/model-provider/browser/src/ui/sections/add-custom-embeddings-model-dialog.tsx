@@ -1,13 +1,5 @@
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
-import { Button, HStack, Input, VStack } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Input, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { customModelEntrySchema } from "@langwatch/model-provider-contract";
@@ -21,8 +13,8 @@ type AddCustomEmbeddingsModelDialogProps = {
   onSubmit: (entry: CustomModelEntry) => void;
   /** When provided, the dialog opens in edit mode pre-filled with these values. */
   initialValues?: CustomModelEntry;
-  /** Override DialogContent background (e.g. "bg.surface" for solid on onboarding). */
-  dialogBackground?: string;
+  /** `card` keeps the card ground the onboarding page gives its dialogs. */
+  ground?: "card";
 };
 
 /**
@@ -35,7 +27,7 @@ export function AddCustomEmbeddingsModelDialog({
   onClose,
   onSubmit,
   initialValues,
-  dialogBackground,
+  ground,
 }: AddCustomEmbeddingsModelDialogProps) {
   const isEditing = !!initialValues;
   const [modelId, setModelId] = useState("");
@@ -82,47 +74,36 @@ export function AddCustomEmbeddingsModelDialog({
   }, [modelId, displayName, onSubmit, onClose, resetForm]);
 
   return (
-    <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()}>
-      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Embeddings Model" : "Add Embeddings Model"}</DialogTitle>
-        </DialogHeader>
-        <DialogCloseTrigger />
-        <DialogBody>
-          <VStack gap={4} align="stretch">
-            <VStack gap={1} align="stretch">
-              <SmallLabel>Model ID</SmallLabel>
-              <Input
-                placeholder="e.g. text-embedding-custom"
-                value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
-                aria-label="Model ID"
-              />
-              {errors.modelId && <SmallLabel color="red.fg">{errors.modelId}</SmallLabel>}
-            </VStack>
-            <VStack gap={1} align="stretch">
-              <SmallLabel>Display Name</SmallLabel>
-              <Input
-                placeholder="e.g. Custom Embedding Model"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                aria-label="Display Name"
-              />
-              {errors.displayName && <SmallLabel color="red.fg">{errors.displayName}</SmallLabel>}
-            </VStack>
-          </VStack>
-        </DialogBody>
-        <DialogFooter>
-          <HStack gap={2}>
-            <Button variant="ghost" size="sm" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button colorPalette="orange" size="sm" onClick={handleSubmit}>
-              {isEditing ? "Save" : "Add model"}
-            </Button>
-          </HStack>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      title={isEditing ? "Edit embeddings model" : "Add embeddings model"}
+      ground={ground}
+      onSubmit={handleSubmit}
+      primaryAction={{ label: isEditing ? "Save" : "Add model", type: "submit" }}
+    >
+      <VStack gap={4} align="stretch">
+        <VStack gap={1} align="stretch">
+          <SmallLabel>Model ID</SmallLabel>
+          <Input
+            placeholder="e.g. text-embedding-custom"
+            value={modelId}
+            onChange={(e) => setModelId(e.target.value)}
+            aria-label="Model ID"
+          />
+          {errors.modelId && <SmallLabel color="red.fg">{errors.modelId}</SmallLabel>}
+        </VStack>
+        <VStack gap={1} align="stretch">
+          <SmallLabel>Display Name</SmallLabel>
+          <Input
+            placeholder="e.g. Custom Embedding Model"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            aria-label="Display Name"
+          />
+          {errors.displayName && <SmallLabel color="red.fg">{errors.displayName}</SmallLabel>}
+        </VStack>
+      </VStack>
+    </Dialog>
   );
 }

@@ -1,16 +1,16 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Alert,
   Box,
-  IconButton,
   Center,
-  EmptyState,
+  Heading,
   HStack,
-  Tabs,
+  IconButton,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { X, SquareCheckBig } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { SquareCheckBig, X } from "lucide-react";
+import { type ReactNode, useId, useState } from "react";
 
 export function WorkflowResultsPanel({
   isCollapsed,
@@ -21,6 +21,7 @@ export function WorkflowResultsPanel({
   onCollapse: () => void;
   children: ReactNode;
 }) {
+  const headingId = useId();
   return (
     <HStack
       display={isCollapsed ? "none" : undefined}
@@ -45,22 +46,41 @@ export function WorkflowResultsPanel({
       >
         <X size={16} />
       </IconButton>
-      <Tabs.Root
-        value="evaluations"
-        width="full"
-        height="full"
-        display="flex"
-        flexDirection="column"
-        size="sm"
-        colorPalette="blue"
-      >
-        <Tabs.List borderBottomWidth="2px">
-          <Tabs.Trigger value="evaluations">Evaluations</Tabs.Trigger>
-        </Tabs.List>
-        <Tabs.Content value="evaluations" padding={0} height="calc(100% - 32px)">
+      <VStack align="stretch" gap={0} width="full" height="full">
+        <Box
+          flexShrink={0}
+          height="32px"
+          display="flex"
+          alignItems="stretch"
+          borderBottomWidth="2px"
+          borderColor="border"
+        >
+          <Box
+            position="relative"
+            display="flex"
+            alignItems="center"
+            paddingX={3}
+            paddingY={1}
+            _after={{
+              content: '""',
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: "-1px",
+              height: "2px",
+              bg: "blue.indicator",
+              pointerEvents: "none",
+            }}
+          >
+            <Heading as="h2" id={headingId} textStyle="bodySm" fontWeight="600" color="fg">
+              Evaluations
+            </Heading>
+          </Box>
+        </Box>
+        <Box as="section" aria-labelledby={headingId} flex={1} minHeight={0}>
           {!isCollapsed && children}
-        </Tabs.Content>
-      </Tabs.Root>
+        </Box>
+      </VStack>
     </HStack>
   );
 }
@@ -84,17 +104,18 @@ export function WorkflowEvaluationResultsLayout(props: WorkflowEvaluationResults
   if (props.status === "waiting") {
     return (
       <Center width="full" height="full">
-        <EmptyState.Root marginTop="-60px">
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <SquareCheckBig />
-            </EmptyState.Indicator>
-            <EmptyState.Title>Waiting for evaluation results</EmptyState.Title>
-            <EmptyState.Description>
-              Run your first evaluation to see the results here
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
+        <NoDataInfoBlock
+          title="Waiting for evaluation results"
+          description="Run your first evaluation to see the results here"
+          icon={<SquareCheckBig />}
+          next={[
+            {
+              kind: "docs",
+              label: "How workflows work",
+              href: "https://docs.langwatch.ai/workflows/building-a-workflow",
+            },
+          ]}
+        />
       </Center>
     );
   }

@@ -53,9 +53,9 @@ var Profiles = map[string]Profile{
 // cloudBilling: main's SaaS runtime refuses to boot without a Stripe key; this one never reaches Stripe.
 var cloudBilling = map[string]string{"STRIPE_SECRET_KEY": "sk_test_upgradelab_never_sent"}
 
-// Tiers and shapes a cell accepts today; L and XL wait for the scale generator (lane L4).
+// Tiers and shapes a cell accepts today; L (the cloud long tail) runs from a produce snapshot only; XL waits for lane L4.
 var (
-	Tiers      = []string{"S", "M"}
+	Tiers      = []string{"S", "M", "L"}
 	DataShapes = []string{"typical", EmptyShape}
 )
 
@@ -86,6 +86,7 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 			env[key] = value
 		}
 	}
+	env["LOG_LEVEL"] = "info" // as cloud runs head; main reads PINO_LOG_LEVEL (fromEnvWith), head warns on it
 	maps.Copy(env, operator)
 	maps.Copy(env, map[string]string{
 		"NODE_ENV": "production", "SKIP_ENV_VALIDATION": "true", // as the release image sets them
@@ -101,6 +102,9 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 	targets := input.PrivateTargets
 	if targets == nil {
 		targets = shape.PrivateTargets()
+	}
+	if input.Stores.Cluster != "" {
+		env["CLICKHOUSE_CLUSTER"] = input.Stores.Cluster
 	}
 	routePrivateTargets(env, input.Stores, targets)
 	routeObjects(env, input.Stores, shape.PrivateObjectTargets())

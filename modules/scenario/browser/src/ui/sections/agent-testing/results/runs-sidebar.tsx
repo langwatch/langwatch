@@ -5,11 +5,11 @@
  * @see specs/suites/run-notes.feature
  */
 
+import { LoadMore } from "@langwatch/design-system/load-more";
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
 import type { RunPlanBatches } from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { RunsSidebarEntry } from "../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
 import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
 import type { PeriodControls } from "./period-controls.ts";
@@ -93,25 +93,19 @@ function RunsList({
       ))}
 
       {isEmptyShown ? (
-        <Text fontSize="11.5px" color={FG_MUTED} paddingX={1} paddingTop={2}>
+        <Text textStyle="caption" color="fg.muted" paddingX={1} paddingTop={2}>
           No run in this period.
         </Text>
       ) : null}
 
-      {hasMore ? (
-        <Button
-          size="xs"
-          variant="ghost"
-          height="26px"
-          fontSize="11.5px"
-          color={FG_MUTED}
-          justifyContent="flex-start"
-          paddingX={3}
-          onClick={loadMore}
-        >
-          Load More...
-        </Button>
-      ) : null}
+      <LoadMore
+        hasMore={hasMore}
+        loading={isLoading}
+        onLoadMore={loadMore}
+        shown={hasMore ? batchRuns.length : void 0}
+        total={totalBatchCount ?? void 0}
+        unitLabel="runs"
+      />
     </>
   );
 }
@@ -142,11 +136,11 @@ export function RunsSidebar({
         size="xs"
         variant="ghost"
         height="28px"
-        fontSize="12px"
+        textStyle="caption"
         fontWeight="medium"
-        color={FG_MUTED}
+        color="fg.muted"
         justifyContent="flex-start"
-        paddingX="10px"
+        paddingX="2.5"
         marginBottom={1}
         onClick={onBack}
       >

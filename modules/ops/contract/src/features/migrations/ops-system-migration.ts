@@ -196,6 +196,8 @@ const opsMigrationOverviewSchemaDefinition = z.object({
   enrolledAutomatically: z.boolean(),
   /** Whose rows the step migrates (ADR-101 §6); only organization holds are held organizations. */
   tenant: z.enum(["organization", "user"]),
+  /** Its `migrated` tenants are kept in step by design, never held or needing attention. */
+  migratedIsSteady: z.boolean(),
   counts: opsMigrationStatusCountsSchema,
   /**
    * The rollout gauge. Null when there is nothing to enroll — off cloud, and

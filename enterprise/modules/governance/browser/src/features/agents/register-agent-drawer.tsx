@@ -28,48 +28,30 @@ export function RegisterAgentDrawer({ open = true }: { open?: boolean }) {
   const { closeDrawer } = useDrawer();
 
   return (
-    <Drawer.Root
-      open={open}
-      placement="end"
-      size="md"
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) closeDrawer();
-      }}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Register an agent</Drawer.Title>
-          {/* No `onClick` of its own. The trigger already closes the drawer,
-              which fires `onOpenChange` above, and wiring `closeDrawer` here
-              as well would navigate twice for one dismissal. */}
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={4} paddingBottom={4}>
-            <Text textStyle="sm" color="fg.muted">
-              An agent registers itself from the process that runs it. Decorate the function behind
-              your agent, start the process, and it appears on this page with its environment, its
-              models and its spend.
-            </Text>
-            <VStack align="stretch" gap={2}>
-              <Text textStyle="sm" fontWeight="semibold">
-                Python
-              </Text>
-              <CodePreview code={PYTHON_SNIPPET} language="python" />
-            </VStack>
-            <VStack align="stretch" gap={2}>
-              <Text textStyle="sm" fontWeight="semibold">
-                TypeScript
-              </Text>
-              <CodePreview code={TYPESCRIPT_SNIPPET} language="typescript" />
-            </VStack>
-            <Text textStyle="sm" color="fg.muted">
-              The process needs a LangWatch API key in its environment. Nothing listens on your side
-              and no public address is involved: the connection is outbound only.
-            </Text>
-          </VStack>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer open={open} onClose={closeDrawer} size="md" title="Register an agent">
+      <VStack align="stretch" gap={4} paddingBottom={4}>
+        <Text textStyle="sm" color="fg.muted">
+          An agent registers itself from the process that runs it. Decorate the function behind your
+          agent, start the process, and it appears on this page with its environment, its models and
+          its spend.
+        </Text>
+        <VStack align="stretch" gap={2}>
+          <Text textStyle="sm" fontWeight="semibold">
+            Python
+          </Text>
+          <CodePreview code={PYTHON_SNIPPET} language="python" />
+        </VStack>
+        <VStack align="stretch" gap={2}>
+          <Text textStyle="sm" fontWeight="semibold">
+            TypeScript
+          </Text>
+          <CodePreview code={TYPESCRIPT_SNIPPET} language="typescript" />
+        </VStack>
+        <Text textStyle="sm" color="fg.muted">
+          The process needs a LangWatch API key in its environment. Nothing listens on your side and
+          no public address is involved: the connection is outbound only.
+        </Text>
+      </VStack>
+    </Drawer>
   );
 }

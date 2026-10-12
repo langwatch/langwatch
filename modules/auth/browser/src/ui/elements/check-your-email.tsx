@@ -33,7 +33,7 @@ export function CheckYourEmail({
 
   return (
     <AuthCard title="Check your email" solid>
-      <VStack width="full" align="stretch" gap="14px">
+      <VStack width="full" align="stretch" gap="3.5">
         {/* Centred under a centred title, because there is nothing to do on
             this card. Every other screen left-aligns its words against a form
             the eye has to return to; here the sentence IS the screen, so it
@@ -69,10 +69,10 @@ export function CheckYourEmail({
         ) : null}
         {onUseDifferentEmail ? (
           <Button
+            textStyle="bodySm"
             variant="plain"
             size="sm"
             alignSelf="center"
-            fontSize="13px"
             textDecoration="underline"
             textUnderlineOffset="3px"
             onClick={onUseDifferentEmail}

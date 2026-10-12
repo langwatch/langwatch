@@ -145,7 +145,6 @@ function useNavigationHostReading({
     commandBar: palette,
     presenceMenuItem,
     impersonationBanner,
-    upgradeAttentionBanner,
   },
   process,
 }: {
@@ -280,18 +279,14 @@ function useNavigationHostReading({
   const routePattern = routePatternOf(pathname, route.reading().params);
 
   // The header carries ops's impersonation banner whenever the session says so
-  // (specs/auth/impersonation-banner.feature) and ops's upgrade notice, which draws itself only
-  // when ops says so. Presence is offered only on the surface that broadcasts it.
+  // (specs/auth/impersonation-banner.feature). Presence is offered only on the surface that
+  // broadcasts it.
   const graphicsQualityOverride = useGraphicsQualityOverrideStore();
   const accountMenu = useMemo<NavigationAccountMenu>(() => {
     const ImpersonationBanner = impersonationBanner.default;
-    const UpgradeAttentionBanner = upgradeAttentionBanner.default;
-    const headerBanner = (
-      <>
-        {currentUser?.impersonator && <ImpersonationBanner user={currentUser} />}
-        <UpgradeAttentionBanner />
-      </>
-    );
+    const headerBanner = currentUser?.impersonator ? (
+      <ImpersonationBanner user={currentUser} />
+    ) : undefined;
     const graphicsQuality = {
       value: graphicsQualityOverride,
       label: GRAPHICS_QUALITY_LABELS[graphicsQualityOverride],
@@ -313,7 +308,6 @@ function useNavigationHostReading({
     activeScope.projectId,
     presenceMenuItem,
     impersonationBanner,
-    upgradeAttentionBanner,
     currentUser,
   ]);
 

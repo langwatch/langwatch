@@ -43,21 +43,14 @@ export function LicenseDetailDrawer({
   const license = query.data;
 
   return (
-    <Drawer.Root
+    <Drawer
       open={licenseId !== null}
-      onOpenChange={({ open }) => !open && onClose()}
+      onClose={onClose}
+      title={license ? license.organizationName : "License"}
       size="lg"
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{license ? license.organizationName : "License"}</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          <DrawerContent isLoading={query.isLoading} license={license} onRevoke={onRevoke} />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      <DrawerContent isLoading={query.isLoading} license={license} onRevoke={onRevoke} />
+    </Drawer>
   );
 }
 

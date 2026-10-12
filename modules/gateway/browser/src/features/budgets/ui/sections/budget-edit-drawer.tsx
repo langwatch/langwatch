@@ -1,12 +1,9 @@
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
-  Button,
   Field,
-  HStack,
   Input,
   NativeSelect,
-  Spacer,
   Text,
   Textarea,
   VStack,
@@ -115,111 +112,101 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
   };
 
   return (
-    <Drawer.Root open={!!budget} onOpenChange={() => close()} placement="end" size="md">
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Edit budget</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={4}>
-            <Field.Root required>
-              <Field.Label>
-                Name
-                <FieldInfoTooltip
-                  description="Short identifier shown in /gateway/usage and audit log. Rename is non-breaking; scope and window are immutable below."
-                  docHref="/ai-gateway/budgets#creating-a-budget"
-                />
-              </Field.Label>
-              <Input
-                data-testid="gateway-budget-edit-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>Applies to</Field.Label>
-              <Text fontSize="sm" color="fg.muted">
-                {scopeSummary(budget)} (immutable after create)
-              </Text>
-              {budget?.scopeType === "GROUP" && (
-                <Field.HelperText>
-                  Each member of the group gets this limit individually.
-                </Field.HelperText>
-              )}
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>Window</Field.Label>
-              <Text fontSize="sm" color="fg.muted">
-                {budget?.window.toLowerCase()} (immutable after create)
-              </Text>
-            </Field.Root>
-            <Field.Root required invalid={!!limitError}>
-              <Field.Label>
-                Limit (USD)
-                <FieldInfoTooltip
-                  description="Hard cap for the chosen window. Debits accrue in real time against provider-reported cost. Crossing the cap triggers the on_breach action (BLOCK or WARN)."
-                  docHref="/ai-gateway/budgets#creating-a-budget"
-                />
-              </Field.Label>
-              <Input
-                data-testid="gateway-budget-edit-limit"
-                value={limitUsd}
-                onChange={(e) => {
-                  setLimitUsd(e.target.value);
-                  setLimitError(null);
-                }}
-                inputMode="decimal"
-              />
-              {limitError && <Field.ErrorText>{limitError}</Field.ErrorText>}
-              <Field.HelperText>
-                Raising the limit does not reset the window. Lowering it may cause the budget to
-                enter breach immediately if current spend already exceeds the new value.
-              </Field.HelperText>
-            </Field.Root>
-            <Field.Root required>
-              <Field.Label>
-                On breach
-                <FieldInfoTooltip
-                  description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error, which suits soft budgets where ops monitors spend without enforcing a hard cap."
-                  docHref="/ai-gateway/budgets#on_breach"
-                />
-              </Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  data-testid="gateway-budget-edit-on-breach"
-                  value={onBreach}
-                  onChange={(e) => setOnBreach(e.target.value === "WARN" ? "WARN" : "BLOCK")}
-                >
-                  <option value="BLOCK">Block: reject requests at limit</option>
-                  <option value="WARN">Warn: tag responses, keep serving</option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-            </Field.Root>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={close} disabled={updateMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              data-testid="gateway-budget-edit-submit"
-              onClick={submit}
-              loading={updateMutation.isPending}
-              disabled={!name || !limitUsd}
+    <Drawer
+      open={!!budget}
+      onClose={close}
+      title="Edit budget"
+      size="md"
+      busy={updateMutation.isPending}
+      footer={{
+        cancel: { label: "Cancel", onClick: close },
+        primaryAction: {
+          label: "Save changes",
+          loading: updateMutation.isPending,
+          onClick: () => void submit(),
+          "data-testid": "gateway-budget-edit-submit",
+        },
+      }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Field.Root required>
+          <Field.Label>
+            Name
+            <FieldInfoTooltip
+              description="The name shown in Usage and the audit log; renaming does not change the budget's scope or reset schedule."
+              docHref="/ai-gateway/budgets#creating-a-budget"
+            />
+          </Field.Label>
+          <Input
+            data-testid="gateway-budget-edit-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Description</Field.Label>
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Applies to</Field.Label>
+          <Text fontSize="sm" color="fg.muted">
+            {scopeSummary(budget)} (immutable after create)
+          </Text>
+          {budget?.scopeType === "GROUP" && (
+            <Field.HelperText>
+              Each member of the group gets this limit individually.
+            </Field.HelperText>
+          )}
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Window</Field.Label>
+          <Text fontSize="sm" color="fg.muted">
+            {budget?.window.toLowerCase()} (immutable after create)
+          </Text>
+        </Field.Root>
+        <Field.Root required invalid={!!limitError}>
+          <Field.Label>
+            Limit (USD)
+            <FieldInfoTooltip
+              description="Hard cap for the chosen window. Debits accrue in real time against provider-reported cost. Crossing the cap triggers the on_breach action (BLOCK or WARN)."
+              docHref="/ai-gateway/budgets#creating-a-budget"
+            />
+          </Field.Label>
+          <Input
+            data-testid="gateway-budget-edit-limit"
+            value={limitUsd}
+            onChange={(e) => {
+              setLimitUsd(e.target.value);
+              setLimitError(null);
+            }}
+            inputMode="decimal"
+          />
+          {limitError && <Field.ErrorText>{limitError}</Field.ErrorText>}
+          <Field.HelperText>
+            Raising the limit does not reset the window. Lowering it may cause the budget to enter
+            breach immediately if current spend already exceeds the new value.
+          </Field.HelperText>
+        </Field.Root>
+        <Field.Root required>
+          <Field.Label>
+            On breach
+            <FieldInfoTooltip
+              description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error, which suits soft budgets where ops monitors spend without enforcing a hard cap."
+              docHref="/ai-gateway/budgets#on_breach"
+            />
+          </Field.Label>
+          <NativeSelect.Root size="sm">
+            <NativeSelect.Field
+              data-testid="gateway-budget-edit-on-breach"
+              value={onBreach}
+              onChange={(e) => setOnBreach(e.target.value === "WARN" ? "WARN" : "BLOCK")}
             >
-              Save changes
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+              <option value="BLOCK">Block: reject requests at limit</option>
+              <option value="WARN">Warn: tag responses, keep serving</option>
+            </NativeSelect.Field>
+          </NativeSelect.Root>
+        </Field.Root>
+      </VStack>
+    </Drawer>
   );
 }

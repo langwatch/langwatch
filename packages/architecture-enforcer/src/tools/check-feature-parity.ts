@@ -165,6 +165,8 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // scans this directory for `.bats` files; this is the `.test.mjs`
   // counterpart. Without it, dev-tooling scenarios could only ever be @unimplemented.
   "dev/scripts/__tests__",
+  // dev/nx plugins' own logic is tested with `node --test` beside them.
+  "dev/nx/__tests__",
   "dev/scripts/upgrade-rehearsal/__tests__",
 ];
 
@@ -229,22 +231,25 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The IdP simulator. Its scenarios (OIDC/SAML/SCIM/domain verification,
   // specs/setup/idp-simulator.feature) are satisfied by Go tests and by
   // nothing else.
-  "services/idpsim",
+  "services/sims/idpsim",
   // The mail sink. Its service-side scenarios (SMTP intake, the message API,
   // security headers, the browser inbox — specs/setup/mail-sink.feature) are
   // satisfied by Go tests and by nothing else.
-  "services/mailsim",
+  "services/sims/mailsim",
   // The other simulators haven runs (LLM, storage, analytics, voice, outbound,
   // telemetry) and the diff and fuzz suites: their specs/setup scenarios bind
   // only from Go tests.
-  "services/llmsim",
-  "services/storagesim",
-  "services/analyticssim",
-  "services/voicesim",
-  "services/outboundsim",
-  "services/paymentsim",
-  "services/telemetrysim",
-  "services/lambdasim",
+  "services/sims/llmsim",
+  "services/sims/storagesim",
+  "services/sims/analyticssim",
+  "services/sims/voicesim",
+  "services/sims/outboundsim",
+  "services/sims/paymentsim",
+  "services/sims/telemetrysim",
+  "services/sims/lambdasim",
+  "services/sims/githubsim",
+  // The Go scenario runner: its child-contract and fence scenarios bind only from Go tests.
+  "services/scenariorunner",
   "tools/diffsuite",
   "tools/fuzz",
   "tools/workerrun",
@@ -289,7 +294,7 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   "tools/upgradelab",
   // telemetrysim: presets, rates, fuzz replay and its control API
   // (specs/setup/haven-telemetrysim.feature) are asserted by these Go tests only.
-  "services/telemetrysim",
+  "services/sims/telemetrysim",
   // ClickHouse serverless chart configuration rendering. Scenarios describing
   // keeper-backed replicated access storage binding through unit tests in
   // internal/render/render_test.go that verify the XML config is generated
@@ -355,7 +360,6 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "modules/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
   "specs/ai-gateway/budgets-principal-cascade.feature",
@@ -551,8 +555,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/monitor-execution-backend.feature",
   "specs/monitors/monitor-trace-mappings.feature",
   "specs/monitors/new-evaluation-menu.feature",
-  "specs/monitors/online-evaluation-drawer-flow.feature",
-  "specs/monitors/pending-mappings-validation.feature",
   "specs/monitors/replicate-monitor-to-project.feature",
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",
@@ -634,7 +636,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/editable-trace-name-alignment.feature",
   "specs/traces-v2/facet-perspectives.feature",
   "modules/trace/specs/flame-graph.feature",
-  "specs/traces-v2/grouping-engine.feature",
   "specs/traces-v2/io-pretty-markdown.feature",
   "specs/traces-v2/lens-preset-groups.feature",
   "specs/traces-v2/light-mode-contrast.feature",
@@ -680,6 +681,9 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the grouping relabel scenario was bound.
+  // The other grouping scenarios describe the engine and stay untagged.
+  "specs/traces-v2/grouping-engine.feature",
   // Reason: left LEGACY_INERT when sub-cent costs stopped reading as zero;
   // the "Cost formatting" rule is enforced. The pills, duration, token and
   // span tab rules are described here and stay untagged.

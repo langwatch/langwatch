@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { DashboardData } from "@langwatch/ops-contract";
 import { readableDate } from "@langwatch/time";
 import { useRef, useState } from "react";
@@ -205,7 +206,7 @@ function CustomTooltip({
             <Box width="6px" height="6px" borderRadius="full" bg={entry.color} />
             <Text textStyle="xs">{entry.name}</Text>
           </HStack>
-          <Text textStyle="xs" fontFamily="mono" fontWeight="medium">
+          <Text textStyle="caption" fontVariantNumeric="tabular-nums" fontWeight="medium">
             {entry.value.toFixed(1)}/s
           </Text>
         </HStack>
@@ -219,7 +220,7 @@ function CustomTooltip({
                 <Box width="6px" height="2px" bg={entry.color} />
                 <Text textStyle="xs">{entry.name}</Text>
               </HStack>
-              <Text textStyle="xs" fontFamily="mono">
+              <Text textStyle="caption" fontVariantNumeric="tabular-nums">
                 {entry.value.toLocaleString()}
               </Text>
             </HStack>
@@ -375,13 +376,13 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             scale="time"
             ticks={timeTicks}
             tickFormatter={formatTime}
-            tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
+            tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             yAxisId="rate"
-            tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
+            tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
             axisLine={false}
             tickLine={false}
             width={40}
@@ -393,7 +394,7 @@ export function ThroughputChart({ data }: { data: DashboardData }) {
             <YAxis
               yAxisId="count"
               orientation="right"
-              tick={{ fontSize: 10, fill: "var(--chakra-colors-fg-muted)" }}
+              tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
               axisLine={false}
               tickLine={false}
               width={40}

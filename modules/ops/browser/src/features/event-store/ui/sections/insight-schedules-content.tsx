@@ -1,6 +1,6 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Center, Heading, Spinner, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Center, Heading, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import type { OpsInsightSchedule } from "@langwatch/ops-contract";
 import { nowInstant, readableDate, toEpochMs } from "@langwatch/time";
 import { Inbox } from "lucide-react";
@@ -66,29 +66,23 @@ function InsightSchedulesTable({
   }
 
   return (
-    <ListTable
-      density="compact"
-      columnRules={false}
-      containerProps={{ overflowX: "auto" }}
-      variant="line"
-      size="sm"
-    >
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Board</Table.ColumnHeader>
-          <Table.ColumnHeader>Owner</Table.ColumnHeader>
-          <Table.ColumnHeader>Schedule</Table.ColumnHeader>
-          <Table.ColumnHeader>Next run</Table.ColumnHeader>
-          <Table.ColumnHeader>Last run</Table.ColumnHeader>
-          <Table.ColumnHeader>Skipped days</Table.ColumnHeader>
-          <Table.ColumnHeader>Status</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable density="compact" scroll="x" scrollLabel="Daily insights schedules table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Board</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Owner</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Schedule</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Next run</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Last run</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Skipped days</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {schedules.toSorted(compareInsightSchedules).map((schedule) => (
           <InsightScheduleRow key={schedule.id} schedule={schedule} now={now} />
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
@@ -98,52 +92,53 @@ function InsightScheduleRow({ schedule, now }: { schedule: OpsInsightSchedule; n
   const { nextRunAt, lastRunAt } = schedule;
 
   return (
-    <Table.Row>
-      <Table.Cell>
+    <ListTable.Row>
+      <ListTable.Cell>
         <Text textStyle="xs" title={`${schedule.boardKind} · ${schedule.boardId}`}>
           {schedule.boardName}
         </Text>
         <Text textStyle="xs" color="fg.muted" title={schedule.projectId}>
           {schedule.projectName ?? middleEllipsis(schedule.projectId, 18)}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" title={schedule.userId}>
           {schedule.owner ?? middleEllipsis(schedule.userId, 18)}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs">{runTimeWords(schedule)}</Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text
           textStyle="xs"
           title={nextRunAt ? readableDate(nextRunAt).toLocaleString() : undefined}
         >
           {nextRunText({ schedule, now })}
         </Text>
-      </Table.Cell>
-      <Table.Cell color="fg.muted">
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text
           textStyle="xs"
+          color="fg.muted"
           title={lastRunAt ? readableDate(lastRunAt).toLocaleString() : undefined}
         >
           {lastRunAt ? `${formatTimeAgo(toEpochMs(lastRunAt), now)} · ` : ""}
           {lastRunWords(schedule)}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs">{skippedDaysWords(schedule)}</Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <InsightScheduleStatusBadge status={status} />
         {status === "turned_off" && (
           <Text textStyle="xs" color="fg.muted">
             {offReasonWords(schedule)}
           </Text>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 

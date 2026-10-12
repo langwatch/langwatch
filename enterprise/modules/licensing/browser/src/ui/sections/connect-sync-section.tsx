@@ -1,4 +1,4 @@
-import { Alert } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
 import { OverviewDetail, SettingList, SettingsCard } from "@langwatch/design-system/settings-card";
 import { RefreshCw } from "lucide-react";
 
@@ -35,12 +35,9 @@ export function ConnectSyncSection({ status }: { status: ConnectEnabledStatus })
         </OverviewDetail>
       </SettingList>
       {failure ? (
-        <Alert.Root status="warning" data-testid="connect-sync-failure">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>{failure}</Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="warning" data-testid="connect-sync-failure">
+          {failure}
+        </Banner>
       ) : null}
     </SettingsCard>
   );

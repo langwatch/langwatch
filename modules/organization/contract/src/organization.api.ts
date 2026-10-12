@@ -251,6 +251,8 @@ export interface OrganizationApi {
   ): Promise<{
     organization: { id: string; name: string };
     team: { id: string; slug: string; name: string };
+    /** False while the founder's grants are still landing; a read hint follows when they do. */
+    grantsConfirmed: boolean;
   }>;
   /**
    * Whether this address may create a new account on the installation

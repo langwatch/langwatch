@@ -39,16 +39,15 @@ vi.mock("../../onboarding/spotlights/spotlight-overlay.tsx", () => ({
   writeSpotlightFragment: vi.fn(),
 }));
 
-vi.mock("../automate-button.tsx", () => ({ AutomateButton: () => <div data-testid="automate" /> }));
 vi.mock("../columns-dropdown.tsx", () => ({
   ColumnsDropdown: () => <div data-testid="columns" />,
 }));
-vi.mock("../density-toggle.tsx", () => ({ DensityToggle: () => <div data-testid="density" /> }));
-vi.mock("../grouping-selector.tsx", () => ({
-  GroupingSelector: () => <div data-testid="grouping" />,
+vi.mock("../grouping-select.tsx", () => ({
+  GroupingSelect: () => <div data-testid="grouping" />,
 }));
-vi.mock("../keyboard-shortcuts-button.tsx", () => ({
-  KeyboardShortcutsButton: () => <div data-testid="shortcuts" />,
+vi.mock("../density-toggle.tsx", () => ({ DensityToggle: () => <div data-testid="density" /> }));
+vi.mock("../toolbar-more-menu.tsx", () => ({
+  ToolbarMoreMenu: () => <div data-testid="more" />,
 }));
 vi.mock("../live-indicator.tsx", () => ({ LiveIndicator: () => <div data-testid="live" /> }));
 vi.mock("../time-range-picker.tsx", () => ({
@@ -64,22 +63,28 @@ afterEach(() => cleanup());
 describe("the toolbar row", () => {
   describe("when the page renders", () => {
     /** @scenario Lens tabs take remaining horizontal space */
-    it("lets the lens tabs grow and holds the right cluster at its own width", () => {
+    it("lets the lens tabs grow and holds both right clusters at their own width", () => {
       const { container, getByTestId } = renderWithDesignSystem(<Toolbar />);
 
-      const cluster = getByTestId("live").parentElement as HTMLElement;
+      const timeCluster = getByTestId("live").parentElement as HTMLElement;
+      const viewCluster = getByTestId("columns").parentElement as HTMLElement;
       const tabs = container.querySelector('[data-scope="tabs"][data-part="root"]') as HTMLElement;
       const tabsBox = tabs.parentElement as HTMLElement;
 
-      expect(tabsBox.parentElement).toBe(cluster.parentElement);
       expect(getComputedStyle(tabs).flexGrow).toBe("1");
       expect(getComputedStyle(tabs).minWidth).toBe("0px");
       expect(getComputedStyle(tabsBox).flexGrow).toBe("1");
-      expect(getComputedStyle(cluster).flexShrink).toBe("0");
-      expect(getComputedStyle(cluster).flexGrow).not.toBe("1");
-      expect(tabsBox.compareDocumentPosition(cluster) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-        Node.DOCUMENT_POSITION_FOLLOWING,
-      );
+      for (const cluster of [timeCluster, viewCluster]) {
+        expect(tabsBox.parentElement).toBe(cluster.parentElement);
+        expect(getComputedStyle(cluster).flexShrink).toBe("0");
+        expect(getComputedStyle(cluster).flexGrow).not.toBe("1");
+        expect(tabsBox.compareDocumentPosition(cluster) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }
+      expect(getByTestId("time-range").parentElement).toBe(timeCluster);
+      expect(getByTestId("grouping").parentElement).toBe(timeCluster);
+      expect(getByTestId("density").parentElement).toBe(timeCluster);
     });
   });
 });

@@ -136,12 +136,12 @@ function ResetPasswordForm({ token }: { token: string }) {
       <HandledErrorAlert error={refusal?.error} fallbackTitle="Couldn't reset your password" />
       {refusal?.linkIsDead ? <RequestNewLink /> : null}
       {refusal?.waitLine ? (
-        <Text fontSize="13px" lineHeight="1.55" color="fg.error" data-testid="reset-wait">
+        <Text textStyle="bodySm" color="fg.error" data-testid="reset-wait">
           {refusal.waitLine}
         </Text>
       ) : null}
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
-        <VStack width="full" align="stretch" gap="14px">
+        <VStack width="full" align="stretch" gap="3.5">
           <FrontDoorField label="New password" error={form.formState.errors.password}>
             {(id) => (
               <PasswordInput
@@ -227,23 +227,18 @@ function PostResetPasskeyOffer({
   if (state === "dismissed") return null;
   if (state === "registering") {
     return (
-      <Text
-        fontSize="14px"
-        fontWeight={600}
-        textAlign="center"
-        data-testid="reset-passkey-ceremony-title"
-      >
+      <Text textStyle="cardTitle" textAlign="center" data-testid="reset-passkey-ceremony-title">
         Follow your device's prompt to create a passkey
       </Text>
     );
   }
   if (state === "added") {
     return (
-      <VStack width="full" align="stretch" gap="6px" textAlign="center">
-        <Text fontSize="13.5px" fontWeight={600} data-testid="reset-passkey-added">
+      <VStack width="full" align="stretch" gap="1.5" textAlign="center">
+        <Text textStyle="cardTitle" data-testid="reset-passkey-added">
           Passkey added
         </Text>
-        <Text fontSize="13px" lineHeight="1.6" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           Next time you can sign in with your fingerprint, face or screen lock instead of typing a
           password.
         </Text>
@@ -254,19 +249,19 @@ function PostResetPasskeyOffer({
     <VStack
       width="full"
       align="stretch"
-      gap="10px"
+      gap="2.5"
       textAlign="center"
       data-testid="post-reset-passkey-offer"
     >
-      <Text fontSize="13px" lineHeight="1.6" color="fg.muted">
+      <Text textStyle="bodySm" color="fg.muted">
         Next time, skip the password. A passkey uses the fingerprint, face or screen lock your
         device already has, and there is nothing to forget.
       </Text>
       <Button
+        textStyle="bodySm"
         variant="outline"
         width="full"
         minHeight="42px"
-        fontSize="13.5px"
         borderRadius={SHAPE.field}
         onClick={onAdd}
         data-testid="reset-add-passkey"
@@ -274,10 +269,10 @@ function PostResetPasskeyOffer({
         Add a passkey
       </Button>
       <Button
+        textStyle="bodySm"
         variant="plain"
         size="sm"
         alignSelf="center"
-        fontSize="13px"
         color="fg.muted"
         onClick={onDismiss}
         data-testid="reset-dismiss-passkey"

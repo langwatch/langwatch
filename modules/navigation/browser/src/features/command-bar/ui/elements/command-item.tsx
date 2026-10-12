@@ -16,6 +16,12 @@ function labelsOf(item: ListItem): { label: string; description?: string } {
   return { label: item.data.label, description: item.data.description };
 }
 
+function metaOf(item: ListItem): string | undefined {
+  if (item.type === "recent") return formatTimeAgoCompact(item.data.accessedAt);
+  if (item.type === "command") return item.data.productLabel;
+  return undefined;
+}
+
 /** One command bar row for a command, search result, recent item or project. */
 export function CommandItem({ item, index, isSelected, onSelect, onMouseEnter }: CommandItemProps) {
   const { Icon, color } = getIconInfo(item);
@@ -24,7 +30,7 @@ export function CommandItem({ item, index, isSelected, onSelect, onMouseEnter }:
       icon={Icon}
       iconColor={color}
       {...labelsOf(item)}
-      meta={item.type === "recent" ? formatTimeAgoCompact(item.data.accessedAt) : undefined}
+      meta={metaOf(item)}
       index={index}
       isSelected={isSelected}
       onSelect={() => onSelect(item)}

@@ -1,4 +1,5 @@
 import { ActivityTimeline } from "@langwatch/design-system/activity-timeline";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Box, Skeleton, Text } from "@langwatch/design-system/primitives";
 import {
   Circle,
@@ -64,7 +65,12 @@ export function ConnectionHistory({ connectionId }: { connectionId: string }) {
       ) : null,
     };
   });
-  let emptyState = <Text>Nothing has happened to this connection yet.</Text>;
+  let emptyState = (
+    <NoDataInfoBlock
+      size="line"
+      title="Nothing has happened to this connection yet. Review the connection details above; future setup and status changes will appear here."
+    />
+  );
   if (history.isLoading) emptyState = <Skeleton height="16" />;
   if (history.error)
     emptyState = <Text color="fg.error">This connection’s history could not be loaded.</Text>;

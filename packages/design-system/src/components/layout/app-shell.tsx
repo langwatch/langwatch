@@ -8,6 +8,7 @@ import { ChevronRight, CornerDownLeft, Lightbulb, Search, type LucideIcon } from
 import type React from "react";
 import type { ReactNode } from "react";
 
+import { ICON_RAIL_LABEL_PX } from "../../system/text-styles.ts";
 import { useReducedMotion } from "../../use-reduced-motion.ts";
 import { Dialog } from "../overlays/dialog.tsx";
 
@@ -59,7 +60,12 @@ export function IconRailTile({
       ) : null}
       <VStack gap={1}>
         <Icon size={19} strokeWidth={isActive ? 2.1 : 1.9} />
-        <Text fontSize="8.5px" fontWeight="semibold" lineHeight="1" letterSpacing="tight">
+        <Text
+          fontSize={`${ICON_RAIL_LABEL_PX}px`}
+          fontWeight="semibold"
+          lineHeight="1"
+          letterSpacing="tight"
+        >
           {label}
         </Text>
       </VStack>
@@ -159,13 +165,19 @@ export function AppTopBar({
           pointerEvents="none"
         />
       ) : null}
-      <HStack gap={0} flex={1} alignItems="center" minWidth={0}>
+      <HStack gap={0} flex={1} alignItems="center" minWidth={0} position="relative">
         {leading}
         <HStack gap={3} alignItems="center" minWidth={0} paddingLeft={leading ? "22px" : 0}>
           {controls}
         </HStack>
       </HStack>
-      <HStack gap={2} justifyContent="flex-end" overflow="hidden" flexShrink={0}>
+      <HStack
+        gap={2}
+        justifyContent="flex-end"
+        overflow="hidden"
+        flexShrink={0}
+        position="relative"
+      >
         {trailing}
       </HStack>
     </HStack>
@@ -209,7 +221,7 @@ export function SidebarSection({
             gap={showExpanded ? 1 : 0}
             justifyContent={showExpanded ? "flex-start" : "center"}
             borderRadius="md"
-            color="gray.500"
+            color="nav.fgMuted"
             _hover={{ color: "nav.fg" }}
           >
             {showExpanded ? heading : null}
@@ -300,7 +312,7 @@ export function CommandBarFooter({ isMac }: { isMac: boolean }) {
       paddingX={{ base: 4, md: 5 }}
       paddingY={2.5}
       gap={5}
-      fontSize="12px"
+      textStyle="caption"
       color="fg.muted"
     >
       {hints.map(([keys, action]) => (
@@ -354,7 +366,7 @@ export function CommandBarInput({
         outline="none"
         boxShadow="none"
         background="transparent"
-        fontSize={hero ? "16px" : "15px"}
+        fontSize="md"
         lineHeight="1.5"
         height="auto"
         padding={0}
@@ -373,8 +385,7 @@ export function CommandBarGroup({ label, children }: { label: string; children: 
   return (
     <VStack align="stretch" gap={0}>
       <Text
-        fontSize="12px"
-        fontWeight="normal"
+        textStyle="caption"
         color="fg.muted"
         paddingX={{ base: 4, md: 5 }}
         paddingTop={3.5}
@@ -429,17 +440,17 @@ export function CommandBarItem({
         <Icon size={18} />
       </Box>
       <HStack flex={1} gap={2} overflow="hidden">
-        <Text fontSize="14px" fontWeight="medium" color="fg.default" truncate>
+        <Text textStyle="body" fontWeight="medium" color="fg.default" truncate>
           {label}
         </Text>
         {description ? (
-          <Text fontSize="12px" color="fg.subtle" truncate>
+          <Text textStyle="caption" color="fg.subtle" truncate>
             {description}
           </Text>
         ) : null}
       </HStack>
       {meta ? (
-        <Text fontSize="11px" color="fg.muted" flexShrink={0}>
+        <Text textStyle="caption" color="fg.muted" flexShrink={0}>
           {meta}
         </Text>
       ) : null}
@@ -461,7 +472,7 @@ export function CommandBarHint({ hint }: { hint: ReactNode }) {
       paddingX={{ base: 4, md: 5 }}
       paddingY={2.5}
       gap={2.5}
-      fontSize="12px"
+      textStyle="caption"
       color="fg.muted"
     >
       <Box color="yellow.500" flexShrink={0}>

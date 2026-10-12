@@ -5,7 +5,7 @@
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 
 /** What the dialog says when the caller does not name the thing being archived. */
 const defaultTitle = "Archive run plan?";
@@ -32,47 +32,25 @@ export function SuiteArchiveDialog({
   description?: string;
 }) {
   return (
-    <Dialog.Root open={open} onOpenChange={onClose} placement="center">
-      <Dialog.Content maxWidth="500px" onClick={(e) => e.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>{title}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={4}>
-            <Text>
-              <Text as="span" fontWeight="semibold">
-                {suiteName}
-              </Text>
-            </Text>
-            <Text color="fg.muted" fontSize="sm">
-              {description}
-            </Text>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={(e) => {
-              e.stopPropagation();
-              onConfirm();
-            }}
-            disabled={isLoading}
-          >
-            {isLoading ? <Spinner size="sm" /> : "Archive"}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="md"
+      placement="center"
+      busy={isLoading}
+      primaryAction={{ label: "Archive", loading: isLoading, onClick: onConfirm }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Text>
+          <Text as="span" fontWeight="semibold">
+            {suiteName}
+          </Text>
+        </Text>
+        <Text color="fg.muted" fontSize="sm">
+          {description}
+        </Text>
+      </VStack>
+    </Dialog>
   );
 }

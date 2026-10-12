@@ -90,12 +90,17 @@ export function AppHeaderUserMenu() {
               <PersonalWorkspaceEntries entries={personalWorkspaceEntries} host={host} />
               {!plan.isLiteMember && (
                 <Menu.Item value="api-keys" asChild>
-                  <NavigationLink href="/settings/api-keys">API Keys</NavigationLink>
+                  <NavigationLink href="/settings/api-keys">API keys</NavigationLink>
                 </Menu.Item>
               )}
               <Menu.Item value="settings" asChild>
                 <NavigationLink href="/settings">Settings</NavigationLink>
               </Menu.Item>
+              {host.opsAccess().hasAccess && (
+                <Menu.Item value="admin" asChild>
+                  <NavigationLink href="/ops">Admin</NavigationLink>
+                </Menu.Item>
+              )}
               {accountMenu?.presence}
               {accountMenu?.experiments && (
                 <Menu.Item value="experiments" onSelect={accountMenu.experiments.open}>

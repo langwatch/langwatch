@@ -164,7 +164,7 @@ export function LangyFailureSurface({
   if (!surface) return null;
   // Padded to the message column's own measure, since it sits outside that column.
   return (
-    <Box paddingX={panelGutter(floating)} paddingBottom="12px">
+    <Box paddingX={panelGutter(floating)} paddingBottom="3">
       {surface}
     </Box>
   );
@@ -206,7 +206,7 @@ export function LangyPinnedPlan({
   return (
     <Box
       paddingX={panelGutter(floating)}
-      paddingBottom="8px"
+      paddingBottom="2"
       maxHeight="34%"
       overflowY="auto"
       flexShrink={0}
@@ -273,7 +273,7 @@ function ignoreAction(_kind: ErrorAction): void {}
  */
 export function LangyTimeTravelVeil({ floating, atMs }: { floating: boolean; atMs: number }) {
   return (
-    <HStack paddingX={panelGutter(floating)} paddingBottom="4px" gap={2}>
+    <HStack paddingX={panelGutter(floating)} paddingBottom="1" gap={2}>
       <Text textStyle="2xs" color="orange.fg" fontWeight="600">
         Viewing tape @ {atMs ? readableDate(atMs).toLocaleTimeString() : "start"}
       </Text>

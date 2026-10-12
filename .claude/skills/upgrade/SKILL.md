@@ -1,6 +1,6 @@
 ---
 name: upgrade
-description: "How the upgrade system works end to end, for an engineer changing or debugging it: `pnpm task upgrade` (`status`, `plan`, `steps`), the ledger schema, the runner lease and the serving roster, release manifests in `packages/upgrade/releases/`, blocking, background and operator steps, `.withMigrations`, the code-step generator and `code-step-ids.generated.ts`, `-- after:` notes, the serving gate, rollback, the Ops Upgrades console and `retryStep`, the worker running the upgrade, serving while upgrading (no holds, `upgrade_in_progress`, `ClickHouseColumns`), the first-install token console, and how to test it (live fixture, migration-compat, rehearsal, upgradelab). Use when someone says 'how does the upgrade work', 'pnpm task upgrade', 'the ledger', 'upgrade lease', 'serving roster', 'serving gate', 'refuses to serve', 'behind this image', 'release manifest', 'stamp the release', 'code-step-ids', 'image-code-steps', 'CodeStepId', 'after: note', 'upgrade_in_progress', 'serves while upgrading', 'no holds', 'token console', 'the worker runs the upgrade', 'rollback reopened', 'Upgrades page', 'retry a failed step', 'upgradelab', 'upgrade rehearsal' or 'migration-compat'."
+description: "How the upgrade system works end to end, for an engineer changing or debugging it: `pnpm task upgrade` (`status`, `plan`, `steps`), the ledger schema, the runner lease and the serving roster, release manifests in `packages/upgrade/releases/`, blocking, background and operator steps, `.withMigrations`, the code-step generator and `code-step-ids.generated.ts`, operator steps, the serving gate, rollback, the Ops Upgrades console and `retryStep`, the worker running the upgrade, serving while upgrading (no holds, `upgrade_in_progress`, `ClickHouseColumns`), the first-install token console, and how to test it (live fixture, migration-compat, rehearsal, upgradelab). Use when someone says 'how does the upgrade work', 'pnpm task upgrade', 'the ledger', 'upgrade lease', 'serving roster', 'serving gate', 'refuses to serve', 'behind this image', 'release manifest', 'stamp the release', 'code-step-ids', 'image-code-steps', 'CodeStepId', 'operator step', 'upgrade_in_progress', 'serves while upgrading', 'no holds', 'token console', 'the worker runs the upgrade', 'rollback reopened', 'Upgrades page', 'retry a failed step', 'upgradelab', 'upgrade rehearsal' or 'migration-compat'."
 user-invocable: true
 argument-hint: "<the part of the upgrade you are changing or debugging>"
 ---
@@ -15,10 +15,12 @@ Record: `dev/docs/ARCHITECTURE.md` §7 ("Upgrades run on deploy", no required st
 
 ```
 new image ─► worker boot ─► gate.admit (behind or first install)
-                 │            lease `upgrade` free? ─► child `pnpm task upgrade`
+                 │            lease `upgrade` free? ─► the upgrade in this process (runImageUpgrade)
+                 │              over the installed modules booted in the tasks role (bootModules)
                  │            held by a peer / failed run ─► wait, re-ask every 10 s, wait for Retry
                  │              ledger schema, lease, seed, plan
-                 │              per release: schema (Prisma, goose) ─► blocking steps ─► reconcilers
+                 │              per release: schema (Prisma, goose programs) ─► blocking steps
+                 │              ─► reconcilers (TTL, `pnpm task upgrade lwql-provision`, pass request)
                  ▼
              ledger current ─► takes jobs ─► background steps (per-step leases)
 
@@ -29,8 +31,10 @@ new image ─► api boot (beside the worker, never after it) ─► never runs 
    ledger current (re-read every 10 s) ─► SERVING ─► roster row every 15 s
 ```
 
-Entry points (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER): the worker's gate is the
-one runner of an image; every entry point reaches it. Helm upgrade: new worker pods run it, new api
+Entry points (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER): the worker is the one
+runner of an image; every entry point reaches it. `pnpm task upgrade` is a run-once worker (Alex,
+2026-10-11): it starts `apps/worker` with `upgrade`, which runs the upgrade once in-process and
+exits 0, 1 or 3; `status`, `plan` and `steps` stay reads in the tasks app. Helm upgrade: new worker pods run it, new api
 pods hold not ready, and the pre-roll Job renders only with `serializeUpgrades` (never a
 pre-install or pre-rollback hook). Helm with `workers.enabled: false`: each app pod carries the
 worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). Compose has no
@@ -43,18 +47,20 @@ worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). 
 
 | Piece                                                           | File                                                                                                                                                 |
 | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Task, `status`, `plan`, `steps`, stepping applier               | `apps/tasks/src/upgrade.ts`                                                                                                                          |
+| Task (run-once worker), `status`, `plan`, `steps`               | `apps/tasks/src/upgrade.ts`; the run-once mode is `apps/worker/src/main.ts` (`upgradeOnce`)                                                           |
+| The composed runner: Prisma, goose, reconcilers, hints          | `packages/upgrade/src/runner/image-upgrade.ts`, `release-stepping-applier.ts`                                                                        |
+| The worker's in-process run and its modules                     | `packages/upgrade/src/gate/in-process-upgrade.ts`; `bootModules` from `packages/process/src/preamble.ts`                                            |
 | Runner, phases, outcome codes and exit codes                    | `packages/upgrade/src/runner/upgrade-runner.ts`, `upgrade-outcome.ts`, `run-phases.ts`                                                               |
 | Lease (ttl 60 s, heartbeat 15 s, wait 10 min)                   | `packages/upgrade/src/runner/runner-lease.ts` (`DEFAULT_LEASE_TIMING`)                                                                               |
 | Ledger kinds, modes, statuses                                   | `packages/upgrade/src/ledger.ts`                                                                                                                     |
 | Ledger schema and tables                                        | `packages/upgrade/src/ledger-tables.ts`                                                                                                              |
-| Plan, `after` ordering, `-- after:` inlining                    | `packages/upgrade/src/plan/plan-upgrade.ts`                                                                                                          |
+| Plan, `after` ordering                                          | `packages/upgrade/src/plan/plan-upgrade.ts`                                                                                                          |
 | Installed release inferred from the ledger                      | `packages/upgrade/src/runner/installed-release.ts`                                                                                                   |
 | One release at a time                                           | `packages/upgrade/src/stepping/` (`apply-release.ts`, `rerunnable-migrations.ts`)                                                                    |
 | Manifests                                                       | `packages/upgrade/releases/*.json`, `packages/upgrade/src/manifest/`                                                                                 |
 | Step declaration                                                | `packages/upgrade/src/step/migration-step.ts`, `projection-replay-step.ts`                                                                           |
 | Collection over the installed list                              | `packages/process/src/migration/migration-steps.ts`                                                                                                  |
-| Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`; the child is `gate/first-install-upgrade.ts` |
+| Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`                                               |
 | Liveness door and the token console                             | `packages/process/src/lifecycle/liveness-thread.ts`                                                                                                  |
 | `upgrade_in_progress` mapping (all transports)                  | `packages/api/src/errors.ts` (`promoteStoreFailure`)                                                                                                 |
 | Defensive ClickHouse reads                                      | `packages/clickhouse-client/src/present-columns.ts` (`ClickHouseColumns`)                                                                            |
@@ -98,10 +104,9 @@ api builds none. Ordering:
 
 - `after: [step]` (value, or a foreign id typed as `CodeStepId`): only background steps; the worker
   holds it `waiting` until each named step is `done` or `not-needed` (STEP-AFTER).
-- `-- after: <step id>` in a contract's SQL beside its `-- contract: retired in` note: the upgrade
-  runs that background step (and its own `after`s) inline before the contract's release
-  (`inlineBeforeContracts`, STEP-AFTER-2). Unknown id: `step_after_unknown`; cycle:
-  `step_after_cycle`.
+- Unknown id: `step_after_unknown`; cycle: `step_after_cycle`, both refused when the upgrade plans.
+- Nothing is deleted automatically (Alex, 2026-10-11): a drop is an operator step confirmed in Ops once safe. The upgrade
+  registers operator steps pending and never runs them, nor any background step.
 
 **After adding, renaming or removing a code step**, regenerate from the root:
 

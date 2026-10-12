@@ -1,4 +1,7 @@
-import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import type {
+  ManagedProviderApi,
+  ManagedProviderServerConfig,
+} from "@langwatch/enterprise-managed-provider-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
 
 import { ManagedProviderModule } from "./app/managed-provider.app.ts";
@@ -7,7 +10,7 @@ import { managedProviderChannels } from "./channels/managed-provider-channels.re
 export const managedProviderProcessModule: PublishedProcessModule<
   "managed-provider",
   ManagedProviderApi,
-  undefined
+  ManagedProviderServerConfig
 > = defineProcessModule("managed-provider")
   .withChannels(managedProviderChannels)
   .withApi(ManagedProviderModule)

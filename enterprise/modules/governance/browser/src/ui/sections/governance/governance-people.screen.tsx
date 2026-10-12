@@ -2,6 +2,7 @@
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
@@ -11,11 +12,10 @@ import {
   Collapsible,
   HStack,
   Spacer,
-  Spinner,
-  Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
@@ -78,7 +78,6 @@ import {
 import { Link } from "../../../ui/elements/governance-link.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
-import { GovernanceTabLabel } from "../../../ui/elements/governance-tab-label.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import GovernanceLayout from "../../../ui/sections/governance-layout.tsx";
@@ -537,61 +536,54 @@ function PeopleTabsSection({
   } = screen;
 
   return (
-    <Tabs.Root
-      colorPalette="accent"
-      size="sm"
+    <ContentTabs
+      label="People and departments"
       value={tab}
       onValueChange={({ value }) => onSelectTab(value)}
-      variant="line"
-      lazyMount
-      unmountOnExit
-    >
-      <PeopleTabsList summary={summary} />
-      <Tabs.Content value="people" paddingTop={4}>
-        <PeopleTabPane
-          orgId={orgId}
-          reads={reads}
-          allRows={allRows}
-          sampleActive={sample.active}
-          canReadActivity={canReadActivity}
-          canManage={canManage}
-          department={filters.department}
-          onDepartmentChange={filters.setDepartment}
-          sortBy={spendSort.sortBy}
-          onSortChange={spendSort.setSortBy}
-          onAssignDepartment={onAssignDepartment}
-          onRunMatch={runMatch.run}
-          isRunningMatch={runMatch.isRunning}
-          onSuggestionsChanged={refreshers.refreshIdentity}
-        />
-      </Tabs.Content>
-      <Tabs.Content value="departments" paddingTop={4}>
-        <DepartmentsTabPane
-          orgId={orgId}
-          rows={departmentTab.rows}
-          isLoading={!sample.active && reads.departments.isLoading}
-          error={sample.active ? null : reads.departments.error}
-          // Invented rows carry no record to rename or archive.
-          canManage={canManage && !sample.active}
-          canManageGrant={canManage}
-          onChanged={refreshers.refreshDepartments}
-        />
-      </Tabs.Content>
-    </Tabs.Root>
-  );
-}
-
-/** The two tab triggers, factored out so the styling repeats only once. */
-function PeopleTabsList({ summary }: { summary: PeopleSummary }) {
-  return (
-    <Tabs.List>
-      <Tabs.Trigger value="people">
-        <GovernanceTabLabel label="People" count={summary.people} />
-      </Tabs.Trigger>
-      <Tabs.Trigger value="departments">
-        <GovernanceTabLabel label="Departments" count={summary.departments} />
-      </Tabs.Trigger>
-    </Tabs.List>
+      mount="active"
+      items={[
+        {
+          value: "people",
+          label: "People",
+          count: summary.people ?? void 0,
+          content: (
+            <PeopleTabPane
+              orgId={orgId}
+              reads={reads}
+              allRows={allRows}
+              sampleActive={sample.active}
+              canReadActivity={canReadActivity}
+              canManage={canManage}
+              department={filters.department}
+              onDepartmentChange={filters.setDepartment}
+              sortBy={spendSort.sortBy}
+              onSortChange={spendSort.setSortBy}
+              onAssignDepartment={onAssignDepartment}
+              onRunMatch={runMatch.run}
+              isRunningMatch={runMatch.isRunning}
+              onSuggestionsChanged={refreshers.refreshIdentity}
+            />
+          ),
+        },
+        {
+          value: "departments",
+          label: "Departments",
+          count: summary.departments ?? void 0,
+          content: (
+            <DepartmentsTabPane
+              orgId={orgId}
+              rows={departmentTab.rows}
+              isLoading={!sample.active && reads.departments.isLoading}
+              error={sample.active ? null : reads.departments.error}
+              // Invented rows carry no record to rename or archive.
+              canManage={canManage && !sample.active}
+              canManageGrant={canManage}
+              onChanged={refreshers.refreshDepartments}
+            />
+          ),
+        },
+      ]}
+    />
   );
 }
 
@@ -779,6 +771,7 @@ function PeopleTabPane({
         sources={sampleActive ? undefined : reads.sources.data}
         canManage={canManage}
         onAssignDepartment={onAssignDepartment}
+        onClearDepartment={() => onDepartmentChange(null)}
         onRunMatch={onRunMatch}
         isRunningMatch={isRunningMatch}
       />
@@ -837,6 +830,7 @@ function PeopleTableSection({
   sources,
   canManage,
   onAssignDepartment,
+  onClearDepartment,
   onRunMatch,
   isRunningMatch,
 }: {
@@ -846,13 +840,14 @@ function PeopleTableSection({
   sources: Parameters<typeof sourceForTarget>[0]["sources"];
   canManage: boolean;
   onAssignDepartment: (row: PeopleRow) => void;
+  onClearDepartment: () => void;
   onRunMatch: () => void;
   isRunningMatch: boolean;
 }) {
   if (isLoading) {
     return (
       <Box padding={6}>
-        <Spinner />
+        <SkeletonRows rows={5} label="Loading people" />
       </Box>
     );
   }
@@ -884,7 +879,12 @@ function PeopleTableSection({
         color="fg.muted"
         fontSize="sm"
       >
-        {emptyPeopleLine({ department })}
+        <VStack align="start" gap={3}>
+          <Text>{emptyPeopleLine({ department })}</Text>
+          <Button size="sm" variant="outline" onClick={onClearDepartment}>
+            Show every department
+          </Button>
+        </VStack>
       </Box>
     );
   }
@@ -1276,7 +1276,7 @@ function DepartmentListPanel({
       </HStack>
       {isLoading && (
         <Box padding={4}>
-          <Spinner />
+          <SkeletonRows rows={3} label="Loading people" />
         </Box>
       )}
       {showEmpty && (

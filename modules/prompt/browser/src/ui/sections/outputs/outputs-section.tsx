@@ -1,15 +1,12 @@
-import { Menu } from "@langwatch/design-system/menu";
+import { Dialog } from "@langwatch/design-system/dialog";
 import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+  FieldEditor,
+  FieldEditorName,
+  FieldEditorRemove,
+  FieldEditorRow,
+} from "@langwatch/design-system/field-editor";
+import { Menu } from "@langwatch/design-system/menu";
+import { Box, Button, HStack, Text, useDisclosure } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   outputsSchema,
@@ -18,8 +15,8 @@ import {
 } from "@langwatch/prompt-contract";
 import type { Field } from "@langwatch/workflow-contract";
 import Ajv from "ajv";
-import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Plus } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { LuBraces } from "react-icons/lu";
 import { fromZodError } from "zod-validation-error";
 
@@ -98,6 +95,19 @@ export const OutputsSection = ({
   availableTypes = LLM_OUTPUT_TYPES,
 }: OutputsSectionProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [focusAfterRemove, setFocusAfterRemove] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (focusAfterRemove === null) return;
+    const frame = requestAnimationFrame(() => {
+      const target =
+        document.querySelector<HTMLElement>(`[data-testid="${focusAfterRemove}"]`) ??
+        document.querySelector<HTMLElement>('[data-testid="add-output-button"]');
+      target?.focus();
+      setFocusAfterRemove(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusAfterRemove]);
   const jsonSchemaDialog = useDisclosure();
   const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<number | null>(null);
 
@@ -132,6 +142,9 @@ export const OutputsSection = ({
 
   const handleRemoveOutput = useCallback(
     (identifier: string) => {
+      const index = outputs.findIndex((o) => o.identifier === identifier);
+      const neighbour = outputs[index + 1] ?? outputs[index - 1];
+      setFocusAfterRemove(neighbour ? `output-name-${neighbour.identifier}` : "");
       onChange(outputs.filter((o) => o.identifier !== identifier));
     },
     [outputs, onChange],
@@ -186,17 +199,21 @@ export const OutputsSection = ({
   const canDelete = outputs.length > 1;
 
   return (
-    <VStack align="stretch" gap={3} width="full">
-      {/* Header */}
-      <HStack width="full">
-        <Text fontSize="xs" fontWeight="bold" textTransform="uppercase" color="fg.muted">
-          {title}
-        </Text>
-        <Spacer />
-        {canAddRemove && !readOnly && (
+    <FieldEditor
+      label={title}
+      empty={outputs.length === 0}
+      emptyMessage="No outputs defined"
+      addAction={
+        canAddRemove && !readOnly ? (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button size="xs" variant="outline" data-testid="add-output-button">
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                aria-label="Add output"
+                data-testid="add-output-button"
+              >
                 <Plus size={14} />
                 Add
               </Button>
@@ -216,45 +233,36 @@ export const OutputsSection = ({
               ))}
             </Menu.Content>
           </Menu.Root>
-        )}
-      </HStack>
-
-      {/* Outputs List */}
-      {outputs.length === 0 ? (
-        <Text fontSize="13px" color="fg.subtle">
-          No outputs defined
-        </Text>
-      ) : (
-        <VStack align="stretch" gap={2}>
-          {outputs.map((output, index) => (
-            <OutputRow
-              key={output.identifier}
-              output={output}
-              canRemove={canAddRemove && canDelete}
-              readOnly={readOnly}
-              isEditing={editingId === output.identifier}
-              onStartEdit={() => setEditingId(output.identifier)}
-              onEndEdit={() => setEditingId(null)}
-              onUpdate={(updates) => handleUpdateOutput(output.identifier, updates)}
-              onRemove={() => handleRemoveOutput(output.identifier)}
-              onEditJsonSchema={() => handleEditJsonSchema(index)}
-              typeOptions={typeOptions}
-            />
-          ))}
-        </VStack>
-      )}
-
-      {/* JSON Schema Dialog */}
-      <JsonSchemaDialog
-        open={jsonSchemaDialog.open}
-        onClose={() => {
-          jsonSchemaDialog.onClose();
-          setEditingJsonSchemaIndex(null);
-        }}
-        value={currentJsonSchema}
-        onChange={handleJsonSchemaChange}
-      />
-    </VStack>
+        ) : undefined
+      }
+      message={
+        <JsonSchemaDialog
+          open={jsonSchemaDialog.open}
+          onClose={() => {
+            jsonSchemaDialog.onClose();
+            setEditingJsonSchemaIndex(null);
+          }}
+          value={currentJsonSchema}
+          onChange={handleJsonSchemaChange}
+        />
+      }
+    >
+      {outputs.map((output, index) => (
+        <OutputRow
+          key={output.identifier}
+          output={output}
+          canRemove={canAddRemove && canDelete}
+          readOnly={readOnly}
+          isEditing={editingId === output.identifier}
+          onStartEdit={() => setEditingId(output.identifier)}
+          onEndEdit={() => setEditingId(null)}
+          onUpdate={(updates) => handleUpdateOutput(output.identifier, updates)}
+          onRemove={() => handleRemoveOutput(output.identifier)}
+          onEditJsonSchema={() => handleEditJsonSchema(index)}
+          typeOptions={typeOptions}
+        />
+      ))}
+    </FieldEditor>
   );
 };
 
@@ -274,16 +282,6 @@ type OutputRowProps = {
   onEditJsonSchema: () => void;
   typeOptions: { value: OutputType; label: string }[];
 };
-
-function focusInputOnNextFrame(inputRef: React.RefObject<HTMLInputElement | null>): void {
-  // Use requestAnimationFrame to ensure DOM is ready after render
-  requestAnimationFrame(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  });
-}
 
 function applyOutputTypeChange({
   newType,
@@ -318,13 +316,6 @@ const OutputRow = ({
 }: OutputRowProps) => {
   const [editValue, setEditValue] = useState(output.identifier);
   const [hasError, setHasError] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Focus input when editing starts
-  useEffect(() => {
-    if (isEditing) focusInputOnNextFrame(inputRef);
-  }, [isEditing]);
-
   const handleSave = () => {
     if (editValue.trim() === "") {
       setEditValue(output.identifier);
@@ -341,106 +332,74 @@ const OutputRow = ({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave();
-    } else if (e.key === "Escape") {
-      setEditValue(output.identifier);
-      onEndEdit();
-    }
+  const handleCancel = () => {
+    setEditValue(output.identifier);
+    onEndEdit();
   };
 
   return (
-    <HStack gap={2} width="full">
-      <FieldTypeSelect
-        value={output.type}
-        options={typeOptions}
-        onChange={(newTypeStr) =>
-          applyOutputTypeChange({
-            newType: newTypeStr as OutputType,
-            currentType: output.type,
-            onUpdate,
-            onEditJsonSchema,
-          })
-        }
-        readOnly={readOnly}
-        testId={`output-type-select-${output.identifier}`}
-      />
-
-      {/* Output Name */}
-      {isEditing && !readOnly ? (
-        <Input
-          ref={inputRef}
-          value={editValue}
-          onChange={(e) => setEditValue(normalizeIdentifier(e.target.value))}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          size="sm"
-          width="100px"
-          fontFamily="mono"
-          fontSize="13px"
-          borderColor={hasError ? "red.emphasized" : undefined}
-          data-testid={`output-name-input-${output.identifier}`}
+    <FieldEditorRow
+      typeControl={
+        <FieldTypeSelect
+          value={output.type}
+          options={typeOptions}
+          onChange={(newTypeStr) =>
+            applyOutputTypeChange({
+              newType: newTypeStr as OutputType,
+              currentType: output.type,
+              onUpdate,
+              onEditJsonSchema,
+            })
+          }
+          readOnly={readOnly}
+          testId={`output-type-select-${output.identifier}`}
         />
-      ) : (
-        <Text
-          fontFamily="mono"
-          fontSize="13px"
-          cursor={readOnly ? "default" : "pointer"}
-          onClick={readOnly ? undefined : onStartEdit}
-          border="1px solid"
-          borderColor="transparent"
-          paddingX={2}
-          paddingY={1}
-          marginX={-2}
-          marginY={-1}
-          borderRadius="lg"
-          _hover={readOnly ? undefined : { borderColor: "border" }}
-          minWidth="60px"
-          data-testid={`output-name-${output.identifier}`}
-        >
-          {output.identifier}
-        </Text>
-      )}
-
-      <Spacer />
-
-      {/* JSON Schema Edit Button */}
-      {output.type === "json_schema" && (
-        <Tooltip content="Edit JSON Schema" positioning={{ placement: "top" }}>
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={onEditJsonSchema}
-            data-testid={`edit-json-schema-${output.identifier}`}
-          >
-            <LuBraces size={14} />
-            <Text fontSize="xs">JSON Schema</Text>
-          </Button>
-        </Tooltip>
-      )}
-
-      {/* Delete Button */}
-      {!readOnly && (
-        <Tooltip
-          content={canRemove ? "Remove output" : "At least one output is required"}
-          positioning={{ placement: "top" }}
-        >
-          <Button
-            size="xs"
-            variant="ghost"
-            colorPalette="gray"
-            onClick={onRemove}
-            flexShrink={0}
-            color="fg.subtle"
+      }
+      nameControl={
+        <FieldEditorName
+          value={output.identifier}
+          editing={isEditing && !readOnly}
+          draft={editValue}
+          readOnly={readOnly}
+          invalid={hasError}
+          ariaLabel={`Output name ${output.identifier}`}
+          onStartEdit={onStartEdit}
+          onDraftChange={(draft) => setEditValue(normalizeIdentifier(draft))}
+          onCommit={handleSave}
+          onCancel={handleCancel}
+          displayTestId={`output-name-${output.identifier}`}
+          inputTestId={`output-name-input-${output.identifier}`}
+        />
+      }
+      value={
+        output.type === "json_schema" ? (
+          <Tooltip content="Edit JSON Schema" positioning={{ placement: "top" }}>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={onEditJsonSchema}
+              data-testid={`edit-json-schema-${output.identifier}`}
+            >
+              <LuBraces size={14} />
+              <Text fontSize="xs">JSON Schema</Text>
+            </Button>
+          </Tooltip>
+        ) : undefined
+      }
+      valueLabel="Schema"
+      removeAction={
+        !readOnly ? (
+          <FieldEditorRemove
+            label={`Remove output ${output.identifier}`}
+            tooltip={canRemove ? "Remove output" : "At least one output is required"}
             disabled={!canRemove}
+            onClick={onRemove}
             data-testid={`remove-output-${output.identifier}`}
-          >
-            <X size={14} />
-          </Button>
-        </Tooltip>
-      )}
-    </HStack>
+          />
+        ) : undefined
+      }
+    />
   );
 };
 
@@ -501,60 +460,44 @@ const JsonSchemaDialog = ({
   );
 
   return (
-    <Dialog.Root
-      size="lg"
+    <Dialog
       open={open}
-      onOpenChange={({ open }) => {
-        if (!open) {
-          const isEdited = JSON.stringify(value, null, 2) !== code;
-          if (isEdited && !confirm("Changes will be lost. Are you sure?")) {
-            return;
-          }
-          onClose();
+      onClose={() => {
+        const isEdited = JSON.stringify(value, null, 2) !== code;
+        if (isEdited && !confirm("Changes will be lost. Are you sure?")) {
+          return;
         }
+        onClose();
+      }}
+      title="JSON Schema"
+      size="lg"
+      ground="card"
+      primaryAction={{
+        label: "Save",
+        onClick: () => {
+          if (error) return;
+          onChange(JSON.parse(code));
+          onClose();
+        },
       }}
     >
-      <Dialog.Content margin="64px" background="bg.card" color="fg">
-        <Dialog.Header>
-          <Dialog.Title>JSON Schema</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger color="fg" _hover={{ color: "fg.muted" }} />
-        <Dialog.Body>
-          <Box height="400px">
-            {open && (
-              <WorkflowCodeEditor
-                code={code}
-                setCode={(code: string) => {
-                  setCode(code);
-                  checkForErrors(code);
-                }}
-                onClose={onClose}
-                language="json"
-                technologies={["json", "json schema"]}
-                // A JSON schema names no secrets, so the editor offers none.
-                secretNames={[]}
-              />
-            )}
-            {error && <Text>Error: {error}</Text>}
-          </Box>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button
-            onClick={() => {
-              onChange(JSON.parse(code));
-              onClose();
+      <Box height="400px">
+        {open && (
+          <WorkflowCodeEditor
+            code={code}
+            setCode={(code: string) => {
+              setCode(code);
+              checkForErrors(code);
             }}
-            variant="outline"
-            color="fg"
-            colorPalette="white"
-            size="lg"
-            disabled={!!error}
-            _hover={{ color: "fg.muted" }}
-          >
-            Save
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+            onClose={onClose}
+            language="json"
+            technologies={["json", "json schema"]}
+            // A JSON schema names no secrets, so the editor offers none.
+            secretNames={[]}
+          />
+        )}
+        {error && <Text role="alert">Error: {error}</Text>}
+      </Box>
+    </Dialog>
   );
 };

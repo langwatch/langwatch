@@ -1,3 +1,4 @@
+import { Popover } from "@langwatch/design-system/popover";
 import {
   Badge,
   Box,
@@ -10,7 +11,7 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs, type Instant } from "@langwatch/time";
 import { BookText, ChevronDown, Code, Globe, Plug, Plus, Workflow } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import {
   agentTargetLabel,
@@ -117,29 +118,9 @@ export function ScenarioTargetSelector({
 }) {
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
-  const [maxDropdownHeight, setMaxDropdownHeight] = useState(400);
-  const [dropUp, setDropUp] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const closeOnOutsideClick = (event: MouseEvent) => {
-      const eventTarget = event.target;
-      const isInside = eventTarget instanceof Node && containerRef.current?.contains(eventTarget);
-      if (!isInside) {
-        setOpen(false);
-        setSearchValue("");
-      }
-    };
-    document.addEventListener("mousedown", closeOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
-  }, [open]);
 
   const filteredPrompts = useMemo(
     () => filterPublishedPrompts({ prompts, searchValue }),
@@ -174,24 +155,12 @@ export function ScenarioTargetSelector({
     triggerRef.current?.focus();
   };
 
-  const handleToggle = () => {
-    const nextOpen = !open;
+  const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
     if (!nextOpen) {
       setSearchValue("");
       return;
     }
-
-    const triggerBounds = triggerRef.current?.getBoundingClientRect();
-    if (triggerBounds) {
-      const spaceBelow = window.innerHeight - triggerBounds.bottom - 8;
-      const spaceAbove = triggerBounds.top - 8;
-      const shouldDropUp = spaceAbove > spaceBelow;
-      const availableSpace = shouldDropUp ? spaceAbove : spaceBelow;
-      setDropUp(shouldDropUp);
-      setMaxDropdownHeight(Math.min(400, Math.max(40, availableSpace)));
-    }
-
     setTimeout(() => {
       inputRef.current?.focus();
       scrollContainerRef.current?.scrollTo(0, 0);
@@ -199,75 +168,71 @@ export function ScenarioTargetSelector({
   };
 
   return (
-    <Box ref={containerRef} position="relative" width="fit-content">
-      <Button
-        ref={triggerRef}
-        variant="outline"
-        size="sm"
-        minWidth="240px"
-        justifyContent="space-between"
-        onClick={handleToggle}
-        data-testid="target-selector-trigger"
-      >
-        <HStack gap={2}>
-          <ScenarioTargetSelectionMark target={value} />
-          <Text>{selectedLabel ?? placeholder}</Text>
-        </HStack>
-        <ChevronDown size={14} />
-      </Button>
-      {open && (
-        <Box
-          position="absolute"
-          {...(dropUp ? { bottom: "100%", marginBottom: 1 } : { top: "100%", marginTop: 1 })}
-          left={0}
-          width="300px"
-          maxHeight={`${maxDropdownHeight}px`}
-          borderRadius="lg"
-          borderWidth="1px"
-          borderColor="border"
-          background="bg.panel"
-          boxShadow="lg"
-          zIndex={10}
-          overflow="hidden"
-          display="flex"
-          flexDirection="column"
-          onPointerDown={(event) => event.stopPropagation()}
-          data-testid="target-selector-dropdown"
+    <Popover.Root
+      open={open}
+      lazyMount
+      unmountOnExit
+      onOpenChange={(details) => handleOpenChange(details.open)}
+      positioning={{ placement: "bottom-start", sameWidth: false }}
+    >
+      <Popover.Trigger asChild>
+        <Button
+          ref={triggerRef}
+          variant="outline"
+          size="sm"
+          minWidth="240px"
+          justifyContent="space-between"
+          data-testid="target-selector-trigger"
         >
-          <Box padding={2} borderBottomWidth="1px" borderColor="border" bg="bg" flexShrink={0}>
-            <Input
-              ref={inputRef}
-              size="sm"
-              placeholder="Search prompts or agents..."
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-            />
-          </Box>
-          <Box ref={scrollContainerRef} flex={1} minHeight={0} overflowY="auto">
-            <ScenarioTargetAgentOptions
-              agents={filteredAgents}
-              searchValue={searchValue}
-              selectedTarget={value}
-              onSelect={handleSelect}
-              onCreate={() => {
-                resetDropdown();
-                onCreateAgent?.();
-              }}
-            />
-            <ScenarioTargetPromptOptions
-              prompts={filteredPrompts}
-              searchValue={searchValue}
-              selectedTarget={value}
-              onSelect={handleSelect}
-              onCreate={() => {
-                resetDropdown();
-                onCreatePrompt?.();
-              }}
-            />
-          </Box>
+          <HStack gap={2}>
+            <ScenarioTargetSelectionMark target={value} />
+            <Text>{selectedLabel ?? placeholder}</Text>
+          </HStack>
+          <ChevronDown size={14} />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content
+        width="300px"
+        maxHeight="min(400px, var(--available-height))"
+        padding={0}
+        overflow="hidden"
+        display="flex"
+        flexDirection="column"
+        data-testid="target-selector-dropdown"
+      >
+        <Box padding={2} borderBottomWidth="1px" borderColor="border" bg="bg" flexShrink={0}>
+          <Input
+            ref={inputRef}
+            size="sm"
+            placeholder="Search prompts or agents..."
+            value={searchValue}
+            onChange={(event) => setSearchValue(event.target.value)}
+          />
         </Box>
-      )}
-    </Box>
+        <Box ref={scrollContainerRef} flex={1} minHeight={0} overflowY="auto">
+          <ScenarioTargetAgentOptions
+            agents={filteredAgents}
+            searchValue={searchValue}
+            selectedTarget={value}
+            onSelect={handleSelect}
+            onCreate={() => {
+              resetDropdown();
+              onCreateAgent?.();
+            }}
+          />
+          <ScenarioTargetPromptOptions
+            prompts={filteredPrompts}
+            searchValue={searchValue}
+            selectedTarget={value}
+            onSelect={handleSelect}
+            onCreate={() => {
+              resetDropdown();
+              onCreatePrompt?.();
+            }}
+          />
+        </Box>
+      </Popover.Content>
+    </Popover.Root>
   );
 }
 
@@ -325,7 +290,7 @@ function ScenarioTargetAgentOptions({
         onClick={onCreate}
       >
         <Plus size={14} />
-        <Text fontSize="sm">Add New Agent</Text>
+        <Text fontSize="sm">Add new agent</Text>
       </HStack>
     </Box>
   );
@@ -490,7 +455,7 @@ function ScenarioTargetPromptOptions({
         onClick={onCreate}
       >
         <Plus size={14} />
-        <Text fontSize="sm">Add New Prompt</Text>
+        <Text fontSize="sm">Add new prompt</Text>
       </HStack>
     </Box>
   );

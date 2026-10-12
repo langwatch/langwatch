@@ -1,8 +1,9 @@
-import { Button } from "@langwatch/design-system/primitives";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import type { DrawerFooterProps } from "@langwatch/design-system/drawer";
 
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import type { GroupTarget, useGroupActions } from "../../behavior/use-group-actions.ts";
 
+type FooterAction = NonNullable<DrawerFooterProps["secondaryActions"]>[number];
 type GroupActions = ReturnType<typeof useGroupActions>;
 
 export function GroupActionConfirms({
@@ -20,7 +21,7 @@ export function GroupActionConfirms({
         onConfirm={() => actions.drainMutation.mutate(target)}
         title="Drain Group"
         description={`Permanently remove all jobs from "${target.groupId}". Cannot be undone.`}
-        isLoading={actions.drainMutation.isPending}
+        loading={actions.drainMutation.isPending}
       />
       <ConfirmDialog
         open={actions.confirmAction === "dlq"}
@@ -28,14 +29,14 @@ export function GroupActionConfirms({
         onConfirm={() => actions.moveToDlqMutation.mutate(target)}
         title="Move Group to Dead-Letter Queue"
         description={`Move all jobs from "${target.groupId}" to the dead-letter queue. They stop processing until replayed from the Dead Letter Queue card.`}
-        isLoading={actions.moveToDlqMutation.isPending}
+        loading={actions.moveToDlqMutation.isPending}
       />
     </>
   );
 }
 
-/** The footer's action buttons; the confirms above catch the destructive two. */
-export function GroupDrawerActions({
+/** The drawer footer's actions; the confirms above catch the destructive two. */
+export function groupDrawerFooter({
   target,
   actions,
   isBlocked,
@@ -43,31 +44,21 @@ export function GroupDrawerActions({
   target: GroupTarget;
   actions: GroupActions;
   isBlocked: boolean;
-}) {
-  return (
-    <>
-      {isBlocked && (
-        <Button
-          variant="outline"
-          size="sm"
-          colorPalette="green"
-          loading={actions.unblockMutation.isPending}
-          onClick={() => actions.unblockMutation.mutate(target)}
-        >
-          Retry now
-        </Button>
-      )}
-      <Button variant="outline" size="sm" onClick={() => actions.setConfirmAction("dlq")}>
-        Move to dead-letter queue
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        colorPalette="red"
-        onClick={() => actions.setConfirmAction("drain")}
-      >
-        Drain
-      </Button>
-    </>
-  );
+}): DrawerFooterProps {
+  const retry: FooterAction = {
+    label: "Retry now",
+    tone: "success",
+    loading: actions.unblockMutation.isPending,
+    onClick: () => actions.unblockMutation.mutate(target),
+  };
+  const deadLetter: FooterAction = {
+    label: "Move to dead-letter queue",
+    onClick: () => actions.setConfirmAction("dlq"),
+  };
+  const drain: FooterAction = {
+    label: "Drain",
+    tone: "danger",
+    onClick: () => actions.setConfirmAction("drain"),
+  };
+  return { secondaryActions: [...(isBlocked ? [retry] : []), deadLetter, drain] };
 }

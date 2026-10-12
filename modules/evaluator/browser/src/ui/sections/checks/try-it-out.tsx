@@ -5,6 +5,7 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import { ListTable, RawTable as Table } from "@langwatch/design-system/list-table";
 import {
   Alert,
   Button,
@@ -15,7 +16,6 @@ import {
   Skeleton,
   Spacer,
   Spinner,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -218,11 +218,16 @@ export function TryItOut({
   );
 
   const hasAnyLabels = evaluatorDefinition?.result.label;
+  const columnCount = sampleColumnCount({
+    evaluatorType,
+    evaluatorDefinition,
+    hasAnyLabels: !!hasAnyLabels,
+  });
 
   return (
     <VStack width="full" gap={6} marginTop={6}>
       <HStack width="full" align="end">
-        <Heading as="h2" size="lg" textAlign="center" paddingTop={4}>
+        <Heading as="h2" size="xl" textAlign="center" paddingTop={4}>
           Try it out
         </Heading>
         <Spacer />
@@ -236,7 +241,7 @@ export function TryItOut({
             type="search"
             placeholder="Search"
             _placeholder={{ color: "fg.subtle" }}
-            fontSize="14px"
+            textStyle="body"
             paddingY={1.5}
             height="auto"
             onChange={(e) => setQuery(e.target.value)}
@@ -317,7 +322,13 @@ export function TryItOut({
           </Card.Header>
           <Card.Body paddingX={2} paddingTop={0}>
             <VStack width="full" align="start" gap={6}>
-              <Table.Root variant="line">
+              <ListTable
+                variant="embedded"
+                scroll="x"
+                scrollLabel="Sample traces"
+                aria-label="Sample traces to try the evaluator on"
+                loading={tracesPassingPreconditionsOnLoad.isLoading}
+              >
                 <SampleTableHeader
                   evaluatorType={evaluatorType}
                   evaluatorDefinition={evaluatorDefinition}
@@ -356,7 +367,7 @@ export function TryItOut({
                   {tracesPassingPreconditionsOnLoad.isLoading &&
                     Array.from({ length: 10 }).map((_, i) => (
                       <Table.Row key={i}>
-                        {Array.from({ length: 6 }).map((_, i) => (
+                        {Array.from({ length: columnCount }).map((_, i) => (
                           <Table.Cell key={i}>
                             <Skeleton height="20px" />
                           </Table.Cell>
@@ -366,19 +377,19 @@ export function TryItOut({
                   {tracesPassingPreconditionsOnLoad.isFetched &&
                     tracesPassingPreconditionsOnLoad.data?.length === 0 && (
                       <Table.Row>
-                        <Table.Cell colSpan={5}>
+                        <Table.Cell colSpan={columnCount}>
                           No messages found, try selecting different filters and dates
                         </Table.Cell>
                       </Table.Row>
                     )}
                   <Table.Row>
-                    <Table.Cell colSpan={5} textAlign="right" fontWeight={500}>
+                    <Table.Cell colSpan={columnCount - 1} textAlign="right" fontWeight={500}>
                       Total Cost:
                     </Table.Cell>
                     <Table.Cell>{totalCostText(runningResults, totalCost)}</Table.Cell>
                   </Table.Row>
                 </Table.Body>
-              </Table.Root>
+              </ListTable>
             </VStack>
           </Card.Body>
         </Card.Root>
@@ -694,6 +705,21 @@ function SampleTableHeader({
       </Table.Row>
     </Table.Header>
   );
+}
+
+/** How many columns the sample table draws for this evaluator, as its header does. */
+function sampleColumnCount({
+  evaluatorType,
+  evaluatorDefinition,
+  hasAnyLabels,
+}: {
+  evaluatorType: string | undefined;
+  evaluatorDefinition: EvaluatorDefinition | undefined;
+  hasAnyLabels: boolean;
+}): number {
+  const isCustom = !!evaluatorType?.startsWith("custom/");
+  const scoreOrPassed = evaluatorDefinition?.isGuardrail || evaluatorDefinition?.result.score;
+  return 5 + (scoreOrPassed ? 1 : 0) + (isCustom ? 2 : 0) + (hasAnyLabels ? 1 : 0);
 }
 
 type RunningState = { state: "idle" } | { state: "paused" | "running"; nextTraceId: string };

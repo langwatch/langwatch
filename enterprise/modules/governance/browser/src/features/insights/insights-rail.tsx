@@ -65,7 +65,7 @@ export function InsightsRail({
       align="stretch"
       gap={0.5}
       minWidth="200px"
-      fontSize="12.5px"
+      textStyle="bodySm"
       flexShrink={0}
     >
       {FOLDERS.map((folder, index) => (
@@ -104,8 +104,8 @@ function FolderRow({
       alignItems="center"
       gap={2.5}
       width="full"
-      paddingX="10px"
-      paddingY="6px"
+      paddingX="2.5"
+      paddingY="1.5"
       borderRadius="lg"
       textAlign="left"
       fontWeight={active ? "medium" : "normal"}
@@ -143,7 +143,7 @@ function FolderCount({ stream, count }: { stream: boolean; count: number }) {
     );
   }
   return (
-    <Text as="span" fontSize="10.5px" fontWeight="500" color="fg.subtle">
+    <Text as="span" textStyle="micro" fontWeight="500" color="fg.subtle">
       {count}
     </Text>
   );

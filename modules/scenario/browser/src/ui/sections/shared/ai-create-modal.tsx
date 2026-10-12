@@ -1,3 +1,4 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import {
   Box,
@@ -10,14 +11,12 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { ErrorRetryRow } from "../../../behavior/errors.tsx";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error.ts";
 import { useAiGeneration } from "../../../behavior/use-ai-generation.ts";
-import { CARD } from "../../../model/langy/asaplangy-tokens.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -125,93 +124,76 @@ export function AICreateModal({
     onSkip();
   }, [onSkip]);
 
-  const handleOpenChange = useCallback(
-    (details: { open: boolean }) => {
-      // Only allow closing when not generating
-      if (!details.open && modalState !== "generating") {
-        onClose();
-      }
-    },
-    [modalState, onClose],
-  );
-
-  const showCloseButton = modalState !== "generating";
+  // Not while generating: that takes the X, Escape and outside click with it.
+  const isDismissible = modalState !== "generating";
+  const footer = (() => {
+    const isReady = !!description.trim();
+    if (showsAssistFooter) {
+      return (
+        <AssistFooter
+          onGenerate={handleGenerate}
+          isGenerateDisabled={!isReady}
+          footerHint={footerHint}
+          assistant={assistant}
+        />
+      );
+    }
+    if (showsManualFooter) return <ManualFooter onSkip={handleSkip} />;
+    if (showsIdleFooter) {
+      return (
+        <IdleFooter
+          onSkip={handleSkip}
+          onGenerate={handleGenerate}
+          isGenerateDisabled={!isReady}
+          footerHint={footerHint}
+        />
+      );
+    }
+    if (modalState !== "error") return null;
+    return (
+      <ErrorFooter
+        error={capturedError}
+        onSkip={handleSkip}
+        onTryAgain={handleTryAgain}
+        assistant={assistant}
+      />
+    );
+  })();
 
   return (
-    <Dialog.Root open={open} onOpenChange={handleOpenChange}>
-      <Dialog.Content
-        className={assistant ? "langy-root" : undefined}
-        // A calm LangWatch surface. The one warm accent lives on the docked
-        // composer (the assisted path), not smeared across the whole dialog — so
-        // the wash is NOT combined here (a `bg` shorthand + `backgroundImage` on
-        // one element is order-fragile in Emotion, which is why LangyPanelSurface
-        // layers its wash separately rather than mixing the two).
-        bg={assistant ? CARD.bg : "bg"}
-        maxWidth={assistant ? "620px" : undefined}
-        overflow="hidden"
-        borderWidth={assistant ? "1px" : undefined}
-        borderColor={assistant ? CARD.border : undefined}
-        // A plain deep shadow — no purple "AI" glow. LangWatch's chrome is a
-        // hairline and one warm accent, not a spectrum.
-        boxShadow={
-          assistant
-            ? "0 28px 90px -32px color-mix(in srgb, var(--chakra-colors-bg-scrim) 62%, transparent)"
-            : undefined
-        }
-      >
-        {assistant && <LangyMarkGradientDefs />}
-        {showCloseButton && <Dialog.CloseTrigger />}
-        <CreateModalHeader assistant={assistant} title={title} startMode={startMode} />
-        <Dialog.Body pb={assistant ? 4 : undefined}>
-          {modalState === "idle" && (
-            <CreateModalIdleBody
-              assistant={assistant}
-              startMode={startMode}
-              setStartMode={setStartMode}
-              description={description}
-              placeholder={placeholder}
-              exampleTemplates={exampleTemplates}
-              onDescriptionChange={handleDescriptionChange}
-              onExampleClick={handleExampleClick}
-            />
-          )}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="detail"
+      surface={assistant ? "assistant" : "default"}
+      dismissible={isDismissible}
+      headerContent={
+        assistant ? (
+          <CreateModalHeader assistant={assistant} title={title} startMode={startMode} />
+        ) : undefined
+      }
+      footerContent={footer}
+    >
+      {modalState === "idle" && (
+        <CreateModalIdleBody
+          assistant={assistant}
+          startMode={startMode}
+          setStartMode={setStartMode}
+          description={description}
+          placeholder={placeholder}
+          exampleTemplates={exampleTemplates}
+          onDescriptionChange={handleDescriptionChange}
+          onExampleClick={handleExampleClick}
+        />
+      )}
 
-          {modalState === "generating" && (
-            <GeneratingState text={generatingText} assistant={assistant} />
-          )}
+      {modalState === "generating" && (
+        <GeneratingState text={generatingText} assistant={assistant} />
+      )}
 
-          {modalState === "error" && <ErrorState error={capturedError} />}
-        </Dialog.Body>
-        <Dialog.Footer>
-          {showsAssistFooter && (
-            <AssistFooter
-              onGenerate={handleGenerate}
-              isGenerateDisabled={!description.trim()}
-              footerHint={footerHint}
-              assistant={assistant}
-            />
-          )}
-          {showsManualFooter && <ManualFooter onSkip={handleSkip} />}
-          {showsIdleFooter && (
-            <IdleFooter
-              onSkip={handleSkip}
-              onGenerate={handleGenerate}
-              isGenerateDisabled={!description.trim()}
-              footerHint={footerHint}
-            />
-          )}
-
-          {modalState === "error" && (
-            <ErrorFooter
-              error={capturedError}
-              onSkip={handleSkip}
-              onTryAgain={handleTryAgain}
-              assistant={assistant}
-            />
-          )}
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      {modalState === "error" && <ErrorState error={capturedError} />}
+    </Dialog>
   );
 }
 
@@ -237,50 +219,44 @@ function CreateModalHeader({
   title,
   startMode,
 }: {
-  assistant?: AICreateAssistant;
+  assistant: AICreateAssistant;
   title: string;
   startMode: "assist" | "manual";
 }) {
   return (
-    <Dialog.Header pb={assistant ? 3 : undefined}>
-      {assistant ? (
-        <HStack align="start" gap={3} paddingRight={8}>
-          <Box
-            display="grid"
-            placeItems="center"
-            width="42px"
-            height="42px"
-            flexShrink={0}
-            borderRadius="12px"
-            borderWidth="1px"
-            borderColor="border.muted"
-            bg="bg.card"
-          >
-            <LangyMark size={27} />
-          </Box>
-          <Box>
-            <HStack gap={2} align="baseline" flexWrap="wrap">
-              <Dialog.Title>{title}</Dialog.Title>
-              {/* Langy's name rides the header only while the user is on the
-                      assisted path — on the manual tab this is just "Create new
-                      scenario", so nothing implies the assistant is mandatory. */}
-              {startMode === "assist" && (
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted" letterSpacing="0.04em">
-                  with {assistant.name}
-                </Text>
-              )}
-            </HStack>
-            <Text color="fg.muted" fontSize="sm" marginTop={1}>
-              {startMode === "manual"
-                ? `Build the scenario yourself. ${assistant.name} stays one click away if you want a first draft.`
-                : assistant.description}
+    <HStack align="start" gap={3}>
+      <LangyMarkGradientDefs />
+      <Box
+        display="grid"
+        placeItems="center"
+        width="42px"
+        height="42px"
+        flexShrink={0}
+        borderRadius="12px"
+        borderWidth="1px"
+        borderColor="border.muted"
+        bg="bg.card"
+      >
+        <LangyMark size={27} />
+      </Box>
+      <Box>
+        <HStack gap={2} align="baseline" flexWrap="wrap">
+          <Text textStyle="sectionTitle">{title}</Text>
+          {/* Langy's name rides the header only on the assisted path; on the manual
+              tab this is just "Create new scenario", so the assistant is never mandatory. */}
+          {startMode === "assist" && (
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted" letterSpacing="0.04em">
+              with {assistant.name}
             </Text>
-          </Box>
+          )}
         </HStack>
-      ) : (
-        <Dialog.Title>{title}</Dialog.Title>
-      )}
-    </Dialog.Header>
+        <Text color="fg.muted" fontSize="sm" marginTop={1}>
+          {startMode === "manual"
+            ? `Build the scenario yourself. ${assistant.name} stays one click away if you want a first draft.`
+            : assistant.description}
+        </Text>
+      </Box>
+    </HStack>
   );
 }
 
@@ -308,7 +284,7 @@ function CreateModalIdleBody({
           <Box>
             <Text
               mb={2}
-              fontSize="11px"
+              textStyle="micro"
               fontWeight="bold"
               color="fg.muted"
               letterSpacing="0.1em"
@@ -563,7 +539,12 @@ function IdleFooter({ onSkip, onGenerate, isGenerateDisabled, footerHint }: Idle
         <Button variant="ghost" onClick={onSkip}>
           I&apos;ll write it myself
         </Button>
-        <Button colorPalette="blue" onClick={onGenerate} disabled={isGenerateDisabled}>
+        <Button
+          colorPalette="orange"
+          variant="solid"
+          onClick={onGenerate}
+          disabled={isGenerateDisabled}
+        >
           <Sparkles size={14} />
           Generate with AI
         </Button>
@@ -713,7 +694,7 @@ function ErrorFooter({ error, onSkip, onTryAgain, assistant }: ErrorFooterProps)
         {assistant ? "Set up manually" : "I'll write it myself"}
       </Button>
       {showConfigure && (
-        <Button colorPalette="blue" asChild>
+        <Button colorPalette="orange" variant="solid" asChild>
           <a
             data-testid="error-configure-model-provider-button"
             href="/settings/model-providers"
@@ -725,7 +706,7 @@ function ErrorFooter({ error, onSkip, onTryAgain, assistant }: ErrorFooterProps)
         </Button>
       )}
       {showRetry && (
-        <Button colorPalette="blue" onClick={onTryAgain}>
+        <Button colorPalette="orange" variant="solid" onClick={onTryAgain}>
           Try again
         </Button>
       )}

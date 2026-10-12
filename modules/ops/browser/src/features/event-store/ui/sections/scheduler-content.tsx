@@ -1,14 +1,8 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Badge,
-  Center,
-  EmptyState,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Badge, HStack, Text } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { OpsScheduledJob, SchedulerAuditEntryView } from "@langwatch/ops-contract";
 import { nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { CalendarClock } from "lucide-react";
@@ -53,18 +47,7 @@ export function SchedulerContentView({
   const loop = deriveLoopHealth({ jobs, now });
 
   if (isLoading) {
-    return (
-      <Center paddingY={20}>
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <Spinner size="lg" />
-            </EmptyState.Indicator>
-            <EmptyState.Title>Loading scheduled jobs</EmptyState.Title>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   if (jobs.length === 0) {
@@ -80,24 +63,18 @@ export function SchedulerContentView({
   return (
     <>
       <SchedulerHeader counts={counts} loopHealthy={loop.healthy} lastFiredAt={loop.lastFiredAt} />
-      <ListTable
-        density="compact"
-        columnRules={false}
-        containerProps={{ overflowX: "auto" }}
-        variant="line"
-        size="sm"
-      >
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Target</Table.ColumnHeader>
-            <Table.ColumnHeader>Schedule</Table.ColumnHeader>
-            <Table.ColumnHeader>Next run</Table.ColumnHeader>
-            <Table.ColumnHeader>Last run</Table.ColumnHeader>
-            <Table.ColumnHeader>Status</Table.ColumnHeader>
-            <Table.ColumnHeader width="40px" />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+      <ListTable density="compact" scroll="x" scrollLabel="Scheduled jobs table">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Target</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Schedule</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Next run</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Last run</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+            <ListTable.ActionHeader />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {sorted.map((job) => (
             <ScheduleRow
               key={job.id}
@@ -107,7 +84,7 @@ export function SchedulerContentView({
               renderActions={renderActions}
             />
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
       <SchedulerRecentActions entries={recentActions} />
     </>
@@ -129,8 +106,8 @@ function ScheduleRow({
   const status = deriveStatus({ job, now });
 
   return (
-    <Table.Row>
-      <Table.Cell>
+    <ListTable.Row>
+      <ListTable.Cell>
         <HStack gap={2}>
           <Badge colorPalette="purple" variant="subtle">
             {job.targetType}
@@ -142,44 +119,42 @@ function ScheduleRow({
             {job.projectName ?? middleEllipsis(job.projectId, 18)}
           </Text>
         </HStack>
-      </Table.Cell>
-      <Table.Cell>
-        <Text textStyle="xs" fontFamily="mono">
-          {job.cron}
-        </Text>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <InlineCode variant="neutral">{job.cron}</InlineCode>
         <Text textStyle="xs" color="fg.muted">
           {job.timezone}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text
           textStyle="xs"
           title={job.nextRunAt ? readableDate(job.nextRunAt).toLocaleString() : undefined}
         >
           {job.nextRunAt ? formatTimeAgo(toEpochMs(job.nextRunAt), now) : "not scheduled"}
         </Text>
-      </Table.Cell>
-      <Table.Cell color="fg.muted">
+      </ListTable.Cell>
+      <ListTable.Cell tone="muted">
         <Text
           textStyle="xs"
           title={job.lastSlot ? readableDate(job.lastSlot).toLocaleString() : undefined}
         >
           {job.lastSlot ? formatTimeAgo(toEpochMs(job.lastSlot), now) : "never"}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <SchedulerStatusBadge
           status={status}
           latenessMs={latenessMs({ job, now })}
           attempts={job.attempts}
           lastError={job.lastError}
         />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         {/* A view-only operator is shown no control they cannot use, rather
             than one that errors. */}
         {hasAccess && renderActions?.(job, status, now)}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }

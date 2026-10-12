@@ -62,7 +62,7 @@ function StatusBadge({ status, tone }: { status: EvalEntry["status"]; tone: Stat
     <HStack paddingX={2} paddingY={0.5} borderRadius="sm" bg={tone.bg} flexShrink={0} gap={1}>
       {status === "skipped" && <Icon as={LuCircleSlash} boxSize={2.5} color={tone.fg} />}
       {status === "error" && <Icon as={LuCircleAlert} boxSize={2.5} color={tone.fg} />}
-      <Text textStyle="2xs" fontWeight="bold" color={tone.fg} letterSpacing="0.06em">
+      <Text textStyle="2xs" fontWeight="semibold" color={tone.fg} letterSpacing="0.06em">
         {tone.label}
       </Text>
     </HStack>
@@ -96,7 +96,7 @@ function EvalCardHeader({
       {runHistory.length > 1 && <RunHistorySparkline runs={runHistory} />}
       {view.score.label !== "" && (
         <HStack gap={0.5} align="baseline" flexShrink={0}>
-          <Text textStyle="lg" fontWeight="bold" color={tone.color} lineHeight={1}>
+          <Text textStyle="lg" fontWeight="semibold" color={tone.color} lineHeight={1}>
             {view.score.label}
           </Text>
           {view.score.subLabel && (
@@ -166,7 +166,7 @@ function CategoryChip({ label }: { label: string }) {
   return (
     <Text
       textStyle="2xs"
-      fontWeight="bold"
+      fontWeight="semibold"
       color="blue.fg"
       bg="blue.subtle"
       paddingX={2}
@@ -386,7 +386,7 @@ function DetailRow({ label, children }: { label: string; children: ReactNode }) 
         color="fg.subtle"
         textTransform="uppercase"
         letterSpacing="0.06em"
-        fontWeight="600"
+        fontWeight="semibold"
         marginBottom={1}
       >
         {label}

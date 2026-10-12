@@ -114,7 +114,7 @@ export function ThreadedTurnView({
           <Text
             textStyle="2xs"
             color={palette.fg}
-            fontWeight="600"
+            fontWeight="semibold"
             textTransform="uppercase"
             letterSpacing="0.06em"
             lineHeight={1.4}

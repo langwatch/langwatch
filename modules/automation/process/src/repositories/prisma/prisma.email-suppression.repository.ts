@@ -1,4 +1,8 @@
-import { emailSuppressionSchema, type EmailSuppression } from "@langwatch/automation-contract";
+import {
+  emailSuppressionSchema,
+  type EmailSuppression,
+  type EmailSuppressionCursor,
+} from "@langwatch/automation-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { EmailSuppressionRepository } from "../email-suppression.repository.ts";
@@ -21,6 +25,32 @@ export class PrismaEmailSuppressionRepository extends EmailSuppressionRepository
       await this.database.emailSuppression.findMany({
         where: input,
         orderBy: { createdAt: "desc" },
+      })
+    ).map(map);
+  }
+  async findPage(input: {
+    projectId: string;
+    limit: number;
+    cursor: EmailSuppressionCursor | null;
+  }): Promise<EmailSuppression[]> {
+    const { projectId, limit, cursor } = input;
+    return (
+      await this.database.emailSuppression.findMany({
+        where: {
+          projectId,
+          // `createdAt` alone is not unique, so the id breaks the tie or a
+          // page boundary inside a burst of equal timestamps skips rows.
+          ...(cursor
+            ? {
+                OR: [
+                  { createdAt: { lt: cursor.createdAt } },
+                  { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+                ],
+              }
+            : {}),
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit,
       })
     ).map(map);
   }

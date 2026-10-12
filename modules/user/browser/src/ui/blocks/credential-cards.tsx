@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type {
   CliSessionCard,
@@ -36,36 +37,23 @@ export function CredentialCard({
   children?: ReactNode;
 }) {
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      borderWidth="1px"
-      borderColor={isPendingRevoke ? "red.emphasized" : "border.muted"}
-      borderRadius="sm"
-      padding={3}
-      data-credential-card={title}
-    >
-      <HStack gap={3}>
-        <Box>{icon}</Box>
-        <VStack align="start" gap={0} flex={1}>
-          <HStack gap={2}>
-            <Text fontSize="sm" fontWeight="medium">
-              {title}
-            </Text>
-            {badge}
-          </HStack>
-          {subline && (
-            <Text fontSize="xs" color="fg.muted">
-              {subline}
-            </Text>
-          )}
-          {meta}
-        </VStack>
-        {action}
-      </HStack>
-      {confirmation}
-      {children}
-    </VStack>
+    <Box width="full" data-credential-card={title}>
+      <Card
+        titleLevel={3}
+        padding="sm"
+        bodyLayout="spaced"
+        status={isPendingRevoke ? "bad" : void 0}
+        icon={icon}
+        title={title}
+        badge={badge}
+        description={subline}
+        actions={action}
+      >
+        {meta}
+        {confirmation}
+        {children}
+      </Card>
+    </Box>
   );
 }
 
@@ -114,12 +102,11 @@ export function DeviceCard({
   onConfirmRevoke: () => void;
   children?: ReactNode;
 }) {
-  const Icon = platformIcon(session.platform);
   const sub = [session.hostname, session.uname].filter(Boolean).join(" · ");
 
   return (
     <CredentialCard
-      icon={<Icon size={20} />}
+      icon={platformIcon(session.platform)}
       title={session.deviceLabel}
       badge={
         session.platform ? (
@@ -248,12 +235,12 @@ const fmtDate = (ms: number): string =>
       })
     : "—";
 
-const platformIcon = (platform: string | null) => {
-  if (!platform) return Server;
+const platformIcon = (platform: string | null): ReactNode => {
+  if (!platform) return <Server size={20} />;
   const p = platform.toLowerCase();
-  if (p.includes("darwin") || p.includes("mac")) return Laptop;
-  if (p.includes("linux")) return Monitor;
-  if (p.includes("win")) return Laptop;
-  if (p.includes("ios") || p.includes("android")) return Smartphone;
-  return Server;
+  if (p.includes("darwin") || p.includes("mac")) return <Laptop size={20} />;
+  if (p.includes("linux")) return <Monitor size={20} />;
+  if (p.includes("win")) return <Laptop size={20} />;
+  if (p.includes("ios") || p.includes("android")) return <Smartphone size={20} />;
+  return <Server size={20} />;
 };

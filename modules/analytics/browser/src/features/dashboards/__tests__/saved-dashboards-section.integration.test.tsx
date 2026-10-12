@@ -416,7 +416,7 @@ describe("the Dashboards sidebar", () => {
 
       await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
       await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
-      const dialog = await screen.findByRole("dialog");
+      const dialog = await screen.findByRole("alertdialog");
       expect(inputsTo(calls, "dashboards.delete")).toEqual([]);
       fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 

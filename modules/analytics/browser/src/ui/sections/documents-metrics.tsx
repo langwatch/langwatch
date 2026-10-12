@@ -1,17 +1,14 @@
-import {
-  Box,
-  Card,
-  Heading,
-  HStack,
-  Tabs,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { MetricTabs } from "@langwatch/design-system/metric-tabs";
+import { Heading, HStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
 import { useTopUsedDocuments } from "../../behavior/use-analytics-documents.ts";
 import { useFilterParams } from "../../behavior/use-filter-params.ts";
 import { DocumentsCountsSummary, DocumentsCountsTable } from "./documents-counts-table.tsx";
+
+/** The documents section has one metric, so there is no other tab to select. */
+function keepOnlyTab() {}
 
 /**
  * The Documents section of the analytics overview. It hides when the window has no
@@ -36,36 +33,25 @@ export function DocumentsMetrics() {
   return (
     <>
       <HStack width="full" align="top">
-        <Heading as="h2" size="md" paddingTop={6} paddingBottom={2}>
+        <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
           Documents
         </Heading>
       </HStack>
-      <Card.Root width="full">
-        <Card.Body>
-          <Tabs.Root variant="plain" defaultValue="total-documents">
-            <Tabs.List gap={12}>
-              <Tabs.Trigger value="total-documents" paddingX={0} paddingBottom={4}>
-                <VStack align="start">
-                  <Text color="fg">Total documents</Text>
-                  <Box textStyle="2xl" color="fg" fontWeight="bold">
-                    <DocumentsCountsSummary params={params} />
-                  </Box>
-                </VStack>
-              </Tabs.Trigger>
-              <Tabs.Indicator
-                mt="-1.5px"
-                height="4px"
-                bg="orange.400"
-                borderRadius="1px"
-                bottom={0}
-              />
-            </Tabs.List>
-            <Tabs.Content value="total-documents">
-              <DocumentsCountsTable params={params} />
-            </Tabs.Content>
-          </Tabs.Root>
-        </Card.Body>
-      </Card.Root>
+      <Card padding="lg">
+        <MetricTabs
+          value="total-documents"
+          onValueChange={keepOnlyTab}
+          label="Documents"
+          items={[
+            {
+              value: "total-documents",
+              label: "Total documents",
+              figure: <DocumentsCountsSummary params={params} />,
+              content: <DocumentsCountsTable params={params} />,
+            },
+          ]}
+        />
+      </Card>
     </>
   );
 }

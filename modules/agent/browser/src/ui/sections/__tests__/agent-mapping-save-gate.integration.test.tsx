@@ -5,7 +5,7 @@ import { buildCodeConfig } from "@langwatch/agent-contract/code-config";
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { act, cleanup, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { AgentBrowser } from "../../../model/agent-client.ts";
@@ -28,6 +28,7 @@ const threadIdOnly = {
 afterEach(() => cleanup());
 
 function workflowEditor(overrides: Partial<AgentWorkflowEditorDrawerProps>) {
+  const onUpdate = vi.fn();
   let clearOutput: (field: string | undefined) => void = () => {};
   const props: AgentWorkflowEditorDrawerProps = {
     open: true,
@@ -45,12 +46,12 @@ function workflowEditor(overrides: Partial<AgentWorkflowEditorDrawerProps>) {
       clearOutput = (field) => mapping.onOutputFieldChange(field);
       return null;
     },
-    onUpdate: vi.fn(),
+    onUpdate,
     onClose: vi.fn(),
     ...overrides,
   };
   renderWithDesignSystem(<AgentWorkflowEditorDrawer {...props} />);
-  return { clearOutput: () => act(() => clearOutput(undefined)) };
+  return { onUpdate, clearOutput: () => act(() => clearOutput(undefined)) };
 }
 
 function codeAgent(scenarioMappings: Record<string, AgentInputBinding>): AgentBrowser {
@@ -78,6 +79,7 @@ function codeAgent(scenarioMappings: Record<string, AgentInputBinding>): AgentBr
 }
 
 function codeEditor(agent: AgentBrowser) {
+  const onUpdate = vi.fn();
   let clearOutput: (field: string | undefined) => void = () => {};
   const props: AgentCodeEditorDrawerProps = {
     open: true,
@@ -86,7 +88,7 @@ function codeEditor(agent: AgentBrowser) {
     projectId: "project_1",
     onClose: vi.fn(),
     onCreate: vi.fn(),
-    onUpdate: vi.fn(),
+    onUpdate,
     onError: vi.fn(),
     renderCodeEditor: () => null,
     renderCodeModal: () => null,
@@ -99,7 +101,7 @@ function codeEditor(agent: AgentBrowser) {
     renderTestPanel: () => null,
   };
   renderWithDesignSystem(<AgentCodeEditorDrawer {...props} />);
-  return { clearOutput: () => act(() => clearOutput(undefined)) };
+  return { onUpdate, clearOutput: () => act(() => clearOutput(undefined)) };
 }
 
 const saveButton = () => screen.getByTestId("save-agent-button");
@@ -121,8 +123,8 @@ describe("the workflow agent editor's save gate", () => {
   });
 
   /** @scenario "Save workflow agent stays blocked when no input mapping is configured" */
-  it("stays blocked with only a threadId mapping", () => {
-    workflowEditor({
+  it("refuses a threadId-only mapping on Save and says which mapping is missing", () => {
+    const { onUpdate } = workflowEditor({
       agent: {
         id: "agent-1",
         name: "Workflow agent",
@@ -130,7 +132,11 @@ describe("the workflow agent editor's save gate", () => {
       },
     });
 
-    expect(saveButton()).toBeDisabled();
+    expect(saveButton()).toBeEnabled();
+    fireEvent.click(saveButton());
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Map the scenario input or messages");
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -144,9 +150,13 @@ describe("the code agent editor's save gate", () => {
   });
 
   /** @scenario "Save code agent stays blocked when no input mapping is configured" */
-  it("stays blocked with only a threadId mapping", () => {
-    codeEditor(codeAgent(threadIdOnly));
+  it("refuses a threadId-only mapping on Save and says which mapping is missing", () => {
+    const { onUpdate } = codeEditor(codeAgent(threadIdOnly));
 
-    expect(saveButton()).toBeDisabled();
+    expect(saveButton()).toBeEnabled();
+    fireEvent.click(saveButton());
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Map the scenario input or messages");
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 });

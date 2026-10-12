@@ -24,7 +24,7 @@ const ROW = {
 };
 
 function repositoryAnswering(rows: unknown[]) {
-  const query = vi.fn(async (_request: { query: string }) => ({
+  const query = vi.fn(async (_request: { query: string; SKIP_COLD_SCAN_CHECK?: true }) => ({
     json: async () => JSON.parse(JSON.stringify(rows)),
   }));
   class FakeStoredObjectsClickHouse implements StoredObjectsClickHouse {
@@ -46,6 +46,14 @@ describe("given a project's legacy stored-object index", () => {
       await repository.findPage({ projectId: "proj-1", limit: 10 });
 
       expect(query.mock.calls[0]?.[0].query).not.toMatch(/AS\s+(project_id|inserted_at)\b/);
+    });
+
+    it("declares the whole-index read, so it raises no cold-scan warning", async () => {
+      const { query, repository } = repositoryAnswering([]);
+
+      await repository.findPage({ projectId: "proj-1", limit: 10 });
+
+      expect(query.mock.calls[0]?.[0].SKIP_COLD_SCAN_CHECK).toBe(true);
     });
 
     it("maps each row to the paged project and its latest insert", async () => {

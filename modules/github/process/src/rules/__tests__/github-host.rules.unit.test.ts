@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { githubHostOf, type GithubHost } from "../github-host.rules.ts";
 
-type HostConfig = { host?: string };
+type HostConfig = { host?: string; apiBase?: string; webBase?: string };
 
 function host(config: HostConfig = {}): GithubHost {
   return githubHostOf(config);
@@ -95,6 +95,28 @@ describe("the GitHub host this instance is bound to", () => {
       expect(getGithubAppInstallUrl("weird slug/../x", config)).toBe(
         `https://${GHES}/github-apps/weird%20slug%2F..%2Fx/installations/new`,
       );
+    });
+  });
+
+  describe("given a stand-in names the origins", () => {
+    const config = { apiBase: "http://127.0.0.1:5596/", webBase: "http://127.0.0.1:5596" };
+
+    /** @scenario "The github module honours stand-in origins" */
+    it("serves the named origins, trailing slash dropped, in place of github.com's", () => {
+      expect(getGithubApiBase(config)).toBe("http://127.0.0.1:5596");
+      expect(getGithubWebBase(config)).toBe("http://127.0.0.1:5596");
+      expect(getGithubAppInstallUrl("langwatch", config)).toBe(
+        "http://127.0.0.1:5596/apps/langwatch/installations/new",
+      );
+    });
+
+    it("keeps the host arithmetic for repositories", () => {
+      expect(getGithubHost(config)).toBe("github.com");
+      expect(isMappableGithubHost("github.com", config)).toBe(true);
+    });
+
+    it("treats a blank base as unset", () => {
+      expect(getGithubApiBase({ apiBase: " ", webBase: "" })).toBe("https://api.github.com");
     });
   });
 });

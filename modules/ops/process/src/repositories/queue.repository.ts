@@ -155,6 +155,9 @@ export abstract class QueueRepository {
    * summed as absolute values.
    */
   abstract readPublishedPendingDrift(queueNames: string[]): Promise<number>;
+
+  /** Jobs waiting across every registered group queue: what a paced migration holds behind. */
+  abstract countWaitingJobs(): Promise<number>;
 }
 
 export class NullQueueRepository extends QueueRepository {
@@ -168,6 +171,11 @@ export class NullQueueRepository extends QueueRepository {
 
   async discoverQueueNames(): Promise<string[]> {
     return [];
+  }
+
+  /** No group queue runs here (the memory stack's queues are in-process), so nothing waits. */
+  async countWaitingJobs(): Promise<number> {
+    return 0;
   }
 
   async scanQueues(): Promise<QueueInfo[]> {

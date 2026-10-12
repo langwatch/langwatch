@@ -33,6 +33,19 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     return record;
   }
 
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    return tenantIds.flatMap((tenantId) => {
+      const record = this.rows.get(`${migrationName}:${tenantId}`);
+      return record ? [record] : [];
+    });
+  }
+
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     this.rows.set(`${record.migrationName}:${record.tenantId}`, record);
   }

@@ -3,12 +3,14 @@ package cell
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/tools/upgradelab/snapshot"
 )
@@ -100,4 +102,35 @@ func withStdout(options Options, out *bytes.Buffer) Options {
 
 func gitIn(dir string, args ...string) ([]byte, error) {
 	return exec.CommandContext(context.Background(), "git", append([]string{"-C", dir}, args...)...).CombinedOutput() // #nosec G204 -- test argv.
+}
+
+func TestDrainVerdict(t *testing.T) {
+	limit := time.Hour
+	cases := []struct {
+		name   string
+		depth  int
+		err    error
+		waited time.Duration
+		want   drainState
+	}{
+		{"backlog remains", 2_000_000, nil, time.Minute, drainWaiting},
+		{"near zero", 100, nil, time.Minute, drainDone},
+		{"empty", 0, nil, 0, drainDone},
+		{"unread is never done", 0, errors.New("redis down"), time.Minute, drainWaiting},
+		{"bound passed with backlog", 5000, nil, limit, drainExpired},
+		{"bound passed unread", 0, errors.New("redis down"), limit, drainExpired},
+		{"drained at the bound", 10, nil, limit, drainDone},
+	}
+	for _, each := range cases {
+		if got := drainVerdict(each.depth, each.err, 100, each.waited, limit); got != each.want {
+			t.Errorf("%s: got %d, want %d", each.name, got, each.want)
+		}
+	}
+}
+
+func TestCacheKeyCarriesTheRecipeRevision(t *testing.T) {
+	key := CacheKey(Options{Deployment: "cloud", Tier: "M", Shape: "typical", Seed: 1, Release: "main@abc"})
+	if want := "cloud-M-typical-seed1-main-abc-r3"; key != want {
+		t.Errorf("got %q, want %q: old -r2 snapshots must not match", key, want)
+	}
 }

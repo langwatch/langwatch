@@ -24,6 +24,11 @@ describe("normalizeSignInErrorCode", () => {
       expect(normalizeSignInErrorCode("email_doesn't_match")).toBe("DIFFERENT_EMAIL_NOT_ALLOWED");
     });
 
+    /** @scenario "The different-email refusal in every spelling shows the specific message" */
+    it("maps email_does_not_match to DIFFERENT_EMAIL_NOT_ALLOWED", () => {
+      expect(normalizeSignInErrorCode("email_does_not_match")).toBe("DIFFERENT_EMAIL_NOT_ALLOWED");
+    });
+
     it("maps LINKING_DIFFERENT_EMAILS_NOT_ALLOWED to DIFFERENT_EMAIL_NOT_ALLOWED", () => {
       expect(normalizeSignInErrorCode("LINKING_DIFFERENT_EMAILS_NOT_ALLOWED")).toBe(
         "DIFFERENT_EMAIL_NOT_ALLOWED",

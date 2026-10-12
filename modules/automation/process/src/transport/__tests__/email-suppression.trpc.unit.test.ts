@@ -49,6 +49,7 @@ describe("the email suppression tRPC namespace", () => {
       expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "confirmUnsubscribe",
         "getAll",
+        "getPage",
         "remove",
         "resolveUnsubscribeToken",
       ]);
@@ -103,6 +104,87 @@ describe("the email suppression tRPC namespace", () => {
         await expect(
           operator.remove({ projectId: "project-1", id: "suppression-1" }),
         ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      });
+    });
+  });
+  describe("given an operator who may view automations", () => {
+    describe("when they read a page of the suppression list", () => {
+      /** @scenario "A page is readable with the permission to view automations" */
+      it("answers the page for that operator with the default page size", async () => {
+        const page = { suppressions: [], nextCursor: null };
+        const listSuppressionsPage = vi.fn().mockResolvedValue(page);
+        const { router } = mount({
+          app: { listSuppressionsPage },
+          permits: (permission) => permission === "triggers:view",
+        });
+        const operator = router.createCaller({ actor: { id: "user-1" }, address: null });
+
+        await expect(operator.getPage({ projectId: "project-1" })).resolves.toEqual(page);
+        expect(listSuppressionsPage).toHaveBeenCalledWith({
+          projectId: "project-1",
+          limit: 50,
+          actorId: "user-1",
+        });
+      });
+
+      it("hands the continuation back as a date and an id", async () => {
+        const listSuppressionsPage = vi
+          .fn()
+          .mockResolvedValue({ suppressions: [], nextCursor: null });
+        const { operator } = mount({ app: { listSuppressionsPage } });
+
+        await operator.getPage({
+          projectId: "project-1",
+          limit: 10,
+          cursor: { createdAt: new Date("2026-10-01T10:00:00.000Z"), id: "s4" },
+        });
+
+        expect(listSuppressionsPage).toHaveBeenCalledWith({
+          projectId: "project-1",
+          limit: 10,
+          cursor: { createdAt: new Date("2026-10-01T10:00:00.000Z"), id: "s4" },
+          actorId: "user-1",
+        });
+      });
+    });
+  });
+
+  describe("given an operator who may not view automations", () => {
+    describe("when they read a page", () => {
+      /** @scenario "A page is refused without the permission to view automations" */
+      it("refuses them before the app is asked", async () => {
+        const listSuppressionsPage = vi.fn();
+        const { router } = mount({ app: { listSuppressionsPage }, permits: () => false });
+        const operator = router.createCaller({ actor: { id: "user-1" }, address: null });
+
+        await expect(operator.getPage({ projectId: "project-1" })).rejects.toMatchObject({
+          code: "FORBIDDEN",
+        });
+        expect(listSuppressionsPage).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a continuation with no id, or a page size outside the allowed range", () => {
+    describe("when the page is read", () => {
+      /** @scenario "A malformed continuation or page size is refused before any read" */
+      it("refuses the request as malformed and reads nothing", async () => {
+        const listSuppressionsPage = vi.fn();
+        const { operator } = mount({ app: { listSuppressionsPage } });
+
+        await expect(
+          operator.getPage({
+            projectId: "project-1",
+            cursor: { createdAt: new Date("2026-10-01T10:00:00.000Z"), id: "" },
+          }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        await expect(operator.getPage({ projectId: "project-1", limit: 0 })).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+        });
+        await expect(
+          operator.getPage({ projectId: "project-1", limit: 101 }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+        expect(listSuppressionsPage).not.toHaveBeenCalled();
       });
     });
   });

@@ -47,8 +47,8 @@ export function ModelProviderStepScreen({
           variant="ghost"
           size="sm"
           color="fg.subtle"
+          textStyle="body"
           fontWeight="semibold"
-          fontSize="14px"
           borderRadius="8px"
           _hover={{ color: "fg", bg: "bg.muted" }}
           onClick={() => {

@@ -1,5 +1,9 @@
-import { Box, SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
+import { Terminal } from "lucide-react";
 import numeral from "numeral";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
@@ -37,18 +41,28 @@ export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
   const totals = query.data;
   if (!totals || totals.sessionCount === 0) {
     return (
-      <VStack align="start" gap={1}>
-        <Text fontSize="sm" color="fg.muted">
-          No coding-agent usage yet
-        </Text>
-        <Text fontSize="xs" color="fg.subtle">
+      <NoDataInfoBlock
+        size="inline"
+        bordered={false}
+        icon={<Terminal />}
+        title="No coding-agent usage yet"
+        description="Wire your coding agent's telemetry here with one command."
+        next={[
+          {
+            kind: "docs",
+            label: "Coding agents quickstart",
+            href: docsUrl("/coding-agents/quickstart"),
+          },
+        ]}
+      >
+        <Text fontSize="xs">
           Run{" "}
           <Text as="code" fontSize="xs">
             langwatch claude
           </Text>{" "}
-          to wire your coding agent&apos;s telemetry here.
+          to begin.
         </Text>
-      </VStack>
+      </NoDataInfoBlock>
     );
   }
 
@@ -85,19 +99,8 @@ export function CodingAgentUsageContent({ projectId }: { projectId: string }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={3}
-      backgroundColor="bg.subtle"
-    >
-      <Text fontSize="xs" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
-        {label}
-      </Text>
-      <Text fontSize="xl" fontWeight="semibold" marginTop={1}>
-        {value}
-      </Text>
-    </Box>
+    <StatTile label={label}>
+      <StatTileFigure>{value}</StatTileFigure>
+    </StatTile>
   );
 }

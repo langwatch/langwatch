@@ -339,6 +339,7 @@ function ProviderCredentialsArea({
   return (
     <CodexSignIn
       onFailed={(code) => onFailed?.({ provider: provider.provider, code })}
+      modelProviderId={provider.id}
       projectId={projectId}
       scopes={state.scopes}
       setAsCodingDefaults={false}
@@ -546,13 +547,11 @@ function ProviderModelArea({
 function SaveProviderButton({
   canResolveTarget,
   isBusy,
-  isDirty,
   label,
   onSave,
 }: {
   canResolveTarget: boolean;
   isBusy: boolean;
-  isDirty: boolean;
   label: string;
   onSave: () => void;
 }) {
@@ -562,7 +561,7 @@ function SaveProviderButton({
         size="sm"
         colorPalette="orange"
         loading={isBusy}
-        disabled={!canResolveTarget || !isDirty}
+        disabled={!canResolveTarget}
         data-testid="model-provider-save"
         onClick={onSave}
       >
@@ -602,6 +601,15 @@ function ProviderModelSections({
   );
 }
 
+/** What a drawer needs to draw the form's Save in its own footer. */
+export type ModelProviderSaveState = { busy: boolean; label: string; canSave: boolean };
+
+type ModelProviderFormProps = EditModelProviderFormProps & {
+  /** Submit target: set, the form has no Save of its own; the owner's button submits it. */
+  formId?: string;
+  onSaveStateChange?: (state: ModelProviderSaveState) => void;
+};
+
 export const EditModelProviderForm = ({
   projectId,
   organizationId,
@@ -611,7 +619,9 @@ export const EditModelProviderForm = ({
   guided = false,
   embedded = false,
   onFailed,
-}: EditModelProviderFormProps) => {
+  formId,
+  onSaveStateChange,
+}: ModelProviderFormProps) => {
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
   });
@@ -743,8 +753,6 @@ export const EditModelProviderForm = ({
     setAdvancedAccordionValue([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gatewayMenuEnabled, providerId]);
-
-  const isAdvancedDirty = JSON.stringify(advancedDraft) !== JSON.stringify(initialAdvancedDraft);
 
   // Controlled accordion state: collapsed by default, but expands
   // automatically when the user clicks Save with malformed JSON so the
@@ -902,6 +910,13 @@ export const EditModelProviderForm = ({
   const isBusy = state.isSaving || isValidatingApiKey;
   const providerName = providerDefinition?.name ?? provider.provider;
 
+  const reportSaveState = useEffectEvent((next: ModelProviderSaveState) =>
+    onSaveStateChange?.(next),
+  );
+  useEffect(() => {
+    reportSaveState({ busy: isBusy, label: saveLabel, canSave: !cannotResolveTarget });
+  }, [isBusy, saveLabel, cannotResolveTarget]);
+
   if (guided) {
     return (
       <GuidedProviderForm
@@ -958,7 +973,7 @@ export const EditModelProviderForm = ({
     );
   }
 
-  return (
+  const body = (
     <VStack gap={4} align="start" width="full">
       {isStaleMiss && (
         <Text color="red.fg" fontSize="sm">
@@ -1031,14 +1046,29 @@ export const EditModelProviderForm = ({
           skipPermissionsPlaceholder={skipPermissionsPlaceholder}
         />
 
-        <SaveProviderButton
-          canResolveTarget={!cannotResolveTarget}
-          isDirty={state.isDirty || isAdvancedDirty}
-          isBusy={isBusy}
-          label={saveLabel}
-          onSave={handleSave}
-        />
+        {!formId && (
+          <SaveProviderButton
+            canResolveTarget={!cannotResolveTarget}
+            isBusy={isBusy}
+            label={saveLabel}
+            onSave={handleSave}
+          />
+        )}
       </VStack>
     </VStack>
+  );
+
+  if (!formId) return body;
+  return (
+    <form
+      id={formId}
+      style={{ width: "100%" }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        void handleSave();
+      }}
+    >
+      {body}
+    </form>
   );
 };

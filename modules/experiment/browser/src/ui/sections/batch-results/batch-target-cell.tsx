@@ -69,7 +69,7 @@ const MetricBadge = ({
   children: ReactNode;
 }) => (
   <Tooltip content={tooltipLabel} positioning={{ placement: "top" }} openDelay={100}>
-    <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap" px={1} data-testid={testId}>
+    <Text textStyle="micro" color="fg.muted" whiteSpace="nowrap" px={1} data-testid={testId}>
       {children}
     </Text>
   </Tooltip>
@@ -169,11 +169,11 @@ const CellFailure = ({
     <Tooltip
       content={
         <VStack align="start" gap={1} data-testid={`error-tooltip-${targetId}`}>
-          <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
+          <Text textStyle="bodySm" whiteSpace="pre-wrap" wordBreak="break-word">
             {failure.description ? `${failure.title}. ${failure.description}` : failure.title}
           </Text>
           {failure.raw && failure.raw !== failure.title && (
-            <Text fontSize="12px" opacity={0.8} whiteSpace="pre-wrap" wordBreak="break-word">
+            <Text textStyle="caption" opacity={0.8} whiteSpace="pre-wrap" wordBreak="break-word">
               {failure.raw}
             </Text>
           )}
@@ -189,10 +189,10 @@ const CellFailure = ({
 };
 
 const OutputText = ({ text, isTruncated }: { text: string; isTruncated: boolean }) => (
-  <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
+  <Text textStyle="bodySm" whiteSpace="pre-wrap" wordBreak="break-word">
     {text}
     {isTruncated && (
-      <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
+      <Box as="span" color="fg.subtle" textStyle="micro" marginLeft={1}>
         (truncated)
       </Box>
     )}
@@ -271,7 +271,7 @@ const CellOutput = ({
   }
   if (!output) {
     return (
-      <Text fontSize="13px" color="fg.subtle">
+      <Text textStyle="bodySm" color="fg.subtle">
         No output
       </Text>
     );
@@ -297,7 +297,7 @@ const EvaluatorChip = ({
 }) => {
   if (renderEvaluatorResult) return <Box>{renderEvaluatorResult({ result })}</Box>;
   return (
-    <HStack gap={1} fontSize="11px" color="fg.muted">
+    <HStack gap={1} textStyle="micro" color="fg.muted">
       <Text>{result.evaluatorName}</Text>
       {result.score !== null && result.score !== undefined && (
         <Text fontWeight="semibold">{result.score.toFixed(2)}</Text>

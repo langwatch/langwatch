@@ -4,6 +4,7 @@ export {
   type BackgroundStepsLedger,
   type BackgroundStepsLog,
   type BackgroundStepsOptions,
+  type BackgroundStepsQueue,
   BackgroundStepsService,
   type BackgroundSweep,
   startBackgroundSteps,

@@ -18,8 +18,8 @@ export function LangyFailedCard({ part }: { part: LangyCardFailedPart }) {
       borderColor="border.muted"
       borderRadius="langyCard"
       background="bg.subtle"
-      paddingX="12px"
-      paddingY="8px"
+      paddingX="3"
+      paddingY="2"
     >
       <chakra.button
         type="button"

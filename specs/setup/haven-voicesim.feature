@@ -6,9 +6,9 @@ Feature: voicesim, a local stand-in for the voice providers a scenario call uses
   just those calls with canned, deterministic data: tones for audio, a scripted
   agent, one fixed caller transcript. It checks no key: it is a dev shim.
 
-  # Bound by Go tests in services/voicesim/voicesim_test.go and
+  # Bound by Go tests in services/sims/voicesim/voicesim_test.go and
   # tools/thuishaven/domain/overlay_voice_test.go and tools/thuishaven/cmd/sim_voice_test.go, by their `// @scenario`
-  # annotations, by apps/voicesim-web/src/__tests__/calls-console.integration.test.tsx,
+  # annotations, by apps/sims/src/voice/__tests__/calls-console.integration.test.tsx,
   # and by the product's loopback-rule tests in model-provider, gateway and scenario.
   # The Twilio phone transport is not faked: the scenario SDK dials api.twilio.com
   # with no way to point it elsewhere.

@@ -1,7 +1,8 @@
 import type { UiFailureNotice, UiSuccessNotice } from "@langwatch/browser-host/capabilities";
 import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryObserver } from "@tanstack/react-query";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createUiQueryClient, resetUiQueries } from "../wire/query-client.ts";
 
@@ -210,6 +211,61 @@ describe("createUiQueryClient", () => {
 
       expect(sessionRead).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("given a read that could not reach the API", () => {
+  async function failUnreachable() {
+    const client = createUiQueryClient();
+    let serverUp = false;
+    const health = vi.fn(() => Promise.resolve({ ok: serverUp }));
+    vi.stubGlobal("fetch", health);
+    const read = vi.fn(() =>
+      serverUp ? Promise.resolve({ rows: 3 }) : Promise.reject(new TypeError("Failed to fetch")),
+    );
+    const observer = new QueryObserver(client, { queryKey: ["page"], queryFn: read, retry: false });
+    const unsubscribe = observer.subscribe(() => {});
+    await vi.advanceTimersByTimeAsync(0);
+    return { observer, unsubscribe, health, read, bringServerUp: () => void (serverUp = true) };
+  }
+
+  beforeEach(() => void vi.useFakeTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  /** @scenario "A page whose reads could not reach the API carries on when it answers" */
+  it("polls the health route with backoff, then refetches the read and draws its data", async () => {
+    const { observer, unsubscribe, health, read, bringServerUp } = await failUnreachable();
+    expect(observer.getCurrentResult().status).toBe("error");
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(health).toHaveBeenCalledTimes(1);
+    expect(health).toHaveBeenCalledWith("/api/health", { cache: "no-store" });
+    await vi.advanceTimersByTimeAsync(3_999);
+    expect(health).toHaveBeenCalledTimes(1);
+
+    bringServerUp();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(health).toHaveBeenCalledTimes(2);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(observer.getCurrentResult()).toMatchObject({ status: "success", data: { rows: 3 } });
+    unsubscribe();
+  });
+
+  /** @scenario "A page whose reads could not reach the API carries on when it answers" */
+  it("stops polling once no read is still failing unreachable", async () => {
+    const { unsubscribe, health, bringServerUp } = await failUnreachable();
+    bringServerUp();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(health).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(health).toHaveBeenCalledTimes(1);
+    unsubscribe();
   });
 });
 

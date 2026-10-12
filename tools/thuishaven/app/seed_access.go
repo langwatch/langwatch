@@ -48,10 +48,12 @@ type SeedOrg struct {
 const shownLogins = 5
 
 // seededOrgs reads every run record of the stack and keeps what its acks minted, never the plan's
-// wish: an org or user is listed only once the product returned its id.
+// wish: an org or user is listed only once the product returned its id. Newest run first, and an
+// org key of an earlier run is listed once.
 func (o *Orchestrator) seededOrgs(slug, password string) []SeedOrg {
 	dirs, _ := os.ReadDir(o.seedRunsDir(slug))
-	seen := map[string]bool{}
+	slices.SortFunc(dirs, func(a, b os.DirEntry) int { return modTime(b).Compare(modTime(a)) })
+	seen, named := map[string]bool{}, map[string]bool{}
 	var orgs []SeedOrg
 	for _, dir := range dirs {
 		plan, refs, ok := readSeedRun(filepath.Join(o.seedRunsDir(slug), dir.Name()))
@@ -60,10 +62,10 @@ func (o *Orchestrator) seededOrgs(slug, password string) []SeedOrg {
 		}
 		for _, org := range plan.Orgs {
 			id, minted := refs[org.Ref]
-			if !minted || seen[id] || plan.Flags.Into != "" {
+			if !minted || seen[id] || named[org.Key] || plan.Flags.Into != "" {
 				continue
 			}
-			seen[id] = true
+			seen[id], named[org.Key] = true, true
 			seeded := SeedOrg{Name: org.Key, ID: id, Persona: org.Persona, Logins: []SeedLogin{}}
 			for _, user := range org.Users {
 				if _, ok := refs[user.Ref]; ok && user.State == "accepted" {

@@ -446,15 +446,6 @@ Feature: Local IdP simulator (idpsim)
     Then the tenant's clock is still skewed by ten minutes
 
   @unit
-  Scenario: An Auth0 tenant checks and changes a password the way the product asks
-    Given a tenant playing the legacy Auth0 provider
-    When the product checks a user's current password with the password grant at the host root
-    Then the right password is accepted and a wrong one is refused as invalid_grant
-    And a Management API token from the client_credentials grant changes it with PATCH /api/v2/users/{id}
-    And a token without update:users is refused as insufficient_scope, a short password as PasswordStrengthError
-    And resetting the tenant restores the default password and scopes
-
-  @unit
   Scenario: A tenant can assert a second factor in its ID tokens
     Given a tenant whose ID tokens assert no authentication methods
     When its config sets amr to "pwd" and "mfa"

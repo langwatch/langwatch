@@ -1,4 +1,5 @@
-import { Card, HStack, Icon, List, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { HStack, Icon, List, Text, VStack } from "@langwatch/design-system/primitives";
 import { Check, CircleDot, MessageSquare, TriangleAlert, Users } from "lucide-react";
 
 import type { ScenarioFormController } from "../../elements/scenario-form.tsx";
@@ -19,113 +20,109 @@ export function ScenarioEditorSidebar({ form, variant }: ScenarioEditorSidebarPr
       <ScenarioAIGeneration form={form ?? null} />
 
       {/* Writing tips */}
-      <Card.Root>
-        <Card.Body>
+      <Card padding="lg">
+        <VStack align="stretch" gap={3}>
+          <Text fontWeight="semibold" fontSize="sm">
+            {isAgentTesting ? "Writing great scenarios" : "Writing great scenarios"}
+          </Text>
+
           <VStack align="stretch" gap={3}>
-            <Text fontWeight="semibold" fontSize="sm">
-              {isAgentTesting ? "Writing great scenarios" : "Writing Great Scenarios"}
-            </Text>
+            <HStack align="start" gap={3}>
+              <Icon color="green.fg" mt={0.5}>
+                <CircleDot size={16} />
+              </Icon>
+              <VStack align="start" gap={0}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Define success clearly
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  What does &apos;good&apos; look like? Be specific about expected outcomes.
+                </Text>
+              </VStack>
+            </HStack>
 
-            <VStack align="stretch" gap={3}>
-              <HStack align="start" gap={3}>
-                <Icon color="green.fg" mt={0.5}>
-                  <CircleDot size={16} />
-                </Icon>
-                <VStack align="start" gap={0}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    Define Success Clearly
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    What does &apos;good&apos; look like? Be specific about expected outcomes.
-                  </Text>
-                </VStack>
-              </HStack>
+            <HStack align="start" gap={3}>
+              <Icon color="yellow.fg" mt={0.5}>
+                <TriangleAlert size={16} />
+              </Icon>
+              <VStack align="start" gap={0}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Consider edge cases
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  What unusual situations should your agent handle?
+                </Text>
+              </VStack>
+            </HStack>
 
-              <HStack align="start" gap={3}>
-                <Icon color="yellow.fg" mt={0.5}>
-                  <TriangleAlert size={16} />
-                </Icon>
-                <VStack align="start" gap={0}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    Consider Edge Cases
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    What unusual situations should your agent handle?
-                  </Text>
-                </VStack>
-              </HStack>
+            <HStack align="start" gap={3}>
+              <Icon color="purple.fg" mt={0.5}>
+                <Users size={16} />
+              </Icon>
+              <VStack align="start" gap={0}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Think about personas
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Who are your users? Different users have different needs.
+                </Text>
+              </VStack>
+            </HStack>
 
-              <HStack align="start" gap={3}>
-                <Icon color="purple.fg" mt={0.5}>
-                  <Users size={16} />
-                </Icon>
-                <VStack align="start" gap={0}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    Think About Personas
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    Who are your users? Different users have different needs.
-                  </Text>
-                </VStack>
-              </HStack>
-
-              <HStack align="start" gap={3}>
-                <Icon color="blue.fg" mt={0.5}>
-                  <MessageSquare size={16} />
-                </Icon>
-                <VStack align="start" gap={0}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    Conversation Flow
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    How should the conversation progress?
-                  </Text>
-                </VStack>
-              </HStack>
-            </VStack>
+            <HStack align="start" gap={3}>
+              <Icon color="blue.fg" mt={0.5}>
+                <MessageSquare size={16} />
+              </Icon>
+              <VStack align="start" gap={0}>
+                <Text fontSize="sm" fontWeight="medium">
+                  Conversation flow
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  How should the conversation progress?
+                </Text>
+              </VStack>
+            </HStack>
           </VStack>
-        </Card.Body>
-      </Card.Root>
+        </VStack>
+      </Card>
 
       {/* Best Practices */}
-      <Card.Root>
-        <Card.Body>
-          <VStack align="stretch" gap={3}>
-            <Text fontWeight="semibold" fontSize="sm">
-              Best Practices
-            </Text>
+      <Card padding="lg">
+        <VStack align="stretch" gap={3}>
+          <Text fontWeight="semibold" fontSize="sm">
+            Best practices
+          </Text>
 
-            <List.Root gap={2} listStyleType="none">
-              <List.Item fontSize="xs" color="fg.muted">
-                <List.Indicator asChild color="blue.fg">
-                  <Check size={14} />
-                </List.Indicator>
-                {isAgentTesting
-                  ? "Start with small scenarios to validate quickly"
-                  : "Start with small simulations to validate quickly"}
-              </List.Item>
-              <List.Item fontSize="xs" color="fg.muted">
-                <List.Indicator asChild color="blue.fg">
-                  <Check size={14} />
-                </List.Indicator>
-                Use specific prompts for better results
-              </List.Item>
-              <List.Item fontSize="xs" color="fg.muted">
-                <List.Indicator asChild color="blue.fg">
-                  <Check size={14} />
-                </List.Indicator>
-                Include edge cases in your testing
-              </List.Item>
-              <List.Item fontSize="xs" color="fg.muted">
-                <List.Indicator asChild color="blue.fg">
-                  <Check size={14} />
-                </List.Indicator>
-                Review metrics after each run
-              </List.Item>
-            </List.Root>
-          </VStack>
-        </Card.Body>
-      </Card.Root>
+          <List.Root gap={2} listStyleType="none">
+            <List.Item fontSize="xs" color="fg.muted">
+              <List.Indicator asChild color="blue.fg">
+                <Check size={14} />
+              </List.Indicator>
+              {isAgentTesting
+                ? "Start with small scenarios to validate quickly"
+                : "Start with small simulations to validate quickly"}
+            </List.Item>
+            <List.Item fontSize="xs" color="fg.muted">
+              <List.Indicator asChild color="blue.fg">
+                <Check size={14} />
+              </List.Indicator>
+              Use specific prompts for better results
+            </List.Item>
+            <List.Item fontSize="xs" color="fg.muted">
+              <List.Indicator asChild color="blue.fg">
+                <Check size={14} />
+              </List.Indicator>
+              Include edge cases in your testing
+            </List.Item>
+            <List.Item fontSize="xs" color="fg.muted">
+              <List.Indicator asChild color="blue.fg">
+                <Check size={14} />
+              </List.Indicator>
+              Review metrics after each run
+            </List.Item>
+          </List.Root>
+        </VStack>
+      </Card>
     </VStack>
   );
 }

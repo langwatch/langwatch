@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Card, Badge, Box, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Badge, Box, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { ToolCardFigure, ToolCardMark } from "./tool-card-figure";
@@ -45,14 +46,7 @@ export function ToolCatalogCard({
 }) {
   const actions = renderActions?.(card);
   return (
-    <Card.Root
-      variant="showcase"
-      data-testid={`tool-card-${card.id}`}
-      padding={4}
-      display="flex"
-      flexDirection="column"
-      gap={3}
-    >
+    <Card variant="showcase" data-testid={`tool-card-${card.id}`} padding="md" bodyLayout="spaced">
       <HStack gap={2.5} align="start">
         <ToolCardMark card={card} />
         <Box flex="1" minWidth={0}>
@@ -110,7 +104,7 @@ export function ToolCatalogCard({
           </HStack>
         ))}
       </Box>
-    </Card.Root>
+    </Card>
   );
 }
 

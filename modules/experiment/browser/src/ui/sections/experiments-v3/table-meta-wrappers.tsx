@@ -7,13 +7,15 @@ import { toComparisonConfig } from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
 import type { HeaderContext } from "@tanstack/react-table";
 
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import type { TableMeta, TableRowData } from "../../../model/experiments-v3/types.ts";
 import { ComparisonCell } from "./comparison-cell.tsx";
 import { TargetCellContent } from "./TargetSection/target-cell.tsx";
 import { TargetHeader } from "./TargetSection/target-header.tsx";
 
 /**
- * Checkbox header that reads selection state from table meta.
+ * Checkbox header. It reads the selection from the store: the header context keeps
+ * its identity while rows are selected, so table meta would show a stale state.
  */
 export const CheckboxHeaderFromMeta = ({
   context,
@@ -21,18 +23,21 @@ export const CheckboxHeaderFromMeta = ({
   context: HeaderContext<TableRowData, unknown>;
 }) => {
   const meta = context.table.options.meta as TableMeta | undefined;
+  const selectedCount = useEvaluationsV3Store((state) => state.ui.selectedRows.size);
+  const rowCount = useEvaluationsV3Store((state) => state.getRowCount(state.activeDatasetId));
   if (!meta) return null;
 
-  const partialSelection = meta.someSelected ? "indeterminate" : false;
+  const allSelected = rowCount > 0 && selectedCount === rowCount;
+  const partialSelection = selectedCount > 0 && selectedCount < rowCount ? "indeterminate" : false;
 
   return (
     <Checkbox.Root
-      checked={meta.allSelected ? true : partialSelection}
+      checked={allSelected ? true : partialSelection}
       onCheckedChange={() => {
-        if (meta.allSelected) {
+        if (allSelected) {
           meta.clearRowSelection();
         } else {
-          meta.selectAllRows(meta.rowCount);
+          meta.selectAllRows(rowCount);
         }
       }}
     >
@@ -43,7 +48,8 @@ export const CheckboxHeaderFromMeta = ({
 };
 
 /**
- * Checkbox cell that reads selection state from table meta.
+ * Checkbox cell. Cells keep the identity of their props while selection changes,
+ * so it reads its own row's selection from the store rather than from table meta.
  */
 export const CheckboxCellFromMeta = ({
   rowIndex,
@@ -52,11 +58,13 @@ export const CheckboxCellFromMeta = ({
   rowIndex: number;
   tableMeta: TableMeta | undefined;
 }) => {
+  const isSelected = useEvaluationsV3Store((state) => state.ui.selectedRows.has(rowIndex));
+
   if (!tableMeta) return null;
 
   return (
     <Checkbox.Root
-      checked={tableMeta.selectedRows.has(rowIndex)}
+      checked={isSelected}
       onCheckedChange={() => tableMeta.toggleRowSelection(rowIndex)}
       onClick={(e) => e.stopPropagation()}
     >

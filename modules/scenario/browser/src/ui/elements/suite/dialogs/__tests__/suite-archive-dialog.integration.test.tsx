@@ -49,8 +49,7 @@ describe("<SuiteArchiveDialog/>", () => {
 
       const dialog = screen.getByRole("dialog");
       expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
-      const buttons = within(dialog).getAllByRole("button");
-      expect(buttons.filter((button) => button.hasAttribute("disabled"))).toHaveLength(2);
+      expect(within(dialog).getByRole("button", { name: "Archive" })).toBeDisabled();
     });
   });
 });

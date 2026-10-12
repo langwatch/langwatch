@@ -9,6 +9,8 @@ export type UserCreatedFactBackfillRun = Readonly<{
   dryRun: boolean;
   signal: AbortSignal;
   afterUserId: string | null;
+  /** Accounts the run this one resumes had counted, so the report totals every attempt. */
+  countedBefore: number;
   onPageDone: (input: {
     afterUserId: string;
     report: UserCreatedFactBackfillReport;
@@ -36,9 +38,10 @@ export class UserCreatedFactBackfillService {
     dryRun,
     signal,
     afterUserId,
+    countedBefore,
     onPageDone,
   }: UserCreatedFactBackfillRun): Promise<UserCreatedFactBackfillReport> {
-    const report: UserCreatedFactBackfillReport = { users: 0 };
+    const report: UserCreatedFactBackfillReport = { users: countedBefore };
     let cursor = afterUserId;
     while (!signal.aborted) {
       const page = await this.deps.users.findCreatedPage({ afterId: cursor, limit: PAGE_SIZE });

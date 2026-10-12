@@ -37,7 +37,7 @@ export function OutroPanel({ onIntegrate, onDone }: OutroPanelProps): React.Reac
           <Icon boxSize={3.5} color="orange.fg">
             <Sparkles />
           </Icon>
-          <Text textStyle="sm" fontWeight={500} color="fg" truncate>
+          <Text textStyle="sm" fontWeight="medium" color="fg" truncate>
             Tour done. Explore freely.
           </Text>
         </HStack>

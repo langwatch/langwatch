@@ -1,6 +1,6 @@
-import { Card, GridItem, Heading, HStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { GridItem } from "@langwatch/design-system/primitives";
 import type { PropsWithChildren } from "react";
-import { BarChart2 } from "react-feather";
 
 export function ChartCard({
   title,
@@ -9,15 +9,9 @@ export function ChartCard({
 }: PropsWithChildren<{ title: string; colSpan?: number }>) {
   return (
     <GridItem colSpan={colSpan} display="inline-grid">
-      <Card.Root>
-        <Card.Header>
-          <HStack gap={2}>
-            <BarChart2 color="var(--chakra-colors-orange-fg)" />
-            <Heading size="sm">{title}</Heading>
-          </HStack>
-        </Card.Header>
-        <Card.Body>{children}</Card.Body>
-      </Card.Root>
+      <Card title={title} padding="lg">
+        {children}
+      </Card>
     </GridItem>
   );
 }

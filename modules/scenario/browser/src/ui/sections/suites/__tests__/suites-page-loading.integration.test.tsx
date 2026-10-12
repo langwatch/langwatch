@@ -110,7 +110,7 @@ vi.mock("../run-history-panel.tsx", () => ({
         </div>
       );
     }
-    return <div data-testid="all-runs-panel">All Runs Panel</div>;
+    return <div data-testid="all-runs-panel">All runs Panel</div>;
   },
 }));
 

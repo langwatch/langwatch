@@ -12,8 +12,8 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 | Page key                         | URL                         | Within   | Label           | Permission | Flags |
 | -------------------------------- | --------------------------- | -------- | --------------- | ---------- | ----- |
-| `pages/settings/model-providers` | `/settings/model-providers` | settings | Model Providers | –          | –     |
-| `pages/settings/model-costs`     | `/settings/model-costs`     | settings | Model Costs     | –          | –     |
+| `pages/settings/model-providers` | `/settings/model-providers` | settings | Model providers | –          | –     |
+| `pages/settings/model-costs`     | `/settings/model-costs`     | settings | Model costs     | –          | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 

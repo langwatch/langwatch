@@ -6,6 +6,7 @@ export type {
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,
   JobDelivery,
+  ListedWork,
   QueueSendOptions,
 } from "./queue.types.ts";
 export { resolveDeduplicationStrategy } from "./queue.types.ts";

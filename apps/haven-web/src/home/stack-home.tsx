@@ -12,7 +12,13 @@ import {
 import { Suspense, lazy } from "react";
 
 import type { Navigate } from "../hub/hub-app.tsx";
-import { START_PATH, restartPath, seedPath, startServicePath } from "../shared/api.ts";
+import {
+  START_PATH,
+  restartPath,
+  seedPath,
+  startServicePath,
+  stopServicePath,
+} from "../shared/api.ts";
 import type { StackHome as StackHomeData, Surface } from "../shared/contract.ts";
 import { HavenTopBar } from "../shared/haven-top-bar.tsx";
 import { tabPath } from "../shared/route.ts";
@@ -85,8 +91,14 @@ export const StackHome = ({ home, now, refresh, stale, tab, sub, navigate }: Sta
   const startSurface = (surface: Surface) =>
     void act({
       key: surface.name,
-      path: startServicePath({ slug: home.slug, service: surface.start }),
-      doing: `start ${surface.start}`,
+      path: startServicePath({ slug: home.slug, service: surface.switch }),
+      doing: `turn on ${surface.switch}`,
+    });
+  const stopSurface = (surface: Surface) =>
+    void act({
+      key: surface.name,
+      path: stopServicePath({ slug: home.slug, service: surface.switch }),
+      doing: `turn off ${surface.switch}`,
     });
   const seed = ({ size, persona }: { size: string; persona: string }) =>
     void act({
@@ -162,6 +174,7 @@ export const StackHome = ({ home, now, refresh, stale, tab, sub, navigate }: Sta
             busy={busy}
             onRestart={home.actions.canRestart ? restartSurface : undefined}
             onStart={home.actions.canStartService ? startSurface : undefined}
+            onStop={home.actions.canStopService ? stopSurface : undefined}
           />
           <Grid columns={2}>
             <FactsPanel facts={home.facts} now={now} />

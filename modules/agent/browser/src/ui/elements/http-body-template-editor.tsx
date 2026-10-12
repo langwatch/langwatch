@@ -1,4 +1,5 @@
-import { Box, Code, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Code, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { httpBodyLanguage } from "../../model/http-body-language.ts";
 import { HttpBodyCodeEditor } from "./http-body-code-editor.tsx";
@@ -47,7 +48,7 @@ export function BodyTemplateEditor({
         disabled={disabled}
         language={httpBodyLanguage({ headers })}
       />
-      <Box padding={3} bg="bg.subtle" borderRadius="md" borderWidth="1px" borderColor="border">
+      <Card variant="nested" tone="neutral" padding="sm">
         <Text fontSize="xs" fontWeight="medium" color="fg.muted" marginBottom={2}>
           Available Variables
         </Text>
@@ -61,7 +62,7 @@ export function BodyTemplateEditor({
             </Text>
           ))}
         </VStack>
-      </Box>
+      </Card>
     </VStack>
   );
 }

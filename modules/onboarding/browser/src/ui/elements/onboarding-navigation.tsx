@@ -64,8 +64,8 @@ export const OnboardingNavigation = <T extends number = number>({
             variant="ghost"
             size="sm"
             color="fg.subtle"
+            textStyle="body"
             fontWeight="semibold"
-            fontSize="14px"
             borderRadius="8px"
             disabled={isSubmitting}
             _hover={{ color: "fg", bg: "bg.muted" }}
@@ -88,8 +88,8 @@ export const OnboardingNavigation = <T extends number = number>({
             variant="ghost"
             size="sm"
             color="fg.subtle"
+            textStyle="body"
             fontWeight="semibold"
-            fontSize="14px"
             borderRadius="8px"
             _hover={{ color: "fg", bg: "bg.muted" }}
             onClick={() => {

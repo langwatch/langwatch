@@ -156,7 +156,7 @@ export function PinnedAwareJsonView({
                 background: "transparent !important",
                 // Bumped from 0.78em (~9 px under xs, ~7 px under
                 // 2xs parents) to a flat 10 px — operator floor.
-                fontSize: "0.625rem",
+                textStyle: "micro",
                 lineHeight: "1.6",
                 padding: "0 !important",
                 margin: "0 !important",

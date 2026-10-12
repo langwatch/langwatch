@@ -1,6 +1,6 @@
 ---
 name: postgres-migration
-description: "Change the Postgres schema without breaking any release still in the supported window: the expand/contract recipes for adding a column or table, removing one, renaming one, changing its type, making it NOT NULL, adding an index or a unique constraint and splitting a table; why a drop waits until old writers are gone and the `-- contract: retired in <release>` note every drop needs; the lock-heavy shapes the guard refuses and the ops pre-build note for an index; re-runnable statements; one owner per migration; timestamp keys and the migration-order check; no new foreign key and no new @relation; where schema.prisma and packages/prisma-client/prisma/migrations live; why inline DML on an existing table, a volatile default, two ALTERs on one table and a long lock_timeout are refused; and how a projection table changes (a rebuild beside the old one). Use whenever someone says 'add a field', 'add a column', 'add a table', 'drop that column', 'drop the table', 'rename this table', 'rename the column', 'change the column type', 'make it required', 'NOT NULL', 'add an index', 'unique constraint', 'add a relation', 'foreign key', '@relation', 'onDelete Cascade', 'write a Prisma migration', 'the migration failed on deploy', 'prisma migrate resolve', or the migration-safety test named their migration."
+description: "Change the Postgres schema without breaking any release still in the supported window: the expand/contract recipes for adding a column or table, removing one, renaming one, changing its type, making it NOT NULL, adding an index or a unique constraint and splitting a table; why a migration never drops a table or a column (a drop is an operator step confirmed in Ops); the lock-heavy shapes the guard refuses and the ops pre-build note for an index; re-runnable statements; one owner per migration; timestamp keys and the migration-order check; no new foreign key and no new @relation; where schema.prisma and packages/prisma-client/prisma/migrations live; why inline DML on an existing table, a volatile default, two ALTERs on one table and a long lock_timeout are refused; and how a projection table changes (a rebuild beside the old one). Use whenever someone says 'add a field', 'add a column', 'add a table', 'drop that column', 'drop the table', 'rename this table', 'rename the column', 'change the column type', 'make it required', 'NOT NULL', 'add an index', 'unique constraint', 'add a relation', 'foreign key', '@relation', 'onDelete Cascade', 'write a Prisma migration', 'the migration failed on deploy', 'prisma migrate resolve', or the migration-safety test named their migration."
 user-invocable: true
 argument-hint: "<the schema change, or the migration name the scanner refused>"
 ---
@@ -9,9 +9,9 @@ argument-hint: "<the schema change, or the migration name the scanner refused>"
 
 **The rule** (ADR-155; ADR-173): the previous image serves on the new schema during the rollout
 and after a rollback, so every change is expand/contract. No release is a required stop (Alex,
-2026-10-11): any install upgrades to the latest image through every step, so a DROP or contract
-waits until old writers are gone (`needsOldWritersGone`), and the step that drops is kept, like
-every step. Which recipe applies at all: the `migration` skill.
+2026-10-11): any install upgrades to the latest image through every step. Nothing is deleted
+automatically (Alex, 2026-10-11): a migration never drops a table or a column; a drop is an operator step confirmed in Ops once safe.
+Which recipe applies at all: the `migration` skill.
 
 Files: `packages/prisma-client/prisma/schema.prisma` and
 `packages/prisma-client/prisma/migrations/<timestamp>_<slug>/migration.sql`.
@@ -48,9 +48,11 @@ folder into a release manifest (`packages/upgrade/releases/<release>.json`); you
    `ADD VALUE IF NOT EXISTS`, `INSERT ... ON CONFLICT`, `CREATE OR REPLACE`; guard a constraint, a
    type or a rename with a `DO $$ ... $$` block that checks the catalogue. Prisma's generated SQL
    has none of these: edit it before you commit. Never move the marker back.
-7. **Nothing is dropped until old writers are gone** (`needsOldWritersGone`), and the statement
-   carries `-- contract: retired in <release>`, the release that stopped using it. It also carries
-   `-- archive: <table>` or `-- archive: none (<reason>)`, else `contract-without-archive-note` fails.
+7. **A migration never drops a table or a column** (`drop-table-or-column`, above the newest
+   `langwatch@v*` tag). Leave it, stop reading and writing it, and declare an operator step
+   (`mode: "operator"`) in the owning module that drops it; an operator confirms it in Ops once
+   it is safe. Dropping an index, constraint, default or type holds no data and stays allowed.
+   Released history kept its drops under `-- contract: retired in <release>` and `-- archive:`.
 8. **Nothing is renamed or retyped in place.**
 9. **No new foreign key and no new `@relation`** (Alex, 2026-10-06; existing ones stay).
 
@@ -66,7 +68,8 @@ is never edited and goes in `migration-safety.from-main.txt` instead.
 
 | Rule                                               | Refuses                                                                            | Write instead                                                                                                   |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `drop-without-retirement-note`                     | `DROP TABLE`, `DROP COLUMN` with no note                                           | the note, once old writers are gone                                                                             |
+| `drop-table-or-column`                             | `DROP TABLE`, `DROP COLUMN` in a new migration                                     | leave it; an operator step in the owning module drops it once an operator confirms                              |
+| `drop-without-retirement-note`                     | `DROP TABLE`, `DROP COLUMN` with no note (released history)                        | history only: a new drop is refused above                                                                       |
 | `add-not-null-column-without-default`              | `ADD COLUMN ... NOT NULL` with no `DEFAULT`                                        | a `DEFAULT`, or nullable now                                                                                    |
 | `set-not-null-on-populated-column`                 | `ALTER COLUMN ... SET NOT NULL` on an existing table                               | app-level enforcement, or `CHECK (col IS NOT NULL) NOT VALID` then `VALIDATE` later; no escape hatch (round 22) |
 | `alter-column-type`                                | `ALTER COLUMN ... TYPE`                                                            | new column, backfill, switch, retire the old                                                                    |
@@ -145,20 +148,15 @@ or with `NOT NULL DEFAULT 'free'`. New writers set the new shape from this relea
 plans data steps by mode, so a backfill is never the only way a row becomes correct.
 
 **Remove a column or table.** Release A stops reading and writing it, marked `/// retired: unread
-since A` in `schema.prisma`, no migration. Once old writers are gone (`needsOldWritersGone`), drop it:
-
-```sql
--- contract: retired in 3.20.1
--- archive: none (derived column, nothing to keep)
-ALTER TABLE "Project" DROP COLUMN IF EXISTS "legacyKey";
-```
-
-If a tenant step's legacy path reads it, archive-or-fail first (`migration-data-step`).
+since A` in `schema.prisma`, no migration. Nothing drops it automatically: the owning module
+declares an operator step (`defineMigrationStep({ mode: "operator", ... })`) whose run drops it
+through the module's own repository, and an operator confirms it in Ops once old writers are gone.
+The upgrade registers it pending and never runs it (`packages/upgrade/specs/contract-order.feature`).
 
 **Rename a column, or change its type.** Expand: the new column beside the old. Migrate: dual-write
 from release A and copy with a background `.withMigrations` step (never an inline `UPDATE` on an
-existing table); readers switch in A or read `coalesce(new, old)`. Contract:
-drop the old under rule 7.
+existing table); readers switch in A or read `coalesce(new, old)`. The old column stays until an operator step
+drops it (rule 7).
 
 **Make a column required.** Writers set it from release A; a step fills the gaps; enforce it in the
 application. If the database must enforce it, add `CHECK ("slug" IS NOT NULL) NOT VALID` once

@@ -16,7 +16,7 @@ func startOrch(t *testing.T) (*Orchestrator, *fakeSystem) {
 	t.Helper()
 	sys := &fakeSystem{alive: map[int]bool{99: true}}
 	return &Orchestrator{
-		cfg: Config{RepoRoot: "/repo", Home: "/home/haven", UpArgv: []string{"/usr/local/bin/haven", "up"}},
+		cfg: Config{RepoRoot: "/repo", Home: "/home/haven", UpArgv: []string{"/usr/local/bin/haven", "up"}, ServiceArgv: []string{"/usr/local/bin/haven", "service"}},
 		hyg: &fakeHygiene{worktrees: []Worktree{
 			{Dir: "/repo", Branch: "main"},
 			{Dir: "/repo/.claude/worktrees/idle", Branch: "feat/idle"},
@@ -90,12 +90,16 @@ func TestStartWorktreeStack(t *testing.T) {
 
 // @scenario "A service the stack does not run is started from its row"
 func TestStartStackService(t *testing.T) {
-	t.Run("given a registered stack, adding a selectable service runs up +<service> in its worktree", func(t *testing.T) {
+	t.Run("given a registered stack, a selectable service is switched on or off in its worktree", func(t *testing.T) {
 		o, sys := startOrch(t)
 		if err := o.StartStackService("main", "llm"); err != nil {
 			t.Fatalf("StartStackService: %v", err)
 		}
-		if len(sys.spawned) != 1 || sys.spawned[0].Dir != "/repo" || strings.Join(sys.spawned[0].Argv, " ") != "/usr/local/bin/haven up +llm" {
+		if err := o.StopStackService("main", "app"); err != nil {
+			t.Fatalf("StopStackService: %v", err)
+		}
+		if len(sys.spawned) != 2 || sys.spawned[0].Dir != "/repo" || strings.Join(sys.spawned[0].Argv, " ") != "/usr/local/bin/haven service on llm" ||
+			strings.Join(sys.spawned[1].Argv, " ") != "/usr/local/bin/haven service off app" {
 			t.Errorf("spawned %v", sys.spawned)
 		}
 	})

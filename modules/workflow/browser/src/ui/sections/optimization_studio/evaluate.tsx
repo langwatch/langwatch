@@ -30,6 +30,10 @@ import {
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import {
+  WAITING_FOR_ENGINE,
+  useIsStudioConnected,
+} from "../../../behavior/use-studio-connected.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { trainTestSplit } from "../../../model/studio-dataset.utils.ts";
@@ -97,16 +101,19 @@ type DatasetSplitOption = {
 };
 
 function evaluateDisabledReason({
+  isConnected,
   hasProvidersWithoutCustomKeys,
   isDatasetLoading,
   estimatedTotal,
   needsACommitMessage,
 }: {
+  isConnected: boolean;
   hasProvidersWithoutCustomKeys: boolean;
   isDatasetLoading: boolean;
   estimatedTotal: number | undefined;
   needsACommitMessage: boolean;
 }): string | false {
+  if (!isConnected) return WAITING_FOR_ENGINE;
   if (hasProvidersWithoutCustomKeys) return "Set up your API keys to run evaluations";
   if (isDatasetLoading) return false;
   if (!estimatedTotal || estimatedTotal < 1) {
@@ -208,6 +215,7 @@ export function EvaluateModalContent({
 
   const commitVersion = workflowApi.workflow.commitVersion.useMutation();
   const { startEvaluationExecution } = useEvaluationExecution();
+  const isConnected = useIsStudioConnected();
 
   const [hasStarted, setHasStarted] = useState(false);
 
@@ -268,6 +276,7 @@ export function EvaluateModalContent({
   const isDatasetLoading = total === undefined && datasetQuery.isFetching;
 
   const isDisabled = evaluateDisabledReason({
+    isConnected,
     hasProvidersWithoutCustomKeys,
     isDatasetLoading,
     estimatedTotal,
@@ -362,7 +371,7 @@ const DatasetSplitSelect = ({
             <Select.Item item={option} key={option.value}>
               <VStack align="start" width="full">
                 <Text>{option.label}</Text>
-                <Text fontSize="13px" color="fg.muted">
+                <Text textStyle="bodySm" color="fg.muted">
                   {option.description}
                 </Text>
               </VStack>

@@ -314,6 +314,7 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 			_ = cmd.Wait()
 			close(done)
 		}()
+		reaped := capMemory(ctx, cmd.Process.Pid, ac.MaxRSSBytes, done)
 		select {
 		case <-ctx.Done():
 			if cmd.Process != nil {
@@ -325,13 +326,38 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 			if ctx.Err() != nil {
 				return
 			}
-			c.logln(levelRecordLine("warn", "exited — restarting in 1s", time.Time{}))
+			why := "exited"
+			select {
+			case reason := <-reaped:
+				why = reason
+				if ac.OnReap != nil {
+					ac.OnReap(reason)
+				}
+			default:
+			}
+			c.logln(levelRecordLine("warn", why+" — restarting in 1s", time.Time{}))
 			select {
 			case <-ctx.Done():
 			case <-time.After(time.Second):
 			}
 		}
 	}
+}
+
+// capMemory runs reap's RSS check on a long-running lane until it exits, so a
+// lane past its ceiling is killed and the restart loop brings it back.
+func capMemory(ctx context.Context, pgid int, maxRSS int64, done <-chan struct{}) <-chan string {
+	reaped := make(chan string, 1)
+	if maxRSS <= 0 {
+		return reaped
+	}
+	reapCtx, cancel := context.WithCancel(ctx)
+	go func() {
+		<-done
+		cancel()
+	}()
+	go reap(reapCtx, pgid, app.ReapLimits{MaxRSSBytes: maxRSS}, reaped)
+	return reaped
 }
 
 // waitForReady blocks until an HTTP GET to url gets a non-5xx response (the

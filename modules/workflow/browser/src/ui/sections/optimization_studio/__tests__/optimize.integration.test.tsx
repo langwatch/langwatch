@@ -36,6 +36,7 @@ vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (store: unknown) => unknown) =>
     selector({
       workflow_id: "wf-1",
+      socketStatus: "connected",
       getWorkflow: () => WORKFLOW,
       nodes: WORKFLOW.nodes,
       state: { optimization: undefined },

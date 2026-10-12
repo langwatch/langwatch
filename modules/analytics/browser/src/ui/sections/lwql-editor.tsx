@@ -6,6 +6,7 @@
 import type { LangWatchQLSchema } from "@langwatch/analytics-contract";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense, useId, useState } from "react";
@@ -24,7 +25,7 @@ const NO_MARKERS: readonly LwqlEditorMarker[] = [];
 
 const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   minimap: { enabled: false },
-  fontSize: 12,
+  fontSize: TYPE_SCALE_PX.caption,
   wordWrap: "on",
   automaticLayout: true,
   scrollBeyondLastLine: false,

@@ -183,7 +183,7 @@ func TestStackHomeCarriesFactsSurfacesErrorsAndCredentials(t *testing.T) {
 		want := map[string]string{
 			"app": statusLive, "api": statusLive, "worker": statusStarting, "gateway": statusStarting,
 			"nlp": statusStarting, "langyagent": statusNotSelected, "idp": statusLive, "mail": statusStarting,
-			"design-system": statusNotSelected, "mail-room": statusNotSelected, "langevals": statusNotSelected, "storage": statusNotSelected, "voice": statusNotSelected, "llm": statusNotSelected, "analytics": statusNotSelected, "telemetry": statusNotSelected, "outbound": statusNotSelected, "payment": statusNotSelected, "lambda": statusNotSelected, "observability": statusDown,
+			"design-system": statusNotSelected, "mail-room": statusNotSelected, "langevals": statusNotSelected, "storage": statusNotSelected, "voice": statusNotSelected, "llm": statusNotSelected, "analytics": statusNotSelected, "telemetry": statusNotSelected, "outbound": statusNotSelected, "payment": statusNotSelected, "lambda": statusNotSelected, "github": statusNotSelected, "observability": statusDown,
 		}
 		got := map[string]string{}
 		var order []string
@@ -275,13 +275,13 @@ func TestStackHomeJSONFieldNames(t *testing.T) {
 	pinKeys(t, "databases", databases, "postgres", "clickhouse", "redis")
 	pinKeys(t, "postgres", databases["postgres"], "name", "port")
 	pinKeys(t, "redis", databases["redis"], "db", "port")
-	pinKeys(t, "surface", body["surfaces"].([]any)[0], "name", "role", "hostname", "url", "port", "status", "hint", "fallback", "reason", "detail", "restart", "start")
+	pinKeys(t, "surface", body["surfaces"].([]any)[0], "name", "role", "hostname", "url", "port", "status", "hint", "fallback", "reason", "detail", "restart", "start", "switch")
 	credentials := body["credentials"].(map[string]any)
 	pinKeys(t, "credentials", credentials, "login", "mailAddress", "idpTenants", "apiKey")
 	pinKeys(t, "login", credentials["login"], "email")
 	pinKeys(t, "apiKey", credentials["apiKey"], "masked", "revealPath")
 	pinKeys(t, "idp tenant", credentials["idpTenants"].([]any)[0], "id", "domain", "url")
-	pinKeys(t, "actions", body["actions"], "canRestart", "canStart", "startDir", "canStartService")
+	pinKeys(t, "actions", body["actions"], "canRestart", "canStart", "startDir", "canStartService", "canStopService")
 	if errs, ok := body["errors"].([]any); !ok || errs == nil {
 		t.Errorf("errors must be an array even when empty, got %v", body["errors"])
 	}

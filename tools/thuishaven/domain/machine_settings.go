@@ -9,9 +9,10 @@ import (
 
 // MachineSettings are the choices that hold for every stack on this machine,
 // saved in haven's home and edited by `haven machine settings` and the hub.
-// The zero value is the default: observability on, the VM left alone.
+// The zero value is the default: observability on, the VM allowed and left alone.
 type MachineSettings struct {
 	ObservabilityOff        bool `json:"observabilityOff,omitempty"`
+	VMOff                   bool `json:"vmOff,omitempty"`
 	RuntimeAutoStop         bool `json:"runtimeAutoStop,omitempty"`
 	RuntimeIdleGraceMinutes int  `json:"runtimeIdleGraceMinutes,omitempty"`
 }
@@ -19,6 +20,7 @@ type MachineSettings struct {
 // The kebab names the CLI and the hub address each setting by.
 const (
 	SettingObservability    = "observability"
+	SettingVM               = "vm"
 	SettingRuntimeAutoStop  = "runtime-auto-stop"
 	SettingRuntimeIdleGrace = "runtime-idle-grace-minutes"
 )
@@ -51,6 +53,8 @@ func (s MachineSettings) View() []MachineSettingView {
 	return []MachineSettingView{
 		{Name: SettingObservability, Kind: "switch", Value: onOff(!s.ObservabilityOff), Default: "on",
 			Summary: "run the shared observability stack (Grafana, Tempo, Loki, Prometheus, Pyroscope); off stops it and stacks export nothing"},
+		{Name: SettingVM, Kind: "switch", Value: onOff(!s.VMOff), Default: "on",
+			Summary: "off: never start the Colima VM; ClickHouse and observability run natively, and features that need a container refuse"},
 		{Name: SettingRuntimeAutoStop, Kind: "switch", Value: onOff(s.RuntimeAutoStop), Default: "off",
 			Summary: "stop the colima VM, whoever started it, once no stack needs it and no container runs on it for the grace period"},
 		{Name: SettingRuntimeIdleGrace, Kind: "minutes", Value: strconv.Itoa(int(s.RuntimeIdleGrace() / time.Minute)),
@@ -66,6 +70,10 @@ func (s MachineSettings) With(name, value string) (MachineSettings, error) {
 	case SettingObservability:
 		on, err := parseSwitch(name, value, true)
 		s.ObservabilityOff = !on
+		return s, err
+	case SettingVM:
+		on, err := parseSwitch(name, value, true)
+		s.VMOff = !on
 		return s, err
 	case SettingRuntimeAutoStop:
 		on, err := parseSwitch(name, value, false)
@@ -83,8 +91,8 @@ func (s MachineSettings) With(name, value string) (MachineSettings, error) {
 		s.RuntimeIdleGraceMinutes = n
 		return s, nil
 	}
-	return s, fmt.Errorf("no machine setting %q — the settings are %s, %s and %s",
-		name, SettingObservability, SettingRuntimeAutoStop, SettingRuntimeIdleGrace)
+	return s, fmt.Errorf("no machine setting %q — the settings are %s, %s, %s and %s",
+		name, SettingObservability, SettingVM, SettingRuntimeAutoStop, SettingRuntimeIdleGrace)
 }
 
 func parseSwitch(name, value string, def bool) (bool, error) {

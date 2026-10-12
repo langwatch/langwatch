@@ -64,50 +64,34 @@ import {
 | Alerts         | Error messages             |
 | Simple choices | "Save or discard changes?" |
 
-### Drawer Anatomy
+### Drawer and dialog: shapes, not parts
+
+Render the shape; the `Drawer.*` and `Dialog.*` parts are deprecated (ADR-002,
+`packages/design-system/adrs/002-overlay-and-card-shapes.md`).
 
 ```tsx
-<Drawer.Root open={isOpen} onOpenChange={({ open }) => setOpen(open)} placement="end" size="lg">
-  <Drawer.Backdrop />
-  <Drawer.Content>
-    <Drawer.CloseTrigger />
-    <Drawer.Header>
-      <Drawer.Title>Drawer Title</Drawer.Title>
-    </Drawer.Header>
-    <Drawer.Body>{/* Main content */}</Drawer.Body>
-    <Drawer.Footer>
-      <Button variant="outline" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button colorPalette="blue" onClick={onSave}>
-        Save
-      </Button>
-    </Drawer.Footer>
-  </Drawer.Content>
-</Drawer.Root>
+<Drawer
+  title="New budget"
+  onClose={closeDrawer}
+  onBack={canGoBack ? goBack : undefined}
+  size="md"
+  onSubmit={handleSubmit(save)}
+  footer={{ primaryAction: { label: "Create budget", type: "submit", loading: isSaving } }}
+>
+  {/* fields */}
+</Drawer>
+
+<Dialog
+  open={open}
+  onClose={() => setOpen(false)}
+  title="Copy dataset"
+  description="Copies every row into another project."
+  primaryAction={{ label: "Copy", onClick: copy, loading: isCopying }}
+/>
 ```
 
-### Dialog Anatomy
-
-```tsx
-<Dialog.Root open={isOpen} onOpenChange={({ open }) => setOpen(open)}>
-  <Dialog.Content>
-    <Dialog.CloseTrigger />
-    <Dialog.Header>
-      <Dialog.Title>Confirm Action</Dialog.Title>
-    </Dialog.Header>
-    <Dialog.Body>Are you sure you want to proceed?</Dialog.Body>
-    <Dialog.Footer>
-      <Button variant="outline" onClick={onClose}>
-        Cancel
-      </Button>
-      <Button colorPalette="red" onClick={onConfirm}>
-        Delete
-      </Button>
-    </Dialog.Footer>
-  </Dialog.Content>
-</Dialog.Root>
-```
+A drawer footer never has Cancel; a dialog draws Cancel unless `secondaryAction` takes its place.
+A child component that owns its form passes `{ type: "submit", form: "<form id>" }` instead.
 
 ## Drawer Navigation
 

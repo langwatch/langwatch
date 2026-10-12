@@ -34,7 +34,12 @@ export async function composedAuth({ repositories }: { repositories: AuthReposit
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: true,
-      auth0ManagementClientId: undefined,
+      socialProviderBases: {
+        google: undefined,
+        github: undefined,
+        gitlab: undefined,
+        microsoft: undefined,
+      },
       cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,

@@ -13,6 +13,7 @@ import {
 import {
   type BackgroundStepsLedger,
   type BackgroundStepsLog,
+  type BackgroundStepsQueue,
   BackgroundStepsService,
 } from "../background-steps.service.ts";
 
@@ -243,11 +244,15 @@ function serviceOver({
   run,
   log = () => undefined,
   clock = { now: 0 },
+  queue,
+  queueWaitMs,
 }: {
   ledger: MemoryBackgroundLedger;
   run: MigrationStepRun;
   log?: BackgroundStepsLog;
   clock?: { now: number };
+  queue?: BackgroundStepsQueue;
+  queueWaitMs?: number;
 }) {
   return BackgroundStepsService.create({
     ledger,
@@ -257,6 +262,7 @@ function serviceOver({
         kind: "data",
         mode: "background",
         description: "Reopens accounts that never proved their address.",
+        ...(queueWaitMs === undefined ? {} : { queueWaitMs }),
         run,
       }),
     ],
@@ -267,6 +273,7 @@ function serviceOver({
     renewEveryMs: 1_000,
     retry: { attempts: 3, firstBackoffMs: 60_000, maxBackoffMs: 600_000 },
     now: () => clock.now,
+    ...(queue === undefined ? {} : { queue }),
   });
 }
 
@@ -584,83 +591,6 @@ describe("BackgroundStepsService.sweep() with old writers", () => {
   });
 });
 
-describe("BackgroundStepsService.runNow()", () => {
-  const id = "identity:reopen-unproven-accounts";
-  const reopen = (run: MigrationStepRun) =>
-    defineMigrationStep({
-      id,
-      kind: "data",
-      mode: "background",
-      description: "Reopens accounts that never proved their address.",
-      needsOldWritersGone: true,
-      run,
-    });
-
-  describe("given a pending step that waits for old writers, on a process that does not serve", () => {
-    /** @scenario "A background step run before a contract runs even while old writers still serve" */
-    it("runs it and records it done without asking the serving roster", async () => {
-      let runs = 0;
-      let asked = 0;
-      const statuses: string[] = [];
-      const service = BackgroundStepsService.create({
-        ledger: {
-          findSteps: async () => [{ id, status: "pending", report: null }],
-          acquireLease: async () => ({}),
-          renewLease: async () => ({}),
-          releaseLease: async () => true,
-          markRunning: async () => undefined,
-          setStatus: async ({ status }) => {
-            statuses.push(status);
-          },
-          saveReport: async () => undefined,
-          reopen: async () => [],
-        },
-        steps: [reopen(async () => ({ runs: ++runs }))],
-        serving: () => false,
-        oldWritersGoneFor: async () => (asked++, false),
-        identity: { owner: "upgrade:run-1", image: "3.21.0", host: "host" },
-        log: () => undefined,
-      });
-
-      const outcome = await service.runNow({ id, signal: new AbortController().signal });
-
-      expect(outcome).toBe("done");
-      expect(runs).toBe(1);
-      expect(asked).toBe(0);
-      expect(statuses).toEqual(["done"]);
-    });
-  });
-
-  describe("given a step a worker already finished", () => {
-    /** @scenario "A background step already done is not run again before a contract" */
-    it("skips it without taking its lease", async () => {
-      let runs = 0;
-      const service = BackgroundStepsService.create({
-        ledger: {
-          findSteps: async () => [{ id, status: "done", report: null }],
-          acquireLease: refuse,
-          renewLease: refuse,
-          releaseLease: refuse,
-          markRunning: refuse,
-          reopen: refuse,
-          setStatus: refuse,
-          saveReport: refuse,
-        },
-        steps: [reopen(async () => ({ runs: ++runs }))],
-        serving: () => true,
-        oldWritersGoneFor: async () => true,
-        identity: { owner: "upgrade:run-1", image: "3.21.0", host: "host" },
-        log: () => undefined,
-      });
-
-      const outcome = await service.runNow({ id, signal: new AbortController().signal });
-
-      expect(outcome).toBe("skipped");
-      expect(runs).toBe(0);
-    });
-  });
-});
-
 describe("BackgroundStepsService one copy at a time", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -813,6 +743,152 @@ describe("BackgroundStepsService one copy at a time", () => {
         lastError: expect.stringContaining("older image"),
       });
       expect(ledger.leaseOwner).toBeNull();
+    });
+  });
+});
+
+/** The job queue's listed runs: records each run, and answers with the work or a refusal. */
+class ListedRunsDouble implements BackgroundStepsQueue {
+  readonly runs: { name: string; timeoutMs: number }[] = [];
+  refusal: Error | undefined;
+
+  async runListedWork<Result>({
+    name,
+    timeoutMs,
+    work,
+  }: {
+    name: string;
+    timeoutMs: number;
+    work: () => Promise<Result>;
+  }): Promise<Result> {
+    this.runs.push({ name, timeoutMs });
+    const result = await work();
+    if (this.refusal) throw this.refusal;
+    return result;
+  }
+}
+
+describe("BackgroundStepsService queue work", () => {
+  describe("given a step whose queue work all runs", () => {
+    /** @scenario "A background step is done only once the queue work it sent has run" */
+    it("runs the step on a list of its own, waiting 60 s by default, and records it done", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new ListedRunsDouble();
+      const service = serviceOver({ ledger, queue, run: async () => ({ sent: 2 }) });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+
+      expect(queue.runs).toEqual([
+        { name: expect.stringMatching(`^upgrade-step:${STEP}:`), timeoutMs: 60_000 },
+      ]);
+      expect(ledger.row).toMatchObject({ status: "done", report: { sent: 2 } });
+    });
+  });
+
+  describe("given two runs of a step that declares a longer wait", () => {
+    it("waits as long as it declares, on a new list each run", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new ListedRunsDouble();
+      queue.refusal = new Error("Queue work had not all run within 300000 ms");
+      const clock = { now: 0 };
+      const service = serviceOver({
+        ledger,
+        queue,
+        clock,
+        queueWaitMs: 300_000,
+        run: async () => ({ sent: 1 }),
+      });
+
+      await sweepOnce(service);
+      queue.refusal = undefined;
+      clock.now = 600_000;
+      await sweepOnce(service);
+
+      expect(queue.runs.map((run) => run.timeoutMs)).toEqual([300_000, 300_000]);
+      expect(new Set(queue.runs.map((run) => run.name)).size).toBe(2);
+    });
+  });
+
+  describe("given a step whose queue work failed or did not run in time", () => {
+    /** @scenario "A step whose queue work stops draining fails that attempt and stays resumable" */
+    it("is not recorded done: pending again with the refusal and its checkpoint kept", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new ListedRunsDouble();
+      queue.refusal = new Error(
+        "Queue work of upgrade-step had not all run within 60000 ms (still waiting: t/command/a)",
+      );
+      const service = serviceOver({
+        ledger,
+        queue,
+        run: async ({ checkpoint }) => {
+          await checkpoint.save({ report: { sent: 1 } });
+          return { sent: 1 };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [], retrying: [STEP] });
+
+      expect(ledger.row).toMatchObject({
+        status: "pending",
+        report: { sent: 1 },
+        lastError: expect.stringContaining("still waiting: t/command/a"),
+      });
+    });
+  });
+});
+
+describe("BackgroundStepsService side by side", () => {
+  describe("given five independent pending steps and one that runs after another", () => {
+    /** @scenario "Independent background steps run side by side, a few at a time" */
+    it("runs three at once under their own leases, and the dependent step waits", async () => {
+      const ids = ["a:one", "a:two", "a:three", "a:four", "a:five"];
+      let running = 0;
+      let widest = 0;
+      const leases: string[] = [];
+      const step = (id: string, after?: string[]) =>
+        defineMigrationStep({
+          id,
+          kind: "data",
+          mode: "background",
+          description: `Runs ${id}.`,
+          ...(after ? { after } : {}),
+          run: async () => {
+            running += 1;
+            widest = Math.max(widest, running);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            running -= 1;
+            return { id };
+          },
+        });
+      const ledger: BackgroundStepsLedger = {
+        findSteps: async () =>
+          [...ids, "a:six"].map((id) => ({ id, status: "pending" as const, report: null })),
+        acquireLease: async ({ name }) => {
+          leases.push(name);
+          return {};
+        },
+        renewLease: async () => ({}),
+        releaseLease: async () => true,
+        markRunning: async () => undefined,
+        reopen: async () => [],
+        setStatus: async () => undefined,
+        saveReport: async () => undefined,
+      };
+      const service = BackgroundStepsService.create({
+        ledger,
+        steps: [...ids.map((id) => step(id)), step("a:six", ["a:one"])],
+        serving: () => true,
+        oldWritersGoneFor: async () => true,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+
+      const sweep = await service.sweep({ signal: new AbortController().signal });
+
+      expect(widest).toBe(3);
+      expect(sweep.ran).toEqual(ids);
+      expect(sweep.waiting).toEqual(["a:six"]);
+      expect(leases.toSorted()).toEqual(ids.map((id) => `background:${id}`).toSorted());
     });
   });
 });

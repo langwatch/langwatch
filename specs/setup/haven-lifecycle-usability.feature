@@ -224,6 +224,13 @@ Feature: haven lifecycle usability
     Then it starts the daemon in the background
     And that daemon starts the stack's keeper
 
+  @integration
+  Scenario: Up's hand-over survives the daemon restarting after a rebuild
+    Given the haven daemon answers the hand-over with 404 unknown stack while it restarts
+    When the up hands its provisioned stack over
+    Then the up keeps asking the daemon that runs now, starting one if none does
+    And the successor daemon starts the stack's keeper
+
   @unit
   Scenario: The daemon refuses to start a keeper for a stack it does not know
     When the start route names a slug with no registered stack

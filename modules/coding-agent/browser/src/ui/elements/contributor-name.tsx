@@ -1,4 +1,4 @@
-import { Table } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
 import type React from "react";
 
 import { Link } from "./activity-link.tsx";
@@ -18,12 +18,7 @@ export const ContributorName: React.FC<{
     contributorIsProject: boolean;
   };
 }> = ({ contributor }) => (
-  <Table.Cell
-    fontSize="sm"
-    maxWidth={CONTRIBUTOR_COLUMN_WIDTH}
-    truncate
-    title={contributor.contributorLabel}
-  >
+  <ListTable.Cell maxWidth={CONTRIBUTOR_COLUMN_WIDTH} truncate title={contributor.contributorLabel}>
     {contributor.contributorIsProject && contributor.projectSlug ? (
       <Link href={`/${contributor.projectSlug}/traces`} color="blue.fg">
         {contributor.contributorLabel}
@@ -31,5 +26,5 @@ export const ContributorName: React.FC<{
     ) : (
       contributor.contributorLabel
     )}
-  </Table.Cell>
+  </ListTable.Cell>
 );

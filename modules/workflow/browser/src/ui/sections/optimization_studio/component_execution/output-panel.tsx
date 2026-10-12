@@ -1,4 +1,4 @@
-import { Box } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
 import type { Component } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
@@ -14,22 +14,12 @@ export const OutputPanel = ({ node }: { node: Node<Component> }) => {
   );
 
   return (
-    <Box
-      background="bg"
-      height="full"
-      padding={6}
-      border="1px solid"
-      borderColor="border.emphasized"
-      borderRadius="0 8px 8px 0"
-      borderLeftWidth={0}
-      boxShadow="sm"
-      overflowY="auto"
-    >
+    <Card variant="joined-panel" edge="end">
       <ExecutionOutputPanel
         executionState={node.data.execution_state}
         isTracingEnabled={enableTracing}
         nodeType={node.type}
       />
-    </Box>
+    </Card>
   );
 };

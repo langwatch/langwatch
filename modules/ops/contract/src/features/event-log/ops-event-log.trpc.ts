@@ -30,7 +30,12 @@ import {
   opsSearchTenantsInputSchema,
   opsStartReplayInputSchema,
 } from "./ops-event-log.ts";
-import { replayHistoryEntrySchema, replayStatusSchema } from "./ops-replay.ts";
+import {
+  replayHistoryEntrySchema,
+  replayHistoryPageInputSchema,
+  replayHistoryPageSchema,
+  replayStatusSchema,
+} from "./ops-replay.ts";
 
 export const opsEventLogTrpc = defineTrpcContract("ops")
   .query("searchAggregates")
@@ -69,6 +74,10 @@ export const opsEventLogTrpc = defineTrpcContract("ops")
   .query("getReplayHistory")
   .withInput(z.void())
   .withOutput(replayHistoryEntrySchema.array())
+
+  .query("getReplayHistoryPage")
+  .withInput(replayHistoryPageInputSchema)
+  .withOutput(replayHistoryPageSchema)
 
   .query("getReplayRun")
   .withInput(opsGetReplayRunInputSchema)

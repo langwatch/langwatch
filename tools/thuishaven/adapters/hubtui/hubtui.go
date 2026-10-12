@@ -122,11 +122,10 @@ type Actions struct {
 	HasViewer  bool
 }
 
-// Outcome is what the hub wants the caller to do after it closed: open a git
-// view, hand the terminal to cleanup, or nothing (a plain quit). The caller
-// re-enters the hub after either handoff.
+// Outcome is what the hub wants the caller to do after it closed: open a
+// stack's viewer, hand the terminal to cleanup, or nothing (a plain quit). The
+// caller re-enters the hub after either handoff.
 type Outcome struct {
-	OpenGitDir string
 	RunCleanup bool
 	OpenStack  string
 }
@@ -318,16 +317,7 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(m.items)-1 {
 			m.cursor++
 		}
-	case "enter", "g":
-		if it, ok := m.selected(); ok {
-			if msg.String() == "enter" && it.stack != nil && m.actions.HasViewer {
-				m.outcome.OpenStack = it.stack.Slug
-			} else {
-				m.outcome.OpenGitDir = it.dir()
-			}
-			return m, tea.Quit
-		}
-	case "l":
+	case "enter", "l":
 		if it, ok := m.selected(); ok && it.stack != nil && m.actions.HasViewer {
 			m.outcome.OpenStack = it.stack.Slug
 			return m, tea.Quit
@@ -740,10 +730,7 @@ func (m model) viewFooter(b *strings.Builder) {
 	case m.flash != "":
 		b.WriteString("  " + m.flash + "\n")
 	default:
-		selected := append([]string{"↑↓ Select", "g Git"}, m.stackKeys()...)
-		if it, ok := m.selected(); ok && it.wt != nil {
-			selected = append(selected, "enter Git")
-		}
+		selected := append([]string{"↑↓ Select"}, m.stackKeys()...)
 		selected = append(selected, "x Destroy")
 		b.WriteString(styleSection.Render(" Selected  ") + styleDim.Render(strings.Join(selected, " · ")) + "\n")
 		b.WriteString(styleSection.Render(" Machine   ") + styleDim.Render(strings.Join(m.keyHints(), " · ")) + "\n")

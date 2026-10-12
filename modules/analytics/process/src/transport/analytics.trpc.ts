@@ -1,6 +1,7 @@
 /**
- * The server half of `analytics.*`. A series takes `analytics:view`, the two
- * cost-oriented reads `cost:view`; nothing here decides what a series means.
+ * The server half of `analytics.*`. A series takes `analytics:view`, the cost-oriented
+ * reads (documents, feedbacks and their pages) `cost:view`; nothing here decides what a
+ * series means.
  * @see modules/analytics/specs/analytics-timeseries.feature
  */
 import { AnalyticsApi, analyticsTrpc } from "@langwatch/analytics-contract";
@@ -23,4 +24,8 @@ export const analyticsTrpcTransport: TrpcRouterDeclaration<AnalyticsApi, typeof 
     .procedure("feedbacks")
     .withPermission("cost:view")
     .handle(({ app, input }) => app.getFeedbacks(input))
+
+    .procedure("feedbacksPage")
+    .withPermission("cost:view")
+    .handle(({ app, input }) => app.getFeedbacksPage(input))
     .build();

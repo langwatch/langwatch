@@ -8,7 +8,7 @@ const meta = {
   parameters: {
     usage: {
       use: "The small label above a group of values in a panel.",
-      avoid: "A field's own label: use Field.Label from primitives.",
+      avoid: "A field's own label: use Settings field.",
     },
   },
   component: SmallLabel,

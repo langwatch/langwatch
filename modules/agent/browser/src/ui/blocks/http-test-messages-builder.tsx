@@ -1,4 +1,5 @@
 import type { TestMessage } from "@langwatch/agent-contract/http-test";
+import { Card } from "@langwatch/design-system/card";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Box,
@@ -159,7 +160,7 @@ export function TestMessagesBuilder({
         <AddMessageButton onAdd={handleAdd} />
       </HStack>
 
-      <Box padding={4} bg="bg.subtle" borderRadius="md" borderWidth="1px" borderColor="border">
+      <Card variant="nested" tone="neutral">
         {/* Message rows */}
         {messages.map((message, index) => (
           <MessageRow
@@ -171,7 +172,7 @@ export function TestMessagesBuilder({
             canRemove={messages.length > 1}
           />
         ))}
-      </Box>
+      </Card>
     </VStack>
   );
 }

@@ -237,7 +237,15 @@ describe("the shared provider form in its guided presentation", () => {
   });
 
   describe("when the provider refuses the typed key", () => {
-    const refusal = { code: "provider_key_invalid" };
+    const refusal = {
+      code: "provider_key_invalid",
+      kind: "provider_key_invalid",
+      retryable: false,
+      meta: {},
+      httpStatus: 401,
+      fault: "customer" as const,
+      reasons: [],
+    };
     let user: ReturnType<typeof userEvent.setup>;
 
     beforeEach(async () => {

@@ -8,6 +8,8 @@ import { z } from "zod";
 
 import {
   emailSuppressionAcknowledgedSchema,
+  emailSuppressionPageInputSchema,
+  emailSuppressionPageSchema,
   emailSuppressionRowSchema,
   unsubscribeViewSchema,
 } from "./automation.ts";
@@ -39,6 +41,10 @@ export const emailSuppressionTrpc = defineTrpcContract("emailSuppression")
   .query("getAll")
   .withInput(suppressionProjectScopeSchema)
   .withOutput(emailSuppressionRowSchema.array())
+
+  .query("getPage")
+  .withInput(emailSuppressionPageInputSchema)
+  .withOutput(emailSuppressionPageSchema)
 
   .mutation("remove")
   .withInput(removeSuppressionInputSchema)

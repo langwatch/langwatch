@@ -41,10 +41,9 @@ type hookReply struct {
 }
 
 type hookSpecificOutput struct {
-	HookEventName            string         `json:"hookEventName"`
-	PermissionDecision       string         `json:"permissionDecision,omitempty"`
-	PermissionDecisionReason string         `json:"permissionDecisionReason,omitempty"`
-	UpdatedInput             map[string]any `json:"updatedInput,omitempty"`
+	HookEventName            string `json:"hookEventName"`
+	PermissionDecision       string `json:"permissionDecision,omitempty"`
+	PermissionDecisionReason string `json:"permissionDecisionReason,omitempty"`
 }
 
 // deferReply is the neutral verdict: no opinion, so the tool call continues
@@ -81,6 +80,14 @@ func (o *Orchestrator) decodeGateContext(stdin io.Reader) (gateContext, hookRepl
 	if json.NewDecoder(stdin).Decode(&p) != nil {
 		return gateContext{}, deferReply()
 	}
+	command, _ := p.ToolInput["command"].(string)
+	if reason, refused := domain.PlaywrightRefusal(p.ToolName, command); refused {
+		return gateContext{}, hookReply{Specific: hookSpecificOutput{
+			HookEventName:            "PreToolUse",
+			PermissionDecision:       "deny",
+			PermissionDecisionReason: reason,
+		}}
+	}
 	if warning := o.cacheCostWarning(p); warning != "" {
 		// The price is information, not a veto: this still carries no permission
 		// decision, same as deferReply, because pricing an action must never need
@@ -92,7 +99,6 @@ func (o *Orchestrator) decodeGateContext(stdin io.Reader) (gateContext, hookRepl
 	if p.ToolName != "Bash" {
 		return gateContext{}, deferReply()
 	}
-	command, _ := p.ToolInput["command"].(string)
 	if command == "" || domain.AlreadyWrapped(command) {
 		return gateContext{}, deferReply()
 	}

@@ -126,9 +126,9 @@ Public: the provider signs every delivery and the signature is verified over the
 Answers at `/api/webhooks/stripe`, `/api/v1/webhooks/stripe`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/billing-stripe-webhook.rest.ts:40)
-type Headers = z.infer<typeof billingStripeWebhookHeadersSchema>; // ../contract/src/billing-types.ts:215
-// Response: billingStripeWebhookReceiptSchema, ../contract/src/billing-types.ts:213
+// Rawbody: "bytes" (inline, src/transport/billing-stripe-webhook.rest.ts:41)
+type Headers = z.infer<typeof billingStripeWebhookHeadersSchema>; // ../contract/src/billing-types.ts:250
+// Response: billingStripeWebhookReceiptSchema, ../contract/src/billing-types.ts:241
 interface Response {
   received: true;
 }
@@ -151,23 +151,23 @@ Contract `../contract/src/connected-billing.trpc.ts:21`, router `src/transport/c
 
 ```typescript
 // connectedBilling.get
-// Input: connectedCustomerInputSchema, ../contract/src/connected-billing.schemas.ts:14
+// Input: connectedCustomerInputSchema, ../contract/src/connected-billing.schemas.ts:20
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof connectedBillingOverviewSchema>; // ../contract/src/connected-billing.schemas.ts:110
+type Output = z.infer<typeof connectedBillingOverviewSchema>; // ../contract/src/connected-billing.schemas.ts:182
 
 // connectedBilling.onboard
-type Input = z.infer<typeof connectedOnboardRequestSchema>; // ../contract/src/connected-billing.schemas.ts:25
-type Output = z.infer<typeof connectedBillingAccountViewSchema>; // ../contract/src/connected-billing.schemas.ts:54
+type Input = z.infer<typeof connectedOnboardRequestSchema>; // ../contract/src/connected-billing.schemas.ts:48
+type Output = z.infer<typeof connectedBillingAccountViewSchema>; // ../contract/src/connected-billing.schemas.ts:100
 
 // connectedBilling.addCommit
-// Input: connectedAddCommitRequestSchema, ../contract/src/connected-billing.schemas.ts:46
+// Input: connectedAddCommitRequestSchema, ../contract/src/connected-billing.schemas.ts:70
 interface Input {
   organizationId: string;
   amountUsdCents: number;
 }
-// Output: connectedCreditGrantViewSchema, ../contract/src/connected-billing.schemas.ts:72
+// Output: connectedCreditGrantViewSchema, ../contract/src/connected-billing.schemas.ts:114
 interface Output {
   stripeCreditGrantId: string;
   amountUsdCents: number;
@@ -177,7 +177,7 @@ interface Output {
 }
 
 // connectedBilling.renew
-// Input: connectedRenewRequestSchema, ../contract/src/connected-billing.schemas.ts:40
+// Input: connectedRenewRequestSchema, ../contract/src/connected-billing.schemas.ts:59
 interface Input {
   organizationId: string;
   termStartsAt: string;
@@ -187,26 +187,26 @@ interface Input {
   seatCurrency: "USD" | "EUR";
   commitUsdCents: number;
 }
-type Output = z.infer<typeof connectedBillingAccountViewSchema>; // ../contract/src/connected-billing.schemas.ts:54
+type Output = z.infer<typeof connectedBillingAccountViewSchema>; // ../contract/src/connected-billing.schemas.ts:100
 
 // connectedBilling.completeRenewalIfDue
-type Input = z.infer<typeof connectedCustomerInputSchema>; // ../contract/src/connected-billing.schemas.ts:14
-// Output: connectedRenewalOutcomeSchema, ../contract/src/connected-billing.schemas.ts:129
+type Input = z.infer<typeof connectedCustomerInputSchema>; // ../contract/src/connected-billing.schemas.ts:20
+// Output: connectedRenewalOutcomeSchema, ../contract/src/connected-billing.schemas.ts:192
 interface Output {
   outcome: "completed" | "waiting" | "none";
 }
 
 // connectedBilling.markPaidOutOfBand
-// Input: connectedInvoiceTargetSchema, ../contract/src/connected-billing.schemas.ts:52
+// Input: connectedInvoiceTargetSchema, ../contract/src/connected-billing.schemas.ts:78
 interface Input {
   stripeInvoiceId: string;
 }
-type Output = z.infer<typeof connectedInvoiceTargetSchema>; // ../contract/src/connected-billing.schemas.ts:52
+type Output = z.infer<typeof connectedInvoiceTargetSchema>; // ../contract/src/connected-billing.schemas.ts:78
 ```
 
 ### `currency`
 
-Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.trpc.ts:46`.
+Contract `../contract/src/currency.trpc.ts:22`, router `src/transport/currency.trpc.ts:46`.
 
 | Procedure                 | Kind  | Gate                                                                                                                                     | Input                       | Output                   |
 | ------------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------ |
@@ -214,9 +214,9 @@ Contract `../contract/src/currency.trpc.ts:17`, router `src/transport/currency.t
 
 ```typescript
 // currency.detectCurrency
-// Input: detectCurrencyInputSchema, ../contract/src/currency.trpc.ts:15
+// Input: detectCurrencyInputSchema, ../contract/src/currency.trpc.ts:20
 type Input = Record<string, unknown>;
-// Output: detectedCurrencySchema, ../contract/src/pricing.ts:14
+// Output: detectedCurrencySchema, ../contract/src/pricing.ts:19
 interface Output {
   currency: "USD" | "EUR";
   country: string | null;
@@ -240,14 +240,14 @@ Contract `../contract/src/subscription.trpc.ts:34`, router `src/transport/subscr
 ```typescript
 // subscription.addTeamMemberOrEvents
 // Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:37)
-// Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:211
+// Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:234
 interface Output {
   success: boolean;
 }
 
 // subscription.create
 // Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:54)
-// Output: billingRedirectSchema, ../contract/src/billing-types.ts:205
+// Output: billingRedirectSchema, ../contract/src/billing-types.ts:218
 interface Output {
   url: string | null;
 }
@@ -258,7 +258,7 @@ interface Input {
   organizationId: string;
   baseUrl: string;
 }
-// Output: billingPortalSessionSchema, ../contract/src/billing-types.ts:208
+// Output: billingPortalSessionSchema, ../contract/src/billing-types.ts:226
 interface Output {
   url: string;
 }
@@ -363,15 +363,15 @@ Run by the tasks process, before serve.
 | secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:177`           |
 | secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:178`           |
 | secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:179`           |
-| config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:12` |
-| config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:14` |
-| config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:22` |
-| config | `hubspotFormId`                     | `HUBSPOT_FORM_ID`                              | `../contract/src/billing.config.ts:23` |
-| config | `hubspotReachedLimitFormId`         | `HUBSPOT_REACHED_LIMIT_FORM_ID`                | `../contract/src/billing.config.ts:24` |
-| config | `bankDetails`                       | `LANGWATCH_BILLING_BANK_DETAILS`               | `../contract/src/billing.config.ts:25` |
-| config | `stripeApiBase`                     | `STRIPE_API_BASE`                              | `../contract/src/billing.config.ts:27` |
-| config | `isSaas`                            | `IS_SAAS`                                      | `../contract/src/billing.config.ts:29` |
-| config | `publicBaseUrl`                     | `BASE_HOST`                                    | `../contract/src/billing.config.ts:31` |
-| config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:33` |
+| config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
+| config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
+| config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |
+| config | `hubspotFormId`                     | `HUBSPOT_FORM_ID`                              | `../contract/src/billing.config.ts:24` |
+| config | `hubspotReachedLimitFormId`         | `HUBSPOT_REACHED_LIMIT_FORM_ID`                | `../contract/src/billing.config.ts:25` |
+| config | `bankDetails`                       | `LANGWATCH_BILLING_BANK_DETAILS`               | `../contract/src/billing.config.ts:26` |
+| config | `stripeApiBase`                     | `STRIPE_API_BASE`                              | `../contract/src/billing.config.ts:28` |
+| config | `isSaas`                            | `IS_SAAS`                                      | `../contract/src/billing.config.ts:36` |
+| config | `publicBaseUrl`                     | `BASE_HOST`                                    | `../contract/src/billing.config.ts:38` |
+| config | `nodeEnvironment`                   | `NODE_ENV`                                     | `../contract/src/billing.config.ts:40` |
 
 <!-- readme:generated:end -->

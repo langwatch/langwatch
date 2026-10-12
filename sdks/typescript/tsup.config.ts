@@ -15,6 +15,12 @@ import packageJson from "./package.json";
 // against the SDK's copy.
 const noExternal = [/^@langwatch\/(langy|handled-error)(\/|$)/, /^zod(\/|$)/];
 
+// Used only under src/cli, so they are devDependencies bundled into the CLI.
+// cloudflared's postinstall would otherwise download a binary on every install.
+const cliOnlyPackages = [
+  /^(chalk|ora|prompts|commander|js-yaml|dotenv|jsonc-parser|cloudflared)(\/|$)/,
+];
+
 // tsconfig.json is a solution container (no files of its own), so the build reads the
 // package's check config, which carries the same compiler options (ADR-150, 2026-10-10).
 const tsconfig = "tsconfig.app.json";
@@ -45,6 +51,13 @@ export default defineConfig([
     clean: false,
     format: ["cjs", "esm"],
     dts: true,
+    // ESM keeps import.meta (every ESM loader has it) while the rest stays
+    // es2017; the Node setup resolves its optional peers from that URL.
+    esbuildOptions(options, { format }) {
+      const url = format === "esm" ? "import.meta.url" : "undefined";
+      options.define = { ...options.define, __ESM_MODULE_URL__: url };
+      if (format === "esm") options.supported = { ...options.supported, "import-meta": true };
+    },
     sourcemap: true,
     noExternal,
     define,
@@ -107,7 +120,9 @@ export default defineConfig([
     // `pnpm build`, and use the local dist/cli/bundle.js.map -- esbuild
     // output is deterministic, so it matches what shipped.
     sourcemap: true,
-    noExternal,
+    // `@opentelemetry/api` is a peer of the library, so tsup would leave it
+    // external; `npx langwatch` has no host app to supply it.
+    noExternal: [...noExternal, ...cliOnlyPackages, /^@opentelemetry\/api(\/|$)/],
     define,
     tsconfig,
     onSuccess: async () => {

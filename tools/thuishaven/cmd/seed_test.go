@@ -51,3 +51,16 @@ func TestNoSeedFlagTurnsTheAutoSeedOff(t *testing.T) {
 		t.Errorf("HAVEN_AUTO_SEED = %q, want 0", got)
 	}
 }
+
+func TestResumeIsAFlagOfItsOwnNotPassedAsSeedgenArgs(t *testing.T) {
+	inv, err := parse(seedSpec(), []string{"--size", "tiny", "--resume"})
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !inv.has("--resume") {
+		t.Error("--resume was not parsed")
+	}
+	if got := seedgenArgs(inv); !slices.Equal(got, []string{"--size", "tiny"}) {
+		t.Errorf("args = %v, want --resume left to haven", got)
+	}
+}

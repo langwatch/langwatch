@@ -176,6 +176,13 @@ export const FEATURE_FLAGS = [
       "Offers the trained annotations evaluator in evaluator selection. Off by default; operators can enable it per project or organization.",
   },
   {
+    key: "release_scenario_go_runner_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Runs a project's non-voice scenario runs on the Go scenario runner shipped in the worker image instead of the Node scenario child. Off by default; enable per project or organization via the operator store. Voice runs always stay on the Node child, and a worker without the binary keeps every run on Node.",
+  },
+  {
     key: "release_voice_agents_enabled",
     scope: "PRODUCT",
     defaultValue: false,
@@ -294,13 +301,6 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
-  },
-  {
-    key: "release_ui_home_signal_focused_enabled",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: modules/project/specs/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
   },
   {
     key: "release_ui_comparison_leaderboard_enabled",

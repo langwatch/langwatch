@@ -1,6 +1,6 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
-import { Button, Field, HStack } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Field, HStack } from "@langwatch/design-system/primitives";
 import { Controller, type FieldErrors, useFormState } from "react-hook-form";
 
 import { type ScenarioFormController, type ScenarioFormData } from "../scenario-form.tsx";
@@ -25,47 +25,44 @@ export function ScenarioParametersDialog({
   const { parametersError, parameterRowErrors } = readParameterErrors(errors);
 
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)} size="xl">
-      <Dialog.Content>
-        <Dialog.Header>
-          <HStack gap={0}>
-            <Dialog.Title>Parameters</Dialog.Title>
-            <FieldInfoTooltip
-              description='Named values a run supplies, so the same scenario can run against another account, tenant or region. The situation, the criteria and the target read them as "params.NAME", and whoever starts the run can override any default. A secret parameter carries no default: its value is supplied when the run starts, and only the target reads it, as "secrets.NAME".'
-              testId="scenario-parameters-info"
+    <Dialog
+      open={open}
+      onClose={() => onOpenChange(false)}
+      title="Parameters"
+      description={
+        <HStack gap={0}>
+          Named values a run supplies
+          <FieldInfoTooltip description={PARAMETERS_INFO} testId="scenario-parameters-info" />
+        </HStack>
+      }
+      size="lg"
+      cancelLabel={null}
+      primaryAction={{
+        label: "Done",
+        onClick: () => onOpenChange(false),
+        "data-testid": "scenario-parameters-done",
+      }}
+    >
+      <Field.Root invalid={!!parametersError}>
+        <Controller
+          name="parameters"
+          control={form.control}
+          render={({ field }) => (
+            <ScenarioParameterDefinitionsInput
+              value={field.value}
+              onChange={field.onChange}
+              rowErrors={parameterRowErrors}
             />
-          </HStack>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Field.Root invalid={!!parametersError}>
-            <Controller
-              name="parameters"
-              control={form.control}
-              render={({ field }) => (
-                <ScenarioParameterDefinitionsInput
-                  value={field.value}
-                  onChange={field.onChange}
-                  rowErrors={parameterRowErrors}
-                />
-              )}
-            />
-            <Field.ErrorText>{parametersError}</Field.ErrorText>
-          </Field.Root>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button
-            colorPalette="orange"
-            onClick={() => onOpenChange(false)}
-            data-testid="scenario-parameters-done"
-          >
-            Done
-          </Button>
-        </Dialog.Footer>
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
+          )}
+        />
+        <Field.ErrorText>{parametersError}</Field.ErrorText>
+      </Field.Root>
+    </Dialog>
   );
 }
+
+const PARAMETERS_INFO =
+  'Named values a run supplies, so the same scenario can run against another account, tenant or region. The situation, the criteria and the target read them as "params.NAME", and whoever starts the run can override any default. A secret parameter carries no default: its value is supplied when the run starts, and only the target reads it, as "secrets.NAME".';
 
 /**
  * Validation messages for the parameters field.

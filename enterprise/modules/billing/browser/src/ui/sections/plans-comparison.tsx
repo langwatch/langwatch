@@ -1,11 +1,11 @@
 import { Link } from "@langwatch/browser-host/link";
 import { AccessStateIcon } from "@langwatch/design-system/access-state";
+import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
-  Alert,
   Box,
   Button,
-  Card,
   Heading,
   HStack,
   SimpleGrid,
@@ -172,49 +172,45 @@ function PlanCard({
   growthSeatPriceCents: GrowthSeatPriceCents;
 }) {
   return (
-    <Card.Root
+    <Card
+      variant="emphasized"
       data-testid={`plan-column-${plan.id}`}
-      borderWidth={1}
-      borderColor="border.emphasized"
-      bg="bg.panel"
-      borderRadius="2xl"
-      height="full"
+      padding="xl"
+      bodyLayout="stack"
     >
-      <Card.Body paddingY={6} paddingX={6}>
-        <VStack align="stretch" gap={5} height="full">
-          <VStack align="start" gap={3}>
-            {plan.id !== "free" && <AccessStateIcon kind="upgrade" compact />}
-            <HStack gap={2}>
-              <Heading as="h2" size="xl">
-                {plan.name}
-              </Heading>
-              {isCurrent && <StatusChip label="Current" tone="good" />}
-            </HStack>
-            <Text color="fg" fontSize="md" fontWeight="medium">
-              {getPlanPrice({ planId: plan.id, currency, billingPeriod, growthSeatPriceCents })}
-            </Text>
-            <Text color="fg.muted" fontSize="sm">
-              {plan.subtitle}
-            </Text>
-          </VStack>
-
-          <VStack align="start" gap={2} flex={1}>
-            {plan.features.map((feature) => (
-              <HStack key={feature} align="start" gap={2}>
-                <Check size={14} style={{ marginTop: "4px", flexShrink: 0 }} aria-hidden />
-                <Text fontSize="sm" color="fg.muted">
-                  {feature}
-                </Text>
-              </HStack>
-            ))}
-          </VStack>
-
-          <VStack width="full" marginTop="auto" paddingTop={4}>
-            <PlanCardActions plan={plan} currentPlan={currentPlan} />
-          </VStack>
+      <VStack align="stretch" gap={5} flex={1}>
+        <VStack align="start" gap={3}>
+          {plan.id !== "free" && <AccessStateIcon kind="upgrade" compact />}
+          <HStack gap={2}>
+            <Heading as="h2" size="lg">
+              {plan.name}
+            </Heading>
+            {isCurrent && <StatusChip label="Current" tone="good" />}
+          </HStack>
+          <Text color="fg" fontSize="md" fontWeight="medium">
+            {getPlanPrice({ planId: plan.id, currency, billingPeriod, growthSeatPriceCents })}
+          </Text>
+          <Text color="fg.muted" fontSize="sm">
+            {plan.subtitle}
+          </Text>
         </VStack>
-      </Card.Body>
-    </Card.Root>
+
+        <VStack align="start" gap={2} flex={1}>
+          {plan.features.map((feature) => (
+            <HStack key={feature} align="start" gap={2}>
+              <Check size={14} style={{ marginTop: "4px", flexShrink: 0 }} aria-hidden />
+              <Text fontSize="sm" color="fg.muted">
+                {feature}
+              </Text>
+            </HStack>
+          ))}
+        </VStack>
+
+        <VStack width="full" marginTop="auto" paddingTop={4}>
+          <PlanCardActions plan={plan} currentPlan={currentPlan} />
+        </VStack>
+      </VStack>
+    </Card>
   );
 }
 
@@ -240,10 +236,10 @@ export function PlansComparisonPage({
       <PageLayout.Header>
         <PageLayout.Heading>Plans</PageLayout.Heading>
         <Spacer />
-        <Link href="/settings/subscription">
-          <PageLayout.HeaderButton>
-            <ArrowLeft size={14} /> Subscription
-          </PageLayout.HeaderButton>
+        <Link unstyled href="/settings/subscription">
+          <HStack gap={1} color="fg.muted" textStyle="bodySm">
+            <ArrowLeft size={14} aria-hidden /> Subscription
+          </HStack>
         </Link>
       </PageLayout.Header>
       <VStack gap={6} width="full" align="stretch" paddingTop={4}>
@@ -330,18 +326,13 @@ export function PlansComparisonPage({
         </HStack>
 
         {showTieredNotice && (
-          <Alert.Root status="warning" data-testid="tiered-discontinued-notice">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Description>
-                Your current pricing model has been discontinued.{" "}
-                <Link href="/settings/subscription" color="orange.fg">
-                  Update your plan
-                </Link>{" "}
-                to move to seat and usage billing.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
+          <Banner status="warning" data-testid="tiered-discontinued-notice">
+            Your current pricing model has been discontinued.{" "}
+            <Link href="/settings/subscription" color="orange.fg">
+              Update your plan
+            </Link>{" "}
+            to move to seat and usage billing.
+          </Banner>
         )}
 
         <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>

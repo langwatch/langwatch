@@ -103,3 +103,10 @@ Feature: Trace span-tree read service
     Given a stored assistant message holding a "tool-call" part and a tool message holding a "tool-result" part
     When the trace is read with its spans
     Then the chat message schema accepts both parts as stored
+
+  @unit
+  Scenario: A trace read for a private organization whose route is missing answers the handled refusal
+    Given an organization recorded as private whose ClickHouse route is missing
+    When one of its traces is read with its spans
+    Then the read is refused with private_dataplane_unavailable (503)
+    And it is not wrapped into a bare internal_error

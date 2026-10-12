@@ -8,7 +8,7 @@ user-invocable: true
 
 Answers OpenAI chat completions, embeddings and models, Anthropic messages, Gemini and
 Vertex generateContent, and Bedrock Converse from a seeded Markov chain: the same prompt
-gets the same answer, at no cost. Code: `services/llmsim`, console `apps/llmsim-web`.
+gets the same answer, at no cost. Code: `services/sims/llmsim`, console `apps/sims/src/llm`.
 
 ## Run it
 
@@ -40,7 +40,8 @@ gets the same answer, at no cost. Code: `services/llmsim`, console `apps/llmsim-
 - Scripted tool calls, on any model when the request offers tools (and in Langy mode): each
   `/tool <name> <json args>` line of the last user message is a call with exactly those
   arguments, in order; `/next` starts the turn after the tool results; other lines are text.
-  Type it into Langy's chat to make Langy call one of its tools (`bash`, `read`, …) your way.
+  Type it into Langy's chat to make Langy call one of its tools (`bash`, `read`, `notify`, …) your way;
+  `/tool A` `/next` `/tool B` `/next` text runs A, then B, then answers, in one turn (githubsim: LANGY-09).
 - A `/json <object>` line in the last user message is the exact answer to a JSON request;
   settings `nextJson` queues one exact answer for the next JSON request (PUT replaces all settings).
 - Agentic runs: `tools` in the model name (`markov-tools`) or `X-Llmsim-Tools: auto` makes

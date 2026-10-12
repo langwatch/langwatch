@@ -52,20 +52,20 @@ recordCanonicalLogRecords(records: readonly CanonicalLogRecord[]): Promise<void>
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/otlp-logs.rest.ts:115`  |
+| Declared at | `src/transport/otlp-logs.rest.ts:112`  |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | otlp_ingest                            |
 
 #### `POST /api/otel/v1/logs` · `ingestOtlpLogs`
 
-Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:121`.
+Authenticated: the OTLP ingest door's resolved key is the whole gate, as on main. Credential `otlp_ingest`. Hidden from the OpenAPI document. Declared at `src/transport/otlp-logs.rest.ts:118`.
 
 Answers at `/api/otel/v1/logs`.
 
 ```typescript
-// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:123)
-// Response: inline, src/transport/otlp-logs.rest.ts:126
+// Rawbody: "bytes" (inline, src/transport/otlp-logs.rest.ts:121)
+// Response: inline, src/transport/otlp-logs.rest.ts:124
 type Response = unknown;
 ```
 

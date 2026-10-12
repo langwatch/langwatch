@@ -168,93 +168,12 @@
       },
       {
         "filter": {
-          "projects": ["@langwatch/idpsim-web"]
+          "projects": ["@langwatch/sims"]
         },
         "cache": true,
         "dependsOn": ["^build"],
         "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/idpsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/mailsim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/mailsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/llmsim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/llmsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/storagesim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/storagesim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/voicesim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/voicesim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/analyticssim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/analyticssim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/outboundsim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/outboundsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/paymentsim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/paymentsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/telemetrysim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/telemetrysim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/lambdasim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/lambdasim/web/dist"]
+        "outputs": ["{workspaceRoot}/services/sims/simconsole/dist"]
       },
       {
         "filter": {

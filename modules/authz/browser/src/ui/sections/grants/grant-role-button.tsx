@@ -16,7 +16,8 @@ export function GrantRoleButton({ onClick, canManage }: GrantRoleButtonProps) {
     <Tooltip content={NEEDS_MANAGE} disabled={canManage}>
       <Button
         size="sm"
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         disabled={!canManage}
         onClick={onClick}
         data-testid="grant-role-open"

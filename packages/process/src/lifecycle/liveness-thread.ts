@@ -239,7 +239,9 @@ const server = http.createServer((req, res) => {
     return;
   }
   // UIW-7: only a failed first install's console stands in front of the routes (NO-HOLDS).
-  if (consoleHold !== null && !consoleHold.passThrough.includes(String(req.url).split("?")[0])) {
+  const routePath = String(req.url).split("?")[0];
+  const healthRoute = routePath === workerData.readinessPath || routePath === workerData.livenessPath;
+  if (consoleHold !== null && !healthRoute && !consoleHold.passThrough.includes(routePath)) {
     answerFailed(req, res);
     return;
   }

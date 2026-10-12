@@ -54,7 +54,7 @@ function FormErrorDisplay({ error }: { error?: unknown }) {
 
   if (typeof error === "string" || typeof error === "number") {
     return (
-      <Text marginTop="6px" fontSize="13px" color="fg.error">
+      <Text marginTop="1.5" textStyle="bodySm" color="fg.error">
         {error}
       </Text>
     );
@@ -64,9 +64,9 @@ function FormErrorDisplay({ error }: { error?: unknown }) {
   if (messages.length === 0) return null;
 
   return (
-    <VStack align="start" gap={1} marginTop="6px">
+    <VStack align="start" gap={1} marginTop="1.5">
       {messages.map((message, index) => (
-        <Text key={index} fontSize="13px" color="fg.error">
+        <Text key={index} textStyle="bodySm" color="fg.error">
           {message}
         </Text>
       ))}
@@ -103,10 +103,8 @@ export function VerticalFormControl({
             paddingLeft={2}
             width="full"
             {...(size === "sm" && {
-              fontSize: "12px",
-              textTransform: "uppercase",
+              textStyle: "eyebrow",
               color: "fg.subtle",
-              fontWeight: "bold",
             })}
             {...labelProps}
           >
@@ -119,7 +117,7 @@ export function VerticalFormControl({
               )}
             </HStack>
           </Field.Label>
-          <Field.HelperText margin={0} fontSize="13px">
+          <Field.HelperText margin={0} textStyle="bodySm">
             {helper}
           </Field.HelperText>
         </VStack>

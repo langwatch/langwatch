@@ -5,16 +5,12 @@
  */
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ResultGroup } from "@langwatch/scenario-contract";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Fragment } from "react";
 
 import { useNow } from "../../../../behavior/use-now.ts";
-import {
-  FG_MUTED,
-  GROUP_HEADER_BG,
-  ROW_HOVER_BG,
-} from "../../../../model/agent-testing/shared/design.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { passRateColor } from "../../../elements/agent-testing/shared/pass-rate-color.ts";
@@ -24,15 +20,32 @@ import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-spa
 import type { ResultRow } from "./result-atoms.ts";
 import { isCodeTargetKey } from "./result-atoms.ts";
 import {
-  ResultsTableBody,
-  ResultsTableCard,
+  type ResultsColumn,
+  ResultsTable,
   ResultsTableEmptyLine,
   ResultsTableHead,
-  ResultsTableRow,
   ResultsTableTruncationLine,
 } from "./results-table-chrome.tsx";
 
-const GROUP_COLUMNS = "20px minmax(0,1fr) minmax(120px,190px) 70px 78px minmax(100px,110px)";
+/** The columns of a grouping: the chevron, the title on the free width, then the numbers. */
+function groupColumns({ isScenario }: { isScenario: boolean }): ResultsColumn[] {
+  return [
+    { key: "chevron", text: "", label: "Show runs", width: "48px" },
+    { key: "title", text: isScenario ? "Scenario" : "Target" },
+    { key: "middle", text: isScenario ? "Labels" : "Scenarios covered", width: "194px" },
+    { key: "runs", text: "Runs", width: "94px", align: "end" },
+    { key: "pass", text: "Pass", width: "102px", align: "end" },
+    { key: "trend", text: "Trend", width: "138px" },
+  ];
+}
+
+/** Under this a grouping scrolls sideways, so the title keeps room to be read. */
+const GROUP_MIN_WIDTH = "776px";
+
+/** The id of the opened row that lists the runs behind a group. */
+function runListId(group: ResultGroup): string {
+  return `results-group-runs-${group.key}`;
+}
 
 /** How many runs an opened row lists before it says there are more. */
 const EXPANDED_RUN_LIMIT = 40;
@@ -50,7 +63,7 @@ function Verdict({ row }: { row: ResultRow }) {
   return (
     <Text
       as="span"
-      fontSize="11.5px"
+      textStyle="caption"
       fontWeight="semibold"
       whiteSpace="nowrap"
       color={passRateColor(passRate)}
@@ -85,19 +98,19 @@ function RunLine({
       textAlign="left"
       paddingY={1.5}
       paddingRight={4}
-      paddingLeft={11}
+      paddingLeft={15}
       cursor="pointer"
-      _hover={{ background: ROW_HOVER_BG }}
+      _hover={{ background: "bg.muted/40" }}
       onClick={() => onOpenRun(row)}
       data-testid={`results-run-line-${row.executionId}`}
     >
-      <Text flex={1} minWidth={0} fontSize="12px" fontWeight="medium" color="fg" truncate>
+      <Text flex={1} minWidth={0} textStyle="caption" fontWeight="medium" color="fg" truncate>
         {show === "plan" ? row.planName : row.scenarioName}
       </Text>
-      <Text width="200px" flexShrink={0} fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text width="200px" flexShrink={0} textStyle="caption" color="fg.muted" truncate>
         {resolveTargetName(row.targetKey)}
       </Text>
-      <Text width="70px" flexShrink={0} fontSize="11px" color={FG_MUTED} whiteSpace="nowrap">
+      <Text width="70px" flexShrink={0} textStyle="micro" color="fg.muted" whiteSpace="nowrap">
         {formatTimeAgoCompact(row.runAt, now)}
       </Text>
       <Box width="76px" flexShrink={0}>
@@ -140,40 +153,53 @@ function GroupSummaryRow({
   const title = isScenario ? group.title : resolveTargetName(group.key);
   const isCodeTarget = !isScenario && isCodeTargetKey({ targetKey: group.key });
   return (
-    <ResultsTableRow
-      columns={GROUP_COLUMNS}
-      onClick={() => onToggleOpen(group.key)}
-      testId={`results-group-row-${group.key}`}
+    <ListTable.Row
+      expanded={isOpen}
+      onActivate={() => onToggleOpen(group.key)}
+      data-testid={`results-group-row-${group.key}`}
     >
-      <Box color={FG_MUTED} display="flex" alignItems="center">
-        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-      </Box>
+      <ListTable.ExpandCell
+        expanded={isOpen}
+        onToggle={() => onToggleOpen(group.key)}
+        label={`Show runs for ${title}`}
+        panelId={runListId(group)}
+      />
 
-      <HStack gap={1.5} minWidth={0}>
-        {!isScenario ? (
-          <TargetMark
-            kind={resolveTargetKind(group.key)}
-            testId={`results-group-target-mark-${group.key}`}
-          />
-        ) : null}
-        <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
-          {title}
+      <ListTable.Cell>
+        <HStack gap={1.5} minWidth={0}>
+          {!isScenario ? (
+            <TargetMark
+              kind={resolveTargetKind(group.key)}
+              testId={`results-group-target-mark-${group.key}`}
+            />
+          ) : null}
+          <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
+            {title}
+          </Text>
+          {isCodeTarget ? <FromCodeBadge /> : null}
+        </HStack>
+      </ListTable.Cell>
+
+      <ListTable.Cell>
+        <Text textStyle="caption" color="fg.muted" truncate>
+          {middleColumnText({ group, isScenario })}
         </Text>
-        {isCodeTarget ? <FromCodeBadge /> : null}
-      </HStack>
+      </ListTable.Cell>
 
-      <Text fontSize="11.5px" color={FG_MUTED} truncate>
-        {middleColumnText({ group, isScenario })}
-      </Text>
+      <ListTable.Cell align="end">
+        <Text textStyle="caption" color="fg.muted" fontVariantNumeric="tabular-nums">
+          {group.runCount}
+        </Text>
+      </ListTable.Cell>
 
-      <Text fontSize="12px" color={FG_MUTED} textAlign="right" fontVariantNumeric="tabular-nums">
-        {group.runCount}
-      </Text>
+      <ListTable.Cell align="end">
+        <PassRateText passRate={group.passRate} />
+      </ListTable.Cell>
 
-      <PassRateText passRate={group.passRate} />
-
-      <TrendSparkline bars={group.trend} per="execution" />
-    </ResultsTableRow>
+      <ListTable.Cell>
+        <TrendSparkline bars={group.trend} per="execution" />
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
@@ -200,9 +226,7 @@ function GroupRunList({
       align="stretch"
       gap={0}
       paddingY={1}
-      borderTopWidth="1px"
-      borderTopColor="border.muted"
-      background={GROUP_HEADER_BG}
+      background="bg.muted/30"
       data-testid={`results-group-expanded-${group.key}`}
     >
       {ordered.slice(0, EXPANDED_RUN_LIMIT).map((row) => (
@@ -216,13 +240,13 @@ function GroupRunList({
         />
       ))}
       {ordered.length > EXPANDED_RUN_LIMIT ? (
-        <Text fontSize="11px" color={FG_MUTED} paddingX={4} paddingY={1.5}>
+        <Text textStyle="micro" color="fg.muted" paddingX={4} paddingY={1.5}>
           {ordered.length - EXPANDED_RUN_LIMIT} older runs are not listed. Narrow the period to see
           them.
         </Text>
       ) : null}
       {ordered.length === 0 ? (
-        <Text fontSize="11px" color={FG_MUTED} paddingX={4} paddingY={1.5}>
+        <Text textStyle="micro" color="fg.muted" paddingX={4} paddingY={1.5}>
           The runs behind this row are still loading.
         </Text>
       ) : null}
@@ -242,6 +266,8 @@ export type GroupedRowsTableProps = {
   resolveTargetName: (targetKey: string) => string;
   resolveTargetKind: (targetKey: string) => TargetKind;
   onOpenRun: (row: ResultRow) => void;
+  /** Offered in the empty line when filters left nothing to draw. */
+  onClearFilters?: () => void;
 };
 
 export function GroupedRowsTable({
@@ -253,30 +279,23 @@ export function GroupedRowsTable({
   resolveTargetName,
   resolveTargetKind,
   onOpenRun,
+  onClearFilters,
 }: GroupedRowsTableProps) {
   const now = useNow();
   const isScenario = kind === "scenario";
+  const columns = groupColumns({ isScenario });
 
   return (
-    <ResultsTableCard testId={`agent-testing-results-by-${kind}`}>
-      <ResultsTableHead
-        columns={GROUP_COLUMNS}
-        headings={[
-          { key: "chevron", text: "" },
-          { key: "title", text: isScenario ? "Scenario" : "Target" },
-          {
-            key: "middle",
-            text: isScenario ? "Labels" : "Scenarios covered",
-          },
-          { key: "runs", text: "Runs", align: "right" },
-          { key: "pass", text: "Pass", align: "right" },
-          { key: "trend", text: "Trend" },
-        ]}
-      />
+    <ResultsTable
+      columns={columns}
+      minWidth={GROUP_MIN_WIDTH}
+      testId={`agent-testing-results-by-${kind}`}
+    >
+      <ResultsTableHead columns={columns} />
 
-      <ResultsTableBody>
+      <ListTable.Body>
         {groups.map((group) => (
-          <Box key={group.key}>
+          <Fragment key={group.key}>
             <GroupSummaryRow
               group={group}
               isScenario={isScenario}
@@ -285,30 +304,48 @@ export function GroupedRowsTable({
               resolveTargetName={resolveTargetName}
               resolveTargetKind={resolveTargetKind}
             />
-
             {openedKeys.includes(group.key) ? (
-              <GroupRunList
-                group={group}
-                rows={rowsByGroupKey.get(group.key) ?? []}
-                show={isScenario ? "plan" : "scenario"}
-                resolveTargetName={resolveTargetName}
-                onOpenRun={onOpenRun}
-                now={now}
-              />
+              <ListTable.SpanRow columns={columns.length} id={runListId(group)}>
+                <GroupRunList
+                  group={group}
+                  rows={rowsByGroupKey.get(group.key) ?? []}
+                  show={isScenario ? "plan" : "scenario"}
+                  resolveTargetName={resolveTargetName}
+                  onOpenRun={onOpenRun}
+                  now={now}
+                />
+              </ListTable.SpanRow>
             ) : null}
-          </Box>
+          </Fragment>
         ))}
 
-        {groups.length === 0 ? <ResultsTableEmptyLine text="No runs match these filters." /> : null}
-      </ResultsTableBody>
-    </ResultsTableCard>
+        {groups.length === 0 ? (
+          <ResultsTableEmptyLine
+            columns={columns.length}
+            state="no-results"
+            title="No runs match these filters"
+            onClearFilters={onClearFilters}
+          />
+        ) : null}
+      </ListTable.Body>
+    </ResultsTable>
   );
 }
 
 /** How many rows the flat list draws before it says there are more. */
 export const FLAT_ROW_LIMIT = 300;
 
-const FLAT_COLUMNS = "minmax(0,1.3fr) minmax(0,1fr) minmax(150px,205px) 80px 92px";
+/** The columns of the flat list: the scenario and the run plan share the free width. */
+const FLAT_COLUMNS: ResultsColumn[] = [
+  { key: "scenario", text: "Scenario" },
+  { key: "plan", text: "Run plan" },
+  { key: "target", text: "Target", width: "200px" },
+  { key: "when", text: "When", width: "104px" },
+  { key: "result", text: "Result", width: "120px" },
+];
+
+/** Under this the flat list scrolls sideways, so both names keep room to be read. */
+const FLAT_MIN_WIDTH = "664px";
 
 export type FlatRowsTableProps = {
   rows: ResultRow[];
@@ -316,63 +353,82 @@ export type FlatRowsTableProps = {
   onOpenRun: (row: ResultRow) => void;
   /** True while more rows exist on the server than were loaded. */
   hasMore: boolean;
+  /** Offered in the empty line when filters left nothing to draw. */
+  onClearFilters?: () => void;
 };
 
 /**
  * The None grouping: one row per scenario, target and run.
  */
-export function FlatRowsTable({ rows, resolveTargetName, onOpenRun, hasMore }: FlatRowsTableProps) {
+export function FlatRowsTable({
+  rows,
+  resolveTargetName,
+  onOpenRun,
+  hasMore,
+  onClearFilters,
+}: FlatRowsTableProps) {
   const now = useNow();
   const ordered = [...rows].toSorted((a, b) => b.runAt - a.runAt);
   const drawn = ordered.slice(0, FLAT_ROW_LIMIT);
   const isCut = hasMore || ordered.length > FLAT_ROW_LIMIT;
 
   return (
-    <ResultsTableCard testId="agent-testing-results-flat">
-      <ResultsTableHead
-        columns={FLAT_COLUMNS}
-        headings={[
-          { key: "scenario", text: "Scenario" },
-          { key: "plan", text: "Run plan" },
-          { key: "target", text: "Target" },
-          { key: "when", text: "When" },
-          { key: "result", text: "Result" },
-        ]}
-      />
+    <ResultsTable
+      columns={FLAT_COLUMNS}
+      minWidth={FLAT_MIN_WIDTH}
+      testId="agent-testing-results-flat"
+    >
+      <ResultsTableHead columns={FLAT_COLUMNS} />
 
-      <ResultsTableBody>
+      <ListTable.Body>
         {drawn.map((row) => (
-          <ResultsTableRow
+          <ListTable.Row
             key={row.executionId}
-            columns={FLAT_COLUMNS}
-            paddingY="8px"
-            onClick={() => onOpenRun(row)}
-            testId={`results-flat-row-${row.executionId}`}
+            onActivate={() => onOpenRun(row)}
+            data-testid={`results-flat-row-${row.executionId}`}
           >
-            <Text fontSize="12.5px" fontWeight="medium" color="fg" truncate>
-              {row.scenarioName}
-            </Text>
-            <Text fontSize="11.5px" color={FG_MUTED} truncate>
-              {row.planName}
-            </Text>
-            <Text fontSize="11.5px" color={FG_MUTED} truncate>
-              {resolveTargetName(row.targetKey)}
-            </Text>
-            <Text fontSize="11.5px" color={FG_MUTED} whiteSpace="nowrap">
-              {formatTimeAgoCompact(row.runAt, now)}
-            </Text>
-            <Verdict row={row} />
-          </ResultsTableRow>
+            <ListTable.Cell>
+              <Text textStyle="bodySm" fontWeight="medium" color="fg" truncate>
+                {row.scenarioName}
+              </Text>
+            </ListTable.Cell>
+            <ListTable.Cell>
+              <Text textStyle="caption" color="fg.muted" truncate>
+                {row.planName}
+              </Text>
+            </ListTable.Cell>
+            <ListTable.Cell>
+              <Text textStyle="caption" color="fg.muted" truncate>
+                {resolveTargetName(row.targetKey)}
+              </Text>
+            </ListTable.Cell>
+            <ListTable.Cell>
+              <Text textStyle="caption" color="fg.muted" whiteSpace="nowrap">
+                {formatTimeAgoCompact(row.runAt, now)}
+              </Text>
+            </ListTable.Cell>
+            <ListTable.Cell>
+              <Verdict row={row} />
+            </ListTable.Cell>
+          </ListTable.Row>
         ))}
 
-        {drawn.length === 0 ? <ResultsTableEmptyLine text="No runs match these filters." /> : null}
-      </ResultsTableBody>
+        {drawn.length === 0 ? (
+          <ResultsTableEmptyLine
+            columns={FLAT_COLUMNS.length}
+            state="no-results"
+            title="No runs match these filters"
+            onClearFilters={onClearFilters}
+          />
+        ) : null}
 
-      {isCut && drawn.length > 0 ? (
-        <ResultsTableTruncationLine
-          text={`Showing the newest ${drawn.length} runs. Add a filter or narrow the period to see the rest.`}
-        />
-      ) : null}
-    </ResultsTableCard>
+        {isCut && drawn.length > 0 ? (
+          <ResultsTableTruncationLine
+            columns={FLAT_COLUMNS.length}
+            text={`Showing the newest ${drawn.length} runs. Add a filter or narrow the period to see the rest.`}
+          />
+        ) : null}
+      </ListTable.Body>
+    </ResultsTable>
   );
 }

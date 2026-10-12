@@ -1,4 +1,5 @@
-import { Box, Button, EmptyState, Text, VStack } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Button } from "@langwatch/design-system/primitives";
 import { AlertTriangle } from "lucide-react";
 
 import { isPermissionRefusal } from "../../model/permission-refusal.ts";
@@ -39,30 +40,18 @@ export function GatewayErrorPanel({
     "The request failed unexpectedly. Please try again or check the server logs.";
   return (
     <Box paddingY={12}>
-      <EmptyState.Root>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <AlertTriangle size={32} color="var(--chakra-colors-fg-error)" />
-          </EmptyState.Indicator>
-          <VStack gap={2} textAlign="center" maxWidth="420px">
-            <EmptyState.Title>{title}</EmptyState.Title>
-            <Text fontSize="sm" color="fg.muted">
-              {message}
-            </Text>
-            {onRetry && (
-              <Button
-                size="sm"
-                variant="outline"
-                colorPalette="orange"
-                onClick={onRetry}
-                marginTop={2}
-              >
-                Retry
-              </Button>
-            )}
-          </VStack>
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <NoDataInfoBlock
+        title={title}
+        description={message}
+        icon={<AlertTriangle size={32} color="var(--chakra-colors-fg-error)" />}
+        primaryAction={
+          onRetry && (
+            <Button size="sm" variant="outline" onClick={onRetry}>
+              Retry
+            </Button>
+          )
+        }
+      />
     </Box>
   );
 }

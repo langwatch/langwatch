@@ -32,8 +32,7 @@ export function OutputPathInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="$.choices[0].message.content"
-        fontFamily="mono"
-        fontSize="13px"
+        textStyle="mono"
         disabled={disabled}
       />
       {value && <HttpJsonPathText path={value} shape={shape} anyIndex={shapeIsSample} />}

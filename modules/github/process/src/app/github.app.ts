@@ -30,7 +30,7 @@ import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/pr
 
 import type { GithubChannels } from "../channels/github.channels.ts";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import { githubHostOf } from "../rules/github-host.rules.ts";
+import { githubHostOf, type GithubHostConfig } from "../rules/github-host.rules.ts";
 import { installErrorHtml, installSuccessHtml } from "../rules/github-install-response.rules.ts";
 import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
 import type { GithubWebhookDelivery, GithubWebhookReceipt } from "../rules/github-webhook.rules.ts";
@@ -152,14 +152,14 @@ type GithubComposition = Readonly<{
     webhookSecret: string;
     signingKey: string;
   };
-  hostConfig?: { host?: string };
+  hostConfig?: GithubHostConfig;
 }>;
 
 /** What the fleet-wide branch sweep needs beside its rows. */
 type GithubBranchMaintenanceComposition = Readonly<{
   repositories: GithubRepositories;
   api: GithubAppClient;
-  hostConfig?: { host?: string };
+  hostConfig?: GithubHostConfig;
 }>;
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
@@ -310,7 +310,13 @@ export class GithubModule implements GithubApiContract {
         (session) => credentials || session || "",
       ),
     );
-    const hostConfig = config.host === undefined ? {} : { hostConfig: { host: config.host } };
+    const hostConfig = {
+      hostConfig: {
+        ...(config.host !== undefined && { host: config.host }),
+        ...(config.apiBase !== undefined && { apiBase: config.apiBase }),
+        ...(config.webBase !== undefined && { webBase: config.webBase }),
+      },
+    };
 
     return new GithubModule({
       service: GithubModule.composeApi({

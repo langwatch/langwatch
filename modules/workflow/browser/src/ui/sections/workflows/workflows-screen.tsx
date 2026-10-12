@@ -4,9 +4,9 @@
  * `@langwatch/langy-browser` is ungoverned.
  */
 
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { ListPage } from "@langwatch/design-system/list-page";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Grid, Skeleton, Spacer, useDisclosure, VStack } from "@langwatch/design-system/primitives";
+import { Grid, Skeleton, useDisclosure } from "@langwatch/design-system/primitives";
 import { Plus, Workflow } from "lucide-react";
 import type { MouseEvent } from "react";
 
@@ -14,6 +14,8 @@ import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { useWorkflowHost } from "../../../model/workflow-host.ts";
 import { WorkflowCreateDialogHost } from "../workflow-create-dialog-host.tsx";
 import { WorkflowListCard } from "../workflow-list-card.tsx";
+
+const WORKFLOWS_DOCS = "https://docs.langwatch.ai/workflows/overview";
 
 /**
  * Whether this click landed inside the card's own overflow menu. The menu
@@ -44,55 +46,50 @@ export default function WorkflowsScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Workflows</PageLayout.Heading>
-        <Spacer />
-        <PageLayout.HeaderButton primary data-testid="workflow-new-open" onClick={onOpen}>
-          <Plus size={16} /> New Workflow
-        </PageLayout.HeaderButton>
-      </PageLayout.Header>
-
-      {showEmptyState ? (
-        <NoDataInfoBlock
-          title="No workflows yet"
-          description="Create reusable workflows with the Optimization Studio."
-          icon={<Workflow size={24} />}
-          color="blue.fg"
-        >
-          <PageLayout.HeaderButton primary onClick={onOpen}>
-            <Plus size={16} /> Create your first workflow
+      {/* Loading stays "ready": the tile skeletons below are the loading look. */}
+      <ListPage
+        title="Workflows"
+        actions={
+          <PageLayout.HeaderButton primary data-testid="workflow-new-open" onClick={onOpen}>
+            <Plus size={16} /> New workflow
           </PageLayout.HeaderButton>
-        </NoDataInfoBlock>
-      ) : (
-        <PageLayout.Container paddingTop={6}>
-          <VStack gap={6} width="full" align="start">
-            <Grid templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={6} width="full">
-              {workflows.isLoading &&
-                Array.from({ length: 3 }).map((_, index) => (
-                  <Skeleton key={index} height="200px" />
-                ))}
-              {workflows.data?.map((workflow) => (
-                <WorkflowListCard
-                  key={workflow.id}
-                  workflowId={workflow.id}
-                  workflows={workflows.data}
-                  name={workflow.name}
-                  icon={workflow.icon}
-                  data-testid={`workflow-card-${workflow.name}`}
-                  onClick={(event: MouseEvent<HTMLElement>) => {
-                    if (isInnerMenuClick(event)) {
-                      event.stopPropagation();
-                      event.preventDefault();
-                      return;
-                    }
-                    host.navigate(`/${projectSlug ?? ""}/studio/${workflow.id}`);
-                  }}
-                />
-              ))}
-            </Grid>
-          </VStack>
-        </PageLayout.Container>
-      )}
+        }
+        state={showEmptyState ? "empty" : "ready"}
+        empty={{
+          title: "No workflows yet",
+          description: "Create reusable workflows with the workflow studio.",
+          icon: <Workflow size={24} />,
+          primaryAction: (
+            <PageLayout.HeaderButton primary onClick={onOpen}>
+              <Plus size={16} /> Create your first workflow
+            </PageLayout.HeaderButton>
+          ),
+          next: [{ kind: "docs", label: "Read about workflows", href: WORKFLOWS_DOCS }],
+        }}
+      >
+        <Grid templateColumns="repeat(auto-fill, minmax(260px, 1fr))" gap={6} width="full">
+          {workflows.isLoading &&
+            Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} height="200px" />)}
+          {workflows.data?.map((workflow) => (
+            <WorkflowListCard
+              key={workflow.id}
+              workflowId={workflow.id}
+              workflows={workflows.data}
+              name={workflow.name}
+              icon={workflow.icon}
+              data-testid={`workflow-card-${workflow.name}`}
+              onClick={(event: MouseEvent<HTMLElement>) => {
+                if (isInnerMenuClick(event)) {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  return;
+                }
+                host.navigate(`/${projectSlug ?? ""}/studio/${workflow.id}`);
+              }}
+            />
+          ))}
+        </Grid>
+      </ListPage>
 
       <WorkflowCreateDialogHost open={open} onClose={onClose} />
     </>

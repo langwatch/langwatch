@@ -179,7 +179,7 @@ export function GraphCardMenu({
               host.navigate(builderEditUrl);
             }}
           >
-            <Edit /> {onEdit || isDashboardWidget ? "Edit" : "Edit Graph"}
+            <Edit /> {onEdit || isDashboardWidget ? "Edit" : "Edit graph"}
           </Menu.Item>
         )}
 

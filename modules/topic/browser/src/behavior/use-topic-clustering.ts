@@ -8,7 +8,3 @@ import { topicApi } from "./topic-api.ts";
 export function useClusteringStatus({ projectId }: { projectId: string }) {
   return topicApi.topics.getClusteringStatus.useQuery({ projectId });
 }
-
-export function useClusteringRunHistory({ projectId }: { projectId: string }) {
-  return topicApi.topics.getClusteringRunHistory.useQuery({ projectId });
-}

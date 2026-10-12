@@ -1,7 +1,10 @@
 import { moduleApi, type Named } from "@langwatch/module";
 import { z } from "zod";
 
-import { TOPIC_CLUSTERING_TRIGGER } from "./topic-clustering.constants.ts";
+import {
+  TOPIC_CLUSTERING_RUN_HISTORY_LIMIT,
+  TOPIC_CLUSTERING_TRIGGER,
+} from "./topic-clustering.constants.ts";
 
 const topicSchemaDefinition = z
   .object({
@@ -102,6 +105,46 @@ export const topicClusteringRunHistoryEntrySchema: TopicClusteringRunHistoryEntr
 
 export type TopicClusteringRunHistoryEntry = z.infer<typeof topicClusteringRunHistoryEntrySchema>;
 
+/**
+ * One page of the retained run history, newest first. The cursor is the run id of the previous
+ * page's last entry, so a run finishing between two reads never shifts what the next page returns.
+ */
+const topicClusteringRunHistoryPageInputSchemaDefinition = topicProjectInputSchema.safeExtend({
+  cursor: z.string().min(1).optional(),
+  limit: z.number().int().min(1).max(TOPIC_CLUSTERING_RUN_HISTORY_LIMIT).default(20),
+});
+export interface TopicClusteringRunHistoryPageInputSchema extends Named<
+  typeof topicClusteringRunHistoryPageInputSchemaDefinition
+> {}
+export const topicClusteringRunHistoryPageInputSchema: TopicClusteringRunHistoryPageInputSchema =
+  topicClusteringRunHistoryPageInputSchemaDefinition;
+export type TopicClusteringRunHistoryPageInput = z.infer<
+  typeof topicClusteringRunHistoryPageInputSchema
+>;
+
+/**
+ * `cursor_expired` means the run the cursor names is no longer in the retained history (it keeps
+ * only the newest runs): the reader restarts from the first page. `hasMore` never reaches runs
+ * the projection has already discarded.
+ */
+const topicClusteringRunHistoryPageSchemaDefinition = z.discriminatedUnion("outcome", [
+  z
+    .object({
+      outcome: z.literal("page"),
+      entries: topicClusteringRunHistoryEntrySchema.array(),
+      hasMore: z.boolean(),
+      nextCursor: z.string().nullable(),
+    })
+    .strict(),
+  z.object({ outcome: z.literal("cursor_expired") }).strict(),
+]);
+export interface TopicClusteringRunHistoryPageSchema extends Named<
+  typeof topicClusteringRunHistoryPageSchemaDefinition
+> {}
+export const topicClusteringRunHistoryPageSchema: TopicClusteringRunHistoryPageSchema =
+  topicClusteringRunHistoryPageSchemaDefinition;
+export type TopicClusteringRunHistoryPage = z.infer<typeof topicClusteringRunHistoryPageSchema>;
+
 /** What a manual clustering trigger did, which is not always "started a run". */
 const topicClusteringTriggerResultSchemaDefinition = z.union([
   z.object({ started: z.literal(true) }).strict(),
@@ -136,6 +179,10 @@ export interface TopicApi {
   getNamesByIds(input: TopicNamesInput): Promise<Map<string, string>>;
   getClusteringStatus(input: TopicProjectInput): Promise<TopicClusteringStatus>;
   getClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]>;
+  /** The same retained history a page at a time, newest first, beside the full read. */
+  getClusteringRunHistoryPage(
+    input: TopicClusteringRunHistoryPageInput,
+  ): Promise<TopicClusteringRunHistoryPage>;
   /** Asks the project's clustering process for a run; ports main's `requestClustering`. */
   requestClustering(input: TopicClusteringRequestInput): Promise<void>;
 }

@@ -15,7 +15,7 @@ function Introduction({ colorMode }: { colorMode?: unknown }) {
   return (
     <Stack gap={8} maxWidth="56rem" padding={8} marginX="auto">
       <Stack gap={2}>
-        <Heading size="2xl">The LangWatch design system</Heading>
+        <Heading size="xl">The LangWatch design system</Heading>
         <Text color="fg.muted" textStyle="lg">
           Everything a screen is built from, shown the way the application mounts it. Look here
           before drawing a component: if it exists, use it; if two modules need it, it belongs here.
@@ -46,7 +46,7 @@ function Introduction({ colorMode }: { colorMode?: unknown }) {
         ))}
       </Grid>
       <Stack gap={2}>
-        <Heading size="md">Using it</Heading>
+        <Heading size="sm">Using it</Heading>
         <Text>
           Import a named entry point, never a deep path:{" "}
           <Code>@langwatch/design-system/list-table</Code>. Layout and text come from{" "}
@@ -58,9 +58,16 @@ function Introduction({ colorMode }: { colorMode?: unknown }) {
           it. A component's page shows it, then its states, then its props. The toolbar switches the
           colour mode.
         </Text>
+        <Text>
+          Raw Chakra components, the layer under these, are in{" "}
+          <Link href="https://storybook.chakra-ui.com" target="_blank" rel="noreferrer">
+            Chakra UI's own Storybook
+          </Link>
+          .
+        </Text>
       </Stack>
       <Stack gap={2}>
-        <Heading size="md">Adding a component</Heading>
+        <Heading size="sm">Adding a component</Heading>
         <Text>
           One kebab-case file in <Code>src/components/</Code>, a named subpath in{" "}
           <Code>package.json</Code>, a story beside it with a title in one of the sections above and

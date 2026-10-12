@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, createListCollection, Text, VStack } from "@langwatch/design-system/primitives";
+import { createListCollection, Text, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 
@@ -67,62 +67,50 @@ export function AssignDepartmentDialog({
   });
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open && userId !== null}
-      onOpenChange={(event) => {
-        if (!event.open) onClose();
-      }}
+      onClose={onClose}
+      title="Assign department"
       size="sm"
+      busy={assignMutation.isPending}
+      primaryAction={{
+        label: "Save",
+        loading: assignMutation.isPending,
+        onClick: () => {
+          if (!userId) return;
+          assignMutation.mutate({
+            organizationId: orgId,
+            userId,
+            departmentId: selected,
+          });
+        },
+      }}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Assign department</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body paddingBottom={6}>
-          <VStack align="stretch" gap={3}>
-            <Text fontSize="sm" color="fg.muted">
-              {personName}'s spend, including personal AI use, rolls up to the department you pick.
-            </Text>
-            <Select.Root
-              collection={collection}
-              value={[selected ?? UNASSIGNED]}
-              onValueChange={(event) => {
-                const next = event.value[0];
-                setSelected(next === UNASSIGNED ? null : (next ?? null));
-              }}
-              size="sm"
-            >
-              <Select.Trigger aria-label="Department">
-                <Select.ValueText placeholder="Unassigned" />
-              </Select.Trigger>
-              <Select.Content>
-                {collection.items.map((item) => (
-                  <Select.Item key={item.value} item={item}>
-                    {item.label}
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Root>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button
-            size="sm"
-            loading={assignMutation.isPending}
-            onClick={() => {
-              if (!userId) return;
-              assignMutation.mutate({
-                organizationId: orgId,
-                userId,
-                departmentId: selected,
-              });
-            }}
-          >
-            Save
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack align="stretch" gap={3}>
+        <Text fontSize="sm" color="fg.muted">
+          {personName}'s spend, including personal AI use, rolls up to the department you pick.
+        </Text>
+        <Select.Root
+          collection={collection}
+          value={[selected ?? UNASSIGNED]}
+          onValueChange={(event) => {
+            const next = event.value[0];
+            setSelected(next === UNASSIGNED ? null : (next ?? null));
+          }}
+          size="sm"
+        >
+          <Select.Trigger aria-label="Department">
+            <Select.ValueText placeholder="Unassigned" />
+          </Select.Trigger>
+          <Select.Content>
+            {collection.items.map((item) => (
+              <Select.Item key={item.value} item={item}>
+                {item.label}
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Root>
+      </VStack>
+    </Dialog>
   );
 }

@@ -1,19 +1,11 @@
+import { IdText } from "@langwatch/design-system/id-text";
 import { ListTable } from "@langwatch/design-system/list-table";
-import {
-  Box,
-  Collapsible,
-  HStack,
-  IconButton,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Box, Collapsible, HStack, Text } from "@langwatch/design-system/primitives";
 import type { ParkedTenant } from "@langwatch/ops-contract";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { formatCount, formatTimeAgo } from "../../../../model/ops-formatters.ts";
-import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
 
 export type ParkedGroupsRender = (
   tenant: Pick<ParkedTenant, "tenantId" | "queueName">,
@@ -50,38 +42,29 @@ export function ParkedTenantsSection({
           other tenants keep moving. Nothing has failed.
         </Text>
       </Box>
-      <Table.ScrollArea>
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          variant="line"
-          css={{ "& tr:last-child td": { borderBottom: "none" } }}
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader width="40px" />
-              <Table.ColumnHeader>Tenant</Table.ColumnHeader>
-              <Table.ColumnHeader>Queue</Table.ColumnHeader>
-              <Table.ColumnHeader>Parked groups</Table.ColumnHeader>
-              <Table.ColumnHeader>Oldest wait</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {parkedTenants.map((tenant) => (
-              <ParkedTenantRow
-                key={`${tenant.queueName}::${tenant.tenantId}`}
-                tenantId={tenant.tenantId}
-                queueName={tenant.queueName}
-                groupCount={tenant.groupCount}
-                oldestParkedMs={tenant.oldestParkedMs}
-                renderParkedGroups={renderParkedGroups}
-              />
-            ))}
-          </Table.Body>
-        </ListTable>
-      </Table.ScrollArea>
+      <ListTable density="compact" variant="embedded" scroll="x" scrollLabel="Parked tenants">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader width={40} label="Expand" />
+            <ListTable.ColumnHeader>Tenant</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Queue</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Parked groups</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Oldest wait</ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {parkedTenants.map((tenant) => (
+            <ParkedTenantRow
+              key={`${tenant.queueName}::${tenant.tenantId}`}
+              tenantId={tenant.tenantId}
+              queueName={tenant.queueName}
+              groupCount={tenant.groupCount}
+              oldestParkedMs={tenant.oldestParkedMs}
+              renderParkedGroups={renderParkedGroups}
+            />
+          ))}
+        </ListTable.Body>
+      </ListTable>
     </Box>
   );
 }
@@ -107,46 +90,30 @@ function ParkedTenantRow({
 
   return (
     <>
-      <Table.Row data-testid="parked-tenant-row">
-        <Table.Cell>
-          {/* The control is a real button, not a clickable row: a row cannot be
-              focused or activated from the keyboard, which puts the only route
-              to the drill-down behind a mouse. */}
-          <IconButton
-            aria-label={
-              open ? `Hide parked groups for ${tenantId}` : `Show parked groups for ${tenantId}`
-            }
-            aria-expanded={open}
-            aria-controls={panelId}
-            variant="ghost"
-            size="sm"
-            color="fg.muted"
-            onClick={() => setOpen((prior) => !prior)}
-          >
-            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </IconButton>
-        </Table.Cell>
-        <Table.Cell>
-          <Text fontFamily="mono" textStyle="xs" title={tenantId}>
-            {middleEllipsis(tenantId, 32)}
-          </Text>
-        </Table.Cell>
-        <Table.Cell color="fg.muted">{queueName}</Table.Cell>
-        <Table.Cell>
+      <ListTable.Row expanded={open} data-testid="parked-tenant-row">
+        <ListTable.ExpandCell
+          expanded={open}
+          onToggle={() => setOpen((prior) => !prior)}
+          label={open ? `Hide parked groups for ${tenantId}` : `Show parked groups for ${tenantId}`}
+          panelId={panelId}
+        />
+        <ListTable.Cell>
+          <IdText value={tenantId} label="ID" />
+        </ListTable.Cell>
+        <ListTable.Cell tone="muted">{queueName}</ListTable.Cell>
+        <ListTable.Cell>
           <Text fontWeight="medium">{formatCount(groupCount)}</Text>
-        </Table.Cell>
-        <Table.Cell color="fg.muted">{formatTimeAgo(oldestParkedMs)}</Table.Cell>
-      </Table.Row>
+        </ListTable.Cell>
+        <ListTable.Cell tone="muted">{formatTimeAgo(oldestParkedMs)}</ListTable.Cell>
+      </ListTable.Row>
       {open && (
-        <Table.Row>
-          <Table.Cell colSpan={5} padding={0}>
-            <Collapsible.Root open>
-              <Collapsible.Content id={panelId}>
-                {renderParkedGroups?.({ tenantId, queueName })}
-              </Collapsible.Content>
-            </Collapsible.Root>
-          </Table.Cell>
-        </Table.Row>
+        <ListTable.SpanRow columns={5} id={panelId}>
+          <Collapsible.Root open>
+            <Collapsible.Content>
+              {renderParkedGroups?.({ tenantId, queueName })}
+            </Collapsible.Content>
+          </Collapsible.Root>
+        </ListTable.SpanRow>
       )}
     </>
   );

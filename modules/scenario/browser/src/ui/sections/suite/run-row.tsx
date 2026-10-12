@@ -93,7 +93,7 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           <Box flex={1} />
           {/* Invisible spacer matching RunMetricsSummary pill height */}
           <Box paddingY={1} paddingX={2} borderRadius="lg" border="1px solid transparent">
-            <Text fontSize="12px" visibility="hidden">
+            <Text textStyle="caption" visibility="hidden">
               &nbsp;
             </Text>
           </Box>

@@ -60,7 +60,7 @@ export function ParameterLineField({
   return (
     <Box position="relative" flex={flex} minWidth={minWidth}>
       {/* A native input carries the ARIA 1.2 combobox role; Input lends it the field's look. */}
-      <Input {...DIALOG_FIELD_STYLE} asChild width="full" fontFamily="mono" fontSize="12px">
+      <Input {...DIALOG_FIELD_STYLE} asChild width="full" fontFamily="mono" textStyle="caption">
         <input
           ref={inputRef}
           autoComplete="off"

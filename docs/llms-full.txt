@@ -673,7 +673,7 @@ Click **Export CSV** to download every row that matches the current filters as `
 
 ## Who can see it
 
-Opening **Settings > Audit Log** needs `organization:manage`. Querying the log needs `auditLog:view`, which every built-in team role holds except the Lite Member cap. A custom role can grant `auditLog:view` on its own.
+Opening **Settings > Audit Log** and querying the log both need `auditLog:view`. The log shows every member's actions, so by default only administrators hold it; the built-in Viewer and Member roles do not. The query asks for it at the organization, and again at a project when you filter by one. A custom role can grant `auditLog:view` on its own.
 
 **Also check:** [Access Control (RBAC)](/platform/rbac).
 
@@ -1268,7 +1268,7 @@ A team role applies to one team and, through inheritance, to every project in it
 | `secrets`           | view   | manage                       | manage                      |
 | `langy`             |        | view, create, update, delete | manage                      |
 | `agentCache`        |        | manage                       | manage                      |
-| `auditLog`          | view   | view                         | view                        |
+| `auditLog`          |        |                              | view                        |
 | `virtualKeys`       | view   | view, create, update, rotate | manage, viewOtherPersonal   |
 | `gatewayBudgets`    | view   | view                         | manage                      |
 | `gatewayProviders`  | view   | view                         | manage                      |
@@ -10082,7 +10082,7 @@ Team roles apply on the teams and projects the binding names. Organization roles
 | `gatewayCacheRules:view` | yes | yes | yes | |
 | `gatewayCacheRules:create`, `update`, `delete`, `manage` | | | yes | |
 | `gatewayUsage:view` | yes | yes | yes | |
-| `auditLog:view` | yes | yes | yes | |
+| `auditLog:view` | | | yes | |
 | `gatewaySpend:view`, `manage` | | | | yes |
 | `webhookEndpoints:view`, `manage` | | | | yes |
 
@@ -70567,6 +70567,7 @@ That runs `pnpm task upgrade` (Postgres, ClickHouse and LangWatchQL, under one l
 | `0` | `done` | Every step the image needs is applied | Start or restart the app and the workers |
 | `1` | `failed_prisma_migration` | A PostgreSQL migration failed and cannot be retried by the upgrade (written before re-runnable migrations became the rule, or not shipped in this image) | Run the `prisma migrate resolve` command the message names, then run the upgrade again |
 | `1` | `rerunnable_migration_failed` | A re-runnable migration still failed on its last attempt | Fix what its error names (often a lock another session holds), then run the upgrade again. No resolve command is needed |
+| `1` | `prebuilt_index_differs` | A pending migration creates an index if it does not exist, and an index of that name already exists with another definition or invalid | Drop or rename the index the message names (nothing drops it for you), then run the upgrade again. A waiting worker retries by itself |
 | `1` | `schema_failed` | A PostgreSQL or ClickHouse target could not be applied, or the ledger schema could not be created | Check the named target is reachable (`DATABASE_URL`, `CLICKHOUSE_URL`) and that the `DATABASE_URL` user has `CREATE` on the database, then run the upgrade again |
 | `1` | `step_failed` | A blocking data step failed | Read its error with `pnpm task upgrade status`, fix the cause, then run the upgrade again. The step resumes from its checkpoint |
 | `1` | `reconciler_failed` | The ClickHouse TTL or LangWatchQL reconciler failed | Fix the store it names (`CLICKHOUSE_URL`), then run the upgrade again |

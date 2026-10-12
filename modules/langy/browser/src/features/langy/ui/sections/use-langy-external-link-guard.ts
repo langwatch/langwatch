@@ -1,6 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 
-import { classifyLangyLinkDestination } from "../../model/logic/langy-link-destination.ts";
+import {
+  classifyLangyLinkDestination,
+  type LangyLinkDestination,
+} from "../../model/logic/langy-link-destination.ts";
 import type {
   LangyExternalLinkDialogProps,
   LangyExternalLinkTarget,
@@ -27,6 +30,18 @@ export const LANGY_FIRST_PARTY_LINK_ATTRIBUTE = "data-langy-first-party-link";
 export const langyFirstPartyLinkProps = {
   [LANGY_FIRST_PARTY_LINK_ATTRIBUTE]: "true",
 } as const;
+
+/**
+ * The markdown renderer empties an address it refuses (`data:`, `javascript:`), and
+ * an empty href reloads the page: it is unsupported, not a link to leave alone.
+ */
+function destinationOfHref(href: string): LangyLinkDestination {
+  if (href.trim() === "") return { kind: "unsupported" };
+  return classifyLangyLinkDestination({
+    href,
+    appOrigin: typeof window === "undefined" ? "" : window.location.origin,
+  });
+}
 
 /**
  * One guard for every link the Langy panel renders.
@@ -56,10 +71,7 @@ export function useLangyExternalLinkGuard(): LangyExternalLinkGuard {
     // resolved against the page, which quietly rewrites `//evil.com` and a
     // relative path into the same shape and hides what was actually written.
     const href = anchor.getAttribute("href") ?? "";
-    const destination = classifyLangyLinkDestination({
-      href,
-      appOrigin: typeof window === "undefined" ? "" : window.location.origin,
-    });
+    const destination = destinationOfHref(href);
 
     if (destination.kind === "internal" || destination.kind === "ignored") {
       return;
@@ -115,6 +127,7 @@ export function useLangyExternalLinkGuard(): LangyExternalLinkGuard {
       link: pending,
       onCancel: cancel,
       onConfirm: confirm,
+      finalFocusEl: () => anchorRef.current,
     },
   };
 }

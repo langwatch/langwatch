@@ -92,6 +92,17 @@ Feature: Re-runnable migrations are resolved and retried by the upgrade
     And no schema was reset
 
   @integration
+  Scenario: A first install re-runs a failed folder the image contains but no release file names
+    Given an empty database that no upgrade run ever finished
+    And the image contains a "0_init" folder that no release file and no image step names
+    And a type planted beforehand makes "0_init" fail on every attempt
+    When the upgrade runs
+    Then it stops without the message "This image does not ship it"
+    When the operator drops the planted type and the upgrade runs again
+    Then "0_init" is marked rolled back, applied, and the upgrade exits with code 0
+    And nothing was dropped but the planted type the operator removed
+
+  @integration
   Scenario: Retry on Ops Upgrades is the operator's consent to re-run a failed migration
     Given a migration older than the marker failed and the run stopped with "failed_prisma_migration"
     When the operator presses Retry on its step

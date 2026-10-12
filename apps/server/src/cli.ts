@@ -1,5 +1,6 @@
 import { existsSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import chalk from "chalk";
 import { Command } from "commander";
@@ -27,7 +28,14 @@ import { captureUserEnv } from "./shared/env.ts";
 import { paths } from "./shared/paths.ts";
 import { detectPlatform } from "./shared/platform.ts";
 import { allocatePorts, PORT_BASE_DEFAULT } from "./shared/ports.ts";
-import type { RuntimeApi, RuntimeContext, ServiceHandle } from "./shared/runtime-contract.ts";
+import {
+  exitCause,
+  type RuntimeApi,
+  type RuntimeContext,
+  type RuntimeEvent,
+  type ServiceHandle,
+} from "./shared/runtime-contract.ts";
+import { createShutdown, type ShutdownOutcome } from "./shared/shutdown.ts";
 
 declare const __LANGWATCH_VERSION__: string;
 const VERSION = typeof __LANGWATCH_VERSION__ !== "undefined" ? __LANGWATCH_VERSION__ : "0.0.0-dev";
@@ -193,45 +201,41 @@ program
     // Drain runtime events to two renderers: panels and prefixed scroll lines.
     const installRouter = makeInstallPanelRouter();
     const panelsPromise = renderInstallPanels(installRouter);
+    let handles: ServiceHandle[] = [];
+    let booted = false;
     const eventsStream = streamEventsToTTY(runtime.events(ctx), {
       intercept: (ev) => {
+        // After boot a crash past its restarts ends the run; during boot startAll fails on its own.
+        if (booted) endOnCrash({ ev, shutdown });
         if (!isInstallEvent(ev)) return false;
         installRouter.feed(ev);
         return true;
       },
     });
 
-    // Registered BEFORE installServices/startAll so Ctrl+C during install
-    // or boot still tears down anything spawned so far — otherwise SIGINT
-    // orphans supervised children and leaks postgres/redis/clickhouse ports.
-    let handles: ServiceHandle[] = [];
-    let shuttingDown = false;
-    const onShutdown = async () => {
-      if (shuttingDown) return;
-      shuttingDown = true;
-      console.log(chalk.yellow("\n  ⏻ shutting down LangWatch..."));
-      installRouter.installFinished();
-      if (handles.length > 0) {
-        await runtime.stopAll(handles).catch(() => undefined);
-      }
-      await eventsStream.catch(() => undefined);
-      process.exit(0);
-    };
-    process.on("SIGINT", onShutdown);
-    process.on("SIGTERM", onShutdown);
+    // Registered BEFORE installServices/startAll so Ctrl+C during install or
+    // boot still tears down anything spawned so far: stopAll also reaches the
+    // services still waiting on their first health check.
+    const shutdown = createShutdown({
+      announce: (outcome) => {
+        installRouter.installFinished();
+        announceShutdown(outcome);
+      },
+      stopServices: () => runtime.stopAll(handles),
+      // The event stream never ends on its own; give the last "stopped" lines a moment to render.
+      flush: () => Promise.race([eventsStream, sleep(500)]).then(() => undefined),
+      exit: (code) => process.exit(code),
+    });
+    process.on("SIGINT", () => void shutdown({ exitCode: 0 }));
+    process.on("SIGTERM", () => void shutdown({ exitCode: 0 }));
 
     try {
-      await runtime.installServices(ctx);
-    } finally {
-      // Signal panels for cached steps to skip and any pending tasks to
-      // close. Even if installServices throws mid-step, we don't want
-      // panels left hanging on the screen during error reporting.
-      installRouter.installFinished();
+      handles = await bootServices({ runtime, ctx, installRouter, panelsPromise });
+      booted = true;
+    } catch (err) {
+      await shutdown({ exitCode: 1, reason: err instanceof Error ? err.message : String(err) });
+      return;
     }
-    await panelsPromise;
-
-    handles = await runtime.startAll(ctx);
-    await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });
 
     const url = `http://localhost:${ports.langwatch}`;
     if (
@@ -242,11 +246,55 @@ program
       await openBrowser(url, ctx.orchestrator.browser);
     }
 
-    // Block forever — drained by the events tee above. SIGINT exits via
-    // `onShutdown`; an uncaught crash event in renderEvent ends the
-    // iterator and returns control here.
+    // Block forever, drained by the events tee above. A signal or a crash
+    // ends the run through `shutdown`.
     await eventsStream;
   });
+
+/** Installs and starts every service, then waits for health; the handles to stop on the way out. */
+async function bootServices({
+  runtime,
+  ctx,
+  installRouter,
+  panelsPromise,
+}: {
+  runtime: RuntimeApi;
+  ctx: RuntimeContext;
+  installRouter: ReturnType<typeof makeInstallPanelRouter>;
+  panelsPromise: Promise<unknown>;
+}): Promise<ServiceHandle[]> {
+  try {
+    await runtime.installServices(ctx);
+  } finally {
+    // Close the install panels even when a step threw, so none hang over the error.
+    installRouter.installFinished();
+  }
+  await panelsPromise;
+  const handles = await runtime.startAll(ctx);
+  await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });
+  return handles;
+}
+
+/** A requested stop reads as one; a failure names its reason. */
+function announceShutdown({ exitCode, reason }: ShutdownOutcome): void {
+  if (exitCode === 0) {
+    console.log(chalk.yellow("\n  ⏻ shutting down LangWatch..."));
+    return;
+  }
+  console.error(chalk.red(`\n✗ ${reason ?? "LangWatch failed"}, shutting down LangWatch...`));
+}
+
+/** A service the supervisor gave up on ends the whole run, non-zero. */
+function endOnCrash({
+  ev,
+  shutdown,
+}: {
+  ev: RuntimeEvent;
+  shutdown: (outcome: ShutdownOutcome) => Promise<void>;
+}): void {
+  if (ev.type !== "crashed") return;
+  void shutdown({ exitCode: 1, reason: `${ev.service} crashed (${exitCause(ev)})` });
+}
 
 program
   .command("doctor")

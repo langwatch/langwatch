@@ -113,7 +113,7 @@ function LangWatchQLChartCanvas({
       {isResultNoteHidden ? (
         <VisuallyHidden id={descriptionId}>{note}</VisuallyHidden>
       ) : (
-        <Text id={descriptionId} fontSize="12px" color="fg.muted">
+        <Text id={descriptionId} textStyle="caption" color="fg.muted">
           {note}
         </Text>
       )}
@@ -137,7 +137,7 @@ function LangWatchQLChartWarnings({ warnings }: { warnings: readonly VegaValidat
       {warnings.map((warning, index) => (
         <Text
           key={`${warning.code}-${warning.path}-${index}`}
-          fontSize="12.5px"
+          textStyle="bodySm"
           color="fg.muted"
           data-warning-code={warning.code}
         >

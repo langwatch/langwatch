@@ -238,7 +238,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   { path: "/onboarding", page: "pages/onboarding" },
   {
     path: "/onboarding/:team/project",
-    page: "pages/onboarding/[team]/project",
+    redirect: { from: "/onboarding/:team/project", to: "/" },
   },
   {
     path: "/onboarding/product",
@@ -297,6 +297,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "layouts/project-langy",
         children: [
           { path: "/settings", page: "pages/settings" },
+          { path: "/settings/project", page: "pages/settings/project" },
           {
             // Role Bindings became the Roles page's assignments tab.
             path: "/settings/role-bindings",
@@ -763,7 +764,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
           {
             path: "/:project/setup",
-            redirect: { from: "/:project/setup", to: "/:project" },
+            redirect: { from: "/:project/setup", to: "/:project/traces" },
           },
           {
             path: "/:project/workflows",

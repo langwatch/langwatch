@@ -43,7 +43,7 @@ function Catalog() {
   return (
     <DesignSystemProvider forcedTheme="light">
       <Box padding={6} background="gray.50" width="820px">
-        <Heading size="md" marginBottom={1}>
+        <Heading size="sm" marginBottom={1}>
           Evaluator catalog (Zod-first)
         </Heading>
         <Text fontSize="sm" color="gray.600" marginBottom={4}>

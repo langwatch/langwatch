@@ -7,7 +7,6 @@ import { HStack, Text } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { useMemo } from "react";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { RESULT_GROUPING_LABELS, RESULT_GROUPINGS, type ResultGrouping } from "./result-atoms.ts";
 
 function isResultGrouping(value: string): value is ResultGrouping {
@@ -31,7 +30,7 @@ export function GroupByTabs({ grouping, onGroupingChange }: GroupByTabsProps) {
 
   return (
     <HStack gap={1.5} flexWrap="wrap">
-      <Text fontSize="12.5px" color={FG_MUTED} whiteSpace="nowrap">
+      <Text textStyle="bodySm" color="fg.muted" whiteSpace="nowrap">
         Group by:
       </Text>
       <SegmentedControl

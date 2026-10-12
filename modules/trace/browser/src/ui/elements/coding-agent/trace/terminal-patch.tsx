@@ -10,7 +10,7 @@ import type { PatchHunk } from "../../../../model/coding-agent/trace/terminal-to
 
 const CELL = {
   fontFamily: TERMINAL_FONT_STACK,
-  fontSize: "13px",
+  textStyle: "bodySm",
   lineHeight: "1.55",
 } as const;
 

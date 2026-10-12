@@ -68,6 +68,7 @@ export async function startLangwatch(
   });
 
   const ready = await pollUntilHealthy({
+    handle,
     // The api half's /api/health returns 204 No Content (apiHealthRoute in
     // apps/api/src/main.ts), the helm chart's liveness signal too. One wait
     // covers the process: a worker that refuses boot exits it.

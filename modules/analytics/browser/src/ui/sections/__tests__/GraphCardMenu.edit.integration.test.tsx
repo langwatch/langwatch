@@ -122,7 +122,7 @@ describe("a card's Edit menu item", () => {
   });
 
   describe("given a builder graph", () => {
-    it('is labelled "Edit Graph" and navigates to the builder editor', async () => {
+    it('is labelled "Edit graph" and navigates to the builder editor', async () => {
       const user = userEvent.setup();
       render(
         <GraphCardMenu
@@ -136,7 +136,7 @@ describe("a card's Edit menu item", () => {
       );
 
       await user.click(screen.getByRole("button"));
-      const editItem = await screen.findByText("Edit Graph");
+      const editItem = await screen.findByText("Edit graph");
       await user.click(editItem);
 
       expect(host.navigations).toEqual(["/proj/analytics/custom/graph_1"]);

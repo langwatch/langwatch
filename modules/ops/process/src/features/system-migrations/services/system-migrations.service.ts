@@ -84,7 +84,8 @@ export class SystemMigrationsService {
           this.deps.state.findStatusCounts({ migrationName: migration.name }),
           this.deps.state.findRecordsByStatus({
             migrationName: migration.name,
-            statuses: ["migrated", "parked"],
+            // A step whose `migrated` is its steady state holds nobody; only parked rows count.
+            statuses: migration.migratedIsSteady ? ["parked"] : ["migrated", "parked"],
             limit: ATTENTION_LIMIT,
           }),
         ]);
@@ -97,6 +98,7 @@ export class SystemMigrationsService {
           availableOnThisInstallation: isSaaS || migration.runsAutomaticallyOnSelfHosted,
           enrolledAutomatically: migration.enrolledAutomatically,
           tenant: migration.tenant ?? "organization",
+          migratedIsSteady: migration.migratedIsSteady ?? false,
           counts,
           // Null for a migration that admits every organization automatically:
           // the gauge would describe rows that decide nothing. That is what

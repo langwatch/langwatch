@@ -3,6 +3,7 @@ import {
   maskEmail,
   suppressEmailCommandSchema,
   type EmailSuppression,
+  type EmailSuppressionCursor,
   type SuppressEmailCommand,
 } from "@langwatch/automation-contract";
 
@@ -48,13 +49,48 @@ export class AutomationEmailSuppressionService {
     projectId: string;
   }): Promise<(EmailSuppression & { triggerName: string | null })[]> {
     const rows = await this.suppressions.findAll(input);
-    const ids = [...new Set(rows.flatMap((row) => (row.triggerId ? [row.triggerId] : [])))];
+
+    return this.withTriggerNames({ projectId: input.projectId, rows });
+  }
+
+  /**
+   * One page of the same list. The repository is asked for one row more than
+   * the page holds: that row only answers "is there more?" and is never shown.
+   */
+  async getPageEnriched(input: {
+    projectId: string;
+    limit: number;
+    cursor?: EmailSuppressionCursor | null;
+  }): Promise<{
+    rows: (EmailSuppression & { triggerName: string | null })[];
+    nextCursor: EmailSuppressionCursor | null;
+  }> {
+    const found = await this.suppressions.findPage({
+      projectId: input.projectId,
+      limit: input.limit + 1,
+      cursor: input.cursor ?? null,
+    });
+    const page = found.slice(0, input.limit);
+    const last = page.at(-1);
+
+    return {
+      rows: await this.withTriggerNames({ projectId: input.projectId, rows: page }),
+      nextCursor:
+        found.length > input.limit && last ? { createdAt: last.createdAt, id: last.id } : null,
+    };
+  }
+
+  private async withTriggerNames(input: {
+    projectId: string;
+    rows: EmailSuppression[];
+  }): Promise<(EmailSuppression & { triggerName: string | null })[]> {
+    const ids = [...new Set(input.rows.flatMap((row) => (row.triggerId ? [row.triggerId] : [])))];
     const names = await this.names.findTriggerNames({
       projectId: input.projectId,
       triggerIds: ids,
     });
 
-    return rows.map((row) => ({
+    return input.rows.map((row) => ({
       ...row,
       triggerName: row.triggerId ? (names.get(row.triggerId) ?? null) : null,
     }));

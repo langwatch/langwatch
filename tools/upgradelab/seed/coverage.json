@@ -62,7 +62,7 @@
       "cells": ["C1", "C3"],
       "note": "heavy creates the dataset by REST with no rows yet; rows in Postgres need a row door (REST rows route)"
     },
-    "entitlement:seed-trace-meter": {
+    "trace:send-month-trace-ids": {
       "status": "seeded",
       "seed": "traffic:otlp",
       "cells": ["C3", "C4", "C9"],

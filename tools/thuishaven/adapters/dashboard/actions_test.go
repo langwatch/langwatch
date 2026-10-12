@@ -241,6 +241,21 @@ func TestStartServiceFromTheBrowser(t *testing.T) {
 	}
 }
 
+// @scenario "Each optional service has an on and off switch on its row"
+func TestStopServiceFromTheBrowser(t *testing.T) {
+	var slug, service string
+	s := actionServer(Actions{StopService: func(sl, svc string) error { slug, service = sl, svc; return nil }})
+	if rec := post(s, "/api/stacks/portless/stop-service?service=app", ""); rec.Code != http.StatusOK || slug != "portless" || service != "app" {
+		t.Errorf("stop-service: status %d, slug %q, service %q", rec.Code, slug, service)
+	}
+	if rec := post(s, "/api/stacks/nosuch/stop-service?service=mail", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("unknown stack: status %d, want 404", rec.Code)
+	}
+	if rec := post(actionServer(Actions{}), "/api/stacks/portless/stop-service?service=mail", ""); rec.Code != http.StatusNotImplemented {
+		t.Errorf("unwired stop-service: status %d, want 501", rec.Code)
+	}
+}
+
 // @scenario "The daemon refuses to start a keeper for a stack it does not know"
 func TestStartKeeperRoute(t *testing.T) {
 	var started []string

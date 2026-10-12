@@ -418,6 +418,8 @@ function failedCallLogLevel({
   if (handledCause.code === "upgrade_in_progress") return "warn";
   // A refused private dataplane: the stores log it once at error, never per call.
   if (handledCause.code === "private_dataplane_unavailable") return "warn";
+  // A busy ClickHouse is self-healing too: the caller retries, nothing is broken.
+  if (handledCause.code === "clickhouse_overloaded") return "warn";
 
   return handledCause.fault === "customer" ? "warn" : "error";
 }

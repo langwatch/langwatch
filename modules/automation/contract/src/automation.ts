@@ -64,6 +64,47 @@ export const emailSuppressionRowSchema: EmailSuppressionRowSchema =
   emailSuppressionRowSchemaDefinition;
 export type EmailSuppressionRow = z.infer<typeof emailSuppressionRowSchema>;
 
+/**
+ * Where a suppression page resumes: the `(createdAt, id)` of the last row of
+ * the page before. A position, not a reference, so a row removed between pages
+ * never breaks the walk.
+ */
+const emailSuppressionCursorSchemaDefinition = z.object({
+  createdAt: z.coerce.date(),
+  id: z.string().min(1),
+});
+export interface EmailSuppressionCursorSchema extends Named<
+  typeof emailSuppressionCursorSchemaDefinition
+> {}
+export const emailSuppressionCursorSchema: EmailSuppressionCursorSchema =
+  emailSuppressionCursorSchemaDefinition;
+export type EmailSuppressionCursor = z.infer<typeof emailSuppressionCursorSchema>;
+
+/** One page of a project's suppression list, resuming after `cursor` when one is given. */
+const emailSuppressionPageInputSchemaDefinition = z.object({
+  projectId: z.string(),
+  limit: z.number().int().min(1).max(100).default(50),
+  cursor: emailSuppressionCursorSchema.nullish(),
+});
+export interface EmailSuppressionPageInputSchema extends Named<
+  typeof emailSuppressionPageInputSchemaDefinition
+> {}
+export const emailSuppressionPageInputSchema: EmailSuppressionPageInputSchema =
+  emailSuppressionPageInputSchemaDefinition;
+export type EmailSuppressionPageInput = z.infer<typeof emailSuppressionPageInputSchema>;
+
+/** One page of suppression rows, newest first. `nextCursor` is null on the last page. */
+const emailSuppressionPageSchemaDefinition = z.object({
+  suppressions: emailSuppressionRowSchema.array(),
+  nextCursor: emailSuppressionCursorSchema.nullable(),
+});
+export interface EmailSuppressionPageSchema extends Named<
+  typeof emailSuppressionPageSchemaDefinition
+> {}
+export const emailSuppressionPageSchema: EmailSuppressionPageSchema =
+  emailSuppressionPageSchemaDefinition;
+export type EmailSuppressionPage = z.infer<typeof emailSuppressionPageSchema>;
+
 /** What the email-suppression writes answer with: the write landed. */
 const emailSuppressionAcknowledgedSchemaDefinition = z.object({ ok: z.boolean() }).strict();
 export interface EmailSuppressionAcknowledgedSchema extends Named<

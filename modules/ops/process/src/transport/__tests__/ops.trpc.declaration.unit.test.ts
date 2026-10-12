@@ -163,6 +163,7 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   searchTenants: "query",
   dryRunReplay: "mutation",
   getReplayHistory: "query",
+  getReplayHistoryPage: "query",
   getReplayRun: "query",
   startReplay: "mutation",
   getReplayStatus: "query",

@@ -245,7 +245,11 @@ describe("the single sign-on setup page", () => {
     it("names the page and says what it is for, above the journey", () => {
       renderWithSsoHost(<SsoSetupScreen />);
 
-      expect(screen.getByRole("heading", { name: "Identity provider" })).toBeTruthy();
+      expect(screen.getByRole("heading", { level: 1, name: "Authentication" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Identity provider" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
       expect(
         screen.getByText(
           "Where your people sign in, and everything it takes to put it in front of them.",
@@ -256,21 +260,21 @@ describe("the single sign-on setup page", () => {
 
   describe("given the page inside the Authentication section", () => {
     /**
-     * @scenario "The Authentication pages share main's rail"
+     * @scenario "The Authentication pages share one row of header tabs"
      * @scenario "Managing a live connection stays on the same page"
      */
-    it("frames it in main's rail with Identity provider as the current entry", () => {
+    it("titles the header Authentication with Identity provider as the current tab", () => {
       renderWithSsoHost(<SsoSetupScreen />);
 
-      const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
-      const links = within(rail).getAllByRole("link");
+      const tabs = screen.getByRole("navigation", { name: "Authentication pages" });
+      const links = within(tabs).getAllByRole("link");
       expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
         ["Overview", "/settings/authentication"],
         ["Identity provider", "/settings/authentication/provider"],
         ["Connectors", "/settings/authentication/connectors"],
       ]);
       expect(
-        within(rail).getByRole("link", { name: "Identity provider" }).getAttribute("aria-current"),
+        within(tabs).getByRole("link", { name: "Identity provider" }).getAttribute("aria-current"),
       ).toBe("page");
     });
   });

@@ -33,7 +33,7 @@ export function TokenTimelineChart({
 
   return (
     <VStack align="stretch" gap={3}>
-      <VStack align="stretch" gap="4px">
+      <VStack align="stretch" gap="1">
         <HStack
           gap="3px"
           height={`${CHART_HEIGHT_PX}px`}

@@ -347,3 +347,49 @@ describe("given a process that composes ops health", () => {
     });
   });
 });
+
+describe("given an install whose ClickHouse owners each ask per project", () => {
+  describe("when the report is taken", () => {
+    it("asks the ClickHouse owners one at a time, one window at a time", async () => {
+      seedTwoOrganizations();
+      const peers = state.peers();
+      let inFlight = 0;
+      let mostInFlight = 0;
+      const owners = ["traces", "scenarios", "instantEvals", "codingAgents", "gateway"] as const;
+      for (const owner of owners) {
+        const countUsage = peers[owner].countUsage.bind(peers[owner]);
+        Object.assign(peers[owner], {
+          countUsage: async (input: Parameters<typeof countUsage>[0]) => {
+            inFlight += 1;
+            mostInFlight = Math.max(mostInFlight, inFlight);
+            await Promise.resolve();
+            inFlight -= 1;
+            return countUsage(input);
+          },
+        });
+      }
+      const service = UsageReportCollectionService.create({
+        peers,
+        deployment: () => ({
+          version: "3.17.0",
+          installMethod: "helm",
+          chartVersion: undefined,
+          environment: "production",
+          hostname: "langwatch.acme.test",
+        }),
+      });
+
+      const payload = await service.collect({
+        organizationIds: ["org-1", "org-2"],
+        instanceId: INSTANCE_ID,
+        firstSeenAt: undefined,
+        connected: false,
+        license: LICENSE,
+        now: NOW,
+      });
+
+      expect(mostInFlight).toBe(1);
+      expect(payload).toMatchObject({ totalTraces: 2, gateway_requests: 2 });
+    });
+  });
+});

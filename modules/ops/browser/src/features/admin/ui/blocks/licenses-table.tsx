@@ -1,11 +1,11 @@
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Badge, Button, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Button, Text, VStack } from "@langwatch/design-system/primitives";
 import { Inbox, MoreVertical } from "lucide-react";
 
 import { SERVICE_LABELS, type License, type Service } from "../../model/license-terms.ts";
-import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { LicenseStatusBadge } from "../elements/license-status-badge.tsx";
 
 const COLUMN_COUNT = 9;
@@ -30,27 +30,21 @@ export function LicensesTable({
   onResetBinding: (license: License) => void;
 }) {
   return (
-    <ListTable
-      density="compact"
-      columnRules={false}
-      containerProps={{ overflowX: "auto" }}
-      variant="line"
-      size="sm"
-    >
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Customer</Table.ColumnHeader>
-          <Table.ColumnHeader>Plan</Table.ColumnHeader>
-          <Table.ColumnHeader>Seats</Table.ColumnHeader>
-          <Table.ColumnHeader>Term ends</Table.ColumnHeader>
-          <Table.ColumnHeader>Status</Table.ColumnHeader>
-          <Table.ColumnHeader>Hosted services</Table.ColumnHeader>
-          <Table.ColumnHeader>Instance</Table.ColumnHeader>
-          <Table.ColumnHeader>Last sync</Table.ColumnHeader>
-          <Table.ColumnHeader width="1%" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable density="compact" scroll="x" scrollLabel="Licenses table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Customer</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Plan</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Seats</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Term ends</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Hosted services</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Instance</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Last sync</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader width="fit" label="Actions" />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {licenses.length === 0 && !isLoading ? <EmptyRow /> : null}
         {licenses.map((license) => (
           <LicensesTableRow
@@ -61,22 +55,20 @@ export function LicensesTable({
             onResetBinding={() => onResetBinding(license)}
           />
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
 
 function EmptyRow() {
   return (
-    <Table.Row>
-      <Table.Cell colSpan={COLUMN_COUNT}>
-        <NoDataInfoBlock
-          icon={<Inbox />}
-          title="No licenses in the registry yet."
-          description="Records will appear here when they are available."
-        />
-      </Table.Cell>
-    </Table.Row>
+    <ListTable.SpanRow columns={COLUMN_COUNT}>
+      <NoDataInfoBlock
+        icon={<Inbox />}
+        title="No licenses in the registry yet."
+        description="Records will appear here when they are available."
+      />
+    </ListTable.SpanRow>
   );
 }
 
@@ -87,43 +79,45 @@ function LicensesTableRow({
   onResetBinding,
 }: RowCallbacks & { license: License }) {
   return (
-    <Table.Row cursor="pointer" onClick={onOpen}>
-      <Table.Cell>
+    <ListTable.Row onActivate={onOpen}>
+      <ListTable.Cell>
         <VStack align="start" gap={0}>
-          <Text fontWeight="medium">{license.organizationName}</Text>
+          <ListTable.RowAction onActivate={onOpen}>{license.organizationName}</ListTable.RowAction>
           <Text fontSize="xs" color="fg.muted">
             {license.organizationId ? license.email : "Not linked to a customer organization"}
           </Text>
         </VStack>
-      </Table.Cell>
-      <Table.Cell>{license.planType}</Table.Cell>
-      <Table.Cell>{license.maxMembers}</Table.Cell>
-      <Table.Cell>{formatDate(license.expiresAt)}</Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>{license.planType}</ListTable.Cell>
+      <ListTable.Cell>{license.maxMembers}</ListTable.Cell>
+      <ListTable.Cell>
+        <AdminDate value={license.expiresAt} display="date" />
+      </ListTable.Cell>
+      <ListTable.Cell>
         <LicenseStatusBadge status={license.status} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <ServicesCell services={license.services} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {license.instanceId ? (
           <Badge colorPalette="green">bound</Badge>
         ) : (
           <EmptyCell>not bound</EmptyCell>
         )}
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <SyncCell license={license} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <RowActions
           license={license}
           onOpen={onOpen}
           onRevoke={onRevoke}
           onResetBinding={onResetBinding}
         />
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 

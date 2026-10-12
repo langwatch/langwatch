@@ -12,7 +12,8 @@ export default defineConfig({
   publicDir: false,
   logLevel: "warn",
   plugins: [react()],
-  define: { "process.env.NODE_ENV": JSON.stringify("production") },
+  // Must match the JSX mode plugin-react picks from NODE_ENV, or jsxDEV resolves to undefined.
+  define: { "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? "production") },
   resolve: { dedupe: ["zod"] },
   build: {
     write: false,

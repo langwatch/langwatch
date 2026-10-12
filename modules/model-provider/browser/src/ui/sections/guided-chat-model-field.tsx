@@ -25,6 +25,7 @@ export function GuidedChatModelField({
       <chakra.label display="block">
         <GuidedFieldLabel>Chat model</GuidedFieldLabel>
         <chakra.input
+          textStyle="monoSm"
           aria-label="Chat model"
           value={pickedModel ?? ""}
           onChange={(e) => onPick(e.target.value)}
@@ -37,13 +38,11 @@ export function GuidedChatModelField({
           bg="bg.page"
           px={3}
           py={2.5}
-          fontFamily="mono"
-          fontSize="12.5px"
           outline="none"
           _placeholder={{ color: "fg.subtle" }}
           _focus={{ borderColor: "border.emphasized" }}
         />
-        <Text as="span" display="block" mt={1} fontSize="11px" color="fg.subtle">
+        <Text textStyle="micro" as="span" display="block" mt={1} color="fg.subtle">
           Type it exactly as deployed: {providerName} has no model list we can read for you.
         </Text>
       </chakra.label>
@@ -66,6 +65,7 @@ export function GuidedChatModelField({
           const picked = model === pickedModel;
           return (
             <chakra.button
+              textStyle="monoSm"
               key={model}
               type="button"
               aria-pressed={picked}
@@ -79,9 +79,6 @@ export function GuidedChatModelField({
               borderColor={picked ? "fg" : "border"}
               bg={picked ? "bg.muted" : "transparent"}
               color={picked ? "fg" : "fg.muted"}
-              fontFamily="mono"
-              fontSize="11.5px"
-              fontWeight={picked ? "600" : "400"}
               px={2.5}
               py={1}
               cursor="pointer"
@@ -91,7 +88,13 @@ export function GuidedChatModelField({
               {picked && <Sparkles size={11} />}
               {model}
               {index === 0 && picked && (
-                <Text as="span" fontFamily="body" fontSize="9.5px" fontWeight="500" opacity={0.7}>
+                <Text
+                  textStyle="micro"
+                  fontWeight="medium"
+                  as="span"
+                  fontFamily="body"
+                  opacity={0.7}
+                >
                   recommended
                 </Text>
               )}

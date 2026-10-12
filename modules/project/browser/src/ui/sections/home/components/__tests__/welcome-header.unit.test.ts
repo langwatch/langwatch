@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { getGreeting, getGreetingName, getTimeOfDay } from "../welcome-header.tsx";
+import { getGreeting, getGreetingName, getTimeOfDay } from "../welcome-header.model.ts";
 
 describe("WelcomeHeader", () => {
   describe("getGreetingName()", () => {

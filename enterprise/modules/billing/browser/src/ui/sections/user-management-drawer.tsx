@@ -1,21 +1,19 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import {
+  Badge,
+  Button,
+  Collapsible,
+  HStack,
+  Input,
+  Separator,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 /**
  * User management drawer component
  * Manages ephemeral state for planning upgrades - does NOT save to DB
  */
-import {
-  Badge,
-  Box,
-  Button,
-  Collapsible,
-  Flex,
-  HStack,
-  Input,
-  Separator,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { MemberType } from "@langwatch/enterprise-licensing-contract";
 import { nowInstant } from "@langwatch/time";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
@@ -167,135 +165,112 @@ export function UserManagementDrawer({
   const priceLabel = billingPeriod === "annual" ? "Annual Price:" : "Monthly Price:";
 
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      placement="end"
+      onClose={handleClose}
       size="lg"
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) {
-          handleClose();
-        }
-      }}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Manage Seats</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
+      title="Manage seats"
+      footer={{
+        summary: (
+          <VStack
+            data-testid="drawer-footer-breakdown"
+            align="stretch"
+            gap={2}
+            fontSize="sm"
+            padding={4}
+            bg="bg.subtle"
+            borderRadius="md"
+            width="full"
+          >
+            <HStack justify="space-between">
+              <Text fontWeight="bold">Total Seats:</Text>
+              <Text fontWeight="bold" data-testid="total-seats-footer-count">
+                {totalFullMembersInDrawer}
+              </Text>
+            </HStack>
+            <Separator />
 
-        <Drawer.Body>
-          {isLoading ? (
-            <Flex justifyContent="center" padding={8}>
-              <Spinner />
-            </Flex>
-          ) : (
-            <VStack align="start" gap={6} width="full">
-              {/* Current Members section - collapsible */}
-              <CurrentMembersSection
-                editableUsers={editableUsers}
-                pendingInvitesWithMemberType={pendingInvitesWithMemberType}
-              />
-
-              {/* New Planned Seats section (editable) */}
-              <VStack align="start" gap={3} width="full">
-                <HStack justify="space-between" width="full">
-                  <Text fontWeight="semibold" fontSize="sm" color="fg.muted">
-                    Seats available
-                  </Text>
-                  <Button variant="outline" size="sm" onClick={handleAddSeat}>
-                    <Plus size={16} />
-                    Add Seat
-                  </Button>
-                </HStack>
-                {localPlannedUsers.map((user, index) => (
-                  <VStack key={user.id} width="full" gap={1} align="stretch">
-                    <HStack
-                      data-testid={`pending-seat-${index}`}
-                      width="full"
-                      gap={2}
-                      padding={3}
-                      borderWidth={1}
-                      borderRadius="md"
-                      borderColor={emailErrors[user.id] ? "red.emphasized" : "border"}
-                    >
-                      <Input
-                        data-testid={`seat-email-${index}`}
-                        placeholder="Enter email address"
-                        size="sm"
-                        flex={1}
-                        value={user.email}
-                        onChange={(e) => handleUpdatePlannedUserEmail(user.id, e.target.value)}
-                      />
-                      <Badge
-                        data-testid={`seat-member-type-${index}`}
-                        colorPalette="blue"
-                        variant="outline"
-                      >
-                        Full Member
-                      </Badge>
-                      <Button
-                        data-testid={`remove-seat-${index}`}
-                        size="xs"
-                        variant="ghost"
-                        colorPalette="red"
-                        onClick={() => handleRemovePlannedUser(user.id)}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </HStack>
-                    {emailErrors[user.id] && (
-                      <Text fontSize="xs" color="red.fg" paddingLeft={3}>
-                        {emailErrors[user.id]}
-                      </Text>
-                    )}
-                  </VStack>
-                ))}
-              </VStack>
-            </VStack>
-          )}
-        </Drawer.Body>
-
-        <Drawer.Footer>
-          <VStack width="full" gap={4}>
-            <VStack
-              data-testid="drawer-footer-breakdown"
-              align="stretch"
-              gap={2}
-              fontSize="sm"
-              padding={4}
-              bg="bg.subtle"
-              borderRadius="md"
-              width="full"
-            >
-              <HStack justify="space-between">
-                <Text fontWeight="bold">Total Seats:</Text>
-                <Text fontWeight="bold" data-testid="total-seats-footer-count">
-                  {totalFullMembersInDrawer}
-                </Text>
-              </HStack>
-              <Separator />
-
-              <HStack justify="space-between">
-                <Text fontWeight="bold">{priceLabel}</Text>
-                <Text fontWeight="bold" color="blue.fg" data-testid="monthly-price-footer">
-                  {formatPrice({ cents: totalPriceCentsInDrawer, currency })}
-                  {periodSuffix}
-                </Text>
-              </HStack>
-            </VStack>
-
-            <HStack width="full" justifyContent="flex-end">
-              <Button variant="ghost" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button colorPalette="blue" onClick={handleSave}>
-                Done
-              </Button>
+            <HStack justify="space-between">
+              <Text fontWeight="bold">{priceLabel}</Text>
+              <Text fontWeight="bold" color="blue.fg" data-testid="monthly-price-footer">
+                {formatPrice({ cents: totalPriceCentsInDrawer, currency })}
+                {periodSuffix}
+              </Text>
             </HStack>
           </VStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        ),
+        cancel: { label: "Cancel", onClick: handleClose },
+        primaryAction: { label: "Done", onClick: handleSave },
+      }}
+    >
+      {isLoading ? (
+        <SkeletonRows rows={6} leading label="Loading members" />
+      ) : (
+        <VStack align="start" gap={6} width="full">
+          {/* Current Members section - collapsible */}
+          <CurrentMembersSection
+            editableUsers={editableUsers}
+            pendingInvitesWithMemberType={pendingInvitesWithMemberType}
+          />
+
+          {/* New Planned Seats section (editable) */}
+          <VStack align="start" gap={3} width="full">
+            <HStack justify="space-between" width="full">
+              <Text fontWeight="semibold" fontSize="sm" color="fg.muted">
+                Seats available
+              </Text>
+              <Button variant="outline" size="sm" onClick={handleAddSeat}>
+                <Plus size={16} />
+                Add Seat
+              </Button>
+            </HStack>
+            {localPlannedUsers.map((user, index) => (
+              <VStack key={user.id} width="full" gap={1} align="stretch">
+                <HStack
+                  data-testid={`pending-seat-${index}`}
+                  width="full"
+                  gap={2}
+                  padding={3}
+                  borderWidth={1}
+                  borderRadius="md"
+                  borderColor={emailErrors[user.id] ? "red.emphasized" : "border"}
+                >
+                  <Input
+                    data-testid={`seat-email-${index}`}
+                    placeholder="Enter email address"
+                    size="sm"
+                    flex={1}
+                    value={user.email}
+                    onChange={(e) => handleUpdatePlannedUserEmail(user.id, e.target.value)}
+                  />
+                  <Badge
+                    data-testid={`seat-member-type-${index}`}
+                    colorPalette="blue"
+                    variant="outline"
+                  >
+                    Full Member
+                  </Badge>
+                  <Button
+                    data-testid={`remove-seat-${index}`}
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="red"
+                    onClick={() => handleRemovePlannedUser(user.id)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </HStack>
+                {emailErrors[user.id] && (
+                  <Text fontSize="xs" color="red.fg" paddingLeft={3}>
+                    {emailErrors[user.id]}
+                  </Text>
+                )}
+              </VStack>
+            ))}
+          </VStack>
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 
@@ -318,50 +293,61 @@ function CurrentMembersSection({
         </Collapsible.Trigger>
       </HStack>
       <Collapsible.Content>
-        <Box as="table" width="full" style={{ borderCollapse: "collapse" }}>
-          <Box as="tbody">
-            {editableUsers.map((user) => (
-              <Box as="tr" key={user.id}>
-                <Box as="td" paddingY={2} verticalAlign="top">
-                  <Text fontSize="sm" fontWeight="medium" color="fg">
-                    {user.email}
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    Active
-                  </Text>
-                </Box>
-                <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
-                  <Badge colorPalette={SEAT_BADGE[user.memberType].tone} variant="outline">
-                    {SEAT_BADGE[user.memberType].label}
-                  </Badge>
-                </Box>
-              </Box>
-            ))}
-            {pendingInvitesWithMemberType.map((invite) => (
-              <Box
-                as="tr"
-                key={invite.id}
-                opacity={0.8}
-                data-testid={`pending-invite-${invite.email}`}
-              >
-                <Box as="td" paddingY={2} verticalAlign="top">
-                  <Text fontSize="sm" fontWeight="medium" color="fg">
-                    {invite.email}
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    Invited - Waiting for acceptance
-                  </Text>
-                </Box>
-                <Box as="td" paddingY={2} textAlign="right" verticalAlign="middle">
-                  <Badge colorPalette={SEAT_BADGE[invite.memberType].tone} variant="outline">
-                    {SEAT_BADGE[invite.memberType].label}
-                  </Badge>
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        </Box>
+        <VStack as="ul" align="stretch" gap={0} width="full" listStyleType="none" padding={0}>
+          {editableUsers.map((user) => (
+            <MemberRow
+              key={user.id}
+              email={user.email}
+              status="Active"
+              memberType={user.memberType}
+            />
+          ))}
+          {pendingInvitesWithMemberType.map((invite) => (
+            <MemberRow
+              key={invite.id}
+              email={invite.email}
+              status="Invited - Waiting for acceptance"
+              memberType={invite.memberType}
+              pending
+            />
+          ))}
+        </VStack>
       </Collapsible.Content>
     </Collapsible.Root>
+  );
+}
+
+function MemberRow({
+  email,
+  status,
+  memberType,
+  pending = false,
+}: {
+  email: string;
+  status: string;
+  memberType: MemberType;
+  pending?: boolean;
+}) {
+  return (
+    <HStack
+      as="li"
+      justify="space-between"
+      gap={4}
+      paddingY={2}
+      opacity={pending ? 0.8 : void 0}
+      data-testid={pending ? `pending-invite-${email}` : void 0}
+    >
+      <VStack align="start" gap={0} minWidth={0}>
+        <Text fontSize="sm" fontWeight="medium" color="fg">
+          {email}
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          {status}
+        </Text>
+      </VStack>
+      <Badge colorPalette={SEAT_BADGE[memberType].tone} variant="outline">
+        {SEAT_BADGE[memberType].label}
+      </Badge>
+    </HStack>
   );
 }

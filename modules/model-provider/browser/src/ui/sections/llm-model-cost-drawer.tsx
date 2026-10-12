@@ -9,7 +9,7 @@ import { applyHandledErrorToForm } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { Button, Field, Input, Text } from "@langwatch/design-system/primitives";
+import { Field, Input, Text } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { FormServerError } from "@langwatch/error-views";
 import { useState } from "react";
@@ -26,6 +26,12 @@ import {
   LLMModelCostMatchingSpans,
   type MatchingSpansPreviewInput,
 } from "./llm-model-cost-matching-spans.tsx";
+
+const FORM_ID = "llm-model-cost-form";
+
+type CreateOrUpdateMutation = ReturnType<
+  typeof modelProviderApi.llmModelCost.createOrUpdate.useMutation
+>;
 
 interface LLMModelCostFormValues {
   model: string;
@@ -133,26 +139,33 @@ export function LLMModelCostDrawer({
     { enabled: !!projectId },
   );
 
+  const createOrUpdate = modelProviderApi.llmModelCost.createOrUpdate.useMutation();
+
   return (
-    <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{drawerTitle({ id, cloneModel })}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {llmModelCosts.data && (
-            <LLMModelCostForm
-              id={id}
-              cloneModel={cloneModel}
-              prefillModel={prefillModel}
-              prefillRegex={prefillRegex}
-              llmModelCosts={llmModelCosts.data.map(toLLMModelCostRow)}
-            />
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer
+      onClose={closeDrawer}
+      size="xl"
+      title={drawerTitle({ id, cloneModel })}
+      footer={{
+        primaryAction: {
+          label: "Save",
+          type: "submit",
+          form: FORM_ID,
+          loading: createOrUpdate.isPending,
+        },
+      }}
+    >
+      {llmModelCosts.data && (
+        <LLMModelCostForm
+          id={id}
+          cloneModel={cloneModel}
+          prefillModel={prefillModel}
+          prefillRegex={prefillRegex}
+          llmModelCosts={llmModelCosts.data.map(toLLMModelCostRow)}
+          createOrUpdate={createOrUpdate}
+        />
+      )}
+    </Drawer>
   );
 }
 
@@ -162,12 +175,14 @@ function LLMModelCostForm({
   prefillModel,
   prefillRegex,
   llmModelCosts,
+  createOrUpdate,
 }: {
   id?: string;
   cloneModel?: string;
   prefillModel?: string;
   prefillRegex?: string;
   llmModelCosts: LLMModelCostRow[];
+  createOrUpdate: CreateOrUpdateMutation;
 }) {
   const host = useModelProviderHost();
   const { closeDrawer } = useDrawer();
@@ -176,8 +191,6 @@ function LLMModelCostForm({
   const organizationName = available.organization?.name;
   const teamName = available.teams.find((candidate) => candidate.id === teamId)?.name;
   const project = available.projects.find((candidate) => candidate.id === projectId);
-
-  const createOrUpdate = modelProviderApi.llmModelCost.createOrUpdate.useMutation();
 
   const llmModelCostsQuery = modelProviderApi.llmModelCost.getAllForProject.useQuery(
     { projectId: projectId ?? "" },
@@ -268,7 +281,7 @@ function LLMModelCostForm({
 
   return (
     <>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form id={FORM_ID} onSubmit={handleSubmit(onSubmit)}>
         <FormServerError form={form} />
         <HorizontalFormControl
           label="Applies to"
@@ -305,12 +318,12 @@ function LLMModelCostForm({
         >
           <InputGroup
             startElement={
-              <Text paddingX={2} fontFamily="monospace">
+              <Text paddingX={2} fontFamily="mono">
                 /
               </Text>
             }
             endElement={
-              <Text paddingX={2} fontFamily="monospace">
+              <Text paddingX={2} fontFamily="mono">
                 /
               </Text>
             }
@@ -435,15 +448,6 @@ function LLMModelCostForm({
           </InputGroup>
           <Field.ErrorText>{errors.cacheCreation1hCostPerToken?.message}</Field.ErrorText>
         </HorizontalFormControl>
-        <Button
-          marginTop={4}
-          colorPalette="orange"
-          type="submit"
-          minWidth="fit-content"
-          loading={createOrUpdate.isPending}
-        >
-          Save
-        </Button>
       </form>
     </>
   );

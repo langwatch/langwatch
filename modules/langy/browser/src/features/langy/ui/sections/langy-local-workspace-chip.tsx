@@ -42,7 +42,7 @@ export function LangyLocalWorkspaceChip({
         data-testid="langy-workspace-chip"
         gap={1}
         paddingX={1.5}
-        paddingY="2px"
+        paddingY="0.5"
         borderWidth="1px"
         borderColor="border.muted"
         borderRadius="full"

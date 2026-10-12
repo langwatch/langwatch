@@ -316,11 +316,6 @@ func painterFor(isAgent bool) painter {
 	return styledPainter
 }
 
-// style is painterFor applied once, for the one-off lines outside the report.
-func style(d deps, s lipgloss.Style, text string) string {
-	return painterFor(d.isAgent)(s, text)
-}
-
 // prereqDetail is the right-hand column: what was found, or the command that
 // would fix it. An actionable entry always names its command, so the report
 // is something you can act on without reading the help.

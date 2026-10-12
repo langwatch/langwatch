@@ -2,7 +2,8 @@
 # (sections 6.4, 6.6, 6.7, 6.10 and 6.11) and dev/docs/plans/migrations-blitz-2026-10-06.md (section
 # 5.2, row mig-s3-runner; deltas D4 and D6).
 #
-# `pnpm task upgrade` is the one command that changes the schema. It takes the runner lease, plans
+# `pnpm task upgrade` is a run-once worker (Alex, 2026-10-11): it starts the worker, which runs the
+# same in-process upgrade its gate runs, and answers its exit code. The run takes the lease, plans
 # from the ledger and the shipped manifests, applies the plan release by release from whatever
 # release the installation is on (no required stop; Alex, 2026-10-11), records every step and every
 # ClickHouse target in the ledger, runs the reconcilers last and records the run. Exit codes: 0 done,
@@ -46,6 +47,47 @@ Feature: The upgrade command
     Then it exits with code 1 before the schema applier is called
     And its message names "20261001000000_broken"
     And its message gives the command "prisma migrate resolve --rolled-back 20261001000000_broken"
+    And its message says to run it in packages/prisma-client with DATABASE_URL set
+    And its message says a waiting worker runs the upgrade again by itself once the row is resolved
+
+  # T9-F1: the command the refusal names works in the image as written.
+  @unit
+  Scenario: The Prisma config where the refusal sends the operator carries DATABASE_URL
+    Given DATABASE_URL is set in the operator's shell
+    When packages/prisma-client/prisma.config.ts loads
+    Then its datasource url is DATABASE_URL, so "prisma migrate resolve" runs there
+
+  # T9-F3: an index of another definition under a migration's index name is never accepted in
+  # silence and never dropped automatically; a matching pre-built index (ops pre-build) passes.
+  @integration
+  Scenario: A pre-built index that differs from a pending migration's stops the upgrade by name
+    Given a pending migration creates "Widget_key_key" UNIQUE on "Widget" ("key") if it does not exist
+    And the database already holds an index "Widget_key_key" on "Widget" ("createdAt")
+    When the upgrade runs
+    Then it exits with code 1 and code "prebuilt_index_differs" before the schema applier is called
+    And its message names the index, the table, the definition it should have and the one it has
+    And its message says to drop or rename the index, and the index is left in place
+
+  @integration
+  Scenario: A pre-built index that matches a pending migration's passes
+    Given a pending migration creates "Widget_key_key" UNIQUE on "Widget" ("key") if it does not exist
+    And the database already holds the same unique index, built ahead as the ops pre-build note says
+    When the upgrade runs
+    Then it completes with code 0
+
+  @unit
+  Scenario: An invalid pre-built index under a migration's index name is refused
+    Given a pending migration creates an index if it does not exist
+    And an index of that name exists but a build that never finished left it invalid
+    When the pending folders are checked
+    Then the index is named as differing
+
+  @unit
+  Scenario: An index a pending migration drops before it creates it again is not compared
+    Given a pending migration drops "Widget_key_key" and a later pending one creates it if it does not exist
+    And the database holds an index "Widget_key_key" of another definition
+    When the pending folders are checked
+    Then nothing is named as differing
 
   # Each ClickHouse target upgrades on its own (Alex, 2026-10-11, T7-F1): a private target that
   # fails holds only its organizations; the shared target and the release go on.
@@ -76,6 +118,15 @@ Feature: The upgrade command
     When the upgrade runs again with nothing else to apply
     Then it asks the applier once for every shipped step and exits with code 0
     And the private target's rows stay failed
+
+  # T7-F16: only the shared target delays ready by the full connect wait.
+  @unit
+  Scenario: A private ClickHouse target is waited for briefly before it is held
+    Given CLICKHOUSE_MIGRATE_WAIT_SECONDS is 180
+    When goose is run for the shared target and for "private:org_1"
+    Then the shared target is waited for 180 seconds
+    And "private:org_1" is waited for 5 seconds at most
+    And a wait of 0 stays 0 on both
 
   @integration
   Scenario: A failing shared ClickHouse target fails the run
@@ -204,6 +255,20 @@ Feature: The upgrade command
     When the upgrade runs
     Then the run is recorded failed naming the reconciler "langwatchql"
 
+  @unit
+  Scenario: pnpm task upgrade runs the upgrade as a run-once worker and answers its exit code
+    Given the tasks app is asked to run the upgrade
+    When it starts the worker with "upgrade"
+    Then the worker runs the upgrade once in its own process and exits 0, 1 or 3
+    And the tasks app answers that exit code; status, plan and steps stay reads in the tasks app
+
+  @unit
+  Scenario: The worker's upgrade provisions LangWatchQL through the tasks app under its own lease
+    Given the worker runs the upgrade in-process
+    When its reconcilers run
+    Then it runs "pnpm task upgrade lwql-provision", which takes no lease of its own
+    And a provisioning that exits non-zero fails the reconciler "langwatchql"
+
   @integration
   Scenario: Running an older image marks completed background steps pending again
     Given the ledger records a succeeded upgrade to 3.22.0 with a done background step of 3.22.0
@@ -239,6 +304,13 @@ Feature: The upgrade command
     When the upgrade runs through preflight, one schema release and reconcile
     Then a hint is published as each phase starts and ends, and once when the run finishes
     And each hint names the run, the phase and its outcome under the platform upgrade scope
+
+  @unit
+  Scenario: A worker's in-process run publishes its read hints on the worker's Redis
+    Given the worker runs the upgrade in its own process with REDIS_URL set
+    When the run changes phase
+    Then its read hint is published on the worker's Redis, resolved as its stores resolve it
+    And the connection opened for the run is closed when the run ends
 
   @integration
   Scenario: A hint that cannot be published does not fail the run

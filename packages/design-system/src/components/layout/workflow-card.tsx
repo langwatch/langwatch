@@ -101,7 +101,10 @@ export type WorkflowCardDisplayProps = {
   children?: ReactNode;
 } & WorkflowCardBaseProps;
 
-/** A workflow as a card: icon, name or description, and when it last changed. */
+/**
+ * A workflow as a card: icon, name or description, and when it last changed.
+ * @deprecated Use `ResourceTile` from `@langwatch/design-system/resource-tile`. Goes in W-final.
+ */
 export function WorkflowCardDisplay({
   name,
   icon,
@@ -130,7 +133,7 @@ export function WorkflowCardDisplay({
       <Text paddingX={4} color="fg" fontSize="sm" fontWeight={!description ? 500 : undefined}>
         {description ?? name}
       </Text>
-      <Text paddingX={4} color="fg.subtle" fontSize="12px">
+      <Text paddingX={4} color="fg.subtle" textStyle="caption">
         {updatedAtLabel}
       </Text>
     </WorkflowCardBase>

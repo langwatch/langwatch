@@ -4,16 +4,8 @@
  * Spec: modules/integration/specs/github-connection.feature.
  */
 
-import {
-  Badge,
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { SettingList } from "@langwatch/design-system/settings-card";
+import { Badge, Box, Button, Text } from "@langwatch/design-system/primitives";
+import { SettingList, SettingsCard } from "@langwatch/design-system/settings-card";
 import { useState } from "react";
 import { GitHub } from "react-feather";
 
@@ -61,81 +53,63 @@ export function GithubCard({ organizationId }: { organizationId: string }) {
   const showConnect = configured && installations.length === 0;
   const showInstallations = configured && installations.length > 0;
 
+  const connectLabel = showConnect ? "Connect GitHub" : "Add another account";
+  const connectAction =
+    showConnect || showInstallations ? (
+      <Button
+        data-testid={showConnect ? "github-connect" : undefined}
+        variant="outline"
+        size="sm"
+        onClick={onInstall}
+        disabled={!installAddress}
+      >
+        {connectLabel}
+      </Button>
+    ) : null;
+
   return (
-    <Card.Root
-      bg="bg.card"
-      borderColor="border.card"
-      id="github"
-      data-testid="github-connection-card"
-    >
-      <Card.Body>
-        <VStack align="stretch" gap={3}>
-          <HStack gap={2}>
-            <GitHub size={18} />
-            <Heading size="sm">GitHub</Heading>
-            {installations.length > 0 ? (
-              <Badge colorPalette="green" variant="subtle">
-                Installed
-              </Badge>
-            ) : null}
-          </HStack>
-          <Text fontSize="sm" color="fg.muted">
-            Lets LangWatch open pull requests on the repositories you choose, and link coding agent
-            sessions to the pull requests they produced. Pull requests are made by the LangWatch app
-            and credit you as the requester.
+    <Box id="github" width="full">
+      <SettingsCard
+        data-testid="github-connection-card"
+        title="GitHub"
+        leading={<GitHub size={18} />}
+        badge={
+          installations.length > 0 ? (
+            <Badge colorPalette="green" variant="subtle">
+              Installed
+            </Badge>
+          ) : null
+        }
+        hint="Lets LangWatch open pull requests on the repositories you choose, and link coding agent sessions to the pull requests they produced. Pull requests are made by the LangWatch app and credit you as the requester."
+        actions={connectAction}
+      >
+        {!configured && (
+          <Text textStyle="body" color="fg.muted" data-testid="github-not-configured">
+            The GitHub integration is not available on this instance.
           </Text>
+        )}
+        {showInstallations && (
+          <SettingList>
+            {installations.map((installation) => (
+              <GithubInstallationRow
+                key={installation.installationId}
+                installation={installation}
+                disconnecting={
+                  disconnect.isPending && disconnectingId === installation.installationId
+                }
+                uninstallStarted={uninstallStartedFor === installation.installationId}
+                onDisconnect={(installationId) => {
+                  setDisconnectingId(installationId);
+                  disconnect.mutate({ organizationId, installationId });
+                }}
+              />
+            ))}
+          </SettingList>
+        )}
 
-          {!configured && (
-            <Text fontSize="sm" color="fg.muted" data-testid="github-not-configured">
-              The GitHub integration is not available on this instance.
-            </Text>
-          )}
-          {showConnect && (
-            <Button
-              data-testid="github-connect"
-              variant="solid"
-              colorPalette="orange"
-              onClick={onInstall}
-              disabled={!installAddress}
-              alignSelf="flex-start"
-            >
-              Connect GitHub
-            </Button>
-          )}
-          {showInstallations && (
-            <VStack align="stretch" gap={3}>
-              <SettingList>
-                {installations.map((installation) => (
-                  <GithubInstallationRow
-                    key={installation.installationId}
-                    installation={installation}
-                    disconnecting={
-                      disconnect.isPending && disconnectingId === installation.installationId
-                    }
-                    uninstallStarted={uninstallStartedFor === installation.installationId}
-                    onDisconnect={(installationId) => {
-                      setDisconnectingId(installationId);
-                      disconnect.mutate({ organizationId, installationId });
-                    }}
-                  />
-                ))}
-              </SettingList>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onInstall}
-                disabled={!installAddress}
-                alignSelf="flex-start"
-              >
-                Add another account
-              </Button>
-            </VStack>
-          )}
-
-          {/* How Langy reaches this person's code, once they chose (ADR-129). */}
-          <LangyCodeAccess />
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+        {/* How Langy reaches this person's code, once they chose (ADR-129). */}
+        <LangyCodeAccess />
+      </SettingsCard>
+    </Box>
   );
 }

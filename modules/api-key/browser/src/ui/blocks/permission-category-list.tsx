@@ -19,7 +19,7 @@ export function PermissionCounter({ count }: { count: number }) {
   return (
     <HStack gap={1.5}>
       <Lock size={13} color="var(--chakra-colors-fg-muted)" />
-      <Text fontSize="xs" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         {count} selected permission{count !== 1 ? "s" : ""}
       </Text>
     </HStack>
@@ -77,7 +77,7 @@ function PermissionRow({
     return (
       <HStack justify="space-between" paddingY={3}>
         <HStack gap={1.5}>
-          <Text fontSize="sm" color="fg.muted">
+          <Text textStyle="body" color="fg.muted">
             {category.label}
           </Text>
           <Tooltip content={`Your role does not include access to ${category.label.toLowerCase()}`}>

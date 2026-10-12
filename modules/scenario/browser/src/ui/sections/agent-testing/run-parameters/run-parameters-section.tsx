@@ -9,7 +9,6 @@ import { Box, chakra, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
 import type { RunDialogForm } from "../run/use-run-dialog-form.ts";
@@ -70,7 +69,7 @@ function SecretParametersToggle({
         title={isLockedInRows ? LOCKED_IN_ROWS_MESSAGE : undefined}
         data-testid="run-dialog-secret-parameters-toggle"
       >
-        <Text as="span" fontSize="11.5px" color={FG_MUTED}>
+        <Text as="span" textStyle="caption" color="fg.muted">
           Secret parameters
         </Text>
         <Switch

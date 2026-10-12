@@ -2,7 +2,8 @@ import { Link } from "@langwatch/browser-host/link";
 /**
  * Current Plan Block - displays the active subscription
  */
-import { Alert, Box, Button, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Box, Button, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 import {
   SettingList,
   SettingRow,
@@ -97,7 +98,7 @@ export function CurrentPlanBlock({
     >
       <SettingList>
         <SettingRow label="Members / seats">
-          <Text fontSize="13px" fontWeight={600} fontVariantNumeric="tabular-nums">
+          <Text textStyle="bodySm" fontWeight={600} fontVariantNumeric="tabular-nums">
             {maxSeats != null ? `${userCount} / ${maxSeats}` : userCount}
           </Text>
           {onUserCountClick && (
@@ -120,7 +121,7 @@ export function CurrentPlanBlock({
         >
           {features.map((feature) => (
             <HStack key={feature} gap={2} alignItems="start">
-              <Box color="green.fg" flexShrink={0} paddingTop="2px">
+              <Box color="green.fg" flexShrink={0} paddingTop="0.5">
                 <Check size={16} />
               </Box>
               <Text fontSize="sm">{feature}</Text>
@@ -129,18 +130,13 @@ export function CurrentPlanBlock({
         </SimpleGrid>
       )}
       {deprecatedNotice && (
-        <Alert.Root status="info" data-testid="tiered-deprecated-notice">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>
-              You are on a legacy tiered pricing model.{" "}
-              <Link href="/settings/plans" color="orange.fg">
-                Update your plan →
-              </Link>{" "}
-              to move to seat and usage billing.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="info" data-testid="tiered-deprecated-notice">
+          You are on a legacy tiered pricing model.{" "}
+          <Link href="/settings/plans" color="orange.fg">
+            Update your plan →
+          </Link>{" "}
+          to move to seat and usage billing.
+        </Banner>
       )}
     </SettingsCard>
   );

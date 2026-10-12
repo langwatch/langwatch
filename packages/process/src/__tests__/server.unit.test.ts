@@ -195,6 +195,24 @@ describe("Server", () => {
     });
   });
 
+  describe("given a server whose boot was refused before it listened", () => {
+    describe("when the server closes", () => {
+      /** @scenario "A server closed before it listened releases what was already live" */
+      it("stops a component with no start and leaves one that never started", async () => {
+        const server = await startServer();
+        const live = vi.fn();
+        const unstarted = vi.fn();
+        server.with({ name: "telemetry", stop: live });
+        server.with({ name: "runtime", start: () => undefined, stop: unstarted });
+
+        await server.close();
+
+        expect(live).toHaveBeenCalledOnce();
+        expect(unstarted).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("given a contribution on the door that throws", () => {
     describe("when it is asked", () => {
       /** @scenario "A door handler fails" */

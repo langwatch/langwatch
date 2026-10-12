@@ -1,18 +1,8 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { BackLink } from "@langwatch/design-system/back-link";
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
-import { ListTable } from "@langwatch/design-system/list-table";
+import { Card } from "@langwatch/design-system/card";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Pagination } from "@langwatch/design-system/pagination";
 import {
   Badge,
   Box,
@@ -25,6 +15,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
@@ -183,38 +175,40 @@ function SourcePullStatus({ source }: { source: Source }) {
   const pull = source.pullStatus;
   const retrying = source.status !== "disabled" && !source.archivedAt;
   return (
-    <VStack align="stretch" gap={2} borderWidth="1px" borderRadius="md" padding={3}>
-      <Text fontSize="sm">
-        Last successful pull:{" "}
-        {source.lastSuccessAt ? formatMoment(source.lastSuccessAt) : "No successful pull yet"}
-      </Text>
-      {pull?.lastRunAt && (
+    <Card padding="sm">
+      <VStack align="stretch" gap={2}>
         <Text fontSize="sm">
-          Last attempt: {formatMoment(pull.lastRunAt)} ({pull.outcome})
+          Last successful pull:{" "}
+          {source.lastSuccessAt ? formatMoment(source.lastSuccessAt) : "No successful pull yet"}
         </Text>
-      )}
-      {pull?.error && (
-        <Text fontSize="sm" color="red.fg">
-          {pull.error}{" "}
-          {retrying ? "The next scheduled pull will retry." : "This source is disabled."} Saved
-          records may be incomplete.
-        </Text>
-      )}
-      {pull?.backfillThrough && (
-        <Text fontSize="sm">
-          Backfill reached: {formatMoment(pull.backfillThrough)}. This is the latest saved
-          checkpoint.
-        </Text>
-      )}
-      {pull?.hasMore && (
-        <Text fontSize="sm" color="fg.muted">
-          More history remains.
-          {retrying
-            ? " The next scheduled pull continues from the saved checkpoint."
-            : " Resume the source to continue."}
-        </Text>
-      )}
-    </VStack>
+        {pull?.lastRunAt && (
+          <Text fontSize="sm">
+            Last attempt: {formatMoment(pull.lastRunAt)} ({pull.outcome})
+          </Text>
+        )}
+        {pull?.error && (
+          <Text fontSize="sm" color="red.fg">
+            {pull.error}{" "}
+            {retrying ? "The next scheduled pull will retry." : "This source is disabled."} Saved
+            records may be incomplete.
+          </Text>
+        )}
+        {pull?.backfillThrough && (
+          <Text fontSize="sm">
+            Backfill reached: {formatMoment(pull.backfillThrough)}. This is the latest saved
+            checkpoint.
+          </Text>
+        )}
+        {pull?.hasMore && (
+          <Text fontSize="sm" color="fg.muted">
+            More history remains.
+            {retrying
+              ? " The next scheduled pull continues from the saved checkpoint."
+              : " Resume the source to continue."}
+          </Text>
+        )}
+      </VStack>
+    </Card>
   );
 }
 
@@ -322,26 +316,6 @@ function SourceActivityPanels({
         presentation={{
           renderError: ({ error, title }) => (
             <HandledErrorAlert error={error} fallbackTitle={title} />
-          ),
-          renderTable: ({ header, body }) => (
-            <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
-              {header}
-              {body}
-            </ListTable>
-          ),
-          renderPagination: (view) => (
-            <Pagination
-              page={view.page}
-              pageSize={view.pageSize}
-              totalCount={view.totalCount}
-              visibleCount={view.rows.length}
-              onPageChange={view.goToPage}
-              onPageSizeChange={view.setPageSize}
-              isLoading={view.status === "loading"}
-              navDisabled={view.isFetching}
-              isPageReachable={view.isPageReachable}
-              canGoNext={view.canGoNext}
-            />
           ),
         }}
       />
@@ -586,7 +560,7 @@ function IngestionSourceDetailPage() {
     return (
       <SourceDetailShell pageTitle={pageTitle}>
         <PageLayout.Container>
-          <Spinner size="sm" />
+          <SkeletonRows rows={4} label="Loading the source" />
         </PageLayout.Container>
       </SourceDetailShell>
     );
@@ -717,12 +691,12 @@ function StaleTimestampCallout({
     (health.events24h ?? 0) === 0 && (health.events7d ?? 0) === 0 && (health.events30d ?? 0) === 0;
   if (!all30dZero || eventsCount === 0) return null;
   return (
-    <Box borderWidth="1px" borderColor="border" padding={3} borderRadius="md">
+    <Card padding="sm">
       <Text fontSize="sm" color="fg.muted">
         The table contains older records outside the last 30 days. Recent counters use each record's
         original date, so historical imports can show records here while those counters remain zero.
       </Text>
-    </Box>
+    </Card>
   );
 }
 
@@ -758,7 +732,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         new value through every upstream client.
       </Text>
       {isOtel && (
-        <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+        <Card variant="frame" padding="sm">
           <Text fontSize="xs" fontWeight="semibold" color="fg.muted" mb={2}>
             Minimum viable OTLP body shape (camelCase keys):
           </Text>
@@ -791,7 +765,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
             </Link>{" "}
             for the full attribute reference.
           </Text>
-        </Box>
+        </Card>
       )}
     </VStack>
   );
@@ -885,117 +859,102 @@ function SecretRevealModal({
   };
 
   return (
-    <DialogRoot open onOpenChange={(e) => !e.open && onClose()} closeOnInteractOutside={false}>
-      <DialogContent maxWidth="2xl">
-        <DialogHeader>
-          <DialogTitle>
-            <HStack gap={2}>
-              <KeyRound size={16} />
-              <Text>New secret minted - old valid for 24h</Text>
-            </HStack>
-          </DialogTitle>
-        </DialogHeader>
-        <DialogCloseTrigger />
-        <DialogBody>
-          <VStack align="stretch" gap={4}>
-            <Text fontSize="sm" color="fg.muted">
-              This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
-              into the upstream platform&apos;s admin console. The previous secret keeps working for
-              24h so you have time to roll the new value through every upstream client.
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      icon={<KeyRound size={16} />}
+      title="New secret minted - old valid for 24h"
+      cancelLabel={null}
+      closeOnInteractOutside={false}
+      primaryAction={{ label: "I've saved it", onClick: onClose }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Text fontSize="sm" color="fg.muted">
+          This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
+          into the upstream platform&apos;s admin console. The previous secret keeps working for 24h
+          so you have time to roll the new value through every upstream client.
+        </Text>
+        <VStack align="stretch" gap={1}>
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+            Ingest secret (bearer token)
+          </Text>
+          <HStack gap={2}>
+            <Code flex={1} padding={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
+              {details.secret}
+            </Code>
+            <Button size="sm" variant="outline" onClick={() => copy(details.secret)}>
+              <Copy size={14} /> {copied ? "Copied" : "Copy"}
+            </Button>
+          </HStack>
+        </VStack>
+        {usesPushUrl && (
+          <VStack align="stretch" gap={1}>
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              OTLP endpoint URL
             </Text>
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Ingest secret (bearer token)
-              </Text>
-              <HStack gap={2}>
-                <Code
-                  flex={1}
-                  padding={2}
-                  fontSize="xs"
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-all"
-                >
-                  {details.secret}
-                </Code>
-                <Button size="sm" variant="outline" onClick={() => copy(details.secret)}>
-                  <Copy size={14} /> {copied ? "Copied" : "Copy"}
-                </Button>
-              </HStack>
-            </VStack>
-            {usesPushUrl && (
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  OTLP endpoint URL
-                </Text>
-                <Code padding={2} fontSize="xs">
-                  {otlpUrl}
-                </Code>
-                {isClaudeCode && (
-                  <Text fontSize="xs" color="fg.muted">
-                    Paste this URL into Claude Code&apos;s{" "}
-                    <Code fontSize="xs" backgroundColor="transparent">
-                      OTEL_EXPORTER_OTLP_ENDPOINT
-                    </Code>{" "}
-                    - Claude Code&apos;s SDK appends{" "}
-                    <Code fontSize="xs" backgroundColor="transparent">
-                      /v1/logs
-                    </Code>{" "}
-                    and{" "}
-                    <Code fontSize="xs" backgroundColor="transparent">
-                      /v1/metrics
-                    </Code>{" "}
-                    itself.
-                  </Text>
-                )}
-              </VStack>
-            )}
+            <Code padding={2} fontSize="xs">
+              {otlpUrl}
+            </Code>
             {isClaudeCode && (
-              <VStack align="stretch" gap={1}>
-                <HStack justify="space-between" alignItems="center">
-                  <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                    Claude Code shell env block
-                  </Text>
-                  <Button size="xs" variant="outline" onClick={() => copy(claudeCodeEnvBlock)}>
-                    <Copy size={12} /> Copy block
-                  </Button>
-                </HStack>
-                <Code padding={3} fontSize="xs" whiteSpace="pre" display="block" overflowX="auto">
-                  {claudeCodeEnvBlock}
-                </Code>
-                <Text fontSize="xs" color="fg.muted">
-                  Paste in your Claude Code shell, then run{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    claude
-                  </Code>
-                  . To attribute spend to a specific team, also export{" "}
-                  <Code fontSize="xs" backgroundColor="transparent">
-                    OTEL_RESOURCE_ATTRIBUTES=team.id=…
-                  </Code>{" "}
-                  - it lands as a resource attribute and slots into /governance&apos;s spendByTeam
-                  without further config. Department attribution is resolved from the project&apos;s
-                  assignment at read time, not from an OTEL attribute.
-                </Text>
-              </VStack>
-            )}
-            {usesWebhookUrl && (
-              <VStack align="stretch" gap={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Webhook URL
-                </Text>
-                <Code padding={2} fontSize="xs">
-                  {webhookUrl}
-                </Code>
-              </VStack>
+              <Text fontSize="xs" color="fg.muted">
+                Paste this URL into Claude Code&apos;s{" "}
+                <Code fontSize="xs" backgroundColor="transparent">
+                  OTEL_EXPORTER_OTLP_ENDPOINT
+                </Code>{" "}
+                - Claude Code&apos;s SDK appends{" "}
+                <Code fontSize="xs" backgroundColor="transparent">
+                  /v1/logs
+                </Code>{" "}
+                and{" "}
+                <Code fontSize="xs" backgroundColor="transparent">
+                  /v1/metrics
+                </Code>{" "}
+                itself.
+              </Text>
             )}
           </VStack>
-        </DialogBody>
-        <DialogFooter>
-          <Button colorPalette="accent" onClick={onClose}>
-            I&apos;ve saved it
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+        )}
+        {isClaudeCode && (
+          <VStack align="stretch" gap={1}>
+            <HStack justify="space-between" alignItems="center">
+              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                Claude Code shell env block
+              </Text>
+              <Button size="xs" variant="outline" onClick={() => copy(claudeCodeEnvBlock)}>
+                <Copy size={12} /> Copy block
+              </Button>
+            </HStack>
+            <Code padding={3} fontSize="xs" whiteSpace="pre" display="block" overflowX="auto">
+              {claudeCodeEnvBlock}
+            </Code>
+            <Text fontSize="xs" color="fg.muted">
+              Paste in your Claude Code shell, then run{" "}
+              <Code fontSize="xs" backgroundColor="transparent">
+                claude
+              </Code>
+              . To attribute spend to a specific team, also export{" "}
+              <Code fontSize="xs" backgroundColor="transparent">
+                OTEL_RESOURCE_ATTRIBUTES=team.id=…
+              </Code>{" "}
+              - it lands as a resource attribute and slots into /governance&apos;s spendByTeam
+              without further config. Department attribution is resolved from the project&apos;s
+              assignment at read time, not from an OTEL attribute.
+            </Text>
+          </VStack>
+        )}
+        {usesWebhookUrl && (
+          <VStack align="stretch" gap={1}>
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Webhook URL
+            </Text>
+            <Code padding={2} fontSize="xs">
+              {webhookUrl}
+            </Code>
+          </VStack>
+        )}
+      </VStack>
+    </Dialog>
   );
 }
 

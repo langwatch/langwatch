@@ -57,13 +57,7 @@ export function EmojiPickerModal({
         <VStack gap={2} align="stretch">
           <SimpleGrid columns={8} gap={1}>
             {COMMON_EMOJI.map((emoji) => (
-              <Button
-                key={emoji}
-                variant="ghost"
-                size="sm"
-                fontSize="18px"
-                onClick={() => choose(emoji)}
-              >
+              <Button key={emoji} variant="ghost" size="sm" onClick={() => choose(emoji)}>
                 {emoji}
               </Button>
             ))}

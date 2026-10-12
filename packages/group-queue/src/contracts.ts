@@ -118,6 +118,8 @@ export interface GroupQueueDependencies<Payload, Destination = unknown> {
    * touch and drain them before anything else consumes the queue.
    */
   dispatchGroupAllowListKey?: string;
+  /** A consumer that runs only the groups on lists a producer's `runListedWork` opened. */
+  dispatchListed?: boolean;
 }
 
 export interface QueueAuditAdapter<Payload> {

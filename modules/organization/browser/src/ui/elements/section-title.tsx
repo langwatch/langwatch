@@ -22,11 +22,11 @@ export function SectionTitle({
       as="header"
     >
       <VStack align="start" gap={0.5} minWidth={0} flex="1 1 14rem">
-        <Text as="h3" fontSize="13px" fontWeight="640" letterSpacing="-0.005em" lineHeight="1.35">
+        <Text textStyle="cardTitle" as="h3">
           {title}
         </Text>
         {hint && (
-          <Text fontSize="11.5px" lineHeight="1.55" color="fg.muted">
+          <Text textStyle="caption" color="fg.muted">
             {hint}
           </Text>
         )}

@@ -95,7 +95,7 @@ vi.mock("@langwatch/scenario-client", () => ({
 }));
 
 vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
-  ScenarioFormDrawer: ({ open }: { open?: boolean }) => (open ? <div>Edit Scenario</div> : null),
+  ScenarioFormDrawer: ({ open }: { open?: boolean }) => (open ? <div>Edit scenario</div> : null),
 }));
 
 vi.mock("../../scenarios/run-scenario-modal.tsx", () => ({
@@ -110,7 +110,7 @@ vi.mock("../../../../behavior/use-simulation-streaming-state.ts", () => ({
   useSimulationStreamingState: () => ({
     streamingMessages: [],
     handleStreamingEvent: vi.fn(),
-    clearCompleted: vi.fn(),
+    reconcileWithServer: vi.fn(),
   }),
 }));
 
@@ -275,7 +275,7 @@ describe("the run detail drawer", () => {
 
         const results = document.querySelector('[data-section="results"]') as HTMLElement;
         expect(within(results).getByText("0/4")).toBeInTheDocument();
-        expect(within(results).getByText(/Unmet Criteria \(4\)/)).toBeInTheDocument();
+        expect(within(results).getByText(/Unmet criteria \(4\)/)).toBeInTheDocument();
         for (const criterion of [
           "echoes the user request",
           "keeps the wording",

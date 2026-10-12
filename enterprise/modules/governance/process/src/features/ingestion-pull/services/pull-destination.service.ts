@@ -20,10 +20,11 @@ const DATABRICKS_WORKSPACE_HOST_SUFFIXES = [
  * and the adapter still has to be pointable at a local fixture by its own tests.
  */
 export class PullDestinationService {
-  private constructor() {}
+  private constructor(private readonly configuredBase: string | undefined) {}
 
-  static create(): PullDestinationService {
-    return new PullDestinationService();
+  /** `configuredBase` is the one extra origin a Databricks workspace may be (a dev stand-in). */
+  static create({ configuredBase }: { configuredBase?: string } = {}): PullDestinationService {
+    return new PullDestinationService(configuredBase);
   }
 
   /**
@@ -31,12 +32,22 @@ export class PullDestinationService {
    * restriction, not a formatting check: the decrypted workspace token goes out as
    * `Authorization: Bearer` to whatever host this string names.
    */
-  static isDatabricksWorkspaceOrigin(value: string): boolean {
+  static isDatabricksWorkspaceOrigin(
+    value: string,
+    { configuredBase }: { configuredBase?: string } = {},
+  ): boolean {
     let url: URL;
     try {
       url = new URL(value);
     } catch {
       return false;
+    }
+
+    if (
+      configuredBase !== undefined &&
+      PullDestinationService.isConfiguredBase(url, configuredBase)
+    ) {
+      return true;
     }
 
     // Plain http would put the token on the wire in clear even for a real
@@ -68,6 +79,18 @@ export class PullDestinationService {
     return DATABRICKS_WORKSPACE_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
   }
 
+  /** Exactly the configured base: its origin, bare, and no credentials. Nothing wider. */
+  private static isConfiguredBase(url: URL, configuredBase: string): boolean {
+    let base: URL;
+    try {
+      base = new URL(configuredBase);
+    } catch {
+      return false;
+    }
+    const bare = url.pathname === "/" && url.search === "" && url.hash === "";
+    return url.username === "" && url.password === "" && bare && url.origin === base.origin;
+  }
+
   assertAllowed(parserConfig: Record<string, unknown> | null | undefined): void {
     if (!parserConfig || typeof parserConfig !== "object") {
       return;
@@ -79,7 +102,9 @@ export class PullDestinationService {
 
     if (
       typeof parserConfig.workspaceUrl !== "string" ||
-      !PullDestinationService.isDatabricksWorkspaceOrigin(parserConfig.workspaceUrl)
+      !PullDestinationService.isDatabricksWorkspaceOrigin(parserConfig.workspaceUrl, {
+        configuredBase: this.configuredBase,
+      })
     ) {
       const message = `Workspace URL must be an https Databricks workspace address, ending in ${PullDestinationService.allowedSuffixes()}.`;
 

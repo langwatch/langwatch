@@ -18,7 +18,8 @@ import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 import { fallbackRecentItemType, recentItemTypes } from "../../../../model/recent-item-types.ts";
 import NextLink from "../../../../ui/elements/app-link.tsx";
 import { HomeCard } from "./home-card.tsx";
-import { HOME_SECTION_GAP, HomeSectionHeader } from "./home-section-header.tsx";
+import { HomeSectionHeader } from "./home-section-header.tsx";
+import { HOME_SECTION_GAP } from "./home-section-layout.ts";
 
 const getIconForType = (type: RecentItemType): ReactNode => {
   const config = recentItemTypes[type] ?? fallbackRecentItemType;
@@ -27,21 +28,6 @@ const getIconForType = (type: RecentItemType): ReactNode => {
 
 const getLabelForType = (type: RecentItemType): string =>
   (recentItemTypes[type] ?? fallbackRecentItemType).label;
-
-/**
- * Group items by type — kept for consumers/tests even though the section now
- * renders one flat list (each row carries its own type label instead).
- */
-export const groupItemsByType = (
-  items: HomeRecentItem[],
-): Map<RecentItemType, HomeRecentItem[]> => {
-  const grouped = new Map<RecentItemType, HomeRecentItem[]>();
-  for (const item of items) {
-    const existing = grouped.get(item.type) ?? [];
-    grouped.set(item.type, [...existing, item]);
-  }
-  return grouped;
-};
 
 const MAX_RECENT_ROWS = 8;
 
@@ -75,16 +61,15 @@ function RecentItemRow({ item }: { item: HomeRecentItem }) {
           >
             {getIconForType(item.type)}
           </Box>
-          <Text fontSize="13px" color="fg" flex={1} minWidth={0} lineClamp={1} title={item.name}>
+          <Text textStyle="bodySm" color="fg" flex={1} minWidth={0} lineClamp={1} title={item.name}>
             {item.name}
           </Text>
-          <Text fontFamily="mono" fontSize="11px" color="fg.subtle" flexShrink={0}>
+          <Text textStyle="micro" color="fg.subtle" flexShrink={0}>
             {getLabelForType(item.type)}
           </Text>
           {timeAgo ? (
             <Text
-              fontFamily="mono"
-              fontSize="11px"
+              textStyle="monoSm"
               color="fg.subtle"
               flexShrink={0}
               minWidth="56px"

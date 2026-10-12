@@ -38,26 +38,27 @@ func (o *Orchestrator) ensureClickHouseStackAccess(ctx context.Context, st *doma
 // never waits long on a busy server.
 const clickHouseFocusTimeout = 5 * time.Second
 
-// weightFocusedWorkload gives the stack the pressure governor treats as focused
-// (the head of Stacks(), see demoteUnfocused) the larger ClickHouse share and
-// every other provisioned stack the plain one. It writes only when the focus
-// moved; a failed write is retried on the next tick.
+// weightFocusedWorkload gives the focused stack (FocusedSlug) the larger
+// ClickHouse share and every other provisioned stack the plain one; with no
+// focus all are plain. It writes only when the focus moved; a failed write is
+// retried on the next tick.
 func (o *Orchestrator) weightFocusedWorkload(ctx context.Context) {
 	if o.ch == nil || !o.cfg.ShouldManageClickHouse {
 		return
 	}
 	stacks := o.store.Stacks()
-	if len(stacks) == 0 || stacks[0].Slug == o.clickHouseFocus {
+	focus := o.FocusedSlug()
+	if len(stacks) == 0 || (o.clickHouseWeighted && focus == o.clickHouseFocus) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(ctx, clickHouseFocusTimeout)
 	defer cancel()
-	for i, s := range stacks {
+	for _, s := range stacks {
 		if s.ClickHouseUser == "" || s.ClickHouseDatabase == "" {
 			continue
 		}
 		weight := domain.StackWorkloadWeight
-		if i == 0 {
+		if focus != "" && s.Slug == focus {
 			weight = domain.FocusedStackWorkloadWeight
 		}
 		if err := o.ch.SetStackWeight(ctx, s.ClickHouseDatabase, weight); err != nil {
@@ -65,5 +66,5 @@ func (o *Orchestrator) weightFocusedWorkload(ctx context.Context) {
 			return
 		}
 	}
-	o.clickHouseFocus = stacks[0].Slug
+	o.clickHouseFocus, o.clickHouseWeighted = focus, true
 }

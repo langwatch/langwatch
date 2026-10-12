@@ -122,7 +122,7 @@ describe("sessions lens cells", () => {
 
       renderCell({ cellId: "contextSize", row });
       // Enriched sessions surface the coding-agent fold's peak context.
-      expect(screen.getByText("173.0K")).toBeInTheDocument();
+      expect(screen.getByText("173K")).toBeInTheDocument();
 
       renderCell({ cellId: "modelCalls", row });
       expect(screen.getByText("63")).toBeInTheDocument();

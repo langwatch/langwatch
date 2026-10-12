@@ -1,16 +1,8 @@
 // The role cards (main's RoleCards): a predefined tier names what it adds to the one
 // below; a custom role shows what it grants, where it is in force and who holds it.
 
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { format } from "@langwatch/time";
@@ -23,7 +15,7 @@ import { permissionsNeedingOrganizationScope } from "../../model/role-permission
 import { PermissionTokenList } from "../elements/permission-token.tsx";
 import { PrincipalAvatar } from "../elements/principal-avatar.tsx";
 
-const TIER_COLOUR = { ADMIN: "red", MEMBER: "blue", VIEWER: "gray" } as const;
+const TIER_TONE = { ADMIN: "warning", MEMBER: "ok", VIEWER: "neutral" } as const;
 
 export function BuiltinRoleCard({
   card,
@@ -38,70 +30,46 @@ export function BuiltinRoleCard({
   onOpenDetail: () => void;
 }) {
   return (
-    <Card.Root
-      width="full"
-      height="full"
-      variant="outline"
-      borderColor="border.muted"
-      colorPalette={TIER_COLOUR[card.teamRole]}
-      _hover={{ borderColor: "border.emphasized", boxShadow: "sm" }}
-      transition="border-color 0.15s ease, box-shadow 0.15s ease"
-      data-testid={`builtin-role-${card.teamRole.toLowerCase()}`}
-    >
-      <Card.Body display="flex" flexDirection="column" gap={2.5} padding={4}>
-        <HStack width="full" align="baseline" gap={2}>
-          <Box
-            width="7px"
-            height="7px"
-            borderRadius="full"
-            backgroundColor="colorPalette.solid"
-            alignSelf="center"
-            flexShrink={0}
-          />
-          <Text fontWeight="semibold" fontSize="sm">
-            {card.name}
-          </Text>
-          <Spacer />
-          <PeopleCount people={people} />
-        </HStack>
-
-        <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
-          {card.description}
-        </Text>
-
-        <Spacer />
-
-        <CardSection>
-          <SectionEyebrow>
-            {card.inheritsFrom
-              ? `Everything ${card.inheritsFrom} has, and`
-              : "The base every other role builds on"}
-          </SectionEyebrow>
-          <PermissionTokenList permissions={card.headline} limit={card.headline.length} />
-          <Text fontSize="xs" color="fg.subtle">
-            {totalPermissions} permissions in total
-          </Text>
-        </CardSection>
-
-        <Button size="xs" variant="ghost" color="fg.muted" alignSelf="start" onClick={onOpenDetail}>
+    <Card
+      titleLevel={3}
+      status={TIER_TONE[card.teamRole]}
+      title={card.name}
+      badge={<PeopleCount people={people} />}
+      description={card.description}
+      bodyLayout="spaced"
+      footer={
+        <Button size="xs" variant="ghost" color="fg.muted" onClick={onOpenDetail}>
           See what it can do
         </Button>
-      </Card.Body>
-    </Card.Root>
+      }
+      data-testid={`builtin-role-${card.teamRole.toLowerCase()}`}
+    >
+      <CardSection>
+        <SectionEyebrow>
+          {card.inheritsFrom
+            ? `Everything ${card.inheritsFrom} has, and`
+            : "The base every other role builds on"}
+        </SectionEyebrow>
+        <PermissionTokenList permissions={card.headline} limit={card.headline.length} readable />
+        <Text textStyle="caption" color="fg.subtle">
+          {totalPermissions} permissions in total
+        </Text>
+      </CardSection>
+    </Card>
   );
 }
 
 function PeopleCount({ people }: { people: number | null }) {
   if (people === null) {
     return (
-      <Text fontSize="xs" color="fg.subtle">
+      <Text textStyle="caption" color="fg.subtle">
         Holders unavailable
       </Text>
     );
   }
   return (
     <Tooltip content="Counted from the role assignments in this organization, including people who hold it through a group.">
-      <Text fontSize="xs" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         {people} {people === 1 ? "person" : "people"}
       </Text>
     </Tooltip>
@@ -142,115 +110,95 @@ export function CustomRoleCard({
     inert.length > 0;
 
   return (
-    <Card.Root
-      width="full"
-      variant="outline"
-      borderColor="border.muted"
-      _hover={{ borderColor: "border.emphasized", boxShadow: "sm" }}
-      transition="border-color 0.15s ease, box-shadow 0.15s ease"
+    <Card
+      titleLevel={3}
+      title={role.name}
+      description={role.description ?? void 0}
+      badge={<PeopleCount people={people} />}
+      actions={
+        canManage ? (
+          <>
+            <Tooltip content="Edit this role">
+              <Button
+                size="xs"
+                variant="ghost"
+                color="fg.muted"
+                aria-label="Edit this role"
+                onClick={onEdit}
+              >
+                <Pencil size={14} aria-hidden />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Delete this role">
+              <Button
+                size="xs"
+                variant="ghost"
+                color="fg.muted"
+                aria-label="Delete this role"
+                _hover={{ color: "red.solid" }}
+                onClick={onDelete}
+              >
+                <Trash2 size={14} aria-hidden />
+              </Button>
+            </Tooltip>
+          </>
+        ) : (
+          void 0
+        )
+      }
+      bodyLayout="spaced"
       data-testid={`custom-role-${role.id}`}
     >
-      <Card.Body display="flex" flexDirection="column" gap={3} padding={4}>
-        <HStack width="full" align="start" gap={3}>
-          <VStack align="start" gap={1} flex={1} minWidth={0}>
-            <Text fontWeight="semibold" fontSize="sm">
-              {role.name}
-            </Text>
-            {role.description ? (
-              <Text fontSize="xs" color="fg.muted" lineHeight="1.5">
-                {role.description}
-              </Text>
-            ) : null}
-          </VStack>
-          <HStack gap={2} flexShrink={0}>
-            <PeopleCount people={people} />
-            {canManage && (
-              <HStack gap={0.5}>
-                <Tooltip content="Edit this role">
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    color="fg.muted"
-                    aria-label="Edit this role"
-                    onClick={onEdit}
-                  >
-                    <Pencil size={14} aria-hidden />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Delete this role">
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    color="fg.muted"
-                    aria-label="Delete this role"
-                    _hover={{ color: "red.solid" }}
-                    onClick={onDelete}
-                  >
-                    <Trash2 size={14} aria-hidden />
-                  </Button>
-                </Tooltip>
-              </HStack>
-            )}
-          </HStack>
-        </HStack>
+      <CardSection>
+        <SectionEyebrow>Grants</SectionEyebrow>
+        <PermissionTokenList permissions={role.permissions} limit={6} />
+        <Button size="xs" variant="plain" padding={0} color="fg.muted" onClick={onOpenDetail}>
+          See all {role.permissions.length}{" "}
+          {role.permissions.length === 1 ? "permission" : "permissions"}
+        </Button>
+      </CardSection>
 
-        <CardSection>
-          <SectionEyebrow>Grants</SectionEyebrow>
-          <PermissionTokenList permissions={role.permissions} limit={6} />
-          <Button size="xs" variant="plain" padding={0} color="fg.muted" onClick={onOpenDetail}>
-            See all {role.permissions.length}{" "}
-            {role.permissions.length === 1 ? "permission" : "permissions"}
-          </Button>
-        </CardSection>
-
-        <CardSection>
-          <SectionEyebrow>In force on</SectionEyebrow>
-          {scopes.length === 0 ? (
-            <Text fontSize="sm" color="fg.muted">
-              Nowhere yet. This role grants nothing until somebody is assigned it.
-            </Text>
-          ) : (
-            <ProviderScopeChips
-              scopes={scopes.map((scope) => ({
-                scopeType: scope.scopeType,
-                scopeId: scope.scopeId,
-                ...(scope.scopeName ? { name: scope.scopeName } : {}),
-              }))}
-            />
-          )}
-          {assignedBelowOrganizationOnly && (
-            <Text fontSize="xs" color="fg.muted">
-              {inert.length} {inert.length === 1 ? "permission takes" : "permissions take"} effect
-              only where this role is assigned on the organization.
-            </Text>
-          )}
-        </CardSection>
-
-        <CardSection>
-          <SectionEyebrow>Held by</SectionEyebrow>
-          <RoleHolderStrip holders={holders} people={people} />
-        </CardSection>
-
-        {role.createdAt && (
-          <Text fontSize="xs" color="fg.subtle">
-            Created {format(role.createdAt, "d MMM yyyy")}
+      <CardSection>
+        <SectionEyebrow>In force on</SectionEyebrow>
+        {scopes.length === 0 ? (
+          <Text textStyle="body" color="fg.muted">
+            Nowhere yet. This role grants nothing until somebody is assigned it.
+          </Text>
+        ) : (
+          <ProviderScopeChips
+            scopes={scopes.map((scope) => ({
+              scopeType: scope.scopeType,
+              scopeId: scope.scopeId,
+              ...(scope.scopeName ? { name: scope.scopeName } : {}),
+            }))}
+          />
+        )}
+        {assignedBelowOrganizationOnly && (
+          <Text textStyle="caption" color="fg.muted">
+            {inert.length} {inert.length === 1 ? "permission takes" : "permissions take"} effect
+            only where this role is assigned on the organization.
           </Text>
         )}
-      </Card.Body>
-    </Card.Root>
+      </CardSection>
+
+      <CardSection>
+        <SectionEyebrow>Held by</SectionEyebrow>
+        <RoleHolderStrip holders={holders} people={people} />
+      </CardSection>
+
+      {role.createdAt && (
+        <Text textStyle="caption" color="fg.subtle">
+          Created {format(role.createdAt, "d MMM yyyy")}
+        </Text>
+      )}
+    </Card>
   );
 }
 
 /** The quiet label every card section, and the role detail dialog, leads with. */
 export function SectionEyebrow({ children }: { children: ReactNode }) {
   return (
-    <Text
-      fontSize="10px"
-      fontWeight="medium"
-      color="fg.subtle"
-      textTransform="uppercase"
-      letterSpacing="0.08em"
-    >
+    <Text textStyle="eyebrow" color="fg.subtle">
       {children}
     </Text>
   );
@@ -280,14 +228,14 @@ function RoleHolderStrip({
 }) {
   if (people === null) {
     return (
-      <Text fontSize="sm" color="fg.subtle">
+      <Text textStyle="body" color="fg.subtle">
         Who holds this could not be read.
       </Text>
     );
   }
   if (holders.length === 0) {
     return (
-      <Text fontSize="sm" color="fg.muted">
+      <Text textStyle="body" color="fg.muted">
         Nobody yet.
       </Text>
     );
@@ -315,7 +263,9 @@ function RoleHolderStrip({
             name={holder.name}
             image={holder.image}
           />
-          <Text fontSize="xs">{holder.kind === "group" ? `via ${holder.name}` : holder.name}</Text>
+          <Text textStyle="caption">
+            {holder.kind === "group" ? `via ${holder.name}` : holder.name}
+          </Text>
           {holder.kind === "group" && holder.directory ? (
             <Badge
               size="xs"
@@ -328,7 +278,7 @@ function RoleHolderStrip({
         </HStack>
       ))}
       {remaining > 0 && (
-        <Box fontSize="xs" color="fg.muted">
+        <Box textStyle="caption" color="fg.muted">
           and {remaining} more
         </Box>
       )}

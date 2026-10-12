@@ -370,7 +370,7 @@ function MutedAnswerLine({ children }: { children: string }) {
     <Text
       fontSize="langyAnswer"
       lineHeight="1.5"
-      paddingX="2px"
+      paddingX="0.5"
       fontStyle="italic"
       color="fg.muted"
     >
@@ -704,7 +704,7 @@ function AnswerRun({
   // (ADR-060 §7). Fence-less streams take the plain path inside, unchanged.
   if (isStreaming) {
     return (
-      <Box paddingX="2px">
+      <Box paddingX="0.5">
         <StreamingAnswerWithCards text={display} projectSlug={context.projectSlug} />
       </Box>
     );
@@ -714,7 +714,7 @@ function AnswerRun({
       // The cards around it have a border plus their own inner padding, so a
       // flush-left paragraph sat a hair OUTSIDE their text edge. Two pixels
       // tucks the prose onto the same optical column.
-      paddingX="2px"
+      paddingX="0.5"
       css={{
         "& > div > :first-child": { marginTop: 0 },
         "& > div > :last-child": { marginBottom: 0 },
@@ -845,7 +845,7 @@ function ProseSegment({
     <Box
       // Same 2px optical alignment as the joined path: prose lines up with
       // the inner text of the bordered cards above it.
-      paddingX="2px"
+      paddingX="0.5"
       css={{
         "& > div > :first-child": { marginTop: 0 },
         "& > div > :last-child": { marginBottom: 0 },
@@ -924,7 +924,7 @@ function SayRun({ parts }: { parts: readonly unknown[] }) {
   return (
     <Box
       data-langy-say
-      paddingX="2px"
+      paddingX="0.5"
       display="flex"
       flexDirection="column"
       gap={2}

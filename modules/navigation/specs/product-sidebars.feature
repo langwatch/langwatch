@@ -3,7 +3,7 @@ Feature: Product sidebars
   I want the sidebar to hold only the pages of the product I am in
   So that each product reads as its own coherent surface
 
-  Both modes share one sidebar frame: Quick Search first, then the
+  Both modes share one sidebar frame: pinned Quick Search first, then the
   product's own pages, then a pinned bottom block with usage, Settings,
   Support and the theme control. The product bodies reuse the same menu
   components the app has always rendered: LLM Ops and Me keep their
@@ -25,8 +25,9 @@ Feature: Product sidebars
   The menu moves only when it must. It keeps the place the reader put it
   while they move around the product, and it brings the open page's entry
   to the top only when that entry would otherwise be out of view. A page
-  near the start of the menu therefore opens with Quick Search and the
-  first group heading still on screen.
+  near the start of the menu opens with the first group heading on screen.
+  Quick Search stays in place regardless of menu scroll. The top bar has
+  no second search trigger; Cmd/Ctrl+K also works on full-screen tools.
 
   @integration
   Scenario: Quick Search sits first and opens the command bar

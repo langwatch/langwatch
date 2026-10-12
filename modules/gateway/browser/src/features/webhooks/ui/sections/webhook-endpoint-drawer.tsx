@@ -6,15 +6,16 @@ import {
   Badge,
   Button,
   Code,
+  Field,
   HStack,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Copy } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, type RefObject, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type { WebhookEventType, RouterOutputs } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
@@ -50,19 +51,62 @@ function familyLabel(family: string): string {
   return FAMILY_LABELS[family] ?? family;
 }
 
+/** The fields that can fail, in the order the drawer shows them and focuses the first bad one. */
+const PROBLEM_ORDER = ["address", "events", "batchSize", "batchDelay", "inFlight"] as const;
+type ProblemKey = (typeof PROBLEM_ORDER)[number];
+type Problems = Partial<Record<ProblemKey, string>>;
+type FocusTargets = RefObject<Partial<Record<ProblemKey, HTMLElement | null>>>;
+
 /** Mirrors the server bounds; NaN from a cleared field fails these too. */
-function controlsWithinBounds(maxBatchSize: number, maxBatchDelayMs: number, maxInFlight: number) {
-  return (
-    Number.isInteger(maxBatchSize) &&
-    maxBatchSize >= 1 &&
-    maxBatchSize <= 100 &&
-    Number.isInteger(maxBatchDelayMs) &&
-    maxBatchDelayMs >= 0 &&
-    maxBatchDelayMs <= 60000 &&
-    Number.isInteger(maxInFlight) &&
-    maxInFlight >= 1 &&
-    maxInFlight <= 8
-  );
+function isWholeNumberWithin({ value, min, max }: { value: number; min: number; max: number }) {
+  return Number.isInteger(value) && value >= min && value <= max;
+}
+
+function findProblems({
+  destinationKind,
+  addressFilled,
+  selectedCount,
+  maxBatchSize,
+  maxBatchDelayMs,
+  maxInFlight,
+}: {
+  destinationKind: WebhookDestinationKind;
+  addressFilled: boolean;
+  selectedCount: number;
+  maxBatchSize: number;
+  maxBatchDelayMs: number;
+  maxInFlight: number;
+}): Problems {
+  const problems: Problems = {};
+  if (!addressFilled) {
+    problems.address =
+      destinationKind === "sqs" ? "Enter an Amazon SQS queue URL." : "Enter an endpoint URL.";
+  }
+  if (selectedCount === 0) problems.events = "Select at least one event.";
+  if (!isWholeNumberWithin({ value: maxBatchSize, min: 1, max: 100 })) {
+    problems.batchSize = "Enter a whole number from 1 to 100.";
+  }
+  if (!isWholeNumberWithin({ value: maxBatchDelayMs, min: 0, max: 60000 })) {
+    problems.batchDelay = "Enter a whole number from 0 to 60000 milliseconds.";
+  }
+  if (!isWholeNumberWithin({ value: maxInFlight, min: 1, max: 8 })) {
+    problems.inFlight = "Enter a whole number from 1 to 8.";
+  }
+  return problems;
+}
+
+/** The first event checkbox that can take focus, else the labelled group itself. */
+function focusProblem({ targets, key }: { targets: FocusTargets; key: ProblemKey }) {
+  const target = targets.current[key];
+  if (!target) return;
+  if (key === "events") {
+    const checkbox = target.querySelector<HTMLInputElement>(
+      'input[type="checkbox"]:not(:disabled)',
+    );
+    (checkbox ?? target).focus();
+    return;
+  }
+  target.focus();
 }
 
 /**
@@ -173,9 +217,11 @@ function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
   const [maxBatchSize, setMaxBatchSize] = useState(100);
   const [maxBatchDelayMs, setMaxBatchDelayMs] = useState(250);
   const [maxInFlight, setMaxInFlight] = useState(4);
+  const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
+    setAttempted(false);
     setSelected(new Set(endpoint?.enabledEvents ?? []));
     setMaxBatchSize(endpoint?.maxBatchSize ?? 100);
     setMaxBatchDelayMs(endpoint?.maxBatchDelayMs ?? 250);
@@ -206,10 +252,16 @@ function useEndpointForm(isOpen: boolean, endpoint: EndpointView | null) {
     setMaxInFlight,
     toggleType,
     toggleFamily,
-    isValid:
-      destination.isAddressFilled &&
-      selected.size > 0 &&
-      controlsWithinBounds(maxBatchSize, maxBatchDelayMs, maxInFlight),
+    attempted,
+    setAttempted,
+    problems: findProblems({
+      destinationKind: destination.destinationKind,
+      addressFilled: destination.isAddressFilled,
+      selectedCount: selected.size,
+      maxBatchSize,
+      maxBatchDelayMs,
+      maxInFlight,
+    }),
     toInput: (): EndpointInput => ({
       ...destination.toDestinationInput(),
       enabledEvents: [...selected],
@@ -225,28 +277,36 @@ type EndpointForm = ReturnType<typeof useEndpointForm>;
 function EndpointUrlField({
   value,
   onChange,
+  error,
+  targets,
 }: {
   value: string;
   onChange: (value: string) => void;
+  error: string | undefined;
+  targets: FocusTargets;
 }) {
   return (
-    <VStack gap={2} align="start" width="full">
+    <Field.Root invalid={error !== undefined} gap={2} alignItems="start" width="full">
       <HStack gap={1}>
-        <Text fontWeight="600" fontSize="sm">
+        <Field.Label fontWeight="600" fontSize="sm">
           Endpoint URL
-        </Text>
+        </Field.Label>
         <FieldInfoTooltip
           description="HTTPS only. Batches of up to 100 events arrive as POST requests signed with the endpoint's secret."
           testId="webhook-url-info"
         />
       </HStack>
       <Input
+        ref={(element) => {
+          targets.current.address = element;
+        }}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="https://example.com/webhooks/langwatch"
         data-testid="webhook-url-input"
       />
-    </VStack>
+      <Field.ErrorText>{error}</Field.ErrorText>
+    </Field.Root>
   );
 }
 
@@ -258,6 +318,9 @@ function DestinationTextField({
   onChange,
   testId,
   type,
+  error,
+  focusKey,
+  targets,
 }: {
   label: string;
   description: string;
@@ -266,16 +329,23 @@ function DestinationTextField({
   onChange: (value: string) => void;
   testId: string;
   type?: "password";
+  error?: string;
+  /** Set on the field that holds the destination address, so a failed save can focus it. */
+  focusKey?: ProblemKey;
+  targets: FocusTargets;
 }) {
   return (
-    <VStack gap={2} align="start" width="full">
+    <Field.Root invalid={error !== undefined} gap={2} alignItems="start" width="full">
       <HStack gap={1}>
-        <Text fontWeight="600" fontSize="sm">
+        <Field.Label fontWeight="600" fontSize="sm">
           {label}
-        </Text>
+        </Field.Label>
         <FieldInfoTooltip description={description} testId={`${testId}-info`} />
       </HStack>
       <Input
+        ref={(element) => {
+          if (focusKey) targets.current[focusKey] = element;
+        }}
         value={value}
         type={type}
         onChange={(e) => onChange(e.target.value)}
@@ -286,7 +356,8 @@ function DestinationTextField({
         autoComplete={type === "password" ? "off" : undefined}
         data-testid={testId}
       />
-    </VStack>
+      <Field.ErrorText>{error}</Field.ErrorText>
+    </Field.Root>
   );
 }
 
@@ -334,7 +405,7 @@ function ExternalIdField({ externalId }: { externalId: string }) {
         >
           {externalId}
         </Code>
-        <Button size="sm" variant="outline" onClick={copy}>
+        <Button type="button" size="sm" variant="outline" onClick={copy}>
           <Copy size={14} />
           {copied ? "Copied" : "Copy"}
         </Button>
@@ -343,7 +414,15 @@ function ExternalIdField({ externalId }: { externalId: string }) {
   );
 }
 
-function SqsDestinationFields({ form }: { form: EndpointForm }) {
+function SqsDestinationFields({
+  form,
+  errors,
+  targets,
+}: {
+  form: EndpointForm;
+  errors: Problems;
+  targets: FocusTargets;
+}) {
   return (
     <>
       <DestinationTextField
@@ -353,6 +432,9 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
         value={form.queueUrl}
         onChange={form.setQueueUrl}
         testId="webhook-sqs-queue-url"
+        error={errors.address}
+        focusKey="address"
+        targets={targets}
       />
       <DestinationTextField
         label="Role to assume"
@@ -361,6 +443,7 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
         value={form.roleArn}
         onChange={form.setRoleArn}
         testId="webhook-sqs-role-arn"
+        targets={targets}
       />
       {form.externalId ? <ExternalIdField externalId={form.externalId} /> : null}
       <DestinationTextField
@@ -370,6 +453,7 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
         value={form.accessKeyId}
         onChange={form.setAccessKeyId}
         testId="webhook-sqs-access-key-id"
+        targets={targets}
       />
       <DestinationTextField
         label="Secret access key"
@@ -379,6 +463,7 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
         onChange={form.setSecretAccessKey}
         testId="webhook-sqs-secret-access-key"
         type="password"
+        targets={targets}
       />
     </>
   );
@@ -389,7 +474,17 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
  * once the endpoint exists — batches already planned against the old
  * transport are in flight, so moving means a new endpoint until it drains.
  */
-function DestinationSection({ form, isEditing }: { form: EndpointForm; isEditing: boolean }) {
+function DestinationSection({
+  form,
+  isEditing,
+  errors,
+  targets,
+}: {
+  form: EndpointForm;
+  isEditing: boolean;
+  errors: Problems;
+  targets: FocusTargets;
+}) {
   return (
     <VStack gap={4} align="start" width="full">
       <VStack gap={2} align="start" width="full">
@@ -418,9 +513,14 @@ function DestinationSection({ form, isEditing }: { form: EndpointForm; isEditing
         />
       </VStack>
       {form.destinationKind === "sqs" ? (
-        <SqsDestinationFields form={form} />
+        <SqsDestinationFields form={form} errors={errors} targets={targets} />
       ) : (
-        <EndpointUrlField value={form.url} onChange={form.setUrl} />
+        <EndpointUrlField
+          value={form.url}
+          onChange={form.setUrl}
+          error={errors.address}
+          targets={targets}
+        />
       )}
     </VStack>
   );
@@ -487,12 +587,17 @@ function EventsSection({
   selected,
   onToggleType,
   onToggleFamily,
+  error,
+  targets,
 }: {
   eventTypes: readonly EventType[] | undefined;
   selected: Set<string>;
   onToggleType: (type: string, on: boolean) => void;
   onToggleFamily: (family: string, on: boolean) => void;
+  error: string | undefined;
+  targets: FocusTargets;
 }) {
+  const errorId = useId();
   const families = useMemo(() => {
     const grouped = new Map<string, EventType[]>();
     for (const t of eventTypes ?? []) {
@@ -504,7 +609,19 @@ function EventsSection({
   }, [eventTypes]);
 
   return (
-    <VStack gap={3} align="start" width="full">
+    <VStack
+      ref={(element) => {
+        targets.current.events = element;
+      }}
+      as="fieldset"
+      aria-label="Events"
+      aria-describedby={error ? errorId : undefined}
+      tabIndex={-1}
+      outline="none"
+      gap={3}
+      align="start"
+      width="full"
+    >
       <HStack gap={1}>
         <Text fontWeight="600" fontSize="sm">
           Events
@@ -514,7 +631,7 @@ function EventsSection({
           testId="webhook-events-info"
         />
       </HStack>
-      {!eventTypes && <Spinner size="sm" />}
+      {!eventTypes && <SkeletonRows rows={3} />}
       {families.map(([family, types]) => (
         <EventFamilySection
           key={family}
@@ -525,6 +642,11 @@ function EventsSection({
           onToggleFamily={onToggleFamily}
         />
       ))}
+      {error ? (
+        <Field.Root invalid>
+          <Field.ErrorText id={errorId}>{error}</Field.ErrorText>
+        </Field.Root>
+      ) : null}
     </VStack>
   );
 }
@@ -538,6 +660,9 @@ function DeliveryNumberField({
   value,
   onChange,
   testId,
+  error,
+  focusKey,
+  targets,
 }: {
   label: string;
   width: string;
@@ -546,13 +671,19 @@ function DeliveryNumberField({
   value: number;
   onChange: (value: number) => void;
   testId: string;
+  error: string | undefined;
+  focusKey: ProblemKey;
+  targets: FocusTargets;
 }) {
   return (
-    <VStack gap={1} align="start">
-      <Text fontSize="xs" color="fg.muted">
+    <Field.Root invalid={error !== undefined} gap={1} alignItems="start" width="auto">
+      <Field.Label fontSize="xs" fontWeight="normal" color="fg.muted">
         {label}
-      </Text>
+      </Field.Label>
       <Input
+        ref={(element) => {
+          targets.current[focusKey] = element;
+        }}
         type="number"
         size="sm"
         width={width}
@@ -562,12 +693,21 @@ function DeliveryNumberField({
         onChange={(e) => onChange(Number(e.target.value))}
         data-testid={testId}
       />
-    </VStack>
+      <Field.ErrorText maxWidth="48">{error}</Field.ErrorText>
+    </Field.Root>
   );
 }
 
 /** How hard this endpoint is driven: batch shape and delivery concurrency. */
-function DeliveryControlsSection({ form }: { form: EndpointForm }) {
+function DeliveryControlsSection({
+  form,
+  errors,
+  targets,
+}: {
+  form: EndpointForm;
+  errors: Problems;
+  targets: FocusTargets;
+}) {
   return (
     <VStack gap={3} align="start" width="full">
       <HStack gap={1}>
@@ -579,7 +719,7 @@ function DeliveryControlsSection({ form }: { form: EndpointForm }) {
           testId="webhook-delivery-info"
         />
       </HStack>
-      <HStack gap={4} width="full">
+      <HStack gap={4} width="full" align="start" wrap="wrap">
         <DeliveryNumberField
           label="Batch size"
           width="90px"
@@ -588,6 +728,9 @@ function DeliveryControlsSection({ form }: { form: EndpointForm }) {
           value={form.maxBatchSize}
           onChange={form.setMaxBatchSize}
           testId="webhook-max-batch-size"
+          error={errors.batchSize}
+          focusKey="batchSize"
+          targets={targets}
         />
         <DeliveryNumberField
           label="Batch delay (ms)"
@@ -597,6 +740,9 @@ function DeliveryControlsSection({ form }: { form: EndpointForm }) {
           value={form.maxBatchDelayMs}
           onChange={form.setMaxBatchDelayMs}
           testId="webhook-max-batch-delay"
+          error={errors.batchDelay}
+          focusKey="batchDelay"
+          targets={targets}
         />
         <DeliveryNumberField
           label="In-flight"
@@ -606,6 +752,9 @@ function DeliveryControlsSection({ form }: { form: EndpointForm }) {
           value={form.maxInFlight}
           onChange={form.setMaxInFlight}
           testId="webhook-max-in-flight"
+          error={errors.inFlight}
+          focusKey="inFlight"
+          targets={targets}
         />
       </HStack>
     </VStack>
@@ -616,21 +765,26 @@ function EndpointFormFields({
   form,
   eventTypes,
   isEditing,
+  targets,
 }: {
   form: EndpointForm;
   eventTypes: readonly EventType[] | undefined;
   isEditing: boolean;
+  targets: FocusTargets;
 }) {
+  const errors: Problems = form.attempted ? form.problems : {};
   return (
     <VStack gap={6} align="start" width="full">
-      <DestinationSection form={form} isEditing={isEditing} />
+      <DestinationSection form={form} isEditing={isEditing} errors={errors} targets={targets} />
       <EventsSection
         eventTypes={eventTypes}
         selected={form.selected}
         onToggleType={form.toggleType}
         onToggleFamily={form.toggleFamily}
+        error={errors.events}
+        targets={targets}
       />
-      <DeliveryControlsSection form={form} />
+      <DeliveryControlsSection form={form} errors={errors} targets={targets} />
     </VStack>
   );
 }
@@ -657,42 +811,46 @@ export function WebhookEndpointDrawer({
   onSave: (input: EndpointInput) => void;
 }) {
   const form = useEndpointForm(isOpen, endpoint);
-  const canSave = form.isValid && !isSaving;
+  const formId = useId();
+  const targets: FocusTargets = useRef({});
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isSaving) return;
+    form.setAttempted(true);
+    const first = PROBLEM_ORDER.find((key) => form.problems[key] !== undefined);
+    if (first) {
+      focusProblem({ targets, key: first });
+      return;
+    }
+    onSave(form.toInput());
+  };
 
   return (
-    <Drawer.Root
-      placement="end"
-      size="md"
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
+      onClose={onClose}
+      size="md"
+      title={endpoint ? "Edit webhook endpoint" : "New webhook endpoint"}
+      footer={{
+        cancel: { onClick: onClose },
+        primaryAction: {
+          label: endpoint ? "Save changes" : "Create endpoint",
+          type: "submit",
+          form: formId,
+          loading: isSaving,
+          "data-testid": "webhook-save",
+        },
       }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{endpoint ? "Edit webhook endpoint" : "New webhook endpoint"}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <EndpointFormFields form={form} eventTypes={eventTypes} isEditing={endpoint !== null} />
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack gap={2}>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              disabled={!canSave}
-              loading={isSaving}
-              onClick={() => onSave(form.toInput())}
-              data-testid="webhook-save"
-            >
-              {endpoint ? "Save changes" : "Create endpoint"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      <form id={formId} noValidate onSubmit={handleSubmit}>
+        <EndpointFormFields
+          form={form}
+          eventTypes={eventTypes}
+          isEditing={endpoint !== null}
+          targets={targets}
+        />
+      </form>
+    </Drawer>
   );
 }

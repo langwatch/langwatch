@@ -1,6 +1,7 @@
 /**
- * Real-Chromium look of the Profile and Security pages: the 820px column, the hairline above each
- * band and the bordered rows are measured layout and computed style, which jsdom reports as zero.
+ * Real-Chromium look of the Profile and Security pages: the column (its measure is the shell's),
+ * the hairline above each band and the bordered rows are measured layout and computed style,
+ * which jsdom reports as zero.
  * Spec: specs/settings/profile.feature, specs/identity/authentication-settings.feature
  */
 
@@ -168,7 +169,7 @@ afterEach(() => cleanup());
 describe("given a wide window", () => {
   describe("when the profile page renders", () => {
     /** @scenario The profile is a narrow column of divided bands with bordered rows */
-    it("is an 820px column of divided bands whose rows are bordered", async () => {
+    it("is a column of divided bands whose rows are bordered", async () => {
       const container = mount("profile");
       await waitFor(() => expect(screen.getByText("My CLI key")).toBeVisible());
       const { column, bands, rows } = look(container, [
@@ -176,8 +177,6 @@ describe("given a wide window", () => {
         "personal-api-key-row",
       ]);
 
-      expect(getComputedStyle(column).maxWidth).toBe("820px");
-      expect(column.getBoundingClientRect().width).toBeLessThanOrEqual(820);
       expect(column.getBoundingClientRect().width).toBeGreaterThan(600);
       expect(bands.length).toBeGreaterThanOrEqual(4);
       for (const band of bands) expect(hasBorder(band, "Top")).toBe(true);
@@ -188,13 +187,11 @@ describe("given a wide window", () => {
 
   describe("when the security page renders", () => {
     /** @scenario The page is a narrow column of divided sections with bordered rows */
-    it("is an 820px column of divided sections whose rows are bordered", async () => {
+    it("is a column of divided sections whose rows are bordered", async () => {
       const container = mount("security");
       await waitFor(() => expect(screen.getByText("Security", { exact: true })).toBeVisible());
       const { column, bands, rows } = look(container, ["linked-account-row"]);
 
-      expect(getComputedStyle(column).maxWidth).toBe("820px");
-      expect(column.getBoundingClientRect().width).toBeLessThanOrEqual(820);
       expect(column.getBoundingClientRect().width).toBeGreaterThan(600);
       expect(bands.length).toBeGreaterThanOrEqual(3);
       for (const band of bands) expect(hasBorder(band, "Top")).toBe(true);

@@ -86,7 +86,7 @@ should name an Ops concept and compose those shared parts.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/ops.web.ts:11` (`defineBrowserModule("ops")`), exported as `opsWeb` at `./declaration`.
+Declared in `src/ops.web.ts:12` (`defineBrowserModule("ops")`), exported as `opsWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -107,9 +107,6 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | `pages/ops/feature-flags`               | `/ops/feature-flags` (route table)               | –        | –       | `ops:view`   | –     |
 | `pages/ops/foundry`                     | `/ops/foundry` (route table)                     | –        | –       | `ops:view`   | –     |
 | `pages/ops/upgrades`                    | `/ops/upgrades` (route table)                    | –        | –       | `ops:view`   | –     |
-| `pages/ops/upgrades/preview`            | `/ops/upgrades/preview` (route table)            | –        | –       | `ops:view`   | –     |
-| `pages/ops/upgrades/releases/[release]` | `/ops/upgrades/releases/:release` (route table)  | –        | –       | `ops:view`   | –     |
-| `pages/ops/upgrades/runs/[runId]`       | `/ops/upgrades/runs/:runId` (route table)        | –        | –       | `ops:view`   | –     |
 | `pages/ops/projections/[runId]`         | `/ops/projections/:runId` (route table)          | –        | –       | `ops:view`   | –     |
 | `pages/ops/operators`                   | `/ops/operators` (route table)                   | –        | –       | `ops:manage` | –     |
 | `pages/ops/users`                       | `/ops/users` (route table)                       | –        | –       | `ops:manage` | –     |
@@ -140,7 +137,8 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/enterprise-billing-client`, `@langwatch/prompt-client`.
+- Client packages (package.json): `@langwatch/api-key-client`, `@langwatch/enterprise-billing-client`, `@langwatch/ops-client`, `@langwatch/prompt-client`.
+- Lends: `UpgradeActionNeededToken`.
 - Host APIs it requires: `OpsHostApi`, `CheckupHostApi`.
 - Capabilities: `impersonationBanner`.
 - Config slices: `ops`, `rum`.

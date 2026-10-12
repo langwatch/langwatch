@@ -1,6 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Box, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import type { PausedSchedule } from "../../model/paused-schedule.ts";
@@ -43,41 +44,33 @@ export function PausedSchedulesSection({
           </Link>
         )}
       </HStack>
-      <Table.ScrollArea>
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          variant="line"
-          css={{ "& tr:last-child td": { borderBottom: "none" } }}
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Fires</Table.ColumnHeader>
-              <Table.ColumnHeader>Target</Table.ColumnHeader>
-              <Table.ColumnHeader>Schedule</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {schedules.map((schedule) => (
-              <Table.Row key={schedule.id} data-testid="paused-schedule-row">
-                <Table.Cell>{schedule.targetType}</Table.Cell>
-                <Table.Cell>
-                  <Text fontFamily="mono" textStyle="xs">
-                    {schedule.targetId}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell color="fg.muted">
-                  <Text fontFamily="mono" textStyle="xs">
-                    {schedule.cron}
-                  </Text>
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </ListTable>
-      </Table.ScrollArea>
+      <ListTable
+        density="compact"
+        variant="embedded"
+        scroll="x"
+        scrollLabel="Switched-off schedules"
+      >
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Fires</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Target</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Schedule</ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {schedules.map((schedule) => (
+            <ListTable.Row key={schedule.id} data-testid="paused-schedule-row">
+              <ListTable.Cell>{schedule.targetType}</ListTable.Cell>
+              <ListTable.Cell>
+                <InlineCode variant="neutral">{schedule.targetId}</InlineCode>
+              </ListTable.Cell>
+              <ListTable.Cell tone="muted">
+                <InlineCode variant="neutral">{schedule.cron}</InlineCode>
+              </ListTable.Cell>
+            </ListTable.Row>
+          ))}
+        </ListTable.Body>
+      </ListTable>
     </Box>
   );
 }

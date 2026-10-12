@@ -1,6 +1,6 @@
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, IconButton, HStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Box, HStack, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
@@ -37,7 +37,7 @@ export type StudioDrawerWrapperProps = {
   children: React.ReactNode;
   /** Called when the drawer should close (e.g. close button or backdrop click). */
   onClose: () => void;
-  /** Content rendered in the drawer footer (e.g. Apply/Save/Discard buttons) */
+  /** The footer row, an `ActionRow`: the wrapper draws the footer band around it. */
   footer?: React.ReactNode;
 };
 
@@ -48,7 +48,7 @@ function escapeCollapses(input: { key: string; expanded: boolean }): boolean {
 }
 
 /**
- * StudioDrawerWrapper -- reusable drawer shell for the optimization studio.
+ * StudioDrawerWrapper -- reusable drawer shell for the workflow studio.
  */
 export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioDrawerWrapperProps) {
   const { deselectAllNodes, propertiesExpanded, setPropertiesExpanded, duplicateNode, deleteNode } =
@@ -114,81 +114,96 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
 
   const MotionDiv = motion.div;
 
-  // ----- Shared header JSX (used in both drawer and expanded modes) -----
-  const headerContent = node ? (
-    <HStack width="full" justify="space-between" gap={0}>
-      {/* Left: icon + name */}
-      <HStack gap={2} overflow="hidden" flex={1} minWidth={0}>
-        <ComponentIcon type={node.type as ComponentType} cls={node.data.cls} size="lg" />
-        <HoverableBigText
-          lineClamp={2}
-          textStyle="md"
-          fontWeight="medium"
-          overflow="hidden"
-          textOverflow="ellipsis"
-          expandable={false}
-        >
-          {getNodeDisplayName(node)}
-        </HoverableBigText>
-      </HStack>
+  // ----- Header pieces, shared by the drawer and the expanded panel -----
+  const nodeTitle = node ? (
+    <HStack gap={2} overflow="hidden" flex={1} minWidth={0}>
+      <ComponentIcon type={node.type as ComponentType} cls={node.data.cls} size="lg" />
+      <HoverableBigText
+        lineClamp={2}
+        textStyle="md"
+        fontWeight="medium"
+        overflow="hidden"
+        textOverflow="ellipsis"
+        expandable={false}
+      >
+        {getNodeDisplayName(node)}
+      </HoverableBigText>
+    </HStack>
+  ) : null;
 
-      {/* Right: action buttons */}
-      <HStack gap={0} flexShrink={0}>
-        {showControls && (
-          <>
-            <ComponentExecutionButton node={node} size="sm" iconSize={16} />
+  const nodeTools = node ? (
+    <>
+      {showControls && (
+        <>
+          <ComponentExecutionButton node={node} size="sm" iconSize={16} />
 
-            <Tooltip
-              content={
-                propertiesExpanded
-                  ? "Collapse input and output panels"
-                  : "Expand input and output panels"
-              }
-              showArrow
-              positioning={{ placement: "top" }}
-              openDelay={0}
-              closeDelay={0}
+          <Tooltip
+            content={
+              propertiesExpanded
+                ? "Collapse input and output panels"
+                : "Expand input and output panels"
+            }
+            showArrow
+            positioning={{ placement: "top" }}
+            openDelay={0}
+            closeDelay={0}
+          >
+            <IconButton
+              variant="ghost"
+              size="sm"
+              color="fg.muted"
+              aria-label="Toggle input and output panels"
+              onClick={() => setPropertiesExpanded(!propertiesExpanded)}
             >
-              <IconButton
-                variant="ghost"
-                size="sm"
-                color="fg.muted"
-                aria-label="Toggle input and output panels"
-                onClick={() => setPropertiesExpanded(!propertiesExpanded)}
-              >
-                <Columns size={16} />
-              </IconButton>
-            </Tooltip>
-          </>
-        )}
-        {isExpandableNode(node) && (
-          <Menu.Root positioning={{ placement: "bottom-end" }}>
-            <Menu.Trigger asChild>
-              <IconButton variant="ghost" size="sm" color="fg.muted" aria-label="Node actions">
-                <MoreHorizontal size={16} />
-              </IconButton>
-            </Menu.Trigger>
-            <Menu.Content>
-              <Menu.Item value="duplicate" onClick={() => duplicateNode(node.id)}>
-                <Copy size={14} />
-                Duplicate
-              </Menu.Item>
-              <Menu.Item
-                value="delete"
-                onClick={() => {
-                  deleteNode(node.id);
-                  setPropertiesExpanded(false);
-                  deselectAllNodes();
-                  onClose();
-                }}
-              >
-                <Trash2 size={14} />
-                Delete
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
-        )}
-        <StudioDrawerClose expanded={propertiesExpanded} onClose={handleClose} />
+              <Columns size={16} />
+            </IconButton>
+          </Tooltip>
+        </>
+      )}
+      {isExpandableNode(node) && (
+        <Menu.Root positioning={{ placement: "bottom-end" }}>
+          <Menu.Trigger asChild>
+            <IconButton variant="ghost" size="sm" color="fg.muted" aria-label="Node actions">
+              <MoreHorizontal size={16} />
+            </IconButton>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item value="duplicate" onClick={() => duplicateNode(node.id)}>
+              <Copy size={14} />
+              Duplicate
+            </Menu.Item>
+            <Menu.Item
+              value="delete"
+              onClick={() => {
+                deleteNode(node.id);
+                setPropertiesExpanded(false);
+                deselectAllNodes();
+                onClose();
+              }}
+            >
+              <Trash2 size={14} />
+              Delete
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+      )}
+    </>
+  ) : null;
+
+  const expandedHeader = node ? (
+    <HStack width="full" justify="space-between" gap={0}>
+      {nodeTitle}
+      <HStack gap={0} flexShrink={0}>
+        {nodeTools}
+        <IconButton
+          variant="ghost"
+          size="sm"
+          color="fg.muted"
+          aria-label="Close drawer"
+          onClick={handleClose}
+        >
+          <X size={16} />
+        </IconButton>
       </HStack>
     </HStack>
   ) : null;
@@ -196,25 +211,19 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
   return (
     <>
       {/* ----- Normal drawer mode (closed when expanded) ----- */}
-      <Drawer.Root
+      <Drawer
         open={isOpen && !propertiesExpanded}
-        onOpenChange={({ open }) => {
-          if (!open) handleClose();
-        }}
+        onClose={handleClose}
         size="md"
-        closeOnInteractOutside={false}
-        modal={false}
+        topInset="studio-header"
+        title={node ? getNodeDisplayName(node) : "Component"}
+        titleContent={nodeTitle}
+        headerTools={nodeTools}
+        body="flush"
+        footerContent={effectiveFooter ?? null}
       >
-        <Drawer.Content bg="bg" marginTop="56px">
-          {node && <Drawer.Header>{headerContent}</Drawer.Header>}
-
-          <Drawer.Body display="flex" flexDirection="column" overflow="auto" padding={0}>
-            {children}
-          </Drawer.Body>
-
-          {effectiveFooter && <Drawer.Footer>{effectiveFooter}</Drawer.Footer>}
-        </Drawer.Content>
-      </Drawer.Root>
+        {children}
+      </Drawer>
 
       {/* ----- Expanded mode: entire drawer rendered via portal ----- */}
       {propertiesExpanded &&
@@ -267,7 +276,7 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
                 borderColor="border"
                 flexShrink={0}
               >
-                {headerContent}
+                {expandedHeader}
               </Box>
 
               {/* Body */}
@@ -369,21 +378,5 @@ export function StudioDrawerWrapper({ node, children, onClose, footer }: StudioD
           document.body,
         )}
     </>
-  );
-}
-
-/** Expanded canvas panels sit outside the drawer context. */
-function StudioDrawerClose({ expanded, onClose }: { expanded: boolean; onClose: () => void }) {
-  if (!expanded) return <Drawer.CloseTrigger />;
-  return (
-    <IconButton
-      variant="ghost"
-      size="sm"
-      color="fg.muted"
-      aria-label="Close drawer"
-      onClick={onClose}
-    >
-      <X size={16} />
-    </IconButton>
   );
 }

@@ -91,7 +91,7 @@ async function rosterProcessIds(): Promise<string[]> {
 function gateFor({
   role,
   withClickHouse = true,
-  firstInstall = async () => ({ exitCode: 0, logTail: [] }),
+  firstInstall = async () => ({ code: "done", logTail: [] }),
   tree = TREE,
   warn = () => undefined,
   wait = async () => undefined,
@@ -131,7 +131,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         firstInstall: async () => {
           runs += 1;
           await markStep({ id: GOOSE, status: "done" });
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
       });
 
@@ -149,7 +149,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         role: "api",
         firstInstall: async () => {
           runs += 1;
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
       }).admit();
 
@@ -197,7 +197,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         release: null,
         withClickHouse: true,
         processId: "test:api",
-        firstInstall: async () => ({ exitCode: 1, logTail: [] }),
+        firstInstall: async () => ({ code: "failed", logTail: [] }),
       });
 
       await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
@@ -214,7 +214,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         firstInstall: async () => {
           runs += 1;
           await recordSteps({ [PRISMA]: "done", [GOOSE]: "done" });
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
       });
 
@@ -240,17 +240,17 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
           if (runs === 1) {
             await recordSteps({ [PRISMA]: "pending", [GOOSE]: "pending" });
             await markStep({ id: PRISMA, status: "failed" });
-            return { exitCode: 1, logTail: [] };
+            return { code: "failed", logTail: [] };
           }
           await markStep({ id: PRISMA, status: "done" });
           await markStep({ id: GOOSE, status: "done" });
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
       });
 
       await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
       expect(runs).toBe(2);
-      expect(said).toContainEqual(expect.stringMatching(/`pnpm task upgrade` exited 1/));
+      expect(said).toContainEqual(expect.stringMatching(/`pnpm task upgrade` ended failed/));
       await gate.release();
     });
 
@@ -276,11 +276,11 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
             await registerSteps({ ids: ["trace:retired-backfill"], mode: "background" });
             await markStep({ id: "trace:retired-backfill", status: "failed" });
             await markStep({ id: PRISMA, status: "failed" });
-            return { exitCode: 1, logTail: [] };
+            return { code: "failed", logTail: [] };
           }
           await markStep({ id: PRISMA, status: "done" });
           await markStep({ id: GOOSE, status: "done" });
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
       });
 
@@ -296,7 +296,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         role: "api",
         firstInstall: async () => {
           runs += 1;
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
       }).admit();
 
@@ -306,6 +306,66 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         outstanding: [PRISMA],
       });
       expect(runs).toBe(0);
+    });
+  });
+
+  describe("given a failed Prisma migration the upgrade does not re-run unasked", () => {
+    /** @scenario "A waiting worker runs the upgrade again once the failed migration's row is resolved" */
+    it("waits while the row is failed and runs again by itself once it is rolled back, with no Retry", async () => {
+      const { postgres } = scratch;
+      await postgres.query(
+        `CREATE TABLE "_prisma_migrations" ("migration_name" TEXT NOT NULL,
+           "started_at" TIMESTAMPTZ NOT NULL DEFAULT now(), "finished_at" TIMESTAMPTZ,
+           "rolled_back_at" TIMESTAMPTZ, "logs" TEXT)`,
+      );
+      await postgres.query(
+        `INSERT INTO "_prisma_migrations" ("migration_name", "logs") VALUES ($1, 'boom')`,
+        [PRISMA_FOLDER],
+      );
+      await createLedgerTables({ postgres });
+      for (const [id, kind] of [
+        [PRISMA, "postgres-schema"],
+        [GOOSE, "clickhouse-schema"],
+      ]) {
+        await postgres.query(
+          `INSERT INTO "_langwatch_upgrade_step" ("id", "kind", "mode", "status", "updated_at")
+           VALUES ($1, $2, 'blocking', 'pending', now())`,
+          [id, kind],
+        );
+      }
+      const said: string[] = [];
+      const statusAtRun: string[] = [];
+      let waits = 0;
+      const gate = gateFor({
+        role: "worker",
+        warn: (message) => void said.push(message),
+        wait: async () => {
+          waits += 1;
+          // The operator's fix lands on the third ask: `prisma migrate resolve --rolled-back`.
+          if (waits === 3)
+            await postgres.query(`UPDATE "_prisma_migrations" SET "rolled_back_at" = now()`);
+        },
+        firstInstall: async () => {
+          const { rows } = await postgres.query<{ status: string }>(
+            `SELECT "status" FROM "_langwatch_upgrade_step" WHERE "id" = $1`,
+            [PRISMA],
+          );
+          statusAtRun.push(rows[0]?.status ?? "missing");
+          if (statusAtRun.length === 1) {
+            await markStep({ id: PRISMA, status: "failed" });
+            return { code: "failed_prisma_migration", logTail: [] };
+          }
+          await markStep({ id: PRISMA, status: "done" });
+          await markStep({ id: GOOSE, status: "done" });
+          return { code: "done", logTail: [] };
+        },
+      });
+
+      await expect(gate.admit()).resolves.toMatchObject({ admitted: true });
+      expect(statusAtRun).toEqual(["pending", "failed"]);
+      expect(waits).toBeGreaterThanOrEqual(3);
+      expect(said).toContainEqual(expect.stringMatching(/waits for a Retry in Ops > Upgrades/));
+      await gate.release();
     });
   });
 
@@ -331,7 +391,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         firstInstall: async () => {
           for (const id of blocking) await markStep({ id, status: "done" });
           await registerSteps({ ids: background, mode: "background" });
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
       });
 
@@ -351,7 +411,7 @@ describe.skipIf(!DB_URL)("servingUpgradeGate over a ledger", () => {
         firstInstall: async () => {
           runs += 1;
           await registerSteps({ ids: background, mode: "background" });
-          return { exitCode: 0, logTail: [] };
+          return { code: "done", logTail: [] };
         },
       });
 

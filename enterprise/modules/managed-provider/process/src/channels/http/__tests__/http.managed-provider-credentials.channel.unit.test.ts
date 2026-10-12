@@ -6,6 +6,7 @@ import { HttpManagedProviderCredentialsChannel } from "../http.managed-provider-
 const sts = vi.hoisted(() => ({
   clients: [] as {
     region: string;
+    endpoint?: string;
     credentials: { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
   }[],
   assumed: [] as { clientIndex: number; roleArn: string }[],
@@ -22,6 +23,7 @@ vi.mock("@aws-sdk/client-sts", () => {
 
     constructor(config: {
       region: string;
+      endpoint?: string;
       credentials: { accessKeyId: string; secretAccessKey: string; sessionToken?: string };
     }) {
       this.index = sts.clients.length;
@@ -103,6 +105,31 @@ describe("HttpManagedProviderCredentialsChannel", () => {
           secretAccessKey: "customer-secret",
           sessionToken: "customer-token",
         });
+      });
+    });
+
+    describe("when the deployment configures an STS base", () => {
+      /** @scenario "The role hops reach the STS base the deployment configures" */
+      it("sends both role hops to that base", async () => {
+        const adapter = HttpManagedProviderCredentialsChannel.create({
+          stsBase: "http://127.0.0.1:5597/sts",
+        });
+
+        await adapter.assumeCustomerRole(CONFIG);
+
+        expect(sts.clients.map((client) => client.endpoint)).toEqual([
+          "http://127.0.0.1:5597/sts",
+          "http://127.0.0.1:5597/sts",
+        ]);
+      });
+    });
+
+    describe("when no STS base is configured", () => {
+      /** @scenario "An STS base that is unset or blank reaches AWS" */
+      it("leaves the endpoint to the AWS SDK", async () => {
+        await HttpManagedProviderCredentialsChannel.create().assumeCustomerRole(CONFIG);
+
+        expect(sts.clients.map((client) => client.endpoint)).toEqual([undefined, undefined]);
       });
     });
 

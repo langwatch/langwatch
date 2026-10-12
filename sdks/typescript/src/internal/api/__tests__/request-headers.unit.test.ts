@@ -12,8 +12,8 @@ const basicProject = (headers: Record<string, string>): string | undefined => {
 };
 
 describe("buildRequestHeaders", () => {
-  /** @scenario "a command that builds its own request carries the resolved project" */
   describe("when the resolver chose a project and the command names none", () => {
+    /** @scenario "a command that builds its own request carries the resolved project" */
     it("scopes the user-scoped key to that project", () => {
       const headers = runWithCredentialHolder(() => {
         setResolvedProjectId("project_checkout");

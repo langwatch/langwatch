@@ -331,6 +331,27 @@ describe("given the identifier-first sign-in screen", () => {
       expect(await screen.findByTestId("routed-to-connection")).toHaveTextContent(/okta/i);
     });
 
+    /** @scenario "An address routed to an identity provider is dialled on the router's first answer" */
+    it("dials the provider once, from the address's one answer, asking the router nothing more", async () => {
+      routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
+        outcome: "redirect_to_connection",
+        connectionId: "org:acme",
+        methodSet: [oktaMethod],
+        reasonCode: "domain_routed",
+      } satisfies RoutingDecision);
+
+      renderScreen();
+      await enterEmail("sam@acme.com");
+
+      await waitFor(() => expect(signInMock).toHaveBeenCalledTimes(1));
+      // The card that follows the dial outlasts the quiet window; nothing re-asks or re-dials.
+      expect(await screen.findByTestId("routed-to-connection")).toBeInTheDocument();
+      // One ask on arrival with no address, one for the address typed.
+      expect(routeMock).toHaveBeenCalledTimes(2);
+      expect(routeMock).toHaveBeenLastCalledWith({ identifier: "sam@acme.com", breakGlass: false });
+      expect(signInMock).toHaveBeenCalledTimes(1);
+    });
+
     /** @scenario "A provider my address was routed to is badged once it lets me in" */
     it("parks the provider it dials, so the landing can badge it", async () => {
       routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({

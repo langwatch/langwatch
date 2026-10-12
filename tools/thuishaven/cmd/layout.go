@@ -55,9 +55,9 @@ func buildTable() []commandSpec {
 	up.rewrite, down.rewrite = retireUpSpellings, retireShortForce("down")
 	top := []commandSpec{
 		hidden("simulator"), hidden("static"), hidden("go-watch"), hidden("ui-watch"), hidden("keep"), hidden("daemon"), hidden("gate"),
-		up, down, take("restart"), take("reload"), statusCommand(take("status")), take("logs"), take("errors"), take("env"),
+		up, down, take("restart"), take("reload"), serviceCommand(), statusCommand(take("status")), take("logs"), take("errors"), take("env"),
 		browserCommand(take("browser"), take("auth"), take("mfa")),
-		take("pr"), take("switch"), waitSpec(), defaultsSpec(),
+		take("pr"), take("switch"), take("focus"), waitSpec(), defaultsSpec(),
 		{name: "sim", args: "[<name> <verb>]", summary: "every simulator: bare lists them; sim <name> <verb> drives one", run: runSims, flags: simFlags(), subs: sims},
 		{name: "obs", summary: "this stack's own telemetry: traces, metrics, profiles, raw queries", subs: []commandSpec{take("traces"), take("metrics"), take("profiles"), take("query")}},
 		{name: "orb", summary: "what the haven orb on the app page saw and was sent", subs: []commandSpec{take("feedback"), pageVerb("console"), pageVerb("network")}},

@@ -7,29 +7,28 @@ import { UpgradeRequired } from "@langwatch/design-system/access-state";
  * it does not manage. Lent to organization's Directory through `withCapabilities`.
  * Spec: specs/identity/directory-administration.feature
  */
+import { Card } from "@langwatch/design-system/card";
 import {
+  Box,
   Button,
-  Card,
+  Grid,
   HStack,
-  SimpleGrid,
   Skeleton,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { StatusChip, type StatusChipTone } from "@langwatch/design-system/settings-card";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { StatTileFigure } from "@langwatch/design-system/stat-tile";
 import type { DirectorySummaryProps } from "@langwatch/enterprise-scim-client";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { nowInstant, readableDate } from "@langwatch/time";
-import { Boxes, Clock, Info, Plug, Plus, Users, UserX } from "lucide-react";
+import { Boxes, Clock, Plug, Users, UserX } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useDirectoryFacts } from "../../behavior/use-directory-facts.ts";
 import { relativeTime } from "../../model/display-formatters.ts";
 import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
 
-/** Sources named before the rest collapse into a count. */
-const SOURCES_SHOWN = 3;
 const AUTHENTICATION_PAGE = "/settings/authentication";
 
 type DirectoryFactsRead = ReturnType<typeof useDirectoryFacts>;
@@ -55,36 +54,44 @@ export default function DirectorySummary({
 
   return (
     <VStack align="stretch" gap={3} width="full">
-      <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} data-testid="directory-summary">
+      <Card data-testid="directory-summary" padding="none" bodyLayout="stack">
         <DirectorySources connections={facts.connections} />
-        <Fact label="Last directory change" icon={<Clock size={14} />}>
-          <FactNumber
-            muted={facts.lastPushedAtMs === null}
-            title={
-              facts.lastPushedAtMs === null
-                ? void 0
-                : readableDate(facts.lastPushedAtMs).toLocaleString()
-            }
+        <Grid templateColumns={{ base: "1fr", lg: "repeat(4, minmax(0, 1fr))" }}>
+          <Fact label="Last directory change" icon={<Clock size={14} />}>
+            <FactNumber
+              muted={facts.lastPushedAtMs === null}
+              title={
+                facts.lastPushedAtMs === null
+                  ? void 0
+                  : readableDate(facts.lastPushedAtMs).toLocaleString()
+              }
+            >
+              {facts.lastPushedAtMs === null
+                ? "No push yet"
+                : relativeTime({
+                    atMs: facts.lastPushedAtMs,
+                    nowMs: nowInstant().epochMilliseconds,
+                  })}
+            </FactNumber>
+          </Fact>
+          <Fact
+            label="People it manages"
+            hint="Counted from the directory itself, so it holds even when the membership cannot be read."
+            icon={<Users size={14} />}
+            divided
           >
-            {facts.lastPushedAtMs === null
-              ? "No push yet"
-              : relativeTime({ atMs: facts.lastPushedAtMs, nowMs: nowInstant().epochMilliseconds })}
-          </FactNumber>
-        </Fact>
-        <Fact
-          label="People it manages"
-          hint="Counted from the directory itself, so it holds even when the membership cannot be read."
-          icon={<Users size={14} />}
-        >
-          <FactNumber data-testid="directory-managed-people">{facts.managedPeople}</FactNumber>
-        </Fact>
-        <Fact label="Groups it sent" icon={<Boxes size={14} />}>
-          <Unavailable canRead={canReadMembership} read={facts.groups}>
-            <FactNumber>{facts.directoryGroups.length}</FactNumber>
-          </Unavailable>
-        </Fact>
-        <MembersOutsideDirectory facts={facts} canReadMembership={canReadMembership} />
-      </SimpleGrid>
+            <FactNumber data-testid="directory-managed-people">{facts.managedPeople}</FactNumber>
+          </Fact>
+          <Fact label="Groups it sent" icon={<Boxes size={14} />} divided>
+            <Unavailable canRead={canReadMembership} read={facts.groups}>
+              <FactNumber data-testid="directory-groups-sent">
+                {facts.directoryGroups.length}
+              </FactNumber>
+            </Unavailable>
+          </Fact>
+          <MembersOutsideDirectory facts={facts} canReadMembership={canReadMembership} />
+        </Grid>
+      </Card>
       {facts.groups.isError && (
         <HandledErrorAlert
           error={facts.groups.error}
@@ -128,6 +135,7 @@ function MembersOutsideDirectory({
       label="Not managed by directory"
       hint="Your directory did not create these accounts, so removing them there will not remove them here."
       icon={<UserX size={14} />}
+      divided
     >
       <Unavailable canRead={canReadMembership} read={facts.provenance}>
         <FactNumber data-testid="members-outside-directory">
@@ -140,55 +148,64 @@ function MembersOutsideDirectory({
 
 /** The running connections, each with its state; none says nobody arrives on their own. */
 function DirectorySources({ connections }: { connections: DirectoryFactsRead["connections"] }) {
-  if (connections.length === 0) {
-    return (
-      <Fact
-        label="Sources"
-        icon={<Plug size={14} />}
-        caption={
-          <Text asChild fontSize="xs" color="orange.fg">
-            <Link unstyled href={AUTHENTICATION_PAGE} data-testid="connect-identity-provider">
-              Connect a provider →
-            </Link>
-          </Text>
-        }
-      >
-        <FactNumber
-          muted
-          title="No identity provider is connected, so nothing is provisioned here automatically."
-          data-testid="directory-source-chip"
-        >
-          Not set up
-        </FactNumber>
-      </Fact>
-    );
-  }
-
-  const shown = connections.slice(0, SOURCES_SHOWN);
-  const rest = connections.length - shown.length;
+  const none = connections.length === 0;
   return (
-    <Fact label="Sources" icon={<Plug size={14} />}>
-      <HStack gap={1} flexWrap="wrap">
-        {shown.map((connection) => (
+    <HStack
+      gap={3}
+      rowGap={2}
+      flexWrap="wrap"
+      align="center"
+      paddingX={4}
+      paddingY={3}
+      data-testid="directory-sources"
+    >
+      <HStack gap={1.5} color="fg.muted" flexShrink={0}>
+        <Plug size={14} />
+        <Text fontSize="xs" fontWeight={500} lineHeight="1.3">
+          Sources
+        </Text>
+      </HStack>
+      <HStack gap={1.5} flexWrap="wrap" minWidth={0} maxWidth="full">
+        {none ? (
           <StatusChip
-            key={connection.connectionId}
-            label={`${connection.providerId} · ${connection.status.headline}`}
-            tone={sourceTone(connection.status.tone)}
-            title={connection.status.headline}
+            label="Not set up"
+            title="No identity provider is connected, so nothing is provisioned here automatically."
             data-testid="directory-source-chip"
           />
-        ))}
-        {rest > 0 && <Text fontSize="xs" color="fg.muted">{`+${rest} more`}</Text>}
+        ) : (
+          connections.map((connection) => (
+            <HStack
+              key={connection.connectionId}
+              gap={1.5}
+              minWidth={0}
+              maxWidth="full"
+              data-testid="directory-source"
+            >
+              <Text fontSize="xs" fontWeight={500} minWidth={0} overflowWrap="anywhere">
+                {connection.providerId}
+              </Text>
+              <Box flexShrink={0}>
+                <StatusChip
+                  label={connection.status.headline}
+                  tone={sourceTone(connection.status.tone)}
+                  title={connection.status.headline}
+                  data-testid="directory-source-chip"
+                />
+              </Box>
+            </HStack>
+          ))
+        )}
+      </HStack>
+      <Text asChild fontSize="xs" color="orange.fg">
         <Link
           unstyled
           href={AUTHENTICATION_PAGE}
-          aria-label="Connect another identity provider"
-          title="Connect another identity provider"
+          data-testid={none ? "connect-identity-provider" : "manage-identity-providers"}
         >
-          <Plus size={16} />
+          {none ? "Connect a provider →" : "Manage identity providers →"}
         </Link>
-      </HStack>
-    </Fact>
+      </Text>
+    </HStack>
   );
 }
 
@@ -226,88 +243,73 @@ function Unavailable({
 
 function DirectorySummarySkeleton() {
   return (
-    <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} width="full" aria-busy="true">
-      {[0, 1, 2, 3, 4].map((tile) => (
-        <Card.Root key={tile} borderRadius="xl" minWidth={0}>
-          <Card.Body paddingX={4} paddingY={3}>
-            <VStack align="start" gap={1.5} minWidth={0}>
-              <Skeleton height="3" width="16" />
-              <Skeleton height="5" width="24" />
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-      ))}
-    </SimpleGrid>
+    <Card padding="none" bodyLayout="stack" data-testid="directory-summary-loading">
+      <Box paddingX={4} paddingY={3}>
+        <Skeleton height="3.5" width="48" />
+      </Box>
+      <Grid templateColumns={{ base: "1fr", lg: "repeat(4, minmax(0, 1fr))" }} aria-busy="true">
+        {[0, 1, 2, 3].map((fact) => (
+          <VStack
+            key={fact}
+            align="start"
+            gap={1.5}
+            paddingX={4}
+            paddingY={3}
+            borderTopWidth="1px"
+            borderStartWidth={{ base: 0, lg: fact === 0 ? 0 : "1px" }}
+            borderColor="border.muted"
+          >
+            <Skeleton height="3" width="16" />
+            <Skeleton height="5" width="24" />
+          </VStack>
+        ))}
+      </Grid>
+    </Card>
   );
 }
 
-/** One independently readable directory fact: label line, the big value, one short caption. */
+/** One independently readable fact in the band, set off from its neighbour by a hairline. */
 function Fact({
   label,
   hint,
-  caption,
   icon,
+  divided = false,
   children,
 }: {
   label: string;
-  /** The long explanation, behind an info icon by the label. */
   hint?: string;
-  caption?: ReactNode;
   icon: ReactNode;
+  /** Not the first fact: a hairline on its leading edge where the band is a row. */
+  divided?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Card.Root borderRadius="xl" minWidth={0} height="full">
-      <Card.Body paddingX={3} paddingY={3}>
-        <VStack align="start" gap={1} minWidth={0}>
-          <HStack gap={1.5} color="fg.muted" whiteSpace="nowrap">
-            {icon}
-            <Text fontSize="xs" fontWeight={500} lineHeight="1.3">
-              {label}
-            </Text>
-            {hint && (
-              <Tooltip content={hint}>
-                <span aria-label={hint} style={{ display: "inline-flex" }}>
-                  <Info size={12} />
-                </span>
-              </Tooltip>
-            )}
-          </HStack>
-          <HStack align="center" minWidth={0} maxWidth="full">
-            {children}
-          </HStack>
-          {caption}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+    <VStack
+      align="start"
+      gap={1.5}
+      minWidth={0}
+      paddingX={4}
+      paddingY={3}
+      borderTopWidth="1px"
+      borderStartWidth={{ base: 0, lg: divided ? "1px" : 0 }}
+      borderColor="border.muted"
+    >
+      <HStack gap={1.5} color="fg.muted">
+        {icon}
+        <Text fontSize="xs" fontWeight={500} lineHeight="1.3">
+          {label}
+        </Text>
+      </HStack>
+      <HStack align="center" minWidth={0} maxWidth="full">
+        {children}
+      </HStack>
+      {hint && (
+        <Text fontSize="xs" color="fg.muted" lineHeight="1.35">
+          {hint}
+        </Text>
+      )}
+    </VStack>
   );
 }
 
-/** A fact that is a number, or a phrase in its place: the tile's big figure. */
-function FactNumber({
-  children,
-  muted = false,
-  title,
-  "data-testid": testId,
-}: {
-  children: ReactNode;
-  muted?: boolean;
-  title?: string;
-  "data-testid"?: string;
-}) {
-  return (
-    <Text
-      fontSize="lg"
-      lineHeight="1.3"
-      fontWeight={muted ? 400 : 600}
-      color={muted ? "fg.muted" : void 0}
-      fontVariantNumeric="tabular-nums"
-      truncate
-      maxWidth="full"
-      title={title}
-      data-testid={testId}
-    >
-      {children}
-    </Text>
-  );
-}
+const FactNumber = StatTileFigure;

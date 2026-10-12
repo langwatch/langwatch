@@ -646,6 +646,10 @@ export function createFamilyErrorHandler(options: {
           name: error.name,
           message: error.message,
           stack: error.stack,
+          // The raw reasons (a dropped socket, a host) go to the log, never the body.
+          ...(HandledError.isHandled(error)
+            ? { reasons: error.reasons.map((reason) => reason.message) }
+            : {}),
         },
       },
       `${options.label} [${status}]: ${error.message || String(error)}`,
@@ -944,6 +948,10 @@ export function createCanonicalFamilyErrorHandler(options: {
           name: error.name,
           message: error.message,
           stack: error.stack,
+          // The raw reasons (a dropped socket, a host) go to the log, never the body.
+          ...(HandledError.isHandled(error)
+            ? { reasons: error.reasons.map((reason) => reason.message) }
+            : {}),
         },
       },
       `${options.label} [${status}]: ${error.message || String(error)}`,

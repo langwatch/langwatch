@@ -6,13 +6,13 @@ The server half of [managed-provider](../README.md). Enterprise managed model pr
 
 ## Installation
 
-`defineProcessModule("managed-provider").withChannels(managedProviderChannels).withApi(ManagedProviderModule).build()`, `src/managed-provider.module.ts:11`.
+`defineProcessModule("managed-provider").withChannels(managedProviderChannels).withApi(ManagedProviderModule).build()`, `src/managed-provider.module.ts:14`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`ManagedProviderApi`)
 
-Peers call these through the token, declared at `../contract/src/managed-provider.api.ts:32`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/managed-provider.api.ts:42`; nothing else in this package is public.
 
 #### `isManagedProvider`
 
@@ -44,8 +44,9 @@ None: managed-provider declares no pipeline, process manager, subscriber or task
 
 ## Configuration
 
-| Kind   | Leaf | Environment variable      | Declared at                          |
-| ------ | ---- | ------------------------- | ------------------------------------ |
-| secret | `–`  | `MANAGED_BEDROCK_CONFIGS` | `src/app/managed-provider.app.ts:24` |
+| Kind   | Leaf      | Environment variable       | Declared at                                     |
+| ------ | --------- | -------------------------- | ----------------------------------------------- |
+| secret | `–`       | `MANAGED_BEDROCK_CONFIGS`  | `src/app/managed-provider.app.ts:27`            |
+| config | `stsBase` | `MANAGED_BEDROCK_STS_BASE` | `../contract/src/managed-provider.config.ts:33` |
 
 <!-- readme:generated:end -->

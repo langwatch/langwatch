@@ -25,6 +25,7 @@ Check `haven status`, then the URL; `haven up` returning is not health.
 
 ```bash
 haven up +langy -mail             # add or drop a service; sticky
+haven service off mail             # switch one service in place, keeping the mode; app = ui+api+worker
 haven up +langevals               # evaluators (monitors, evaluations)
 haven up +llm                     # zero-cost model answers (llmsim)
 haven up +design-system +mail-room  # the Storybook and the mail studio
@@ -85,6 +86,16 @@ Old chunks stay loadable for 24 h after a swap. `pnpm dev` runs the Vite dev ser
 - Old assets pile up in `apps/ui/dist/client/assets`; `rm -rf apps/ui/dist` clears them.
 - A build peaks at about 4.8 GB.
 
+## focus
+
+One stack is the focused one: under memory pressure the others are slowed and it gets the larger ClickHouse share. It changes only on `haven up`, `haven switch` into a worktree with a stack, and `haven focus <slug>`; heartbeats never move it. If it goes down there is no focus until one of those runs again.
+
+```bash
+haven focus              # prints "focus: <slug>" or "focus: none"
+haven focus <slug>       # make a registered stack the focus (a unique prefix works)
+haven status             # shows the same "focus:" line
+```
+
 ## install, setup, switch, clean
 
 ```bash
@@ -108,6 +119,8 @@ prometheus loki` and the pinned ClickHouse, Tempo and Alloy downloads). macOS ne
 - haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or
   observability, sandboxed Langy, `haven pr --throwaway`), records that in `colima-<profile>.json`, and stops it
   once nothing needs it (`haven status` adds "stopped by haven"). A VM you started is never stopped.
+- `haven machine settings set vm off` keeps haven off the VM entirely: ClickHouse and observability run
+  natively, sandboxed Langy and `haven pr --throwaway` refuse naming the setting, and a VM haven started stops.
 - `machine clean` flags: `--stale-days <n>`, `--include-recent` (agent jobs finished within 48h).
   Only agents that were asked may run `haven machine clean` or `haven down --destroy`.
 
@@ -115,3 +128,5 @@ Internal commands (hidden from help, spawned by haven, not for agents): `haven k
 keeper), `haven go-watch`, `haven simulator`, `haven static <lane> <dir> <port>` (serves a built bundle
 for `+design-system` and `+mail-room`). `haven hmr`, `haven git` and `haven play-launch` are deleted (ADR-064).
 See also: `haven-env` (`machine limits`), `haven-logs`, `troubleshooting.md` in `haven`.
+
+`haven reload` and `haven daemon restart` finish by ensuring the shared portless proxy is up; every portless command runs in its own session.

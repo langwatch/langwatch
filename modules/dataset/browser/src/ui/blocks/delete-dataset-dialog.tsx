@@ -17,6 +17,7 @@ export function DeleteDatasetDialog({
       open={open}
       onClose={onClose}
       onConfirm={onConfirm}
+      title="Delete dataset?"
       closeOnConfirm={false}
       trimConfirmation
       description={`Deleting "${datasetName ?? "this dataset"}" cannot be undone.`}

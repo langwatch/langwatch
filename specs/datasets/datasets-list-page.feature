@@ -78,6 +78,13 @@ Feature: Datasets list page
     Then I see that the list is loading
     And I am not shown an empty-project message
 
+  @integration
+  Scenario: A failed refresh keeps the datasets I already see
+    Given my datasets have loaded
+    When a later refresh of the list fails
+    Then I still see my datasets
+    And I am told the refresh failed, above them
+
   # ============================================================================
   # Creating
   # ============================================================================

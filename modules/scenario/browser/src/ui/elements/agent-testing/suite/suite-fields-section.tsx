@@ -35,7 +35,6 @@ import { GripVertical, X } from "lucide-react";
 
 import type { SuiteFieldRow } from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import { useFocusOnMount } from "../../../../behavior/use-focus-on-mount.ts";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { DIALOG_FIELD_STYLE, FieldError, FieldLabel } from "../shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../shared/remove-block-button.tsx";
 
@@ -86,8 +85,8 @@ function RowButton({
       variant="ghost"
       height="22px"
       minWidth="22px"
-      color={FG_MUTED}
-      boxShadow={QUIET_BUTTON_SHADOW}
+      color="fg.muted"
+      boxShadow="none"
       cursor={grab ? "grab" : undefined}
       _hover={{ color: danger ? "red.fg" : "fg" }}
       onClick={onClick}
@@ -147,7 +146,7 @@ function FieldRow({
           flex={1}
           minWidth={0}
           fontFamily="mono"
-          fontSize="12px"
+          textStyle="caption"
           paddingY={1}
           aria-label={`Field ${index + 1} identifier`}
           placeholder={FIELD_IDENTIFIER_PLACEHOLDER}
@@ -159,7 +158,7 @@ function FieldRow({
           <NativeSelect.Field
             {...DIALOG_FIELD_STYLE}
             paddingY={1}
-            fontSize="12px"
+            textStyle="caption"
             aria-label={`Field ${index + 1} type`}
             value={row.type}
             onChange={(event) => onPatch(index, { type: event.target.value as SuiteFieldType })}
@@ -218,7 +217,7 @@ export function SuiteFieldsSection({
         Fields
         <RemoveBlockButton label="Remove the fields" onClick={onClose} />
       </FieldLabel>
-      <Text fontSize="11px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         {FIELDS_SECTION_HELP}
       </Text>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -242,7 +241,7 @@ export function SuiteFieldsSection({
       <chakra.button
         type="button"
         alignSelf="flex-start"
-        fontSize="12px"
+        textStyle="caption"
         fontWeight="medium"
         color="blue.fg"
         cursor="pointer"

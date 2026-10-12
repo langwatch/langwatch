@@ -1,6 +1,5 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Button, Spinner, Text } from "@langwatch/design-system/primitives";
+import { IconButton, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type LocalPromptConfig,
@@ -171,15 +170,11 @@ const convertTabToTarget = ({
   };
 };
 
-interface ExperimentFromPlaygroundButtonProps {
-  iconOnly?: boolean;
-}
-
 /**
  * Button to create an experiment from the current prompt playground tabs. Opens a
  * confirmation dialog and creates the experiment with all open prompts as targets.
  */
-export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlaygroundButtonProps) {
+export function ExperimentFromPlaygroundButton() {
   const { project, hasPermission } = usePromptProject();
   const host = usePromptHost();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -285,45 +280,36 @@ export function ExperimentFromPlaygroundButton({ iconOnly }: ExperimentFromPlayg
 
   return (
     <>
-      <Tooltip content="Experiment" disabled={!iconOnly}>
-        <PageLayout.HeaderButton
+      <Tooltip content="Experiment">
+        <IconButton
+          aria-label="Experiment"
+          size="sm"
+          variant="outline"
           onClick={() => setIsDialogOpen(true)}
           disabled={isDisabled}
           title={isDisabled ? "Open a prompt to create an experiment" : undefined}
         >
-          <FlaskConical size="18px" />
-          {!iconOnly && "Experiment"}
-        </PageLayout.HeaderButton>
+          <FlaskConical size="16px" />
+        </IconButton>
       </Tooltip>
 
-      <Dialog.Root open={isDialogOpen} onOpenChange={({ open }) => setIsDialogOpen(open)}>
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Create Experiment</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text>
-              {!isComparing || promptCount === 1
-                ? "Create new experiment with this prompt?"
-                : `Create new experiment with these prompts? (${promptCount} prompts)`}
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isCreating}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              onClick={handleCreate}
-              disabled={isCreating || isLoadingSavedPrompts}
-            >
-              {(isCreating || isLoadingSavedPrompts) && <Spinner size="sm" marginRight={2} />}
-              {isLoadingSavedPrompts ? "Loading..." : "Create"}
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
+      <Dialog
+        open={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        title="Create experiment"
+        busy={isCreating}
+        primaryAction={{
+          label: isLoadingSavedPrompts ? "Loading..." : "Create",
+          onClick: handleCreate,
+          loading: isCreating || isLoadingSavedPrompts,
+        }}
+      >
+        <Text>
+          {!isComparing || promptCount === 1
+            ? "Create new experiment with this prompt?"
+            : `Create new experiment with these prompts? (${promptCount} prompts)`}
+        </Text>
+      </Dialog>
     </>
   );
 }

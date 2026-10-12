@@ -192,6 +192,40 @@ func totalPending(counts []QueueCount) int {
 	return total
 }
 
+// QueueNotDue counts group-queue jobs scheduled later than now (zset score = due ms), such as the trace
+// pipeline's five-minute deferred origin jobs: waiting by design, not a backlog the worker failed to drain.
+func QueueNotDue(ctx context.Context, port string) (int, error) {
+	names, err := scanKeys(ctx, port, "*:gq:group:*:jobs")
+	if err != nil || len(names) == 0 {
+		return 0, err
+	}
+	after := "(" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+	commands := make([][]string, 0, len(names))
+	for _, name := range names {
+		commands = append(commands, []string{"ZCOUNT", name, after, "+inf"})
+	}
+	replies, err := redisReplies(ctx, port, commands)
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, reply := range replies {
+		total += replyInt(reply)
+	}
+	return total, nil
+}
+
+// QueueDueDepth is QueueDepth less the jobs not yet due; the not-due scan runs only above limit.
+func QueueDueDepth(ctx context.Context, port string, limit int) (depth, notDue int, err error) {
+	if depth, err = QueueDepth(ctx, port); err != nil || depth <= limit {
+		return depth, 0, err
+	}
+	if notDue, err = QueueNotDue(ctx, port); err != nil {
+		return depth, 0, err
+	}
+	return max(depth-notDue, 0), notDue, nil
+}
+
 // QueueBreakdown names each queue's counts, so a report reader can judge what the depth counted.
 func QueueBreakdown(ctx context.Context, port string) string {
 	counts, err := queueCounts(ctx, redisCLI(port))

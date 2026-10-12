@@ -84,6 +84,7 @@ import type {
   AuditLogFilters,
   CreateAndAssignInput,
   CreateAndAssignResult,
+  FounderOrganizationCreated,
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
@@ -862,10 +863,9 @@ function auditLogFilterConditions({
     });
   }
 
+  // A project-filtered read holds that project's rows only, never the organization-wide ones.
   if (projectId) {
-    conditions.push({
-      OR: [{ projectId }, { projectId: null }],
-    });
+    conditions.push({ projectId });
   }
 
   if (startDate !== undefined || endDate !== undefined) {
@@ -1011,34 +1011,45 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return organization;
   }
 
-  async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
+  async createAndAssign(input: CreateAndAssignInput): Promise<FounderOrganizationCreated> {
     const created = await this.createFounderBootstrap(input);
+    let landed: boolean;
 
     try {
       // The membership stays disabled while the founder's two grants make
       // their round trip, so committing the organization first exposes no access.
-      await this.writer.attachBindings({
-        organizationId: created.organization.id,
-        bindings: [
-          { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: created.organization.id },
-          { scopeType: RoleBindingScopeType.TEAM, scopeId: created.team.id },
-        ].map((scope) => ({
-          bindingId: newAuthzGrantId(),
-          principal: { userId: input.userId },
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
-          ...scope,
-          membershipStamp: created.membershipStamp,
-          membershipBootstrap: true,
-        })),
-        caller: { type: "system" },
-        actor: ledgerActorFor({
-          userId: input.userId,
-          fallback: "organizationService",
+      landed = await landedInTime(() =>
+        this.writer.attachBindings({
+          organizationId: created.organization.id,
+          bindings: [
+            { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: created.organization.id },
+            { scopeType: RoleBindingScopeType.TEAM, scopeId: created.team.id },
+          ].map((scope) => ({
+            bindingId: newAuthzGrantId(),
+            principal: { userId: input.userId },
+            role: TeamUserRole.ADMIN,
+            customRoleId: null,
+            ...scope,
+            membershipStamp: created.membershipStamp,
+            membershipBootstrap: true,
+          })),
+          caller: { type: "system" },
+          actor: ledgerActorFor({
+            userId: input.userId,
+            fallback: "organizationService",
+          }),
+          onDuplicate: "skip",
+          requireProjection: true,
         }),
-        onDuplicate: "skip",
-        requireProjection: true,
-      });
+      );
+      // Slow is not refused: the append is durable and fenced to this membership, so the
+      // organization stays and its grants land when a worker takes them (T0-F11).
+      if (!landed) {
+        logger.warn(
+          { organizationId: created.organization.id, userId: input.userId },
+          "the founder's grants had not landed yet; kept the organization, they converge",
+        );
+      }
 
       await this.prisma.organizationUser.update({
         where: {
@@ -1063,7 +1074,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       throw error;
     }
 
-    return { organization: created.organization, team: created.team };
+    return { organization: created.organization, team: created.team, grantsConfirmed: landed };
   }
 
   /** The organization, its first team and the founder's membership, held disabled. */

@@ -9,6 +9,8 @@ import {
   ReplayAlreadyRunningError,
   ReplayStartFailedError,
   type ReplayHistoryEntry,
+  type ReplayHistoryPage,
+  type ReplayHistoryPageInput,
   type ReplayStatus,
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
@@ -75,6 +77,27 @@ export class ReplayService {
 
   async getHistory(): Promise<ReplayHistoryEntry[]> {
     return this.repo.findHistory();
+  }
+
+  /**
+   * The next page after `cursor`, the run id of the previous page's last entry. The position is
+   * found by that id in the retained list, so a run prepended since the last read changes nothing.
+   */
+  async getHistoryPage({ cursor, limit }: ReplayHistoryPageInput): Promise<ReplayHistoryPage> {
+    const history = await this.repo.findHistory();
+    const cursorAt = cursor === void 0 ? -1 : history.findIndex((entry) => entry.runId === cursor);
+    if (cursor !== void 0 && cursorAt === -1) return { outcome: "cursor_expired" };
+
+    const start = cursorAt + 1;
+    const entries = history.slice(start, start + limit);
+    const hasMore = start + limit < history.length;
+
+    return {
+      outcome: "page",
+      entries,
+      hasMore,
+      nextCursor: hasMore ? (entries.at(-1)?.runId ?? null) : null,
+    };
   }
 
   async findHistoryEntry(params: { runId: string }): Promise<ReplayHistoryEntry | null> {

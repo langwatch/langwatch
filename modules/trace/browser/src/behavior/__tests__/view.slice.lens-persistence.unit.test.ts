@@ -111,8 +111,8 @@ describe("viewStore drafts when device storage arrives after the store", () => {
     vi.resetModules();
   });
 
-  /** @scenario "Eval column survives a reload" */
   describe("given an All lens draft holding an eval column", () => {
+    /** @scenario "Eval column survives a reload" */
     it("restores the column once the reader is answered", async () => {
       localStorage.setItem(
         "langwatch:traces-v2:drafts:v1",

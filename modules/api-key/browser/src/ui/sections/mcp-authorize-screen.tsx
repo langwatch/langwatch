@@ -153,7 +153,7 @@ export default function McpAuthorize() {
         intro={`${appName} is asking to use your LangWatch project. Allow it?`}
       >
         <HStack width="full" justify="space-between">
-          <Text fontSize="sm" color="fg.muted">
+          <Text textStyle="body" color="fg.muted">
             Project
           </Text>
           {host.projectSwitcher()}

@@ -50,13 +50,13 @@ export function CallerVoiceGroup({ control }: { control: Control<ScenarioFormDat
       </Collapsible.Trigger>
       <Collapsible.Content>
         <VStack align="stretch" gap={4} pt={3}>
-          <Text fontSize="12px" color="fg.muted">
+          <Text textStyle="caption" color="fg.muted">
             Used when this scenario runs against a voice agent.
           </Text>
           {/* The picker queries the project's providers, so it mounts only once opened. */}
           {open && (
             <Field.Root>
-              <Text fontSize="13px" fontWeight="medium">
+              <Text textStyle="bodySm" fontWeight="medium">
                 Voice
               </Text>
               <Controller
@@ -79,7 +79,7 @@ export function CallerVoiceGroup({ control }: { control: Control<ScenarioFormDat
               const percent = Math.round((field.value ?? 0) * 100);
               return (
                 <Field.Root>
-                  <Text fontSize="13px" fontWeight="medium">
+                  <Text textStyle="bodySm" fontWeight="medium">
                     Interrupts: {percent}%
                   </Text>
                   <SimpleSlider
@@ -96,7 +96,7 @@ export function CallerVoiceGroup({ control }: { control: Control<ScenarioFormDat
             }}
           />
           <Field.Root>
-            <Text fontSize="13px" fontWeight="medium">
+            <Text textStyle="bodySm" fontWeight="medium">
               Effects
             </Text>
             <Controller

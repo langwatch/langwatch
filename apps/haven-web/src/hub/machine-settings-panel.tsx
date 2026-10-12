@@ -24,6 +24,7 @@ const POLL_MS = 10_000;
 
 const LABELS: Record<string, string> = {
   observability: "Observability stack",
+  vm: "Colima VM (off: native only)",
   "runtime-auto-stop": "Stop the VM when idle",
   "runtime-idle-grace-minutes": "Idle grace before the VM stops",
 };

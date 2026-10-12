@@ -66,17 +66,20 @@ describe("AddOverrideDrawer plan-gated behavior", () => {
     };
 
     /** @scenario "A grandfathered value is shown but never silently changed" */
-    it("surfaces it as read-only 'current (legacy)' and disables Save until changed", () => {
-      renderDrawer({ isEnterprise: false, editTarget: legacyTarget });
+    it("surfaces it as read-only 'current (legacy)' and refuses to save it until changed", () => {
+      const onSave = vi.fn();
+      renderDrawer({ isEnterprise: false, editTarget: legacyTarget, onSave });
       // The label shows in both the selected-value readout and the option list,
       // so assert at least one occurrence rather than a unique match.
       expect(screen.getAllByText("Current: 371 days (legacy)").length).toBeGreaterThan(0);
-      // Grandfathering: never coerce or silently shorten — Save stays disabled
-      // while the read-only legacy value is selected.
-      const save = screen.getByRole("button", {
-        name: "Save changes",
-      }) as HTMLButtonElement;
-      expect(save.disabled).toBe(true);
+      // Grandfathering: never coerce or silently shorten. Save is clickable, says why it
+      // cannot save the read-only legacy value, and never reaches onSave.
+      const save = screen.getByRole("button", { name: "Save changes" });
+      expect((save as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(save);
+
+      expect(onSave).not.toHaveBeenCalled();
+      expect(screen.getByText(/isn't available on your plan/)).toBeTruthy();
     });
   });
 });

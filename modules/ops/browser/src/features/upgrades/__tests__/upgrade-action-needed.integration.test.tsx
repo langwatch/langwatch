@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let hasAccess = true;
+let attention = false;
 let stepsQuery: { data?: { items: { id: string; status: string }[] }; error?: Error } = {};
 const listSteps = vi.fn();
 
@@ -16,6 +17,7 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
     ops: {
       upgrade: {
+        attentionNotice: { useQuery: () => ({ data: { show: attention } }) },
         listSteps: {
           useQuery: (input: unknown, options: unknown) => {
             listSteps(input, options);
@@ -41,8 +43,11 @@ afterEach(() => {
   cleanup();
   listSteps.mockClear();
   hasAccess = true;
+  attention = false;
   stepsQuery = {};
 });
+
+const NOTICE = "LangWatch's last update needs attention. Contact your LangWatch operator.";
 
 function renderBar() {
   render(
@@ -97,6 +102,39 @@ describe("UpgradeActionNeeded", () => {
 
       expect(screen.queryByTestId("home-upgrade-action-needed")).toBeNull();
       expect(listSteps).toHaveBeenCalledWith({ mode: "operator" }, { enabled: false });
+    });
+  });
+
+  describe("given the upgrade attention notice answers show", () => {
+    /** @scenario "Home's upgrade notice tells a member to contact their operator" */
+    it("tells a member without ops:view to contact their operator, with no link", () => {
+      attention = true;
+      hasAccess = false;
+      renderBar();
+
+      expect(screen.getByText("Action needed for updates")).toBeTruthy();
+      expect(screen.getByText(NOTICE)).toBeTruthy();
+      expect(screen.queryByRole("link")).toBeNull();
+    });
+
+    /** @scenario "An operator's upgrade notice on Home links to Ops › Upgrades" */
+    it("shows an operator one card that links to Ops, Upgrades", () => {
+      attention = true;
+      stepsQuery = { data: { items: [{ id: "a", status: "pending" }] } };
+      renderBar();
+
+      expect(screen.getAllByText("Action needed for updates")).toHaveLength(1);
+      expect(screen.getByRole("link").getAttribute("href")).toBe("/ops/upgrades");
+    });
+  });
+
+  describe("given the upgrade attention notice has not answered yet", () => {
+    /** @scenario "The upgrade notice shows nothing while it loads" */
+    it("draws no card", () => {
+      hasAccess = false;
+      renderBar();
+
+      expect(screen.queryByTestId("home-upgrade-action-needed")).toBeNull();
     });
   });
 });

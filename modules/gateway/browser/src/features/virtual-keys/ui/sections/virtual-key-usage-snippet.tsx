@@ -1,6 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import {
-  Card,
   ClientOnly,
   CodeBlock,
   IconButton,
@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ensureShikiLangLoaded, useShikiAdapter } from "@langwatch/design-system/shiki";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { useEffect } from "react";
 
 import { useGatewayDeployment } from "../../../../behavior/gateway-session.ts";
@@ -60,6 +61,7 @@ export function VirtualKeyUsageSnippet({
   model = "gpt-5-mini",
 }: VirtualKeyUsageSnippetProps) {
   const { colorMode } = useColorMode();
+  const accent = useProductAccent();
   const deployment = useGatewayDeployment();
   const credential = secret ?? "$LANGWATCH_VK_SECRET";
   const resolvedBaseUrl = resolveSnippetGatewayBaseUrl(gatewayBaseUrl, deployment.gatewayBaseUrl);
@@ -187,18 +189,18 @@ func main() {
         Aider).{" "}
         <Link
           href="https://langwatch.ai/docs/ai-gateway/quickstart"
-          color="orange.fg"
+          color={accent.roles.fg}
           target="_blank"
           rel="noreferrer"
         >
           Read more →
         </Link>
       </Text>
-      <Tabs.RootProvider value={tabs} size="sm" variant="line" colorPalette="accent">
+      <Tabs.RootProvider value={tabs} size="sm" variant="line" colorPalette={accent.colorPalette}>
         <CodeBlock.AdapterProvider value={shikiAdapter}>
           <ClientOnly>
             {() => (
-              <Card.Root variant="showcase">
+              <Card variant="showcase" padding="none">
                 <CodeBlock.Root
                   code={activeTab.code}
                   language={activeTab.language}
@@ -211,12 +213,13 @@ func main() {
                   bg="transparent"
                   borderWidth="0"
                   overflow="hidden"
+                  minWidth={0}
                 >
                   <CodeBlock.Header borderBottomWidth="1px" borderColor="border">
                     <Tabs.List w="full" border="0" ms="-1">
                       {tabItems.map((t) => (
                         <Tabs.Trigger
-                          colorPalette="accent"
+                          colorPalette={accent.colorPalette}
                           key={t.key}
                           value={t.key}
                           textStyle="xs"
@@ -227,7 +230,7 @@ func main() {
                       ))}
                     </Tabs.List>
                     <CodeBlock.CopyTrigger asChild>
-                      <IconButton variant="ghost" size="2xs" mr={"-4px"} aria-label="Copy code">
+                      <IconButton variant="ghost" size="2xs" mr="-1" aria-label="Copy code">
                         <CodeBlock.CopyIndicator />
                       </IconButton>
                     </CodeBlock.CopyTrigger>
@@ -237,6 +240,8 @@ func main() {
                     css={{
                       "& pre, & code": {
                         transition: "background-color 0.3s ease, color 0.3s ease",
+                        whiteSpace: "pre-wrap",
+                        overflowWrap: "anywhere",
                       },
                     }}
                     overflow="scroll"
@@ -251,7 +256,7 @@ func main() {
                     </Tabs.Content>
                   </CodeBlock.Content>
                 </CodeBlock.Root>
-              </Card.Root>
+              </Card>
             )}
           </ClientOnly>
         </CodeBlock.AdapterProvider>

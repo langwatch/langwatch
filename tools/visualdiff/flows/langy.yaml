@@ -130,7 +130,7 @@ flows:
 
   # Flows below need the stack's llmsim (`haven up +llm`): the model picker offers langy-echo, and
   # in that mode a plain message comes back verbatim and a `/tool <name> <json>` line makes exactly
-  # that tool call (services/llmsim/README.md). Labels and test ids are main's.
+  # that tool call (services/sims/llmsim/README.md). Labels and test ids are main's.
   - id: langy-open-from-home
     title: Open Langy from the project home, then minimise it
     steps:

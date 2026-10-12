@@ -104,7 +104,7 @@ export const useCreateProductScreens = ({
       [ProductScreenIndex.VIA_CLAUDE_CODE]: {
         id: "via-claude-code",
         required: false,
-        heading: "Via Coding Agent",
+        heading: "With a coding agent",
         subHeading: "Pick how you want to work with LangWatch in your coding agent",
         widthVariant: "full",
         component: ViaClaudeCodeOnboardingScreen,
@@ -112,7 +112,7 @@ export const useCreateProductScreens = ({
       [ProductScreenIndex.VIA_PLATFORM]: {
         id: "via-platform",
         required: false,
-        heading: "Via the Platform",
+        heading: "In the platform",
         subHeading: "Configure everything from the dashboard, no code changes needed",
         widthVariant: "full",
         component: ViaPlatformScreen,

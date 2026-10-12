@@ -25,7 +25,7 @@ const SkeletonTable = ({ rows = 5, columns = 3 }: Omit<TableSkeletonProps, "with
       },
       "& td": {
         borderBottom: "1px solid var(--chakra-colors-border-muted)",
-        padding: "12px",
+        padding: "3",
       },
     }}
   >

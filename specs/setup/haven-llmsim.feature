@@ -6,7 +6,7 @@ Feature: llmsim, a local LLM provider stand-in run by haven
   exercise every model path for $0 and get the same answer for the same prompt.
   It accepts any key and checks none: it is a dev shim.
 
-  # Bound by Go tests in services/llmsim/*_test.go and
+  # Bound by Go tests in services/sims/llmsim/*_test.go and
   # tools/thuishaven/domain/overlay_llm_test.go and tools/thuishaven/app/plan_llm_test.go, by their `// @scenario`
   # annotations. The playground scenario waits on a browser run against a stack.
 
@@ -110,7 +110,7 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the answer makes exactly those tool calls with exactly those arguments, in order
     And any other lines become the answer's text
 
-  # Bound by services/llmsim/llmsim_test.go. An agent whose model is fixed (Langy's agent
+  # Bound by services/sims/llmsim/llmsim_test.go. An agent whose model is fixed (Langy's agent
   # runs on the project's default model) can still be steered to one exact call.
   Scenario: Any model makes the tool calls a scripted message names
     Given the request offers tools and its model is not langy-echo
@@ -118,7 +118,7 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the answer makes exactly those tool calls with exactly those arguments, in order
     And a message without such lines keeps the model's usual answer
 
-  # Bound by services/llmsim/llmsim_test.go. A schema-less json_object caller (trace Ask AI)
+  # Bound by services/sims/llmsim/llmsim_test.go. A schema-less json_object caller (trace Ask AI)
   # gets one exact object, so a walk can drive it to a parseable answer.
   Scenario: A JSON request answers the object a scripted message names
     Given the request asks for a JSON object or a JSON schema
@@ -126,7 +126,7 @@ Feature: llmsim, a local LLM provider stand-in run by haven
     Then the answer is exactly that object
     And a text request with the same message keeps the model's usual answer
 
-  # Bound by services/llmsim/llmsim_test.go. Steers a JSON call whose prompt the
+  # Bound by services/sims/llmsim/llmsim_test.go. Steers a JSON call whose prompt the
   # person cannot write, such as the trace search router behind the search bar.
   Scenario: A queued JSON answer is the next JSON request's answer, once
     Given the console settings hold a "nextJson" object

@@ -1,3 +1,4 @@
+import { PRODUCT_NAMES } from "@langwatch/design-system/product-colours";
 import { describe, expect, it } from "vitest";
 
 import { PRODUCTS, productById, productFromPathname, seatReachesProduct } from "../products.ts";
@@ -132,6 +133,16 @@ describe("productFromPathname", () => {
           }
         }
       });
+    });
+  });
+});
+
+describe("product accent map", () => {
+  describe("given the registry and the design system's colour map", () => {
+    /** @scenario "Every registered product has an accent assignment and no other does" */
+    it("names exactly the same products in both directions", () => {
+      const registered = PRODUCTS.map((product) => product.id).toSorted();
+      expect(PRODUCT_NAMES.toSorted()).toEqual(registered);
     });
   });
 });

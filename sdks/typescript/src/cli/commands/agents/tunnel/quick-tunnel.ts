@@ -6,8 +6,11 @@
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
+import * as path from "node:path";
 
 import chalk from "chalk";
+
+import { configPath } from "../../../utils/governance/config";
 
 /** How long to wait for the tunnel to report its public URL. */
 const TUNNEL_URL_TIMEOUT_MS = 30_000;
@@ -48,6 +51,15 @@ export interface TunnelHandle {
  */
 const UNVERIFIED_PLATFORMS = new Set(["darwin-x64", "darwin-arm64"]);
 
+/**
+ * Where the binary is cached: beside the CLI config, so it follows
+ * LANGWATCH_CLI_CONFIG and survives package upgrades.
+ */
+function cloudflaredBinPath(): string {
+  const name = process.platform === "win32" ? "cloudflared.exe" : "cloudflared";
+  return path.join(path.dirname(configPath()), "bin", name);
+}
+
 /** Verifies the binary about to run against the pinned release digest. */
 function verifyBinary(binPath: string): void {
   const platformKey = `${process.platform}-${process.arch}`;
@@ -83,21 +95,24 @@ export async function startQuickTunnel({
   localUrl: string;
 }): Promise<{ url: string; tunnel: TunnelHandle }> {
   const cloudflared = await import("cloudflared");
+  const binPath = cloudflaredBinPath();
+  cloudflared.use(binPath);
 
-  if (!fs.existsSync(cloudflared.bin)) {
+  if (!fs.existsSync(binPath)) {
     console.log(
       chalk.gray(
         `First run: downloading the cloudflared binary (release ${CLOUDFLARED_RELEASE}). Quick tunnels are a Cloudflare service, subject to the Cloudflare terms: ${CLOUDFLARE_TERMS_URL}`,
       ),
     );
-    await cloudflared.install(cloudflared.bin, CLOUDFLARED_RELEASE);
+    fs.mkdirSync(path.dirname(binPath), { recursive: true });
+    await cloudflared.install(binPath, CLOUDFLARED_RELEASE);
   }
 
   // Every run, not only the run that downloaded: a binary already on disk
   // comes from an earlier release, another tool, or a tampered cache, and
   // executing it unverified would break the checksum guarantee this path
   // advertises.
-  verifyBinary(cloudflared.bin);
+  verifyBinary(binPath);
 
   const tunnel = cloudflared.Tunnel.quick(localUrl);
   const url = await new Promise<string>((resolve, reject) => {

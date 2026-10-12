@@ -5,15 +5,7 @@
 
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Badge,
-  Box,
-  HStack,
-  IconButton,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Box, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import {
@@ -63,40 +55,40 @@ export const OnlineEvaluationsTable = ({
   onToggle,
   onDelete,
 }: OnlineEvaluationsTableProps) => (
-  <ListTable width="full">
-    <Table.Header>
-      <Table.Row>
-        <Table.ColumnHeader width="32%">Online evaluation</Table.ColumnHeader>
-        <Table.ColumnHeader width="15%">Mode</Table.ColumnHeader>
-        <Table.ColumnHeader width="13%">Status</Table.ColumnHeader>
-        <Table.ColumnHeader width="35%">Performance, last 7 days</Table.ColumnHeader>
-        <Table.ColumnHeader width="5%" />
-      </Table.Row>
-    </Table.Header>
-    <Table.Body>
+  <ListTable>
+    <ListTable.Header>
+      <ListTable.Row>
+        <ListTable.ColumnHeader width="32%">Online evaluation</ListTable.ColumnHeader>
+        <ListTable.ColumnHeader width="15%">Mode</ListTable.ColumnHeader>
+        <ListTable.ColumnHeader width="13%">Status</ListTable.ColumnHeader>
+        <ListTable.ColumnHeader width="35%">Performance, last 7 days</ListTable.ColumnHeader>
+        <ListTable.ColumnHeader width="5%" label="Actions" />
+      </ListTable.Row>
+    </ListTable.Header>
+    <ListTable.Body>
       {rows.map((row) => {
         const [definition] = findEvaluatorDefinitions(row.checkType);
         const href = analyticsHref(projectSlug, row.id);
 
         return (
-          <Table.Row key={row.id} data-testid={`monitor-row-${row.id}`}>
-            <Table.Cell>
+          <ListTable.Row key={row.id} data-testid={`monitor-row-${row.id}`}>
+            <ListTable.Cell>
               <VStack align="start" gap={0.5}>
                 <Text fontWeight="medium">{row.name}</Text>
                 <Text textStyle="xs" color="fg.muted">
                   {definition?.name ?? row.checkType}
                 </Text>
               </VStack>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Badge
                 colorPalette={row.executionMode === "AS_GUARDRAIL" ? "blue" : "teal"}
                 variant="subtle"
               >
                 {row.executionMode === "AS_GUARDRAIL" ? "Guardrail" : "Online evaluation"}
               </Badge>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <HStack gap={2}>
                 <Box
                   width="6px"
@@ -106,8 +98,8 @@ export const OnlineEvaluationsTable = ({
                 />
                 <Text textStyle="sm">{row.enabled ? "Active" : "Paused"}</Text>
               </HStack>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               {canViewAnalytics ? (
                 <MonitorLink
                   href={href}
@@ -136,8 +128,8 @@ export const OnlineEvaluationsTable = ({
                   Analytics access required
                 </Text>
               )}
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               {(canViewAnalytics || canManage) && (
                 <Menu.Root>
                   <Menu.Trigger asChild>
@@ -190,10 +182,10 @@ export const OnlineEvaluationsTable = ({
                   </Menu.Content>
                 </Menu.Root>
               )}
-            </Table.Cell>
-          </Table.Row>
+            </ListTable.Cell>
+          </ListTable.Row>
         );
       })}
-    </Table.Body>
+    </ListTable.Body>
   </ListTable>
 );

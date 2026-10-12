@@ -18,6 +18,14 @@ export function privateTargetsOf(
   return targets.filter((target) => target.target !== SHARED_TARGET);
 }
 
+/** The Dataplanes table's rows: the shared target first, then each private one (T7-F5). */
+function sharedFirst(targets: readonly UpgradeTargetSummaryView[]): UpgradeTargetSummaryView[] {
+  return [
+    ...targets.filter((target) => target.target === SHARED_TARGET),
+    ...privateTargetsOf(targets),
+  ];
+}
+
 export type UpgradesTab = "overview" | "runs" | "steps" | "organizations" | "dataplanes";
 
 /** The tab an address names; anything unknown, or Dataplanes with no target, opens the overview. */
@@ -138,7 +146,7 @@ export function UpgradesTabs({
       </Tabs.Content>
       {targets.length > 0 && (
         <Tabs.Content value="dataplanes" padding={0}>
-          <TargetsTable targets={targets} />
+          <TargetsTable targets={sharedFirst(allTargets)} />
         </Tabs.Content>
       )}
     </Tabs.Root>

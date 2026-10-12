@@ -72,10 +72,28 @@ func TestPartsRedisAndHostPressureHalveOrPause(t *testing.T) {
 func TestCleanReadsGrowTheWindowToItsCeiling(t *testing.T) {
 	guard := NewGuard(nil)
 	for range 3 * 40 {
-		guard.Observe(time.Now(), []Reading{{SignalClickHouseMemory, 0.1}})
+		guard.Observe(time.Now(), []Reading{{SignalClickHouseMemory, 0.1}, {SignalWorkerBacklog, 100}})
 	}
 	if guard.Window != WindowCeil {
 		t.Fatalf("window %d, want %d", guard.Window, WindowCeil)
+	}
+}
+
+func TestAnUnreadWorkerBacklogNeitherResumesNorGrowsTheWindow(t *testing.T) {
+	now := time.Now()
+	var log strings.Builder
+	guard := NewGuard(&log)
+	guard.Observe(now, []Reading{{SignalWorkerBacklog, 230_000}})
+	guard.Observe(now, []Reading{{SignalClickHouseMemory, 0.1}})
+	if guard.Paused == nil || strings.Contains(log.String(), "resumed") {
+		t.Fatalf("an unread backlog resumed the seed: %q", log.String())
+	}
+	fresh := NewGuard(nil)
+	for range 3 * 5 {
+		fresh.Observe(now, []Reading{{SignalClickHouseMemory, 0.1}})
+	}
+	if fresh.Window != WindowStart {
+		t.Fatalf("window grew to %d on reads that never saw the backlog", fresh.Window)
 	}
 }
 

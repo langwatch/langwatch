@@ -8,7 +8,7 @@ user-invocable: true
 
 A local S3 answering the path-style calls the product makes (PUT, GET, HEAD, DELETE
 object; HEAD and PUT bucket; ListObjectsV2, so upgradelab snapshots work against it), with SigV4 (header or presigned) checked against one dev
-key. Code: `services/storagesim`, console `apps/storagesim-web`.
+key. Code: `services/sims/storagesim`, console `apps/sims/src/storage`.
 
 ## Run it
 
@@ -49,7 +49,7 @@ key answers `NoSuchKey`.
 
 - Hit the loopback port directly; presign with the AWS SDK against that endpoint.
 - Object operations take one of 64 striped locks, so distinct keys do not serialise.
-  Benchmark: `go test -bench . -benchmem ./services/storagesim`.
+  Benchmark: `go test -bench . -benchmem ./services/sims/storagesim`.
 - Limits: single PUT up to 5 GiB, keys up to 1024 bytes; ListObjectsV2 only (no v1
   listing, no ListBuckets), no multipart or versioning. Listing reads every sidecar per page.
 

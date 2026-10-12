@@ -3,7 +3,7 @@
 import type { UiScopeStatus } from "@langwatch/browser-host/session";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, type RenderResult } from "@testing-library/react";
-import type { ReactElement, ReactNode } from "react";
+import { useSyncExternalStore, type ReactElement, type ReactNode } from "react";
 
 import {
   AnnotationHostApi,
@@ -40,12 +40,35 @@ export class StubAnnotationHost extends AnnotationHostApi {
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
   readonly drawers: { name: string; params?: Readonly<Record<string, unknown>> }[] = [];
   /** The drawer the address bar names; a test clears it to close the drawer. */
-  openDrawerName: string | undefined;
+  /** One box shared with the harness's per-change views of this host. */
+  readonly drawer = {
+    name: undefined as string | undefined,
+    version: 0,
+    listeners: new Set<() => void>(),
+  };
 
   constructor(private readonly options: StubAnnotationHostOptions = {}) {
     super();
-    this.openDrawerName = options.openDrawer;
+    this.drawer.name = options.openDrawer;
   }
+
+  get openDrawerName(): string | undefined {
+    return this.drawer.name;
+  }
+
+  set openDrawerName(name: string | undefined) {
+    this.drawer.name = name;
+    this.drawer.version += 1;
+    this.drawer.listeners.forEach((listener) => listener());
+  }
+
+  /** What the harness listens to, so a changed drawer reaches a memoised reader. */
+  readonly subscribeToDrawer = (listener: () => void): (() => void) => {
+    this.drawer.listeners.add(listener);
+    return () => void this.drawer.listeners.delete(listener);
+  };
+
+  readonly drawerSnapshot = (): number => this.drawer.version;
 
   project(): AnnotationHostProject | undefined {
     return "project" in this.options
@@ -120,6 +143,9 @@ export class StubAnnotationHost extends AnnotationHostApi {
   }
 }
 
+const noSubscription = (): (() => void) => () => {};
+const noSnapshot = (): number => 0;
+
 /** The providers every annotations component needs before it can render. */
 export function AnnotationTestHarness({
   host,
@@ -128,9 +154,18 @@ export function AnnotationTestHarness({
   host: AnnotationHostApi;
   children: ReactNode;
 }) {
+  "use no memo";
+  useSyncExternalStore(
+    host instanceof StubAnnotationHost ? host.subscribeToDrawer : noSubscription,
+    host instanceof StubAnnotationHost ? host.drawerSnapshot : noSnapshot,
+  );
+  // The real host is a new value when the address changes; a stub that mutates in
+  // place would leave a memoised reader of `isDrawerOpen` on the old answer.
+  const reactiveHost: AnnotationHostApi = Object.create(host);
+
   return (
     <DesignSystemProvider forcedTheme="light">
-      <AnnotationHostProvider value={host}>{children}</AnnotationHostProvider>
+      <AnnotationHostProvider value={reactiveHost}>{children}</AnnotationHostProvider>
     </DesignSystemProvider>
   );
 }

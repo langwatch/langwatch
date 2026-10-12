@@ -1,5 +1,5 @@
-import { Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Text } from "@langwatch/design-system/primitives";
 import { useRef } from "react";
 
 import type { MakeDefaultWritePlan } from "../../model/logic/langy-make-default-offer.ts";
@@ -24,9 +24,6 @@ export function LangyMakeDefaultDialog({
   onDecline: () => void;
   onConfirm: () => void;
 }) {
-  // Keeping the pick to this conversation is the safe answer, so it is the
-  // one already under the reader's fingers when the dialog opens.
-  const declineRef = useRef<HTMLButtonElement>(null);
   // The plan outlives the decision by one closing frame, so the dialog keeps
   // its content through its own close animation.
   const lastPlanRef = useRef<MakeDefaultWritePlan | null>(null);
@@ -37,47 +34,28 @@ export function LangyMakeDefaultDialog({
   const modelLabel = shown ? shown.model.split("/").slice(1).join("/") || shown.model : "";
 
   return (
-    <Dialog.Root
+    // Keeping the pick to this conversation is the safe answer, so it is the
+    // one already under the reader's fingers when the dialog opens.
+    <Dialog
       open={!!plan}
+      onClose={onDecline}
+      title="Set model as default?"
+      size="md"
       placement="center"
-      onOpenChange={(details) => {
-        if (!details.open) onDecline();
-      }}
-      initialFocusEl={() => declineRef.current}
+      initialFocus="secondary"
+      secondaryAction={{ label: "Just this conversation", onClick: onDecline }}
+      primaryAction={shown ? { label: "Make it the default", onClick: onConfirm } : undefined}
+      errorScope="Langy default ask"
     >
       {shown ? (
-        <Dialog.Content maxWidth="480px" errorScope="Langy default ask">
-          <Dialog.CloseTrigger />
-          <Dialog.Header>
-            <Dialog.Title>Set model as default?</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body paddingTop={0}>
-            <Text fontSize="sm" color="fg.muted" wordBreak="break-word">
-              Make{" "}
-              <Text
-                as="span"
-                fontWeight="semibold"
-                color="fg"
-                data-testid="langy-make-default-model"
-              >
-                {modelLabel}
-              </Text>{" "}
-              the default model for Langy for the {shown.scopeLabel}?
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack width="full">
-              <Spacer />
-              <Button ref={declineRef} variant="outline" onClick={onDecline}>
-                Just this conversation
-              </Button>
-              <Button colorPalette="orange" onClick={onConfirm}>
-                Make it the default
-              </Button>
-            </HStack>
-          </Dialog.Footer>
-        </Dialog.Content>
+        <Text fontSize="sm" color="fg.muted" wordBreak="break-word">
+          Make{" "}
+          <Text as="span" fontWeight="semibold" color="fg" data-testid="langy-make-default-model">
+            {modelLabel}
+          </Text>{" "}
+          the default model for Langy for the {shown.scopeLabel}?
+        </Text>
       ) : null}
-    </Dialog.Root>
+    </Dialog>
   );
 }

@@ -11,7 +11,7 @@ Platform health: checks of the services a deployment depends on, all at once or 
 | Classification | core (`modules/catalogue.json`)                                                                                                 |
 | Subjects       | platform-health                                                                                                                 |
 | Halves         | [contract](contract) · [process](process/README.md)                                                                             |
-| Api token      | `PlatformHealthApi` = `moduleApi<PlatformHealthApi>()("platform-health")`, `contract/src/platform-health.ts:102` (2 operations) |
+| Api token      | `PlatformHealthApi` = `moduleApi<PlatformHealthApi>()("platform-health")`, `contract/src/platform-health.ts:127` (2 operations) |
 | Other token    | `PlatformHealthProbeApi`, `process/src/transport/platform-health-probe.rest.ts:22`                                              |
 | Installed by   | api, worker, tasks (process)                                                                                                    |
 

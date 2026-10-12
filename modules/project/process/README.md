@@ -216,7 +216,7 @@ touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<
 
 #### `findInternal`
 
-The organisation's internal governance project, or nothing when it has none.
+The organisation's internal project of this kind, or nothing when it has none.
 
 ```typescript
 findInternal(input: InternalProjectQuery): Promise<InternalProject | null>;
@@ -224,7 +224,7 @@ findInternal(input: InternalProjectQuery): Promise<InternalProject | null>;
 
 #### `ensureInternal`
 
-The organisation's internal governance project, created on first ask.
+The organisation's internal project of this kind, created on first ask.
 
 ```typescript
 ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
@@ -417,7 +417,7 @@ Permission `project:view`. Declared at `src/transport/project.rest.ts:116`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-// Params: projectRestParamsSchema, ../contract/src/project.ts:390
+// Params: projectRestParamsSchema, ../contract/src/project.ts:395
 interface Params {
   id: string;
 }
@@ -444,8 +444,8 @@ Permission `project:update`. Declared at `src/transport/project.rest.ts:140`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:390
-// Body: projectRestUpdateSchema, ../contract/src/project.ts:386
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
+// Body: projectRestUpdateSchema, ../contract/src/project.ts:391
 interface Body {
   name?: string;
   language?: string;
@@ -465,7 +465,7 @@ Permission `project:delete`. Declared at `src/transport/project.rest.ts:168`.
 Answers at `/api/projects/:id`; also, undocumented, `/api/projects/2026-08-07/:id`, `/api/projects/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:390
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
 // Response: projectRestArchivedSchema, ../contract/src/project.responses.ts:125
 interface Response {
   id: string;
@@ -483,7 +483,7 @@ Authenticated: the base key is never handed to an API token, so there is no perm
 Answers at `/api/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:390
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
 // Response: projectApiKeyRotationSchema, ../contract/src/project.responses.ts:56
 interface Response {
   apiKey: string;
@@ -499,8 +499,8 @@ Authenticated: the base key is never handed to an API token, so there is no perm
 Answers at `/api/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`.
 
 ```typescript
-type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:390
-// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:398
+type Params = z.infer<typeof projectRestParamsSchema>; // ../contract/src/project.ts:395
+// Body: projectRestRegenerateApiKeyInputSchema, ../contract/src/project.ts:403
 type Body = Record<string, unknown>;
 type Response = z.infer<typeof projectApiKeyRotationSchema>; // ../contract/src/project.responses.ts:56
 ```

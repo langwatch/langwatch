@@ -125,12 +125,16 @@ func TestQueueVerdictPassesOnlyBackAtTheBaseline(t *testing.T) {
 		t.Fatalf("stuck summary %+v", stuck)
 	}
 	verdictStuck := queueVerdict(stuck)
-	if verdictStuck.Result != "fail" || !strings.Contains(verdictStuck.Detail, "1600000 at the end") || !strings.Contains(verdictStuck.Detail, "slope") {
+	if verdictStuck.Result != "fail" || !strings.Contains(verdictStuck.Detail, "1600000 due at the end") || !strings.Contains(verdictStuck.Detail, "slope") {
 		t.Errorf("a restored backlog that never drained: %+v", verdictStuck)
 	}
 	drained := summariseQueue(append(samples, QueueSample{AtMs: 900000, Depth: 150}, QueueSample{AtMs: 910000, Depth: 20}, QueueSample{AtMs: 920000, Depth: 60}), paused, worker)
 	if drained.DrainedMs != 905000 || queueVerdict(drained).Result != "pass" {
 		t.Errorf("drained summary %+v, verdict %v", drained, queueVerdict(drained))
+	}
+	deferred := summariseQueue(append(samples, QueueSample{AtMs: 900000, Depth: 30, NotDue: 182}), paused, worker)
+	if verdict := queueVerdict(deferred); verdict.Result != "pass" || !strings.Contains(verdict.Detail, "182 more scheduled later") {
+		t.Errorf("jobs scheduled later are not a backlog: %+v", verdict)
 	}
 	relapsed := summariseQueue(append(samples, QueueSample{AtMs: 900000, Depth: 10}, QueueSample{AtMs: 910000, Depth: 5000}), paused, worker)
 	if relapsed.DrainedMs != -1 || queueVerdict(relapsed).Result != "fail" {

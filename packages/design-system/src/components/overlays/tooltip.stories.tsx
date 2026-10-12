@@ -70,3 +70,12 @@ export const LongText: Story = {
     </Stack>
   ),
 };
+
+/** A keycap after the content. Set aria-keyshortcuts on the trigger yourself. */
+export const WithShortcut: Story = {
+  args: {
+    content: "Refresh trace",
+    shortcut: { alternatives: [{ keys: ["r"] }] },
+    open: true,
+  },
+};

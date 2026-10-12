@@ -22,6 +22,8 @@ import {
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import { z, type ZodType } from "zod";
 
+import type { AutomationActionParamsSchema } from "../app/automation.app.ts";
+
 /** What a delivery credential reads as on the public API. Clients and agents match on it. */
 export const REDACTED_CREDENTIAL = "[redacted]";
 
@@ -171,14 +173,7 @@ export function readDeliveryConfiguration({
   schema,
   delivery,
 }: {
-  schema: {
-    safeParse(value: unknown):
-      | { success: true; data: unknown }
-      | {
-          success: false;
-          error: { issues: readonly { message: string; path: readonly PropertyKey[] }[] };
-        };
-  };
+  schema: AutomationActionParamsSchema;
   delivery: Record<string, unknown>;
 }): Record<string, unknown> {
   const read = schema.safeParse(delivery);

@@ -18,14 +18,24 @@ export async function pollUntilHealthy({
   check,
   timeoutMs,
   intervalMs = 500,
+  handle,
 }: {
   check: HealthCheck;
   timeoutMs: number;
   intervalMs?: number;
+  /** The supervised process behind the check: once it has crashed, waiting on is pointless. */
+  handle?: { readonly crashed: boolean };
 }): Promise<HealthProbeResult> {
   const start = nowInstant().epochMilliseconds;
   let lastReason = "no probe attempted";
   while (nowInstant().epochMilliseconds - start < timeoutMs) {
+    if (handle?.crashed) {
+      return {
+        ok: false,
+        durationMs: nowInstant().epochMilliseconds - start,
+        reason: "its process exited before it became healthy",
+      };
+    }
     const result = await check();
     if (result.ok) return { ok: true, durationMs: nowInstant().epochMilliseconds - start };
     lastReason = result.reason;

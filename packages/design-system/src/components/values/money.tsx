@@ -8,6 +8,7 @@ import {
   formatCurrencyParts,
 } from "../../format-currency.ts";
 import { Tooltip } from "../overlays/tooltip.tsx";
+import { EmptyValue } from "./empty-value.tsx";
 
 export type MoneySize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl";
 
@@ -98,6 +99,8 @@ export function Money({
   plain = false,
   "data-testid": testId,
 }: MoneyProps) {
+  // An amount parsed from an empty or malformed wire value reads as missing, never "NaN".
+  if (!Number.isFinite(amount)) return <EmptyValue />;
   const signDisplay = tone === "signed" ? "exceptZero" : "auto";
   const parts = formatCurrencyParts({
     amount,

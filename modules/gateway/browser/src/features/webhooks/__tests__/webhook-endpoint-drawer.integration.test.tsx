@@ -139,9 +139,75 @@ describe("WebhookEndpointDrawer", () => {
   });
 
   /** @scenario Saving requires a URL and at least one selected event */
-  it("cannot save without a URL and at least one event", () => {
-    renderDrawer();
-    expect(screen.getByTestId("webhook-save")).toBeDisabled();
+  it("explains every missing requirement on save, focuses the first and sends nothing", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderDrawer();
+
+    expect(screen.queryByText("Enter an endpoint URL.")).not.toBeInTheDocument();
+    expect(screen.getByTestId("webhook-save")).toBeEnabled();
+
+    await user.click(screen.getByTestId("webhook-save"));
+
+    expect(screen.getByText("Enter an endpoint URL.")).toBeInTheDocument();
+    expect(screen.getByText("Select at least one event.")).toBeInTheDocument();
+    expect(screen.getByTestId("webhook-url-input")).toHaveFocus();
+    expect(screen.getByTestId("webhook-url-input")).toBeInvalid();
+    expect(onSave).not.toHaveBeenCalled();
+
+    await user.type(screen.getByTestId("webhook-url-input"), "https://example.com/hook");
+    await user.click(screen.getByTestId("webhook-save"));
+    expect(screen.queryByText("Enter an endpoint URL.")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "All Gateway events" })).toHaveFocus();
+    expect(onSave).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("webhook-event-gateway.request.completed"));
+    await user.click(screen.getByTestId("webhook-save"));
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
+
+  /** @scenario Saving requires a URL and at least one selected event */
+  it("names each delivery control that is out of bounds, in order", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderDrawer();
+
+    await user.type(screen.getByTestId("webhook-url-input"), "https://example.com/hook");
+    await user.click(screen.getByTestId("webhook-event-gateway.request.completed"));
+    await user.clear(screen.getByTestId("webhook-max-batch-size"));
+    await user.type(screen.getByTestId("webhook-max-batch-size"), "101");
+    await user.clear(screen.getByTestId("webhook-max-batch-delay"));
+    await user.type(screen.getByTestId("webhook-max-batch-delay"), "60001");
+    await user.clear(screen.getByTestId("webhook-max-in-flight"));
+    await user.type(screen.getByTestId("webhook-max-in-flight"), "9");
+    await user.click(screen.getByTestId("webhook-save"));
+
+    expect(screen.getByText("Enter a whole number from 1 to 100.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Enter a whole number from 0 to 60000 milliseconds."),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Enter a whole number from 1 to 8.")).toBeInTheDocument();
+    expect(screen.getByTestId("webhook-max-batch-size")).toHaveFocus();
+    expect(onSave).not.toHaveBeenCalled();
+
+    await user.clear(screen.getByTestId("webhook-max-batch-size"));
+    await user.type(screen.getByTestId("webhook-max-batch-size"), "100");
+    await user.clear(screen.getByTestId("webhook-max-batch-delay"));
+    await user.type(screen.getByTestId("webhook-max-batch-delay"), "60000");
+    await user.clear(screen.getByTestId("webhook-max-in-flight"));
+    await user.type(screen.getByTestId("webhook-max-in-flight"), "8");
+    await user.click(screen.getByTestId("webhook-save"));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({ maxBatchSize: 100, maxBatchDelayMs: 60000, maxInFlight: 8 }),
+    );
+  });
+
+  it("does not send a second save while one is pending", async () => {
+    const user = userEvent.setup();
+    const { onSave } = renderDrawer({ isSaving: true });
+
+    await user.type(screen.getByTestId("webhook-url-input"), "https://example.com/hook");
+    await user.click(screen.getByTestId("webhook-event-gateway.request.completed"));
+    await user.type(screen.getByTestId("webhook-url-input"), "{Enter}");
+    expect(onSave).not.toHaveBeenCalled();
   });
 });
 
@@ -206,13 +272,16 @@ describe("WebhookSecretDialog", () => {
     });
 
     /** @scenario A queue endpoint saves only once its queue URL is filled in */
-    it("keeps save disabled until the queue URL is entered, then sends the queue", async () => {
+    it("asks for the queue URL on save, then sends the queue", async () => {
       const user = userEvent.setup();
       const { onSave } = renderDrawer();
 
       await user.click(screen.getByText("Amazon SQS queue"));
       await user.click(screen.getByTestId("webhook-event-gateway.request.completed"));
-      expect(screen.getByTestId("webhook-save")).toBeDisabled();
+      await user.click(screen.getByTestId("webhook-save"));
+      expect(screen.getByText("Enter an Amazon SQS queue URL.")).toBeInTheDocument();
+      expect(screen.getByTestId("webhook-sqs-queue-url")).toHaveFocus();
+      expect(onSave).not.toHaveBeenCalled();
 
       await user.type(
         screen.getByTestId("webhook-sqs-queue-url"),

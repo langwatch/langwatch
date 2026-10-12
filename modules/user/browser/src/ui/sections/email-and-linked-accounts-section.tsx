@@ -10,11 +10,11 @@ import {
   HStack,
   IconButton,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SettingsSection, SettingsSectionRow } from "@langwatch/design-system/settings-section";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AtSign, KeyRound, X } from "lucide-react";
 
@@ -111,7 +111,7 @@ function LinkedAccountRows({ hasSsoProvider }: { hasSsoProvider: boolean }) {
     failureTitle: "Couldn't remove the sign-in method",
   });
 
-  if (accounts.isLoading) return <Spinner size="sm" />;
+  if (accounts.isLoading) return <SkeletonRows rows={2} />;
 
   const linked = accounts.data ?? [];
   return (

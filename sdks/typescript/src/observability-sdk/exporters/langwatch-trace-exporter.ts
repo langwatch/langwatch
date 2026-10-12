@@ -1,5 +1,6 @@
 import { type ExportResult } from "@opentelemetry/core";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { type CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
 
 import { buildAuthHeaders } from "../../internal/api/auth";
@@ -11,6 +12,7 @@ import {
   LANGWATCH_SDK_VERSION,
   TRACES_PATH,
 } from "../../internal/constants";
+import { resolveOtlpCompression } from "../../internal/otlp-compression";
 import { type TraceFilter, type Criteria, type Match, applyFilters } from "./trace-filters";
 
 /** Options: endpoint URL, API key for auth, and optional span filters (default excludes HTTP). */
@@ -24,6 +26,8 @@ export interface LangWatchTraceExporterOptions {
    */
   projectId?: string;
   filters?: TraceFilter[] | null;
+  /** Request compression: gzip unless an OTEL_EXPORTER_OTLP_*COMPRESSION env var is set. */
+  compression?: CompressionAlgorithm;
 }
 
 export type { TraceFilter, Criteria, Match };
@@ -49,6 +53,7 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
         ...buildAuthHeaders({ apiKey, projectId }),
       },
       url: otelEndpoint.toString(),
+      compression: resolveOtlpCompression({ compression: opts?.compression, signal: "TRACES" }),
     });
 
     // Handle filters: null or [] = no filtering, undefined = default, array = use provided

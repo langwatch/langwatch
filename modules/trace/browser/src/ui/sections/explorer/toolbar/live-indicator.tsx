@@ -1,5 +1,5 @@
 import type { ConnectionState } from "@langwatch/browser-host/sse-subscription";
-import { Box, Flex, IconButton, keyframes } from "@langwatch/design-system/primitives";
+import { Box, Button, Flex, IconButton, keyframes } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
@@ -61,7 +61,7 @@ export const LiveIndicator: React.FC = () => {
       : SSE_STATE_STYLE[sseState];
 
   return (
-    <Flex align="center" gap={1}>
+    <Flex align="center" gap={0.5}>
       <Tooltip
         content={describeMode({
           mode: liveUpdatesMode,
@@ -71,12 +71,11 @@ export const LiveIndicator: React.FC = () => {
         })}
         positioning={{ placement: "bottom" }}
       >
-        <Flex
-          as="button"
-          align="center"
+        <Button
+          size="xs"
+          variant="ghost"
           gap={1}
-          paddingX={1}
-          cursor="pointer"
+          paddingX={1.5}
           color={liveUpdatesMode === "paused" ? "fg.subtle" : "fg"}
           onClick={toggleLiveUpdates}
           aria-label={`Live updates mode: ${liveUpdatesMode}. Click to switch to ${nextLabel(liveUpdatesMode)}.`}
@@ -90,7 +89,7 @@ export const LiveIndicator: React.FC = () => {
             bg={dotStyle.dotColor}
             animation={dotStyle.pulse ? "pulse 2s infinite" : undefined}
           />
-        </Flex>
+        </Button>
       </Tooltip>
 
       <Tooltip content={refreshTooltip} positioning={{ placement: "bottom" }}>

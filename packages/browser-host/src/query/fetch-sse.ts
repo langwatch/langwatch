@@ -40,10 +40,11 @@ export interface FetchSSEOptions<T> {
 }
 
 /**
- * Reads the sentence a refused request came back with.
- * Handles both modern coded envelopes and legacy error responses.
+ * The failure a refused request rejects with. A coded body rides under `error`
+ * with the status stamped beside it, the shape `readHandledError` already reads,
+ * so `explainAnyError` and `showErrorToast` give the registry's words.
  */
-async function describeRefusal(response: Response): Promise<string> {
+async function refusalOf(response: Response): Promise<FetchSSERefusedError> {
   const body = (await response
     .clone()
     .json()
@@ -51,11 +52,19 @@ async function describeRefusal(response: Response): Promise<string> {
 
   if (typeof body?.code === "string") {
     const explained = explainSerializedError(body as Parameters<typeof explainSerializedError>[0]);
-    return explained.description || explained.title;
+    return new FetchSSERefusedError({
+      message: explained.description || explained.title,
+      httpStatus: response.status,
+      body,
+    });
   }
 
-  if (typeof body?.error === "string") return body.error;
+  const message = typeof body?.error === "string" ? body.error : uncodedRefusalText(response);
+  return new FetchSSERefusedError({ message, httpStatus: response.status });
+}
 
+/** The sentence for a refusal whose body carries no code and no text. */
+function uncodedRefusalText(response: Response): string {
   return response.status >= 500
     ? `Server error: ${response.status} ${response.statusText}`
     : response.statusText;
@@ -169,7 +178,7 @@ export async function fetchSSE<T>({
           return;
         }
 
-        request.fail(new Error(await describeRefusal(response)));
+        request.fail(await refusalOf(response));
       },
 
       onmessage(ev) {
@@ -197,5 +206,26 @@ export class FetchSSETimeoutError extends Error {
   constructor(message = "Timeout occurred") {
     super(message);
     this.name = "Timeout";
+  }
+}
+
+/** The server answered the request with a refusal instead of opening the stream. */
+export class FetchSSERefusedError extends Error {
+  readonly httpStatus: number;
+  declare readonly error?: Record<string, unknown>;
+
+  constructor({
+    message,
+    httpStatus,
+    body,
+  }: {
+    message: string;
+    httpStatus: number;
+    body?: Record<string, unknown>;
+  }) {
+    super(message);
+    this.name = "FetchSSERefusedError";
+    this.httpStatus = httpStatus;
+    if (body) this.error = body;
   }
 }

@@ -16,7 +16,7 @@ export function FrontDoorFinePrint() {
   if (publicEnv.data?.IS_SAAS !== true) return null;
 
   return (
-    <Text fontSize="11.5px" lineHeight="1.6" color="fg.muted">
+    <Text textStyle="caption" color="fg.muted">
       By continuing, you agree to our{" "}
       <FinePrintLink href={LEGAL_LINKS.terms.href}>{LEGAL_LINKS.terms.label}</FinePrintLink> and{" "}
       <FinePrintLink href={LEGAL_LINKS.privacy.href}>{LEGAL_LINKS.privacy.label}</FinePrintLink>.

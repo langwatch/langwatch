@@ -398,6 +398,8 @@ export function activeTraceContext(): { traceId?: string; spanId?: string } {
  */
 export const TRANSIENT_REFUSAL_CODES = [
   "clickhouse_overloaded",
+  // A dropped connection shows its code; the raw error stays a logged reason (Alex 2026-10-11).
+  "clickhouse_unavailable",
   "connect_credential_pending",
   // Kept through the mask so the refused organization reads why (T7-F3, Alex 2026-10-11).
   "private_dataplane_unavailable",

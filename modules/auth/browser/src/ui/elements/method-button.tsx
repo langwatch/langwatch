@@ -25,13 +25,12 @@ export function MethodButton({
 }) {
   return (
     <Button
+      textStyle="cardTitle"
       type="button"
       variant="outline"
       width="full"
       minHeight="44px"
       position="relative"
-      fontSize="14px"
-      fontWeight={600}
       borderRadius={SHAPE.control}
       justifyContent="center"
       overflow="visible"

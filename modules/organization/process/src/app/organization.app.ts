@@ -538,6 +538,7 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   ): Promise<{
     organization: { id: string; name: string };
     team: { id: string; slug: string; name: string };
+    grantsConfirmed: boolean;
   }> {
     // On an invite-only installation members join the organizations that invited them;
     // founding one is for instance administrators and the first organization.

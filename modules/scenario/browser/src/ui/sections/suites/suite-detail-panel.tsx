@@ -3,16 +3,8 @@
  */
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
-import {
-  Box,
-  Button,
-  Center,
-  EmptyState,
-  HStack,
-  Separator,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Button, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import { getSuiteSetId, parseSuiteTargets } from "@langwatch/suite-contract";
 import {
   BarChart3,
@@ -92,7 +84,8 @@ export function SuiteDetailPanel({
             </Button>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               onClick={onRun}
               disabled={isRunning}
               loading={isRunning}
@@ -237,24 +230,16 @@ function PassRatePill({ passRate }: { passRate: number }) {
 /** Empty state when no suite is selected */
 export function SuiteEmptyState({ onNewSuite }: { onNewSuite: () => void }) {
   return (
-    <Center flex={1} height="100%">
-      <EmptyState.Root>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <FolderOpen size={32} />
-          </EmptyState.Indicator>
-          <EmptyState.Title>No run plan selected</EmptyState.Title>
-          <EmptyState.Description>
-            Select a run plan from the sidebar or create a new one
-          </EmptyState.Description>
-          <HStack gap={2}>
-            <Button colorPalette="blue" onClick={onNewSuite}>
-              <Plus size={16} /> New Run Plan
-            </Button>
-            <SetupWithAgentButton surface="simulations" size="md" />
-          </HStack>
-        </EmptyState.Content>
-      </EmptyState.Root>
-    </Center>
+    <NoDataInfoBlock
+      icon={<FolderOpen size={32} />}
+      title="No run plan selected"
+      description="Select a run plan from the sidebar or create a new one"
+      primaryAction={
+        <Button colorPalette="orange" variant="solid" onClick={onNewSuite}>
+          <Plus size={16} /> New Run Plan
+        </Button>
+      }
+      secondaryAction={<SetupWithAgentButton surface="simulations" size="md" />}
+    />
   );
 }

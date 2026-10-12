@@ -32,6 +32,27 @@ export type Step = {
 
 export type Script = { version: 1; startUrl?: string; steps: Step[] };
 
+/** A lane's newest steps, kept for `record save` without a `record start`; the last one is open. */
+export type Walk = { script: Script; open?: { step: Step; seen: Query[] } };
+export const WALK_CAP = 200;
+
+/** Adds a step to the walk; the oldest drop off and the start moves to where they left the page. */
+export function pushWalk({ walk, step, seen }: { walk: Walk; step: Step; seen: Query[] }) {
+  walk.script.steps.push(step);
+  walk.open = { step, seen };
+  const over = walk.script.steps.length - WALK_CAP;
+  if (over <= 0) return;
+  const dropped = walk.script.steps.splice(0, over);
+  walk.script.startUrl = dropped[dropped.length - 1]?.expect.url;
+}
+
+/** Closes the walk's last step at the page's path now, with the queries it caused since. */
+export function settleWalk({ walk, url }: { walk: Walk; url: string }) {
+  if (!walk.open) return;
+  walk.open.step.expect = { url, queries: dedupe(walk.open.seen) };
+  walk.open = undefined;
+}
+
 /** What the page says about an element; runs inside the browser, so it must be self-contained. */
 export type Described = {
   tag: string;
@@ -129,16 +150,18 @@ export function locatorOf({ page, spec }: { page: Page; spec: LocatorSpec }): Lo
 export async function recordLocator({
   page,
   target,
+  timeout,
 }: {
   page: Page;
   target: Locator;
+  timeout?: number;
 }): Promise<{ spec: LocatorSpec; described: Described }> {
-  const described = await target.evaluate(describeElement);
+  const described = await target.evaluate(describeElement, undefined, { timeout });
   const spec = specOf(described);
   if (!spec) throw new Error("no stable locator for this element (no role, label, id or text)");
   const matches = locatorOf({ page, spec });
   if ((await matches.count()) > 1) {
-    const handle = await target.elementHandle();
+    const handle = await target.elementHandle({ timeout });
     spec.nth = await matches.evaluateAll((els, el) => els.findIndex((e) => e === el), handle);
   }
   return { spec, described };

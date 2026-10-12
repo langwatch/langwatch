@@ -47,6 +47,11 @@ export interface CreateAndAssignResult {
   team: { id: string; slug: string; name: string };
 }
 
+/** A sign-up's organization; `grantsConfirmed` is false while the founder's grants still land. */
+export interface FounderOrganizationCreated extends CreateAndAssignResult {
+  grantsConfirmed: boolean;
+}
+
 /**
  * Input for creating an organization with no user attached: the instance provisioning path.
  * Unlike {@link CreateAndAssignInput}, no member is assigned — an admin API key mints afterwards.
@@ -207,7 +212,7 @@ export abstract class OrganizationMembershipRepository {
 
   // --- New methods for router delegation ---
 
-  abstract createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
+  abstract createAndAssign(input: CreateAndAssignInput): Promise<FounderOrganizationCreated>;
 
   /**
    * Creates an organization and its default team with no user attached (the instance

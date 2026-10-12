@@ -113,11 +113,30 @@ describe("given the edit-project drawer", () => {
       expect(screen.queryAllByRole("option", { name: "Ada", hidden: true })).toHaveLength(0);
     });
 
-    it("keeps Save disabled until something actually changes", async () => {
-      renderWithOrganizationHost(OPEN_FOR_MY_CHATBOT);
+    it("leaves Save clickable, and closing it with nothing changed saves nothing", async () => {
+      const user = userEvent.setup();
+      const { host } = renderWithOrganizationHost(OPEN_FOR_MY_CHATBOT, new FakeOrganizationHost());
 
       await screen.findByDisplayValue("My Chatbot");
-      expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+      const save = screen.getByRole("button", { name: "Save" });
+      expect(save).toBeEnabled();
+      await user.click(save);
+
+      await waitFor(() => expect(host.overlays).toContainEqual({ name: null }));
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("names the missing project name and focuses it when Save is pressed", async () => {
+      const user = userEvent.setup();
+      renderWithOrganizationHost(OPEN_FOR_MY_CHATBOT);
+
+      const input = await screen.findByDisplayValue("My Chatbot");
+      await user.clear(input);
+      await user.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(await screen.findByText("Project name is required")).toBeVisible();
+      await waitFor(() => expect(input).toHaveFocus());
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
   });
 

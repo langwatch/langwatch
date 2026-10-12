@@ -1,5 +1,5 @@
 import { type BoundMiddlewareBindings, type TransportPeers } from "@langwatch/api";
-import { type EventUpcastReader, type FeatureEventing } from "@langwatch/eventing";
+import { type EventUpcastReader, type FeatureEventing, type ListedWork } from "@langwatch/eventing";
 import {
   type DependencyToken,
   type FeatureApiIdentity,
@@ -196,6 +196,12 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
    */
   upcastReader(): EventUpcastReader | undefined {
     return this.eventing?.upcastReader?.();
+  }
+
+  /** Runs work whose queue jobs run ahead of any backlog and waits for them; else just the work. */
+  runListedWork<Result>(input: ListedWork<Result>): Promise<Result> {
+    const eventing = this.eventing;
+    return eventing?.runListedWork ? eventing.runListedWork(input) : input.work();
   }
 
   /**

@@ -10,7 +10,7 @@ Start here: `haven sim --json` lists every simulator with whether it runs in thi
 console URL, the `haven up +<name>` it needs if off, its verbs (read from haven's own command
 table) and its skill path. `--stack <slug>` reads another worktree's stack.
 
-Ten Go simulators stand in for outside services so a stack runs offline, deterministically
+Eleven Go simulators stand in for outside services so a stack runs offline, deterministically
 and for free. Code is `services/<name>` and each console is a React app, `apps/<name>-web`,
 built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 `dev/docs/adr/160-internal-consoles-are-go-served-react.md`).
@@ -24,9 +24,10 @@ built by Vite into the Go package's `web/dist` and embedded (ADR-160,
 | `idpsim`       | OIDC, SAML, SCIM IdP                                | default      | `idpsim`                                   | none (seeded tenants)  |
 | `voicesim`     | ElevenLabs voice, OpenAI audio                      | `+voice`     | `voicesim`                                 | `VOICESIM_SEED`        |
 | `telemetrysim` | OTLP senders (traces, logs, metrics, coding agents) | `+telemetry` | [`telemetrysim`](../telemetrysim/SKILL.md) | `--seed` per run       |
-| `outboundsim`  | Slack, webhook receivers, SQS                       | `+outbound`  | `outboundsim`                              | `OUTBOUNDSIM_SEED`     |
+| `outboundsim`  | Slack, webhook receivers, SQS, governance pull APIs | `+outbound`  | `outboundsim`                              | `OUTBOUNDSIM_SEED`     |
 | `paymentsim`   | Stripe (API, signed webhooks, meters)               | default      | `paymentsim`                               | `PAYMENTSIM_CATALOG`   |
 | `lambdasim`    | AWS Lambda + CloudWatch Logs (NLP Lambda fleet)     | `+lambda`    | [`lambdasim`](../lambdasim/SKILL.md)       | none                   |
+| `githubsim`    | GitHub App, API, pull requests, signed webhooks     | `+github`    | [`githubsim`](../githubsim/SKILL.md)       | `GITHUBSIM_SEED`       |
 
 Passkeys, security keys, U2F tokens and TOTP codes are emulated in the browser, not by a Go
 sim: [`mfasim`](../mfasim/SKILL.md) (`haven browser mfa`, on a `haven browser` lane).
@@ -47,7 +48,7 @@ Chakra, no product design system.
   gateway. `haven restart sims` bounces them all. `haven logs <name>` still reads each.
 - A checkout whose mono-binary has no `combined` subcommand, or a monolith build, runs
   haven's bundled copy of each sim as one lane each (`haven simulator <name>`, hidden).
-- Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim telemetrysim outboundsim paymentsim lambdasim"`,
+- Without haven: `make service svc=combined args="mailsim storagesim llmsim analyticssim voicesim idpsim telemetrysim outboundsim paymentsim lambdasim githubsim"`,
   or one sim: `make service svc=<name>`. `make service-watch svc=<name>` adds air reload.
   `make service` builds the console bundle first; a binary without it serves a one-line
   page naming the build command.
@@ -76,12 +77,13 @@ Every console action has a verb (`--json` on reads, non-zero exit on failure, `-
 | Sim       | Verbs                                                                                                                     |
 | --------- | ------------------------------------------------------------------------------------------------------------------------- |
 | mail      | `haven sim mail address\|status\|list\|get <id>\|links <id>\|wait\|delete <id>\|clear`                                    |
-| llm       | `haven sim llm status\|list [--model <text>] [--failed]\|get <id>\|clear\|fault <status>\|config --seed`                   |
+| llm       | `haven sim llm status\|list [--model <text>] [--failed]\|get <id>\|clear\|fault <status>\|config --seed`                  |
 | analytics | `haven sim analytics status\|list\|get <id>\|clear\|wait --event`                                                         |
 | storage   | `haven sim storage buckets\|objects [bucket]\|object <bucket> <key> [--raw]\|presign\|delete\|clear [bucket]\|seed\|list` |
 | voice     | `haven sim voice status\|list\|get <id>\|clear`                                                                           |
 | telemetry | `haven sim telemetry send\|load\|fuzz\|status\|stop`                                                                      |
 | outbound  | `haven sim outbound status\|list\|deliveries\|wait --channel\|fault add\|list\|clear\|receiver set\|urls\|clear`          |
 | payment   | `haven sim payment status\|list\|usage\|advance --seconds\|fault --customer\|deliver --ids\|hold\|release\|clear`         |
-| lambda    | `haven sim lambda status\|list\|get <id>\|clear\|fault <kind>`                                                    |
+| lambda    | `haven sim lambda status\|list\|get <id>\|clear\|fault <kind>`                                                            |
+| github    | `haven sim github status\|list\|pulls\|calls\|deliveries\|install\|pr\|app\|deliver\|fault\|clear\|reset`                 |
 | idp       | `haven sim idp list\|get\|apps add\|populate\|churn\|scim ...\|signin\|clear` (full list: `haven sim --json`)             |

@@ -258,6 +258,15 @@ Feature: Agent management
     And it says "Stored; enter a new value to replace it"
 
   @integration
+  Scenario: Saving an HTTP agent without a name or endpoint says what is missing
+    Given a new HTTP agent with no name and no endpoint URL
+    When I press "Create Agent"
+    Then the button was clickable and each missing field says what to enter
+    And the name field has focus and no agent is created
+    When I enter a name and press "Create Agent" again
+    Then the endpoint field has focus and no agent is created
+
+  @integration
   Scenario: A saved agent's credentials are read-only on the Studio node
     Given a Studio node for a saved HTTP agent with a bearer token and a header value
     When I open the node's properties on the Auth and Headers tabs

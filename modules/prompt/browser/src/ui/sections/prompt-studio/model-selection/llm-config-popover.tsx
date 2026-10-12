@@ -80,7 +80,7 @@ export function LLMConfigPopover({
         {/* Model Selector */}
         <Box width="full">
           <Text
-            fontSize="13px"
+            textStyle="bodySm"
             fontWeight="medium"
             color="fg.subtle"
             paddingLeft={2}
@@ -102,7 +102,7 @@ export function LLMConfigPopover({
         {/* Dynamic Parameters */}
         <VStack width="full" gap={1} align="stretch">
           <Text
-            fontSize="13px"
+            textStyle="bodySm"
             fontWeight="medium"
             color="fg.subtle"
             paddingLeft={2}
@@ -156,12 +156,12 @@ export function LLMConfigPopover({
 
         {/* Error messages */}
         {errors?.temperature?.message && (
-          <Text color="red.fg" fontSize="12px">
+          <Text color="red.fg" textStyle="caption">
             {errors.temperature.message}
           </Text>
         )}
         {errors?.maxTokens?.message && (
-          <Text color="red.fg" fontSize="12px">
+          <Text color="red.fg" textStyle="caption">
             {errors.maxTokens.message}
           </Text>
         )}
@@ -184,7 +184,7 @@ export function LLMConfigPopover({
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => handleStructuredOutputsToggle(!isStructuredOutputsEnabled)}
               >
-                <Text fontSize="13px" fontWeight="medium" color="fg.subtle">
+                <Text textStyle="label" color="fg.subtle">
                   Structured Outputs
                 </Text>
                 <Box
@@ -200,7 +200,7 @@ export function LLMConfigPopover({
                   height="20px"
                   borderRadius="full"
                   bg={isStructuredOutputsEnabled ? "blue.solid" : "bg.emphasized"}
-                  padding="2px"
+                  padding="0.5"
                   cursor="pointer"
                   transition="background 0.2s"
                   flexShrink={0}

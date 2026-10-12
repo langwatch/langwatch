@@ -5,6 +5,7 @@ import { Select as ChakraSelect, Portal } from "@chakra-ui/react";
 import * as React from "react";
 
 import { OverlayDepthContext, useOverlayZIndex } from "../../overlays/depth.ts";
+import { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
 import { CloseButton } from "../overlays/close-button.tsx";
 
 interface SelectTriggerProps extends ChakraSelect.ControlProps {
@@ -54,15 +55,16 @@ const SelectClearTrigger = React.forwardRef<HTMLButtonElement, ChakraSelect.Clea
 
 interface SelectContentProps extends ChakraSelect.ContentProps {
   portalled?: boolean;
-  portalRef?: React.RefObject<HTMLElement>;
+  portalRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const SelectContent = React.forwardRef<HTMLDivElement, SelectContentProps>(
   function SelectContent(props, ref) {
     const { portalled = true, portalRef, ...rest } = props;
     const { zIndex, depth } = useOverlayZIndex();
+    const overlayTarget = useOverlayPortalTarget();
     return (
-      <Portal disabled={!portalled} container={portalRef}>
+      <Portal disabled={!portalled} container={portalRef ?? overlayTarget}>
         <ChakraSelect.Positioner
           ref={(node: HTMLElement | null) => {
             if (node) {

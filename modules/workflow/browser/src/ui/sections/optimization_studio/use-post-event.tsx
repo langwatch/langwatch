@@ -107,8 +107,14 @@ export const usePostEvent = () => {
       if (!project) return;
 
       setIsLoading(true);
+      // The heartbeat is nobody's run: what it hears only moves the connection status.
+      const isHeartbeat = event.type === "is_alive";
 
       const onError = (error: Error) => {
+        if (isHeartbeat) {
+          logger.debug({ error }, "is_alive did not reach the engine");
+          return;
+        }
         // showErrorToast suppresses the duplicate toast on its own, but the
         // state writes below must be skipped too: a license-limit rejection
         // opens the upgrade modal, and flipping the studio into an error
@@ -156,7 +162,7 @@ export const usePostEvent = () => {
           logger.debug({ serverEvent, event }, "received message");
 
           // Handle the event with the workflow store
-          handleServerMessage(serverEvent);
+          handleServerMessage(serverEvent, { isHeartbeat });
 
           // Handle evaluation errors
           if (serverEvent.type === "error" && event.type === "execute_evaluation") {
@@ -204,10 +210,35 @@ export const useHandleServerMessage = ({
   alertOnComponent: AlertOnComponent;
 }) =>
   useCallback(
-    (message: StudioServerEvent) =>
-      applyServerMessage({ message, workflowStore, alertOnComponent }),
+    (message: StudioServerEvent, { isHeartbeat = false }: { isHeartbeat?: boolean } = {}) =>
+      isHeartbeat
+        ? applyHeartbeatMessage({ message, workflowStore })
+        : applyServerMessage({ message, workflowStore, alertOnComponent }),
     [workflowStore, alertOnComponent],
   );
+
+/**
+ * What the is_alive stream hears: an answer marks the engine alive, and anything else only
+ * moves the connection status. It never toasts and never touches a run nobody started.
+ */
+function applyHeartbeatMessage({
+  message,
+  workflowStore,
+}: {
+  message: StudioServerEvent;
+  workflowStore: WorkflowStore;
+}) {
+  if (message.type === "is_alive_response") {
+    markPythonAlive(workflowStore);
+    return;
+  }
+  if (message.type === "error") {
+    logger.debug({ message: message.payload.message }, "is_alive answered with an error");
+    workflowStore.setSocketStatus((status) =>
+      status === "connected" ? "connecting-python" : status,
+    );
+  }
+}
 
 /**
  * Reports a failed run (ADR-045); a deliberate STOP keeps the local

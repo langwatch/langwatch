@@ -24,7 +24,7 @@ export const CreateExperimentButton = ({
       <Menu.Trigger asChild>
         <PageLayout.HeaderButton primary data-testid="experiment-new-open">
           <Plus size={16} />
-          New Experiment
+          New experiment
           <ChevronDown size={14} />
         </PageLayout.HeaderButton>
       </Menu.Trigger>
@@ -36,12 +36,12 @@ export const CreateExperimentButton = ({
           disabled={isCreating}
         >
           <Box width="100%">
-            <Text fontWeight="medium">
+            <Text textStyle="label">
               {isCreating && <Spinner size="xs" marginRight={2} />}
-              Create Experiment
+              In the workbench
             </Text>
-            <Text fontSize="xs" color="fg.muted">
-              Compare prompts and agents performance side by side
+            <Text textStyle="caption" color="fg.muted">
+              Compare prompts and agents side by side on a dataset
             </Text>
           </Box>
         </Menu.Item>
@@ -49,11 +49,11 @@ export const CreateExperimentButton = ({
           <Link href="https://langwatch.ai/docs/evaluations/experiments/sdk" target="_blank">
             <Box width="100%">
               <HStack gap={1}>
-                <Text fontWeight="medium">New Experiment via SDK</Text>
+                <Text textStyle="label">With the SDK</Text>
                 <ExternalLink size={14} />
               </HStack>
-              <Text fontSize="xs" color="fg.muted">
-                Run experiments programmatically from notebooks or scripts
+              <Text textStyle="caption" color="fg.muted">
+                Run experiments from your notebooks or scripts
               </Text>
             </Box>
           </Link>

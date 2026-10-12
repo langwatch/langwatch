@@ -57,3 +57,5 @@ Limits: `clickhouse-memory-mb`, `observability-memory-mb`, `redis-maxmemory-mb`,
 `colima-memory-gib`, `test-workers`, `instant-eval-mock-judge`. `haven machine limits` also says when each
 change applies (next `haven up`, a restart, or the next test run). Changing a machine limit
 affects every stack on the machine: ask before setting one.
+
+A stack takes its environment from the shell that ran `haven up` (the keeper replays it), never from the daemon: exporting a variable before `haven up` is enough, and what the daemon was started with reaches no stack.

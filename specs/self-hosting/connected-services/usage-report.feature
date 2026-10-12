@@ -132,6 +132,13 @@ Feature: The usage report a self-hosted install sends
     Then each windowed figure appears three times: lifetime, over seven days and over twenty-eight days
     And an install that ingested heavily two years ago and nothing since reads differently from one ingesting today
 
+  @unit
+  Scenario: The ClickHouse figures are asked one owner and one window at a time
+    Given every ClickHouse owner already asks once per project
+    When the report is taken
+    Then only one owner is asked at a time, for one window at a time
+    And an install with many projects never overflows the ClickHouse query queue
+
   # ============================================================================
   # What they do, by family
   # ============================================================================

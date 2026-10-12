@@ -1393,12 +1393,17 @@ repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). P
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
 **Migrations are not the api's job.** The worker runs every upgrade step under the runner's lease:
-at boot, while the ledger is behind its image, its gate runs `pnpm task upgrade` (the tasks app's
-runner, in its own process), waits while another runner holds the lease, takes no job until the
-ledger is current, and after a failed run waits for a Retry that returns the step to `pending`
-(Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker never does"). `pnpm
-task upgrade` stays a runner under the same lease for development, CI and an operator (apps/api
-`start:prepare:db`: upgrade alone; no system-migrations pass); the root `prisma:migrate` and
+at boot, while the ledger is behind its image, its gate runs the upgrade in the worker's own
+process (Alex, 2026-10-11: the runner composed once in `packages/upgrade`, `runImageUpgrade`;
+Prisma and goose still run as their own programs), waits while another runner holds the lease,
+takes no job until the ledger is current, and after a failed run waits for a Retry that returns
+the step to `pending` (Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker
+never does"). The worker takes jobs once the blocking part is done (the schema and the blocking
+steps), while LangWatchQL setup and the system-migrations pass request finish alongside, their
+outcome recorded on the run (Alex, 2026-10-11, T0-F11). `pnpm task upgrade` is a run-once worker (Alex, 2026-10-11): it starts the worker,
+which runs the same upgrade once under the same lease and exits 0, 1 or 3; `status`, `plan` and
+`steps` stay reads in the tasks app (apps/api `start:prepare:db`: upgrade alone; no
+system-migrations pass); the root `prisma:migrate` and
 `clickhouse:migrate` scripts are aliases of it, so no script applies schema outside the ledger
 (Alex, 2026-10-09); the Helm pre-roll Job renders only
 with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step,
@@ -1414,7 +1419,11 @@ column exists. A Postgres query the schema is not ready for (Prisma P2021/P2022,
 transport, to the handled `upgrade_in_progress` (503, Retry-After 10 s on REST, the same code over
 tRPC and SSE), and the browser's query client keeps retrying it with backoff. Each ClickHouse
 target upgrades on its own: a private target that is down holds only its own organisations, which
-answer upgrade_in_progress until it catches up (Alex, 2026-10-11). Ingestion is
+answer upgrade_in_progress until it catches up (Alex, 2026-10-11). The worker's catch-up pass
+writes those targets' organisations to Redis under a short expiry, every process reads the list
+every few seconds, and a schema-behind ClickHouse failure the routing driver tags with one of them
+answers upgrade_in_progress after admission too; Redis unreadable falls back to the 500 (Alex,
+2026-10-11, T7-F18: "store it in Redis, because it's short term"). Ingestion is
 unaffected: it only enqueues for the worker, and a blocking step never touches a sign-in or ingest
 table. Cloud's rolling deploys keep the old pods serving through expand steps, since a new pod is
 not ready until the ledger is current. What a waiting browser sees splits by deployment (Alex,
@@ -1427,8 +1436,8 @@ console. A blocking step never touches a table the sign-in or ingest doors read 
 model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
 (UIW-1..11). A blocking data step touches only tables created in its own release; anything older
 ships as a background step (Alex, 2026-10-09). A background step names the background steps it runs after by their step
-values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
-contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
+values (`after: [step]`, STEP-AFTER); the worker waits on them, and an unknown id or a cycle
+refuses the plan. A fact old images never recorded is
 recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
 runs after `instant-eval:copy-judge-spend` (ADR-174 decision 17). Prisma migrations live with the schema;
 ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
@@ -1459,7 +1468,10 @@ tags fails the guards rather than passing (Alex, 2026-10-09).
   name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
   `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same upgrade
   lease, before serve, and the access-config render runs from env alone in its Helm job (Alex,
-  2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
+  2026-09-28). Before it serves, the worker boots its installed modules in the tasks role, in its
+  own process, to collect and run the blocking steps; it names no process package, and runs
+  LangWatchQL provisioning as the tasks app's `upgrade lwql-provision` under its own lease (Alex,
+  2026-10-11; the preamble hands the gate `bootModules`). SQL migrations stay central, and each is attributed to the owner of the table it
   touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
   migration main has released keeps main's bytes even when it touches two owners: installs hold its
   checksum, so a later idempotent migration carries the split instead, and the check names it as
@@ -1488,9 +1500,9 @@ step's per-tenant state lives in one framework-owned table beside the ledger,
 tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
 steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
 accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
-tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A finished upgrade run asks ops for one
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A step that reports `migrated` on every pass by design declares `migratedIsSteady`: its migrated tenants are kept in step, never held, and Ops lists only its parked ones as needing attention (Alex, 2026-10-12, SWB-F5). A finished upgrade run asks ops for one
 system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
-2026-10-09, UPG-008 D2). A step that must read every tenant reads through its owner's repository with
+2026-10-09, UPG-008 D2); the request's queue jobs run ahead of any backlog (Alex, 2026-10-11). A step that must read every tenant reads through its owner's repository with
 raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1; the flag replaced the `-- @tenancy:` comment, Alex, 2026-10-10). Stored-object's ClickHouse import is a `project` tenant step with
 `needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
@@ -1541,6 +1553,7 @@ latest image and the worker rolls it through every step from the release it is o
 than the first manifest's `previous` (the 3.18.1 baseline) plans from the baseline. Only the latest
 release gets fixes. So every step, alias and upcast is kept: a DROP or contract waits until old
 writers are gone (`needsOldWritersGone`), and the step that drops is kept, like every step.
+2026-10-11: nothing is deleted automatically; a drop is an operator step confirmed in Ops once safe; every step runs after old writers are gone (ADR-173 amendment; the migration-safety guards refuse a new DROP TABLE or DROP COLUMN above the newest release tag).
 
 **A framework package takes module values by injection, never by import** (Alex, 2026-10-06, rounds 5
 and 6, Q211). `packages/group-queue` takes a `mintUri` function and a generic destination type for its
@@ -1574,7 +1587,7 @@ a shrink-only baseline and Postgres RLS is deferred.
 **Main's byte intakes stay for now** (Alex, 2026-09-30). The user avatar and AI tool icon
 data URLs, the deprecated multipart dataset routes, bug-report transcripts and inline scenario
 media keep main's shapes; each moves to createUpload, PUT and confirmUpload only by its own
-ruling. main's signal-focused home and briefing are restored behind `release_ui_home_signal_focused_enabled` (Alex, 2026-10-09);
+ruling. the project home is one composition for every reader, the Langy home; without Langy its field is the command bar (Alex, 2026-10-11);
 automation email previews render in the browser, as on main.
 
 **Every Redis cache key expires, and expiry is the only sweeper** (Alex, 2026-10-01). One Redis is the default: one
@@ -2282,16 +2295,18 @@ through the framework; no module scans queues or reads the `gq:parked-tenants` k
 2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
 
-A dequeued event whose type no pipeline on that worker declares is retried, not refused (Alex,
-2026-10-08, round 24): mid rolling deploy an older worker can take a newer release's event, and the
-queue's retry budget (25 attempts with backoff) is the drain window in which a worker declaring it
-takes the job. Still undeclared once spent, it exhausts on its lane's outcome with a reason naming
-the type; a job with no type is still refused (`packages/eventing/specs/undeclared-event-drain.feature`).
+A dequeued event whose type no pipeline on that worker declares is handed back without using an
+attempt, not refused (Alex, 2026-10-08, round 24; 2026-10-12, G1-F1): mid rolling deploy an older
+worker can take a newer release's event, and a worker declaring it takes the job. Handed back for
+over 30 minutes it spends attempts; still undeclared once spent, it exhausts on its lane's outcome
+with a reason naming the type; a job with no type is still refused (`packages/eventing/specs/undeclared-event-drain.feature`).
 
 **A spent trace job dead-letters instead of blocking its group** (Alex, 2026-09-30): order within
 a trace is not load-bearing, so trace registrations set `onExhausted: "dead-letter"`; every other
 registration blocks. A queued job no registration or alias routes is dead-lettered once its
-attempts run out (Alex, 2026-10-10). The group queue owns and writes the dead-letter layout; ops lists, redrives
+attempts run out (Alex, 2026-10-10). A worker with no handler for a job hands it back without
+using an attempt or counting a group failure; handed back for over 30 minutes it spends attempts
+and surfaces at error (Alex, 2026-10-12, G1-F1). The group queue owns and writes the dead-letter layout; ops lists, redrives
 and discards it through the queue's exported helpers. A span that cannot be scrubbed is never
 stored unredacted, and disabled DLP never skips redaction: it fails and, on a trace pipeline,
 dead-letters, redrivable once analysis is back.
@@ -2414,7 +2429,9 @@ closes the top one and a reload restores the stack. No module-level drawer store
 whole browser.
 
 How a screen is laid out (titles, header actions, containers, drawers, empty and loading
-states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4.
+states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4. Drawers,
+dialogs and cards are prop-driven shapes, not assembled parts (ADR-002 in
+`packages/design-system/adrs/`, ruled 2026-10-11).
 
 **An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
 
@@ -3003,6 +3020,8 @@ accepts it. A class declaring `fault: "customer"` at a 5xx keeps its body, in `p
 Transient 503 refusals keep their code: `clickhouse_overloaded` and `service_unavailable` go on the wire
 unmasked, so a caller can tell a retryable refusal from a fault (Alex, 2026-10-06, round 9, CH-1,
 amending the masking ruling).
+`clickhouse_unavailable` (a ClickHouse connection that dropped or was refused) joins them: the code shows,
+and the raw connection error stays a logged reason, never in the body (Alex, 2026-10-11).
 A relayed herr error with no fault and no status stays `customer`: `presumed_platform` applies only when a
 status of 500 or more is known (coordinator, citing the ruling's "at a 5xx status", 2026-10-05).
 `LangWatchQLFilterRefusal` is a trace contract error (coordinator, citing Alex's ingestion-key approval,

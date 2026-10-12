@@ -68,7 +68,10 @@ type Stack struct {
 	WorkerMetricsPort int `json:"workerMetricsPort"`
 	// VoiceSocketPort is the worker's raw voice socket (VOICE_WS_PORT); each
 	// stack needs its own or two stacks collide on the default 3300.
-	VoiceSocketPort    int    `json:"voiceSocketPort"`
+	VoiceSocketPort int `json:"voiceSocketPort"`
+	// OutboundTLSPort is outboundsim's https listener on 127.0.0.1, under a certificate the
+	// portless CA signs: the push-service stand-in the product reaches over https by IP.
+	OutboundTLSPort    int    `json:"outboundTlsPort,omitempty"`
 	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
 	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
 	// ClickHousePostgresHost is how that server reaches host Postgres for
@@ -127,6 +130,11 @@ type Stack struct {
 	ModeEnv          []string `json:"modeEnv,omitempty"`
 	ModeOverriddenBy []string `json:"modeOverriddenBy,omitempty"`
 	EffectiveMode    string   `json:"effectiveMode,omitempty"`
+	// AppOff marks a stack whose ui, api and worker are stopped (`haven up -app`).
+	AppOff bool `json:"appOff,omitempty"`
+	// KeeperReplans marks a keeper that applies a rewritten plan on SIGHUP, so
+	// a ±service starts or stops only the lanes it changes (app/keeper_live.go).
+	KeeperReplans bool `json:"keeperReplans,omitempty"`
 	// Refresh is the mode this stack was brought up in: still, watch or hmr.
 	Refresh RefreshMode `json:"refresh,omitempty"`
 	// MockInstantEvalJudge injects INSTANT_EVAL_CLASSIFIER=memory, so Instant
@@ -204,6 +212,7 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{PaymentService, "Stripe (paymentsim)"},
 	{TelemetryService, "OTLP sender (telemetrysim)"},
 	{LambdaService, "NLP Lambda fleet (lambdasim)"},
+	{GithubService, "GitHub App, API and webhooks (githubsim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
 	{LangevalsService, "Evaluators (Python)"},

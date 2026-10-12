@@ -41,4 +41,20 @@ describe("model provider server configuration", () => {
       expect(read({ LANGWATCH_DEFAULT_MODEL: "" }).defaultModel).toBeUndefined();
     });
   });
+
+  describe("given the Codex issuer base", () => {
+    /** @scenario "A Codex base that is unset or blank reaches OpenAI" */
+    it("reads as unset when it is not exported or exported blank", () => {
+      expect(read({}).codexOAuthIssuer).toBeUndefined();
+      expect(read({ CODEX_OAUTH_ISSUER: "  " }).codexOAuthIssuer).toBeUndefined();
+    });
+
+    /** @scenario "Codex is reached at the bases the deployment configures" */
+    it("carries the configured URL and refuses a value that is not one", () => {
+      expect(read({ CODEX_OAUTH_ISSUER: "http://127.0.0.1:6970/codex" }).codexOAuthIssuer).toBe(
+        "http://127.0.0.1:6970/codex",
+      );
+      expect(() => read({ CODEX_OAUTH_ISSUER: "not a url" })).toThrow(/CODEX_OAUTH_ISSUER/);
+    });
+  });
 });

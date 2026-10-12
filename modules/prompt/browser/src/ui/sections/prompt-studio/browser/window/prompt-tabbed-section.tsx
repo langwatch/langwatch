@@ -52,6 +52,10 @@ enum PromptTab {
   Parameters = "parameters",
 }
 
+function isPromptTab(value: string): value is PromptTab {
+  return Object.values<string>(PromptTab).includes(value);
+}
+
 export type PromptTabbedSectionProps = {
   /** Layout mode: "vertical" shows resizable divider, "horizontal" shows border-bottom */
   layoutMode: LayoutMode;
@@ -95,6 +99,32 @@ export function PromptTabbedSection({
   const hasDemonstrations = demonstrationRows.length > 0;
   const chatRef = useRef<PromptPlaygroundChatRef>(null);
   const [activeTab, setActiveTab] = useState<PromptTab>(PromptTab.Conversation);
+  const conversationTriggerRef = useRef<HTMLButtonElement>(null);
+  const focusedTabRef = useRef<string | null>(null);
+
+  // A tab that left the strip (its inputs or demonstrations went) hands the selection back to
+  // Conversation, so it does not come back selected when it reappears.
+  const present: Record<PromptTab, boolean> = {
+    [PromptTab.Conversation]: true,
+    [PromptTab.Variables]: hasInputs,
+    [PromptTab.Demonstrations]: hasDemonstrations,
+    [PromptTab.Parameters]: true,
+  };
+  if (!present[activeTab]) {
+    setActiveTab(PromptTab.Conversation);
+  }
+
+  // A trigger that unmounts while focused drops focus to the page: hand it to Conversation.
+  useEffect(() => {
+    const held = focusedTabRef.current;
+    const gone =
+      (held === PromptTab.Variables && !hasInputs) ||
+      (held === PromptTab.Demonstrations && !hasDemonstrations);
+    if (gone) {
+      focusedTabRef.current = null;
+      conversationTriggerRef.current?.focus();
+    }
+  }, [hasInputs, hasDemonstrations]);
 
   /**
    * Whether this deployment has a chat runtime to talk to.
@@ -167,7 +197,9 @@ export function PromptTabbedSection({
   return (
     <Tabs.Root
       value={activeTab}
-      onValueChange={(change) => setActiveTab(change.value as PromptTab)}
+      onValueChange={(change) => {
+        if (isPromptTab(change.value)) setActiveTab(change.value);
+      }}
       display="flex"
       flexDirection="column"
       flex={1}
@@ -183,14 +215,15 @@ export function PromptTabbedSection({
       // DraggableTabsBrowser, which is where the memory win comes from.
       lazyMount
     >
-      <Tabs.List
+      <Box
+        data-testid="prompt-tab-strip"
         display="flex"
         alignItems="center"
         flexShrink={0}
         minHeight="32px"
         borderBottom={layoutMode === "horizontal" ? "1px solid" : undefined}
         borderColor={layoutMode === "horizontal" ? "border" : undefined}
-        paddingBottom={2}
+        paddingBottom={3}
       >
         <HStack
           width="full"
@@ -198,20 +231,37 @@ export function PromptTabbedSection({
           margin="0 auto"
           paddingX={3}
         >
-          <Tabs.Trigger value={PromptTab.Conversation} data-testid="prompt-tab-conversation">
-            Conversation
-          </Tabs.Trigger>
-          {hasInputs && (
-            <Tabs.Trigger value={PromptTab.Variables} data-testid="prompt-tab-variables">
-              Variables
+          <Tabs.List
+            minWidth={0}
+            display="flex"
+            alignItems="center"
+            gap={2}
+            onFocus={(event) => {
+              focusedTabRef.current = event.target.getAttribute("data-value");
+            }}
+            onBlur={() => {
+              focusedTabRef.current = null;
+            }}
+          >
+            <Tabs.Trigger
+              ref={conversationTriggerRef}
+              value={PromptTab.Conversation}
+              data-testid="prompt-tab-conversation"
+            >
+              Conversation
             </Tabs.Trigger>
-          )}
-          {hasDemonstrations && (
-            <Tabs.Trigger value={PromptTab.Demonstrations}>Demonstrations</Tabs.Trigger>
-          )}
-          <Tabs.Trigger value={PromptTab.Parameters} data-testid="prompt-tab-parameters">
-            Parameters
-          </Tabs.Trigger>
+            {hasInputs && (
+              <Tabs.Trigger value={PromptTab.Variables} data-testid="prompt-tab-variables">
+                Variables
+              </Tabs.Trigger>
+            )}
+            {hasDemonstrations && (
+              <Tabs.Trigger value={PromptTab.Demonstrations}>Demonstrations</Tabs.Trigger>
+            )}
+            <Tabs.Trigger value={PromptTab.Parameters} data-testid="prompt-tab-parameters">
+              Parameters
+            </Tabs.Trigger>
+          </Tabs.List>
           <Tabs.Context>
             {(tabs) => (
               <>
@@ -223,13 +273,12 @@ export function PromptTabbedSection({
                     openDelay={0}
                   >
                     <Button
-                      size="xs"
+                      size="sm"
                       variant="outline"
                       onClick={() => {
                         chatRef.current?.resetChat();
                         chatRef.current?.focusInput();
                       }}
-                      aria-label="Reset chat"
                     >
                       <LuEraser />
                       Reset chat
@@ -240,7 +289,7 @@ export function PromptTabbedSection({
             )}
           </Tabs.Context>
         </HStack>
-      </Tabs.List>
+      </Box>
 
       {/* Resizable divider - only in vertical mode */}
       {layoutMode === "vertical" && (

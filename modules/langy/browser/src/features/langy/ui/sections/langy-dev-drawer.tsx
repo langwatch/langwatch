@@ -210,9 +210,9 @@ function DrawerHeader({
     <VStack align="stretch" gap={0} flexShrink={0}>
       <HStack
         paddingTop="13px"
-        paddingBottom="10px"
-        paddingLeft="12px"
-        paddingRight="8px"
+        paddingBottom="2.5"
+        paddingLeft="3"
+        paddingRight="2"
         gap={1}
         borderBottomWidth="1px"
         borderColor="border.muted"
@@ -245,8 +245,8 @@ function DrawerHeader({
       </HStack>
       <HStack
         gap={0}
-        paddingX="8px"
-        paddingY="6px"
+        paddingX="2"
+        paddingY="1.5"
         borderBottomWidth="1px"
         borderColor="border.muted"
       >
@@ -298,8 +298,8 @@ function TimeScrubber({
     <VStack
       align="stretch"
       gap={1}
-      paddingX="12px"
-      paddingY="6px"
+      paddingX="3"
+      paddingY="1.5"
       borderBottomWidth="1px"
       borderColor="border.muted"
       flexShrink={0}
@@ -471,7 +471,7 @@ function LogRow({ record }: { record: LangyDevLogRecord }) {
 /** Shared: the "nothing has happened yet" line, so all three tabs say it alike. */
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <Text paddingX="12px" paddingY="10px" textStyle="xs" color="fg.muted">
+    <Text paddingX="3" paddingY="2.5" textStyle="xs" color="fg.muted">
       {children}
     </Text>
   );
@@ -498,7 +498,7 @@ const LANE_LEGEND: {
  */
 function TapeEmpty() {
   return (
-    <VStack align="stretch" gap={3} paddingX="12px" paddingY="10px">
+    <VStack align="stretch" gap={3} paddingX="3" paddingY="2.5">
       <Text textStyle="xs" color="fg.muted">
         Armed. Send a message. Everything that crosses the wire lands here in arrival order.
       </Text>

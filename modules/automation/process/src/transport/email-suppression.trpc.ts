@@ -58,6 +58,14 @@ export const emailSuppressionTrpcTransport: TrpcRouterDeclaration<
     app.listSuppressions({ projectId: input.projectId, actorId: actor.id }),
   )
 
+  /**
+   * The same list in pages, newest first. Same permission and audit as
+   * `getAll`; `nextCursor` is null on the last page.
+   */
+  .procedure("getPage")
+  .withPermission("triggers:view")
+  .handle(({ app, input, actor }) => app.listSuppressionsPage({ ...input, actorId: actor.id }))
+
   /** Removing a suppression resumes delivery - a deliberate operator action. */
   .procedure("remove")
   .withPermission("triggers:manage")

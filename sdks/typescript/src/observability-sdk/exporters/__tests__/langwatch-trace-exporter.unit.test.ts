@@ -1,4 +1,5 @@
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
@@ -17,7 +18,7 @@ const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatc
 const DEFAULT_URL = `${DEFAULT_ENDPOINT}${TRACES_PATH}`;
 
 // Mock the OTLP exporter
-vi.mock("@opentelemetry/exporter-trace-otlp-http", () => {
+vi.mock("@opentelemetry/exporter-trace-otlp-proto", () => {
   const Ctor: any = vi.fn(function (this: any, config: any) {
     this.config = config;
     this.url = config.url;
@@ -218,6 +219,32 @@ describe("LangWatchExporter", () => {
       const exporter = new LangWatchTraceExporter({ endpoint });
 
       expect((exporter as any).url).toBe(`${endpoint}${TRACES_PATH}`);
+    });
+  });
+
+  describe("when choosing compression", () => {
+    const lastConfig = () => vi.mocked(OTLPTraceExporter).mock.calls.at(-1)?.[0];
+
+    it("defaults to gzip", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "");
+      vi.stubEnv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "");
+      new LangWatchTraceExporter();
+      expect(lastConfig()?.compression).toBe("gzip");
+      vi.unstubAllEnvs();
+    });
+
+    it("leaves the choice to the OTel env var when it is set", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_TRACES_COMPRESSION", "none");
+      new LangWatchTraceExporter();
+      expect(lastConfig()?.compression).toBeUndefined();
+      vi.unstubAllEnvs();
+    });
+
+    it("lets an explicit option win", () => {
+      vi.stubEnv("OTEL_EXPORTER_OTLP_COMPRESSION", "gzip");
+      new LangWatchTraceExporter({ compression: CompressionAlgorithm.NONE });
+      expect(lastConfig()?.compression).toBe("none");
+      vi.unstubAllEnvs();
     });
   });
 

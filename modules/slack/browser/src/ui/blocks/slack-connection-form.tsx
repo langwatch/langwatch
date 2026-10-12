@@ -10,6 +10,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import {
   maskedSecret,
   narrowingConfirmation,
@@ -60,6 +61,7 @@ export function SlackConnectionForm({
     canManageOrganization,
   });
   const errorText = form.errorTexts(save.fieldRefusal);
+  const accent = useProductAccent();
 
   return (
     <VStack align="stretch" gap={5}>
@@ -99,7 +101,8 @@ export function SlackConnectionForm({
       <SlackErrorAlert error={save.error} fallbackTitle="Couldn't save the Slack connection" />
       <HStack justify="space-between" align="start">
         <Button
-          colorPalette="blue"
+          colorPalette={accent.colorPalette}
+          variant="solid"
           disabled={save.isPending}
           loading={save.isPending}
           onClick={() => form.submit().forEach((draft) => save.run(draft))}
@@ -187,6 +190,7 @@ function KindField({
   onChange: (kind: SlackConnectionKind) => void;
   isLocked: boolean;
 }) {
+  const accent = useProductAccent();
   if (isLocked) {
     const current = SLACK_CONNECTION_KINDS.find((candidate) => candidate.value === kind);
     return (
@@ -199,6 +203,7 @@ function KindField({
   }
   return (
     <RadioCard.Root
+      colorPalette={accent.colorPalette}
       value={kind}
       onValueChange={({ value }) => {
         const next = SLACK_CONNECTION_KINDS.find((candidate) => candidate.value === value);

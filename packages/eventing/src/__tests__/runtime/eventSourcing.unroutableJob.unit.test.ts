@@ -9,7 +9,7 @@ import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
 
 const TEST_PIPELINE_NAME = "gateway_spend_processing";
 
-const { errorMock } = vi.hoisted(() => ({ errorMock: vi.fn() }));
+const { warnMock } = vi.hoisted(() => ({ warnMock: vi.fn() }));
 
 vi.mock("@langwatch/observability", () => {
   const createLogger = () => {
@@ -17,8 +17,8 @@ vi.mock("@langwatch/observability", () => {
       trace: vi.fn(),
       debug: vi.fn(),
       info: vi.fn(),
-      warn: vi.fn(),
-      error: errorMock,
+      warn: warnMock,
+      error: vi.fn(),
       fatal: vi.fn(),
       child: () => logger,
     };
@@ -72,7 +72,7 @@ describe("a job whose pipeline is not registered in this worker", () => {
   });
 
   /** @scenario A worker without the spend pipeline refuses the command instead of acknowledging it */
-  it("rejects the spend command for retry and names the request at error level", async () => {
+  it("rejects the spend command for a hand-back and names the request at warn level", async () => {
     // No pipeline is registered, which is what an older build looks like to a
     // command minted by a newer one.
     const eventSourcing = await createEventSourcingWithMockedLogger();
@@ -81,7 +81,7 @@ describe("a job whose pipeline is not registered in this worker", () => {
       /not registered in this worker/,
     );
 
-    expect(errorMock).toHaveBeenCalledWith(
+    expect(warnMock).toHaveBeenCalledWith(
       expect.objectContaining({
         pipelineName: TEST_PIPELINE_NAME,
         jobType: "command",
@@ -89,7 +89,7 @@ describe("a job whose pipeline is not registered in this worker", () => {
         tenantId: "project-unroutable",
         gatewayRequestId: "req_unroutable_probe",
       }),
-      "No handler registered for this job in this worker; rejecting it for retry rather than dropping it",
+      "No handler registered for this job in this worker; handing it back for a worker that has one",
     );
 
     await eventSourcing.close();

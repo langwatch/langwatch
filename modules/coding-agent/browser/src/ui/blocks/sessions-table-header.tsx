@@ -1,4 +1,4 @@
-import { Table } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
 import type React from "react";
 
 import type { SessionsSortColumn, SessionsSortState } from "../../behavior/session-sort.ts";
@@ -13,8 +13,8 @@ export const SessionsTableHeader: React.FC<{
   sort: SessionsSortState;
   onSort: (column: SessionsSortColumn) => void;
 }> = ({ sort, onSort }) => (
-  <Table.Header>
-    <Table.Row>
+  <ListTable.Header>
+    <ListTable.Row>
       <SortableColumnHeader label="Session" column="session" sort={sort} onSort={onSort} />
       {/* Shrink-to-fit with a floor: the label and timestamp columns grow
           with their widest cell and never drop below a width that keeps
@@ -63,7 +63,7 @@ export const SessionsTableHeader: React.FC<{
         sort={sort}
         onSort={onSort}
       />
-      <Table.ColumnHeader width={12} />
-    </Table.Row>
-  </Table.Header>
+      <ListTable.ColumnHeader label="Row actions" width={48} />
+    </ListTable.Row>
+  </ListTable.Header>
 );

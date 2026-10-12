@@ -1,6 +1,5 @@
 import { Lent } from "@langwatch/browser-host/lent";
 import { Box, Field, Input, VStack } from "@langwatch/design-system/primitives";
-import { SmallLabel } from "@langwatch/design-system/small-label";
 import { ManagedModelProviderAlertToken } from "@langwatch/enterprise-managed-provider-client";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import type React from "react";
@@ -60,10 +59,10 @@ const CredentialField = ({
 
   return (
     <Field.Root required={!isOptional} invalid={Boolean(fieldError)} width="full">
-      <SmallLabel>
+      <Field.Label textStyle="monoSm">
         {credentialKey}
         {!isOptional && <Field.RequiredIndicator />}
-      </SmallLabel>
+      </Field.Label>
       <Box width="full">
         <Input
           value={value}

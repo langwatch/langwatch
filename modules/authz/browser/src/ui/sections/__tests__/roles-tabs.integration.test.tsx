@@ -162,7 +162,7 @@ describe("the Roles & access page", () => {
         }),
       );
 
-      expect(await screen.findByTestId("contact-sales-block")).toBeInTheDocument();
+      expect(await screen.findByTestId("roles-enterprise-upsell")).toBeInTheDocument();
       expect(state.bindingReads).toBe(0);
       expect(state.grantReads).toBe(0);
     });

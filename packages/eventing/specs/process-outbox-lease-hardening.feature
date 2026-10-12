@@ -101,6 +101,13 @@ Feature: Process outbox lease hardening
     When it reaches its attempt ceiling
     Then it stops being retried and its failure is reported with a diagnosis
 
+  @unit
+  Scenario: A message whose ClickHouse is unavailable is retried, never dead-lettered on its first attempt
+    Given an outbox message whose dispatch is refused as clickhouse_unavailable over a dropped connection
+    When the dispatcher delivers it
+    Then it is scheduled for retry with the usual backoff
+    And a handled refusal whose ClickHouse cause is permanent still retires at once
+
   @unit @unimplemented
   Scenario: A wake scheduled for a process that no longer exists is discarded
     Given a wake for a completed process instance
