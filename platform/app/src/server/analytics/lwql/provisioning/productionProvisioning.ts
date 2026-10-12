@@ -77,6 +77,43 @@ export function lwqlPostgresSchemaFromDatabaseUrl(
 }
 
 /**
+ * Whether this deploy provisions the ClickHouse access model itself, rather
+ * than leaving it to out-of-band infra.
+ *
+ * Self-provisioning is the DEFAULT everywhere except SaaS. SaaS is the one
+ * exception: there the access model stays Terraform-owned, so Terraform is the
+ * single writer to that security boundary during incidents, the unprivileged
+ * Cloud runtime identity holds no grant-rewriting capability, and the
+ * multi-tenant prod app runtime never issues `CREATE USER`/`GRANT`.
+ *
+ * `LWQL_SELF_PROVISION_ACCESS_MODEL` is an explicit override in both
+ * directions, so a SaaS deploy can opt in and a self-hoster with externally
+ * managed grants can opt out:
+ *
+ *  - `"true"`  — always on, even on SaaS
+ *  - `"false"` — always off
+ *  - unset     — `!isSaas` (on outside SaaS, off on SaaS)
+ *
+ * Pure by design: takes the override string and the SaaS flag as parameters
+ * rather than reading `process.env`/`env`, so the decision is unit-testable
+ * without an environment. {@link tasks/provisionLwql.ts} is the only caller and
+ * the one place that feeds it the live values.
+ */
+export function shouldSelfProvisionLwqlAccessModel({
+  override,
+  isSaas,
+}: {
+  /** Raw `process.env.LWQL_SELF_PROVISION_ACCESS_MODEL`. */
+  override: string | undefined;
+  /** `env.IS_SAAS`. */
+  isSaas: boolean | undefined;
+}): boolean {
+  if (override === "true") return true;
+  if (override === "false") return false;
+  return !isSaas;
+}
+
+/**
  * Builds the object names a production deploy provisions under, from the
  * validated `LWQL_*` connection. `settingsProfile` is derived rather than
  * configured, mirroring the test harness's `lwql_${slug}_profile` convention

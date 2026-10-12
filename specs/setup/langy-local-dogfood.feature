@@ -69,3 +69,16 @@ Feature: Langy local dogfood doctor
     When the developer runs the doctor
     Then the key check reports the rejection
     And the doctor still exits by the state of the other checks so a claude-only setup is not blocked
+
+  @unit
+  Scenario: AGENT_PORT derives from PORT+4 when LANGY_AGENT_URL names no port
+    Given platform/app/.env has no LANGY_AGENT_URL
+    When the developer runs the doctor
+    Then it checks langyagent on PORT+4, matching what pnpm dev would have started it on
+    And it does not fall back to a hard-coded port
+
+  @unit
+  Scenario: OPENCODE_AGENT_URL is not read by the app
+    Given platform/app/.env has an OPENCODE_AGENT_URL but no LANGY_AGENT_URL
+    When the developer runs the doctor
+    Then it warns that OPENCODE_AGENT_URL is ignored and names the variable the app actually reads

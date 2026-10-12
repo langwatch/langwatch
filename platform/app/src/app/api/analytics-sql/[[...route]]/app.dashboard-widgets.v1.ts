@@ -1,20 +1,24 @@
 /**
  * Dashboard widgets — the REST routes (custom-chart-playground authored).
  *
- * Five endpoints under the LangWatchQL analytics SQL family, the twin of the
+ * Endpoints under the LangWatchQL analytics SQL family, the twin of the
  * saved-workbench-chart routes for the widget's own `CustomGraph` kind:
  *
  *  - `GET    /api/v1/projects/{projectId}/analytics/dashboard-widgets`
  *  - `POST   /api/v1/projects/{projectId}/analytics/dashboard-widgets`
  *  - `GET    /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}`
  *  - `PATCH  /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}`
+ *  - `POST   /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard`
+ *  - `PUT    /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/placement`
+ *  - `DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/placement`
  *  - `DELETE /api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}`
  *
- * They exist so Langy — and any CLI caller — can create, update and delete
- * dashboard widgets, an action surface the dashboard UI itself has through
- * the `dashboardWidgets` tRPC router but no API key could reach. Placement
- * on a dashboard is done via the widget's `dashboardId` field, set through
- * the same tRPC router the UI uses.
+ * They exist so Langy — and any CLI caller — can create, update, place and
+ * delete dashboard widgets, an action surface the dashboard UI itself has
+ * through the `dashboardWidgets` tRPC router but no API key could reach.
+ * `/dashboard` auto-places at the next free row keeping the widget's size
+ * (the `pin` CLI command); `/placement` accepts an explicit grid position,
+ * the twin of the saved-workbench-chart `place`/`unplace` routes.
  *
  * ## What is validated here
  *
@@ -136,6 +140,21 @@ const widgetListSchema = z.object({ data: z.array(widgetSchema) });
 /** The `{ dashboardId }` an assign-to-dashboard request supplies. */
 const assignDashboardSchema = z.object({
   dashboardId: z.string().min(1),
+});
+
+/**
+ * A placement request's envelope: a dashboard id, and an optional grid
+ * position. What a valid position *is* — the column and span ceilings, and
+ * which dashboard this project may name — is the service's placement schema
+ * and its tenancy check, not this route's, exactly like the chart route's
+ * own `placeChartSchema`.
+ */
+const placeWidgetSchema = z.object({
+  dashboardId: z.string().min(1),
+  gridColumn: z.number().int().optional(),
+  gridRow: z.number().int().optional(),
+  colSpan: z.number().int().optional(),
+  rowSpan: z.number().int().optional(),
 });
 
 /** The tags every operation in this file carries in the published document. */
@@ -397,6 +416,67 @@ function registerAssignDashboard(
   );
 }
 
+function registerPlace(secured: ReturnType<typeof createProjectApp>): void {
+  secured.access(requires("analytics:update")).put(
+    "/:projectId/analytics/dashboard-widgets/:widgetId/placement",
+    describeRoute({
+      summary: "Place a dashboard widget on a dashboard",
+      description:
+        "Places one dashboard widget on a dashboard in the same project, at the grid position supplied — or, when no grid row is given, at the next row free on that dashboard, counting cards of every kind. A dashboard that is not in this project is reported as not found, exactly like a widget that is not, and nothing is written.",
+      tags: WIDGET_TAGS,
+      responses: {
+        ...canonicalBaseResponses,
+        ...widgetNotFoundResponse,
+        200: {
+          description: "The widget, now placed",
+          content: { "application/json": { schema: resolver(widgetSchema) } },
+        },
+      },
+    }),
+    zValidator("json", placeWidgetSchema),
+    async (c) => {
+      const project = await dashboardWidgetsProject({
+        project: c.get("project"),
+        requestedProjectId: c.req.param("projectId"),
+      });
+      const widget = await widgetService().placeWidget({
+        id: widgetIdOf(c.req.param("widgetId")),
+        projectId: project.id,
+        input: c.req.valid("json"),
+      });
+      return c.json(widgetResource({ widget, project }));
+    },
+  );
+}
+
+function registerUnplace(secured: ReturnType<typeof createProjectApp>): void {
+  secured.access(requires("analytics:update")).delete(
+    "/:projectId/analytics/dashboard-widgets/:widgetId/placement",
+    describeRoute({
+      summary: "Remove a dashboard widget from its dashboard",
+      description:
+        "Removes one dashboard widget from whatever dashboard it is on, clearing its grid position along with the dashboard id. Idempotent: unplacing a widget that is not placed answers 204 all the same.",
+      tags: WIDGET_TAGS,
+      responses: {
+        ...canonicalBaseResponses,
+        ...widgetNotFoundResponse,
+        204: { description: "The widget is no longer on a dashboard" },
+      },
+    }),
+    async (c) => {
+      const project = await dashboardWidgetsProject({
+        project: c.get("project"),
+        requestedProjectId: c.req.param("projectId"),
+      });
+      await widgetService().unplaceWidget({
+        id: widgetIdOf(c.req.param("widgetId")),
+        projectId: project.id,
+      });
+      return c.body(null, 204);
+    },
+  );
+}
+
 function registerDelete(secured: ReturnType<typeof createProjectApp>): void {
   secured.access(requires("analytics:delete")).delete(
     "/:projectId/analytics/dashboard-widgets/:widgetId",
@@ -441,5 +521,7 @@ export function registerDashboardWidgetRoutes(
   registerRead(secured);
   registerUpdate(secured);
   registerAssignDashboard(secured);
+  registerPlace(secured);
+  registerUnplace(secured);
   registerDelete(secured);
 }

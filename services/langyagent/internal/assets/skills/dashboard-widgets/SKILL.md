@@ -31,7 +31,9 @@ langwatch dashboard-widget schema -f json
 
 Read the datasets, their grain, their time column, and which columns are `available` to you.
 
-**Seed data is stale** (newest trace 2026-08-04 as of this writing). Write SQL with a wide time window — `WHERE timestamp >= subtractDays(now(), 400)` — not a narrow recent one. A query that legitimately returns 0 rows because of a narrow window is not a bug; widen the window before assuming something is broken.
+**Bound a dashboard widget's time window with the reserved `{dashboard_context_period_start:DateTime}` / `{dashboard_context_period_end:DateTime}` params (Step 2), not a hand-rolled `now()`/`subtractDays(...)` window.** A widget is meant to follow the dashboard's own period selector — a fixed window never does, and it also cannot be combined with `{dashboard_context_granularity_seconds:UInt32}`: the renderer refuses that combination with `lwql_granularity_requires_window`, since a granularity bucket needs the bounded window to bucket *within*.
+
+**Seed data is stale** (newest trace 2026-08-04 as of this writing). While exploring the schema in this step — before you have a widget with the reserved period bounds wired in — a query against a narrow, hard-coded recent window can legitimately return 0 rows; that is not a bug, widen the window (e.g. `WHERE timestamp >= subtractDays(now(), 400)`) before assuming something is broken. Once the widget itself is written, prefer the reserved bounds over this kind of fixed window.
 
 ## Step 2: Write the queries file
 
@@ -91,6 +93,36 @@ export default function Widget() {
 
 More worked examples: `platform/app/scripts/north-star-widgets/`.
 
+#### `format`, not `yUnit`
+
+`MetricStat`, `Leaderboard`, `AreaTimeseries`, `StackedBars` and `GroupedBars` take a `format` prop — there is no `yUnit`, `unit`, or similar; passing one is silently ignored (an unrecognized prop, not a compile error) and the axis/value renders as a bare number. `format` is one of exactly four strings:
+
+| `format` | Renders `1410` as | Renders `0.141` as |
+| --- | --- | --- |
+| `"number"` (default) | `1,410` | `0.14` |
+| `"currency"` | `$1,410` | `$0.14` |
+| `"percent"` | `141,000%` | `14.1%` |
+| `"duration"` | `1.4s` | `0ms` |
+
+**`"percent"` multiplies by 100 itself — pass the 0-1 fraction, not the already-multiplied percentage.** Passing `14.1` (meaning "14.1%") renders `"1,410%"`; pass `0.141`.
+
+#### Props per primitive
+
+Every component also takes `data: Row[]` (the query result rows) and an optional `height?: number`; not repeated per row below.
+
+| Component | Required props | Notable optional props |
+| --- | --- | --- |
+| `MetricStat` | `value`, `label` | `format`, `delta`, `deltaDirection` (`"up"` | `"down"`), `sparkline`, `sparklineKey`, `colors` |
+| `Sparkline` | — | `x`, `y`, `color` |
+| `AreaTimeseries` | `x`, `series` (string or string\[]) | `format`, `stacked`, `projectionFrom`, `colors` |
+| `StackedBars` | `x`, `series` (string\[]) | `format`, `projectionFrom`, `colors` |
+| `GroupedBars` | `x`, `series` (string\[]) | `format`, `colors` |
+| `ProjectionBars` | `x`, `y`, `projectionFrom` | `budget`, `colors` |
+| `Donut` | `nameKey`, `valueKey` | `centerLabel`, `colors` |
+| `Leaderboard` | `labelKey`, `valueKey` | `format`, `max` (caps the bar scale, not the row count), `navigateTo` |
+| `Heatmap` | `xKey`, `yKey`, `valueKey` | `xLabels`, `yLabels` (default to hour-of-day / weekday labels when `xKey`/`yKey` are exactly `"hour"`/`"weekday"`), `colorScale` (`[from, to]` hex pair) |
+| `LwqlChart` | — (infers everything) | `kind` (forces the auto-picked type), `x`, `y`, `series`, `colors` |
+
 ### Drill-down: `LW.navigate`
 
 `LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget — `target` is `"traces"` or `"trace"`, and `params` is keyed by filter field ids (e.g. `"metadata.user_id"`) that the host resolves into the Trace Explorer URL.
@@ -107,21 +139,25 @@ langwatch dashboard-widget create \
   -f json
 ```
 
-Creating (and updating) validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name or a runtime error in the widget only surfaces when it actually runs. Open the widget's `platformUrl` (printed on success) and confirm it renders with real data before calling the work done.
+**A successful `create`/`update` means "saved", not "renders".** It validates the queries file's shape and the widget's JS/TSX syntax, but it does not execute the queries or mount the component — a wrong column name, a bad SQL bind, or a runtime error in the widget only surfaces when it actually runs in the browser. There is no CLI command that runs a dashboard widget's queries with the dashboard's period params outside that render (unlike `langwatch chart run`, which does this for a saved chart's single statement) — so the only way to confirm a widget actually works is to open its `platformUrl` (printed on success) in a browser and look at it. Do not report the work done from a successful `create`/`update` alone.
 
 ## Managing saved widgets
 
+**Widget ids can start with `-`.** They are nanoids, whose alphabet includes it, and a plain `langwatch dashboard-widget get -L4zZ...` reads the id as an unknown flag and fails. Always pass the id via `--id <id>`, never as the bare positional:
+
 ```bash
 langwatch dashboard-widget list -f json
-langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
-langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
-langwatch dashboard-widget delete <id>
-langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
+langwatch dashboard-widget get --id <id> -f json      # code, queries, platformUrl
+langwatch dashboard-widget update --id <id> --code-file widget.tsx --queries-file queries.json
+langwatch dashboard-widget delete --id <id>
+langwatch dashboard-widget pin --id <id-or-name> --dashboard <id-or-name>   # add to a dashboard, next free row
+langwatch dashboard-widget place --id <id> --dashboard-id <id> --grid-column 0 --grid-row 3 --col-span 4 --row-span 3   # add at an explicit grid position
+langwatch dashboard-widget unplace --id <id>   # remove from its dashboard
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the custom-chart-playground page. See `langwatch dashboard list` for ids.
+`pin` reassigns the widget to that dashboard at the dashboard's next free row, keeping the widget's current size. `place` is the same assignment with an explicit grid position instead — the grid is 8 columns wide (`--grid-column`/`--col-span` in that unit), and `--grid-row` is still auto-allocated when omitted. Either way the widget still lives and is edited on the custom-chart-playground page. See `langwatch dashboard list` for ids.
 
-`update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
+`update` accepts `--name` on its own, a full definition (`--code`/`--code-file` together with `--queries-file`), or just one half of the definition (`--code`/`--code-file` alone, or `--queries-file` alone) — a half-definition update reads the widget's current value back for the side you didn't pass, rather than refusing or saving half a widget. A call with nothing to change (no `--name` and no definition flag at all) is still refused.
 
 ## Worked example: bar chart of daily trace counts
 
@@ -191,5 +227,6 @@ langwatch dashboard-widget create \
 - A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
 - `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.
+- `lwql_granularity_requires_window` — a query declares `{dashboard_context_granularity_seconds:UInt32}` without also declaring both `{dashboard_context_period_start:DateTime}` and `{dashboard_context_period_end:DateTime}` (or bounds the window itself with `now()`/`subtractDays(...)` instead). Add the reserved period bounds to the same query.
 - "Cannot import '\<specifier>'" — the widget imported something other than `react`, `react-dom`, `react-dom/client`, `recharts`, or `@langwatch/charts`; use only those, or the corresponding global.
 - A query returning 0 rows against seed data — the seed's newest trace is 2026-08-04; widen the time window before assuming the query is wrong.

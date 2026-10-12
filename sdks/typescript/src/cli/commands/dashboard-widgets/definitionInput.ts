@@ -49,6 +49,47 @@ export const resolveDefinitionInput = (
   return { code, queries: readQueriesFile(flags.queriesFile!) };
 };
 
+/**
+ * The same resolution `create` uses, except an update may touch just the
+ * source or just the named queries: the missing half is read back from the
+ * widget currently saved rather than refused, since (unlike `create`) there
+ * is already a definition to backfill from.
+ *
+ * `fetchCurrent` is called at most once, and only when at least one side is
+ * missing — a definition supplied in full never triggers the extra read.
+ */
+export const resolveUpdateDefinitionInput = async (
+  flags: DefinitionFlags,
+  fetchCurrent: () => Promise<{
+    code: string;
+    queries: DashboardWidgetQueryInput[];
+  }>,
+): Promise<DashboardWidgetDefinitionInput | undefined> => {
+  const hasCodeFlag = flags.code !== undefined || flags.codeFile !== undefined;
+  const hasQueriesFlag = flags.queriesFile !== undefined;
+  if (!hasCodeFlag && !hasQueriesFlag) return undefined;
+
+  if (flags.code !== undefined && flags.codeFile !== undefined) {
+    throw new WidgetInputError("Pass either --code or --code-file, not both");
+  }
+
+  const current =
+    hasCodeFlag && hasQueriesFlag ? undefined : await fetchCurrent();
+
+  const code = hasCodeFlag
+    ? (flags.code ?? readTextFile(flags.codeFile!, "code"))
+    : current!.code;
+  if (code.trim().length === 0) {
+    throw new WidgetInputError("A widget's code must not be empty");
+  }
+
+  const queries = hasQueriesFlag
+    ? readQueriesFile(flags.queriesFile!)
+    : current!.queries;
+
+  return { code, queries };
+};
+
 const readTextFile = (path: string, label: string): string => {
   try {
     return readFileSync(path, "utf-8");

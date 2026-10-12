@@ -30,7 +30,6 @@
 
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import { LWQL_QUERY_RESULT_DATASET } from "~/features/analytics-query/visualization/lwqlDatasetNames";
 import { validateVegaLiteSpecStructure } from "~/features/analytics-query/visualization/validateVegaLiteSpec";
@@ -48,6 +47,7 @@ import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
 } from "../chartGrid";
+import { generateCustomGraphId } from "../customGraphId";
 import { dashboardBelongsToProject } from "../dashboardBelongsToProject";
 import {
   getLangWatchQLService,
@@ -251,7 +251,7 @@ export class SavedWorkbenchChartService {
     let row: CustomGraph;
     try {
       row = await this.deps.repository.create({
-        id: identity.data.id ?? nanoid(),
+        id: identity.data.id ?? generateCustomGraphId(),
         projectId,
         name: identity.data.name,
         definition: definition as Prisma.InputJsonValue,

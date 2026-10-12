@@ -1,10 +1,10 @@
 import { createLogger } from "@langwatch/observability";
 import { describeRoute, resolver } from "hono-openapi";
-import { nanoid } from "nanoid";
 import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import type { CustomGraph, Prisma } from "~/generated/prisma/client";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+import { generateCustomGraphId } from "~/server/analytics/customGraphId";
 import { assertCustomGraphWritesAllowed } from "~/server/analytics/customGraphPlaygroundGate";
 import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
 import { createProjectApp, requires } from "~/server/api/security";
@@ -197,7 +197,7 @@ secured.access(requires("analytics:create")).post(
 
     const graph = await prisma.customGraph.create({
       data: {
-        id: nanoid(),
+        id: generateCustomGraphId(),
         name: body.name,
         graph: body.graph as Prisma.InputJsonValue,
         projectId: project.id,
