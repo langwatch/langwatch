@@ -10,6 +10,13 @@ Feature: Field editor
     And an output with no value leaves the value column empty
 
   @integration
+  Scenario: A field row reads inline, the value taking the rest of the width
+    Given a Variables row with a type, a short name, a mapping and a remove button
+    Then the "=" sits right after the name, with no gap column between them
+    And the value stretches from the "=" to the remove button
+    And the section heading is bold uppercase with no extra letter spacing
+
+  @integration
   Scenario: Field editor rows fit a narrow drawer
     Given a Variables and an Outputs section 320px wide
     Then the value moves below the name and the page does not scroll sideways

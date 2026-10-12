@@ -45,7 +45,13 @@ export function FieldEditor({
       data-testid={testId}
     >
       <HStack width="full" justify="space-between" minHeight={CONTROL_HEIGHT}>
-        <Text id={headingId} textStyle="eyebrow" color="fg.muted">
+        <Text
+          id={headingId}
+          textStyle="xs"
+          fontWeight="bold"
+          textTransform="uppercase"
+          color="fg.muted"
+        >
           {label}
         </Text>
         {addAction}
@@ -76,8 +82,9 @@ type FieldEditorRowProps = {
 };
 
 /**
- * One row on the fixed grid: type 104px, name and info 144px, separator 12px, value
- * (the rest), remove 32px. Under 400px of section width the value drops below.
+ * One inline row: type and name at their own width (name capped at half the row),
+ * the separator right after the name, the value taking the rest, then remove.
+ * Under 400px of section width the value drops below.
  */
 export function FieldEditorRow({
   typeControl,
@@ -96,11 +103,11 @@ export function FieldEditorRow({
       columnGap={2}
       rowGap={1}
       alignItems="start"
-      gridTemplateColumns="104px minmax(0, 1fr) 32px"
+      gridTemplateColumns="auto minmax(0, 1fr) auto"
       gridTemplateAreas={'"type name remove" "value value value"'}
       css={{
         [`@container (min-width: ${NARROW_BELOW})`]: {
-          gridTemplateColumns: "104px 144px 12px minmax(0, 1fr) 32px",
+          gridTemplateColumns: "auto fit-content(50%) auto minmax(0, 1fr) auto",
           gridTemplateAreas: '"type name sep value remove"',
         },
       }}
