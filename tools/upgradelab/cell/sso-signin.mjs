@@ -3,7 +3,7 @@
 // connectionId, project? }] }. One JSON line per check: { phase, member, door, check, ok, url, detail }.
 // Phase test-login is the go-live checklist's round trip through a connection not yet live;
 // head first replays main's cookie.
-import { existsSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
@@ -37,6 +37,60 @@ async function newContext(browser, storageState) {
   return context;
 }
 
+// A blank page's evidence: console, page errors, failed or 4xx/5xx requests, and at the end what
+// the DOM holds. Written to sso/<member>-console.jsonl; the summary joins the verdict detail.
+function watch(page, member, check) {
+  const file = join(stateDir, `${member.email.replace(/[^a-z0-9]+/gi, "-")}-console.jsonl`);
+  const seen = [];
+  const note = (record) => {
+    seen.push(record);
+    appendFileSync(
+      file,
+      `${JSON.stringify({ phase, check, at: new Date().toISOString(), ...record })}\n`,
+    );
+  };
+  const path = (raw) => new URL(raw).pathname;
+  page.on("console", (message) =>
+    note({ kind: `console.${message.type()}`, text: message.text().slice(0, 2000) }),
+  );
+  page.on("pageerror", (error) =>
+    note({ kind: "pageerror", text: String(error.stack ?? error).slice(0, 2000) }),
+  );
+  page.on("requestfailed", (request) =>
+    note({
+      kind: "requestfailed",
+      text: `${request.method()} ${path(request.url())}: ${request.failure()?.errorText}`,
+    }),
+  );
+  page.on("response", (response) => {
+    if (response.status() >= 400)
+      note({ kind: "response", text: `${response.status()} ${path(response.url())}` });
+  });
+  return async () => {
+    const dom = await page
+      .evaluate(() => ({
+        boot: Boolean(document.getElementById("lw-boot")),
+        body: [...document.body.children].map(
+          (el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}[${el.childElementCount}]`,
+        ),
+        root: document.getElementById("root")?.innerHTML.slice(0, 600) ?? null,
+      }))
+      .catch((error) => ({ error: String(error).slice(0, 200) }));
+    note({ kind: "dom", text: JSON.stringify(dom) });
+    const loud = seen.filter((record) =>
+      /error|pageerror|requestfailed|response/.test(record.kind),
+    );
+    return `; dom ${JSON.stringify(dom).slice(0, 400)}; ${loud.length} errors${
+      loud.length
+        ? `: ${loud
+            .slice(0, 4)
+            .map((record) => `${record.kind} ${record.text.slice(0, 200)}`)
+            .join(" | ")}`
+        : ""
+    }`;
+  };
+}
+
 async function snap(page, member, check) {
   const file = `sso-${phase}-${check}-${member.email.replace(/[^a-z0-9]+/gi, "-")}.png`;
   await page.screenshot({ path: join(shots, file), fullPage: true }).catch(() => undefined);
@@ -50,6 +104,7 @@ async function checkCookie(browser, member) {
     return emit({ ...base, ok: false, url: "", detail: "main left no session to carry over" });
   const context = await newContext(browser, stateFile(member));
   const page = await context.newPage();
+  const evidence = watch(page, member, "cookie");
   let worst = 0;
   page.on("response", (response) => {
     if (response.request().isNavigationRequest()) worst = Math.max(worst, response.status());
@@ -85,7 +140,7 @@ async function checkCookie(browser, member) {
     ...base,
     ok,
     url: page.url(),
-    detail: `${outcome}; worst navigation ${worst}; ${await shown(page)}`,
+    detail: `${outcome}; worst navigation ${worst}; ${await shown(page)}${await evidence()}`,
   });
   if (!ok) await snap(page, member, "cookie");
   await context.close();
