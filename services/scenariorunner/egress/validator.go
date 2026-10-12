@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/net/idna"
+
 	"github.com/langwatch/langwatch/pkg/ssrf"
 )
 
@@ -178,16 +180,138 @@ func parseDestination(raw string) (Destination, error) {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return Destination{}, refusalf("Unsupported protocol: %s: — only http and https are allowed", u.Scheme)
 	}
-	requestHost := strings.ToLower(u.Hostname())
+	hostname, err := canonicalHost(strings.ToLower(u.Hostname()))
+	if err != nil {
+		return Destination{}, err
+	}
+	requestHost := hostname
 	if strings.Contains(requestHost, ":") {
 		requestHost = "[" + requestHost + "]"
 	}
 	return Destination{
 		URL:         u,
-		Hostname:    withoutTrailingDot(strings.ToLower(u.Hostname())),
+		Hostname:    withoutTrailingDot(hostname),
 		RequestHost: requestHost,
 		Port:        portFor(u),
 	}, nil
+}
+
+// whatwgDomains maps a non-ASCII host as the WHATWG URL parser does (UTS 46,
+// nontransitional, no STD3 rules), so full-width digits read as digits.
+var whatwgDomains = idna.New(idna.MapForLookup(), idna.Transitional(false),
+	idna.StrictDomainName(false), idna.CheckHyphens(false))
+
+// canonicalHost reads a host as the WHATWG URL parser the Node child uses
+// does: a zone identifier is invalid, and a host ending in a number is an
+// IPv4 address in any of its decimal, octal or hex spellings, else invalid.
+func canonicalHost(host string) (string, error) {
+	if strings.Contains(host, "%") {
+		return "", refusal(msgInvalidURL)
+	}
+	if !strings.Contains(host, ":") && !isASCII(host) {
+		mapped, err := whatwgDomains.ToASCII(host)
+		if err != nil {
+			return "", refusal(msgInvalidURL)
+		}
+		host = mapped
+	}
+	if strings.Contains(host, ":") || !endsInANumber(host) {
+		return host, nil
+	}
+	addr, ok := parseWHATWGIPv4(host)
+	if !ok {
+		return "", refusal(msgInvalidURL)
+	}
+	return addr.String(), nil
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return false
+		}
+	}
+	return true
+}
+
+// endsInANumber is the WHATWG "ends in a number" check on a host's last label.
+func endsInANumber(host string) bool {
+	parts := strings.Split(host, ".")
+	if parts[len(parts)-1] == "" {
+		if len(parts) == 1 {
+			return false
+		}
+		parts = parts[:len(parts)-1]
+	}
+	last := parts[len(parts)-1]
+	if last != "" && strings.Trim(last, "0123456789") == "" {
+		return true
+	}
+	_, ok := parseIPv4Number(last)
+	return ok
+}
+
+// parseWHATWGIPv4 is the WHATWG IPv4 parser: up to four parts, each decimal,
+// 0-prefixed octal or 0x-prefixed hex, the last filling the remaining bytes.
+func parseWHATWGIPv4(host string) (netip.Addr, bool) {
+	numbers, ok := ipv4Numbers(host)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	last := numbers[len(numbers)-1]
+	if last >= 1<<(8*(5-len(numbers))) {
+		return netip.Addr{}, false
+	}
+	ipv4 := last
+	for i, n := range numbers[:len(numbers)-1] {
+		if n > 255 {
+			return netip.Addr{}, false
+		}
+		ipv4 += n << (8 * (3 - i))
+	}
+	return netip.AddrFrom4([4]byte{byte(ipv4 >> 24), byte(ipv4 >> 16), byte(ipv4 >> 8), byte(ipv4)}), true
+}
+
+// ipv4Numbers splits a host into at most four IPv4 numbers.
+func ipv4Numbers(host string) ([]uint64, bool) {
+	parts := strings.Split(host, ".")
+	if parts[len(parts)-1] == "" && len(parts) > 1 {
+		parts = parts[:len(parts)-1]
+	}
+	if len(parts) > 4 {
+		return nil, false
+	}
+	numbers := make([]uint64, 0, len(parts))
+	for _, part := range parts {
+		n, ok := parseIPv4Number(part)
+		if !ok {
+			return nil, false
+		}
+		numbers = append(numbers, n)
+	}
+	return numbers, true
+}
+
+// parseIPv4Number reads one IPv4 part; an empty part is not a number.
+func parseIPv4Number(part string) (uint64, bool) {
+	if part == "" {
+		return 0, false
+	}
+	base := 10
+	switch {
+	case len(part) >= 2 && (part[:2] == "0x" || part[:2] == "0X"):
+		part, base = part[2:], 16
+	case len(part) >= 2 && part[0] == '0':
+		part, base = part[1:], 8
+	}
+	if part == "" {
+		return 0, true
+	}
+	n, err := strconv.ParseUint(part, base, 64)
+	if err != nil || n > 1<<32 {
+		return 0, false
+	}
+	return n, true
 }
 
 func portFor(u *url.URL) int {

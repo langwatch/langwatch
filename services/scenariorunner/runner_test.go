@@ -74,7 +74,7 @@ func TestAgentTestTurnAnswersThroughTheFencedHTTPTarget(t *testing.T) {
 	assert.Empty(t, gotTraceparent, "an agent test turn runs outside a traced simulation")
 }
 
-// @scenario "An HTTP target behind the fence is refused before it is dialled"
+// @scenario "An HTTP target behind the fence is refused before any connection is made"
 func TestAgentTestTurnIsRefusedByTheFence(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
