@@ -106,6 +106,22 @@ func TestExporter_PostsGzippedOTLPJSONWithHeaders(t *testing.T) {
 	assert.Equal(t, "llm.chat", path(t, got.body, "resourceSpans", 0, "scopeSpans", 0, "spans", 0, "name"))
 }
 
+func TestExporter_PooledGzipWritersStayIndependent(t *testing.T) {
+	rec := &recorder{}
+	exp := newTestExporter(t, rec, nil)
+
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Go(func() { assert.NoError(t, exp.ExportSpans(context.Background(), oneSpan())) })
+	}
+	wg.Wait()
+
+	require.Len(t, rec.requests, 8)
+	for _, r := range rec.requests {
+		assert.Equal(t, "llm.chat", path(t, r.body, "resourceSpans", 0, "scopeSpans", 0, "spans", 0, "name"))
+	}
+}
+
 func TestExporter_UncompressedWhenDisabled(t *testing.T) {
 	rec := &recorder{}
 	exp := newTestExporter(t, rec, func(c *Config) { c.DisableCompression = true })
