@@ -52,8 +52,9 @@ func ClickHouseWorkloadHierarchyStatements(cpus int) []string {
 
 // ClickHouseStackAccessStatements provision one stack's workload and login.
 // The login holds what the app's own provisioning needs: everything on its
-// database, the system tables, and LangWatchQL's access model (users,
-// policies, its named collection, the postgresql() bridge), each grantable.
+// database, the system tables, LangWatchQL's access model (users, policies,
+// its named collection, the postgresql() bridge), each grantable, and its app
+// functions (CREATE OR REPLACE FUNCTION asks CREATE and DROP FUNCTION).
 // maxUserMemory 0 leaves the memory cap off.
 func ClickHouseStackAccessStatements(database, password string, maxUserMemory int64) []string {
 	user := quoteCHIdent(ClickHouseStackUserFor(database))
@@ -73,6 +74,7 @@ func ClickHouseStackAccessStatements(database, password string, maxUserMemory in
 		"GRANT ACCESS MANAGEMENT ON *.* TO " + user + " WITH GRANT OPTION",
 		"GRANT POSTGRES ON *.* TO " + user + " WITH GRANT OPTION",
 		"GRANT CURRENT GRANTS(NAMED COLLECTION ADMIN ON *) TO " + user + " WITH GRANT OPTION",
+		"GRANT CREATE FUNCTION, DROP FUNCTION ON *.* TO " + user,
 	}
 }
 

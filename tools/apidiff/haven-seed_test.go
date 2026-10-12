@@ -3,8 +3,6 @@ package apidiff
 import (
 	"context"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -63,42 +61,6 @@ func reloadedWorker(fake *fakeHaven) bool {
 		}
 	}
 	return false
-}
-
-func TestEnableMonolithWorkers(t *testing.T) {
-	t.Run("a monolith worktree's app .env gains the in-process workers line once", func(t *testing.T) {
-		dir := t.TempDir()
-		appDir := filepath.Join(dir, "platform", "app")
-		if err := os.MkdirAll(appDir, 0o750); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(appDir, ".env"), []byte("A=1"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		instance := Instance{Dir: dir, Profile: bootProfile{name: profileMonolith}}
-		for range 2 {
-			if err := enableMonolithWorkers(instance); err != nil {
-				t.Fatal(err)
-			}
-		}
-		written, err := os.ReadFile(filepath.Join(appDir, ".env"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := strings.Count(string(written), monolithWorkersInProcess); got != 1 {
-			t.Errorf("want one %s line, got %d in %q", monolithWorkersInProcess, got, written)
-		}
-	})
-
-	t.Run("a modular worktree is left alone", func(t *testing.T) {
-		dir := t.TempDir()
-		if err := enableMonolithWorkers(Instance{Dir: dir, Profile: bootProfile{name: profileModular}}); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := os.Stat(filepath.Join(dir, "platform")); !os.IsNotExist(err) {
-			t.Errorf("modular worktree touched: %v", err)
-		}
-	})
 }
 
 func TestRedisSlotsIn(t *testing.T) {

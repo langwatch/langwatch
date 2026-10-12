@@ -22,6 +22,11 @@ const (
 	processDeathPoll = 50 * time.Millisecond
 )
 
+// destroyDeathWait is DestroyStack's longer bound: it flushes the stack's Redis
+// DB next, and a lane still running after the flush writes into it again. A
+// launcher still shutting down after 5s under load was seen on 2026-10-12.
+const destroyDeathWait = 30 * time.Second
+
 // DownStack stops a registered stack by slug, from anywhere: it terminates the
 // launcher (the supervised children die with their process group), removes the
 // stack's routes, and drops its registry entry. Databases are deliberately
@@ -83,7 +88,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	}
 	// Same ordering rule as stopAndDropForDir: the launcher's children must be
 	// gone before the databases they hold connections to are dropped.
-	o.waitForProcessesDead(downed)
+	o.waitForProcessesDeadWithin(downed, destroyDeathWait)
 	o.stopNxDaemon(ctx, worktreeDir)
 	o.dropWorktreeDatabases(ctx, slug)
 	o.flushStackRedis(ctx, slug, rdb)
@@ -299,10 +304,15 @@ func (o *Orchestrator) flushStackRedis(ctx context.Context, slug string, rdb int
 // forever. Uses the wall clock deliberately: this is a real wait on OS
 // processes, not domain time.
 func (o *Orchestrator) waitForProcessesDead(pids []int) {
+	o.waitForProcessesDeadWithin(pids, processDeathWait)
+}
+
+// waitForProcessesDeadWithin is waitForProcessesDead with the caller's bound.
+func (o *Orchestrator) waitForProcessesDeadWithin(pids []int, bound time.Duration) {
 	if len(pids) == 0 {
 		return
 	}
-	deadline := time.Now().Add(processDeathWait)
+	deadline := time.Now().Add(bound)
 	for {
 		if !o.anyAlive(pids) {
 			return

@@ -24,6 +24,9 @@ type monolithPlan struct {
 	Port    func(service string) int
 }
 
+// monolithWorkersInProcess hosts the monolith's workers inside its app process.
+const monolithWorkersInProcess = "WORKERS_IN_PROCESS=1"
+
 // monolithScript runs one of the monolith package's own scripts from the
 // workspace root, so the lane never depends on a path staying where it is.
 func monolithScript(name string) string {
@@ -37,6 +40,8 @@ func monolithScript(name string) string {
 //
 // The skip flags are that checkout's own opt-outs: without them its start
 // script starts a second gateway and NLP engine, on ports haven never routed.
+// WORKERS_IN_PROCESS=1 is what that checkout's own `dev` script sets before
+// `dev:app`: without it the app starts no workers and projects nothing.
 //
 // No readiness probe - the lane would be waiting for itself.
 func (p monolithPlan) appChild() Child {
@@ -47,7 +52,8 @@ func (p monolithPlan) appChild() Child {
 		Env: append(p.NodeEnv(lane),
 			fmt.Sprintf("PORT=%d", p.Port("app")),
 			"LANGWATCH_SKIP_AIGATEWAY=1",
-			"LANGWATCH_SKIP_NLP=1"),
+			"LANGWATCH_SKIP_NLP=1",
+			monolithWorkersInProcess),
 	}
 }
 

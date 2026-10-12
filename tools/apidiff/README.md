@@ -103,11 +103,6 @@ left alone. The same prefix, shape, age and live-run rules apply to both.
   duplicate, so neither side ever projected it. The run records each stack's
   `redisDb` from `haven status` and, after the destroy, runs `FLUSHDB` on each
   one no live stack holds.
-- **A monolith base runs its workers in process.** haven's monolith lane runs
-  `dev:app`, which starts no workers (the monolith's own `dev` script sets
-  `WORKERS_IN_PROCESS=1` first), so main never projected a trace. The run
-  appends `WORKERS_IN_PROCESS=1` to the base worktree's `platform/app/.env`,
-  which the monolith's env-load reads and haven's root `.env` check does not.
 - **A fresh worktree is prepared before either stack boots.** haven's own
   automatic prep is migrate-and-seed, not install-and-build: a worktree
   `git worktree add` just created carries none of a developer checkout's

@@ -6,9 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -26,11 +23,6 @@ const seededKeyProbePath = "/api/prompts"
 // monolith never gets it, so on the branch alone its organizations and users
 // would surface as list differences, written while the probes run.
 const havenNoAutoSeed = "HAVEN_AUTO_SEED=0"
-
-// monolithWorkersInProcess is what the monolith's own `dev` script sets
-// before `dev:app`; haven's monolith lane runs `dev:app` without it, so main's
-// app started no workers and never projected a trace.
-const monolithWorkersInProcess = "WORKERS_IN_PROCESS=1"
 
 // projectKeyStatus is the status the seeded project key answers on baseURL; 0
 // when the stack did not answer.
@@ -91,30 +83,6 @@ func (state *bootState) havenWaitSeeded(ctx context.Context, instance *Instance)
 		state.logf("haven %s: worker reload failed (continuing): %v", instance.Name, err)
 	}
 	return nil
-}
-
-// enableMonolithWorkers appends WORKERS_IN_PROCESS=1 to a monolith worktree's
-// platform/app/.env, which its env-load reads and haven's own .env check
-// (the workspace root's) does not. Other layouts are left alone.
-func enableMonolithWorkers(instance Instance) error {
-	if instance.Profile.name != profileMonolith {
-		return nil
-	}
-	path := filepath.Join(instance.Dir, "platform", "app", ".env")
-	existing, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if strings.Contains(string(existing), "\n"+monolithWorkersInProcess+"\n") {
-		return nil
-	}
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	_, err = file.WriteString("\n" + monolithWorkersInProcess + "\n")
-	return err
 }
 
 // havenRedisSlot is the Redis logical database haven gave one stack.

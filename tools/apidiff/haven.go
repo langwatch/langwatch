@@ -244,9 +244,6 @@ func (state *bootState) havenPrepareInstance(ctx context.Context, instance Insta
 		return fmt.Errorf("prepare %s: copy env: %w", instance.Name, err)
 	}
 	state.logf("prepare %s: copy .env files exit=ok (copied %d)", instance.Name, copied)
-	if err := enableMonolithWorkers(instance); err != nil {
-		return fmt.Errorf("prepare %s: enable the monolith's workers: %w", instance.Name, err)
-	}
 	if state.prepared {
 		state.logf("prepare %s: the parity phase prepared this worktree", instance.Name)
 		return nil
