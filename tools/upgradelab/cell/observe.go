@@ -433,6 +433,7 @@ var acceptedBrowserNoise = []browserNoise{
 	{[]string{"static.hotjar.com"}, "third-party analytics, same on main"},
 	{[]string{"static.reo.dev", "ERR_BLOCKED_BY_ORB"}, "third-party analytics, same on main"},
 	{[]string{"/api/trpc/", "?input=", "net::ERR_ABORTED"}, "a tRPC read the page cancelled itself (navigation or a re-keyed query); its answer is judged by N2 and the api log"},
+	{[]string{"/api/health", "net::ERR_ABORTED"}, "the boot screen's health probe, cancelled when the walk moves to the next page"},
 }
 
 // BrowserFindings reads browser.jsonl: the walks completed and every error outside the accepted list.
