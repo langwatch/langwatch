@@ -105,7 +105,7 @@ func (cell *run) emptyChecks(ctx context.Context) error {
 	}
 	cell.report.Queue = cell.queueSummary(ctx)
 	cell.report.Verdicts = append(cell.report.Verdicts,
-		cell.holdingVerdict(), ledgerVerdict(final), notNeededVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
+		cell.holdingVerdict(), ledgerVerdict(final), notNeededVerdict(final), reopenedVerdict(cell.atReady, final, cell.drills.retried), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(),
 		queueVerdict(cell.report.Queue), cell.opsVerdict(final), cell.storedEventsVerdict(ctx), cell.emptyOrgVerdict(ctx), cell.browserVerdict())
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.signupVerdicts(ctx)...)

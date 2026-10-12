@@ -41,7 +41,7 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Queue = cell.queueSummary(ctx)
 	cell.report.Notes = append(cell.report.Notes, lostByPhase(cell.allCalls(), cell.report.Phases, visible)...)
 	cell.report.Verdicts = append(cell.report.Verdicts,
-		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
+		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final, cell.drills.retried), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
 		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic, cell.downExcused()), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), queueVerdict(cell.report.Queue), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
@@ -101,9 +101,16 @@ func ledgerVerdict(rows []LedgerRow) Verdict {
 		fmt.Sprintf("%d steps, outstanding: %v", len(rows), names))
 }
 
-func reopenedVerdict(atReady, final []LedgerRow) Verdict {
-	reopened := Reopened(atReady, final)
-	return verdict("I2b", len(reopened) == 0, fmt.Sprintf("%d steps done at ready; reopened: %v", countDone(atReady), reopened))
+// reopenedVerdict leaves out the step the retry drill failed and retried on purpose (D3 judges it).
+func reopenedVerdict(atReady, final []LedgerRow, drilled string) Verdict {
+	reopened := slices.DeleteFunc(Reopened(atReady, final), func(each string) bool {
+		return drilled != "" && strings.HasPrefix(each, drilled+" ")
+	})
+	note := ""
+	if drilled != "" {
+		note = fmt.Sprintf(" (the retry drill's own step %s left to D3)", drilled)
+	}
+	return verdict("I2b", len(reopened) == 0, fmt.Sprintf("%d steps done at ready; reopened: %v%s", countDone(atReady), reopened, note))
 }
 
 func countDone(rows []LedgerRow) int {

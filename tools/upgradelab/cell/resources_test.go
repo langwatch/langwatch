@@ -215,3 +215,14 @@ func TestAnUnreadUpgrade503CountsOnlyWhereTheSamePathAnsweredUpgradeInProgress(t
 		t.Errorf("expected %d findings %+v err %v", expected, findings, err)
 	}
 }
+
+func TestReopenedLeavesTheRetryDrillsOwnStepToD3(t *testing.T) {
+	atReady := []LedgerRow{{ID: "a:drilled", Status: "done", Attempt: 1}, {ID: "b:other", Status: "done", Attempt: 1}}
+	final := []LedgerRow{{ID: "a:drilled", Status: "done", Attempt: 2}, {ID: "b:other", Status: "done", Attempt: 1}}
+	if got := reopenedVerdict(atReady, final, "a:drilled"); got.Result != "pass" {
+		t.Errorf("drilled step counted: %+v", got)
+	}
+	if got := reopenedVerdict(atReady, final, ""); got.Result == "pass" {
+		t.Errorf("reopened step missed without a drill: %+v", got)
+	}
+}
