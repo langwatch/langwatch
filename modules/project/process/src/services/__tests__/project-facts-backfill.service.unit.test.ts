@@ -132,3 +132,38 @@ describe("given a project fact step's backfill", () => {
     });
   });
 });
+
+describe("given a page of twenty organizations whose recording waits", () => {
+  /** @scenario "A project fact step records a page's organizations a few at a time" */
+  it("records several at once, never more than eight, and saves only after the page", async () => {
+    const ids = Array.from({ length: 20 }, (_, index) => `org_${String(index).padStart(2, "0")}`);
+    let running = 0;
+    let widest = 0;
+    const events: string[] = [];
+    const service = ProjectFactsBackfillService.create({
+      peers: {
+        organizations: { listAllIds: async () => ({ ids, next: null }) },
+        record: async ({ organizationId }) => {
+          running += 1;
+          widest = Math.max(widest, running);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          running -= 1;
+          events.push(organizationId);
+          return 3;
+        },
+      },
+    });
+
+    const report = await service.backfill({
+      after: undefined,
+      dryRun: false,
+      signal: new AbortController().signal,
+      onPage: async (page) => void events.push(`saved:${page.afterOrganizationId}`),
+    });
+
+    expect(widest).toBe(8);
+    expect(report).toEqual({ afterOrganizationId: "org_19", organizations: 20, projects: 60 });
+    expect(events.at(-1)).toBe("saved:org_19");
+    expect(events.filter((event) => event.startsWith("saved:"))).toHaveLength(1);
+  });
+});

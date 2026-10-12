@@ -73,6 +73,13 @@ Feature: A successor lane also consumes the key a previous release queued its jo
     And once its attempts are spent it is dead-lettered and its group drains on
 
   @unit
+  Scenario: An unroutable job reaches the group queue as a hand-back, not a failure
+    Given a job under a key no registration, drain or alias on this worker routes
+    When the group queue runs it on this worker
+    Then the refusal reaches the queue as a hand-back that keeps its cause
+    And every other failure reaches the queue unchanged
+
+  @unit
   Scenario: An alias that could never apply is refused when the pipeline is built
     When a pipeline aliases a key that is not "<pipeline>:<jobType>:<name>", or its successor's own key
     Or two of its aliases take the same event type from one key

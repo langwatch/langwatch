@@ -18,8 +18,8 @@ const CLI_TSUP_CONFIG = /^sdks\/typescript\/tsup\.config\.ts$/;
 const WEB_PACKAGE_ENTRY = /^(?:enterprise\/)?modules\/[^/]+\/browser\/src\/[^/]+\.ts$/;
 const UI_APPLICATION = /^apps\/ui\/src\//;
 // The dev runtime's entry loads its main after the boot guard, so the fatal handlers
-// cover ESM link failures in that graph too (9ef4238a13). Its two entry files only.
-const DEV_RUNTIME_ENTRY = /^tools\/dev-runtime\/src\/(?:backend|app)\.entrypoint\.ts$/;
+// cover ESM link failures in that graph too (9ef4238a13). Its one entry file only.
+const DEV_RUNTIME_ENTRY = /^tools\/dev-runtime\/src\/app\.entrypoint\.ts$/;
 // The tasks entry loads every module only for a module task, so migrations stay fast.
 const TASKS_ENTRY = /^apps\/tasks\/src\/main\.ts$/;
 

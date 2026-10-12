@@ -9,6 +9,10 @@ export interface OrganizationTenantSourceRepository extends TenantSource {
 /** Projects in id order, for a migration on the project axis. */
 export interface ProjectTenantSourceRepository extends TenantSource {
   getOrganizationId(projectId: string): Promise<string>;
+  /** Each project's owning organization, in one read; unknown projects are left out. */
+  findOrganizationIds(args: {
+    projectIds: readonly string[];
+  }): Promise<{ projectId: string; organizationId: string }[]>;
 }
 
 /** Users in id order, the user-rooted leg's tenants. */

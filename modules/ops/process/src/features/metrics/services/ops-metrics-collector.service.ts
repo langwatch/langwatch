@@ -59,6 +59,10 @@ export class OpsMetricsCollectorService {
    * instance measured. See {@link reconcilePending}.
    */
   private isCollecting = false;
+  private starting: Promise<void> | null = null;
+  private isStopped = false;
+  /** Ticks still talking to Redis; `stop` waits for them so none runs on a closed client. */
+  private readonly inFlight = new Set<Promise<void>>();
 
   private readonly ops: OpsQueueMetricsSourceRepository;
   private readonly rateTracker: AnomalyRateTrackerRepository;
@@ -156,19 +160,32 @@ export class OpsMetricsCollectorService {
     return this.holdsLease;
   }
 
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    this.starting ??= this.startOnce();
+    return this.starting;
+  }
+
+  private async startOnce(): Promise<void> {
     await this.window.restore(this.metrics);
-    await this.discoverQueues();
+    await this.track(() => this.discoverQueues());
+    // A stop that landed while restoring wins: no interval is armed after it.
+    if (this.isStopped) return;
     // Kick off the first collect without blocking start(); the interval below
     // will keep collecting on schedule. Errors are caught inside collect().
-    void this.collect();
-    this.collectInterval = setInterval(() => this.collect(), METRICS_COLLECT_INTERVAL_MS);
-    this.discoveryInterval = setInterval(() => this.discoverQueues(), QUEUE_DISCOVERY_INTERVAL_MS);
+    void this.track(() => this.collect());
+    this.collectInterval = setInterval(
+      () => void this.track(() => this.collect()),
+      METRICS_COLLECT_INTERVAL_MS,
+    );
+    this.discoveryInterval = setInterval(
+      () => void this.track(() => this.discoverQueues()),
+      QUEUE_DISCOVERY_INTERVAL_MS,
+    );
     this.reconcileInterval = setInterval(
-      () => this.reconcilePending(),
+      () => void this.track(() => this.reconcilePending()),
       PENDING_RECONCILE_INTERVAL_MS,
     );
-    void this.reconcilePending();
+    void this.track(() => this.reconcilePending());
     // No broadcast here by design (ADR-090): the writer publishes to Redis and
     // `OpsSnapshotService` is what fans out to each pod's subscribers. A writer
     // that also broadcast would serve its own pod a different payload from
@@ -181,6 +198,8 @@ export class OpsMetricsCollectorService {
    * closes first and fleet waits the full lease TTL.
    */
   async stop(): Promise<void> {
+    this.isStopped = true;
+    await this.starting?.catch(() => undefined);
     if (this.collectInterval) {
       clearInterval(this.collectInterval);
       this.collectInterval = null;
@@ -195,6 +214,7 @@ export class OpsMetricsCollectorService {
       clearInterval(this.reconcileInterval);
       this.reconcileInterval = null;
     }
+    await Promise.allSettled(this.inFlight);
 
     // Hand the lease back rather than letting it lapse: a clean shutdown that
     // waits out the TTL leaves the whole fleet without a writer for up to the
@@ -208,6 +228,13 @@ export class OpsMetricsCollectorService {
         logger.warn({ error: err }, "Failed to release ops snapshot lease");
       }
     }
+  }
+
+  private track(work: () => Promise<void>): Promise<void> {
+    if (this.isStopped) return Promise.resolve();
+    const running = work().finally(() => this.inFlight.delete(running));
+    this.inFlight.add(running);
+    return running;
   }
 
   async discoverQueues(): Promise<void> {

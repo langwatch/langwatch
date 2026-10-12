@@ -2,7 +2,7 @@ import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MigrationLeaseRepository } from "../lease.repository.ts";
-import { SystemMigrationRunnerService } from "../runner.service.ts";
+import { heldNoticeLevel, SystemMigrationRunnerService } from "../runner.service.ts";
 import {
   SystemMigrationRecordNotFoundError,
   type SystemMigrationStateRepository,
@@ -39,6 +39,19 @@ class FakeStateRepository implements SystemMigrationStateRepository {
     const record = this.records.get(this.key(migrationName, tenantId));
     if (!record) throw new SystemMigrationRecordNotFoundError({ migrationName, tenantId });
     return record;
+  }
+
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    return tenantIds.flatMap((tenantId) => {
+      const record = this.records.get(this.key(migrationName, tenantId));
+      return record ? [record] : [];
+    });
   }
 
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
@@ -786,6 +799,27 @@ describe("SystemMigrationRunnerService held tenants", () => {
     });
   });
 
+  describe("when the hold is logged", () => {
+    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
+    it("logs a first hold at info, since the next pass re-proves it", () => {
+      expect(heldNoticeLevel({ existing: undefined })).toBe("info");
+    });
+
+    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
+    it("logs a tenant still held from an earlier pass at warn", () => {
+      const held: TenantMigrationRecord = {
+        migrationName: "m1",
+        tenantId: "org_acme",
+        status: "migrated",
+        report: null,
+        heldReason: "proof",
+        heldSince: nowInstant(),
+      };
+
+      expect(heldNoticeLevel({ existing: held })).toBe("warn");
+    });
+  });
+
   describe("when a held tenant is finalized", () => {
     /** @scenario "A tenant that leaves held drops its reason" */
     it("records no held reason", async () => {
@@ -860,5 +894,71 @@ describe("isHeldTenantFailed", () => {
 
       expect(isHeldTenantFailed({ record, now })).toBe(false);
     });
+  });
+});
+
+describe("SystemMigrationRunnerService over a finished fleet", () => {
+  const ids = Array.from({ length: 1000 }, (_, index) => `org-${String(index).padStart(4, "0")}`);
+
+  function finishedFleet() {
+    const state = new FakeStateRepository();
+    for (const tenantId of ids) {
+      for (const migrationName of ["m1", "m2"]) {
+        state.records.set(`${migrationName}::${tenantId}`, {
+          migrationName,
+          tenantId,
+          status: "finalized",
+        });
+      }
+    }
+    const pageReads = vi.spyOn(state, "findRecords");
+    const singleReads = vi.spyOn(state, "getRecord");
+    const lease = new FakeLeaseRepository();
+    const claims = vi.spyOn(lease, "acquire");
+    const migrate = vi.fn(async () => finalized);
+    const runner = new SystemMigrationRunnerService({
+      now: nowInstant,
+      state,
+      lease,
+      tenants: tenantSourceOf(ids),
+      cohort: () => true,
+      migrations: [migrationOf("m1", migrate), migrationOf("m2", migrate)],
+    });
+    return { runner, state, pageReads, singleReads, claims, migrate };
+  }
+
+  /** @scenario "A tenant whose every migration is finished takes no claim" */
+  it("reads state once per migration per page and claims no finished tenant", async () => {
+    const { runner, pageReads, singleReads, claims, migrate } = finishedFleet();
+
+    const summary = await runner.runPass();
+
+    expect(pageReads).toHaveBeenCalledTimes(2 * 10);
+    expect(singleReads).not.toHaveBeenCalled();
+    expect(claims).not.toHaveBeenCalled();
+    expect(migrate).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ tenantsSeen: 1000, alreadyFinalized: 2000, advanced: 0 });
+  });
+
+  /** @scenario "Asking whether a migration has unfinished tenants reads a page at a time" */
+  it("answers whether any tenant is unfinished in one state read per page", async () => {
+    const { runner, pageReads, singleReads } = finishedFleet();
+
+    expect(await runner.hasUnfinishedTenant({ migrationName: "m1" })).toBe(false);
+
+    expect(pageReads).toHaveBeenCalledTimes(10);
+    expect(singleReads).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A tenant whose every migration is finished takes no claim" */
+  it("still claims and drives a tenant with one migration left", async () => {
+    const { runner, state, claims, migrate } = finishedFleet();
+    state.records.delete("m2::org-0500");
+
+    const summary = await runner.runPass();
+
+    expect(claims).toHaveBeenCalledTimes(1);
+    expect(migrate).toHaveBeenCalledTimes(1);
+    expect(summary.finalized).toBe(1);
   });
 });

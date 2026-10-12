@@ -40,6 +40,31 @@ export {
   type UpgradeSchemaApplier,
 } from "./schema-applier.ts";
 export {
+  clickHouseRunOptions,
+  closingLines,
+  codeStepOf,
+  type ImageUpgradeInputs,
+  type ImageUpgradeRunner,
+  noClickHouseLine,
+  runImageUpgrade,
+  sqlReader,
+  upcastStepsOf,
+  upgradeRunnerLog,
+  withImageUpgradeRunner,
+  writeUpgradeLine,
+} from "./image-upgrade.ts";
+export {
+  releaseSchemaUpTo,
+  releaseSteppingApplier,
+  type SteppedSchema,
+  type StepSchemaTo,
+  steppedLine,
+  steppingStartsLine,
+  stepToLine,
+  type UpgradeTaskLine,
+  withLockTimeout,
+} from "./release-stepping-applier.ts";
+export {
   formatPlan,
   type UpgradeExitCode,
   type UpgradeOutcome,

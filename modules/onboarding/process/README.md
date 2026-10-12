@@ -150,7 +150,7 @@ Contract `../contract/src/onboarding.trpc.ts:183`, router `src/transport/integra
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof integrationsCheckStatusSchema>; // ../contract/src/onboarding.responses.ts:80
+type Output = z.infer<typeof integrationsCheckStatusSchema>; // ../contract/src/onboarding.responses.ts:82
 ```
 
 ### `onboarding`
@@ -240,7 +240,7 @@ type Output = z.infer<typeof guidedStateOutputSchema>; // ../contract/src/onboar
 
 // onboarding.initializeOrganization
 type Input = z.infer<typeof onboardingInitializeOrganizationInputSchema>; // ../contract/src/onboarding.trpc.ts:118
-// Output: organizationInitializedSchema, ../contract/src/onboarding.responses.ts:27
+// Output: organizationInitializedSchema, ../contract/src/onboarding.responses.ts:29
 interface Output {
   success: true;
   teamSlug: string;
@@ -248,6 +248,7 @@ interface Output {
   teamId: string;
   organizationId: string;
   projectSlug: string | null;
+  grantsConfirmed: boolean;
 }
 
 // onboarding.setIntegrationMethod
@@ -255,7 +256,7 @@ interface Output {
 interface Input {
   integrationMethod: "via-claude-code" | "via-platform" | "via-claude-desktop" | "manually";
 }
-// Output: onboardingWriteAckSchema, ../contract/src/onboarding.responses.ts:36
+// Output: onboardingWriteAckSchema, ../contract/src/onboarding.responses.ts:38
 interface Output {
   success: true;
 }

@@ -1,10 +1,13 @@
+import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import { compareOrdinal } from "../utils/compareOrdinal.ts";
 import { REPLAY_CURSOR_SKEW_MARGIN_MS } from "./replayConstants.ts";
 import type { ReplayProjections } from "./replayProjections.ts";
 import type { ReplayService } from "./replayService.ts";
-import type { BatchCompleteInfo, ProjectionKind, ReplayConfig } from "./types.ts";
+import type { BatchCompleteInfo, ProjectionKind, ReplayConfig, ReplayResult } from "./types.ts";
+
+const logger = createLogger("langwatch:event-sourcing:projection-lane-replay");
 
 /** Reached through this file's place in the package index, beside the lane replay it widens. */
 export { unionReplayTenants } from "./replayTenantUnion.ts";
@@ -116,7 +119,11 @@ async function replayTenants({
   for (const tenantId of targets) {
     signal?.throwIfAborted();
     const tenantIds = tenantId === undefined ? [] : [tenantId];
-    const result = await service.replay({ ...selection, tenantIds, since, dryRun }, callbacks);
+    const result = await replayUnlessTenantUnknown({
+      replay: () => service.replay({ ...selection, tenantIds, since, dryRun }, callbacks),
+      lane,
+      tenantId,
+    });
     if (result.batchErrors > 0) {
       throw new ProjectionLaneReplayFailedError({
         lane,
@@ -129,6 +136,34 @@ async function replayTenants({
     if (tenantId !== undefined && !dryRun) onTenantComplete?.({ tenantId, replayedThrough });
   }
   return totals;
+}
+
+/** The ClickHouse router's refusal for a tenant it cannot resolve, read structurally by name. */
+function isUnknownTenant(error: unknown): boolean {
+  return error instanceof Error && error.name === "UnknownTenantError";
+}
+
+/**
+ * One tenant's replay; a tenant with no known organisation (a route naming an organisation that
+ * does not exist, or one since deleted) has nothing to replay, so it is skipped with a warning
+ * and nothing is deleted. Spec: specs/upgrade/projection-replay-step.feature.
+ */
+async function replayUnlessTenantUnknown({
+  replay,
+  lane,
+  tenantId,
+}: {
+  replay: () => Promise<ReplayResult>;
+  lane: string;
+  tenantId: string | undefined;
+}): Promise<ReplayResult> {
+  try {
+    return await replay();
+  } catch (error) {
+    if (tenantId === undefined || !isUnknownTenant(error)) throw error;
+    logger.warn({ lane, tenantId }, "Replay skipped a tenant with no known organisation");
+    return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0 };
+  }
 }
 
 /** The worker's clock less the skew margin: a later run re-reads what a lagging api stamped. */

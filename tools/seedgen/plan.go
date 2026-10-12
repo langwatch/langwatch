@@ -103,6 +103,7 @@ func (p *Plan) sharedOrgs(tier Tier) []*Org {
 		persona := Personas[i%len(Personas)]
 		perPersona[persona]++
 		orgs[i] = p.newOrg(persona, persona+"-"+strconv.Itoa(perPersona[persona]), false)
+		orgs[i].Plan = sharedOrgPlan(p.Flags.Shape)
 		if persona == "startup" {
 			p.fill(orgs[i], 1, 3)
 			projects, users = projects-1, users-3
@@ -121,6 +122,15 @@ func (p *Plan) sharedOrgs(tier Tier) []*Org {
 		p.fill(org, projectCounts[i], userCounts[i])
 	}
 	return slices.DeleteFunc(orgs, func(org *Org) bool { return !slices.Contains(p.Flags.Personas, org.Persona) })
+}
+
+// sharedOrgPlan is a tier org's plan: free Cloud sells two seats and no Lite ones, too few for any
+// persona plus the admin, so saas and sh-licensed seed a licence; sh-free keeps the product's default.
+func sharedOrgPlan(shape string) string {
+	if shape == "sh-free" {
+		return "free"
+	}
+	return "licence"
 }
 
 func (p *Plan) newOrg(persona, name string, private bool) *Org {

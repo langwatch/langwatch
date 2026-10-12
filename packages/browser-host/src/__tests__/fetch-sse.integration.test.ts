@@ -1,9 +1,12 @@
+import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 /**
  * @vitest-environment jsdom
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchSSE } from "../query/fetch-sse.ts";
+import { describeError } from "../errors.ts";
+import { FetchSSERefusedError, fetchSSE } from "../query/fetch-sse.ts";
 
 type Event = { type: string };
 
@@ -83,12 +86,45 @@ describe("fetchSSE", () => {
       expect(errors).toEqual(["Not allowed"]);
     });
 
+    it("keeps a coded refusal readable as the handled error it is", async () => {
+      stubFetch(() =>
+        Response.json(
+          {
+            type: "bad_request",
+            code: "model_restricted_for_execution",
+            message: "restricted",
+            retryable: false,
+            meta: { model: "openai_codex/gpt-5.6-terra" },
+          },
+          { status: 400 },
+        ),
+      );
+
+      const refusal = await fetchSSE<Event>({
+        endpoint: "/sse",
+        payload: {},
+        onEvent: () => undefined,
+      }).catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(FetchSSERefusedError);
+      expect(readHandledError(refusal)).toMatchObject({
+        code: "model_restricted_for_execution",
+        httpStatus: 400,
+        meta: { model: "openai_codex/gpt-5.6-terra" },
+      });
+      expect(explainAnyError(refusal).title).toBe("This model can't run here");
+      // What the experiments run shows for a refused run.
+      expect(describeError({ error: refusal, fallbackTitle: "Couldn't run" })).toMatch(
+        /^This model can't run here\. /,
+      );
+    });
+
     it("rejects with a server error when no onError is given", async () => {
       stubFetch(() => new Response("oops", { status: 500, statusText: "Internal Server Error" }));
 
       await expect(
         fetchSSE<Event>({ endpoint: "/sse", payload: {}, onEvent: () => undefined }),
-      ).rejects.toThrow("Server error: 500 Internal Server Error");
+      ).rejects.toMatchObject({ message: "Server error: 500 Internal Server Error" });
     });
   });
 

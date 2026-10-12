@@ -5,13 +5,11 @@ go 1.27.2
 require (
 	cloud.google.com/go v0.123.0 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
-	github.com/0xdeafcafe/moron v1.0.1-0.20260714030656-2b32ef25bff8 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.22.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.12.0 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.7.2 // indirect
 	github.com/Code-Hex/dd v1.1.0 // indirect
-	github.com/alecthomas/chroma/v2 v2.23.1 // indirect
 	github.com/alecthomas/participle/v2 v2.1.4 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/antchfx/xmlquery v1.5.1 // indirect
@@ -54,7 +52,6 @@ require (
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/crewjam/saml v0.5.1 // indirect
-	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/elastic/go-grok v0.3.1 // indirect
 	github.com/elastic/lunes v0.2.0 // indirect
 	github.com/emersion/go-message v0.18.2 // indirect

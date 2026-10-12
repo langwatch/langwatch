@@ -37,3 +37,8 @@ Feature: First sign-in for a provisioned directory member
     When the authentication library reports that the account is not linked
     Then the error is treated as OAuthAccountNotLinked
     And it is classified as a stable sign-in error
+
+  @unit @regression
+  Scenario: The different-email refusal in every spelling shows the specific message
+    When the authentication library reports "email_does_not_match"
+    Then the error is treated as DIFFERENT_EMAIL_NOT_ALLOWED

@@ -68,8 +68,8 @@ func NewGuard(log io.Writer) *Guard {
 func (g *Guard) Observe(now time.Time, readings []Reading) {
 	if g.Paused != nil {
 		current := g.find(readings, g.Paused.Signal)
-		if current != nil && current.Value >= Thresholds[current.Signal].Resume {
-			return
+		if current == nil || current.Value >= Thresholds[current.Signal].Resume {
+			return // an unread signal is not a clean one: stay paused until it reads low
 		}
 		g.logf("resumed: %s below %g", g.Paused.Signal, Thresholds[g.Paused.Signal].Resume)
 		g.Paused, g.clean = nil, 0
@@ -86,6 +86,9 @@ func (g *Guard) Observe(now time.Time, readings []Reading) {
 			g.Window = next
 		}
 		return
+	}
+	if g.find(readings, SignalWorkerBacklog) == nil {
+		return // the window only grows on reads that saw the worker's backlog
 	}
 	g.clean++
 	if g.clean >= cleanReads && g.Window < WindowCeil {

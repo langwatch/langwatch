@@ -224,6 +224,19 @@ export class MemoryMigrationState implements SystemMigrationStateRepository {
     return record;
   }
 
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    return tenantIds.flatMap((tenantId) => {
+      const record = this.records.get(`${migrationName}::${tenantId}`);
+      return record ? [record] : [];
+    });
+  }
+
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     this.records.set(`${record.migrationName}::${record.tenantId}`, record);
   }

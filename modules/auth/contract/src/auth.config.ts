@@ -17,6 +17,24 @@ import { defineBrowserConfig } from "@langwatch/config/public-app-config";
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+const optionalBaseUrl = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().url().optional(),
+);
+
+/**
+ * Where each social provider's own hosts are reached. Unset or blank is the real provider;
+ * haven names idpsim's `/t/<n>/social/<provider>` under +idp (idpsim README, "Social sign-in").
+ */
+export const socialProviderBases = Config.define((c) => ({
+  google: c.env("GOOGLE_SIGN_IN_BASE", optionalBaseUrl),
+  github: c.env("GITHUB_SIGN_IN_BASE", optionalBaseUrl),
+  gitlab: c.env("GITLAB_SIGN_IN_BASE", optionalBaseUrl),
+  microsoft: c.env("MICROSOFT_SIGN_IN_BASE", optionalBaseUrl),
+}));
+
+export type SocialProviderBases = ConfigOf<typeof socialProviderBases>;
+
 export const authServerConfig = Config.define((c) => ({
   sessionUrl: c.env("NEXTAUTH_URL", z.string().optional()),
   /** The shared capability switches identity and user read too (round 48, A1-a). */
@@ -29,13 +47,9 @@ export const authServerConfig = Config.define((c) => ({
   idpSimulatorUrl,
   /** D09: this deployment issues its own passwords beside a federated provider. */
   localPasswords,
-  /**
-   * The Auth0 Machine-to-Machine app a password change goes through; absent,
-   * the login app's `AUTH0_CLIENT_ID` stands in, as main's did.
-   */
-  auth0ManagementClientId: c.env("AUTH0_MGMT_CLIENT_ID", z.string().min(1).optional()),
   /** The shared leaves sso reads too: which provider is named and its public half. */
   signInProviders,
+  socialProviderBases,
   /** The process's own leaf, read here only to tell the browser whether passwords are on. */
   isSaas,
   /** Organization decides who may sign up; read here only to tell the browser the mode. */

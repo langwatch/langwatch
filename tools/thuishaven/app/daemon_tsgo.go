@@ -32,7 +32,7 @@ func (o *Orchestrator) governProcesses() {
 		return
 	}
 	now := o.sys.Now()
-	samples := o.sys.ProcessSamples()
+	samples := o.processSamples()
 	if browserOn {
 		o.governBrowser(samples, now)
 	}

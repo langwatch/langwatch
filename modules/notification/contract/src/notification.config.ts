@@ -5,6 +5,12 @@ import { z } from "zod";
 
 import type { NotificationService } from "./notification.api.ts";
 
+/** A base that is unset or blank adds no push service; a value that is set must be a URL. */
+const optionalPushServiceBase = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().url().optional(),
+);
+
 /**
  * Mail gateway config; all settings optional, send fails at runtime if
  * unconfigured. Credentials never live here (ADR-132) — they are handles on
@@ -28,6 +34,8 @@ export const notificationConfig = Config.define((c) => ({
   publicBaseUrl,
   /** The proxy spellings (the shared leaf); the SES and Resend calls follow them. */
   outboundProxy,
+  /** One push service accepted beside the browsers' own; unset adds none (a dev stand-in only). */
+  webPushServiceBase: c.env("WEB_PUSH_SERVICE_BASE", optionalPushServiceBase),
 }));
 
 export type NotificationServerConfig = ConfigOf<typeof notificationConfig>;

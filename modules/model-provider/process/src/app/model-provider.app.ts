@@ -195,6 +195,8 @@ type ModelProviderBuildConfig = Readonly<{
   environment: Readonly<Record<string, string | undefined>>;
   /** Per provider, the API root the credential probe uses in place of the vendor's own. */
   probeBaseUrls: Readonly<Record<string, string | undefined>>;
+  /** Where Codex device sign-in and refresh are reached; absent is OpenAI's own issuer. */
+  codexOAuthIssuer: string | undefined;
   /** Hosted-deployment flag. OUT OF SCOPE (config-schema-nuke-batch-c handoff): hardcoded false. */
   isSaas: boolean;
 }>;
@@ -288,6 +290,7 @@ export class ModelProviderModule implements ModelProviderApi {
       executionProxyBaseUrl,
       environment: {},
       probeBaseUrls: config.probeBaseUrls,
+      codexOAuthIssuer: config.codexOAuthIssuer,
       isSaas: false,
     };
     const infrastructure = ModelProviderModule.#composeInfrastructure({
@@ -342,12 +345,14 @@ export class ModelProviderModule implements ModelProviderApi {
       connectionPing: channels.connectionPing,
       codexGatewayPing: channels.codexGatewayPing,
       ids: PrefixedModelProviderIdService.create(),
-      codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create(),
+      codexTokenRefresher: CodexOAuthModelProviderTokenRefresherService.create({
+        issuer: config.codexOAuthIssuer,
+      }),
       connectionRateLimiter: WindowedModelProviderConnectionRateLimiterService.create({
         limiter: repositories.rateLimits,
       }),
       credentialProbe: probe,
-      codexAccounts: CodexAccountService.create(),
+      codexAccounts: CodexAccountService.create({ issuer: config.codexOAuthIssuer }),
       spans: channels.spans,
     };
   }
@@ -628,6 +633,7 @@ export class ModelProviderModule implements ModelProviderApi {
 
     const saved = await this.upsert(
       {
+        id: input.modelProviderId,
         projectId: input.projectId,
         provider: "openai_codex",
         enabled: true,

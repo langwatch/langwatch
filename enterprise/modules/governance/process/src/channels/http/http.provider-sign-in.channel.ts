@@ -3,6 +3,7 @@
 import { ProviderSignInError } from "@langwatch/enterprise-governance-contract";
 import { z } from "zod";
 
+import { REAL_VENDOR_BASES, type VendorBases } from "../../rules/vendor-bases.rules.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 import type { ProviderSignInChannel } from "../provider-sign-in.channel.ts";
 
@@ -24,10 +25,19 @@ function withTimeout(signal: AbortSignal | undefined): AbortSignal {
  * endpoint may echo the request back.
  */
 export class HttpProviderSignInChannel implements ProviderSignInChannel {
-  private constructor(private readonly http: GovernanceHttpClient) {}
+  private constructor(
+    private readonly http: GovernanceHttpClient,
+    private readonly loginBase: string,
+  ) {}
 
-  static create({ http }: { http: GovernanceHttpClient }): HttpProviderSignInChannel {
-    return new HttpProviderSignInChannel(http);
+  static create({
+    http,
+    vendorBases = REAL_VENDOR_BASES,
+  }: {
+    http: GovernanceHttpClient;
+    vendorBases?: VendorBases;
+  }): HttpProviderSignInChannel {
+    return new HttpProviderSignInChannel(http, vendorBases.microsoftLogin);
   }
 
   async getWorkspaceToken({
@@ -111,7 +121,7 @@ export class HttpProviderSignInChannel implements ProviderSignInChannel {
       scope: scope ?? `${environmentUrl.replace(/\/+$/, "")}/.default`,
     });
     const response = await this.http.fetch(
-      `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
+      `${this.loginBase}/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
       {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },

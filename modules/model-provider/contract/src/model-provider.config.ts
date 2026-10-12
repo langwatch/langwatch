@@ -11,6 +11,12 @@ import {
 } from "@langwatch/config";
 import { z } from "zod";
 
+/** A vendor base unset or blank reads as the real vendor; a value that is set must be a URL. */
+const optionalVendorBase = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().url().optional(),
+);
+
 /**
  * The address fence an outbound provider call is judged by, the terminal default
  * model, the NLP engine's address and the AI gateway's (Codex is pinged there).
@@ -36,6 +42,8 @@ export const modelProviderConfig = Config.define((c) => ({
     groq: c.env("GROQ_BASE_URL", z.string().url().optional()),
     elevenlabs: c.env("ELEVENLABS_BASE_URL", z.string().url().optional()),
   },
+  /** Where Codex device sign-in and refresh are reached; unset or blank is OpenAI. */
+  codexOAuthIssuer: c.env("CODEX_OAUTH_ISSUER", optionalVendorBase),
 }));
 
 export type ModelProviderServerConfig = ConfigOf<typeof modelProviderConfig>;

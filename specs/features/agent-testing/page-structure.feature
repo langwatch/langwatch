@@ -31,6 +31,12 @@ Feature: The Agent Testing page
     Then the page is shown with its header and its tabs
 
   @integration
+  Scenario: While the flag is still being read the page shows it is loading
+    Given the Agent Testing release flag has not been read yet
+    When the Agent Testing address is opened
+    Then a loading screen is shown, never an empty page
+
+  @integration
   Scenario: With the flag on the main menu shows one Agent Testing item
     Given the Agent Testing release flag is on
     When the main menu is read

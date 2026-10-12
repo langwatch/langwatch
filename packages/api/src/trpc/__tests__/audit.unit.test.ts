@@ -533,6 +533,31 @@ describe("handleTrpcCallLogging", () => {
       });
     });
 
+    describe("when the cause is a clickhouse_overloaded 503", () => {
+      /** @scenario "A ClickHouse overload refusal is logged at warn, not error" */
+      it("logs at warn level, not error", () => {
+        const log = createMockLog();
+        class Overloaded extends HandledError {
+          constructor() {
+            super("clickhouse_overloaded", "Too many queries in flight", {
+              httpStatus: 503,
+              fault: "platform",
+            });
+          }
+        }
+        const cause = new Overloaded();
+        const error = new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "busy", cause });
+
+        handleTrpcCallLogging({ ...baseArgs, result: { ok: false, error }, log, capture: vi.fn() });
+
+        expect(log.warn).toHaveBeenCalledWith(
+          expect.objectContaining({ statusCode: 503 }),
+          "trpc call",
+        );
+        expect(log.error).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when the cause is an upgrade_in_progress 503", () => {
       it("logs at warn level, not error", () => {
         const log = createMockLog();

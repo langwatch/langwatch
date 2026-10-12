@@ -54,6 +54,18 @@ Feature: Shared ops snapshot with a single elected writer
     And another writer can acquire it on its next cycle
 
   @unit
+  Scenario: A writer stopped while still starting arms no timers
+    Given a writer whose start has not finished
+    When its process shuts down
+    Then no scan or reconcile runs after the shutdown returns
+
+  @unit
+  Scenario: Shutdown waits for a tick already talking to Redis
+    Given a writer whose pending reconcile is still in flight
+    When its process shuts down
+    Then the shutdown returns only after that reconcile has finished, before the stores close
+
+  @unit
   Scenario: Losing the lease mid-flight does not corrupt the snapshot
     Given a writer's lease expired while its detail scan was still running
     And another writer has since written a newer snapshot

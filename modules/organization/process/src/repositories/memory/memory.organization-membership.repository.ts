@@ -37,6 +37,7 @@ import type {
   AuditLogFilters,
   CreateAndAssignInput,
   CreateAndAssignResult,
+  FounderOrganizationCreated,
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
@@ -122,7 +123,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return { primaryIntent: organization.primaryIntent ?? null };
   }
 
-  async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
+  async createAndAssign(input: CreateAndAssignInput): Promise<FounderOrganizationCreated> {
     if (this.findOrganizationBySlug(input.orgSlug)) {
       throw new OrganizationSlugTakenError(input.orgSlug);
     }
@@ -170,6 +171,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return {
       organization: { id: input.orgId, name: input.orgName },
       team: { id: team.id, slug: team.slug, name: team.name },
+      grantsConfirmed: true,
     };
   }
 

@@ -1,11 +1,11 @@
 /**
  * The password doors auth now owns (D-A1U-4), over a user stub, auth's own reads and an
  * in-memory stand-in for Better Auth's account storage, the store sign-in reads.
+ * @see specs/settings/change-password-auth0.feature
  */
 import { ValidationError } from "@langwatch/handled-error";
 import {
   ImpersonationCannotChangeCredentialsError,
-  UserFederatedPasswordAccountMissingError,
   UserPasswordAlreadySetError,
   UserPasswordAttemptsThrottledError,
   UserPasswordAuthUnavailableError,
@@ -58,28 +58,19 @@ async function doors({
   provider = "email",
   localPasswords = false,
   allowed = true,
-  holdsOwnPassword = true,
   storedPassword = "old-pw-123" as string | null,
   holdsNoAccount = false,
-  federated = { outcome: "changed" } as const,
 }: {
   provider?: string;
   localPasswords?: boolean;
   allowed?: boolean;
-  holdsOwnPassword?: boolean;
   /** The plain password the store holds a hash of; null for an empty password slot. */
   storedPassword?: string | null;
   /** No local password account at all. */
   holdsNoAccount?: boolean;
-  federated?:
-    | { outcome: "changed" }
-    | { outcome: "no_federated_account" }
-    | { outcome: "wrong_password" }
-    | { outcome: "weak_password"; message: string };
 } = {}) {
   const users = {
     findById: vi.fn(async () => null),
-    hasPassword: vi.fn(async () => holdsOwnPassword),
   };
   const storedHash = storedPassword === null ? null : await hash(storedPassword, 4);
   const store = accountStore({ passwordHash: holdsNoAccount ? undefined : storedHash });
@@ -89,7 +80,6 @@ async function doors({
       throw new Error("routing is never asked without an address on record");
     }),
     isWithinBudget: vi.fn(async () => ({ allowed })),
-    changeFederatedPassword: vi.fn(async () => federated),
     revokeOtherBrowserSessions: vi.fn(async () => undefined),
   };
   const service = OwnPasswordService.create({
@@ -282,55 +272,29 @@ describe("changing an existing password", () => {
     ).rejects.toBeInstanceOf(UserPasswordNotSetError);
   });
 
-  /** @scenario "A change targets the password the person actually signs in with" */
-  it("changes this deployment's own password for somebody holding one under Auth0", async () => {
-    const { credentials, auth, service } = await doors({ provider: "auth0", localPasswords: true });
-
-    await service.change(change);
-
-    expect(credentials.writePassword).toHaveBeenCalled();
-    expect(auth.changeFederatedPassword).not.toHaveBeenCalled();
-  });
-
-  describe("given a deployment that brokers every password through Auth0", () => {
-    it("changes the tenant's password and ends every other session", async () => {
-      const { credentials, auth, service } = await doors({
-        provider: "auth0",
-        holdsOwnPassword: false,
-      });
+  describe("given a user who came from Auth0, whose password hash was imported", () => {
+    /** @scenario "A user who came from Auth0 changes their password locally" */
+    it("changes the deployment's own password and ends every other session", async () => {
+      const { auth, service, signsIn } = await doors({ provider: "auth0" });
 
       await service.change(change);
 
-      expect(auth.changeFederatedPassword).toHaveBeenCalledWith({
+      expect(await signsIn("new-pw-12345")).toBe(true);
+      expect(await signsIn("old-pw-123")).toBe(false);
+      expect(auth.revokeOtherBrowserSessions).toHaveBeenCalledWith({
         userId: "user-1",
-        email: null,
-        currentPassword: "old-pw-123",
-        newPassword: "new-pw-12345",
+        keepSessionId: "session-1",
       });
+    });
+
+    it("refuses a wrong current password without writing", async () => {
+      const { credentials, service } = await doors({
+        provider: "auth0",
+        storedPassword: "another-pw-123",
+      });
+
+      await expect(service.change(change)).rejects.toBeInstanceOf(UserPasswordIncorrectError);
       expect(credentials.writePassword).not.toHaveBeenCalled();
-      expect(auth.revokeOtherBrowserSessions).toHaveBeenCalled();
-    });
-
-    it("refuses by name where the person holds no Auth0 database identity", async () => {
-      const { service } = await doors({
-        provider: "auth0",
-        holdsOwnPassword: false,
-        federated: { outcome: "no_federated_account" },
-      });
-
-      await expect(service.change(change)).rejects.toBeInstanceOf(
-        UserFederatedPasswordAccountMissingError,
-      );
-    });
-
-    it("passes the provider's wording through when it rejects the new password", async () => {
-      const { service } = await doors({
-        provider: "auth0",
-        holdsOwnPassword: false,
-        federated: { outcome: "weak_password", message: "too common" },
-      });
-
-      await expect(service.change(change)).rejects.toThrow("too common");
     });
   });
 });

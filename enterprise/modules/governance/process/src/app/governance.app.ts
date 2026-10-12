@@ -297,6 +297,7 @@ import { DefaultGovernancePersonalUsageService } from "../features/personal/serv
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
+import { exemptOriginsOf, vendorBasesOf, type VendorBases } from "../rules/vendor-bases.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 import { AggregateReconcilerService } from "../services/aggregate-reconciler.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
@@ -575,6 +576,7 @@ export class GovernanceModule implements GovernanceRestApi {
         blockLocal: config?.blockLocalHttpCalls ?? false,
         allowedHosts: config?.allowedProxyHosts ?? [],
       },
+      vendorBases: vendorBasesOf({ config }),
     });
   }
 
@@ -588,6 +590,7 @@ export class GovernanceModule implements GovernanceRestApi {
     publicBaseUrl,
     ingestRateLimitDisabled,
     pullEgress,
+    vendorBases,
   }: {
     ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
@@ -598,8 +601,10 @@ export class GovernanceModule implements GovernanceRestApi {
     publicBaseUrl: string | undefined;
     ingestRateLimitDisabled: boolean;
     pullEgress: GovernanceEgressPolicy;
+    vendorBases: VendorBases;
   }) {
     this.dependencies = dependencies;
+    this.vendorBases = vendorBases;
     this.repositories = repositories;
     const tenantHistory = GovernanceTenantHistoryService.create({
       projects: dependencies.projects,
@@ -640,6 +645,10 @@ export class GovernanceModule implements GovernanceRestApi {
           occurredAt,
           ...data,
         }),
+      recordMany: (commands) =>
+        this.codingAssistantBillingSender("recordCodingAssistantBilling").sendBatch(
+          commands.map(({ tenantId, occurredAt, data }) => ({ tenantId, occurredAt, ...data })),
+        ),
     });
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,
@@ -827,8 +836,10 @@ export class GovernanceModule implements GovernanceRestApi {
       },
       lifecycle: { sync: (source) => this.pullLifecycle.sync(toPullLifecycleSource(source)) },
       secrets: ingestionSecrets,
-      destinations: PullDestinationService.create(),
-      providerAccounts: HttpProviderAccountChannel.create(),
+      destinations: PullDestinationService.create({
+        configuredBase: vendorBases.databricksWorkspace,
+      }),
+      providerAccounts: HttpProviderAccountChannel.create({ vendorBases }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
       ottl,
     });
@@ -842,24 +853,28 @@ export class GovernanceModule implements GovernanceRestApi {
     const sourceCredentials = SourceCredentialAccessService.create({
       sources: repositories.ingestionSources,
     });
-    const http: GovernanceHttpClient = { fetch: createSsrfSafeFetch(pullEgress) };
+    const http: GovernanceHttpClient = {
+      fetch: createSsrfSafeFetch(pullEgress, {
+        exemptOrigins: exemptOriginsOf({ bases: vendorBases }),
+      }),
+    };
     this.http = http;
     const channels = governanceListingChannels.live;
-    const signIn = channels.providerSignIn.create({ http });
+    const signIn = channels.providerSignIn.create({ http, vendorBases });
     this.agentDiscovery = AgentDiscoveryService.create({
       agents: repositories.discoveredAgents,
       sourceCredentials,
       signIn,
       genieSpaces: channels.genieSpaces.create({ http }),
-      copilotBots: channels.copilotBots.create({ http }),
+      copilotBots: channels.copilotBots.create({ http, vendorBases }),
     });
     this.personListing = PersonListingService.create({
       sourceCredentials,
       suppression: erasureSuppression,
       discovery: PersonDiscoveryService.create({ people: repositories.discoveredPeople }),
       signIn,
-      adminApiUsers: channels.adminApiUsers.create({ http }),
-      microsoftDirectory: channels.microsoftDirectory.create({ http }),
+      adminApiUsers: channels.adminApiUsers.create({ http, vendorBases }),
+      microsoftDirectory: channels.microsoftDirectory.create({ http, vendorBases }),
       databricksScimUsers: channels.databricksScimUsers.create({ http }),
     });
 
@@ -1000,6 +1015,7 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly identityMatchSuggestions: IdentityMatchSuggestionService;
   private readonly repositories: GovernanceRepositories;
   private readonly http: GovernanceHttpClient;
+  private readonly vendorBases: VendorBases;
   private ingestionPullCommands: EventingSenders | undefined;
   private pulledUsageCommands: EventingSenders | undefined;
   private codingAssistantBillingCommands: EventingSenders | undefined;
@@ -1215,12 +1231,18 @@ export class GovernanceModule implements GovernanceRestApi {
     const pullers = PullerRegistryService.create();
     pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
     pullers.register(S3PollingPullerService.create({ objects, diagnostics }));
-    pullers.register(HttpCopilotStudioChannel.create({ http }));
-    pullers.register(HttpCopilotStudioDataverseChannel.create(http));
+    pullers.register(HttpCopilotStudioChannel.create({ http, vendorBases: this.vendorBases }));
+    pullers.register(HttpCopilotStudioDataverseChannel.create(http, this.vendorBases));
     pullers.register(OpenAiComplianceReferencePullerService.create({ objects, diagnostics }));
-    pullers.register(OpenAiAdminPullerService.create(http));
-    pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));
-    pullers.register(AnthropicAdminPullerService.create(http));
+    pullers.register(OpenAiAdminPullerService.create(http, this.vendorBases));
+    pullers.register(
+      ClaudeComplianceReferencePullerAdapter.create({
+        http,
+        diagnostics,
+        vendorBases: this.vendorBases,
+      }),
+    );
+    pullers.register(AnthropicAdminPullerService.create(http, this.vendorBases));
     pullers.register(DatabricksGeniePullerService.create(http));
     const worker = IngestionPullWorkerService.create({
       sources: repositories.ingestionSources,

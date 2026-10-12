@@ -467,6 +467,23 @@ export class QueueRedisRepository extends QueueRepository {
     return Array.from(names);
   }
 
+  /** Each queue's total-pending counter, floored by its ready groups, as the drain audit reads. */
+  async countWaitingJobs(): Promise<number> {
+    const queueNames = await this.discoverQueueNames();
+    const counts = await Promise.all(
+      queueNames.map(async (queueName) => {
+        const prefix = `${queueName}:gq:`;
+        const [totalPending, ready] = await Promise.all([
+          this.redis.get(`${prefix}stats:total-pending`),
+          this.redis.zcard(`${prefix}ready`),
+        ]);
+        const total = Number(totalPending);
+        return Number.isFinite(total) ? Math.max(total, ready) : ready;
+      }),
+    );
+    return counts.reduce((sum, count) => sum + count, 0);
+  }
+
   async scanQueues(params: { queueNames: string[]; topN?: number }): Promise<QueueInfo[]> {
     const queues = await Promise.all(
       params.queueNames.map((queueName) =>

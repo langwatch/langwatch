@@ -51,6 +51,7 @@ export async function startNlpgo(
   });
 
   const ready = await pollUntilHealthy({
+    handle,
     check: httpGetCheck(`http://127.0.0.1:${ctx.ports.nlp}/healthz`),
     timeoutMs: 30_000,
   });

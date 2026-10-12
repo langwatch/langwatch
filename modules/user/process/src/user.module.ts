@@ -31,10 +31,12 @@ export const userProcessModule: PublishedProcessModule<"user", UserApi, UserServ
         needsOldWritersGone: true,
         run: async ({ checkpoint, dryRun, signal }) => {
           const resumed = checkpoint.resumeFrom?.afterUserId;
+          const counted = checkpoint.resumeFrom?.users;
           return app.recordExistingCreatedFacts({
             dryRun,
             signal,
             afterUserId: typeof resumed === "string" ? resumed : null,
+            countedBefore: typeof counted === "number" ? counted : 0,
             onPageDone: ({ afterUserId, report }) =>
               checkpoint.save({ report: { afterUserId, ...report } }),
           });

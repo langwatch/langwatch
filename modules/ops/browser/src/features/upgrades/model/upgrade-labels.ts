@@ -223,13 +223,19 @@ export function upgradeStateLine(
 export function heldOrganizationCount(
   migrations: readonly {
     tenant: "organization" | "user";
-    attention: readonly { tenantId: string }[];
+    migratedIsSteady: boolean;
+    attention: readonly { tenantId: string; status: string }[];
   }[],
 ): number {
   return new Set(
     migrations
       .filter((migration) => migration.tenant === "organization")
-      .flatMap((migration) => migration.attention.map((row) => row.tenantId)),
+      .flatMap((migration) =>
+        migration.attention
+          // A step whose `migrated` is its steady state keeps those tenants in step, not held.
+          .filter((row) => !(migration.migratedIsSteady && row.status === "migrated"))
+          .map((row) => row.tenantId),
+      ),
   ).size;
 }
 

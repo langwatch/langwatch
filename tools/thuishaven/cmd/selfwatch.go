@@ -43,6 +43,7 @@ type selfWatch struct {
 	handOver  func() error
 	log       func(string)
 	last      uint64
+	tree      *gowatch.Tree
 }
 
 // newSelfWatch is the daemon's watcher, or nil when it cannot rebuild itself:
@@ -77,26 +78,24 @@ func newSelfWatch(handOver func() error) *selfWatch {
 	}
 }
 
-// run polls until ctx ends or a rebuild has handed over.
+// run watches until ctx ends or a rebuild has handed over.
 func (w *selfWatch) run(ctx context.Context) {
-	w.last = gowatch.FingerprintPaths(w.root, selfWatchedPaths...)
-	tick := time.NewTicker(w.poll)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case now := <-tick.C:
-			if w.observe(ctx, now) {
-				return
-			}
-		}
-	}
+	w.last = w.fingerprint()
+	loop := gowatch.Loop{Tree: w.tree, Clock: w.clock, Poll: w.poll, Safety: gowatch.SafetyPoll, Log: w.log}
+	loop.Run(ctx, func(now time.Time) bool { return w.observe(ctx, now) })
 }
 
-// observe feeds one poll to the clock; true once a rebuild has handed over.
+// fingerprint hashes haven's own source, keeping directory listings across polls.
+func (w *selfWatch) fingerprint() uint64 {
+	if w.tree == nil {
+		w.tree = gowatch.PathsTree(w.root, selfWatchedPaths...)
+	}
+	return w.tree.Fingerprint()
+}
+
+// observe feeds one wake to the clock; true once a rebuild has handed over.
 func (w *selfWatch) observe(ctx context.Context, now time.Time) bool {
-	if fp := gowatch.FingerprintPaths(w.root, selfWatchedPaths...); fp != w.last {
+	if fp := w.fingerprint(); fp != w.last {
 		w.last = fp
 		w.clock.Change(now)
 	}

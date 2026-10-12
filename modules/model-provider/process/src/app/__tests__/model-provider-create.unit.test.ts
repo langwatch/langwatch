@@ -130,6 +130,7 @@ function createRealModelProviderApp(
         groq: undefined,
         elevenlabs: undefined,
       },
+      codexOAuthIssuer: undefined,
     },
     resources: new ResourceScope(),
     secrets: SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(

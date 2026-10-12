@@ -37,6 +37,7 @@ func (o *Orchestrator) Reload(ctx context.Context, p UpParams, name string) erro
 	if !ok {
 		return fmt.Errorf("no registered stack %q — is it up? (haven up)", slug)
 	}
+	defer o.keepProxyForOtherStacks()
 	if name == "ui" {
 		return o.reloadUI(ctx, st)
 	}

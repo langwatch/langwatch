@@ -90,17 +90,37 @@ func (stores Stores) objectKeys(ctx context.Context, label string) ([]string, er
 const privatePrefix = "private-"
 
 // privateClient speaks as the first live project of the first private organization, with its project key.
-func (cell *run) privateClient() (Client, string, bool) {
-	for _, label := range slices.Sorted(maps.Keys(cell.private)) {
-		organization := cell.private[label]
-		for index := range cell.tenancy.Projects {
-			project := cell.tenancy.Projects[index]
-			if !project.Archived && slices.Contains(cell.tenancy.ProjectsOf(organization), project.ID) {
-				return Client{URL: cell.url(), APIKey: project.APIKey, Project: project.ID, Seed: RunSeed(cell.options.Seed+1_000_000, cell.origin)}, label, true
-			}
+func (cell *run) privateClient() (Client, string, bool) { return cell.privateClientAt(0) }
+
+// privateClientAt speaks as the first live project of the private organization at index, labels sorted.
+func (cell *run) privateClientAt(at int) (Client, string, bool) {
+	labels := slices.Sorted(maps.Keys(cell.private))
+	if at >= len(labels) {
+		return Client{}, "", false
+	}
+	label := labels[at]
+	organization := cell.private[label]
+	for index := range cell.tenancy.Projects {
+		project := cell.tenancy.Projects[index]
+		if !project.Archived && slices.Contains(cell.tenancy.ProjectsOf(organization), project.ID) {
+			return Client{URL: cell.url(), APIKey: project.APIKey, Project: project.ID, Seed: RunSeed(cell.options.Seed+1_000_000*int64(at+1), cell.origin)}, label, true
 		}
 	}
 	return Client{}, "", false
+}
+
+// otherPrivatePrefix names the traffic the second private organization's project sends (tier M, T7-F9). It is not
+// privatePrefix, so the down-target drill counts it with the organizations that must keep working.
+const otherPrivatePrefix = "other-private-"
+
+// OtherPrivateMix is the second private project's telemetry: traces, logs, metrics and a logged evaluation.
+func OtherPrivateMix(rate time.Duration) []Kind {
+	return []Kind{
+		{Name: otherPrivatePrefix + "otlp-trace", Every: 2 * rate, Write: true, Do: otlpTrace},
+		{Name: otherPrivatePrefix + "otlp-log", Every: 4 * rate, Write: true, Do: otlpLog},
+		{Name: otherPrivatePrefix + "otlp-metric", Every: 4 * rate, Write: true, Do: otlpMetric},
+		{Name: otherPrivatePrefix + "collector-eval", Every: 8 * rate, Write: true, Do: collectorEval},
+	}
 }
 
 // PrivateMix is a private project's traffic: traces, datasets with rows (objects), and reads.

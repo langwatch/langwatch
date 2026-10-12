@@ -50,7 +50,7 @@ function gateOver({
     processId: `${role}-1`,
     firstInstall: async () => {
       runs.push("upgrade");
-      return { exitCode: 0, logTail: [] };
+      return { code: "done", logTail: [] };
     },
     warn: () => undefined,
     wait: async () => undefined,

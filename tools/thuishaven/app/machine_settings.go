@@ -46,6 +46,9 @@ func (o *Orchestrator) SetMachineSetting(ctx context.Context, name, value string
 		return "", fmt.Errorf("saving the machine settings: %w", err)
 	}
 	message := fmt.Sprintf("%s set to %s", name, settingValue(next, name))
+	if name == domain.SettingVM {
+		return message + o.applyVMSetting(ctx, next.VMOff), nil
+	}
 	if name != domain.SettingObservability {
 		return message, nil
 	}
@@ -63,6 +66,16 @@ func settingValue(s domain.MachineSettings, name string) string {
 		}
 	}
 	return ""
+}
+
+// applyVMSetting says what vm off means for the running stacks, and stops a VM
+// haven started once nothing runs on it.
+func (o *Orchestrator) applyVMSetting(ctx context.Context, off bool) string {
+	if !off {
+		return "; stacks may use the VM again from their next up"
+	}
+	o.stopColimaIfIdle(ctx)
+	return "; ClickHouse and observability run natively from each stack's next up, and a VM haven started stops once nothing runs on it"
 }
 
 // applyObservabilitySetting stops (off) or starts and routes (on) the stack.

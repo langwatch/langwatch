@@ -177,49 +177,304 @@ describe("createStreamingStore()", () => {
   });
 
   // -----------------------------------------------------------------------
-  // clearByIds()
+  // upsert() with a messageIndex
   // -----------------------------------------------------------------------
-  describe("clearByIds()", () => {
-    it("removes completed messages matching IDs", () => {
-      store.upsert("m1", makeMsg({ messageId: "m1", status: "complete" }));
-      store.upsert("m2", makeMsg({ messageId: "m2", status: "complete" }));
+  describe("given a completed preview at a message index", () => {
+    /** @scenario "A START inserts beside earlier previews, never truncating" */
+    it("inserts beside previews at or after that index, never truncating", () => {
+      store.upsert("m1", makeMsg({ messageId: "m1", messageIndex: 1 }));
+      store.complete("m1", "first");
+      store.upsert("m2", makeMsg({ messageId: "m2", messageIndex: 1 }));
       raf.flush();
 
-      store.clearByIds(["m1"]);
+      expect(store.getSnapshot().map((m) => m.messageId)).toEqual(["m1", "m2"]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // reconcile()
+  // -----------------------------------------------------------------------
+  describe("reconcile()", () => {
+    const stored = (id: string, text: string) => ({ id, text });
+
+    describe("when the run is still going", () => {
+      it("removes completed previews whose final text the server holds", () => {
+        store.upsert("m1", makeMsg({ messageId: "m1", content: "a" }));
+        store.upsert("m2", makeMsg({ messageId: "m2", content: "b" }));
+        store.complete("m1");
+        store.complete("m2");
+        raf.flush();
+
+        store.reconcile({
+          serverMessages: [stored("m1", "a")],
+          isFinished: false,
+        });
+        raf.flush();
+
+        expect(store.getSnapshot().map((m) => m.messageId)).toEqual(["m2"]);
+      });
+
+      it("keeps the final text while the server holds only the empty START row", () => {
+        store.upsert("m1", makeMsg({ messageId: "m1" }));
+        store.complete("m1", "final answer");
+        raf.flush();
+
+        store.reconcile({
+          serverMessages: [stored("m1", "")],
+          isFinished: false,
+        });
+        raf.flush();
+
+        expect(store.getSnapshot()).toEqual([
+          expect.objectContaining({ messageId: "m1", content: "final answer" }),
+        ]);
+      });
+
+      it("keeps the final text while a lagging read holds only part of it", () => {
+        store.upsert("m1", makeMsg({ messageId: "m1" }));
+        store.complete("m1", "final answer");
+        raf.flush();
+
+        store.reconcile({
+          serverMessages: [stored("m1", "final")],
+          isFinished: false,
+        });
+        raf.flush();
+
+        expect(store.getSnapshot()).toEqual([
+          expect.objectContaining({ messageId: "m1", content: "final answer" }),
+        ]);
+      });
+
+      it("removes a completed preview with no text once its row is stored", () => {
+        store.upsert("tools", makeMsg({ messageId: "tools" }));
+        store.complete("tools");
+        raf.flush();
+
+        store.reconcile({
+          serverMessages: [stored("tools", "")],
+          isFinished: false,
+        });
+        raf.flush();
+
+        expect(store.getSnapshot()).toEqual([]);
+      });
+
+      it("keeps in-flight previews while the server lags behind", () => {
+        store.upsert("m1", makeMsg({ messageId: "m1", content: "par" }));
+        raf.flush();
+
+        store.reconcile({
+          serverMessages: [stored("m1", "par")],
+          isFinished: false,
+        });
+        store.appendDelta("m1", "tial");
+        raf.flush();
+
+        expect(store.getSnapshot()).toEqual([
+          expect.objectContaining({ messageId: "m1", content: "partial" }),
+        ]);
+      });
+
+      it("keeps a new completed preview while a lagging read holds another id at its index", () => {
+        store.upsert("new0", makeMsg({ messageId: "new0", messageIndex: 0, content: "new" }));
+        store.complete("new0");
+        raf.flush();
+
+        store.reconcile({
+          serverMessages: [stored("old0", "old")],
+          isFinished: false,
+        });
+        raf.flush();
+
+        expect(store.getSnapshot().map((m) => m.messageId)).toEqual(["new0"]);
+      });
+
+      it("does not notify if no messages removed", () => {
+        store.upsert("m1", makeMsg({ messageId: "m1", status: "streaming" }));
+        raf.flush();
+
+        const listener = vi.fn();
+        store.subscribe(listener);
+
+        store.reconcile({
+          serverMessages: [stored("m1", "")],
+          isFinished: false,
+        });
+        expect(raf.pending).toBe(0);
+        expect(listener).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the run has finished", () => {
+      it("removes aborted and orphaned previews alike", () => {
+        store.upsert("aborted", makeMsg({ messageId: "aborted" }));
+        store.upsert("orphan", makeMsg({ messageId: "orphan", status: "complete" }));
+        raf.flush();
+
+        store.reconcile({
+          serverMessages: [stored("m0", "hi")],
+          isFinished: true,
+        });
+        raf.flush();
+
+        expect(store.getSnapshot()).toEqual([]);
+      });
+
+      it("buffers no late CONTENT and starts no timer", () => {
+        store.reconcile({ serverMessages: [], isFinished: true });
+
+        store.appendDelta("late", "x");
+        store.complete("late", "y");
+        store.upsert("late", makeMsg({ messageId: "late" }));
+
+        expect(vi.getTimerCount()).toBe(0);
+        expect(raf.pending).toBe(0);
+      });
+
+      it("stops the early delta timer", () => {
+        store.appendDelta("orphan", "data");
+
+        store.reconcile({ serverMessages: [], isFinished: true });
+
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it("ignores a START that arrives late", () => {
+        store.reconcile({ serverMessages: [], isFinished: true });
+
+        store.upsert("late", makeMsg({ messageId: "late" }));
+        raf.flush();
+
+        expect(store.getSnapshot()).toEqual([]);
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // snapshotStored()
+  // -----------------------------------------------------------------------
+  describe("snapshotStored()", () => {
+    it("drops every preview at once, with no START or finished run after it", () => {
+      store.upsert("aborted", makeMsg({ messageId: "aborted", content: "ha" }));
+      store.upsert("draft", makeMsg({ messageId: "draft" }));
+      store.complete("draft", "rolled back text");
+      raf.flush();
+
+      store.snapshotStored();
+      raf.flush();
+
+      expect(store.getSnapshot()).toEqual([]);
+    });
+
+    it("stops the early delta timer", () => {
+      store.appendDelta("orphan", "data");
+
+      store.snapshotStored();
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("drops buffered early deltas", () => {
+      store.appendDelta("m1", "stale");
+
+      store.snapshotStored();
+      store.upsert("m1", makeMsg({ messageId: "m1", content: "" }));
+      raf.flush();
+
+      expect(store.getSnapshot()[0]!.content).toBe("");
+    });
+
+    it("accepts previews that start after it", () => {
+      store.snapshotStored();
+      store.upsert("next", makeMsg({ messageId: "next" }));
+      raf.flush();
+
+      expect(store.getSnapshot().map((m) => m.messageId)).toEqual(["next"]);
+    });
+
+    it("keeps a finished run finished", () => {
+      store.reconcile({ serverMessages: [], isFinished: true });
+
+      store.snapshotStored();
+      store.upsert("late", makeMsg({ messageId: "late" }));
+      raf.flush();
+
+      expect(store.getSnapshot()).toEqual([]);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // reset()
+  // -----------------------------------------------------------------------
+  describe("reset()", () => {
+    it("empties the snapshot at once, without waiting for a frame", () => {
+      store.upsert("m1", makeMsg({ messageId: "m1" }));
+      raf.flush();
+
+      store.reset();
+
+      expect(store.getSnapshot()).toEqual([]);
+    });
+
+    it("drops buffered early deltas", () => {
+      store.appendDelta("m1", "stale");
+
+      store.reset();
+      store.upsert("m1", makeMsg({ messageId: "m1", content: "" }));
+      raf.flush();
+
+      expect(store.getSnapshot()[0]!.content).toBe("");
+    });
+
+    it("stops the early delta timer", () => {
+      store.appendDelta("orphan", "data");
+
+      store.reset();
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("accepts new previews after a finished run", () => {
+      store.reconcile({ serverMessages: [], isFinished: true });
+
+      store.reset();
+      store.upsert("m1", makeMsg({ messageId: "m1" }));
       raf.flush();
 
       expect(store.getSnapshot()).toHaveLength(1);
-      expect(store.getSnapshot()[0]!.messageId).toBe("m2");
-    });
-
-    it("keeps streaming messages even if ID matches", () => {
-      store.upsert("m1", makeMsg({ messageId: "m1", status: "streaming" }));
-      raf.flush();
-
-      store.clearByIds(["m1"]);
-      raf.flush();
-
-      expect(store.getSnapshot()).toHaveLength(1);
-      expect(store.getSnapshot()[0]!.messageId).toBe("m1");
-    });
-
-    it("does not notify if no messages removed", () => {
-      store.upsert("m1", makeMsg({ messageId: "m1", status: "streaming" }));
-      raf.flush();
-
-      const listener = vi.fn();
-      store.subscribe(listener);
-
-      store.clearByIds(["m1"]); // m1 is streaming, not removed
-      // No RAF should be scheduled
-      expect(raf.pending).toBe(0);
-      expect(listener).not.toHaveBeenCalled();
     });
   });
 
   // -----------------------------------------------------------------------
   // Early delta TTL cleanup
   // -----------------------------------------------------------------------
+  describe("given the early delta cleanup timer", () => {
+    it("holds no timer until an early delta is buffered", () => {
+      expect(vi.getTimerCount()).toBe(0);
+
+      store.appendDelta("orphan", "data");
+
+      expect(vi.getTimerCount()).toBe(1);
+    });
+
+    it("stops once START takes the buffered deltas", () => {
+      store.appendDelta("m1", "data");
+
+      store.upsert("m1", makeMsg({ messageId: "m1" }));
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("stops once the buffered deltas expire", () => {
+      store.appendDelta("orphan", "data");
+
+      vi.advanceTimersByTime(15_000);
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
   describe("given an orphaned delta past its TTL", () => {
     it("removes orphaned deltas after TTL expires", () => {
       store.appendDelta("orphan", "data");
@@ -282,6 +537,14 @@ describe("createStreamingStore()", () => {
 
       expect(globalThis.cancelAnimationFrame).toHaveBeenCalled();
       expect(store.getSnapshot()).toEqual([]);
+    });
+
+    it("stops the early delta timer", () => {
+      store.appendDelta("orphan", "data");
+
+      store.destroy();
+
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 });

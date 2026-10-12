@@ -63,6 +63,7 @@ type Manifest struct {
 	RedisKeysByPrefix map[string]int    `json:"redisKeysByPrefix"`
 	RedisTopPrefixes  []RedisPrefixSize `json:"redisTopPrefixes,omitempty"`
 	ObjectCount       int               `json:"objectCount"`
+	QueueDepthAtCut   int               `json:"queueDepthAtCut,omitempty"` // group-queue jobs waiting when main's worker was paused; -1 unread
 	Expect            Expect            `json:"expect"`
 	SizeBytes         int64             `json:"sizeBytes"`
 }

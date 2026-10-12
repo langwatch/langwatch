@@ -10,6 +10,7 @@ import {
   FLOOR_AND_LOCK_RULES,
   GRACEFUL_RULES,
   type MigrationSource,
+  NOTHING_DELETED_RULES,
   formatFindings,
   parseBaseline,
   parseRelease,
@@ -113,11 +114,20 @@ const unshipped = migrations.filter(
 function scanTree(migration: MigrationSource) {
   return scanPostgresMigration({ ...migration })
     .filter((finding) => migration.name > NEW_RULES_FROM || !FLOOR_AND_LOCK_RULES.has(finding.rule))
-    .filter((finding) => migration.name > RELEASED_THROUGH || !GRACEFUL_RULES.has(finding.rule));
+    .filter((finding) => migration.name > RELEASED_THROUGH || !GRACEFUL_RULES.has(finding.rule))
+    .filter(
+      (finding) => migration.name > RELEASED_THROUGH || !NOTHING_DELETED_RULES.has(finding.rule),
+    );
 }
 
 const scan = (sql: string) => scanPostgresMigration({ name: "20991231000000_fixture", sql });
 const rules = (sql: string) => scan(sql).map((finding) => finding.rule);
+/** The rules a drop in released history answered to, before nothing was deleted automatically. */
+const historyScan = (sql: string) =>
+  scan(sql).filter((finding) => !NOTHING_DELETED_RULES.has(finding.rule));
+const historyRules = (sql: string) => historyScan(sql).map((finding) => finding.rule);
+/** Only the no-drop rule's findings, for the drops it lets through. */
+const noDropRules = (sql: string) => rules(sql).filter((rule) => NOTHING_DELETED_RULES.has(rule));
 
 describe("Postgres migration safety", () => {
   it("leaves every migration newer than the baseline safe in both directions", () => {
@@ -128,21 +138,21 @@ describe("Postgres migration safety", () => {
   describe("when the rules scan a migration", () => {
     /** @scenario "Dropping a column without a retirement note is refused by name" */
     it("refuses a drop with no retirement note, naming the column", () => {
-      const findings = scan('ALTER TABLE "Project" DROP COLUMN "legacyKey";');
+      const findings = historyScan('ALTER TABLE "Project" DROP COLUMN "legacyKey";');
       expect(findings[0]?.rule).toBe("drop-without-retirement-note");
       expect(findings[0]?.problem).toContain("legacyKey");
       expect(findings[0]?.fix).toContain("must still find its schema");
     });
 
-    /** @scenario "A drop retired a release earlier is accepted" */
+    /** @scenario "A drop retired a release earlier was accepted in released history" */
     it("accepts a drop carrying a retirement note above it", () => {
       expect(
-        rules(
+        historyRules(
           '-- contract: retired in 1.42.0\n-- archive: none (empty)\nALTER "Project" DROP COLUMN "legacyKey";',
         ),
       ).toEqual([]);
       expect(
-        rules(
+        historyRules(
           'ALTER TABLE "Project" DROP COLUMN "legacyKey";\n-- contract: retired in 1.42.0\n-- archive: none (empty)',
         ),
       ).toEqual(["drop-without-retirement-note"]);
@@ -150,15 +160,17 @@ describe("Postgres migration safety", () => {
 
     /** @scenario "A Postgres drop without an archive note is refused by name" */
     it("refuses a retired drop with no archive note, naming the fix", () => {
-      const findings = scan('-- contract: retired in 1.42.0\nALTER TABLE "P" DROP COLUMN "old";');
+      const findings = historyScan(
+        '-- contract: retired in 1.42.0\nALTER TABLE "P" DROP COLUMN "old";',
+      );
       expect(findings.map((finding) => finding.rule)).toEqual(["contract-without-archive-note"]);
       expect(findings[0]?.fix).toContain("-- archive: none (<reason>)");
-      expect(rules('-- contract: retired in 1.42.0\n-- archive: none\nDROP TABLE "T";')).toEqual([
-        "contract-without-archive-note",
-      ]);
-      expect(rules('-- contract: retired in 1.42.0\n-- archive: Thing\nDROP TABLE "T";')).toEqual(
-        [],
-      );
+      expect(
+        historyRules('-- contract: retired in 1.42.0\n-- archive: none\nDROP TABLE "T";'),
+      ).toEqual(["contract-without-archive-note"]);
+      expect(
+        historyRules('-- contract: retired in 1.42.0\n-- archive: Thing\nDROP TABLE "T";'),
+      ).toEqual([]);
     });
 
     /** @scenario "A new NOT NULL column without a default is refused by name" */
@@ -196,13 +208,13 @@ describe("Postgres migration safety", () => {
       ).toEqual([]);
     });
 
-    /** @scenario "A drop under a retirement note naming any release is accepted" */
+    /** @scenario "A drop under a retirement note naming any release was accepted in released history" */
     it("accepts a drop whose note names any release", () => {
       const drop = '-- archive: none (empty)\nALTER TABLE "P" DROP COLUMN "old";';
-      expect(rules(`-- contract: retired in 3.20.1\n${drop}`)).toEqual([]);
-      expect(rules(`-- contract: retired in v3.19.9\n${drop}`)).toEqual([]);
-      expect(rules(`-- contract: retired in 2.99.0\n${drop}`)).toEqual([]);
-      expect(scan(`-- contract: retired in 3.21.0\n${drop}`)).toEqual([]);
+      expect(historyRules(`-- contract: retired in 3.20.1\n${drop}`)).toEqual([]);
+      expect(historyRules(`-- contract: retired in v3.19.9\n${drop}`)).toEqual([]);
+      expect(historyRules(`-- contract: retired in 2.99.0\n${drop}`)).toEqual([]);
+      expect(historyScan(`-- contract: retired in 3.21.0\n${drop}`)).toEqual([]);
       expect(parseRelease("langwatch@v3.20.1")).toEqual([3, 20, 1]);
     });
 
@@ -336,6 +348,36 @@ describe("Postgres migration safety", () => {
     });
   });
 
+  describe("when a new migration drops something", () => {
+    /** @scenario "A new drop of a table or a column is refused by name, even under a retirement note" */
+    it("refuses DROP TABLE and DROP COLUMN, naming the object and the operator step", () => {
+      const notes = "-- contract: retired in 3.20.1\n-- archive: none (empty)\n";
+      const findings = scan(`${notes}ALTER TABLE "Project" DROP COLUMN IF EXISTS "legacyKey";`);
+      expect(findings.map((finding) => finding.rule)).toEqual(["drop-table-or-column"]);
+      expect(findings[0]?.problem).toBe("drops column project.legacyKey");
+      expect(findings[0]?.fix).toContain("operator step");
+      expect(rules(`${notes}DROP TABLE IF EXISTS "LegacyKey";`)).toEqual(["drop-table-or-column"]);
+      expect(rules(`${notes}ALTER TABLE "P" DROP "old";`)).toEqual(["drop-table-or-column"]);
+    });
+
+    /** @scenario "Dropping an index, a constraint, a default or a type, or a table the migration creates, is accepted" */
+    it("accepts the drops that hold no data", () => {
+      expect(noDropRules('DROP INDEX IF EXISTS "P_old_idx";')).toEqual([]);
+      expect(noDropRules('ALTER TABLE "P" DROP CONSTRAINT IF EXISTS "P_old_key";')).toEqual([]);
+      expect(noDropRules('ALTER TABLE "P" ALTER COLUMN "n" DROP DEFAULT;')).toEqual([]);
+      expect(noDropRules('ALTER TABLE "P" ALTER COLUMN "n" DROP NOT NULL;')).toEqual([]);
+      expect(noDropRules('DROP TYPE IF EXISTS "Unused";')).toEqual([]);
+      expect(noDropRules('CREATE TABLE "Staging" ("id" TEXT);\nDROP TABLE "Staging";')).toEqual([]);
+    });
+
+    /** @scenario "A commented rollback note that drops is accepted" */
+    it("reads no drop inside a comment", () => {
+      expect(
+        rules('-- rollback: ALTER TABLE "P" DROP COLUMN "note";\n/* DROP TABLE "P"; */'),
+      ).toEqual([]);
+    });
+  });
+
   describe("when the graceful rules scan a migration", () => {
     /** @scenario "An inline UPDATE or DELETE on an existing table is refused by name" */
     it("refuses UPDATE and DELETE on an existing table, naming it and the background step", () => {
@@ -441,6 +483,20 @@ describe("Postgres migration safety", () => {
       expect(graceful.length).toBeGreaterThan(0);
       expect(
         history.flatMap(scanTree).filter((finding) => GRACEFUL_RULES.has(finding.rule)),
+      ).toEqual([]);
+    });
+
+    /** @scenario "Released history keeps its drops" */
+    it("skips the no-drop rule up to the newest release tag's newest migration", () => {
+      const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
+      const drops = history.flatMap((migration) =>
+        scanPostgresMigration({ ...migration }).filter((finding) =>
+          NOTHING_DELETED_RULES.has(finding.rule),
+        ),
+      );
+      expect(drops.length).toBeGreaterThan(0);
+      expect(
+        history.flatMap(scanTree).filter((finding) => NOTHING_DELETED_RULES.has(finding.rule)),
       ).toEqual([]);
     });
 

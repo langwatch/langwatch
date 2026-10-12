@@ -1,6 +1,7 @@
 # Background steps on the worker (ADR-173 section 1; round 14: the framework runs, ops reads and
 # requests). A worker that passed the serving gate runs the background steps its modules declare
-# with .withMigrations, one at a time under a lease of their own, resuming from the checkpoint.
+# with .withMigrations, a few side by side, each under a lease of its own, resuming from the
+# checkpoint; a step that runs `after` another waits until that one is done.
 # A step that needs old writers gone waits on the serving roster. A paused (lapsed) worker runs none.
 
 Feature: The worker runs declared background steps
@@ -160,3 +161,66 @@ Feature: The worker runs declared background steps
     When the run finishes
     Then the step is not recorded done
     And it is pending again with its checkpoint cleared, naming why
+
+  # Queue work from upgrade steps runs ahead of bulk work (Alex, 2026-10-11): each step run sends
+  # on a list of its own, which the worker's listed consumer runs ahead of any backlog, and the
+  # step is done only once that work has run. Permission changes stay in the normal queue.
+  @integration
+  Scenario: Queue work an upgrade step sends runs ahead of a backlog
+    Given a job queue holding a large backlog of older work
+    And an upgrade step sent a command whose handling sends one more job
+    When the worker's upgrade-step consumer runs
+    Then it runs the command and then the job the command caused
+    And it takes no job from the backlog
+
+  @integration
+  @unit
+  Scenario: A background step is done only once the queue work it sent has run
+    Given a worker running a pending background step that sends a command
+    When the step's run returns
+    Then the step waits until the command and the jobs it caused have run
+    And only then is it recorded done, and its list is removed
+
+  @integration
+  Scenario: A failed job fails only the step whose list it is on
+    Given two background steps running at once, each with its own list
+    When a job on the first step's list fails and blocks its group
+    Then the first step's run fails naming that group
+    And the second step finishes and is recorded done
+
+  # A large step's work drains for longer than any fixed wait: the wait (60 seconds unless the step
+  # declares longer) only runs out once no fewer jobs are outstanding for that long. The run's
+  # deadline still bounds the whole attempt.
+  @integration
+  Scenario: A step whose queue work keeps draining waits for it past its wait
+    Given a background step whose queue work takes longer than its wait to run
+    And fewer of its jobs are outstanding at each look
+    When the wait would have run out
+    Then the step keeps waiting, and returns once every job has run
+
+  @integration
+  @unit
+  Scenario: A step whose queue work stops draining fails that attempt and stays resumable
+    Given a background step whose queue work has not all run
+    When its wait passes with no fewer jobs outstanding
+    Then the attempt fails naming the groups still waiting, and its list is removed
+    And the step is pending again with its checkpoint kept, to retry after its backoff
+
+  @integration
+  Scenario: A step retried after a failed attempt resumes from its last saved checkpoint
+    Given a background step whose attempt saved a checkpoint and then failed
+    When the worker retries it after its backoff
+    Then the run resumes from the checkpoint the failed attempt saved
+
+  @unit
+  Scenario: The upgrade-step consumer leaves the queue's wake-up signal to the main consumer
+    Given the worker runs the upgrade-step consumer beside its main consumer
+    When the upgrade-step consumer waits for listed work
+    Then it claims from each open list in turn, polling, and never takes or clears the queue's shared wake-up signal
+
+  @unit
+  Scenario: Independent background steps run side by side, a few at a time
+    Given more pending background steps than the worker runs at once
+    When the worker sweeps
+    Then it runs that many side by side, each under its own lease, and never more
+    And a step that runs after another still waits for it to be done

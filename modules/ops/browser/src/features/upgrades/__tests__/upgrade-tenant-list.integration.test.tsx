@@ -61,8 +61,8 @@ function renderList() {
     <DesignSystemProvider forcedTheme="light">
       <UpgradeTenantList
         steps={[
-          { name: "ops:first", title: "First step" },
-          { name: "ops:second", title: "Second step" },
+          { name: "ops:first", title: "First step", migratedIsSteady: false },
+          { name: "ops:second", title: "Second step", migratedIsSteady: false },
         ]}
       />
     </DesignSystemProvider>,

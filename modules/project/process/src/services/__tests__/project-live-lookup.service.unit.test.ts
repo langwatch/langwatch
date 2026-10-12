@@ -70,6 +70,7 @@ async function seeded() {
         findWithOrgAdmin: async () => null,
         findIdsByOrganization: async () => [],
         findWithTeam: async () => null,
+        findLiveWithTeamByIds: async () => [],
       },
     }),
     repository,

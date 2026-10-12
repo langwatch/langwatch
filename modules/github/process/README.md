@@ -354,8 +354,10 @@ Declared at `src/eventing/github-maintenance.pipeline.ts:42`.
 | Kind   | Leaf      | Environment variable       | Declared at                           |
 | ------ | --------- | -------------------------- | ------------------------------------- |
 | secret | `–`       | `GITHUB_LANGY_PRIVATE_KEY` | `src/app/github.app.ts:176`           |
-| config | `appId`   | `GITHUB_LANGY_APP_ID`      | `../contract/src/github.config.ts:11` |
-| config | `host`    | `GITHUB_LANGY_HOST`        | `../contract/src/github.config.ts:12` |
-| config | `appSlug` | `GITHUB_LANGY_APP_SLUG`    | `../contract/src/github.config.ts:13` |
+| config | `appId`   | `GITHUB_LANGY_APP_ID`      | `../contract/src/github.config.ts:16` |
+| config | `host`    | `GITHUB_LANGY_HOST`        | `../contract/src/github.config.ts:17` |
+| config | `appSlug` | `GITHUB_LANGY_APP_SLUG`    | `../contract/src/github.config.ts:18` |
+| config | `apiBase` | `GITHUB_LANGY_API_BASE`    | `../contract/src/github.config.ts:20` |
+| config | `webBase` | `GITHUB_LANGY_WEB_BASE`    | `../contract/src/github.config.ts:22` |
 
 <!-- readme:generated:end -->

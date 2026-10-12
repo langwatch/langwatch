@@ -18,7 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/langwatch/langwatch/services/telemetrysim"
+	"github.com/langwatch/langwatch/services/sims/telemetrysim"
 )
 
 // ingestFamilyNames are the ingestion families: telemetrysim's payloads at every door.

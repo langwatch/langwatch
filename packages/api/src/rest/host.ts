@@ -68,8 +68,8 @@ export type RestIdentities = Readonly<
 export type RestFamilyBearers = (namespace: string) => RestIdentity;
 
 /**
- * An upgrade in progress is an expected 503, so it warns; so does a refused private dataplane,
- * which the stores log once at error. Every other 5xx stays an error.
+ * An upgrade in progress and a busy ClickHouse are expected 503s, so they warn; so does a refused
+ * private dataplane, which the stores log once at error. Every other 5xx stays an error.
  */
 function restFailureLevel(error: unknown): "warn" | "error" {
   return HandledError.isHandled(error) && WARNED_REFUSALS.has(error.code) ? "warn" : "error";
@@ -78,6 +78,7 @@ function restFailureLevel(error: unknown): "warn" | "error" {
 const WARNED_REFUSALS: ReadonlySet<string> = new Set([
   "upgrade_in_progress",
   "private_dataplane_unavailable",
+  "clickhouse_overloaded",
 ]);
 
 export class RestHost implements FeatureRestHost<MountableRestApp> {

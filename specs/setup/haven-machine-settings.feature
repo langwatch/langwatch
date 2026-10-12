@@ -1,8 +1,8 @@
 @unit
 Feature: Machine settings switch the observability stack and the idle VM
-  Two choices hold for every stack on a machine, so they are saved once in
-  haven's home: whether the observability stack runs at all, and whether the
-  container VM is stopped once nothing uses it. Both are set with
+  These choices hold for every stack on a machine, so they are saved once in
+  haven's home: whether the observability stack runs at all, whether the
+  container VM may run at all, and whether it is stopped once nothing uses it. Both are set with
   `haven machine settings` and from the hub's Settings page.
 
   # domain/machine_settings.go parses them, adapters/fileregistry keeps them,
@@ -32,6 +32,47 @@ Feature: Machine settings switch the observability stack and the idle VM
       Given observability is off
       When the developer sets observability on
       Then the observability stack is started and routed
+
+  Rule: The VM can be switched off so nothing ever runs in a container
+
+    Scenario: With the VM off, ClickHouse and observability run natively
+      Given the vm setting is off
+      When a stack comes up, whatever HAVEN_CH_RUNTIME or the observability tier pin says
+      Then ClickHouse runs as the native server and observability as native processes
+
+    Scenario: With the VM off, a machine with no native ClickHouse is told what to install
+      Given the vm setting is off
+      And haven pins no native ClickHouse for this machine
+      When a stack comes up
+      Then haven names what to install and stops instead of starting the VM
+
+    Scenario: With the VM off, nothing starts the VM
+      Given the vm setting is off
+      When any path asks the container runtime to start
+      Then it refuses with one line naming the setting
+
+    Scenario: With the VM off, sandboxed Langy is refused, never run unsandboxed
+      Given the vm setting is off
+      And Langy resolves to a container tier
+      When a stack comes up
+      Then Langy is left out with one line naming the setting
+      And it is never moved to the unsandboxed host tier
+
+    Scenario: With the VM off, haven pr --throwaway is refused
+      Given the vm setting is off
+      When the developer asks for a throwaway sandbox
+      Then haven refuses with one line naming the setting
+
+    Scenario: With the VM off, a VM haven started is stopped once nothing runs on it
+      Given the vm setting is off
+      And haven started the VM
+      When no container runs on it
+      Then the VM is stopped, and a VM the developer started is left alone
+
+    Scenario: Status shows the VM switched off
+      Given the vm setting is off
+      When the developer runs haven status
+      Then the VM row says it is off by the machine setting, without probing it
 
   Rule: The container VM stops once nothing has used it for the grace period
 

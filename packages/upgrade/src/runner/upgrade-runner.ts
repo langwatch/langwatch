@@ -2,9 +2,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { generate } from "@langwatch/ksuid";
 
-import { BackgroundStepsService } from "../background/background-steps.service.ts";
 import { BLOCKING_STEP_DEADLINE_MS, stepDeadline } from "../background/step-deadline.ts";
-import { imageContractArchives, imageContractSteps } from "../gate/image-tree.ts";
+import { imageContractArchives, imagePrismaSql } from "../gate/image-tree.ts";
 import { UpgradeLedgerSeedService, withReinferred } from "../ledger-seed.service.ts";
 import { LEDGER_LOCK_TIMEOUT_MS } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
@@ -12,16 +11,13 @@ import type { UpcastStepInput, UpgradeRun, UpgradeStep, UpgradeStepStatus } from
 import { compareReleases } from "../manifest/manifest.ts";
 import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import { planInstallation } from "../plan/plan-installation.ts";
-import {
-  inlineBeforeContracts,
-  type PlannedRelease,
-  type UpgradePlan,
-} from "../plan/plan-upgrade.ts";
+import { orderAfter, type PlannedRelease, type UpgradePlan } from "../plan/plan-upgrade.ts";
 import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
 import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
+import { type DifferingIndex, differingPrebuiltIndexes } from "../stepping/prebuilt-indexes.ts";
 import {
   findHandAppliedSql,
   isRerunnablePrismaMigration,
@@ -34,7 +30,7 @@ import {
 } from "./contract-archive/contract-archive.service.ts";
 import { blocksRelease, type HeldTargets, newlyHeld, withHeldReports } from "./held-targets.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
-import { redactSecrets, resolveCommand, UpgradeRunLog } from "./run-log.ts";
+import { redactSecrets, resolveCommand, UPGRADE_RUN_COMMAND, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
 import { DEFAULT_LEASE_TIMING, holdUpgradeLease, type UpgradeLeaseTiming } from "./runner-lease.ts";
 import {
@@ -59,16 +55,23 @@ export interface UpgradeRunnerOptions {
   postgres: UpgradePostgres;
   /** The shared ClickHouse, read only to seed an empty ledger from `goose_db_version`. */
   clickhouse?: UpgradeClickHouse;
-  /** The image's release (its newest manifest) and every step its tree declares. */
-  image: { release: string | null; steps: readonly ManifestStep[] };
+  /** The image's release (its newest manifest), every step its tree declares and, to re-run a
+   *  failed one, every Prisma folder it contains (`0_init` too; UD-F2). */
+  image: {
+    release: string | null;
+    steps: readonly ManifestStep[];
+    prismaFolders?: readonly string[];
+  };
   releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
   codeSteps?: readonly MigrationStep[];
-  /** Contract ids, each with the steps its SQL names `after`; read from the image if not given. */
-  contracts?: ReadonlyMap<string, readonly string[]>;
+  /** A Prisma folder's SQL, for the pre-built index check; else read from the image. */
+  prismaSql?: (args: { folder: string }) => string | null;
   /** Contract ids, each with the tables its `-- archive:` notes name; else read from the image. */
   archives?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
+  /** Called once the schema and blocking steps are done, before the reconcilers (T0-F11). */
+  onBlockingDone?: () => void;
   /** The image's declared event upcasts and the stored events each covers (record §9). */
   upcasts?: () => Promise<readonly UpcastStepInput[]>;
   identity: { image: string; host: string };
@@ -205,9 +208,30 @@ function prismaFailure({
     "failed_prisma_migration",
     `Prisma migration ${names.join(", ")} failed and is recorded as failed in _prisma_migrations. ` +
       why +
-      `Check what it left behind, then run "${command}" if nothing of it remains, or ` +
-      `"prisma migrate resolve --applied ${names[0]}" if you completed it by hand; then upgrade again.`,
+      `Check what it left behind. Then, in packages/prisma-client with DATABASE_URL set, run ` +
+      `"${command}" if nothing of it remains, or "prisma migrate resolve --applied ${names[0]}" ` +
+      `if you completed it by hand. A waiting worker sees the row resolved and runs the upgrade ` +
+      `again by itself within 10 s; or run \`${UPGRADE_RUN_COMMAND}\`.`,
     { migrations: names, command },
+  );
+}
+
+/** Pending folders whose `IF NOT EXISTS` index another index of that name would skip (T9-F3). */
+function prebuiltIndexFailure({ differing }: { differing: readonly DifferingIndex[] }) {
+  const each = differing.map(
+    ({ migration, name, table, should, is }) =>
+      `Prisma migration ${migration} creates index "${name}" on "${table}" if it does not exist, ` +
+      `but an index of that name already exists and differs. It should be: ${should}. It is: ${is}.`,
+  );
+  const names = differing.map(({ name }) => `"${name}"`).join(", ");
+  return new UpgradeRunFailure(
+    "prebuilt_index_differs",
+    `${each.join(" ")} The migration would skip it and leave the table without the index it ` +
+      `expects, so nothing was applied. Drop or rename ${names} (for example ALTER INDEX ` +
+      `"${differing[0]!.name}" RENAME TO "${differing[0]!.name}_prebuilt"); nothing drops it for ` +
+      `you. Then this worker runs the upgrade again by itself within 5 minutes, or run ` +
+      `\`${UPGRADE_RUN_COMMAND}\` now.`,
+    { indexes: differing.map((index) => ({ ...index })) },
   );
 }
 
@@ -289,6 +313,7 @@ export class UpgradeRunnerService {
   private readonly shipped: RegisteredStep[];
   private readonly narrate: UpgradeRunLog;
   private readonly shippedIds: ReadonlySet<string>;
+  private readonly shippedFolders: ReadonlySet<string>;
   private readonly archiver: ContractArchiveService;
   private resolved: { migration: string; attempt: number }[] = [];
   private permit: RerunPermit = { firstInstall: false, retried: new Set() };
@@ -302,6 +327,7 @@ export class UpgradeRunnerService {
     this.shipped = shippedSteps({ image: options.image, manifests: options.releases.manifests });
     this.narrate = new UpgradeRunLog(options.log);
     this.shippedIds = new Set(this.shipped.map((step) => step.id));
+    this.shippedFolders = new Set(options.image.prismaFolders ?? []);
     const store = ContractArchiveRepository.create({ postgres: options.postgres });
     this.archiver = ContractArchiveService.create({ store });
   }
@@ -572,15 +598,12 @@ export class UpgradeRunnerService {
     await phases.end({ name: "preflight", outcome: "succeeded" });
     const recorded = new Map(before.steps.map((step) => [step.id, step]));
     const applied: string[] = [];
-    const inline = await this.inlineBeforeContracts({ plan });
+    await this.refuseMisorderedSteps();
+    await this.refuseDifferingIndexes({ plan });
     const declared = this.options.archives ?? imageContractArchives();
     const archived: ContractArchiveEntry[] = [];
     for (const [index, release] of plan.releases.entries()) {
       signal.throwIfAborted();
-      for (const id of inline[index] ?? []) {
-        await this.runBeforeContract({ id, signal, runId });
-        applied.push(id);
-      }
       if (release.schema.length > 0) {
         const ahead = plan.releases.slice(index);
         archived.push(...(await this.archiveContracts({ releases: ahead, runId, declared })));
@@ -593,6 +616,7 @@ export class UpgradeRunnerService {
       }
     }
     await this.catchUpTargets({ signal });
+    this.options.onBlockingDone?.();
     await phases.start({ name: "reconcile" });
     await this.runReconcilers({ signal });
     await phases.end({ name: "reconcile", outcome: "succeeded" });
@@ -650,9 +674,14 @@ export class UpgradeRunnerService {
     const handApplied = names.find((name) => findHandAppliedSql({ name }).length > 0);
     if (handApplied !== undefined) return { handApplied };
     if (!names.every((name) => this.mayRerun({ name }))) return "below-marker";
-    if (!names.every((name) => this.shippedIds.has(`prisma:${name}`))) return "not-shipped";
+    if (!names.every((name) => this.ships({ name }))) return "not-shipped";
     if (!this.options.applier.resolveRolledBack) return "no-resolver";
     return null;
+  }
+
+  /** Named by a release file or the image's step list, or a folder the image contains (UD-F2). */
+  private ships({ name }: { name: string }): boolean {
+    return this.shippedIds.has(`prisma:${name}`) || this.shippedFolders.has(name);
   }
 
   /** Re-runnable, a first install (UD12-F2) or an operator's Retry (Alex, 2026-10-11). */
@@ -664,6 +693,20 @@ export class UpgradeRunnerService {
   private whyRerun({ name }: { name: string }): string {
     if (isRerunnablePrismaMigration({ name })) return "is re-runnable";
     return this.permit.firstInstall ? "this is a first install" : "an operator pressed Retry on it";
+  }
+
+  /** Before any folder applies, so a refusal leaves nothing half done; reads every pending one. */
+  private async refuseDifferingIndexes({ plan }: { plan: UpgradePlan }): Promise<void> {
+    const read = this.options.prismaSql ?? imagePrismaSql;
+    const folders = plan.releases.flatMap((release) =>
+      release.schema.filter(isPrisma).flatMap((id) => {
+        const folder = id.slice("prisma:".length);
+        const sql = read({ folder });
+        return sql === null ? [] : [{ name: folder, sql }];
+      }),
+    );
+    const differing = await differingPrebuiltIndexes({ postgres: this.options.postgres, folders });
+    if (differing.length > 0) throw prebuiltIndexFailure({ differing });
   }
 
   /** Marks each failed migration rolled back; refuses by name when one cannot be. */
@@ -1022,75 +1065,20 @@ export class UpgradeRunnerService {
     }
   }
 
-  /** Per planned release, the unfinished background steps its contract steps wait for. */
-  private async inlineBeforeContracts({ plan }: { plan: UpgradePlan }): Promise<string[][]> {
+  /**
+   * Refuses a background step that runs after an unknown step or in a cycle (STEP-AFTER). The
+   * upgrade runs none of them: every background step runs on the worker once old writers are gone.
+   */
+  private async refuseMisorderedSteps(): Promise<void> {
     const settled = (await this.ledger.findSteps())
       .filter((step) => step.status === "done" || step.status === "not-needed")
       .map((step) => step.id);
-    return inlineBeforeContracts({
-      releases: plan.releases,
-      contracts: this.options.contracts ?? imageContractSteps(),
-      background: this.shipped
+    orderAfter({
+      steps: this.shipped
         .filter((step) => step.mode === "background" && this.codeSteps.has(step.id))
-        .map((step) => ({ ...step, after: this.codeSteps.get(step.id)?.after })),
+        .map((step) => ({ id: step.id, after: this.codeSteps.get(step.id)?.after })),
       settled: new Set(settled),
     });
-  }
-
-  /**
-   * Runs one background step to its end before a contract step (Alex, 2026-10-09): forced and
-   * blocking, under the step's own lease, waiting while a worker holds it; a failure fails the run.
-   */
-  private async runBeforeContract({
-    id,
-    signal,
-    runId,
-  }: {
-    id: string;
-    signal: AbortSignal;
-    runId: string;
-  }): Promise<void> {
-    const steps = BackgroundStepsService.create({
-      ledger: {
-        findSteps: () => this.ledger.findSteps(),
-        acquireLease: (input) => this.ledger.acquireLease(input),
-        renewLease: (input) => this.ledger.renewLease(input),
-        releaseLease: (input) => this.ledger.releaseLease(input),
-        markRunning: (input) => this.runner.markRunning(input),
-        setStatus: (input) => this.runner.setStatus(input),
-        saveReport: (input) => this.runner.saveReport(input),
-        reopen: (input) => this.runner.reopenDoneSteps({ ...input, from: "running" }),
-      },
-      steps: [...this.codeSteps.values()],
-      serving: () => true,
-      oldWritersGoneFor: async () => true,
-      identity: { ...this.options.identity, owner: `upgrade:${runId}` },
-      log: (level, message, fields) =>
-        level === "warn" ? this.narrate.warn(message, fields) : undefined,
-      retry: { attempts: 1, firstBackoffMs: 0, maxBackoffMs: 0 },
-    });
-    const description = this.codeSteps.get(id)?.description ?? id;
-    this.narrate.stepStarted({ id, description, resuming: false });
-    for (;;) {
-      const outcome = await steps.runNow({ id, signal });
-      signal.throwIfAborted();
-      if (outcome === "held") {
-        await sleep(this.timing.pollMs, undefined, { signal });
-        continue;
-      }
-      const row = (await this.ledger.findSteps()).find((step) => step.id === id);
-      if (row?.status === "done" || row?.status === "not-needed") {
-        this.narrate.stepEnded({ id, error: null });
-        return;
-      }
-      const lastError = row?.lastError ?? `it is ${row?.status ?? "unrecorded"}`;
-      this.narrate.stepEnded({ id, error: lastError });
-      throw new UpgradeRunFailure(
-        "step_failed",
-        `background step ${id} must finish before a contract step: ${lastError}`,
-        { step: id },
-      );
-    }
   }
 
   /** Plan 2026-10-08 F-3: each run gives failed background steps another try on the worker. */

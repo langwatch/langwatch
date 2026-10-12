@@ -297,6 +297,13 @@ var baseTable = []commandSpec{
 			ctx, unwatch := watchLaunchingGroup(ctx)
 			defer unwatch()
 			d.opts.IsForegroundClient = !isSessionLeader()
+			// The boot's own runs (HAVEN_BOOT) and, when someone is attached, the
+			// wait on it: domain.ResolveCapacity gives that boot the cores first.
+			slug := d.resolvedStack()
+			_ = os.Setenv("HAVEN_BOOT", slug)
+			if d.opts.IsForegroundClient {
+				defer claimBootWait(ctx, d, slug)()
+			}
 			if err := d.orch.Up(ctx, d.params, d.opts); err != nil {
 				return err
 			}
@@ -454,6 +461,35 @@ var baseTable = []commandSpec{
 			flagSpec{long: "--error", takesValue: true, value: "<kind>", summary: "set: force throttled, not-found, function-error or service on every invoke (none turns it off)"},
 		),
 		run: runLambda,
+	},
+	{
+		name:    "github",
+		summary: "githubsim, the GitHub stand-in: status | list | pulls | calls | deliveries | install | pr | app | deliver | fault | clear | reset",
+		args:    "<status|list|pulls|calls|deliveries|install|pr|app|deliver|fault|clear|reset> [verb]",
+		maxArgs: 2,
+		flags: simFlags(
+			flagSpec{long: "--account", takesValue: true, value: "<login>", summary: "install: the account to install the App on"},
+			flagSpec{long: "--type", takesValue: true, value: "<type>", summary: "install: Organization or User"},
+			flagSpec{long: "--repos", takesValue: true, value: "<a/b,c/d>", summary: "install: repositories it can see"},
+			flagSpec{long: "--repo", takesValue: true, value: "<owner/name>", summary: "pr, app, deliver: the repository"},
+			flagSpec{long: "--head", takesValue: true, value: "<branch>", summary: "pr open: the head branch"},
+			flagSpec{long: "--title", takesValue: true, value: "<text>", summary: "pr: the title"},
+			flagSpec{long: "--user", takesValue: true, value: "<login>", summary: "pr open: the author"},
+			flagSpec{long: "--draft", summary: "pr open: open as a draft"},
+			flagSpec{long: "--number", takesValue: true, value: "<n>", summary: "pr, deliver: the pull request number"},
+			flagSpec{long: "--installation", takesValue: true, value: "<id>", summary: "app, deliver: the installation id"},
+			flagSpec{long: "--event", takesValue: true, value: "<name>", summary: "deliver: ping, installation, installation_repositories or pull_request"},
+			flagSpec{long: "--action", takesValue: true, value: "<name>", summary: "deliver: the event's action"},
+			flagSpec{long: "--deliver", summary: "install, pr, app: also send the matching signed webhook to the stack"},
+			flagSpec{long: "--bad-signature", summary: "deliver: sign with the wrong secret"},
+			flagSpec{long: "--omit-signature", summary: "deliver: send no signature header"},
+			flagSpec{long: "--status", takesValue: true, value: "<code>", summary: "fault add: the 4xx/5xx to answer with"},
+			flagSpec{long: "--match", takesValue: true, value: "<text>", summary: "fault add: only calls whose \"METHOD /path\" contains this"},
+			flagSpec{long: "--message", takesValue: true, value: "<text>", summary: "fault add: the message to answer with"},
+			flagSpec{long: "--retry-after", takesValue: true, value: "<seconds>", summary: "fault add: Retry-After to send"},
+			flagSpec{long: "--times", takesValue: true, value: "<n>", summary: "fault add: apply this many times, then delete itself"},
+		),
+		run: runGithub,
 	},
 	{
 		name:    "payment",
@@ -617,6 +653,13 @@ var baseTable = []commandSpec{
 		},
 	},
 	{
+		name:    "focus",
+		summary: "the stack kept at full speed under memory pressure: bare prints it, focus <slug> sets it",
+		args:    "[slug]",
+		maxArgs: 1,
+		run:     runFocus,
+	},
+	{
 		name:    "switch",
 		summary: "cd to a worktree by name (the shell function comes from haven self setup)",
 		args:    "[name]",
@@ -653,8 +696,6 @@ var baseTable = []commandSpec{
 			{long: "--class", takesValue: true, value: "heavy", summary: "which slot pool to take (only \"heavy\" today)"},
 			// NOT --agent: that already means plain, token-free output everywhere
 			// else in this CLI, and ADR-064 rule 2 is one meaning per flag.
-			{long: "--agent-id", takesValue: true, value: "<id>", summary: "the sub-agent this run belongs to — picks the shorter wait ceiling its prompt cache needs"},
-			{long: "--workers", takesValue: true, value: "<n>", summary: "run this narrowed to n test workers, the width the gate admitted it at"},
 		},
 		run: runHeavy,
 	},

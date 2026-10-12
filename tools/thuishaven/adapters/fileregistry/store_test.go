@@ -459,3 +459,22 @@ func TestSelectionIgnoresAndDropsTheRetiredModes(t *testing.T) {
 		}
 	}
 }
+
+// @scenario "The ui, api and worker switch off and on as one"
+func TestTheAppSwitchSticksAndAnOlderFileKeepsTheAppOn(t *testing.T) {
+	s, dir := New(t.TempDir()), t.TempDir()
+	off := domain.DefaultSelection()
+	off.AppOff = true
+	if err := s.WriteSelection(dir, off); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := s.ReadSelection(dir); !ok || got != off {
+		t.Errorf("read back %+v, want the app still off", got)
+	}
+	if err := os.WriteFile(selectionPath(dir), []byte(`{"services":{"mail":false}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := s.ReadSelection(dir); got.AppOff {
+		t.Error("a file written before the app switch turned the app off")
+	}
+}

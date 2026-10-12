@@ -79,6 +79,7 @@ func (p *Proxy) run(args ...string) error {
 	argv := append(p.argv(), args...)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Env = append(os.Environ(), "PORTLESS_TLD="+p.naming.TLD)
+	detach(cmd) // portless may start the proxy itself; it must never join the caller's session
 	return cmd.Run()
 }
 

@@ -8,8 +8,8 @@ user-invocable: true
 
 Sends synthesized OTLP/HTTP (protobuf or JSON, gzip by default) at a stack's OTLP door
 (`<app>/api/otel/v1/<signal>`) with the stack's seeded project key. One run at a time,
-counters in memory: a dev shim, never expose it. Code: `services/telemetrysim`, console
-`apps/telemetrysim-web`.
+counters in memory: a dev shim, never expose it. Code: `services/sims/telemetrysim`, console
+`apps/sims/src/telemetry`.
 
 ## Presets
 

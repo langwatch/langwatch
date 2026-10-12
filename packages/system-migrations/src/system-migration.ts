@@ -54,6 +54,18 @@ export interface SystemMigration {
   readonly enrolledAutomatically: boolean;
 
   /**
+   * True for a step that reports `migrated` on every pass by design and never finalizes, so its
+   * `migrated` tenants are kept in step, not held (Alex, 2026-10-12). Omitted means false.
+   */
+  readonly migratedIsSteady?: boolean;
+
+  /**
+   * Pacing: a pass starts no new page of tenants while the group queues hold more waiting jobs than
+   * this, and an unreadable count reads as over it (Alex, 2026-10-12). Omitted means unpaced.
+   */
+  readonly pauseWhileQueuedAbove?: number;
+
+  /**
    * Safe to re-run every boot: idempotent and self-proving (`finalized`
    * only once verified without the legacy path). `migrated` is not
    * failed - proof disagreed, so it stays on the legacy path to retry.

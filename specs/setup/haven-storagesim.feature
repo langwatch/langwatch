@@ -7,9 +7,9 @@ Feature: storagesim, a local S3 stand-in run by haven
   SigV4 checked against haven's dev key, S3's statuses and XML errors. Its
   storage is disposable and never holds anything executable.
 
-  # Bound by Go tests in services/storagesim/storagesim_test.go and
+  # Bound by Go tests in services/sims/storagesim/storagesim_test.go and
   # tools/thuishaven/domain/overlay_storage_test.go, and by the console's
-  # apps/storagesim-web tests (ADR-160), by their `// @scenario` annotations.
+  # apps/sims/src/storage tests (ADR-160), by their `// @scenario` annotations.
 
   Scenario: A presigned upload round-trips
     Given storagesim is running

@@ -41,6 +41,23 @@ export class PrismaCostAttributionPolicyRepository extends CostAttributionPolicy
     return rows.map((row) => row.config);
   }
 
+  async findEnabledCodingAssistantConfigs({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<{ organizationId: string; config: unknown }[]> {
+    if (organizationIds.length === 0) return [];
+    return this.client.aiToolEntry.findMany({
+      where: {
+        organizationId: { in: [...organizationIds] },
+        type: "coding_assistant",
+        enabled: true,
+        archivedAt: null,
+      },
+      select: { organizationId: true, config: true },
+    });
+  }
+
   async organizationsWithEnabledCodingAssistants(): Promise<string[]> {
     const rows = await this.client.aiToolEntry.findMany({
       where: { type: "coding_assistant", enabled: true, archivedAt: null },

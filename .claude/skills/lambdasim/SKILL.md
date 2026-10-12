@@ -9,8 +9,8 @@ user-invocable: true
 Answers the AWS Lambda and CloudWatch Logs calls the workflow module makes on its
 per-project NLP Lambda fleet, and runs every invoke on this stack's nlpgo, framed the
 way the image's Lambda Web Adapter frames it (`AWS_LWA_INVOKE_MODE=RESPONSE_STREAM`:
-JSON prelude, eight zero bytes, body). Code: `services/lambdasim`, console
-`apps/lambdasim-web`, spec `specs/setup/haven-lambdasim.feature`.
+JSON prelude, eight zero bytes, body). Code: `services/sims/lambdasim`, console
+`apps/sims/src/lambda`, spec `specs/setup/haven-lambdasim.feature`.
 
 ## Run it
 

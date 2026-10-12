@@ -290,6 +290,10 @@ func (traffic *Traffic) attempt(ctx context.Context, kind Kind, call *Call) time
 		}
 		return 0
 	}
+	if startingAnswer(response, call.Error) {
+		call.Gap++ // head's api listens before it serves (T4-F3, UD-F4): a transient refusal on any deployment; a client waits out Retry-After
+		return retryAfter(response.Header.Get("Retry-After"))
+	}
 	call.NonOK++
 	if response.StatusCode == http.StatusBadRequest && strings.Contains(call.Error, "client_outdated") && !client.PlainWire {
 		traffic.reloaded.Store(true)
@@ -342,4 +346,11 @@ func (call Call) ok() bool { return call.Status/100 == 2 }
 
 func (call Call) String() string {
 	return fmt.Sprintf("%s#%d %d %dms", call.Kind, call.N, call.Status, call.Latency)
+}
+
+// startingAnswer: packages/process's server answers a 503 "<name> is starting" with Retry-After while its
+// application boots, before the api serves anything.
+func startingAnswer(response *http.Response, body string) bool {
+	return response.StatusCode == http.StatusServiceUnavailable && response.Header.Get("Retry-After") != "" &&
+		strings.HasSuffix(strings.TrimSpace(body), " is starting")
 }

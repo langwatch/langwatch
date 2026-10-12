@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   LIVENESS_PATH,
+  READINESS_PATH,
   UPGRADE_CONSOLE_PATH,
   UPGRADE_RETRY_PATH,
   startHeartbeat,
@@ -36,6 +37,10 @@ afterEach(async () => {
 async function bootThread(): Promise<LivenessThread> {
   const listener = http.createServer((req, res) => {
     req.resume();
+    if (req.url === READINESS_PATH) {
+      res.writeHead(503, { "Content-Type": "text/plain" }).end("not ready");
+      return;
+    }
     res.writeHead(200, { "Content-Type": "text/plain" }).end("main");
   });
   listeners.push(listener);
@@ -372,6 +377,21 @@ describe("the upgrade console", () => {
         const response = await fetch(urlOf(thread, LIVENESS_PATH));
 
         expect(response.status).toBe(200);
+      });
+    });
+
+    describe("when the kubelet asks for the readiness path", () => {
+      /** @scenario "A failed first install shows the console and prints a console token to its log" */
+      it("answers its plain not-ready 503, never the console", async () => {
+        const thread = await bootThread();
+        await showConsole(thread);
+
+        const response = await fetch(urlOf(thread, READINESS_PATH), {
+          headers: { Accept: "text/html" },
+        });
+
+        expect(response.status).toBe(503);
+        expect(await response.text()).toBe("not ready");
       });
     });
   });

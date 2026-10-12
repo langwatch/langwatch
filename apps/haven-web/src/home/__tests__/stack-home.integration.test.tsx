@@ -177,26 +177,53 @@ describe("StackHome", () => {
 
   describe("when a service is not selected", () => {
     /** @scenario "A service the stack does not run is started from its row" */
-    it("starts it from its row after a confirming second press", async () => {
+    it("turns it on from its row's switch", async () => {
       const daemon = serve({
         home: () => liveHome({ now: NOW }),
         others: (path) =>
           path === "/api/stacks/feat-x/start-service?service=mail-room"
-            ? { body: { message: "restarting feat-x with mail-room" } }
+            ? { body: { message: "starting mail-room in feat-x" } }
             : undefined,
       });
       await openHome({ slug: "feat-x" });
 
       const row = surfaceRow({ name: "mail-room" });
-      fireEvent.click(within(row).getByRole("button", { name: "Start" }));
-      expect(daemon.calls.some((call) => call.method === "POST")).toBe(false);
-
+      const toggle = within(row).getByRole("checkbox", { name: "Off" });
       await act(async () => {
-        fireEvent.click(within(row).getByRole("button", { name: "Start mail-room?" }));
+        fireEvent.click(toggle);
       });
       expect(daemon.calls).toContainEqual({
         method: "POST",
         path: "/api/stacks/feat-x/start-service?service=mail-room",
+        body: undefined,
+      });
+    });
+  });
+
+  describe("when a service runs", () => {
+    /** @scenario "Each optional service has an on and off switch on its row" */
+    it("turns it off from its row's switch, and the app row switches the ui, api and worker", async () => {
+      const daemon = serve({
+        home: () => liveHome({ now: NOW }),
+        others: (path) =>
+          path.startsWith("/api/stacks/feat-x/stop-service")
+            ? { body: { message: "stopping" } }
+            : undefined,
+      });
+      await openHome({ slug: "feat-x" });
+
+      expect(
+        within(surfaceRow({ name: "app" })).getByRole("checkbox", { name: "LangWatch app" }),
+      ).toBeDefined();
+      expect(within(surfaceRow({ name: "api" })).queryByRole("checkbox")).toBeNull();
+      expect(within(surfaceRow({ name: "worker" })).queryByRole("checkbox")).toBeNull();
+
+      await act(async () => {
+        fireEvent.click(within(surfaceRow({ name: "llm" })).getByRole("checkbox", { name: "On" }));
+      });
+      expect(daemon.calls).toContainEqual({
+        method: "POST",
+        path: "/api/stacks/feat-x/stop-service?service=llm",
         body: undefined,
       });
     });

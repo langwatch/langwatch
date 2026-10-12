@@ -107,9 +107,14 @@ function handleStreamingEvent(payload: CompactStreamingEvent, actions: Simulatio
   if (actions.filter?.scenarioRunId && payload.r !== actions.filter.scenarioRunId) return;
   if (actions.onStreamingEvent) {
     actions.onStreamingEvent(payload);
+    // A stored snapshot dropped the previews: read what it stored.
+    if (payload.e === "R") {
+      void actions.applyRunUpdate({ scenarioRunId: payload.r, status: void 0 });
+      actions.scheduleUpdate();
+    }
     return;
   }
-  // Without a streaming consumer, START and END refresh the stored run.
+  // Without a streaming consumer, START, END and R refresh the stored run.
   if (payload.e !== "C") actions.scheduleUpdate();
 }
 

@@ -195,6 +195,13 @@ Feature: The local development topology
     And with LANGWATCH_DEV_ONE_PROCESS=0 the "go" and "sims" lanes are planned as before
     And Langy keeps a lane of its own either way
 
+  # Langy's LLM proxy forwards to the AI gateway; without it every reply fails.
+  @unit
+  Scenario: Selecting Langy also selects the AI gateway it forwards to
+    Given a selection with neither Langy nor the gateway
+    When the developer adds "+langy"
+    Then both Langy and the gateway are selected
+
   # Bound by tools/thuishaven/app/plan_langy_test.go. A global CLI from a package
   # manager lags the checkout, so Langy's commands would be tested against old flags.
   @unit
@@ -292,3 +299,18 @@ Feature: The local development topology
     Given the portless proxy is not running
     When haven up bootstraps the stack
     Then the proxy is started before the stack is reported ready
+
+  @unit
+  Scenario: A stack's environment is the one haven up was run with, not the daemon's
+    Given the haven daemon was started with variables such as IS_SAAS or a licence key
+    And a caller exports other variables, such as RUM_ENABLED, before haven up
+    When the stack's keeper starts
+    Then the exported variables reach that stack's lanes and no other stack's
+    And a variable only the daemon holds reaches no stack, beyond PATH, HOME and the like
+
+  @unit
+  Scenario: Reloading and restarting the daemon leave the shared proxy running
+    Given the portless proxy and a registered stack
+    When haven reload or haven daemon restart finishes
+    Then the proxy is running, started again in its own session if it had died
+    And every portless command starts in its own session, so no signal to a caller's group reaches the proxy

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/langwatch/langwatch/services/telemetrysim"
+	"github.com/langwatch/langwatch/services/sims/telemetrysim"
 )
 
 // Telemetry action kinds: each carries one OTLP JSON export request as its input (design §2).

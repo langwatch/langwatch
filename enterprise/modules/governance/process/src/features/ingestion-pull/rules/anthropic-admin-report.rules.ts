@@ -17,7 +17,7 @@ import { z } from "zod";
 
 import * as AdminUsageReportAdapter from "../../cost/rules/admin-usage-report.rules.ts";
 
-const API_BASE = "https://api.anthropic.com/v1/organizations";
+const API_PATH = "/v1/organizations";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -325,13 +325,16 @@ export function reportUrl({
   config,
   startingAt,
   page,
+  apiBase = "https://api.anthropic.com",
 }: {
   config: AnthropicAdminPullConfig;
   startingAt: string;
   page: string | null;
+  apiBase?: string;
 }): URL {
+  const base = `${apiBase}${API_PATH}`;
   const url = new URL(
-    config.report === "usage" ? `${API_BASE}/usage_report/messages` : `${API_BASE}/cost_report`,
+    config.report === "usage" ? `${base}/usage_report/messages` : `${base}/cost_report`,
   );
   url.searchParams.set("starting_at", startingAt);
   if (config.report === "usage") {

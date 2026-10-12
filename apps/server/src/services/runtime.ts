@@ -22,7 +22,7 @@ import { ensureLangwatchDeps } from "./node-deps.ts";
 import { ensureTiktokenEncodings } from "./offline-defaults.ts";
 import { startPostgres } from "./postgres.ts";
 import { startRedis } from "./redis.ts";
-import type { SupervisedHandle } from "./spawn.ts";
+import { stopEverySupervised, type SupervisedHandle } from "./spawn.ts";
 import { syncVenvs } from "./venvs.ts";
 
 // One bus per RuntimeContext. The CLI calls events(ctx) before startAll
@@ -79,12 +79,20 @@ const runtimeImpl: RuntimeApi = {
     // Phase 1: infrastructure (postgres, redis, clickhouse) in parallel.
     // Each helper waits for its own health probe so by the time Promise.all
     // resolves every infra service is reachable.
-    const [pg, redis, ch] = await Promise.all([
+    // allSettled, as in phase 3: one failing must not leave the others running.
+    const infra = await Promise.allSettled([
       startPostgres(ctx, bus),
       startRedis(ctx, bus),
       startClickhouse(ctx, bus),
     ]);
-    handles.push(pg, redis, ch);
+    for (const r of infra) {
+      if (r.status === "fulfilled") handles.push(r.value);
+    }
+    const infraFailure = infra.find((r): r is PromiseRejectedResult => r.status === "rejected");
+    if (infraFailure) {
+      await stopHandles(handles);
+      throw infraFailure.reason;
+    }
 
     // Phase 3: app-tier services in parallel. The langwatch app receives
     // userEnv overlay so the user's provider keys (OPENAI_API_KEY etc.)
@@ -134,6 +142,8 @@ const runtimeImpl: RuntimeApi = {
 
   async stopAll(handles) {
     await stopHandles(handles);
+    // A stop during boot: services still waiting on their first health check have no handle yet.
+    await stopEverySupervised();
   },
 
   events(ctx) {

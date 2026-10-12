@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
 )
 
 // startKeeperWait outlasts the daemon's own 10 s wait for the keeper.
@@ -32,7 +34,7 @@ func (Client) StartKeeper(ctx context.Context, port int, slug string) error {
 	req.Header.Set("Sec-Fetch-Site", "none")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", app.ErrDaemonNotReady, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxActionBody))
@@ -46,9 +48,13 @@ func (Client) StartKeeper(ctx context.Context, port int, slug string) error {
 	switch {
 	case json.Unmarshal(body, &result) != nil || result.Error == "" && result.Message == "":
 		if resp.StatusCode == http.StatusOK {
-			return errors.New("the daemon does not know the start route; run `haven daemon restart`")
+			return fmt.Errorf("%w: the daemon does not know the start route; run `haven daemon restart`", app.ErrDaemonNotReady)
 		}
-		return fmt.Errorf("the daemon answered %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		answer := fmt.Errorf("the daemon answered %s: %s", resp.Status, strings.TrimSpace(string(body)))
+		if resp.StatusCode == http.StatusNotFound || resp.StatusCode >= http.StatusBadGateway {
+			return fmt.Errorf("%w: %w", app.ErrDaemonNotReady, answer)
+		}
+		return answer
 	case result.Error != "":
 		return errors.New(result.Error)
 	}

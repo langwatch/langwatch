@@ -57,6 +57,9 @@ type Config struct {
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.
 	UpArgv []string
+	// ServiceArgv is this Haven executable plus `service`, resolved like UpArgv:
+	// how the dashboard switches one service of a running stack.
+	ServiceArgv []string
 	// KeepArgv is this Haven executable plus `keep`: the stack's keeper.
 	KeepArgv                 []string
 	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)
@@ -117,6 +120,9 @@ type Config struct {
 	// stand-in (INSTANT_EVAL_CLASSIFIER=memory). Off by default; resolved from
 	// HAVEN_INSTANT_EVAL_MOCK_JUDGE, which `haven machine limits` and the hub also set.
 	ShouldMockInstantEvalJudge bool
+	// LaneMemory is the Node lanes' memory ceilings (`haven machine limits`);
+	// zero means no ceiling.
+	LaneMemory domain.LaneMemoryCaps
 	// ObservabilityConsoleLevel is the console log floor haven injects (as
 	// LOG_CONSOLE_LEVEL) while the observability stack is up — default "warn", so the
 	// terminal is quiet and the full detail lives in Grafana. "" opts out and leaves

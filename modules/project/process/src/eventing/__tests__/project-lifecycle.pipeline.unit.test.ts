@@ -210,6 +210,7 @@ describe("given organization records a newly created personal workspace", () => 
         findWithOrgAdmin: async () => null,
         findIdsByOrganization: async () => [],
         findWithTeam: async () => null,
+        findLiveWithTeamByIds: async () => [],
       },
     });
     const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });

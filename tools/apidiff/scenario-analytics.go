@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/langwatch/langwatch/services/analyticssim"
+	"github.com/langwatch/langwatch/services/sims/analyticssim"
 )
 
 // scenarioAnalyticsWait is how long an analytics step polls by default: the

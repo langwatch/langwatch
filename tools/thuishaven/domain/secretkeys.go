@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // A key's classification used to be data in packages/secrets/keys.json, one
@@ -73,15 +74,24 @@ func SecretClasses(repoRoot string) map[string]SecretClass {
 	for _, key := range havenSeedCredentialKeys {
 		classes[key] = ClassSecret
 	}
+	var paths []string
 	for _, dir := range secretSourceDirs {
-		scanDeclaredSecrets(filepath.Join(repoRoot, dir), classes)
+		paths = appendTypeScriptPaths(paths, filepath.Join(repoRoot, dir))
+	}
+	for _, id := range declaredSecretIDs(paths) {
+		classes[id] = ClassSecret
 	}
 	return classes
 }
 
-// scanDeclaredSecrets walks one top-level directory looking for `Secret.load`
-// calls in TypeScript source, adding every id it finds to classes.
-func scanDeclaredSecrets(root string, classes map[string]SecretClass) {
+// secretScanReaders bounds the concurrent file reads: the scan opens some
+// sixteen thousand files, and one reader at a time made `haven env` wait on
+// each open in turn.
+const secretScanReaders = 8
+
+// appendTypeScriptPaths walks one top-level directory and appends every
+// TypeScript file under it, skipping directories that never hold source.
+func appendTypeScriptPaths(paths []string, root string) []string {
 	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return nil //nolint:nilerr // an unreadable path must not stop the rest of the walk
@@ -89,40 +99,75 @@ func scanDeclaredSecrets(root string, classes map[string]SecretClass) {
 		if entry.IsDir() {
 			return skipVendorDir(entry)
 		}
-		recordDeclaredSecrets(path, classes)
+		if strings.HasSuffix(path, ".ts") && !strings.HasSuffix(path, ".test.ts") {
+			paths = append(paths, path)
+		}
 		return nil
 	})
+	return paths
 }
 
 // skipVendorDir tells WalkDir to descend into an ordinary directory and skip
-// the ones that never hold first-party source.
+// the ones that cannot declare a secret: dependencies, build output, tests
+// (fixture ids only) and a module's browser half, which never loads one.
 func skipVendorDir(entry fs.DirEntry) error {
 	switch entry.Name() {
-	case "node_modules", "dist", ".git":
+	case "node_modules", "dist", ".git", "storybook-static", "coverage", ".turbo", "__tests__", "browser":
 		return filepath.SkipDir
 	default:
 		return nil
 	}
 }
 
-// recordDeclaredSecrets reads one file and adds every `Secret.load` id it
-// declares to classes. Silent on anything that is not a readable, matching
-// TypeScript file — a scan finding fewer handles than expected must not stop
-// the walk, only leave the name-shape layer to cover the gap.
-func recordDeclaredSecrets(path string, classes map[string]SecretClass) {
-	if !strings.HasSuffix(path, ".ts") {
-		return
+// declaredSecretIDs reads the files with a bounded pool and returns every
+// `Secret.load` id they declare, duplicates included.
+func declaredSecretIDs(paths []string) []string {
+	work := make(chan string)
+	found := make(chan []string, secretScanReaders)
+	var wg sync.WaitGroup
+	for range secretScanReaders {
+		wg.Go(func() {
+			var ids []string
+			var buf bytes.Buffer
+			for path := range work {
+				ids = appendDeclaredSecrets(ids, &buf, path)
+			}
+			found <- ids
+		})
 	}
-	raw, err := os.ReadFile(path)
+	for _, path := range paths {
+		work <- path
+	}
+	close(work)
+	wg.Wait()
+	close(found)
+	var all []string
+	for ids := range found {
+		all = append(all, ids...)
+	}
+	return all
+}
+
+// appendDeclaredSecrets reads one file into buf, reused across files, and
+// appends every `Secret.load` id it declares. Silent on an unreadable file:
+// a scan finding fewer handles than expected must not stop the walk, only
+// leave the name-shape layer to cover the gap.
+func appendDeclaredSecrets(ids []string, buf *bytes.Buffer, path string) []string {
+	f, err := os.Open(path)
 	if err != nil {
-		return
+		return ids
 	}
-	if !bytes.Contains(raw, []byte("Secret.load(")) {
-		return
+	buf.Reset()
+	_, err = buf.ReadFrom(f)
+	_ = f.Close()
+	raw := buf.Bytes()
+	if err != nil || !bytes.Contains(raw, []byte("Secret.load(")) {
+		return ids
 	}
 	for _, match := range secretLoadPattern.FindAllSubmatch(raw, -1) {
-		classes[string(match[1])] = ClassSecret
+		ids = append(ids, string(match[1]))
 	}
+	return ids
 }
 
 // NameLooksSecret is the SECOND layer, never the only one: the key-name

@@ -219,6 +219,15 @@ function CountCell({ count, palette }: { count: number; palette?: string }) {
   );
 }
 
+/** A step that never finalizes by design keeps its users in step; none of them is held. */
+function KeptInStepCell({ count }: { count: number }) {
+  return (
+    <Text as="span" textStyle="sm" color="fg.muted" data-testid="upgrade-kept-in-step">
+      <FormattedNumber value={count} /> kept in step
+    </Text>
+  );
+}
+
 function MigrationRow({
   migration,
   previousMigrationTitle,
@@ -253,7 +262,11 @@ function MigrationRow({
         <CountCell count={migration.counts.finalized} />
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <CountCell count={migration.counts.migrated} palette="orange" />
+        {migration.migratedIsSteady ? (
+          <KeptInStepCell count={migration.counts.migrated} />
+        ) : (
+          <CountCell count={migration.counts.migrated} palette="orange" />
+        )}
       </Table.Cell>
       <Table.Cell textAlign="end">
         <CountCell count={migration.counts.parked} palette="red" />

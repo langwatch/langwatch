@@ -71,6 +71,40 @@ describe("CodexAccountService", () => {
     });
   });
 
+  describe("given a configured issuer base", () => {
+    /** @scenario "Codex is reached at the bases the deployment configures" */
+    it("calls that base and points the verification page at it", async () => {
+      const { impl, calls } = scriptedFetch({
+        "/sim/api/accounts/deviceauth/usercode": () => ({
+          status: 200,
+          json: { device_auth_id: "dev-1", user_code: "ABCD-1234", interval: 3 },
+        }),
+      });
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "http://127.0.0.1:6970/sim/",
+      });
+      const device = await service.startDeviceSignIn();
+      expect(calls[0]!.url).toBe("http://127.0.0.1:6970/sim/api/accounts/deviceauth/usercode");
+      expect(device.verificationUrl).toBe("http://127.0.0.1:6970/sim/codex/device");
+    });
+  });
+
+  describe("given no configured issuer base", () => {
+    /** @scenario "A Codex base that is unset or blank reaches OpenAI" */
+    it("calls OpenAI's own issuer", async () => {
+      const { impl, calls } = scriptedFetch({
+        "/api/accounts/deviceauth/usercode": () => ({
+          status: 200,
+          json: { device_auth_id: "dev-1", user_code: "ABCD-1234", interval: 3 },
+        }),
+      });
+      const device = await CodexAccountService.create({ fetchImpl: impl }).startDeviceSignIn();
+      expect(calls[0]!.url).toBe("https://auth.openai.com/api/accounts/deviceauth/usercode");
+      expect(device.verificationUrl).toBe("https://auth.openai.com/codex/device");
+    });
+  });
+
   describe("given the user has not approved yet", () => {
     it.each([403, 404])("reports HTTP %i as pending", async (status) => {
       const { impl } = scriptedFetch({
@@ -88,6 +122,33 @@ describe("CodexAccountService", () => {
         userCode: "ABCD-1234",
       });
       expect(result).toEqual({ status: "pending" });
+    });
+  });
+
+  describe("given the device code ended before approval", () => {
+    it.each([
+      ["expired_token", "sign_in_expired", 400],
+      ["access_denied", "sign_in_denied", 403],
+    ])("names the issuer's %s as a %s refusal", async (issuerError, kind, httpStatus) => {
+      const { impl } = scriptedFetch({
+        "/api/accounts/deviceauth/token": () => ({
+          status: 400,
+          json: { error: issuerError },
+        }),
+      });
+      const service = CodexAccountService.create({
+        fetchImpl: impl,
+        issuer: "https://issuer.test",
+      });
+      await expect(
+        service.pollDeviceSignIn({ deviceAuthId: "dev-1", userCode: "ABCD-1234" }),
+      ).rejects.toMatchObject({
+        code: "codex_auth_failed",
+        kind,
+        httpStatus,
+        fault: "customer",
+        meta: { kind },
+      });
     });
   });
 

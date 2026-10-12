@@ -11,6 +11,7 @@ import slugify from "slugify";
 
 import type {
   CreateAndAssignResult,
+  FounderOrganizationCreated,
   OrganizationProvisioningSummary,
   OrganizationMembershipRepository,
 } from "../repositories/organization-membership.repository.ts";
@@ -70,7 +71,7 @@ export class OrganizationProvisioningService {
     signUpData?: Record<string, unknown>;
     primaryIntent?: OrganizationIntent | null;
     userDisplayName?: string | null;
-  }): Promise<CreateAndAssignResult> {
+  }): Promise<FounderOrganizationCreated> {
     // A TEST SIGN-IN IS NOT A SIGNUP, and this is the one door: onboarding's
     // own mutation delegates here, so a check up there is one this call walks
     // straight past. Creating an organization for the tester strands the real

@@ -38,4 +38,20 @@ export class PrismaProjectTenantSourceRepository implements ProjectTenantSourceR
 
     return project.team.organizationId;
   }
+
+  async findOrganizationIds({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<{ projectId: string; organizationId: string }[]> {
+    if (projectIds.length === 0) return [];
+    const projects = await this.#prisma.project.findMany({
+      where: { id: { in: [...projectIds] } },
+      select: { id: true, team: { select: { organizationId: true } } },
+    });
+    return projects.map((project) => ({
+      projectId: project.id,
+      organizationId: project.team.organizationId,
+    }));
+  }
 }

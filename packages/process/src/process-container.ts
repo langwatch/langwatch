@@ -26,7 +26,10 @@ export function isProcessModule(owner: ConfigOwner): owner is ProcessModule {
  */
 export type BootedApplication = ServedApplication &
   Readonly<{ service<Api>(token: ModuleApiToken<Api>): Api }> &
-  Pick<BootedRuntime<unknown>, "tasks" | "migrationSteps" | "role" | "upcastReader">;
+  Pick<
+    BootedRuntime<unknown>,
+    "tasks" | "migrationSteps" | "role" | "upcastReader" | "runListedWork"
+  >;
 /** What one role boots: its modules, its pipelines' participation and, on the api, transports. */
 export type ProcessBootInput = Readonly<{
   role: "api" | "worker" | "tasks";

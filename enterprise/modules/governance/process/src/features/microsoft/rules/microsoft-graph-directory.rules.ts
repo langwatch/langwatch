@@ -43,19 +43,31 @@ const MICROSOFT_GRAPH_HOST = "graph.microsoft.com";
  * before it is followed carrying the Graph bearer token. The same four
  * comparisons `isAzureResourceManagerUrl` makes, for the same reasons: parsed
  * rather than prefix-compared, https only, no credentials in the authority,
- * no port games.
+ * no port games. A configured Graph base (`graphBase`) is the one other origin it accepts.
  */
-export function isMicrosoftGraphUrl(value: string): boolean {
+export function isMicrosoftGraphUrl(
+  value: string,
+  { graphBase }: { graphBase?: string } = {},
+): boolean {
   let url: URL;
   try {
     url = new URL(value);
   } catch {
     return false;
   }
-  if (url.protocol !== "https:") return false;
   if (url.username !== "" || url.password !== "") return false;
+  if (graphBase !== undefined && isOriginOfBase({ url, base: graphBase })) return true;
+  if (url.protocol !== "https:") return false;
   if (url.port !== "") return false;
   return url.hostname === MICROSOFT_GRAPH_HOST;
+}
+
+function isOriginOfBase({ url, base }: { url: URL; base: string }): boolean {
+  try {
+    return url.origin === new URL(base).origin;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -63,8 +75,13 @@ export function isMicrosoftGraphUrl(value: string): boolean {
  * facts recorded below — Graph returns a much wider row unasked — and `$top`
  * at its documented maximum keeps the page count down on large tenants.
  */
-export const DIRECTORY_USERS_FIRST_PAGE =
-  "https://graph.microsoft.com/v1.0/users?$select=id,displayName,mail,userPrincipalName,department,accountEnabled&$top=999";
+export function directoryUsersFirstPage({ graphBase }: { graphBase: string }): string {
+  return `${graphBase}/v1.0/users?$select=id,displayName,mail,userPrincipalName,department,accountEnabled&$top=999`;
+}
+
+export const DIRECTORY_USERS_FIRST_PAGE = directoryUsersFirstPage({
+  graphBase: "https://graph.microsoft.com",
+});
 
 /**
  * One user row, by the facts this read records. Only the id is required:

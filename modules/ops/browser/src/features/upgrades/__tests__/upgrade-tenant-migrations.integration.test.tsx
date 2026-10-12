@@ -19,6 +19,7 @@ const LONG_STEP = [
     availableOnThisInstallation: true,
     enrolledAutomatically: true,
     tenant: "organization",
+    migratedIsSteady: false,
     counts: { finalized: 4, migrated: 0, parked: 2, rolled_back: 0 },
     enrollment: null,
     attention: [],
@@ -132,6 +133,43 @@ describe("UpgradeTenantMigrations", () => {
       expect(within(row).getByText("All")).toBeTruthy();
       expect(screen.queryByText("No organizations are enrolled for this step yet.")).toBeNull();
       expect(screen.getByText("Organization needing attention")).toBeTruthy();
+    });
+  });
+
+  describe("given a step whose migrated is its steady state, with 3 users kept in step and 1 parked", () => {
+    /** @scenario "A step that never finalizes by design keeps its users in step, not held" */
+    it("reads the count as kept in step, unbadged, and lists only the parked user", () => {
+      MIGRATIONS = [
+        {
+          ...LONG_STEP[0],
+          name: "identity-d01-secret-heal",
+          title: "Sign-in credential repair",
+          tenant: "user",
+          migratedIsSteady: true,
+          counts: { finalized: 0, migrated: 3, parked: 1, rolled_back: 0 },
+          attention: [
+            {
+              migrationName: "identity-d01-secret-heal",
+              tenantId: "user-9",
+              organizationName: null,
+              status: "parked",
+              attempts: 1,
+              updatedAt: 0,
+              report: null,
+            },
+          ],
+        },
+      ];
+      isSaaS = true;
+      renderTab();
+
+      const row = screen.getByTestId("upgrade-tenant-migration-identity-d01-secret-heal");
+      expect(within(row).getByTestId("upgrade-kept-in-step").textContent).toBe("3 kept in step");
+      // Only the parked count is badged; nobody reads as held.
+      expect(row.querySelectorAll("[class*='badge']").length).toBe(1);
+      expect(screen.getByText("Organization needing attention")).toBeTruthy();
+      const attentionRow = screen.getByText("user-9").closest("tr");
+      expect(attentionRow?.textContent).toContain("Parked");
     });
   });
 

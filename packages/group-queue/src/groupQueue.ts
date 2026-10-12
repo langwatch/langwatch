@@ -61,7 +61,12 @@ import type {
 import { deadLetterJob, type ExhaustedOutcome } from "./deadLetter.ts";
 import { GroupQueueDispatcher } from "./dispatcher.ts";
 import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle.ts";
-import { defaultFailureDecision, GroupQueueConfigurationError, GroupQueueError } from "./errors.ts";
+import {
+  defaultFailureDecision,
+  GroupQueueConfigurationError,
+  GroupQueueError,
+  HandBackGroupQueueError,
+} from "./errors.ts";
 import {
   DecodeFailureError,
   type DecodeFailureReason,
@@ -185,6 +190,34 @@ export function getBackoffMs(attempt: number): number {
  */
 export const GROUP_ATTEMPT_TTL_SECONDS = Math.ceil((JOB_RETRY_CONFIG.maxBackoffMs / 1000) * 3);
 
+/** A handed-back job waits `delayMs`; once handed back for over `windowMs`, it spends attempts. */
+export const HAND_BACK_CONFIG = {
+  delayMs: 1_000,
+  windowMs: 30 * 60_000,
+} as const;
+
+/** Whether a job no worker has handled yet is handed back again, or has waited long enough. */
+export function handBackOutcome({
+  handedBackSince,
+  now,
+}: {
+  handedBackSince: number | undefined;
+  now: number;
+}): { kind: "hand-back"; since: number } | { kind: "spend-attempt"; since: number } {
+  const since = handedBackSince ?? now;
+  return now - since < HAND_BACK_CONFIG.windowMs
+    ? { kind: "hand-back", since }
+    : { kind: "spend-attempt", since };
+}
+
+/** What a refusal over a list's groups names: the operation, and whose work it was. */
+type TargetsFault = Readonly<{ operation: string; work: string }>;
+
+const PREFLIGHT_FAULT: TargetsFault = {
+  operation: "waitUntilPreflightIdle",
+  work: "Migration preflight work",
+};
+
 /** The groups a preflight refusal names, capped so one wide fan-out stays a log line. */
 function namedGroups({ groupIds, total }: { groupIds: readonly string[]; total: number }): string {
   if (groupIds.length === 0) return `${total} group(s)`;
@@ -257,6 +290,7 @@ const INTERNAL_FIELDS = [
   "__stagedJobId",
   "__dispatchScore",
   "__attempt",
+  "__handedBackSince",
 ] as const;
 
 /**
@@ -318,6 +352,8 @@ type ClaimedJob<Payload> = {
   contextMetadata: GroupQueueContextMetadata | undefined;
   attempt: number;
   jobAttempt: number;
+  /** When a worker first handed this job back for want of a handler; absent if none has. */
+  handedBackSince: number | undefined;
   jobName: string;
   routingLabels: { queue_name: string; pipeline_name: string; job_type: string; job_name: string };
   batchPayloads: Payload[] | null;
@@ -365,6 +401,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
   private readonly dispatchGroupAllowListKey?: string;
+  private readonly dispatchListed: boolean;
   private readonly preflightDrainTimeoutMs: number;
   private readonly dispatcher: GroupQueueDispatcher | null;
   private readonly metricsCollector: GroupQueueMetricsCollector | null;
@@ -426,6 +463,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     options?: {
       consumerEnabled?: boolean;
       dispatchGroupAllowListKey?: string;
+      /** Runs only the groups on the lists `runListedWork` opens, from any process. */
+      dispatchListed?: boolean;
       preflightDrainTimeoutMs?: number;
       objectStoreFor?: (projectId: string) => ObjectStore;
       resolveStorageDestination?: (projectId: string) => Promise<Destination>;
@@ -474,6 +513,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     this.redisConnection = effectiveConnection;
     this.consumerEnabled = options?.consumerEnabled ?? true;
     this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
+    this.dispatchListed = options?.dispatchListed ?? false;
     this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 60_000;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
@@ -561,6 +601,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         logger: this.logger,
         dispatchGroupAllowListKey: this.dispatchGroupAllowListKey
           ? `${this.dispatchGroupAllowListKey}:candidates`
+          : undefined,
+        listedGroupsKeys: this.dispatchListed
+          ? () => this.scripts.findOpenGroupLists(nowInstant().epochMilliseconds)
           : undefined,
       });
       this.dispatcher.start();
@@ -1114,6 +1157,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // A re-staged sibling carries no __attempt of its own, so fall back to the
     // group's chain counter rather than reading it as a fresh delivery.
     const attempt = Math.max(jobAttempt, await this.readGroupAttempt(groupId));
+    const handedBackSince =
+      typeof jobData.__handedBackSince === "number" ? jobData.__handedBackSince : undefined;
     // Checked, not asserted: these become Prometheus label values, and `??`
     // would let a non-string through to be stringified into one.
     const pipelineName = nonEmptyString(jobData.__pipelineName) ?? "unknown";
@@ -1143,6 +1188,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       contextMetadata,
       attempt,
       jobAttempt,
+      handedBackSince,
       jobName,
       routingLabels,
     };
@@ -1541,6 +1587,29 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       await this.restageDrainedSiblings(groupId, drainedSiblings);
     }
 
+    if (err instanceof HandBackGroupQueueError) {
+      const outcome = handBackOutcome({
+        handedBackSince: job.handedBackSince,
+        now: nowInstant().epochMilliseconds,
+      });
+      if (outcome.kind === "hand-back") {
+        await this.handBackClaimedJob({ job, error, since: outcome.since, stopHeartbeat });
+        return;
+      }
+      this.logger.error(
+        {
+          queueName: this.queueName,
+          groupId,
+          stagedJobId: job.stagedJobId,
+          attempt,
+          handedBackSince: outcome.since,
+          windowMs: HAND_BACK_CONFIG.windowMs,
+          error,
+        },
+        "No worker has run this job since it was first handed back; spending its attempts so it surfaces",
+      );
+    }
+
     const [quarantineError] = await this.quarantineErrors({ job, error, isRetryable });
     if (isRetryable && attempt < JOB_RETRY_CONFIG.maxAttempts && !quarantineError) {
       await this.retryClaimedJob({ job, error, decision, stopHeartbeat });
@@ -1657,6 +1726,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           ...(payload as Record<string, unknown>),
           __context: contextMetadata,
           __attempt: attempt + 1,
+          ...(job.handedBackSince === undefined ? {} : { __handedBackSince: job.handedBackSince }),
         },
         groupId,
       });
@@ -1759,6 +1829,79 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         error,
       },
       "Job attempt failed, re-staged with backoff",
+    );
+  }
+
+  /**
+   * Returns a job this worker has no handler for to the queue unspent: same attempt, no failure
+   * streak, no audit. A short delay keeps this worker from taking it straight back.
+   */
+  private async handBackClaimedJob({
+    job,
+    error,
+    since,
+    stopHeartbeat,
+  }: {
+    job: ClaimedJob<Payload>;
+    error: Error;
+    since: number;
+    stopHeartbeat: () => void;
+  }): Promise<void> {
+    const { groupId, stagedJobId, jobDataJson, payload, contextMetadata, attempt, jobName } = job;
+    let handBackJobData: string;
+    try {
+      handBackJobData = await this.blobLifecycle.encode({
+        jobData: {
+          ...(payload as Record<string, unknown>),
+          __context: contextMetadata,
+          __attempt: attempt,
+          __handedBackSince: since,
+        },
+        groupId,
+      });
+    } catch (encodeErr) {
+      this.recordDrop({
+        groupId,
+        stagedJobId,
+        jobDataJson,
+        err: encodeErr,
+        reason: "retry_encode_failed",
+        message: "Hand-back re-encode failed; releasing old lease and discarding job",
+        bodyPreserved: false,
+      });
+      await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
+      await this.scripts.complete({ groupId, stagedJobId, jobName, dropped: true });
+      return;
+    }
+    // Before the re-stage, as on the retry path: a heartbeat tick would overwrite its TTL.
+    stopHeartbeat();
+    const restaged = await this.scripts.retryRestage({
+      groupId,
+      stagedJobId,
+      newStagedJobId: stagedJobId,
+      dispatchAfterMs: nowInstant().epochMilliseconds + HAND_BACK_CONFIG.delayMs,
+      jobDataJson: handBackJobData,
+      backoffMs: HAND_BACK_CONFIG.delayMs,
+      attempt,
+      attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
+    });
+    if (restaged) {
+      await this.blobLifecycle.transferLease({
+        newValue: handBackJobData,
+        oldValue: jobDataJson,
+        groupId,
+      });
+    }
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        groupId,
+        stagedJobId,
+        attempt,
+        handedBackSince: since,
+        error,
+      },
+      "No handler for this job in this worker; handed it back without using an attempt",
     );
   }
 
@@ -2136,6 +2279,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Non-retryable fails the same way at every size. A named retry delay means
     // the server is overloaded: a split re-runs the work on it at once, so the
     // whole batch backs off through the retry path instead.
+    // A hand-back is no failure: splitting cannot route a job this worker has no handler for.
+    if (err instanceof HandBackGroupQueueError) throw err;
     const decision = this.failureDecision(err);
     if (!decision.retryable || decision.retryAfterMs !== undefined) {
       throw err;
@@ -2808,18 +2953,110 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         message: "Queue has no preflight allow-list",
       });
     }
-    const deadline = nowInstant().epochMilliseconds + this.preflightDrainTimeoutMs;
+    const unsettled = await this.waitForTargets({
+      key,
+      timeoutMs: this.preflightDrainTimeoutMs,
+      fault: { operation: "waitUntilPreflightIdle", work: "Migration preflight work" },
+      onHeld: (state) => this.logHeldFromBefore(state),
+    });
+    if (unsettled) this.settlePastDrainTimeout(unsettled);
+  }
+
+  /**
+   * Runs `work` and the jobs it causes on a list a `dispatchListed` consumer runs ahead of any
+   * backlog; returns once all have run, else names the failed or blocked groups, or the waiting
+   * ones once they stand still for `timeoutMs`. Spec: specs/upgrade/background-steps.feature.
+   */
+  async runListedWork<Result>({
+    name,
+    timeoutMs,
+    work,
+  }: {
+    name: string;
+    timeoutMs: number;
+    work: () => Promise<Result>;
+  }): Promise<Result> {
+    const listKey = `${this.queueName}:gq:listed:${name}`;
+    await this.scripts.openGroupList({ listKey, nowMs: nowInstant().epochMilliseconds });
+    try {
+      const scope = { ...this.captureContext(), queueDispatchScopeKey: listKey };
+      const result = await this.runInContext(scope, work);
+      const fault = { operation: "runListedWork", work: `Queue work of ${name}` };
+      const unsettled = await this.waitForTargets({
+        key: listKey,
+        timeoutMs,
+        fault,
+        whileDraining: true,
+      });
+      if (unsettled) this.refuseUnsettledList({ name, timeoutMs, state: unsettled, fault });
+      return result;
+    } finally {
+      await this.scripts.closeGroupList(listKey);
+    }
+  }
+
+  /**
+   * Polls a list's groups until they settle (undefined) or the deadline passes (their state).
+   * `whileDraining` moves the deadline on whenever the outstanding jobs or groups differ from the
+   * last look, so only work that stands still for `timeoutMs` runs it out.
+   */
+  private async waitForTargets({
+    key,
+    timeoutMs,
+    fault,
+    onHeld,
+    whileDraining = false,
+  }: {
+    key: string;
+    timeoutMs: number;
+    fault: TargetsFault;
+    onHeld?: (state: PreflightTargetsState) => void;
+    whileDraining?: boolean;
+  }): Promise<PreflightTargetsState | undefined> {
+    let deadline = nowInstant().epochMilliseconds + timeoutMs;
     let reportedHeld = false;
+    let lastLook = "";
     while (true) {
+      const lookStartedMs = nowInstant().epochMilliseconds;
       const state = await this.scripts.inspectPreflightTargets(key);
+      const lookMs = nowInstant().epochMilliseconds - lookStartedMs;
+      const look = [state.pending, state.active, state.pendingGroups, ...state.pendingGroupIds];
+      if (whileDraining && look.join("\n") !== lastLook) {
+        deadline = nowInstant().epochMilliseconds + timeoutMs;
+        lastLook = look.join("\n");
+      }
       if (!reportedHeld && state.heldFromBefore > 0) {
         reportedHeld = true;
-        this.logHeldFromBefore(state);
+        onHeld?.(state);
       }
-      if (this.preflightHasSettled(state)) return;
-      if (nowInstant().epochMilliseconds >= deadline) return this.settlePastDrainTimeout(state);
-      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      // A blocked group stays blocked until an operator acts: no point waiting it out.
+      if (state.blocked > 0) this.assertTargetsSucceeded({ state, fault });
+      if (this.targetsHaveSettled({ state, fault })) return undefined;
+      if (nowInstant().epochMilliseconds >= deadline) return state;
+      // Rest at least as long as the look took, so a paged look holds at most half of Redis.
+      await new Promise<void>((resolve) => setTimeout(resolve, Math.max(100, lookMs)));
     }
+  }
+
+  /** A listed run that stopped draining: a fault is named first, else the work still waiting. */
+  private refuseUnsettledList({
+    name,
+    timeoutMs,
+    state,
+    fault,
+  }: {
+    name: string;
+    timeoutMs: number;
+    state: PreflightTargetsState;
+    fault: TargetsFault;
+  }): never {
+    this.assertTargetsSucceeded({ state, fault });
+    const waiting = namedGroups({ groupIds: state.pendingGroupIds, total: state.pendingGroups });
+    throw new GroupQueueError({
+      queueName: this.queueName,
+      operation: "runListedWork",
+      message: `Queue work of ${name} stopped draining: its outstanding jobs did not change for ${timeoutMs} ms on queue ${this.queueName} (still waiting: ${waiting})`,
+    });
   }
 
   /**
@@ -2828,7 +3065,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * pass clears a fault. specs/migration/system-migrations-runner.feature.
    */
   private settlePastDrainTimeout(state: PreflightTargetsState): void {
-    this.assertPreflightTargetsSucceeded(state);
+    this.assertTargetsSucceeded({ state, fault: PREFLIGHT_FAULT });
     this.logger.warn(
       {
         queueName: this.queueName,
@@ -2842,9 +3079,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }
 
   /** Throws on the way past when the settled work did not all succeed. */
-  private preflightHasSettled(state: PreflightTargetsState): boolean {
-    if (state.pending > 0 || state.active > 0) return false;
-    this.assertPreflightTargetsSucceeded(state);
+  private targetsHaveSettled({
+    state,
+    fault,
+  }: {
+    state: PreflightTargetsState;
+    fault: TargetsFault;
+  }): boolean {
+    if (state.pending > 0 || state.active > 0 || state.changedDuringInspection) return false;
+    this.assertTargetsSucceeded({ state, fault });
     return this.processingQueue.idle();
   }
 
@@ -2860,7 +3103,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     );
   }
 
-  private assertPreflightTargetsSucceeded(state: PreflightTargetsState): void {
+  private assertTargetsSucceeded({
+    state,
+    fault,
+  }: {
+    state: PreflightTargetsState;
+    fault: TargetsFault;
+  }): void {
     if (state.failed === 0 && state.blocked === 0) return;
     const faults: string[] = [];
     if (state.failed > 0)
@@ -2874,8 +3123,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     }
     throw new GroupQueueError({
       queueName: this.queueName,
-      operation: "waitUntilPreflightIdle",
-      message: `Migration preflight work did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
+      operation: fault.operation,
+      message: `${fault.work} did not succeed on queue ${this.queueName} (${faults.join("; ")})`,
     });
   }
 

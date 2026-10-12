@@ -35,6 +35,7 @@ import {
   dataverseHeaders,
   isEnvironmentOrigin,
 } from "../../features/microsoft/rules/dataverse-environment-service.rules.ts";
+import { REAL_VENDOR_BASES, type VendorBases } from "../../rules/vendor-bases.rules.ts";
 import type { CopilotBotsChannel, CopilotBotsRead } from "../copilot-bots.channel.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 
@@ -126,6 +127,8 @@ export function readBotRows(rows: unknown[]): Map<string, BotRecord> {
 async function readCopilotBots(params: {
   http: GovernanceHttpClient;
   environmentUrl: string;
+  /** The configured Dataverse base, which counts as an environment address. */
+  configuredBase?: string;
   token: string;
   signal?: AbortSignal;
   /**
@@ -138,7 +141,7 @@ async function readCopilotBots(params: {
    */
   shouldFollowPages?: boolean;
 }): Promise<CopilotBotsRead> {
-  const { http, environmentUrl, token, signal, shouldFollowPages = false } = params;
+  const { http, environmentUrl, configuredBase, token, signal, shouldFollowPages = false } = params;
 
   // The same rule the adapter's validateConfig runs, applied here because this
   // read is reached without it: the listing path safeParses the config schema,
@@ -146,7 +149,7 @@ async function readCopilotBots(params: {
   // token on the wire in clear, and a host outside Power Platform would put it
   // somewhere Microsoft does not serve. Checked before the URL is built rather
   // than after, so no request is ever assembled around it.
-  if (!isEnvironmentOrigin(environmentUrl)) {
+  if (!isEnvironmentOrigin(environmentUrl, configuredBase)) {
     return {
       ok: false,
       refusal: { reason: "not_configured", status: null },
@@ -260,6 +263,7 @@ export function copilotBotsAsAgents(params: {
 async function listCopilotAgents(params: {
   http: GovernanceHttpClient;
   environmentUrl: string;
+  configuredBase?: string;
   token: string;
   signal?: AbortSignal;
 }): Promise<AgentListing> {
@@ -288,10 +292,19 @@ async function listCopilotAgents(params: {
  * transcript walk cannot, and that distinction is what the listing is for.
  */
 export class HttpCopilotBotsChannel implements CopilotBotsChannel {
-  private constructor(private readonly http: GovernanceHttpClient) {}
+  private constructor(
+    private readonly http: GovernanceHttpClient,
+    private readonly configuredBase: string | undefined,
+  ) {}
 
-  static create({ http }: { http: GovernanceHttpClient }): HttpCopilotBotsChannel {
-    return new HttpCopilotBotsChannel(http);
+  static create({
+    http,
+    vendorBases = REAL_VENDOR_BASES,
+  }: {
+    http: GovernanceHttpClient;
+    vendorBases?: VendorBases;
+  }): HttpCopilotBotsChannel {
+    return new HttpCopilotBotsChannel(http, vendorBases.dataverseEnvironment);
   }
 
   async readBots(params: {
@@ -300,7 +313,7 @@ export class HttpCopilotBotsChannel implements CopilotBotsChannel {
     signal?: AbortSignal;
     shouldFollowPages?: boolean;
   }): Promise<CopilotBotsRead> {
-    return readCopilotBots({ http: this.http, ...params });
+    return readCopilotBots({ http: this.http, configuredBase: this.configuredBase, ...params });
   }
 
   async listAgents(params: {
@@ -308,6 +321,6 @@ export class HttpCopilotBotsChannel implements CopilotBotsChannel {
     token: string;
     signal?: AbortSignal;
   }): Promise<AgentListing> {
-    return listCopilotAgents({ http: this.http, ...params });
+    return listCopilotAgents({ http: this.http, configuredBase: this.configuredBase, ...params });
   }
 }

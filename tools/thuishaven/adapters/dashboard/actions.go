@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
 )
 
 // Actions are the lifecycle operations the dashboard may perform. Both are
@@ -22,9 +21,10 @@ type Actions struct {
 	// Down stops a stack and keeps its databases; Destroy also drops them.
 	Down    func(ctx context.Context, slug string) error
 	Destroy func(ctx context.Context, slug string) error
-	// StartService adds one service to a running stack (`haven up +<service>`)
-	// and returns once spawned.
+	// StartService and StopService switch one service of a running stack in
+	// place (`haven service on|off <service>`) and return once spawned.
 	StartService func(slug, service string) error
+	StopService  func(slug, service string) error
 	// Seed runs `haven db seed --size <size> --persona <persona>` for a stack and
 	// returns once spawned; SeedReport is its status line and log tail.
 	Seed       func(slug, size, persona string) error
@@ -176,13 +176,28 @@ func (s *Server) handleDestroy(w http.ResponseWriter, r *http.Request) {
 	writeActionResult(w, "destroyed "+slug+" and dropped its databases", s.config.Actions.Destroy(r.Context(), slug))
 }
 
-// handleStartService adds a service to a running stack: `haven up +<service>`.
+// handleStartService turns a service on in a running stack: `haven service on <service>`.
 func (s *Server) handleStartService(w http.ResponseWriter, r *http.Request) {
+	s.switchService(w, r, serviceSwitch{action: s.config.Actions.StartService, doing: "starting"})
+}
+
+// handleStopService turns a service off in a running stack: `haven service off <service>`.
+func (s *Server) handleStopService(w http.ResponseWriter, r *http.Request) {
+	s.switchService(w, r, serviceSwitch{action: s.config.Actions.StopService, doing: "stopping"})
+}
+
+// serviceSwitch is one side of a row's switch: the action and its toast verb.
+type serviceSwitch struct {
+	action func(slug, service string) error
+	doing  string
+}
+
+func (s *Server) switchService(w http.ResponseWriter, r *http.Request, sw serviceSwitch) {
 	if !guardAction(w, r) {
 		return
 	}
-	if s.config.Actions.StartService == nil {
-		http.Error(w, "this haven cannot add a service to a stack", http.StatusNotImplemented)
+	if sw.action == nil {
+		http.Error(w, "this haven cannot switch a stack's services", http.StatusNotImplemented)
 		return
 	}
 	slug := r.PathValue("slug")
@@ -191,7 +206,7 @@ func (s *Server) handleStartService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	service := r.URL.Query().Get("service")
-	writeActionResult(w, "restarting "+slug+" with "+service+" — it appears here as it comes up", s.config.Actions.StartService(slug, service))
+	writeActionResult(w, sw.doing+" "+service+" in "+slug+"; only its own lanes change", sw.action(slug, service))
 }
 
 // handleSeed is the seed console's start: `haven db seed` at the chosen size and

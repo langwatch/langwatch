@@ -6,6 +6,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -73,6 +74,9 @@ type Store interface {
 	WriteContainerPosture(string) error
 	// The machine settings (observability on/off, VM auto-stop), saved in
 	// haven's home. Absent or corrupt reads as the defaults.
+	// The focused stack's slug, persisted so heartbeats cannot move it.
+	ReadFocus() string
+	WriteFocus(slug string) error
 	ReadMachineSettings() domain.MachineSettings
 	WriteMachineSettings(domain.MachineSettings) error
 	// TouchDBActivity records "slug's databases were in use now" — the clock the
@@ -191,6 +195,11 @@ type Child struct {
 	// SplitLog captures a Node host lane per application (ui, api, worker) beside
 	// LogPath instead of into it, so logs list what a developer thinks about.
 	SplitLog bool
+	// MaxRSSBytes, if set, kills the lane's process group once its RSS crosses
+	// it; the supervisor then restarts the lane as after any exit.
+	MaxRSSBytes int64
+	// OnReap hears each such kill, with its reason, so it lands in the reap record.
+	OnReap func(reason string) `json:"-"`
 }
 
 // ProcessSample is one live process as the tsgo governor's sampler sees it.
@@ -237,6 +246,10 @@ type System interface {
 	// Reload sends pid SIGUSR2, the Node host's "reload on demand" signal
 	// (tools/dev-runtime); the process keeps running.
 	Reload(pid int)
+	// Replan sends a keeper SIGHUP: it rereads its plan and starts, stops or
+	// restarts only the lanes that changed. Only a keeper whose record says
+	// KeeperReplans may be sent it; an older one would die of it.
+	Replan(pid int)
 	// KillGroup SIGKILLs pid's whole process group — `down -f`'s hard stop for
 	// a stack that must die now (or won't die gracefully).
 	KillGroup(pid int)
@@ -253,8 +266,11 @@ type System interface {
 	// occupancy and swap, which unlike summed RSS do not double-count shared
 	// pages. An unreadable signal stays zero and classifies green (ADR-090).
 	MemStat() domain.MemStat
-	// DemoteGroup moves a process group into the throttled background band, and
-	// RestoreGroup moves it back. The group, not the launcher: the policy is
+	// LoadAverage is the 1-minute load average, -1 when unreadable; with
+	// MemStat it is the sample the capacity tier is read from.
+	LoadAverage() float64
+	// DemoteGroup lowers a process group's priority (nice 10), and
+	// RestoreGroup asks for it back. The group, not the launcher: the policy is
 	// inherited only by processes forked after it is set, so a tree that is
 	// already running has to be walked.
 	DemoteGroup(pid int)
@@ -378,6 +394,10 @@ type Observability interface {
 type Dashboard interface {
 	Serve(ctx context.Context, port int) error
 }
+
+// ErrDaemonNotReady is a hand-over the daemon did not take up: no answer, or a
+// daemon that does not know the stack yet (one restarting after a rebuild).
+var ErrDaemonNotReady = errors.New("the daemon is not ready for this stack")
 
 // DaemonClient is how an up asks the running daemon to act (ruling D-S4c-1).
 type DaemonClient interface {
