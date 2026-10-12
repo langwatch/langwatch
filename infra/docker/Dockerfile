@@ -40,6 +40,7 @@ COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
 COPY pkg ./pkg
 COPY sdks/go ./sdks/go
 COPY services/scenariorunner ./services/scenariorunner
+COPY services/third_party ./services/third_party
 RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
     --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
     cd services && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
