@@ -455,9 +455,9 @@ interface CompactRowProps {
 }
 
 // Input reads blue, output green, in both densities. Light mode takes the saturated
-// `green.solid` the sidebar origin dots use; dark mode keeps `*.fg`, which reads on dark.
+// `*.solid` step the sidebar origin dots use; dark mode keeps `*.fg`, which reads on dark.
 const IO_ACCENT = {
-  input: { base: "blue.fg", _dark: "blue.fg" },
+  input: { base: "blue.solid", _dark: "blue.fg" },
   output: { base: "green.solid", _dark: "green.fg" },
 } as const;
 
@@ -573,26 +573,24 @@ const ComfortableIOPreview: React.FC<
 };
 
 /**
- * "Input" / "Output" in their accent colour with the same up / down arrow the compact rows
- * use, so the two sides tell apart by colour, word and shape. A missing side stays muted.
+ * "Input" / "Output" as a bold monospace word in its accent colour, in a fixed-width column
+ * so the preview values line up. A missing side stays muted.
  */
 const ComfortableLabel: React.FC<{ direction: "input" | "output"; muted?: boolean }> = ({
   direction,
   muted = false,
 }) => (
-  <HStack
-    gap={1}
+  <Text
+    textStyle="sm"
+    fontFamily="mono"
+    fontWeight="semibold"
     flexShrink={0}
     width={COMFORTABLE_LABEL_WIDTH}
-    height="20px"
     color={muted ? "fg.subtle" : IO_ACCENT[direction]}
     data-testid={`io-preview-label-${direction}`}
   >
-    <Icon boxSize="12px">{direction === "input" ? <ArrowUp /> : <ArrowDown />}</Icon>
-    <Text textStyle="groupLabel" fontWeight="semibold">
-      {direction === "input" ? "Input" : "Output"}
-    </Text>
-  </HStack>
+    {direction === "input" ? "Input" : "Output"}
+  </Text>
 );
 
 const ComfortableMissingRow: React.FC<{ direction: "input" | "output" }> = ({ direction }) => (

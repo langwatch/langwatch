@@ -587,6 +587,14 @@ Rule: Two-zone row format (compact density only)
     # that carries its own content (Labels, Evals, Prompt, Events).
     # The boundary follows the live column order, so it survives reorder.
 
+  @integration
+  Scenario: Comfortable preview labels read as bold coloured words in a fixed column
+    Given density is "comfortable"
+    And a trace has both `input` and `output` populated
+    Then the preview labels the input side "Input" in bold blue and the output side "Output" in bold green
+    And the labels carry no arrow icon
+    And the labels sit in a fixed-width column so both preview values start at the same x position
+
   @unimplemented
   Scenario: Non-LLM trace row shows header only
     Given a trace is missing either `input` or `output`
