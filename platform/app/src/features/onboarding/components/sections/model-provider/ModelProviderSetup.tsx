@@ -57,6 +57,7 @@ const PROVIDERS_WITH_WELL_KNOWN_MODELS = new Set([
   "anthropic",
   "gemini",
   "deepseek",
+  "doubleword",
   "xai",
 ]);
 

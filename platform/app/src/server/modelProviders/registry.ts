@@ -680,6 +680,17 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2024-06-01"),
   },
+  doubleword: {
+    name: "Doubleword",
+    type: "llm",
+    langySkipPermissionsModels: NO_SKIP_PERMISSIONS_MODELS,
+    apiKey: "DOUBLEWORD_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      DOUBLEWORD_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2026-10-01"),
+  },
   groq: {
     name: "Groq",
     type: "llm",

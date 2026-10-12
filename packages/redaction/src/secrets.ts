@@ -230,7 +230,47 @@ function isKeyShapedBody(body: string): boolean {
   }
   const { lower, upper, digit } = countCharClasses(body);
   if (lower < 2 || upper < 2 || digit < 2) return false;
+  if (isWordSlug(body)) return false;
   return shannonEntropyBits(body) >= SHAPED_TOKEN_MIN_ENTROPY;
+}
+
+const SLUG_MIN_SEGMENTS = 4;
+const SLUG_LETTERS_SEGMENT = /^[A-Za-z]{1,12}$/;
+const SLUG_TAG_SEGMENT = /^[A-Za-z0-9]{1,6}$/;
+const SLUG_WORD_SEGMENT = /^(?:[a-z]{4,}|[A-Z]{4,}|[A-Z][a-z]{3,})$/;
+
+/**
+ * Is this body a name built from words and short tags rather than key material?
+ *
+ * An open-weight model id is written as a vendor, then a run of hyphenated
+ * parts: a word, a size, a quantisation tag. `NVIDIA-Nemotron-3-Super-120B-
+ * A12B-NVFP4` has the length, the character mix and the entropy of a key, and
+ * none of the randomness: every part is a word or a tag of a few characters.
+ *
+ * Key material does not split that way. A base64url body carries a separator
+ * about once in 32 characters, so four or more parts are rare, and the parts
+ * it does have are long and mix letters with digits. The test therefore asks
+ * for at least four parts, each either letters only or at most six
+ * characters, and at least one of them an ordinary word in a single case
+ * pattern. A body holding `+` or `/` never qualifies, because those are not
+ * separators here and a part containing one is neither a word nor a tag.
+ *
+ * No part can hide a credential: the longest one allowed is twelve letters.
+ */
+function isWordSlug(body: string): boolean {
+  const segments = body.split(/[-_]/);
+  if (segments.length < SLUG_MIN_SEGMENTS) return false;
+  let hasWord = false;
+  for (const segment of segments) {
+    if (
+      !SLUG_LETTERS_SEGMENT.test(segment) &&
+      !SLUG_TAG_SEGMENT.test(segment)
+    ) {
+      return false;
+    }
+    if (SLUG_WORD_SEGMENT.test(segment)) hasWord = true;
+  }
+  return hasWord;
 }
 
 /**

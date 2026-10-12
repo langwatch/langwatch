@@ -76,6 +76,21 @@ describe("declaredModelsForProvider", () => {
     });
   });
 
+  describe("when the provider is Doubleword", () => {
+    /** @scenario The gateway knows which models a Doubleword key serves */
+    it("declares its catalog models with the vendor slash kept", () => {
+      const declared = declaredModelsForProvider({
+        provider: "doubleword",
+        customModels: null,
+        customEmbeddingsModels: null,
+      });
+
+      expect(declared).toContain("deepseek-ai/DeepSeek-V4.1-Flash");
+      expect(declared).toContain("Qwen/Qwen3-Embedding-8B");
+      expect(declared?.some((id) => id.startsWith("doubleword/"))).toBe(false);
+    });
+  });
+
   describe("when a provider declares nothing", () => {
     it("declares nothing at all rather than an empty list", () => {
       // Silence is not a denial: the gateway reads an absent catalog as "this

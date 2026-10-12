@@ -92,6 +92,7 @@ const PROVIDER_VENDOR: Record<string, string> = {
   vertex: "Google",
   gemini: "Google",
   deepseek: "DeepSeek",
+  doubleword: "Doubleword",
   groq: "Groq",
   mistral: "Mistral",
   cohere: "Cohere",

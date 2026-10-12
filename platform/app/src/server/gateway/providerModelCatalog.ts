@@ -35,6 +35,7 @@ const HOSTED_CATALOG_PREFIXES: Record<string, string> = {
   anthropic: "anthropic",
   gemini: "gemini",
   deepseek: "deepseek",
+  doubleword: "doubleword",
   xai: "xai",
   voyage: "voyageai",
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseLLMError } from "../formatLLMError";
+import { llmErrorTypeFromStatus, parseLLMError } from "../formatLLMError";
 
 describe("parseLLMError", () => {
   it("parses NotFoundError with correct type", () => {
@@ -116,5 +116,20 @@ describe("parseLLMError", () => {
       type: "unknown",
       message: "ValueError\nit's broken",
     });
+  });
+});
+
+describe("llmErrorTypeFromStatus", () => {
+  it.each([
+    [401, "auth"],
+    [403, "auth"],
+    [402, "out_of_credit"],
+    [404, "not_found"],
+    [429, "rate_limit"],
+    [400, "bad_request"],
+    [422, "bad_request"],
+    [500, "unknown"],
+  ] as const)("maps %i to %s", (status, type) => {
+    expect(llmErrorTypeFromStatus(status)).toBe(type);
   });
 });

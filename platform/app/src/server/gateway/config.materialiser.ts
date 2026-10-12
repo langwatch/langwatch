@@ -764,8 +764,6 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
         provider_row_id: mp.id,
       };
     }
-    case "anthropic":
-      return { api_key: pick("ANTHROPIC_API_KEY") };
     case "gemini":
     case "google_gemini":
       return geminiCredentials(pick);
@@ -779,25 +777,27 @@ export function buildCredentials(mp: ModelProvider): Record<string, unknown> {
         project_id: pick("GOOGLE_AGENT_PLATFORM_PROJECT").trim(),
         region: pick("GOOGLE_AGENT_PLATFORM_LOCATION").trim(),
       };
-    case "openai":
-      return { api_key: pick("OPENAI_API_KEY") };
-    case "deepseek":
-      return { api_key: pick("DEEPSEEK_API_KEY") };
-    case "xai":
-      return { api_key: pick("XAI_API_KEY") };
-    case "cerebras":
-      return { api_key: pick("CEREBRAS_API_KEY") };
-    case "groq":
-      return { api_key: pick("GROQ_API_KEY") };
-    case "cloudflare":
-      return { api_key: pick("CLOUDFLARE_API_KEY") };
-    default: {
-      const apiKey = Object.entries(customKeys).find(([k]) =>
-        /_API_KEY$/.test(k),
-      )?.[1];
-      return { api_key: typeof apiKey === "string" ? apiKey : "" };
-    }
+    default:
+      return { api_key: apiKeyCredential(provider, customKeys) };
   }
+}
+
+/**
+ * Reads the API key of a provider whose credential is a single key: the
+ * field the provider registry declares for it, else the first `*_API_KEY`
+ * entry (custom rows and providers the registry does not list).
+ */
+function apiKeyCredential(
+  provider: string,
+  customKeys: Record<string, unknown>,
+): string {
+  const field = modelProviders[provider as keyof typeof modelProviders]?.apiKey;
+  const declared = field?.endsWith("_API_KEY") ? customKeys[field] : undefined;
+  if (typeof declared === "string") return declared;
+  const apiKey = Object.entries(customKeys).find(([k]) =>
+    /_API_KEY$/.test(k),
+  )?.[1];
+  return typeof apiKey === "string" ? apiKey : "";
 }
 
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {

@@ -52,6 +52,16 @@ const readChunkOrAbort = async (
   }
 };
 
+/**
+ * A consumer that rethrows a node failure from inside onEvent lands in the
+ * stream's catch too. Keeps the provider's HTTP status it carried, which is
+ * what tells an out-of-credit account from a bad key or a rate limit.
+ */
+function upstreamStatusField(error: unknown): { upstream_status?: number } {
+  const status = (error as { upstreamStatus?: unknown } | null)?.upstreamStatus;
+  return typeof status === "number" ? { upstream_status: status } : {};
+}
+
 export const studioBackendPostEvent = async ({
   projectId,
   message: message,
@@ -196,6 +206,7 @@ export const studioBackendPostEvent = async ({
           execution_state: {
             status: "error",
             error: (error as Error).message,
+            ...upstreamStatusField(error),
             timestamps: { finished_at: Date.now() },
           },
         },

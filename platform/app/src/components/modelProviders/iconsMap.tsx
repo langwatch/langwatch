@@ -8,6 +8,7 @@ import { Cerebras } from "../icons/Cerebras";
 import { Codex } from "../icons/Codex";
 import { Custom } from "../icons/Custom";
 import { DeepSeek } from "../icons/DeepSeek";
+import { Doubleword } from "../icons/Doubleword";
 import { ElevenLabs } from "../icons/ElevenLabs";
 import { Gemini } from "../icons/Gemini";
 import { GoogleCloud } from "../icons/GoogleCloud";
@@ -39,6 +40,7 @@ export const modelProviderIcons: Record<
   custom: <Custom />,
   xai: <Xai />,
   cerebras: <Cerebras />,
+  doubleword: <Doubleword />,
   voyage: <Voyage />,
   azure_safety: <Azure />,
 };

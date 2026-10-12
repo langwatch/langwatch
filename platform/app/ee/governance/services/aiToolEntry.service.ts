@@ -263,6 +263,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   cloudflare: "Cloudflare AI",
   deepseek: "DeepSeek",
   cerebras: "Cerebras",
+  doubleword: "Doubleword",
   custom: "Custom",
 };
 

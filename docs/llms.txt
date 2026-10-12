@@ -459,6 +459,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Groq](https://langwatch.ai/docs/ai-gateway/providers/groq.md): Add a Groq API key under Settings, Model Providers and call Groq models through the LangWatch AI Gateway.
 - [Cerebras](https://langwatch.ai/docs/ai-gateway/providers/cerebras.md): Add a Cerebras API key under Settings, Model Providers and call Cerebras models through the LangWatch AI Gateway.
 - [DeepSeek](https://langwatch.ai/docs/ai-gateway/providers/deepseek.md): Add a DeepSeek API key under Settings, Model Providers and call DeepSeek models through the LangWatch AI Gateway.
+- [Doubleword](https://langwatch.ai/docs/ai-gateway/providers/doubleword.md): Add a Doubleword API key under Settings, Model Providers and call Doubleword's hosted open-weight models through the LangWatch AI Gateway.
 - [Voyage AI](https://langwatch.ai/docs/ai-gateway/providers/voyage.md): Add a Voyage AI API key under Settings, Model Providers and call Voyage embedding models through the LangWatch AI Gateway.
 - [ElevenLabs](https://langwatch.ai/docs/ai-gateway/providers/elevenlabs.md): Add an ElevenLabs API key under Settings, Model Providers and call speech and transcription through the LangWatch AI Gateway with the OpenAI audio routes or the ElevenLabs SDKs.
 - [OpenAI account](https://langwatch.ai/docs/ai-gateway/providers/openai-account.md): Sign in with a ChatGPT account under Settings, Model Providers and call the Responses API through the LangWatch AI Gateway on that subscription.

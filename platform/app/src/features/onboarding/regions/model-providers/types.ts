@@ -8,6 +8,7 @@ export type ModelProviderKey =
   | "codex"
   | "custom"
   | "deepseek"
+  | "doubleword"
   | "gemini"
   | "grok_xai"
   | "groq"

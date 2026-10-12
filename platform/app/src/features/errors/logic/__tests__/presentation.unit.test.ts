@@ -661,6 +661,7 @@ describe("explainHandledError", () => {
      */
     it.each([
       ["llm_error", 401, /API key/i],
+      ["llm_error", 402, /no credit or budget left.*gateway budget/i],
       ["llm_error", 429, /rate limiting/i],
       ["llm_error", 503, /trouble/i],
       ["evaluator_error", 403, /API key/i],
