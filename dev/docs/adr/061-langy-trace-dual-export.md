@@ -147,4 +147,3 @@ The fail-closed rules hold. The header can only withhold a copy, never ask for
 one or raise a tier. The worker never sets it: the relay replaces whatever the
 worker sent, from the manager-held tier. An empty or unknown turn tier
 normalises to `skip`, so a version skew withholds rather than leaks.
-
