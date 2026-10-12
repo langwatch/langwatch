@@ -24,8 +24,10 @@ rule, so you extend the house grammar.
 - **An architecture-enforcer policy** (`packages/architecture-enforcer/src/policies/`,
   registered in `policies/index.ts`) when it needs the import graph, package manifests or
   the whole catalogue. It runs under `pnpm lint:architecture`, not `pnpm lint`.
-- **A native oxlint rule or `overrides` block in `.oxlintrc.jsonc`** when a built-in already
-  means the same thing (ADR-135: the lowest layer that can express it).
+- **A native oxlint rule or `overrides` block** when a built-in already means the same thing
+  (ADR-135: the lowest layer that can express it). Put it in the split config `pnpm lint` loads,
+  `.oxlintrc.native.jsonc` for stock rules (`.oxlintrc.types.jsonc` for type-aware ones);
+  `.oxlintrc.jsonc` only extends those for a scoped run.
 - **A test in the owning package** when only one module must hold the property.
 - **A doc in `dev/docs/best_practices/`** when the rule cannot name a fix. Do not lint taste.
 
@@ -42,8 +44,11 @@ cat > "$TMPDIR/one-rule.json" <<EOF
 }
 EOF
 pnpm --silent exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" \
-  apps packages sdks/typescript/src mcp/typescript/src | grep -c '<rule>'
+  apps packages modules enterprise sdks/typescript/src mcp/typescript/src | grep -c '<rule>'
 ```
+
+Include `modules` and `enterprise`: that is where most feature rules fire, and a zero-hit run
+over the old paths proves nothing.
 
 Record the count and the date in the PR body. Zero hits: ship at `error`. Non-zero: fix
 them — there is no baseline tier to defer the rest to (step 6). Never ship a rule that is
@@ -80,7 +85,7 @@ guards, not a sweep of old directives.
 
    ```js
    const workspace = createFixtureWorkspace({
-     features: { agent: { layoutVersion: 0, roles: { server: {} } } },
+     features: { agent: { layoutVersion: 0, roles: { process: {} } } }, // process | contract | browser | client
      catalogue: { agent: ["agent"] }, // feature id -> the subjects it claims
    });
    const found = runRule(rule, { code, cwd: workspace.cwd, filename });
@@ -134,7 +139,7 @@ files) or hold off shipping it at all, not to reintroduce a suppression list.
 A numeric `max` option tier is allowed only when the rule is numeric and a lower
 threshold cannot yet be met honestly.
 
-## 7. Cost: the plugin runs on every save and over ~13k files
+## 7. Cost: the plugin runs on every save and over every governed file
 
 - No `fs`, `child_process`, `new Date()` or JSON parsing inside `create` or a visitor.
   Read config once through the `classify` memo.
@@ -148,7 +153,7 @@ threshold cannot yet be met honestly.
   # cold import of the whole plugin graph
   node -e "const t=performance.now();import('./packages/architecture-enforcer/oxlint-plugin.mjs').then(()=>console.log(\`\${(performance.now()-t).toFixed(0)} ms\`))"
   # one rule over the governed paths, before and after
-  time pnpm --silent exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" apps packages
+  time pnpm --silent exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" apps packages modules enterprise
   # the whole config, one file (the fast edit loop, ~1 s)
   time pnpm --silent exec oxlint --disable-nested-config -c .oxlintrc.jsonc <file>
   ```

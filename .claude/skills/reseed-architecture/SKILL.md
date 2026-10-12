@@ -18,8 +18,11 @@ them back.
 - `CLAUDE.md` and `.claude/rules/*.md` — the always-loaded instructions and the
   path-scoped architecture digests, especially command lines and rows that
   name vocabulary.
-- `.claude/skills/*/SKILL.md` (+ their `references/`) — every skill that
-  quotes a chain, a class name, a file path, or a code example.
+- `.claude/skills/*/SKILL.md` (+ their `references/` and other support
+  Markdown) — every skill that quotes a chain, a class name, a file path, or a
+  code example.
+- Paths that survive a move: grep the surfaces for dead directories as well as
+  dead names.
 - `dev/docs/best_practices/*.md` — pattern docs whose examples name real
   seams.
 - `dev/docs/CODING_STANDARDS.md`, `dev/docs/TESTING_PHILOSOPHY.md` — only
@@ -27,8 +30,10 @@ them back.
 
 ## What is NOT a teaching surface (never touch)
 
-- `dev/docs/adr/**` — ADRs are immutable history. A superseded ADR is
-  superseded by a new ADR or by the record, never edited.
+- `dev/docs/adr/**` prose — ADR decisions are history. A superseded ADR is
+  superseded by a new ADR or by the record, never edited. The exception is a
+  maintained rule table (the `| Rule | Layer | Meaning |` rows of the lint ADRs):
+  the `lint-rule` skill adds and removes those rows with the rule.
 - `specs/**` — feature files are requirements with binding tags; changing one
   is feature work, not a resync.
 - Generated files, `dev/docs/plans/**` handovers (they are snapshots), and
@@ -71,7 +76,9 @@ them back.
 
 ## Guardrails
 
-- The record wins every conflict. If a surface disagrees with the record and
+- Precedence is the one in `CLAUDE.md`: the linters, then the record, then
+  specs; the record itself says a lint rule beats it. A teaching surface
+  yields to all three. If a surface disagrees with the record and
   the surface looks _right_, that is a finding to raise (the record may have
   a gap), not a licence to keep the surface — say so in the report instead
   of silently choosing.

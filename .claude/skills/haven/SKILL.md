@@ -39,7 +39,7 @@ only the part you need.
 | One-shot health of every stack              | `haven status --agent` (`--json <fields>` for a machine; bare `--json` lists the fields) |
 | Read a service's log                        | `haven logs api --since 10m --agent`                                                     |
 | Last distinct failures, grouped             | `haven errors --agent`                                                                   |
-| Restart one lane                            | `haven restart sims`                                                                     |
+| Restart one lane                            | `haven restart api`                                                                      |
 | Logins and stack credentials                | `haven db seed --json --reveal`, `haven env --reveal` (never paste)                      |
 | Keyed REST call, key never printed          | `haven api GET /api/... [--key project\|org\|personal] [--project slug]`                 |
 | Which principal and scope a key has         | `haven api whoami --key org`                                                             |

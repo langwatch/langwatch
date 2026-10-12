@@ -12,12 +12,12 @@ Manage the LangWatch Kanban GitHub project board (project #5, org: langwatch).
 
 ## Project Reference
 
-Every project id, field id and status option id is in the **Constants** section at the
-bottom of this file; read it before issuing a mutation. If a mutation is rejected as an
-unknown field or option, re-read the ids from the API rather than guessing:
+The **Constants** section at the bottom of this file holds the ids as last seen. They can
+change, so resolve the project id, Status field id and option ids from the API before the first
+mutation of a run, and prefer those over the constants:
 `gh api graphql -f query='{organization(login:"langwatch"){projectV2(number:5){id field(name:"Status"){... on ProjectV2SingleSelectField{id options{id name}}}}}}'`.
 
-**Use python3 for all JSON parsing** — issue titles with special characters break jq.
+**Use python3 for JSON parsing of item lists** (issue titles with special characters break jq); `--jq` is fine for a single scalar such as the login.
 
 ## Subcommands
 
@@ -27,7 +27,7 @@ Parse `$ARGUMENTS` to determine which subcommand to run:
 
 Sync the project board so statuses match reality.
 
-1. **Page through all project items** (100 per page, up to 8 pages) using the GraphQL `projectV2.items` query
+1. **Page through all project items** (100 per page) until `hasNextPage` is false, using the GraphQL `projectV2.items` query. If you stop early, say the result is truncated
 2. Find items where:
    - Issue/PR state is `CLOSED` or `MERGED` **but** project status is NOT `Done` or `Released`
 3. For each stale item, update the Status field to `Done` using the `updateProjectV2ItemFieldValue` mutation
@@ -44,7 +44,7 @@ Sync the project board so statuses match reality.
 Show the current user's assigned items grouped by status.
 
 1. Get current user: `gh api user --jq .login`
-2. Page through project items, collecting items where the current user is an assignee
+2. Page through all project items (query `assignees(first: 10){nodes{login}}` on the issue or pull request), collecting items where the current user is an assignee
 3. Group by status and display:
    ```
    ## In progress (3)
@@ -65,7 +65,7 @@ Show the current user's assigned items grouped by status.
 
 Find items that may be stuck or forgotten.
 
-1. Page through project items
+1. Page through all project items, with `updatedAt` and the latest comment and review dates on each issue or pull request
 2. Flag items that are:
    - **In progress** but the issue has had no updates in 14+ days
    - **In review** but the linked PR has no review activity in 7+ days
@@ -114,7 +114,7 @@ import subprocess, json
 cursor = None
 results = []
 
-for page in range(1, 9):
+while True:
     after = f', after: "{cursor}"' if cursor else ''
     query = '''{
       organization(login: "langwatch") {
@@ -123,8 +123,8 @@ for page in range(1, 9):
             nodes {
               id
               content {
-                ... on Issue { number title state }
-                ... on PullRequest { number title state merged }
+                ... on Issue { number title state updatedAt assignees(first: 10) { nodes { login } } }
+                ... on PullRequest { number title state merged updatedAt assignees(first: 10) { nodes { login } } }
               }
               fieldValueByName(name: "Status") {
                 ... on ProjectV2ItemFieldSingleSelectValue { name }
@@ -140,7 +140,11 @@ for page in range(1, 9):
         ['gh', 'api', 'graphql', '-f', f'query={query}'],
         capture_output=True, text=True
     )
+    if result.returncode != 0:
+        raise SystemExit(result.stderr)
     data = json.loads(result.stdout)
+    if data.get('errors'):
+        raise SystemExit(json.dumps(data['errors']))
     items = data['data']['organization']['projectV2']['items']
 
     for n in items['nodes']:
@@ -174,7 +178,7 @@ for page in range(1, 9):
 
 ## Constants
 
-These are hardcoded from the LangWatch Kanban project:
+These were read from the LangWatch Kanban project and were not re-verified when this file was last edited:
 
 ```
 PROJECT_NUMBER = 5

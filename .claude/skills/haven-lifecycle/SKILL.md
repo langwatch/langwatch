@@ -14,7 +14,7 @@ haven up --agent -d               # start; bare `haven up` without a TTY never r
 haven status --agent              # every stack, service health, shared servers, RAM (--json, --reveal)
 haven down                        # stop this stack, keep databases; never stops the shared portless proxy (only --all does); up starts a missing one
 haven down --all                  # every stack, shared servers, daemon and proxy; --force kills hard
-haven restart sims                # bounce one lane; nothing else restarts (--rebuild for an image)
+haven restart api                 # bounce one lane; nothing else restarts (--rebuild for an image)
 haven reload                      # apply changes to a held stack; waits for "reload finished"
 haven down --destroy --stack <slug> --yes        # stop a stack and DROP its databases (ask first, see haven-db)
 ```
@@ -72,9 +72,9 @@ Still builds the bundle once at `up` (cached by Nx) and never again until `haven
 open pages never reload. `--watch` adds a `ui` lane, `haven ui-watch`: one build per settled burst
 of edits, swapped in whole (`haven logs ui` shows each; a failed build keeps the last good
 bundle). An open page then reloads once nobody has touched it for 60 s, or at once when hidden.
-Old chunks stay loadable for 24 h after a swap. `pnpm dev` runs the Vite dev server outside haven. Numbers for each mode: `dev/docs/LOCAL_STACK.md`.
+Old chunks stay loadable for 24 h after a swap. Outside haven, `pnpm dev` builds the UI once and serves it like a still stack; `pnpm dev:hmr` is the one that runs Vite. Numbers for each mode: `dev/docs/LOCAL_STACK.md`.
 
-|             | dev (`pnpm dev`) | built (still, --watch)        |
+|             | Vite (`--hmr`, `pnpm dev:hmr`) | built (still, --watch, `pnpm dev`) |
 | ----------- | ---------------- | ----------------------------- |
 | Role        | almost never     | testing without changing code |
 | Page memory | 708 MB           | 396 MB                        |
@@ -82,7 +82,7 @@ Old chunks stay loadable for 24 h after a swap. `pnpm dev` runs the Vite dev ser
 | Requests    | 2289             | 563                           |
 
 - The app's own process sheds the UI's Vite server too.
-- There is no orb (so no `haven orb feedback`) and no HMR, and the app runs its production code paths.
+- The orb is there on any haven stack, built or Vite (`haven orb feedback`, see `haven-orb`); a built page has no HMR and runs its production code paths.
 - Old assets pile up in `apps/ui/dist/client/assets`; `rm -rf apps/ui/dist` clears them.
 - A build peaks at about 4.8 GB.
 

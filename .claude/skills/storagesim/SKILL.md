@@ -12,7 +12,7 @@ key. Code: `services/sims/storagesim`, console `apps/sims/src/storage`.
 
 ## Run it
 
-- On by default in haven (`-storage` turns it off). Hosted in the `sims` lane.
+- On by default in haven (`-storage` turns it off). Runs in the `go` lane by default (see `sims`).
 - Console and S3 endpoint: `https://storage.<slug>.langwatch.localhost` (console at `/_sim/`);
   `haven status` shows the loopback port for drivers.
 - Overlay sets `STORED_OBJECTS_BACKEND=s3`, `S3_BUCKET_NAME=langwatch`, `S3_ENDPOINT`, dummy

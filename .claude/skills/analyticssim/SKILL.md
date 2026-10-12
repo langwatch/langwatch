@@ -13,7 +13,7 @@ and never checked: a dev shim, never expose it. Code: `services/sims/analyticssi
 
 ## Run it
 
-- Opt-in: `haven up +analytics` (sticky). Hosted in the `sims` lane.
+- Opt-in: `haven up +analytics` (sticky). Runs in the `go` lane by default (see `sims`).
 - Console and ingest base URL: `https://analytics.<slug>.langwatch.localhost`; `haven status`
   shows the loopback port.
 - The overlay points the PostHog host and Customer.io base at it with dummy keys where none
@@ -50,7 +50,7 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 ```
 haven sim analytics status        # record count + activity (last 5 min, distinct ids, last call)
 haven sim analytics list [--provider] [--kind] [--event|--name] [--id] | clear
-haven sim analytics get <id>   # one record: facts, properties, raw call
+haven sim analytics record <id>   # one record: properties, raw call (no public `get` yet: the CLI's internal spelling)
 haven sim analytics fault <4xx|5xx|off>        # the next capture calls fail with that status; off clears it
 haven sim analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]   # exit 66 on timeout
 ```

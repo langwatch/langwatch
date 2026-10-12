@@ -7,8 +7,8 @@ argument-hint: "<template id or what the message says>"
 
 # Write a LangWatch email
 
-Everything is in `packages/mail/src/templates/`. Read `packages/mail/README.md` first —
-it is 78 lines and it is the contract. This is what it does not say.
+Everything is in `packages/mail/src/templates/`. Read `packages/mail/README.md` first:
+it is the contract. This is what it does not say.
 
 ## The five parts, in one file
 
@@ -23,12 +23,21 @@ Types come from the zod schema with `infer`. Never declare both.
 
 Mail uses the **expressive** system (the marketing site and the front door), never the
 **productive** one (the application). Concretely: build on `EmailLayout` and its
-`Paragraph` / `PrimaryButton` / `DetailTable` / `TintPanel` / `CodeBlock` / `InlineLink`.
+`Paragraph` / `PrimaryButton` / `DetailTable` / `TintPanel` / `CodeBlock` / `InlineLink`, plus,
+for digests and tables, `ActionRow`, `DataTable`, `CountTiles`, `PlainBlock`, `HighlightedCode`,
+`Muted` and `FinePrint` (all exported by `email-layout.tsx`).
 Write no colour of your own. The application's `#ED8926` in a rendered mail fails a test,
 on purpose.
 
 The primary action is an **ink pill**, not an orange slab. The brand orange lives in
 details. Do not "fix" this.
+
+## The dark cut
+
+Dark mode is declared once, in the `STYLESHEET` of `email-layout.tsx`: each layout part carries a
+class (`lw-text`, `lw-panel`, `lw-table-cell`, ...) and a `@media (prefers-color-scheme: dark)`
+rule recolours it from the `dark` palette. A new building block takes an existing class or adds a
+class and its dark rule there. Inline-only paint has no dark cut: do not add it in a template.
 
 ## Traps
 
@@ -38,13 +47,17 @@ details. Do not "fix" this.
 - **No flexbox, no percentage-width `div`.** Outlook renders neither. Meters and columns
   are nested table cells — see `UsageLimitEmail`'s bar.
 - **`EmailContent` has no `text` field.** `renderMailTemplate` returns one and the tests
-  assert it, but the four providers do not send it yet. Do not add it here — that is
-  transport work across `src/providers/*`.
-- **No remote web font.** A font fetch from a mail client is an open-tracking pixel. The
-  serif stack names Sentient and falls back; it is not loaded.
+  assert it, but the senders do not send it yet. Do not add it here: that is transport
+  work in the notification module's channels
+  (`modules/notification/process/src/channels/`: `ses/`, `smtp/` and the HTTP SendGrid and
+  Resend channels, via `email-gateway-channels.registry.ts`). The injected `MailSender` is
+  `packages/mail/src/email-sender.ts`.
+- **No remote web font.** A font fetch from a mail client is an open-tracking pixel. Body and
+  headings use one system sans stack (`BODY_FONT` in `email-layout.tsx`); Sentient belongs to the
+  internal-console design system, not mail.
 - **Render versus send.** A message whose envelope belongs to a process (BCC fan-out,
   unsubscribe footer, no-reply `To`) exports a render function and gains a method on
-  `MailRenderPort`. Only a whole send gets a `sendXEmail`. Getting this wrong puts
+  `MailRender` (`packages/mail/src/mail-render.ts`). Only a whole send gets a `sendXEmail`. Getting this wrong puts
   react-email on a worker's boot graph, which
   `packages/architecture-enforcer/tests/frontend-boundary.unit.test.ts` will catch.
 - **Links arrive built.** A template never assembles a URL from a base host it read

@@ -13,7 +13,7 @@ argument-hint: "[open <url> | snapshot | click <ref> | screenshot | record start
 first use and exits once no lane is left. A worktree whose daemon script is older keeps its own. It needs a running stack
 (`haven up --agent -d`, see `haven-lifecycle`).
 
-**Use `haven browser`, not Playwright.** It signs in for you, waits on page events, re-signs a
+**Use `haven browser`, not Playwright, and never an MCP browser tool.** It is the one way to drive a browser here. It signs in for you, waits on page events, re-signs a
 lane that lands on sign-in, and answers an action with what changed. Where haven is installed
 its gate refuses Playwright's MCP tools, `playwright-cli` and `playwright open|codegen|show-trace`;
 e2e runs (`playwright test`, `pnpm test:e2e`) are untouched.
@@ -33,7 +33,7 @@ haven browser snapshot --lane qa-1 --as admin              # accessibility tree 
 haven browser snapshot --grep Save --lane qa-1 --as admin  # only nodes whose role or name contain "Save", plus ancestors
 haven browser snapshot --depth 3 --max-chars 4000 --lane qa-1 --as admin  # first 3 levels; cut with a "truncated" footer
 haven browser click e12 --lane qa-1 --as admin             # a ref from the last snapshot (or a CSS selector)
-haven browser click e12 --download-to /tmp/out/report.csv --lane qa-1 --as admin  # waits for the download the click starts, saves it, prints {"file","name","size","mediaType"}
+haven browser click e12 --download-to .claude/tmp/out/report.csv --lane qa-1 --as admin  # waits for the download the click starts, saves it, prints {"file","name","size","mediaType"}
 haven browser hover e12 --lane qa-1 --as admin             # menus, hover cards, toast stacks
 haven browser drag e12 e30 --lane qa-1 --as admin          # real mouse moves, centre to centre
 haven browser drag e12 --by 120,-40 --lane qa-1 --as admin # or by dx,dy pixels (a node on a canvas)
@@ -131,4 +131,4 @@ haven browser record export flow.json --playwright flow.spec.ts  # a test for de
 - A replay needs each recorded query back with its status and each step at its recorded
   path; it reports the first step that differs.
 
-See also: `haven-auth` (storage state), `haven-seed` (the logins), `haven-orb` (feedback from a person's own page).
+See also: `haven-auth` (storage state), `haven-seed` (the logins), `haven-orb` (feedback from a person's own page), `browser-test` (a scenario walk with a pass/fail report), `browser-pair` (live feedback with a person watching).

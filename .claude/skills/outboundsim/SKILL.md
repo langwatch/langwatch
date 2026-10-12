@@ -13,7 +13,7 @@ it. Code: `services/sims/outboundsim`, console `apps/sims/src/outbound`.
 
 ## Run it
 
-- Opt-in: `haven up +outbound` (sticky). Hosted in the `sims` lane.
+- Opt-in: `haven up +outbound` (sticky). Runs in the `go` lane by default (see `sims`).
 - Console and base URL: `https://outbound.<slug>.langwatch.localhost`.
 - The overlay points the four internal Slack channel settings at it, sets
   `SLACK_API_BASE=<base>/api` and `SLACK_WEBHOOK_BASE=<base>` (so a bot token check,
