@@ -28,6 +28,7 @@ const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
  *  convergence polls, not throughput - each tenant's own claim keeps one
  *  large import from holding the rest of the fleet behind it. */
 const DEFAULT_TENANT_CONCURRENCY = 25;
+const DEFAULT_PACING_WAIT_MS = 5_000;
 
 /** A page's terminal statuses: tenant id, then migration name. */
 type FinishedOnPage = Map<string, Map<string, TenantMigrationRecord["status"]>>;
@@ -59,6 +60,13 @@ export type SystemMigrationRunnerDeps = {
   leaseRenewIntervalMs?: number;
   /** How many organizations to migrate concurrently. Defaults to 25. */
   tenantConcurrency?: number;
+  /**
+   * The group queues' waiting-job count, read before each page a paced migration drives. Omitted,
+   * the runner cannot pace; a throw reads as over the limit, never as empty.
+   */
+  queuedJobs?: () => Promise<number>;
+  /** How long a paced page waits before reading the count again. Defaults to five seconds. */
+  pacingWaitMs?: number;
 };
 
 /**
@@ -140,7 +148,37 @@ export class SystemMigrationRunnerService {
       });
       if (page.length === 0) return;
       cursor = page[page.length - 1] ?? null;
+      if (!(await this.waitForQueueRoom({ signal: args.signal }))) return;
       if (!(await this.drivePage({ ...args, page }))) return;
+    }
+  }
+
+  /**
+   * Holds the next page while the queues hold more waiting jobs than the strictest paced migration
+   * allows, so a backfill never outruns the worker. False means the pass was aborted meanwhile.
+   */
+  private async waitForQueueRoom({ signal }: { signal?: AbortSignal }): Promise<boolean> {
+    const limits = this.deps.migrations.flatMap((migration) =>
+      migration.pauseWhileQueuedAbove === undefined ? [] : [migration.pauseWhileQueuedAbove],
+    );
+    const { queuedJobs } = this.deps;
+    if (limits.length === 0 || queuedJobs === undefined) return !signal?.aborted;
+    const limit = Math.min(...limits);
+    for (;;) {
+      if (signal?.aborted) return false;
+      const queued = await queuedJobs().catch((error: unknown) => {
+        logger.warn(
+          { error },
+          "could not read the queue depth; pacing as if it were over the limit",
+        );
+        return Number.POSITIVE_INFINITY;
+      });
+      if (queued <= limit) return true;
+      logger.info(
+        { queued, limit },
+        "queue over the pacing limit; holding the next page of tenants",
+      );
+      await pause({ ms: this.deps.pacingWaitMs ?? DEFAULT_PACING_WAIT_MS, signal });
     }
   }
 
@@ -228,8 +266,7 @@ export class SystemMigrationRunnerService {
       const status = statuses.get(migration.name);
       if (status === "finalized") counts.alreadyFinalized += 1;
       else if (status === "rolled_back") counts.alreadyRolledBack += 1;
-      else if (await this.deps.cohort({ tenantId, migrationName: migration.name }))
-        return false;
+      else if (await this.deps.cohort({ tenantId, migrationName: migration.name })) return false;
       else counts.skipped += 1;
     }
     summary.skipped += counts.skipped;
@@ -486,4 +523,17 @@ async function recordParkedTenant({
 function undefinedWhenNotFound(error: unknown): undefined {
   if (error instanceof SystemMigrationRecordNotFoundError) return undefined;
   throw error;
+}
+
+/** A wait that ends early, without throwing, when the pass is aborted. */
+function pause({ ms, signal }: { ms: number; signal?: AbortSignal }): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, ms);
+    function done(): void {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    }
+    signal?.addEventListener("abort", done, { once: true });
+  });
 }

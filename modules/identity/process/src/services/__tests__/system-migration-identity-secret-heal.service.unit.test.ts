@@ -29,7 +29,10 @@ describe("the identity heal pass's cohort", () => {
       carryForUser: notCalled,
       findDriftedUserIdsAfter: notCalled,
     });
-    const backfill = IdentityIdentifierBackfillMigrationService.create({ migrateUser: notCalled });
+    const backfill = IdentityIdentifierBackfillMigrationService.create({
+      backfill: { migrateUser: notCalled },
+      maxQueuedJobs: 5_000,
+    });
 
     expect(cohortOf(heal)).toEqual({
       runsAutomaticallyOnSelfHosted: true,
@@ -46,7 +49,8 @@ describe("the identity heal pass's declaration", () => {
       findDriftedUserIdsAfter: notCalled,
     });
     const backfill: SystemMigration = IdentityIdentifierBackfillMigrationService.create({
-      migrateUser: notCalled,
+      backfill: { migrateUser: notCalled },
+      maxQueuedJobs: 5_000,
     });
 
     expect(heal.migratedIsSteady).toBe(true);

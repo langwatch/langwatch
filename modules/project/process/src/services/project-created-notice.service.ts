@@ -130,8 +130,7 @@ export class ProjectCreatedNoticeService {
     await inSlices({
       items: projectIds,
       width: BACKFILL_SEND_WIDTH,
-      each: (projectId) =>
-        this.#send({ projectId, organizationId, adminUserId, backfilled: true }),
+      each: (projectId) => this.#send({ projectId, organizationId, adminUserId, backfilled: true }),
     });
     return projectIds.length;
   }

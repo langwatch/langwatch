@@ -13,7 +13,8 @@ describe("the identifier backfill migration", () => {
         report: { kind: "parity" as const, diffs: [] },
       }));
       const migration = IdentityIdentifierBackfillMigrationService.create({
-        migrateUser,
+        backfill: { migrateUser },
+        maxQueuedJobs: 5_000,
       });
 
       const outcome = await migration.migrateTenant({ tenantId: "user_sam" });
@@ -31,7 +32,8 @@ describe("the identifier backfill migration", () => {
     /** @scenario "The identifier backfill waits for enrollment and migrates one user per tenant" */
     it("registers under the name the write gate reads, dark and operator-free", () => {
       const migration = IdentityIdentifierBackfillMigrationService.create({
-        migrateUser: vi.fn(),
+        backfill: { migrateUser: vi.fn() },
+        maxQueuedJobs: 5_000,
       });
       expect(migration.name).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
       expect(migration.requiresOperatorConfirmation).toBe(false);

@@ -117,6 +117,25 @@ Feature: Running system migrations across organizations
     And the other is driven over the tenants with work left for it
 
   @unit
+  Scenario: A tenant whose every migration is finished takes no claim
+    Given a page of tenants that have finished every migration the pass drives
+    When a pass runs over a source that still lists them
+    Then their state is read once per migration for the whole page
+    And no claim is taken or released for any of them
+
+  @unit
+  Scenario: Asking whether a migration has unfinished tenants reads a page at a time
+    Given a thousand tenants that have finished a migration
+    When the runner is asked whether any eligible tenant is unfinished
+    Then it reads the tenants' state once per page, never once per tenant
+
+  @unit
+  Scenario: A project's organization is read once per page of projects for the cohort
+    Given a project-axis cohort paced by organization enrollment
+    When a page of projects is asked about several migrations
+    Then the projects' organizations are read in one query for the page
+
+  @unit
   Scenario: A pass may ask which tenants have work left across the whole installation
     Given the question a tenant source asks is the tenant list itself
     When the multitenancy guard reads it
@@ -215,6 +234,33 @@ Feature: Running system migrations across organizations
     And the groups it stopped waiting for are named for operator triage
     And their tenants stay held, to be re-proved by a later pass
     But work that failed or blocked by the deadline still prevents startup
+
+  # The barrier once looked at every target group in one Redis script. At cloud
+  # scale (2,000 organisations, 200k users) that script held Redis for over a
+  # minute and every other caller got BUSY. A large set is now looked at in
+  # slices. Slices are not one atomic look, but a job a slice missed was queued
+  # after its group was read, by work that was still running, and queueing it
+  # registers its group: a look that saw a registration happen is not settled.
+  @integration
+  Scenario: The barrier looks at a large set of target groups in bounded slices
+    Given a preflight whose 100,000 target groups hold outstanding work in some of them
+    When the barrier looks at its targets
+    Then no single Redis script call reads more than 500 of those groups
+    And the totals it reports match the outstanding work across every group
+
+  @integration
+  Scenario: A look that ran beside a new registration does not settle the barrier
+    Given the barrier is part-way through a sliced look at its target groups
+    When work queued under the preflight registers its group
+    Then that look reports that it ran beside a registration
+    And the barrier does not settle on it
+
+  @unit
+  Scenario: Slices of a look add up to one look
+    Given the replies of several slices of the barrier's look
+    When they are added together
+    Then every count is the sum across the slices
+    And each list of named groups stops at the refusal's naming limit
 
   @unit
   Scenario: A recurring reconciliation does not loop forever

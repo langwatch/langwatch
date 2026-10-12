@@ -645,6 +645,10 @@ export class GovernanceModule implements GovernanceRestApi {
           occurredAt,
           ...data,
         }),
+      recordMany: (commands) =>
+        this.codingAssistantBillingSender("recordCodingAssistantBilling").sendBatch(
+          commands.map(({ tenantId, occurredAt, data }) => ({ tenantId, occurredAt, ...data })),
+        ),
     });
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,

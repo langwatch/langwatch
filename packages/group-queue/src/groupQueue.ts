@@ -3017,7 +3017,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     let reportedHeld = false;
     let lastLook = "";
     while (true) {
+      const lookStartedMs = nowInstant().epochMilliseconds;
       const state = await this.scripts.inspectPreflightTargets(key);
+      const lookMs = nowInstant().epochMilliseconds - lookStartedMs;
       const look = [state.pending, state.active, state.pendingGroups, ...state.pendingGroupIds];
       if (whileDraining && look.join("\n") !== lastLook) {
         deadline = nowInstant().epochMilliseconds + timeoutMs;
@@ -3031,7 +3033,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       if (state.blocked > 0) this.assertTargetsSucceeded({ state, fault });
       if (this.targetsHaveSettled({ state, fault })) return undefined;
       if (nowInstant().epochMilliseconds >= deadline) return state;
-      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      // Rest at least as long as the look took, so a paged look holds at most half of Redis.
+      await new Promise<void>((resolve) => setTimeout(resolve, Math.max(100, lookMs)));
     }
   }
 
@@ -3083,7 +3086,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     state: PreflightTargetsState;
     fault: TargetsFault;
   }): boolean {
-    if (state.pending > 0 || state.active > 0) return false;
+    if (state.pending > 0 || state.active > 0 || state.changedDuringInspection) return false;
     this.assertTargetsSucceeded({ state, fault });
     return this.processingQueue.idle();
   }

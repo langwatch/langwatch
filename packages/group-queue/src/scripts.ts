@@ -1782,6 +1782,53 @@ export type PreflightTargetsState = {
   blockedGroupIds: string[];
   pendingGroupIds: string[];
   heldFromBeforeGroupIds: string[];
+  /** A group registered while a paged look ran: the counts may have missed its new work. */
+  changedDuringInspection: boolean;
+};
+
+/** Adds one inspected slice's reply to the running totals, naming at most the refusal limit. */
+export function addPreflightPage({
+  state,
+  reply,
+}: {
+  state: PreflightTargetsState;
+  reply: readonly unknown[];
+}): PreflightTargetsState {
+  const count = (index: number): number => Number(reply[index] ?? 0);
+  const names = ({ index, kept }: { index: number; kept: readonly string[] }): string[] => {
+    const value: unknown = reply[index];
+    const added = Array.isArray(value) ? value.map(String) : [];
+    return [...kept, ...added].slice(0, PREFLIGHT_NAMED_GROUP_LIMIT);
+  };
+  return {
+    pending: state.pending + count(0),
+    active: state.active + count(1),
+    failed: state.failed + count(2),
+    blocked: state.blocked + count(3),
+    groups: state.groups + count(4),
+    heldFromBefore: state.heldFromBefore + count(5),
+    pendingGroups: state.pendingGroups + count(6),
+    failedGroupIds: names({ index: 7, kept: state.failedGroupIds }),
+    blockedGroupIds: names({ index: 8, kept: state.blockedGroupIds }),
+    pendingGroupIds: names({ index: 9, kept: state.pendingGroupIds }),
+    heldFromBeforeGroupIds: names({ index: 10, kept: state.heldFromBeforeGroupIds }),
+    changedDuringInspection: state.changedDuringInspection,
+  };
+}
+
+const NO_PREFLIGHT_TARGETS: PreflightTargetsState = {
+  pending: 0,
+  active: 0,
+  failed: 0,
+  blocked: 0,
+  groups: 0,
+  heldFromBefore: 0,
+  pendingGroups: 0,
+  failedGroupIds: [],
+  blockedGroupIds: [],
+  pendingGroupIds: [],
+  heldFromBeforeGroupIds: [],
+  changedDuringInspection: false,
 };
 const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const completeScript = new CachedLuaScript(COMPLETE_LUA);
@@ -2493,8 +2540,50 @@ export class GroupStagingScripts {
     return this.redis.zcard(`${this.keyPrefix}ready`);
   }
 
+  /**
+   * The barrier's look at its target groups, at most {@link PREFLIGHT_GROUPS_PER_CALL} per
+   * script call: 200k groups in one call held Redis for 70 s. Small sets stay one atomic
+   * look; why slices stay sound is in specs/migration/system-migrations-runner.feature.
+   */
   async inspectPreflightTargets(targetKey: string): Promise<PreflightTargetsState> {
-    const result: unknown = await inspectPreflightTargetsScript.run(
+    const whole = await this.inspectPreflightPage({ targetKey, groupIds: [] });
+    if (whole[0] !== -1) return addPreflightPage({ state: NO_PREFLIGHT_TARGETS, reply: whole });
+
+    const registrationsKey = `${targetKey}:registrations`;
+    const before = await this.redis.get(registrationsKey);
+
+    let state = NO_PREFLIGHT_TARGETS;
+    const seen = new Set<string>();
+    let cursor = "0";
+    do {
+      const [next, members] = await this.redis.sscan(
+        targetKey,
+        cursor,
+        "COUNT",
+        PREFLIGHT_GROUPS_PER_CALL,
+      );
+      cursor = next;
+      // SSCAN may return a member twice while the set rehashes; count each group once.
+      const fresh = members.filter((groupId) => !seen.has(groupId));
+      for (const groupId of fresh) seen.add(groupId);
+      for (let start = 0; start < fresh.length; start += PREFLIGHT_GROUPS_PER_CALL) {
+        const groupIds = fresh.slice(start, start + PREFLIGHT_GROUPS_PER_CALL);
+        const reply = await this.inspectPreflightPage({ targetKey, groupIds });
+        state = addPreflightPage({ state, reply });
+      }
+    } while (cursor !== "0");
+    const after = await this.redis.get(registrationsKey);
+    return { ...state, changedDuringInspection: before !== after };
+  }
+
+  private async inspectPreflightPage({
+    targetKey,
+    groupIds,
+  }: {
+    targetKey: string;
+    groupIds: readonly string[];
+  }): Promise<unknown[]> {
+    const reply: unknown = await inspectPreflightPageScript.run(
       this.redis,
       3,
       targetKey,
@@ -2502,26 +2591,10 @@ export class GroupStagingScripts {
       `${targetKey}:baseline`,
       this.keyPrefix,
       String(PREFLIGHT_NAMED_GROUP_LIMIT),
+      String(PREFLIGHT_GROUPS_PER_CALL),
+      ...groupIds,
     );
-    const row = Array.isArray(result) ? result : [];
-    const count = (index: number): number => Number(row[index] ?? 0);
-    const names = (index: number): string[] => {
-      const value: unknown = row[index];
-      return Array.isArray(value) ? value.map(String) : [];
-    };
-    return {
-      pending: count(0),
-      active: count(1),
-      failed: count(2),
-      blocked: count(3),
-      groups: count(4),
-      heldFromBefore: count(5),
-      pendingGroups: count(6),
-      failedGroupIds: names(7),
-      blockedGroupIds: names(8),
-      pendingGroupIds: names(9),
-      heldFromBeforeGroupIds: names(10),
-    };
+    return Array.isArray(reply) ? reply : [];
   }
 
   async registerPreflightTargets({
@@ -2531,19 +2604,22 @@ export class GroupStagingScripts {
     targetKey: string;
     groupIds: readonly string[];
   }): Promise<void> {
-    if (groupIds.length === 0) return;
-    await registerPreflightTargetsScript.run(
-      this.redis,
-      5,
-      targetKey,
-      `${targetKey}:candidates`,
-      this.getSignalKey(),
-      `${this.keyPrefix}blocked`,
-      `${targetKey}:baseline`,
-      this.keyPrefix,
-      String(LISTED_GROUPS_TTL_SEC),
-      ...groupIds,
-    );
+    for (let start = 0; start < groupIds.length; start += PREFLIGHT_GROUPS_PER_CALL) {
+      await registerPreflightTargetsScript.run(
+        this.redis,
+        6,
+        targetKey,
+        `${targetKey}:candidates`,
+        this.getSignalKey(),
+        `${this.keyPrefix}blocked`,
+        `${targetKey}:baseline`,
+        `${targetKey}:registrations`,
+        this.keyPrefix,
+        String(LISTED_GROUPS_TTL_SEC),
+        String(start),
+        ...groupIds.slice(start, start + PREFLIGHT_GROUPS_PER_CALL),
+      );
+    }
   }
 
   /** Opens a list for a `dispatchListed` consumer; it lapses with its groups' own expiry. */
@@ -2561,7 +2637,13 @@ export class GroupStagingScripts {
   /** Closes a list and removes its groups' record; the jobs themselves stay queued. */
   async closeGroupList(listKey: string): Promise<void> {
     await this.redis.zrem(this.openGroupListsKey(), listKey);
-    await this.redis.del(listKey, `${listKey}:candidates`, `${listKey}:baseline`);
+    // UNLINK: a large run's sets are freed off the Redis thread, not inside this call.
+    await this.redis.unlink(
+      listKey,
+      `${listKey}:candidates`,
+      `${listKey}:baseline`,
+      `${listKey}:registrations`,
+    );
   }
 
   private openGroupListsKey(): string {

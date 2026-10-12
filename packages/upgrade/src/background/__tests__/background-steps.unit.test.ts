@@ -836,3 +836,59 @@ describe("BackgroundStepsService queue work", () => {
     });
   });
 });
+
+describe("BackgroundStepsService side by side", () => {
+  describe("given five independent pending steps and one that runs after another", () => {
+    /** @scenario "Independent background steps run side by side, a few at a time" */
+    it("runs three at once under their own leases, and the dependent step waits", async () => {
+      const ids = ["a:one", "a:two", "a:three", "a:four", "a:five"];
+      let running = 0;
+      let widest = 0;
+      const leases: string[] = [];
+      const step = (id: string, after?: string[]) =>
+        defineMigrationStep({
+          id,
+          kind: "data",
+          mode: "background",
+          description: `Runs ${id}.`,
+          ...(after ? { after } : {}),
+          run: async () => {
+            running += 1;
+            widest = Math.max(widest, running);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            running -= 1;
+            return { id };
+          },
+        });
+      const ledger: BackgroundStepsLedger = {
+        findSteps: async () =>
+          [...ids, "a:six"].map((id) => ({ id, status: "pending" as const, report: null })),
+        acquireLease: async ({ name }) => {
+          leases.push(name);
+          return {};
+        },
+        renewLease: async () => ({}),
+        releaseLease: async () => true,
+        markRunning: async () => undefined,
+        reopen: async () => [],
+        setStatus: async () => undefined,
+        saveReport: async () => undefined,
+      };
+      const service = BackgroundStepsService.create({
+        ledger,
+        steps: [...ids.map((id) => step(id)), step("a:six", ["a:one"])],
+        serving: () => true,
+        oldWritersGoneFor: async () => true,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+        log: () => undefined,
+      });
+
+      const sweep = await service.sweep({ signal: new AbortController().signal });
+
+      expect(widest).toBe(3);
+      expect(sweep.ran).toEqual(ids);
+      expect(sweep.waiting).toEqual(["a:six"]);
+      expect(leases.toSorted()).toEqual(ids.map((id) => `background:${id}`).toSorted());
+    });
+  });
+});

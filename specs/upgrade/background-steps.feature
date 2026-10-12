@@ -1,6 +1,7 @@
 # Background steps on the worker (ADR-173 section 1; round 14: the framework runs, ops reads and
 # requests). A worker that passed the serving gate runs the background steps its modules declare
-# with .withMigrations, one at a time under a lease of their own, resuming from the checkpoint.
+# with .withMigrations, a few side by side, each under a lease of its own, resuming from the
+# checkpoint; a step that runs `after` another waits until that one is done.
 # A step that needs old writers gone waits on the serving roster. A paused (lapsed) worker runs none.
 
 Feature: The worker runs declared background steps
@@ -216,3 +217,10 @@ Feature: The worker runs declared background steps
     Given the worker runs the upgrade-step consumer beside its main consumer
     When the upgrade-step consumer waits for listed work
     Then it claims from each open list in turn, polling, and never takes or clears the queue's shared wake-up signal
+
+  @unit
+  Scenario: Independent background steps run side by side, a few at a time
+    Given more pending background steps than the worker runs at once
+    When the worker sweeps
+    Then it runs that many side by side, each under its own lease, and never more
+    And a step that runs after another still waits for it to be done

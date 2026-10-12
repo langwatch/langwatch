@@ -65,7 +65,13 @@ export class SystemMigrationPassCohortService {
         owners.set(projectId, organizationId);
       }
     };
-    const admits = async ({ tenantId, migrationName }: { tenantId: string; migrationName: string }) => {
+    const admits = async ({
+      tenantId,
+      migrationName,
+    }: {
+      tenantId: string;
+      migrationName: string;
+    }) => {
       let organizationId = owners.get(tenantId);
       if (organizationId === undefined) {
         organizationId = await projects.getOrganizationId(tenantId);

@@ -249,7 +249,10 @@ describe("ProjectCreatedNoticeService", () => {
 
   describe("given an organization with a thousand projects", () => {
     function largeOrganization() {
-      const ids = Array.from({ length: 1000 }, (_, index) => `big-${String(index).padStart(4, "0")}`);
+      const ids = Array.from(
+        { length: 1000 },
+        (_, index) => `big-${String(index).padStart(4, "0")}`,
+      );
       const reads: number[] = [];
       const adminReads: string[] = [];
       const presence: RecordProjectPresenceSettingChangedCommandData[] = [];
@@ -309,9 +312,9 @@ describe("ProjectCreatedNoticeService", () => {
     it("reads departments in ten queries, not a thousand, and records every project", async () => {
       const { notice, reads, departments } = largeOrganization();
 
-      expect(
-        await notice.recordExistingDepartmentAssignments({ organizationId: "org-big" }),
-      ).toBe(1000);
+      expect(await notice.recordExistingDepartmentAssignments({ organizationId: "org-big" })).toBe(
+        1000,
+      );
 
       expect(reads).toHaveLength(10);
       expect(departments.every((fact) => fact.backfilled === true)).toBe(true);

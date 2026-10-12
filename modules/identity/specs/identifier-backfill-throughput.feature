@@ -17,3 +17,18 @@ Feature: Identifier backfill throughput
     And no user is finalized before their writes are proven
     When the queue drains and the backfill runs its next pass
     Then nothing is staged again and every user is finalized
+
+  # Pacing (Alex, 2026-10-12): one insert per write stays; the backfill waits for the worker.
+  @unit
+  Scenario: The identifier backfill holds while the queue is over its limit and resumes as it drains
+    Given the group queues hold more waiting jobs than the backfill's limit, 5,000 by default
+    When a migration pass reaches its next page of users
+    Then it queues no new user until the waiting count is at or under the limit
+    And it carries on with every user once the queue has drained
+
+  @unit
+  Scenario: An unreadable queue holds the identifier backfill rather than reading as empty
+    Given the queue depth cannot be read
+    When a migration pass reaches its next page of users
+    Then it waits briefly and reads again
+    And it queues users only after a read at or under the limit

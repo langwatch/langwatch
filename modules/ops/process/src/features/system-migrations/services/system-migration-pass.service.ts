@@ -44,6 +44,7 @@ export type SystemMigrationPassRepositories = Pick<
   | "projectTenants"
   | "userTenants"
   | "organizationMemberTenants"
+  | "queues"
 >;
 
 type SystemMigrationPassOptions = Readonly<{
@@ -95,6 +96,8 @@ export class SystemMigrationPassService {
   readonly #cohorts: SystemMigrationPassCohortService;
   /** Declared tenant steps this process's last pass left pending; each wakes another pass. */
   #pendingDeclaredSteps: readonly string[] = [];
+  /** The waiting-job count a paced migration holds its next page behind (Alex, 2026-10-12). */
+  readonly #queuedJobs = (): Promise<number> => this.options.repositories.queues.countWaitingJobs();
 
   private constructor(private readonly options: SystemMigrationPassOptions) {
     this.#cohorts = SystemMigrationPassCohortService.create({
@@ -168,6 +171,7 @@ export class SystemMigrationPassService {
       for (const bucket of groupByTenantSource({ migrations, everyTenant: sources[axis] })) {
         const runner = new SystemMigrationRunnerService({
           now: nowInstant,
+          queuedJobs: this.#queuedJobs,
           state: declared.state,
           lease: migrationLease,
           tenants: bucket.tenants,
@@ -205,6 +209,7 @@ export class SystemMigrationPassService {
     if (userMigration) {
       return new SystemMigrationRunnerService({
         now: nowInstant,
+        queuedJobs: this.#queuedJobs,
         state,
         lease,
         tenants: this.options.repositories.organizationMemberTenants.membersOf({ organizationId }),
@@ -218,6 +223,7 @@ export class SystemMigrationPassService {
     );
     return new SystemMigrationRunnerService({
       now: nowInstant,
+      queuedJobs: this.#queuedJobs,
       state,
       lease,
       tenants: {
@@ -313,6 +319,7 @@ export class SystemMigrationPassService {
         merged,
         await new SystemMigrationRunnerService({
           now: nowInstant,
+          queuedJobs: this.#queuedJobs,
           state,
           lease,
           tenants,
@@ -368,6 +375,7 @@ export class SystemMigrationPassService {
         cohort,
         migrations,
         now: nowInstant,
+        queuedJobs: this.#queuedJobs,
       }),
     };
   }

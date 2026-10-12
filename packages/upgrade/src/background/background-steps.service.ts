@@ -130,9 +130,9 @@ export class BackgroundStepsService {
   }
 
   /**
-   * One pass over the declared steps, started in declaration order a few at a time; never throws
-   * for a step's failure. `after` is read from the pass's snapshot, so a step whose prerequisite
-   * finishes during this pass starts on the next one, never beside it.
+   * One pass, steps started in declaration order a few at a time; never throws for a step's
+   * failure. `after` reads the pass's snapshot, so a prerequisite done mid-pass frees its
+   * dependants on the next pass, never beside it.
    */
   async sweep({ signal }: { signal: AbortSignal }): Promise<BackgroundSweep> {
     const sweep = { ran: [] as string[], failed: [] as string[], waiting: [] as string[] };
@@ -143,36 +143,35 @@ export class BackgroundStepsService {
     );
     if (declared.length === 0) return { paused: false, ...sweep, retrying };
     const rows = new Map((await this.options.ledger.findSteps()).map((row) => [row.id, row]));
-    const outcomes = new Array<StepOutcome | undefined>(declared.length);
-    let next = 0;
+    const outcomes = new Map<string, StepOutcome>();
     let paused = false;
     let thrown: { error: unknown } | undefined;
-    const lane = async (): Promise<void> => {
-      for (;;) {
-        if (signal.aborted || paused || thrown) return;
+    await eachInLanes({
+      items: declared,
+      width: Math.max(1, this.options.concurrency ?? BACKGROUND_STEP_CONCURRENCY),
+      stop: () => signal.aborted || paused || thrown !== undefined,
+      each: async (step) => {
         if (!this.options.serving()) {
           paused = true;
           return;
         }
-        const index = next++;
-        const step = declared[index];
-        if (!step) return;
         try {
-          outcomes[index] = await this.sweepOne({ step, row: rows.get(step.id), rows, signal });
+          outcomes.set(
+            step.id,
+            await this.sweepOne({ step, row: rows.get(step.id), rows, signal }),
+          );
         } catch (error) {
           // A ledger read or lease call that throws ends the pass, as it did one step at a time.
           thrown ??= { error };
         }
-      }
-    };
-    const width = Math.max(1, this.options.concurrency ?? BACKGROUND_STEP_CONCURRENCY);
-    await Promise.all(Array.from({ length: Math.min(width, declared.length) }, lane));
+      },
+    });
     if (thrown) throw thrown.error;
     const by = { done: sweep.ran, failed: sweep.failed, waiting: sweep.waiting, retrying };
-    declared.forEach((step, index) => {
-      const outcome = outcomes[index];
+    for (const step of declared) {
+      const outcome = outcomes.get(step.id);
       if (outcome && outcome !== "skipped" && outcome !== "held") by[outcome].push(step.id);
-    });
+    }
     return { paused, ...sweep, retrying };
   }
 
@@ -461,6 +460,28 @@ export class BackgroundStepsService {
     });
     return "failed";
   }
+}
+
+/** Runs `each` over the items in order, at most `width` at once, taking none once `stop` says so. */
+async function eachInLanes<Item>({
+  items,
+  width,
+  stop,
+  each,
+}: {
+  items: readonly Item[];
+  width: number;
+  stop: () => boolean;
+  each: (item: Item) => Promise<void>;
+}): Promise<void> {
+  const pending = [...items];
+  const lane = async (): Promise<void> => {
+    while (pending.length > 0 && !stop()) {
+      const item = pending.shift();
+      if (item !== undefined) await each(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, lane));
 }
 
 /** The worker's loop over one service: a pass now, then one every `everyMs`, stopped by `stop`. */

@@ -75,21 +75,52 @@ export class ProjectFactsBackfillService {
     signal: AbortSignal;
     totals: { organizations: number; projects: number };
   }): Promise<boolean> {
-    const pending = [...ids];
     let done = 0;
-    const lane = async (): Promise<void> => {
-      for (;;) {
-        if (signal.aborted) return;
-        const organizationId = pending.shift();
-        if (organizationId === undefined) return;
-        totals.projects += dryRun
-          ? ((await this.peers.preview?.({ organizationId })) ?? 0)
-          : await this.peers.record({ organizationId });
+    let failure: { error: unknown } | undefined;
+    await eachInLanes({
+      items: ids,
+      width: ORGANIZATION_WIDTH,
+      stop: () => signal.aborted || failure !== undefined,
+      each: async (organizationId) => {
+        let projects: number;
+        try {
+          projects = dryRun
+            ? ((await this.peers.preview?.({ organizationId })) ?? 0)
+            : await this.peers.record({ organizationId });
+        } catch (error) {
+          failure ??= { error };
+          return;
+        }
+        // Added after the await: `+=` across an await would drop another lane's count.
+        totals.projects += projects;
         totals.organizations += 1;
         done += 1;
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(ORGANIZATION_WIDTH, ids.length) }, lane));
+      },
+    });
+    // Every lane has stopped before the step hears the failure, so none writes after it.
+    if (failure) throw failure.error;
     return done === ids.length;
   }
+}
+
+/** Runs `each` over the items in order, at most `width` at once, taking none once `stop` says so. */
+async function eachInLanes<Item>({
+  items,
+  width,
+  stop,
+  each,
+}: {
+  items: readonly Item[];
+  width: number;
+  stop: () => boolean;
+  each: (item: Item) => Promise<void>;
+}): Promise<void> {
+  const pending = [...items];
+  const lane = async (): Promise<void> => {
+    while (pending.length > 0 && !stop()) {
+      const item = pending.shift();
+      if (item !== undefined) await each(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, lane));
 }

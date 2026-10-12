@@ -216,6 +216,7 @@ type IdentityAppParts = {
   newbornSweep: IdentityNewbornReconciliationService;
   signUpIdentifiers: SignUpIdentifierService;
   backfill: IdentityBackfillService;
+  backfillMaxQueuedJobs: number;
   secrets: IdentitySecretCarryService;
   ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
   ssoConnectionGrandfather: SsoConnectionGrandfatherService | null;
@@ -881,6 +882,7 @@ export class IdentityModule
       newbornSweep,
       signUpIdentifiers,
       backfill,
+      backfillMaxQueuedJobs: setup.config.identifierBackfillMaxQueuedJobs,
       secrets,
       ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
         setup.repositories.ssoDomainOwnership,
@@ -1191,7 +1193,10 @@ export class IdentityModule
 
   userMigrations(): readonly SystemMigration[] {
     return [
-      IdentityIdentifierBackfillMigrationService.create(this.#parts.backfill),
+      IdentityIdentifierBackfillMigrationService.create({
+        backfill: this.#parts.backfill,
+        maxQueuedJobs: this.#parts.backfillMaxQueuedJobs,
+      }),
       IdentitySecretHealMigrationService.create(this.#parts.secrets),
     ] as const;
   }
