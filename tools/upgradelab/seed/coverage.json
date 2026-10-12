@@ -134,16 +134,6 @@
       "note": "projects made by main onboarding in each heavy organization",
       "cells": ["C1", "C3"]
     },
-    "project:record-department-assignments": {
-      "status": "pending",
-      "seed": "unplanned",
-      "note": "no seed door written yet"
-    },
-    "project:record-presence-settings": {
-      "status": "pending",
-      "seed": "unplanned",
-      "note": "no seed door written yet"
-    },
     "prompt:seed-tags-for-untagged-organizations": {
       "status": "seeded",
       "seed": "heavy:rest.prompt.create",

@@ -389,6 +389,7 @@ Feature: Shared organization service
     When the organization presence upgrade step runs
     Then each organization's stored setting is recorded once
     And the step saves its checkpoint after each page, naming the page's last organization
+    And each page's settings are sent to the queue as one batch
 
   @unit
   Scenario: The organization presence step resumes after the last page it saved

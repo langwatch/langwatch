@@ -428,7 +428,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     Scenario: The project catch-up records every existing project's created fact
       Given projects created before the judge existed
       And a project whose created fact failed to write
-      When the project catch-up runs twice
+      When the project:record-created-facts step runs twice
       Then the judge knows each project's organization
       And each project appears once
 
@@ -436,7 +436,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     Scenario: A failed project created fact logs the catch-up that recovers it
       Given recording a new project's created fact fails
       When the failure is logged
-      Then the log names the backfill-project-created catch-up
+      Then the log names the project:record-created-facts step to retry in Ops
 
     @integration
     Scenario: The usage-billing catch-up gives every organization's answer

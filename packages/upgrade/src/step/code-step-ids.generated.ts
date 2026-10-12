@@ -23,8 +23,6 @@ export type CodeStepId =
   | "ops:seed-platform-operators"
   | "organization:record-presence-settings"
   | "project:record-created-facts"
-  | "project:record-department-assignments"
-  | "project:record-presence-settings"
   | "prompt:seed-tags-for-untagged-organizations"
   | "scenario:close-stalled-runs"
   | "scim:replay-sso-connection-view"

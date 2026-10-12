@@ -174,23 +174,7 @@
     "kind": "data",
     "mode": "background",
     "owner": "project",
-    "description": "Records every existing project as created, so the Instant Evals judge, nurturing and data privacy know it.",
-    "needsOldWritersGone": true
-  },
-  {
-    "id": "project:record-department-assignments",
-    "kind": "data",
-    "mode": "background",
-    "owner": "project",
-    "description": "Records every existing project's department, team and personal flag, for data privacy to fold.",
-    "needsOldWritersGone": true
-  },
-  {
-    "id": "project:record-presence-settings",
-    "kind": "data",
-    "mode": "background",
-    "owner": "project",
-    "description": "Records every existing project's presence setting, for presence to fold.",
+    "description": "Records every existing project as created, and each live project's department and presence setting.",
     "needsOldWritersGone": true
   },
   {

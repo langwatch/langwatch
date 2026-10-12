@@ -46,6 +46,19 @@ export interface ProjectWithOrgAdmin {
   organizationCreatedAt: Instant | null;
 }
 
+/** One stored project as the project facts step reads it, with its organization's oldest admin. */
+export type ProjectBackfillRow = Readonly<{
+  id: string;
+  createdAt: Instant;
+  organizationId: string;
+  teamId: string;
+  isPersonal: boolean;
+  departmentId: string | null;
+  presenceEnabled: boolean;
+  isArchived: boolean;
+  adminUserId: string | null;
+}>;
+
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
   findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
@@ -84,6 +97,8 @@ export interface ProjectRepository {
   touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
+  /** Every project, archived ones included, in id order after `afterId`. */
+  findBackfillPage(input: { afterId: string | null; limit: number }): Promise<ProjectBackfillRow[]>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;

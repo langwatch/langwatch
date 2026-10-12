@@ -15,8 +15,8 @@ import type { GroupRepository } from "../../repositories/group.repository.ts";
 import { MemoryOrganizationDatabase } from "../../repositories/memory/memory.organization.database.ts";
 import { MemoryOrganizationRepository } from "../../repositories/memory/memory.organization.repository.ts";
 import type { TeamRepository } from "../../repositories/team.repository.ts";
-import { OrganizationPresenceSettingBackfillTask } from "../../tasks/organization-presence-setting-backfill.task.ts";
 import { OrganizationLifecycleNoticeService } from "../organization-lifecycle-notice.service.ts";
+import { OrganizationPresenceSettingBackfillService } from "../organization-presence-setting-backfill.service.ts";
 import { OrganizationService, type OrganizationSettingsNotices } from "../organization.service.ts";
 import type { TeamIdentity } from "../team-identity.service.ts";
 
@@ -113,7 +113,7 @@ describe("given two organizations whose presence settings were stored before the
     seedOrganization("org_globex", false);
   });
 
-  describe("when the backfill-organization-presence-setting task runs twice", () => {
+  describe("when the presence step records every stored setting twice", () => {
     /** @scenario "Existing organizations' presence settings are recorded by the backfill, idempotently" */
     it("records each stored setting once per run, marked backfilled, with no changer", async () => {
       const sent: RecordPresenceSettingChangedCommandData[] = [];
@@ -140,20 +140,23 @@ describe("given two organizations whose presence settings were stored before the
         recordMemberRemoved: idle,
         recordMemberDepartmentChanged: idle,
         recordPresenceSettingChanged: {
-          send: async (data) => {
-            sent.push(data);
+          send: async () => undefined,
+          sendBatch: async (batch) => {
+            sent.push(...batch);
           },
         },
       });
       const service = serviceOver(notices);
-      const repository = MemoryOrganizationRepository.create({ memory: database });
-      const task = OrganizationPresenceSettingBackfillTask.create({
-        organizations: {
-          listAllIds: (input) => repository.listAllIds(input),
-          recordStoredPresenceSetting: (input) => service.recordStoredPresenceSetting(input),
-        },
+      const step = OrganizationPresenceSettingBackfillService.create({
+        peers: { recordPage: (input) => service.recordStoredPresenceSettingPage(input) },
       });
-      const backfill = () => task.run({ args: [], signal: new AbortController().signal });
+      const backfill = () =>
+        step.backfill({
+          after: undefined,
+          dryRun: false,
+          signal: new AbortController().signal,
+          onPage: async () => {},
+        });
 
       await backfill();
       const firstRun = sent.map(({ occurredAt: _at, ...rest }) => rest);

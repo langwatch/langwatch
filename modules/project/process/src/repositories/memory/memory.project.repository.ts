@@ -36,9 +36,10 @@ import {
   type ProjectUsageCount,
   type ProjectKind,
 } from "@langwatch/project-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type {
+  ProjectBackfillRow,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -235,6 +236,37 @@ export class MemoryProjectRepository implements ProjectRepository {
       onboardingVariant: organization?.onboardingVariant ?? null,
       organizationCreatedAt: organization?.createdAt ?? null,
     };
+  }
+
+  async findBackfillPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<ProjectBackfillRow[]> {
+    return this.#database
+      .projects()
+      .filter((project) => afterId === null || project.id > afterId)
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .flatMap((project) => {
+        const organization = this.#database.findOrganizationOf(project);
+        if (!organization) return [];
+        return [
+          {
+            id: project.id,
+            createdAt: fromDate(project.createdAt),
+            organizationId: organization.id,
+            teamId: project.teamId,
+            isPersonal: project.isPersonal,
+            departmentId: project.departmentId,
+            presenceEnabled: project.presenceEnabled,
+            isArchived: project.archivedAt !== null,
+            adminUserId: organization.adminUserIds[0] ?? null,
+          },
+        ];
+      })
+      .slice(0, limit);
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {

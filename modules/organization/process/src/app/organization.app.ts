@@ -1574,14 +1574,18 @@ export class OrganizationModule implements OrganizationApi, TeamManagementApi {
     });
   }
 
-  /** Records one organization's stored presence switch, for the backfill task. */
   /** Records the organizations routed to their own ClickHouse or S3; the worker's job calls it. */
   recordPrivateDataplanes(): Promise<{ organizations: number }> {
     return this.#privateDataplanes.recordSeen();
   }
 
-  recordStoredPresenceSetting(input: { organizationId: string }): Promise<boolean> {
-    return this.#dependencies.organizations.recordStoredPresenceSetting(input);
+  /** Records one page of organizations' stored presence switches, for the presence step. */
+  recordStoredPresenceSettingPage(input: {
+    afterOrganizationId: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<{ lastOrganizationId: string | null; organizations: number }> {
+    return this.#dependencies.organizations.recordStoredPresenceSettingPage(input);
   }
 
   connectLifecycle(senders: OrganizationLifecycleSenders): void {

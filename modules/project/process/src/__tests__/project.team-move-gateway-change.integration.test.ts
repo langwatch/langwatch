@@ -60,9 +60,7 @@ describe.skipIf(!DB_URL)("given a project in one of two teams of an organization
       logger: { error: () => void 0 },
       projects: {
         findWithOrgAdmin: async () => null,
-        findIdsByOrganization: async () => [],
         findWithTeam: async () => null,
-        findLiveWithTeamByIds: async () => [],
       },
     }),
     repository: PrismaProjectRepository.create({ prisma }),
@@ -189,9 +187,7 @@ describe.skipIf(!DB_URL)("given a project in one of two teams of an organization
           logger: { error: () => void 0 },
           projects: {
             findWithOrgAdmin: async () => null,
-            findIdsByOrganization: async () => [],
             findWithTeam: async () => null,
-            findLiveWithTeamByIds: async () => [],
           },
         }),
         repository: PrismaProjectRepository.create({ prisma: racingPrisma }),
