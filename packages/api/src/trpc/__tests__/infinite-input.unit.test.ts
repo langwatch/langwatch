@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { acceptingInfiniteQueryKeys } from "../infinite-input.ts";
+import { acceptingInfiniteQueryKeys, doorInputSchema } from "../infinite-input.ts";
 
 const pageInput = z
   .object({ projectId: z.string(), cursor: z.string().nullish(), limit: z.number() })
@@ -43,6 +43,32 @@ describe("acceptingInfiniteQueryKeys", () => {
       const parsed = acceptingInfiniteQueryKeys(sorted).safeParse({ direction: "desc" });
 
       expect(parsed.data).toEqual({ direction: "desc" });
+    });
+  });
+});
+
+describe("doorInputSchema", () => {
+  describe("given a query whose input declares direction", () => {
+    it("hands the declared direction to the schema", () => {
+      const paged = z.object({ direction: z.enum(["forward", "backward"]) }).strict();
+
+      const parsed = doorInputSchema({ kind: "query", input: paged }).safeParse({
+        direction: "backward",
+      });
+
+      expect(parsed.data).toEqual({ direction: "backward" });
+    });
+  });
+
+  describe("given a mutation", () => {
+    it("leaves the strict input as declared", () => {
+      const parsed = doorInputSchema({ kind: "mutation", input: pageInput }).safeParse({
+        projectId: "p1",
+        limit: 20,
+        direction: "forward",
+      });
+
+      expect(parsed.success).toBe(false);
     });
   });
 });

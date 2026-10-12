@@ -26,5 +26,10 @@ export function doorInputSchema<Schema extends z.ZodType>({
   kind: string;
   input: Schema;
 }): z.ZodType {
-  return kind === "query" ? acceptingInfiniteQueryKeys(input) : input;
+  if (kind !== "query" || declaresDirection(input)) return input;
+  return acceptingInfiniteQueryKeys(input);
+}
+
+function declaresDirection(schema: z.ZodType): boolean {
+  return schema instanceof z.ZodObject && "direction" in schema.shape;
 }
