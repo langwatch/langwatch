@@ -34,6 +34,7 @@ import {
 } from "../../../rules/system-migration-pass-summary.rules.ts";
 import type { SystemMigrationStateReader } from "../../../rules/system-migration-support.rules.ts";
 import { RoutingTableOrganizationDataplaneService } from "../../../services/organization-dataplane.service.ts";
+import type { SystemMigrationLegacyMirrorService } from "./system-migration-legacy-mirror.service.ts";
 import { SystemMigrationPassCohortService } from "./system-migration-pass-cohort.service.ts";
 import type { SystemMigrationPassRequestsService } from "./system-migration-pass-requests.service.ts";
 import type { SystemMigrationRollbackFactsService } from "./system-migration-rollback-facts.service.ts";
@@ -308,7 +309,10 @@ export class SystemMigrationPassService {
     rollbackFacts,
     declared,
     runListedWork,
+    legacyMirror,
   }: Pick<SystemMigrationPassOptions, "repositories" | "isSaaS" | "declared" | "runListedWork"> & {
+    /** Writes the moved steps' state and enrolments to ops' older tables too (Alex, 2026-10-12). */
+    legacyMirror?: SystemMigrationLegacyMirrorService;
     /** Tells a step's owner its tenant was rolled back (Alex, 2026-10-12). */
     rollbackFacts?: Pick<SystemMigrationRollbackFactsService, "record">;
     /** The clickhouse store's private routes (§7), read when a cohort or pass asks, not at boot. */
@@ -317,10 +321,14 @@ export class SystemMigrationPassService {
     passRequests: Pick<SystemMigrationPassRequestsService, "request">;
   }): OpsSystemMigrationRunner {
     const { identity, auditLog } = dependencies;
+    const state = legacyMirror ? legacyMirror.state(declared.state) : declared.state;
+    const enrollments = legacyMirror
+      ? legacyMirror.enrollments(repositories.migrationEnrollments)
+      : repositories.migrationEnrollments;
     const passes = SystemMigrationPassService.create({
       repositories,
       isSaaS,
-      declared,
+      declared: { ...declared, state },
       ...(runListedWork ? { runListedWork } : {}),
       newbornSweep: () => identity.newbornSweep().runPass(),
       dataplane: {
@@ -331,10 +339,10 @@ export class SystemMigrationPassService {
       },
     });
     return SystemMigrationsService.create({
-      state: declared.state,
+      state,
       migrations: () => declarationsOf({ steps: declared.steps() }),
       isSaaS,
-      enrollments: repositories.migrationEnrollments,
+      enrollments,
       privateDataplaneOrganizationIds: () => [...routes().keys()],
       audit: async ({ userId, organizationId, action, args }) => {
         await auditLog.record({

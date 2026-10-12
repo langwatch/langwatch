@@ -20,7 +20,7 @@ export class MemoryOpsMigrationRepository extends OpsMigrationRepository {
       Pick<MemoryTenantStepStateRepository, "findRecordsByStatus">;
     enrolments: Pick<
       MemorySystemMigrationEnrollmentRepository,
-      "findAll" | "isEnrolled" | "createMany"
+      "findAll" | "isEnrolled" | "createMany" | "delete"
     >;
   }): MemoryOpsMigrationRepository {
     return new MemoryOpsMigrationRepository(stores);
@@ -93,6 +93,26 @@ export class MemoryOpsMigrationRepository extends OpsMigrationRepository {
       }
     }
     return copied;
+  }
+
+  async withdrawEnrolmentsAfterRollout({
+    moves,
+    dryRun,
+  }: {
+    moves: MovedTenantSteps;
+    dryRun: boolean;
+  }): Promise<number> {
+    const legacyNames = new Map(Object.entries(moves).map(([legacy, stepId]) => [stepId, legacy]));
+    let withdrawn = 0;
+    for (const { organizationId, migrationName } of await this.stores.enrolments.findAll()) {
+      const legacyName = legacyNames.get(migrationName);
+      if (legacyName === undefined) continue;
+      if (await this.stores.enrolments.isEnrolled({ organizationId, migrationName: legacyName }))
+        continue;
+      withdrawn += 1;
+      if (!dryRun) await this.stores.enrolments.delete({ organizationId, migrationName });
+    }
+    return withdrawn;
   }
 
   async copyEnrolments({

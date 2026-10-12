@@ -301,6 +301,7 @@ import {
   type ProjectionReplayRequestSender,
   ReplayService,
 } from "../features/replay/services/replay.service.ts";
+import { SystemMigrationLegacyMirrorService } from "../features/system-migrations/services/system-migration-legacy-mirror.service.ts";
 import {
   type SystemMigrationPassRequestSender,
   SystemMigrationPassRequestsService,
@@ -315,6 +316,7 @@ import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metri
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
+import { MOVED_TO_OWNERS } from "../rules/system-migration-support.rules.ts";
 import {
   type AdminAccess,
   AdminAccessService,
@@ -2453,6 +2455,10 @@ function buildOpsInfrastructure(input: {
         dependencies,
         passRequests,
         ...(input.runListedWork ? { runListedWork: input.runListedWork } : {}),
+        legacyMirror: SystemMigrationLegacyMirrorService.create({
+          legacy: repositories.migrationState,
+          moves: MOVED_TO_OWNERS,
+        }),
         declared: {
           steps: () => (input.declaredMigrationSteps?.() ?? []).filter(isTenantMigrationStep),
           state: repositories.tenantStepState,

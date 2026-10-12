@@ -16,6 +16,7 @@ import { usageReportEventing } from "#eventing/ops-usage-report.pipeline";
 import { CheckupCanaryProjectService } from "#features/checkup/services/checkup-canary-project.service";
 import { upgradeAlertsEventing } from "#features/upgrades/eventing/ops-upgrade-alerts.pipeline";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
+import { MOVED_TO_OWNERS } from "#rules/system-migration-support.rules";
 import { CredentialsResealTask, credentialsResealCiphers } from "#tasks/credentials-reseal.task";
 import { GrantPlatformOperatorTask } from "#tasks/grant-platform-operator.task";
 import { ProcessManagerPurgeTask } from "#tasks/process-manager-purge.task";
@@ -33,15 +34,6 @@ import { opsTrpcTransport } from "#transport/ops.trpc";
 /** Ops-held migrations automation now declares: legacy name -> step id. Never edit (S6-COPY). */
 const MOVED_TO_AUTOMATION = {
   "automations-slack-connections": "automation:import-slack-connections",
-} as const satisfies Record<string, CodeStepId>;
-
-/** The identity and authz migrations ops held, now their owners' steps. Never edit (S6-COPY). */
-const MOVED_TO_OWNERS = {
-  "authz-engine": "authz:engine",
-  "identity-d01-identifier-backfill": "identity:identifier-backfill",
-  "identity-d01-secret-heal": "identity:secret-heal",
-  "identity-d04-connection-grandfather": "identity:connection-grandfather",
-  "identity-sso-domain-ownership-backfill": "identity:sso-domain-ownership-backfill",
 } as const satisfies Record<string, CodeStepId>;
 
 export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerConfig> =
@@ -158,9 +150,17 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
             moves: MOVED_TO_OWNERS,
             dryRun,
           });
+          const enrolmentsWithdrawn = await repositories.migration.withdrawEnrolmentsAfterRollout({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
           return dryRun
-            ? { wouldCopy: copied, wouldCopyEnrolments: enrolmentsCopied }
-            : { copied, enrolmentsCopied };
+            ? {
+                wouldCopy: copied,
+                wouldCopyEnrolments: enrolmentsCopied,
+                wouldWithdrawEnrolments: enrolmentsWithdrawn,
+              }
+            : { copied, enrolmentsCopied, enrolmentsWithdrawn };
         },
       }),
       defineMigrationStep({

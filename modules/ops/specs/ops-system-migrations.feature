@@ -104,6 +104,23 @@ Feature: Ops runs the system migration passes and names their cohorts
     Then the re-copy finalizes "late", rolls back "pulled" and holds "unproven" for another pass
     And "pinned" keeps its rollback, and a second run copies nothing
 
+  # Expand then contract (Alex, 2026-10-12): until a later release, the moved steps write both tables.
+  @unit
+  Scenario: A rollback to the older release after a tenant finished on the new step keeps it on its new path
+    Given the older release reads only ops' older migration table
+    When a pass finishes organization "acme" on the authorization engine step and users "ann" and "sam" on the identifier backfill step
+    And an operator rolls "sam" back from the identifier backfill step
+    Then ops' older table reads "acme" and "ann" finished under the old names, so the older release keeps them on the new path
+    And it reads "sam" rolled back under the identifier backfill's old name
+
+  @unit
+  Scenario: A withdrawal made on the older page during the rollout is withdrawn on the new step by the re-copy
+    Given organizations "acme" and "beta" were enrolled in the authorization engine migration and the copy carried them over
+    And an operator enrolled "gamma" and withdrew "acme" on the new page, which writes both names
+    And an operator withdrew "beta" on the older page during the rollout
+    When the re-copy runs once no older image is running
+    Then only "gamma" is enrolled in the authorization engine step, and a second run withdraws nothing
+
   @unit
   Scenario: The re-copy waits for older images and for identity's reopen step
     Given ops declares its migration steps

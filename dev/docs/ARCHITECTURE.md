@@ -1510,7 +1510,7 @@ migrations page, enrolment, the targeted run and the pass over its Redis lease, 
 process package. Identity, authz and automation have moved: each declares its tenant steps, and ops
 reads its old `SystemMigration*` tables only to copy them; when an owner moved, its `finalized` and
 `rolled_back` rows and enrolments were copied, never moved, into the framework table by a background
-step, and copied again once no older image writes the old table (Alex, 2026-10-12). The api serves the page and awaits a targeted run
+step, and copied again once no older image writes the old table, withdrawn enrolments included (Alex, 2026-10-12). Until a later release stops it, ops also writes each moved step's finished and rolled-back tenants, enrolments and withdrawals to the old tables under the old names, so a rollback to the older image reads them (expand then contract; Alex, 2026-10-12). The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).

@@ -102,6 +102,35 @@ export class PrismaOpsMigrationRepository extends OpsMigrationRepository {
     );
   }
 
+  async withdrawEnrolmentsAfterRollout({
+    moves,
+    dryRun,
+  }: {
+    moves: MovedTenantSteps;
+    dryRun: boolean;
+  }): Promise<number> {
+    const names = [Object.keys(moves), Object.values(moves)];
+    const twinGone = `NOT EXISTS (SELECT 1 FROM "SystemMigrationEnrollment" e
+                       WHERE e."migrationName" = moved."legacy_name"
+                         AND e."organizationId" = n."organizationId")`;
+    if (dryRun) {
+      const [row] = await this.prisma.$queryRawUnsafe<{ count: bigint }[]>(
+        `${ENROLMENT_TENANCY}SELECT count(*) AS "count" FROM "SystemMigrationEnrollment" n
+           JOIN unnest($1::text[], $2::text[]) AS moved("legacy_name", "step_id")
+             ON moved."step_id" = n."migrationName"
+          WHERE ${twinGone}`,
+        ...names,
+      );
+      return Number(row?.count ?? 0);
+    }
+    return this.prisma.$executeRawUnsafe(
+      `${ENROLMENT_TENANCY}DELETE FROM "SystemMigrationEnrollment" n
+        USING unnest($1::text[], $2::text[]) AS moved("legacy_name", "step_id")
+        WHERE n."migrationName" = moved."step_id" AND ${twinGone}`,
+      ...names,
+    );
+  }
+
   async copyEnrolments({
     moves,
     dryRun,

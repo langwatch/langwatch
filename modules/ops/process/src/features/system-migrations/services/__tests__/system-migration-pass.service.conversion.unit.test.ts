@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- * The identity and authz migrations ops held, moved to their owners' declared steps in one
- * release: their state carried over, re-copied after the rollout, driven, run and rolled back.
+ * The identity and authz migrations ops held, moved to their owners' steps in one release: state
+ * copied, re-copied, driven, run, rolled back, and written to ops' older tables too.
  * Spec: modules/ops/specs/ops-system-migrations.feature
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -23,6 +23,7 @@ import { MemoryOpsRepositories } from "../../../../repositories/memory/memory.op
 import { MemorySystemMigrationEnrollmentRepository } from "../../../../repositories/memory/memory.system-migration-enrollment.repository.ts";
 import { MemorySystemMigrationStateRepository } from "../../../../repositories/memory/memory.system-migration-state.repository.ts";
 import { NullQueueRepository } from "../../../../repositories/queue.repository.ts";
+import { SystemMigrationLegacyMirrorService } from "../system-migration-legacy-mirror.service.ts";
 import { SystemMigrationPassService } from "../system-migration-pass.service.ts";
 
 const ENGINE = "authz:engine";
@@ -71,6 +72,7 @@ function world({ oldWritersGone = true }: { oldWritersGone?: boolean } = {}) {
   const state = MemoryTenantStepStateRepository.create();
   const enrolments = MemorySystemMigrationEnrollmentRepository.create();
   const copy = MemoryOpsMigrationRepository.create({ legacy, steps: state, enrolments });
+  const mirror = SystemMigrationLegacyMirrorService.create({ legacy, moves: MOVES });
   const migrateEngine = vi.fn(async (_tenant: { tenantId: string }) => ({
     status: "finalized" as const,
   }));
@@ -96,6 +98,7 @@ function world({ oldWritersGone = true }: { oldWritersGone?: boolean } = {}) {
     organizationTenants: pageOf(["acme"]),
     userTenants: pageOf(["ann", "gil", "sam"]),
     organizationMemberTenants: { membersOf: () => pageOf(["ann", "sam"]) },
+    migrationEnrollments: enrolments,
   };
   const declared = {
     steps: () => steps,
@@ -115,6 +118,7 @@ function world({ oldWritersGone = true }: { oldWritersGone?: boolean } = {}) {
     isSaaS: () => false,
     routes: () => new Map(),
     declared,
+    legacyMirror: mirror,
     rollbackFacts: { record: recordRolledBack },
     dependencies: {
       identity: createApiFixture<IdentityApi>({}),
@@ -134,8 +138,17 @@ function world({ oldWritersGone = true }: { oldWritersGone?: boolean } = {}) {
     tenantId: string,
     status: "finalized" | "rolled_back" | "migrated",
   ) => legacy.upsertRecord({ migrationName, tenantId, status, report: null });
+  const legacyStatusOf = (migrationName: string, tenantId: string) =>
+    legacy.getRecord({ migrationName, tenantId }).then(
+      ({ status }) => status,
+      () => null,
+    );
   return {
     legacyRow,
+    legacyStatusOf,
+    enrolments,
+    /** The enrolment store the migrations page writes through. */
+    pageEnrolments: mirror.enrollments(enrolments),
     state,
     copy,
     passes,
@@ -250,6 +263,51 @@ describe("converting the identity and authz migrations to their owners' steps", 
       expect(recordRolledBack).toHaveBeenCalledWith(
         expect.objectContaining({ migrationName: ENGINE, tenantId: "acme", actorUserId: "op" }),
       );
+    });
+  });
+  describe("given the older release could still be rolled back to", () => {
+    /** @scenario "A rollback to the older release after a tenant finished on the new step keeps it on its new path" */
+    it("writes each finish and rollback to ops' older table under the old name", async () => {
+      const { console, legacyStatusOf, statusOf } = world();
+
+      await console.runConvergencePass({ signal: new AbortController().signal });
+      await console.rollBack({ migrationName: BACKFILL, tenantId: "sam", actorUserId: "op" });
+
+      expect(await statusOf(ENGINE, "acme")).toEqual({ status: "finalized", heldReason: null });
+      expect(await legacyStatusOf("authz-engine", "acme")).toBe("finalized");
+      expect(await legacyStatusOf("identity-d01-identifier-backfill", "ann")).toBe("finalized");
+      expect(await legacyStatusOf("identity-d01-identifier-backfill", "sam")).toBe("rolled_back");
+    });
+  });
+
+  describe("given an operator withdrew an organization on the older page during the rollout", () => {
+    /** @scenario "A withdrawal made on the older page during the rollout is withdrawn on the new step by the re-copy" */
+    it("withdraws it on the new step and keeps what the new page enrolled", async () => {
+      const { copy, enrolments, pageEnrolments } = world();
+      const enrolledBy = "op";
+      await enrolments.createMany({
+        organizationIds: ["acme", "beta"],
+        migrationName: "authz-engine",
+        enrolledByUserId: enrolledBy,
+      });
+      await copy.copyEnrolments({ moves: MOVES, dryRun: false });
+      await pageEnrolments.create({
+        organizationId: "gamma",
+        migrationName: ENGINE,
+        enrolledByUserId: enrolledBy,
+      });
+      await pageEnrolments.delete({ organizationId: "acme", migrationName: ENGINE });
+      await enrolments.delete({ organizationId: "beta", migrationName: "authz-engine" });
+
+      expect(await copy.withdrawEnrolmentsAfterRollout({ moves: MOVES, dryRun: true })).toBe(1);
+      expect(await copy.copyEnrolments({ moves: MOVES, dryRun: false })).toBe(0);
+      expect(await copy.withdrawEnrolmentsAfterRollout({ moves: MOVES, dryRun: false })).toBe(1);
+
+      const enrolled = (await enrolments.findAll())
+        .filter(({ migrationName }) => migrationName === ENGINE)
+        .map(({ organizationId }) => organizationId);
+      expect(enrolled).toEqual(["gamma"]);
+      expect(await copy.withdrawEnrolmentsAfterRollout({ moves: MOVES, dryRun: false })).toBe(0);
     });
   });
 });

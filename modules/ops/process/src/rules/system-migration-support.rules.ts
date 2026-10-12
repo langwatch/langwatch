@@ -7,7 +7,17 @@ import type {
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
+import type { CodeStepId } from "@langwatch/upgrade/step";
 import type { TenantStepStateRow } from "@langwatch/upgrade/step/tenant-state";
+
+/** The identity and authz migrations ops held, now their owners' steps. Never edit (S6-COPY). */
+export const MOVED_TO_OWNERS = {
+  "authz-engine": "authz:engine",
+  "identity-d01-identifier-backfill": "identity:identifier-backfill",
+  "identity-d01-secret-heal": "identity:secret-heal",
+  "identity-d04-connection-grandfather": "identity:connection-grandfather",
+  "identity-sso-domain-ownership-backfill": "identity:sso-domain-ownership-backfill",
+} as const satisfies Record<string, CodeStepId>;
 
 /**
  * The statuses a tenant may be rolled back from. What `migrated` means is each migration's own
