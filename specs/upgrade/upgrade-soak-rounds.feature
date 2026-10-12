@@ -286,6 +286,13 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
     And a refused kind is named while the others are still created
 
   @unit
+  Scenario: Tier M makes its organizations before any telemetry and sends the telemetry in waves
+    Given a running main reachable only by its URL
+    When the heavy seed runs with a worker backlog above the pace limit
+    Then every organization is created before the first telemetry request
+    And the telemetry goes out in waves, each waiting for the backlog to drain
+
+  @unit
   Scenario: A heavy seed packs cells into requests up to the chunk bounds without changing a single id or timestamp
     Given a plan's telemetry chunks, each one cell of one project
     When the heavy seed packs them into requests

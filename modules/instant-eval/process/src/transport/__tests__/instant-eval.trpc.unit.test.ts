@@ -220,7 +220,10 @@ describe("given the instantEval router", () => {
         classified: "instant_eval",
         isInstantEvalAvailable: true,
       });
-      expect(classifySearch).toHaveBeenCalledWith(CLASSIFY_REQUEST);
+      expect(classifySearch).toHaveBeenCalledWith({
+        ...CLASSIFY_REQUEST,
+        actor: { id: "reader-1", type: "user" },
+      });
       expect(permissions).toEqual(["analytics:view"]);
     });
   });

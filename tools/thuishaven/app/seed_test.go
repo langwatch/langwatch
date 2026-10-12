@@ -264,7 +264,7 @@ func TestAFailedSeedNamesSeedgensReason(t *testing.T) {
 	}
 }
 
-// @scenario "A stalled seed is reported as stalled with seedgen's own message"
+// @scenario "A seed that stays paused stops with a checkpoint and resumes later"
 func TestAStalledSeedIsReportedAsStalled(t *testing.T) {
 	sup := &fakeSupervisor{err: exit2Error(t)}
 	o := seedOrchestrator(t, sup, seedStack())

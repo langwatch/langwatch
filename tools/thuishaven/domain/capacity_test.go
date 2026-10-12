@@ -57,6 +57,8 @@ func TestNextCapacityTierDoesNotFlap(t *testing.T) {
 	}
 }
 
+// @scenario "A quiet machine grows the check budget and run widths"
+// @scenario "A check gives way to a boot someone is waiting on"
 func TestResolveCapacity(t *testing.T) {
 	quiet := CapacityReading{Tier: CapacityQuiet, Load1: 1.2, NumCPU: 10}
 	busy := CapacityReading{Tier: CapacityNormal, Load1: 40, NumCPU: 10}

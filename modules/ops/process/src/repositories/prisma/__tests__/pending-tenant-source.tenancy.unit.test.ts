@@ -16,6 +16,24 @@ const walkedRows = {
   findMany: async () => [],
 };
 
+/** What Prisma hands the guard: a nested `Sql` (the skip marker) is folded into the text. */
+function flattenedSql({
+  strings,
+  values,
+}: {
+  strings: TemplateStringsArray;
+  values: unknown[];
+}): string {
+  return strings.reduce((text, part, index) => {
+    const value = values[index - 1];
+    const nested =
+      typeof value === "object" && value !== null && "sql" in value && typeof value.sql === "string"
+        ? value.sql
+        : "?";
+    return text + nested + part;
+  });
+}
+
 /** The `Sql` shape `db.ts` hands the guard — anything else makes it read
  *  nothing and wave the query through, proving nothing. */
 function guardedPrisma(rows: unknown[]): {
@@ -37,7 +55,7 @@ function guardedPrisma(rows: unknown[]): {
           {
             model: void 0,
             action: "queryRaw",
-            args: { strings, values },
+            args: { query: flattenedSql({ strings, values }) },
             dataPath: [],
             runInTransaction: false,
           } as never,
