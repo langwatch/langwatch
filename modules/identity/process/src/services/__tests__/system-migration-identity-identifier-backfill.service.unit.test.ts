@@ -30,18 +30,15 @@ describe("the identifier backfill migration", () => {
   describe("when the runner reads its declaration", () => {
     /** @scenario "Finalizing a user's backfill opens their write gate" */
     /** @scenario "The identifier backfill waits for enrollment and migrates one user per tenant" */
-    it("registers under the name the write gate reads, dark and operator-free", () => {
+    it("registers under the name the write gate reads, operator-free and run automatically", () => {
       const migration = IdentityIdentifierBackfillMigrationService.create({
         backfill: { migrateUser: vi.fn() },
         maxQueuedJobs: 5_000,
       });
       expect(migration.name).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
       expect(migration.requiresOperatorConfirmation).toBe(false);
-      expect(migration.runsAutomaticallyOnSelfHosted).toBe(false);
-      // Still paced by enrollment on cloud: the identity rollout has not
-      // finished, so deploying it must keep changing nothing until an
-      // operator enrolls an organization.
-      expect(migration.enrolledAutomatically).toBe(false);
+      expect(migration.runsAutomaticallyOnSelfHosted).toBe(true);
+      expect(migration.enrolledAutomatically).toBe(true);
     });
   });
 });

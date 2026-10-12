@@ -41,6 +41,7 @@ const metricNames = [
   // ADR-066 pillar 2 mixed-command isolation
   "gq_foreign_siblings_restaged_total",
   "gq_jobs_unroutable_total",
+  "gq_jobs_recovered_total",
   "gq_batch_bisections_total",
   // Work-conserving override visibility
   "gq_jobs_dispatched_override_total",

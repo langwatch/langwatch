@@ -106,7 +106,9 @@ function serviceFor({ budget = 10 }: { budget?: number } = {}): IdentityLookupSe
     sessions: createApiFixture<IdentityLookupServiceDeps["sessions"]>({
       listBrowserSessions: async () => [],
     }),
-    invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({}),
+    invitations: createApiFixture<IdentityLookupServiceDeps["invitations"]>({
+      findPendingInvitationsByEmail: async () => [],
+    }),
     auditLog,
     rateLimiter: fakeRateLimiter(budget),
   });
