@@ -14,6 +14,12 @@ import (
 // pingTimeout bounds one ping of a relay waiting for Twilio.
 const pingTimeout = 10 * time.Second
 
+// errRelayEnded stops a worker pump that waited on a join that never came.
+var errRelayEnded = errors.New("relay ended before Twilio joined")
+
+// errNotPaired ends a relay whose worker sent a frame before Twilio joined.
+var errNotPaired = errors.New("worker sent a frame before Twilio joined")
+
 type side int
 
 const (
@@ -55,6 +61,8 @@ type relay struct {
 	joined chan *websocket.Conn
 	// done closes when the slot is released.
 	done chan struct{}
+	// endedWith is the close code the worker got, set before done closes.
+	endedWith websocket.StatusCode
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -142,7 +150,10 @@ func (rl *relay) awaitTwilio() (*websocket.Conn, ending, bool) {
 			return nil, ending{outcome: OutcomeExpiredUnpaired, worker: closeFrame{CloseExpired, "relay_expired"}}, false
 		case <-ping.C:
 			go rl.ping()
-		case <-rl.ends:
+		case end := <-rl.ends:
+			if errors.Is(end.err, errNotPaired) {
+				return nil, ending{outcome: OutcomeRefusedUnpaired, worker: closeFrame{websocket.StatusPolicyViolation, "relay_not_paired"}}, false
+			}
 			return nil, ending{}, false
 		case <-h.drainOver:
 			return nil, ending{worker: closeFrame{CloseDrain, "relay_drain"}}, false
@@ -214,6 +225,7 @@ func isNormalClose(err error) bool {
 // finish counts the outcome and gives the slot back before it touches either
 // socket, so a peer that is slow to answer its close holds neither up.
 func (rl *relay) finish(end ending) {
+	rl.endedWith = end.worker.code
 	if end.outcome != "" {
 		rl.hub.metrics.RecordVoiceMediaRelay(end.outcome)
 	}
@@ -242,8 +254,8 @@ func (rl *relay) finish(end ending) {
 }
 
 // pump moves messages from one socket to the other, verbatim and in order,
-// until either fails. The worker's pump holds a message read before Twilio
-// joined until Twilio does.
+// until either fails. A worker message read before Twilio joined ends the
+// relay: nothing could carry it, and the pump would stop answering pings.
 func (rl *relay) pump(from side) {
 	for {
 		kind, data, err := rl.source(from).Read(rl.ctx)
@@ -251,8 +263,9 @@ func (rl *relay) pump(from side) {
 			rl.ends <- pumpEnd{side: from, err: err}
 			return
 		}
-		dst, ok := rl.destination(from)
-		if !ok {
+		dst, err := rl.destination(from)
+		if err != nil {
+			rl.ends <- pumpEnd{side: from, err: err}
 			return
 		}
 		if err := rl.write(dst, kind, data); err != nil {
@@ -269,16 +282,25 @@ func (rl *relay) source(from side) *websocket.Conn {
 	return rl.worker
 }
 
-// destination waits for Twilio to join when the worker speaks first.
-func (rl *relay) destination(from side) (*websocket.Conn, bool) {
+// destination is the other socket. A worker speaking before Twilio claimed
+// the relay has none; once claimed, the wait spans only Twilio's accept.
+func (rl *relay) destination(from side) (*websocket.Conn, error) {
 	if from != sideWorker {
-		return rl.worker, true
+		return rl.worker, nil
 	}
 	select {
 	case <-rl.paired:
-		return rl.twilio, true
-	case <-rl.ctx.Done():
-		return nil, false
+		return rl.twilio, nil
+	default:
+	}
+	if !rl.hub.isClaimed(rl) {
+		return nil, errNotPaired
+	}
+	select {
+	case <-rl.paired:
+		return rl.twilio, nil
+	case <-rl.done:
+		return nil, errRelayEnded
 	}
 }
 

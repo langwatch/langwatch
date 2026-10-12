@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -19,19 +20,38 @@ import (
 // the gateway joins the two sockets. The worker is authenticated by a license
 // token or a signed request; Twilio by the unguessable id alone.
 
+var orgIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
+
 // mountMediaRelayRoutes registers the three relay routes under /v1.
 func mountMediaRelayRoutes(v1 chi.Router, deps RouterDeps) {
 	hub := deps.MediaRelay
 	// No auth header can reach this route: Twilio sends none.
 	v1.Get("/voice/twilio/{id}", twilioSocketHandler(deps))
 	v1.Group(func(group chi.Router) {
-		group.Use(countAuthRefusals(hub, AuthMiddleware(deps.App.Auth())))
+		group.Use(refuseBody(deps), countAuthRefusals(hub, AuthMiddleware(deps.App.Auth())))
 		group.Get("/voice/relay", licensedRelayHandler(deps))
 	})
 	v1.Group(func(group chi.Router) {
-		group.Use(countAuthRefusals(hub, InternalAuthMiddleware(deps.InternalSecret)))
+		group.Use(refuseBody(deps), countAuthRefusals(hub, InternalAuthMiddleware(deps.InternalSecret)))
 		group.Get("/voice/relay/{orgId}", signedRelayHandler(deps))
 	})
+}
+
+// refuseBody turns away a relay open that carries a body. It runs before
+// authentication, which may buffer the body to verify a signature.
+func refuseBody(deps RouterDeps) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength != 0 || len(r.TransferEncoding) > 0 || (r.Body != nil && r.Body != http.NoBody) {
+				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+					"message": "a relay open carries no body",
+					"fault":   "customer",
+				}))
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // countAuthRefusals counts every request auth turns away, so the credential
@@ -75,7 +95,17 @@ func licensedRelayHandler(deps RouterDeps) http.HandlerFunc {
 // in the signed path, so one signature is good for one organization.
 func signedRelayHandler(deps RouterDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		openRelay(deps, "org:"+chi.URLParam(r, "orgId"))(w, r)
+		orgID := chi.URLParam(r, "orgId")
+		// The raw segment: the signature covers the decoded path, so an escaped
+		// spelling must not name a scope the signature did not.
+		if !orgIDPattern.MatchString(orgID) {
+			writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+				"message": "the organization id must be 1 to 64 letters, digits, hyphens or underscores",
+				"fault":   "customer",
+			}))
+			return
+		}
+		openRelay(deps, "org:"+orgID)(w, r)
 	}
 }
 

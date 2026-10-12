@@ -106,6 +106,9 @@ type VoiceConfig struct {
 	// MaxPendingRelaysPerScope caps the relays one instance or organization
 	// holds while still waiting for Twilio.
 	MaxPendingRelaysPerScope int `env:"MAX_PENDING_RELAYS_PER_SCOPE"`
+	// MaxRelaysPerScope caps all the relays one instance or organization
+	// holds, paired or not.
+	MaxRelaysPerScope int `env:"MAX_RELAYS_PER_SCOPE"`
 }
 
 // CORSConfig lets browser pages call the public /v1 routes directly.
@@ -251,6 +254,7 @@ func defaultConfig() Config {
 			MaxRelaySeconds:          330,
 			MaxMediaRelays:           500,
 			MaxPendingRelaysPerScope: 20,
+			MaxRelaysPerScope:        50,
 		},
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable from
@@ -385,6 +389,9 @@ func validateMediaRelayLimits(voice VoiceConfig) error {
 	}
 	if voice.MaxPendingRelaysPerScope < 0 {
 		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE is %d; it must be zero or positive", voice.MaxPendingRelaysPerScope)
+	}
+	if voice.MaxRelaysPerScope < 0 {
+		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE is %d; it must be zero or positive", voice.MaxRelaysPerScope)
 	}
 	return nil
 }

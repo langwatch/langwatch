@@ -15,6 +15,7 @@ var mediaRelayEnv = []string{
 	"LW_GATEWAY_VOICE_MAX_RELAY_SECONDS",
 	"LW_GATEWAY_VOICE_MAX_MEDIA_RELAYS",
 	"LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE",
+	"LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE",
 	"GATEWAY_POD_IP",
 }
 
@@ -38,6 +39,7 @@ func TestLoadConfig_MediaRelayDefaults(t *testing.T) {
 	t.Run("maximum relay duration", func(t *testing.T) { assert.Equal(t, int64(330), cfg.Voice.MaxRelaySeconds) })
 	t.Run("maximum relays", func(t *testing.T) { assert.Equal(t, 500, cfg.Voice.MaxMediaRelays) })
 	t.Run("pending relays per scope", func(t *testing.T) { assert.Equal(t, 20, cfg.Voice.MaxPendingRelaysPerScope) })
+	t.Run("relays per scope", func(t *testing.T) { assert.Equal(t, 50, cfg.Voice.MaxRelaysPerScope) })
 	t.Run("pod address", func(t *testing.T) { assert.Empty(t, cfg.PodIP) })
 }
 
@@ -48,6 +50,7 @@ func TestLoadConfig_MediaRelayOverrides(t *testing.T) {
 		"LW_GATEWAY_VOICE_MAX_RELAY_SECONDS":            "60",
 		"LW_GATEWAY_VOICE_MAX_MEDIA_RELAYS":             "7",
 		"LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE": "3",
+		"LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE":         "4",
 		"GATEWAY_POD_IP":                                "10.1.2.3",
 	})
 	require.NoError(t, err)
@@ -56,12 +59,13 @@ func TestLoadConfig_MediaRelayOverrides(t *testing.T) {
 	t.Run("maximum relay duration", func(t *testing.T) { assert.Equal(t, int64(60), cfg.Voice.MaxRelaySeconds) })
 	t.Run("maximum relays", func(t *testing.T) { assert.Equal(t, 7, cfg.Voice.MaxMediaRelays) })
 	t.Run("pending relays per scope", func(t *testing.T) { assert.Equal(t, 3, cfg.Voice.MaxPendingRelaysPerScope) })
+	t.Run("relays per scope", func(t *testing.T) { assert.Equal(t, 4, cfg.Voice.MaxRelaysPerScope) })
 	t.Run("pod address", func(t *testing.T) { assert.Equal(t, "10.1.2.3", cfg.PodIP) })
 }
 
 // @scenario "Relay limits come from the environment"
 func TestLoadConfig_MediaRelayRefusesNegativeValues(t *testing.T) {
-	for _, name := range mediaRelayEnv[:4] {
+	for _, name := range mediaRelayEnv[:5] {
 		t.Run(name, func(t *testing.T) {
 			_, err := loadWithMediaRelayEnv(t, map[string]string{name: "-1"})
 

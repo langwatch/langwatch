@@ -41,7 +41,7 @@ Feature: Twilio media relay on the AI Gateway
       Then both responses are 400 bad_request
 
     @integration
-    Scenario: A cloud worker opens a relay with a request signed for one organisation
+    Scenario: A cloud worker opens a relay with a request signed for one organization
       When the worker upgrades GET /v1/voice/relay/org-1 with a valid HMAC signature over that path
       Then the first frame is the ready frame with a relay id
 
@@ -73,10 +73,44 @@ Feature: Twilio media relay on the AI Gateway
         | credential                                  | code                    |
         | a bad signature                             | invalid_signature       |
         | a signature 301 seconds old                 | timestamp_out_of_window |
-        | a signature over another organisation path  | invalid_signature       |
+        | a signature over another organization path  | invalid_signature       |
         | a signature over /v1/voice/relay            | invalid_signature       |
         | no signature headers                        | missing_signature       |
         | only an lwl_ bearer token                   | missing_signature       |
+
+    @integration
+    Scenario Outline: A relay open that carries a body is refused before authentication
+      When <route> is sent a request with a 1 MiB body and valid credentials
+      Then the response is 400 bad_request
+      And no part of the body was read
+      And no relay slot is taken
+
+      Examples:
+        | route                                  |
+        | GET /v1/voice/relay                    |
+        | GET /v1/voice/relay/org-1              |
+        | GET /v1/voice/relay/org-1, chunked     |
+
+    @integration
+    Scenario Outline: An organization id outside the allowed set is refused before upgrade
+      When a signed relay is opened for the organization path <path>
+      Then the response is 400 or 401
+      And no WebSocket is opened
+      And no relay slot is taken
+
+      Examples:
+        | path                  |
+        | /v1/voice/relay/%41   |
+        | /v1/voice/relay/%5F   |
+        | /v1/voice/relay/a%2Fb |
+        | /v1/voice/relay/org%201 |
+        | /v1/voice/relay/org.1 |
+        | an id of 65 characters |
+
+    @integration
+    Scenario: An organization id of 64 allowed characters still opens a relay
+      When a signed relay is opened for an id of 64 letters, digits, hyphens and underscores
+      Then the first frame is the ready frame with a relay id
 
     @integration
     Scenario: A gateway without an internal secret refuses signed relays
@@ -141,6 +175,21 @@ Feature: Twilio media relay on the AI Gateway
       Given the gateway knows its own pod address
       When a relay is opened and joined
       Then frames pass between the two sockets
+
+    @integration
+    Scenario: A worker that speaks before Twilio joins is closed with 1008
+      Given an open relay that Twilio has not joined
+      When the worker sends a data frame
+      Then the worker is closed with 1008 and reason "relay_not_paired"
+      And its slot is free
+      And one relay outcome is counted besides "opened"
+      And a later Twilio connect with that id gets 403
+
+    @integration
+    Scenario: A relay that ended between the claim and the upgrade closes Twilio with a code
+      Given Twilio has claimed a relay id and its upgrade is not yet complete
+      When the worker leaves before the upgrade completes
+      Then Twilio's socket is closed with a close code, not dropped
 
   # ============================================================
   Rule: A relay nobody joins expires
@@ -254,9 +303,9 @@ Feature: Twilio media relay on the AI Gateway
     @integration
     Scenario: One scope cannot hold more pending relays than its cap
       Given a cap of two pending relays per scope
-      When one instance or one organisation has two pending relays and opens a third
+      When one instance or one organization has two pending relays and opens a third
       Then the third is refused with 503 "voice_relay_unavailable"
-      And another instance or organisation can still open one
+      And another instance or organization can still open one
 
     @integration
     Scenario: Joined relays do not count against the pending cap
@@ -264,6 +313,52 @@ Feature: Twilio media relay on the AI Gateway
       When the scope's relay is joined by Twilio
       Then the scope can open another relay
       And a further open while that one is pending is refused
+
+    @integration
+    Scenario: One scope cannot hold more relays in total than its cap
+      Given a cap of two relays per scope and a higher pending cap
+      When one instance holds two joined relays and opens a third
+      Then the third is refused with 503 "voice_relay_unavailable"
+      And it carries a Retry-After header
+      And another instance or organization can still open one
+
+    @integration
+    Scenario: A scope's slot is reusable once one of its relays ends
+      Given a scope at its cap of joined relays
+      When one of its relays ends
+      Then the scope can open a new relay
+
+    @integration
+    Scenario: The total cap per scope defaults to 50
+      Given no cap per scope is configured
+      When one instance holds 50 joined relays and opens another
+      Then the response is 503 "voice_relay_unavailable"
+
+    @integration
+    Scenario: A shutdown signal starts the drain
+      Given a hub started with a context
+      When the context ends
+      Then a new relay is refused with 503 and a Retry-After header
+
+    @integration
+    Scenario: A paired relay is closed with 1012 once a shutdown signal and the drain budget pass
+      Given a relay joined by a Twilio-shaped client on a hub started with a context
+      When the context ends and the drain budget passes
+      Then the worker is closed with 1012 and reason "relay_drain"
+
+    @integration
+    Scenario: Stopping the hub returns once every relay has ended
+      Given a joined relay and a short drain budget
+      When the hub is stopped with a generous deadline
+      Then Stop returns without an error
+      And no relay is held
+
+    @integration
+    Scenario: Stopping the hub returns the deadline error when the deadline passes first
+      Given a joined relay and a long drain budget
+      When the hub is stopped with a short deadline
+      Then Stop returns the deadline error
+      And the relay is then closed with 1012 and reason "relay_drain"
 
   # ============================================================
   Rule: Every relay outcome is counted
@@ -282,6 +377,7 @@ Feature: Twilio media relay on the AI Gateway
         | refused_unknown  | Twilio connects with a random string           |
         | refused_expired  | Twilio connects with an expired id             |
         | refused_replay   | Twilio connects with an id already joined      |
+        | refused_unpaired | the worker sends a frame before Twilio joins   |
         | expired_unpaired | nobody joins a relay in time                   |
         | dropped          | Twilio's TCP connection drops                  |
         | completed        | Twilio closes the stream with 1000             |
@@ -392,6 +488,7 @@ Feature: Twilio media relay on the AI Gateway
       And the maximum relay duration defaults to 330 seconds
       And the maximum number of relays defaults to 500
       And the pending relays per scope default to 20
+      And the relays per scope default to 50
       And the pod address defaults to empty
       And each can be overridden from the environment
       And a negative value is refused

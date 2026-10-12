@@ -3187,7 +3187,7 @@ Ignore fields you do not recognize. New ones are added over time and none of the
 | `voice_broker_unavailable`       | 503  | The gateway instance is at its limit of supervised voice calls, or is shutting down. No call was created.                                                  | Retry after the `Retry-After` header.                                                           |
 | `voice_relay_license_required` | 403 | A Twilio media relay was opened with a virtual key. Only a license token, or a request signed by the control plane, may open one. | Open the relay with the install's `lwl_` token and `X-LangWatch-Instance`. |
 | `voice_relay_forbidden` | 403 | Twilio's socket was refused: the relay id is unknown, expired, already used, or belongs to another gateway pod. The answer is the same for every reason. | Open a new relay and place the call again. |
-| `voice_relay_unavailable` | 503 | The gateway instance is full, is shutting down, or the caller already has its maximum of relays waiting for Twilio. No relay was opened. | Retry after the `Retry-After` header. |
+| `voice_relay_unavailable` | 503 | The gateway instance is full, is shutting down, or the caller already has its maximum of relays, in total or waiting for Twilio. No relay was opened. | Retry after the `Retry-After` header. |
 | `internal_error`                 | 500  | An unclassified gateway failure.                                                                                                                           | Retry, and quote `trace_id` in a support ticket.                                                |
 
 ## Provider errors
@@ -4407,6 +4407,8 @@ A Live session is asked to close on its socket, then hung up if OpenAI does not 
 A Live client receives `session.closed` with reason `close_requested` on its data channel. A Realtime client sees its data channel close. Neither is told why the gateway ended the call; the reason is on the `gateway_voice_sessions_ended_total` metric and in the gateway log (`voice_session_ended`).
 
 Each gateway instance supervises a bounded number of calls (`LW_GATEWAY_VOICE_MAX_SUPERVISED_SESSIONS`, default 2000). A request to an instance that is full or shutting down answers `503 voice_broker_unavailable` with `Retry-After`, before anything is booked. On shutdown an instance keeps metering its calls for `LW_GATEWAY_VOICE_DRAIN_SECONDS` (default 570; the Helm chart sets `shutdown.voiceDrainSeconds`), then ends the ones still open.
+
+Twilio media relays have their own limits and do not count toward the 2000 supervised sessions above. An instance holds up to `LW_GATEWAY_VOICE_MAX_MEDIA_RELAYS` relays (default 500). One self-hosted install or one organization holds up to `LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE` (default 50), of which `LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE` (default 20) may still wait for Twilio. A relay waits `LW_GATEWAY_VOICE_PENDING_TTL_SECONDS` (default 150) for Twilio to dial in, and a paired relay runs at most `LW_GATEWAY_VOICE_MAX_RELAY_SECONDS` (default 330). A relay past any cap answers `503 voice_relay_unavailable` with `Retry-After`. Relay ids name the pod that minted them through `GATEWAY_POD_IP` (the Helm chart sets it from the downward API). Relays need `LW_GATEWAY_INTERNAL_SECRET`; without it they are disabled and the gateway logs a warning at boot. Both ceilings apply at once, so a deployment can hold 2000 supervised calls and 500 relays per instance.
 
 ## WebSocket relay
 
@@ -8419,7 +8421,7 @@ sum by (code) (rate(gateway_client_rejects_total{vk_id="<vk-id>"}[15m]))
 | `gateway_voice_sessions_supervised`           | gauge   | `kind`              | Brokered voice calls this pod meters from its own server-side socket, by `live` or `realtime`. Media does not pass through the pod |
 | `gateway_voice_sessions_ended_total`          | counter | `kind`, `reason`    | Supervised calls that ended. `reason` is `vendor_closed`, `budget_exceeded`, `key_revoked`, `sideband_lost`, `drain` or `session_closed`. Every reason but `vendor_closed` is the gateway ending the call |
 | `gateway_voice_usage_reports_total`           | counter | `outcome`           | Usage reports sent for supervised calls. `outcome` is `recorded`, `duplicate`, `closed`, `already_closed`, `error` or `dropped`. `error` is retried; `dropped` is usage lost because one call's retry queue was full |
-| `gateway_voice_media_relay_total`             | counter | `outcome`           | Twilio media relay outcomes. `outcome` is `opened`, `paired`, `refused_auth`, `refused_unknown`, `refused_expired`, `refused_replay`, `expired_unpaired`, `dropped` or `completed`. The relay id is never a label |
+| `gateway_voice_media_relay_total`             | counter | `outcome`           | Twilio media relay outcomes. `outcome` is `opened`, `paired`, `refused_auth`, `refused_unknown`, `refused_expired`, `refused_replay`, `refused_unpaired`, `expired_unpaired`, `dropped` or `completed`. The relay id is never a label |
 
 ### Control plane
 

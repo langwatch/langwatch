@@ -86,7 +86,7 @@ Ignore fields you do not recognize. New ones are added over time and none of the
 | `voice_broker_unavailable`       | 503  | The gateway instance is at its limit of supervised voice calls, or is shutting down. No call was created.                                                  | Retry after the `Retry-After` header.                                                           |
 | `voice_relay_license_required` | 403 | A Twilio media relay was opened with a virtual key. Only a license token, or a request signed by the control plane, may open one. | Open the relay with the install's `lwl_` token and `X-LangWatch-Instance`. |
 | `voice_relay_forbidden` | 403 | Twilio's socket was refused: the relay id is unknown, expired, already used, or belongs to another gateway pod. The answer is the same for every reason. | Open a new relay and place the call again. |
-| `voice_relay_unavailable` | 503 | The gateway instance is full, is shutting down, or the caller already has its maximum of relays waiting for Twilio. No relay was opened. | Retry after the `Retry-After` header. |
+| `voice_relay_unavailable` | 503 | The gateway instance is full, is shutting down, or the caller already has its maximum of relays, in total or waiting for Twilio. No relay was opened. | Retry after the `Retry-After` header. |
 | `internal_error`                 | 500  | An unclassified gateway failure.                                                                                                                           | Retry, and quote `trace_id` in a support ticket.                                                |
 
 ## Provider errors

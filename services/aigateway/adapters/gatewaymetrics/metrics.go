@@ -244,7 +244,7 @@ func New() *Recorder {
 
 	r.mediaRelays = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_voice_media_relay_total",
-		Help: "Twilio media relay outcomes (opened, paired, refused_auth, refused_unknown, refused_expired, refused_replay, expired_unpaired, dropped, completed). The relay id is a credential and never a label.",
+		Help: "Twilio media relay outcomes (opened, paired, refused_auth, refused_unknown, refused_expired, refused_replay, refused_unpaired, expired_unpaired, dropped, completed). The relay id is a credential and never a label.",
 	}, []string{"outcome"})
 
 	r.cacheHits = prometheus.NewCounterVec(prometheus.CounterOpts{

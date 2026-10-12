@@ -67,7 +67,7 @@ const (
 var (
 	mrOutcomes = []string{
 		"opened", "paired", "refused_auth", "refused_unknown", "refused_expired",
-		"refused_replay", "expired_unpaired", "dropped", "completed",
+		"refused_replay", "refused_unpaired", "expired_unpaired", "dropped", "completed",
 	}
 	mrIDShape = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 )

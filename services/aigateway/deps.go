@@ -220,9 +220,12 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 			DrainBudget:        time.Duration(cfg.Voice.DrainSeconds) * time.Second,
 			MaxRelays:          cfg.Voice.MaxMediaRelays,
 			MaxPendingPerScope: cfg.Voice.MaxPendingRelaysPerScope,
+			MaxRelaysPerScope:  cfg.Voice.MaxRelaysPerScope,
 			Logger:             logger,
 			Metrics:            metrics,
 		})
+	} else {
+		logger.Warn("voice media relay disabled: LW_GATEWAY_INTERNAL_SECRET unset")
 	}
 
 	// Per-credential circuit breaker. A provider that keeps failing is

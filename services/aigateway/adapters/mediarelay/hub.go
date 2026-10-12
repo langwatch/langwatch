@@ -25,6 +25,7 @@ const (
 	OutcomeRefusedUnknown  = "refused_unknown"
 	OutcomeRefusedExpired  = "refused_expired"
 	OutcomeRefusedReplay   = "refused_replay"
+	OutcomeRefusedUnpaired = "refused_unpaired"
 	OutcomeExpiredUnpaired = "expired_unpaired"
 	OutcomeDropped         = "dropped"
 	OutcomeCompleted       = "completed"
@@ -50,6 +51,7 @@ const (
 	defaultDrainBudget        = 570 * time.Second
 	defaultMaxRelays          = 500
 	defaultMaxPendingPerScope = 20
+	defaultMaxRelaysPerScope  = 50
 	// stopAllowance is what closing the remaining relays takes after the budget.
 	stopAllowance = 10 * time.Second
 )
@@ -81,9 +83,11 @@ type Options struct {
 	// DrainBudget is how long paired relays may run once BeginDrain is called.
 	DrainBudget time.Duration
 	// MaxRelays caps the relays held at once; MaxPendingPerScope caps those
-	// of one instance or organization still waiting for Twilio.
+	// of one instance or organization still waiting for Twilio, and
+	// MaxRelaysPerScope all it holds, paired or not.
 	MaxRelays          int
 	MaxPendingPerScope int
+	MaxRelaysPerScope  int
 	Logger             *zap.Logger
 	Metrics            Metrics
 }
@@ -99,11 +103,13 @@ type Hub struct {
 	metrics Metrics
 
 	pendingTTL, maxDuration, pingInterval, drainBudget time.Duration
-	maxRelays, maxPending                              int
+	maxRelays, maxPending, maxRelaysPerScope           int
 
-	mu         sync.Mutex
-	relays     map[[16]byte]*relay
+	mu     sync.Mutex
+	relays map[[16]byte]*relay
+	// scopes counts a scope's relays still waiting for Twilio; held, all of them.
 	scopes     map[string]int
+	held       map[string]int
 	active     int
 	draining   bool
 	drainTimer *time.Timer
@@ -116,20 +122,22 @@ type Hub struct {
 // NewHub builds a Hub.
 func NewHub(opts Options) *Hub {
 	h := &Hub{
-		codec:        NewIDCodec(opts.Secret),
-		podIP:        opts.PodIP,
-		bootID:       opts.BootID,
-		logger:       opts.Logger,
-		metrics:      opts.Metrics,
-		pendingTTL:   orDuration(opts.PendingTTL, defaultPendingTTL),
-		maxDuration:  orDuration(opts.MaxRelayDuration, defaultMaxRelayDuration),
-		pingInterval: orDuration(opts.PingInterval, defaultPingInterval),
-		drainBudget:  orDuration(opts.DrainBudget, defaultDrainBudget),
-		maxRelays:    orInt(opts.MaxRelays, defaultMaxRelays),
-		maxPending:   orInt(opts.MaxPendingPerScope, defaultMaxPendingPerScope),
-		relays:       make(map[[16]byte]*relay),
-		scopes:       make(map[string]int),
-		drainOver:    make(chan struct{}),
+		codec:             NewIDCodec(opts.Secret),
+		podIP:             opts.PodIP,
+		bootID:            opts.BootID,
+		logger:            opts.Logger,
+		metrics:           opts.Metrics,
+		pendingTTL:        orDuration(opts.PendingTTL, defaultPendingTTL),
+		maxDuration:       orDuration(opts.MaxRelayDuration, defaultMaxRelayDuration),
+		pingInterval:      orDuration(opts.PingInterval, defaultPingInterval),
+		drainBudget:       orDuration(opts.DrainBudget, defaultDrainBudget),
+		maxRelays:         orInt(opts.MaxRelays, defaultMaxRelays),
+		maxPending:        orInt(opts.MaxPendingPerScope, defaultMaxPendingPerScope),
+		maxRelaysPerScope: orInt(opts.MaxRelaysPerScope, defaultMaxRelaysPerScope),
+		relays:            make(map[[16]byte]*relay),
+		scopes:            make(map[string]int),
+		held:              make(map[string]int),
+		drainOver:         make(chan struct{}),
 	}
 	if h.logger == nil {
 		h.logger = zap.NewNop()
@@ -227,6 +235,7 @@ func (h *Hub) Open(w http.ResponseWriter, r *http.Request, scope string) error {
 	}
 	worker, err := websocket.Accept(w, r, acceptOptions())
 	if err != nil {
+		rl.cancel()
 		h.release(rl)
 		//nolint:nilerr // Accept already answered the request over HTTP.
 		return nil
@@ -243,7 +252,7 @@ func (h *Hub) Join(w http.ResponseWriter, r *http.Request, id string) error {
 	ctx := r.Context()
 	refuse := func(outcome, reason string) error {
 		h.metrics.RecordVoiceMediaRelay(outcome)
-		h.logger.Info("voice_media_relay_refused", zap.String("reason", reason), zap.String("relay", idPrefix(id)))
+		h.logger.Debug("voice_media_relay_refused", zap.String("reason", reason), zap.String("relay", idPrefix(id)))
 		return herr.New(ctx, domain.ErrVoiceRelayForbidden, herr.M{
 			"message": "this relay id cannot be joined", "fault": "customer",
 		})
@@ -276,7 +285,12 @@ func (h *Hub) Join(w http.ResponseWriter, r *http.Request, id string) error {
 	select {
 	case rl.joined <- twilio:
 	case <-rl.done:
-		_ = twilio.CloseNow()
+		// The relay ended between the claim and the upgrade: say why.
+		code := rl.endedWith
+		if code == 0 {
+			code = ClosePeerLost
+		}
+		_ = twilio.Close(code, "relay_ended")
 	}
 	return nil
 }
@@ -310,12 +324,15 @@ func (h *Hub) admit(ctx context.Context, scope string) (*relay, string, error) {
 		return nil, "", relayUnavailable(ctx, "this gateway instance is shutting down and opens no new media relays: retry, and another instance will answer")
 	case h.active >= h.maxRelays:
 		return nil, "", relayUnavailable(ctx, "this gateway instance already holds its maximum number of media relays: retry shortly")
+	case h.held[scope] >= h.maxRelaysPerScope:
+		return nil, "", relayUnavailable(ctx, "this scope already holds its maximum number of media relays: retry shortly")
 	case h.scopes[scope] >= h.maxPending:
 		return nil, "", relayUnavailable(ctx, "too many media relays are waiting for Twilio: retry shortly")
 	}
 	rl := newRelay(h, scope, claims.Random)
 	h.relays[claims.Random] = rl
 	h.scopes[scope]++
+	h.held[scope]++
 	h.active++
 	h.wg.Add(1)
 	return rl, id, nil
@@ -342,6 +359,13 @@ func (h *Hub) claim(random [16]byte) (*relay, string) {
 	return rl, ""
 }
 
+// isClaimed reports whether a Twilio join has taken the relay.
+func (h *Hub) isClaimed(rl *relay) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return rl.claimed
+}
+
 // release gives back a relay's slot. It is safe to call twice.
 func (h *Hub) release(rl *relay) {
 	rl.releaseOnce.Do(func() {
@@ -351,8 +375,12 @@ func (h *Hub) release(rl *relay) {
 		if !rl.claimed {
 			h.scopes[rl.scope]--
 		}
+		h.held[rl.scope]--
 		if h.scopes[rl.scope] <= 0 {
 			delete(h.scopes, rl.scope)
+		}
+		if h.held[rl.scope] <= 0 {
+			delete(h.held, rl.scope)
 		}
 		h.mu.Unlock()
 		close(rl.done)
