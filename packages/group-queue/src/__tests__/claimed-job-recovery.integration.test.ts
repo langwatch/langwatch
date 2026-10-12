@@ -4,6 +4,7 @@ import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { deadLetterJob } from "../deadLetter.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 
@@ -261,6 +262,32 @@ describe("GroupQueue claimed-job recovery", () => {
         claimToken: retried!.claimToken,
       });
       expect(await q.scripts.dispatch({ nowMs: 6_000, activeTtlSec: 60 })).toBeNull();
+      expect(await q.pending()).toBe(0);
+    });
+  });
+
+  describe("given a worker that dead-letters the job it claimed and dies before completing", () => {
+    /** @scenario "A dead-lettered job is not brought back by a later claim" */
+    it("leaves the job in the dead-letter queue and claims nothing again", async () => {
+      const q = freshQueue();
+      await q.scripts.stage(stageJob("j1", 100));
+
+      await q.scripts.dispatch({ nowMs: 1_000, activeTtlSec: 1 });
+      const moved = await deadLetterJob({
+        redis,
+        keyPrefix: q.keyPrefix,
+        groupId: "g1",
+        jobId: "j1",
+        score: 100,
+        jobDataJson: JSON.stringify({ stagedJobId: "j1" }),
+        errorMessage: "handler failed",
+        errorStack: "",
+      });
+      expect(moved).toBe(true);
+      await waitForExpiry(q.activeKey("g1"));
+
+      expect(await q.scripts.dispatch({ nowMs: 3_000, activeTtlSec: 60 })).toBeNull();
+      expect(await redis.zrange(`${q.keyPrefix}dlq:g1:jobs`, 0, -1)).toEqual(["j1"]);
       expect(await q.pending()).toBe(0);
     });
   });

@@ -56,3 +56,29 @@ Feature: GroupQueue brings back a job whose worker died while running it
     When the retry's backoff ends and the group is claimed again
     Then the job is claimed once, not once from the retry and once from the record
     And the total-pending counter is conserved
+
+  @integration
+  Scenario: A dead-lettered job is not brought back by a later claim
+    Given a worker that dead-letters the job it claimed
+    When it dies before completing the slot and the group is claimed again
+    Then the job stays in the dead-letter queue and is not claimed again
+
+  @integration
+  Scenario: Draining a group throws away a dead worker's claimed jobs
+    Given a group whose claimed record was left by a worker that died
+    When an operator drains the group
+    Then the claimed record is gone with the group's staged jobs
+    And nothing is left for the next claim of the group to put back
+
+  @integration
+  Scenario: Moving a group to the dead-letter queue carries a dead worker's claimed jobs with it
+    Given a group whose claimed record was left by a worker that died, and one staged job
+    When an operator moves the group to the dead-letter queue
+    Then the dead-letter queue holds the claimed jobs and the staged job, in order
+    And the claimed record is gone
+
+  @unit
+  Scenario: A projection replay waits for a group holding a claimed record
+    Given a projection group with no active key but a claimed record left by a worker that died
+    When a replay waits for the projection's in-flight jobs to drain
+    Then it treats the group as in flight until the claimed record is gone

@@ -139,6 +139,9 @@ local totalDropped = pendingCount
 
 redis.call("DEL", jobsKey)
 redis.call("DEL", dataKey)
+-- A claimed record (":active" is 7 chars) would put a dead worker's jobs back into the
+-- emptied group on the next claim; draining throws them away with the rest.
+redis.call("DEL", string.sub(activeKey, 1, #activeKey - 7) .. ":claimed")
 redis.call("DEL", activeKey)
 redis.call("DEL", errorKey)
 -- Draining empties the group for a fresh start, so EVERY counter that decides

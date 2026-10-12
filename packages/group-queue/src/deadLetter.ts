@@ -68,6 +68,24 @@ for i = 1, #data, 2 do
   redis.call("HSET", dstDataKey, data[i], data[i+1])
 end
 
+-- A dead worker's claimed jobs (no active key; ":active" is 7 chars) go to the dead-letter queue
+-- with the rest, in order. A live worker's claim is dropped with its active key, as before.
+local claimedKey = string.sub(activeKey, 1, #activeKey - 7) .. ":claimed"
+if redis.call("EXISTS", activeKey) == 0 then
+  local claimed = redis.call("HGETALL", claimedKey)
+  for i = 1, #claimed, 2 do
+    if string.sub(claimed[i], 1, 2) == "s:" then
+      local claimedJobId = string.sub(claimed[i], 3)
+      local body = redis.call("HGET", claimedKey, "d:" .. claimedJobId)
+      if body and redis.call("ZADD", dstJobsKey, "NX", claimed[i + 1], claimedJobId) == 1 then
+        redis.call("HSET", dstDataKey, claimedJobId, body)
+        count = count + 1
+      end
+    end
+  end
+end
+redis.call("DEL", claimedKey)
+
 local errorData = redis.call("HGETALL", srcErrorKey)
 for i = 1, #errorData, 2 do
   redis.call("HSET", dstErrorKey, errorData[i], errorData[i+1])
@@ -207,6 +225,9 @@ local groupDataKey = keyPrefix .. "group:" .. groupId .. ":data"
 local dlqJobsKey   = keyPrefix .. "dlq:" .. groupId .. ":jobs"
 local dlqDataKey   = keyPrefix .. "dlq:" .. groupId .. ":data"
 local dlqErrorKey  = keyPrefix .. "dlq:" .. groupId .. ":error"
+-- A dead-lettered job leaves its claim's record too, so a death before the slot is completed
+-- cannot bring it back (packages/group-queue/specs/claimed-job-recovery.feature).
+redis.call("HDEL", keyPrefix .. "group:" .. groupId .. ":claimed", "s:" .. jobId, "d:" .. jobId)
 
 if value == "" then
   -- A staged sibling keeps its value and lease; it leaves the live group and its pending count.
