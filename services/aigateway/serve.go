@@ -62,6 +62,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		CORSAllowedOrigins:    cfg.CORS.AllowedOriginList(),
 		WebhookRelay:          deps.ControlPlane,
 		VoiceRelay:            deps.Voice,
+		MediaRelay:            deps.MediaRelay,
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}
@@ -120,6 +121,10 @@ func addManagedServices(g *lifecycle.Group, deps *Deps, own ownServices) {
 	// until it ends, and the listener stops first so no call is admitted late.
 	if deps.Voice != nil {
 		g.Add(deps.Voice)
+	}
+	// Beside the voice drain: paired relays run through the same budget.
+	if deps.MediaRelay != nil {
+		g.Add(deps.MediaRelay)
 	}
 	if own.Metrics != nil {
 		g.Add(lifecycle.ListenServer("metrics", own.Metrics))

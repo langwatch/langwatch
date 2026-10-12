@@ -16,6 +16,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -67,8 +68,7 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 			presentedSig := r.Header.Get("X-LangWatch-Gateway-Signature")
 			presentedTs := r.Header.Get("X-LangWatch-Gateway-Timestamp")
 			if presentedSig == "" || presentedTs == "" {
-				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{
-					"code":    "missing_signature",
+				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrMissingSignature, herr.M{
 					"message": "X-LangWatch-Gateway-Signature and X-LangWatch-Gateway-Timestamp are required",
 				}))
 				return
@@ -94,11 +94,10 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 			expected := computeSignature(secret, r.Method, r.URL.Path, presentedTs, body)
 			if !constantTimeHexEqual(expected, presentedSig) {
 				clog.Get(r.Context()).Warn("internal_auth_signature_mismatch",
-					zap.String("path", r.URL.Path),
+					zap.String("path", httpmiddleware.RedactPath(r.URL.Path)),
 					zap.String("node", r.Header.Get("X-LangWatch-Gateway-Node")),
 				)
-				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{
-					"code":    "invalid_signature",
+				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidSignature, herr.M{
 					"message": "signature mismatch",
 				}))
 				return
@@ -106,8 +105,7 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 
 			ts, err := strconv.ParseInt(presentedTs, 10, 64)
 			if err != nil {
-				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{
-					"code":    "invalid_timestamp",
+				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidTimestamp, herr.M{
 					"message": "X-LangWatch-Gateway-Timestamp must be unix seconds",
 				}))
 				return
@@ -118,8 +116,7 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 				drift = -drift
 			}
 			if drift > gatewaySignatureWindowSeconds {
-				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{
-					"code":    "timestamp_out_of_window",
+				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrTimestampOutOfWindow, herr.M{
 					"message": "timestamp drift exceeds replay window",
 				}))
 				return

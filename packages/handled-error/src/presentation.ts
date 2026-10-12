@@ -5043,6 +5043,38 @@ const presentations = {
     title: "Couldn't start the voice call",
     describe: () => "No call was created. Try again in a few seconds.",
   },
+  voice_relay_license_required: {
+    title: "Couldn't open the phone relay",
+    describe: () => "The phone relay needs your install's license token, not a virtual key.",
+  },
+  voice_relay_forbidden: {
+    // Deliberately the same copy for every reason, like the code itself.
+    title: "Couldn't join the phone relay",
+    describe: () => "That relay link is not valid any more. Start the call again.",
+  },
+  missing_signature: {
+    title: "Request not signed",
+    describe: () => "This internal request carried no signature.",
+  },
+  invalid_signature: {
+    title: "Request signature rejected",
+    describe: () => "This internal request's signature did not match.",
+  },
+  invalid_timestamp: {
+    title: "Request timestamp rejected",
+    describe: () => "This internal request's timestamp was not unix seconds.",
+  },
+  timestamp_out_of_window: {
+    title: "Request timestamp too old",
+    describe: () =>
+      "This internal request was signed too long ago or too far ahead. Check the clocks.",
+  },
+  voice_relay_unavailable: {
+    // Nothing was opened. This instance is full or shutting down, and
+    // another one answers the retry.
+    title: "Couldn't open the phone relay",
+    describe: () => "No relay was opened. Try again in a few seconds.",
+  },
   guardrail_blocked: {
     title: "Blocked by a guardrail",
     describe: () => "This request didn't pass one of your configured policies.",

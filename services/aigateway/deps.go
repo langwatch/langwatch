@@ -29,6 +29,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/mediarelay"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/modelresolver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/policy"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/providers"
@@ -50,13 +51,16 @@ type Deps struct {
 	RateLimiter   *ratelimit.Limiter
 	BudgetChecker *budget.Checker
 	// Voice supervises brokered voice calls and ends them on shutdown.
-	Voice   *voicesession.Manager
-	Policy  *policy.Matcher
-	Cache   *cacherules.Evaluator
-	Models  *modelresolver.Resolver
-	Health  *health.Registry
-	Metrics *gatewaymetrics.Recorder
-	Breaker *breaker.Registry
+	Voice *voicesession.Manager
+	// MediaRelay joins workers to Twilio's media streams. Nil without an
+	// internal secret, which keys its relay ids.
+	MediaRelay *mediarelay.Hub
+	Policy     *policy.Matcher
+	Cache      *cacherules.Evaluator
+	Models     *modelresolver.Resolver
+	Health     *health.Registry
+	Metrics    *gatewaymetrics.Recorder
+	Breaker    *breaker.Registry
 	// Spend emission (nil when LW_GATEWAY_SPEND_ENABLED is off).
 	SpendEmitter *spendemitter.Emitter
 	SpendSpool   *spendemitter.Spool
@@ -206,6 +210,21 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		DrainBudget:   time.Duration(cfg.Voice.DrainSeconds) * time.Second,
 	})
 
+	var mediaRelay *mediarelay.Hub
+	if cfg.ControlPlane.InternalSecret != "" {
+		mediaRelay = mediarelay.NewHub(mediarelay.Options{
+			Secret:             cfg.ControlPlane.InternalSecret,
+			PodIP:              cfg.PodIP,
+			PendingTTL:         time.Duration(cfg.Voice.PendingTTLSeconds) * time.Second,
+			MaxRelayDuration:   time.Duration(cfg.Voice.MaxRelaySeconds) * time.Second,
+			DrainBudget:        time.Duration(cfg.Voice.DrainSeconds) * time.Second,
+			MaxRelays:          cfg.Voice.MaxMediaRelays,
+			MaxPendingPerScope: cfg.Voice.MaxPendingRelaysPerScope,
+			Logger:             logger,
+			Metrics:            metrics,
+		})
+	}
+
 	// Per-credential circuit breaker. A provider that keeps failing is
 	// skipped outright rather than costing every request another dead
 	// round-trip, and its state is published so operators can see which
@@ -303,6 +322,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		RateLimiter:   limiter,
 		BudgetChecker: budgetChecker,
 		Voice:         voice,
+		MediaRelay:    mediaRelay,
 		Policy:        policy.NewMatcher(),
 		Cache:         cacherules.NewEvaluator(),
 		Models:        modelresolver.New(),
