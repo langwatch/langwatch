@@ -830,7 +830,8 @@ func (cell *run) reviveAPI() {
 }
 
 func (cell *run) startHeadWorker() error {
-	return cell.startHead("head-worker", "apps/worker", map[string]string{"WORKER_METRICS_PORT": itoa(mustPort()), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort())})
+	// VOICE_WS_PORT: the raw socket door defaults to 3300, which a parallel cell's worker may hold.
+	return cell.startHead("head-worker", "apps/worker", map[string]string{"WORKER_METRICS_PORT": itoa(mustPort()), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort()), "VOICE_WS_PORT": itoa(mustPort())})
 }
 
 func (cell *run) startHead(name, app string, extra map[string]string) error {

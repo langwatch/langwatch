@@ -33,7 +33,7 @@ func (cell *run) viaRelease(ctx context.Context) error {
 	url := "http://127.0.0.1:" + itoa(port)
 	for _, spec := range []ProcSpec{
 		{Name: "via-app", Args: FromAppArgs, Env: cell.fromEnvWith(map[string]string{"PORT": itoa(port)})},
-		{Name: "via-worker", Args: FromWorkerArgs, Env: cell.fromEnvWith(map[string]string{"PORT": itoa(port), "WORKER_METRICS_PORT": itoa(mustPort())})},
+		{Name: "via-worker", Args: FromWorkerArgs, Env: cell.fromEnvWith(map[string]string{"PORT": itoa(port), "WORKER_METRICS_PORT": itoa(mustPort()), "VOICE_WS_PORT": itoa(mustPort())})},
 	} {
 		spec.Dir, spec.Log = dir, cell.logPath(spec.Name)
 		proc, err := Start(spec)
