@@ -290,7 +290,7 @@ async function signIn(browser, member) {
 }
 
 const browser = await chromium.launch({
-  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--no-sandbox"],
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl", "--no-sandbox"],
 });
 try {
   for (const member of members) {
