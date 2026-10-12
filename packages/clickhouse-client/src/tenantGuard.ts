@@ -856,9 +856,9 @@ export function describeTenantScopeViolation(violation: TenantScopeViolation): s
     case "param-mismatch":
       return `Statement binds tenant parameter "${violation.param}" to a different tenant than the request claims.`;
     case "tenant-set-mismatch":
-      return "Statement's `TenantId IN (...)` list does not bind exactly the declared tenant set, or the request's tenant is not in it. Bind one placeholder per declared tenant, or one Array(String) parameter holding exactly the set, and nothing else.";
+      return "Statement's `TenantId IN (...)` list, or a batch's row tenants, are not exactly the declared tenant set, or the request's tenant is not in it. Bind one placeholder per declared tenant, or one Array(String) parameter holding exactly the set, and nothing else; write a batch whose rows belong to exactly the tenants it declares.";
     case "tenant-set-spans-organizations":
-      return `The declared tenant set spans ${violation.organizations.length} organisations. A read across tenants stays inside one organisation, which is also the one server that can answer it.`;
+      return `The declared tenant set spans ${violation.organizations.length} organisations. A read or a batch across tenants stays inside one organisation, which is also the one server that can answer it.`;
     case "missing-row-tenant":
       return `Row ${violation.row} of the batch carries no TenantId. Every written row names the tenant it belongs to, so a later read scoped to one tenant can never miss it or find someone else's.`;
     case "row-tenant-mismatch":
@@ -945,18 +945,31 @@ export class TenantGuard {
   }
 }
 
-/** Returns the reason a batch is not one tenant's, or null when it is. */
+/**
+ * Returns the reason a batch is not one tenant's, or not exactly its declared tenant set's (the
+ * rows' tenants are the set, the request's tenant among them), or null when it is.
+ */
 export function checkInsertTenantScope(
-  request: Pick<InsertRequest, "tenantId" | "rows">,
+  request: Pick<InsertRequest, "tenantId" | "rows" | "tenantIds">,
 ): TenantScopeViolation | null {
+  const declared = request.tenantIds === undefined ? undefined : new Set(request.tenantIds);
+  const written = new Set<unknown>();
   for (const [index, row] of request.rows.entries()) {
     const tenantId = row.TenantId;
     if (tenantId === undefined || tenantId === null || tenantId === "") {
       return { kind: "missing-row-tenant", row: index };
     }
-    if (tenantId !== request.tenantId) {
+    written.add(tenantId);
+    if (declared === undefined && tenantId !== request.tenantId) {
       return { kind: "row-tenant-mismatch", row: index, actual: tenantId };
     }
   }
-  return null;
+  if (declared === undefined) return null;
+  const isExact =
+    declared.has(request.tenantId) &&
+    written.size === declared.size &&
+    [...written].every((tenantId) => typeof tenantId === "string" && declared.has(tenantId));
+  return isExact
+    ? null
+    : { kind: "tenant-set-mismatch", declared: request.tenantIds ?? [], bound: [...written] };
 }

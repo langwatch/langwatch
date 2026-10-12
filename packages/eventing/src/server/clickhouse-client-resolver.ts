@@ -17,6 +17,8 @@ export interface EventingClickHouseClient {
     values: readonly Record<string, unknown>[];
     format: "JSONEachRow";
     clickhouse_settings: Record<string, number>;
+    /** The tenant set a batch of several tenants' rows declares, resolving tenant included. */
+    tenantIds?: readonly string[] | undefined;
   }): Promise<unknown>;
 }
 

@@ -11,6 +11,7 @@ import type {
   EventingClickHouseClientResolver,
 } from "../../clickhouse-client-resolver.ts";
 import type { EventingRetentionConfiguration } from "../../eventing-server-runtime.ts";
+import { EventLogAppendFold, type EventLogInsert } from "./event-log-append-fold.ts";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 
@@ -124,6 +125,11 @@ function occurredAtPredicate(window: EventOccurredAtWindow | undefined): {
   };
 }
 
+/** Inserts one organisation's appends hold at once before the rest fold into the next. */
+const EVENT_LOG_FOLD_MAX_IN_FLIGHT = 4;
+/** Rows one shared event log insert carries at most. */
+const EVENT_LOG_FOLD_MAX_ROWS = 1_000;
+
 /**
  * ClickHouse implementation of EventRepository: raw data access without
  * business logic. Schema in
@@ -132,11 +138,21 @@ function occurredAtPredicate(window: EventOccurredAtWindow | undefined): {
 export class EventingClickHouseEventRepository implements EventRepository {
   private readonly logger = createLogger("langwatch:trace-processing:event-repository:clickhouse");
 
+  private readonly appendFold: EventLogAppendFold;
+
   private constructor(
     private readonly resolveClient: EventingClickHouseClientResolver,
     /** Absent on a reads-only repository, which refuses to insert. */
     private readonly retention: EventingRetentionConfiguration | undefined,
-  ) {}
+    /** The organisation a tenant's rows are written for; absent, every append inserts alone. */
+    private readonly organizationOf?: (tenantId: string) => Promise<string | null>,
+  ) {
+    this.appendFold = new EventLogAppendFold({
+      insert: (insert) => this.insertEventLog(insert),
+      maxInFlight: EVENT_LOG_FOLD_MAX_IN_FLIGHT,
+      maxRows: EVENT_LOG_FOLD_MAX_ROWS,
+    });
+  }
 
   /** Reads only, for a read seat: a process that appends nothing states no retention. */
   static createForEventReads(options: {
@@ -148,8 +164,14 @@ export class EventingClickHouseEventRepository implements EventRepository {
   static create(options: {
     resolveClient: EventingClickHouseClientResolver;
     retention: EventingRetentionConfiguration;
+    /** The directory the routed member places tenants with; folds appends per organisation. */
+    organizationOf?: (tenantId: string) => Promise<string | null>;
   }): EventingClickHouseEventRepository {
-    return new EventingClickHouseEventRepository(options.resolveClient, options.retention);
+    return new EventingClickHouseEventRepository(
+      options.resolveClient,
+      options.retention,
+      options.organizationOf,
+    );
   }
 
   private async getClient(tenantId: string): Promise<EventingClickHouseClient> {
@@ -577,13 +599,12 @@ export class EventingClickHouseEventRepository implements EventRepository {
         // not resolve a tenant policy, never leave it to the column default.
         _retention_days: r._retention_days ?? retention.defaultRetentionDays,
       }));
-      const client = await this.getClient(tenantId);
-      await client.insert({
-        table: "event_log",
-        values: stampedRecords,
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
+      const organizationId = await this.organizationOf?.(tenantId);
+      if (organizationId === undefined || organizationId === null) {
+        await this.insertEventLog({ tenantId, rows: stampedRecords });
+      } else {
+        await this.appendFold.append({ organizationId, tenantId, rows: stampedRecords });
+      }
     } catch (error) {
       this.logger.debug(
         {
@@ -596,5 +617,17 @@ export class EventingClickHouseEventRepository implements EventRepository {
       );
       throw error;
     }
+  }
+
+  /** One insert, flushed before it answers; a folded one declares its tenant set. */
+  private async insertEventLog({ tenantId, rows, tenantIds }: EventLogInsert): Promise<void> {
+    const client = await this.getClient(tenantId);
+    await client.insert({
+      table: "event_log",
+      values: rows,
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      ...(tenantIds === undefined ? {} : { tenantIds }),
+    });
   }
 }

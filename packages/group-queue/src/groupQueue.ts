@@ -243,8 +243,11 @@ function nonEmptyString(value: unknown): string | undefined {
  * floor for poison guard beacon TTL (interdependency tested across modules).
  */
 export const GROUP_QUEUE_CONFIG = {
-  /** Default global concurrency (max parallel groups) */
-  defaultGlobalConcurrency: 100,
+  /**
+   * Max parallel groups per consumer. Jobs mostly wait on flushed ClickHouse inserts (~200 ms),
+   * so slots set throughput; a listed run's bench reached 1,474 jobs/s at 1,000 (Alex, 2026-10-12).
+   */
+  defaultGlobalConcurrency: 1_000,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */

@@ -1718,8 +1718,8 @@ export interface DrainedJob {
 }
 
 /**
- * Default tenant soft-cap: half a worker pod's default concurrency
- * (GLOBAL_QUEUE_CONCURRENCY, 100), protecting against noisy-neighbour
+ * Default tenant soft-cap: half the 100 slots a worker pod held before the
+ * default rose to 1,000 (2026-10-12), protecting against noisy-neighbour
  * starvation while still bounding a runaway on a single-pod install.
  */
 export const DEFAULT_TENANT_CAP = 50;

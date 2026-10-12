@@ -1674,7 +1674,10 @@ answered on that organization's server, never a skipped tenant check (Alex, 2026
 also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
 bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
 subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
-Alex, 2026-10-09). Eventing's replay
+Alex, 2026-10-09). An insert declares a tenant set the same way (Alex, 2026-10-12): its rows'
+`TenantId`s are exactly the set, its `tenantId` among them, and the router refuses a set spanning
+organisations; eventing folds event appends waiting on one organisation's server into such
+inserts, each still flushed before it answers, and retries a failed one as each append alone. Eventing's replay
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 
