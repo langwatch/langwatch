@@ -3,13 +3,14 @@
  * line to stdout, parent parses and records it. Child is real node script.
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const childScript = vi.hoisted(() => ({ current: "" }));
-vi.mock("../../features/child/services/child-process-spawn.service.ts", () => ({
-  ChildProcessSpawnService: {
+vi.mock("../../channels/scenario-child.spawn.channel.ts", () => ({
+  ScenarioChildSpawn: {
     create: () => ({
       resolve: () => ({
         command: process.execPath,
@@ -23,7 +24,12 @@ import type {
   CancellationSubscriber,
   ScenarioProcessorServiceMetrics,
 } from "../../app/scenario.app.ts";
-import { NodeScenarioChildService } from "../../features/child/services/node-scenario-child.service.ts";
+import { GoScenarioChildChannel } from "../../channels/scenario-child.go.channel.ts";
+import {
+  NodeScenarioChildChannel,
+  type ScenarioChildProcessConfig,
+} from "../../channels/scenario-child.node.channel.ts";
+import { ScenarioChildChoiceService } from "../../features/child/services/scenario-child-choice.service.ts";
 import { VoiceNonceRegistryService } from "../../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryVoiceNonceRepository } from "../../repositories/memory/memory.voice-nonce.repository.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
@@ -83,23 +89,26 @@ function buildProcessor() {
       }),
     }) as never;
 
+  const config: ScenarioChildProcessConfig = {
+    packageRoot: process.cwd(),
+    sourcePath: `${process.cwd()}/src/scenario-child.entrypoint.ts`,
+    sourceRoots: [`${process.cwd()}/src`],
+    nodeEnv: "test",
+    isSaas: false,
+    egress: { blockLocal: false, allowedHosts: [] },
+    parentEnvironment: { path: process.env.PATH ?? "/usr/bin", home: process.env.HOME ?? "/" },
+  };
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
   const processor = ScenarioProcessorService.create({
     execution,
     pool,
     cancellations: new SilentCancellations(),
-    childProcesses: NodeScenarioChildService.create({
+    childProcesses: ScenarioChildChoiceService.create({
+      node: NodeScenarioChildChannel.create({ config }),
+      go: GoScenarioChildChannel.create({ config, binaryPath: undefined }),
+      featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
       pool,
       nonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
-      config: {
-        packageRoot: process.cwd(),
-        sourcePath: `${process.cwd()}/src/scenario-child.entrypoint.ts`,
-        sourceRoots: [`${process.cwd()}/src`],
-        nodeEnv: "test",
-        isSaas: false,
-        egress: { blockLocal: false, allowedHosts: [] },
-        parentEnvironment: { path: process.env.PATH ?? "/usr/bin", home: process.env.HOME ?? "/" },
-      },
     }),
     metrics: new SilentMetrics(),
   });

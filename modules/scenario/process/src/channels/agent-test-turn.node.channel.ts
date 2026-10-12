@@ -16,12 +16,12 @@ import {
   type ScenarioLogContext,
 } from "@langwatch/scenario-contract";
 
-import type { AgentTestTurnChild, ScenarioChildEnvironment } from "../../../app/scenario.app.ts";
-import { ChildProcessSpawnService } from "./child-process-spawn.service.ts";
+import type { AgentTestTurnChild, ScenarioChildEnvironment } from "../app/scenario.app.ts";
 import {
-  NodeScenarioChildService,
+  buildBaseEnvironment,
   type ScenarioChildProcessConfig,
-} from "./node-scenario-child.service.ts";
+} from "./scenario-child.node.channel.ts";
+import { ScenarioChildSpawn } from "./scenario-child.spawn.channel.ts";
 
 const logger = createLogger("langwatch:scenarios:agent-test-turn-child");
 
@@ -46,9 +46,9 @@ function lastAnswer({
   return unanswered;
 }
 
-export class AgentTestTurnChildService implements AgentTestTurnChild {
-  static create(options: { config: ScenarioChildProcessConfig }): AgentTestTurnChildService {
-    return new AgentTestTurnChildService(options.config);
+export class NodeAgentTestTurnChannel implements AgentTestTurnChild {
+  static create(options: { config: ScenarioChildProcessConfig }): NodeAgentTestTurnChannel {
+    return new NodeAgentTestTurnChannel(options.config);
   }
 
   private constructor(private readonly config: ScenarioChildProcessConfig) {}
@@ -58,14 +58,14 @@ export class AgentTestTurnChildService implements AgentTestTurnChild {
     environment: ScenarioChildEnvironment;
     logContext: ScenarioLogContext;
   }): Promise<AgentTestTurnAnswer> {
-    const spawnConfig = ChildProcessSpawnService.create().resolve({
+    const spawnConfig = ScenarioChildSpawn.create().resolve({
       packageRoot: this.config.packageRoot,
       nodeEnv: this.config.nodeEnv,
       sourcePath: this.config.sourcePath,
       sourceRoots: this.config.sourceRoots,
     });
     const child = spawn(spawnConfig.command, spawnConfig.args, {
-      env: NodeScenarioChildService.buildBaseEnvironment({
+      env: buildBaseEnvironment({
         config: this.config,
         labels: input.environment.labels,
         telemetry: input.environment.telemetry,

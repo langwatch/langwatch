@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildChildEnvironment } from "../features/child/services/node-scenario-child.service.ts";
+import { buildChildEnvironment } from "../scenario-child.node.channel.ts";
 
 const config = {
   packageRoot: "/app",

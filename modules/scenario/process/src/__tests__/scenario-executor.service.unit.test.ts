@@ -14,6 +14,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   createLogger: () => ({ info: vi.fn(), warn: logWarn, error: vi.fn(), debug: vi.fn() }),
 }));
 
+import { MemoryScenarioChildChannel } from "../channels/memory/memory.scenario-child.channel.ts";
 import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
 import { MemoryScenarioCancellationRepository } from "../repositories/memory/memory.scenario-cancellation.repository.ts";
 import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
@@ -35,9 +36,11 @@ function harness({
   nlpServiceUrl: string | undefined;
 }) {
   const channel = MemoryScenarioCancellationRepository.create();
+  const children = MemoryScenarioChildChannel.create();
   const owned: string[] = [];
   const executor = ScenarioExecutorService.create({
     voiceNonces: VoiceNonceRegistryService.create({ nonces: MemoryVoiceNonceRepository.create() }),
+    children: { node: children, go: children },
     peers: {
       ...scenarioExecutorPeers(),
       agents: createApiFixture<AgentApi>(),
@@ -54,10 +57,6 @@ function harness({
     host: {
       voicePublicUrl: async () => scenarioTestVoicePublicUrl,
       nlpServiceUrl,
-      nlpInternalSecret: void 0,
-      isSaas: false,
-      nodeEnvironment: "test",
-      publicBaseUrl: void 0,
     },
   });
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
