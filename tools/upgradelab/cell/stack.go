@@ -30,6 +30,7 @@ type Stores struct {
 	IDP                          int            // idpsim port, for profiles that sign in through an identity provider
 	IDPPublic, IDPCA             string         // legacy SSO: idpsim behind the cell's TLS proxy, and the CA the releases trust
 	Gates                        map[string]int // private-down drill: the gate port in front of each private target
+	Cluster                      string         // CLICKHOUSE_CLUSTER: the server is a replicated cluster of this name; empty: one node
 }
 
 // DatabaseURL is the Prisma URL both releases share; schema mydb matches the tenancy SQL.
@@ -115,10 +116,10 @@ func (stores Stores) Fresh(ctx context.Context) error {
 		}
 	}
 	for _, database := range stores.clickHouseDatabases() {
-		if err := clickhouseExec(ctx, stores.ClickHouseBase, "DROP DATABASE IF EXISTS "+database); err != nil {
+		if err := clickhouseExec(ctx, stores.ClickHouseBase, stores.dropDatabase(database)); err != nil {
 			return err
 		}
-		if err := clickhouseExec(ctx, stores.ClickHouseBase, "CREATE DATABASE "+database); err != nil {
+		if err := clickhouseExec(ctx, stores.ClickHouseBase, stores.createDatabase(database)); err != nil {
 			return err
 		}
 	}
@@ -132,9 +133,27 @@ func (stores Stores) Drop(ctx context.Context) error {
 	}
 	_, err := psql(ctx, stores.PostgresBase+"/postgres", `DROP DATABASE IF EXISTS "`+stores.Name+`" WITH (FORCE)`)
 	for _, database := range stores.clickHouseDatabases() {
-		err = errors.Join(err, clickhouseExec(ctx, stores.ClickHouseBase, "DROP DATABASE IF EXISTS "+database))
+		err = errors.Join(err, clickhouseExec(ctx, stores.ClickHouseBase, stores.dropDatabase(database)))
 	}
 	return err
+}
+
+// createDatabase is a plain database on one node; on a cluster, the Replicated engine on every
+// replica at the Keeper path the app's migration bootstrap uses, as a clustered cloud install has it.
+func (stores Stores) createDatabase(database string) string {
+	if stores.Cluster == "" {
+		return "CREATE DATABASE " + database
+	}
+	return fmt.Sprintf("CREATE DATABASE %s ON CLUSTER %s ENGINE = Replicated('/clickhouse/databases/%s', '{shard}', '{replica}')",
+		database, stores.Cluster, database)
+}
+
+// dropDatabase drops on every replica of a cluster, SYNC so the Keeper path is free for the next create.
+func (stores Stores) dropDatabase(database string) string {
+	if stores.Cluster == "" {
+		return "DROP DATABASE IF EXISTS " + database
+	}
+	return "DROP DATABASE IF EXISTS " + database + " ON CLUSTER " + stores.Cluster + " SYNC"
 }
 
 func (stores Stores) clickHouseDatabases() []string {

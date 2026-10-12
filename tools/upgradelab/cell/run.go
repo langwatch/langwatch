@@ -33,6 +33,7 @@ type Options struct {
 	FromDir, HeadDir, RunDir         string
 	ViaDir                           string // a release between from and head the operator upgrades to first (UM-21); empty: none
 	PostgresBase, ClickHouseBase     string
+	ClickHouseCluster                string        // CLICKHOUSE_CLUSTER for both releases; ClickHouseBase is then a replica of that cluster
 	Before, AtCut, AfterReady        time.Duration // traffic on main, with main's worker paused, after head is ready
 	ReadyWithin, SettleWithin        time.Duration
 	WorkerDelay, Rate, Hold          time.Duration
@@ -310,7 +311,7 @@ func (cell *run) freshStores(ctx context.Context) error {
 		return err
 	}
 	cell.stores = Stores{PostgresBase: cell.options.PostgresBase, ClickHouseBase: cell.options.ClickHouseBase,
-		Name: DedicatedPrefix + cell.options.Name(), RedisPort: itoa(redisPort)}
+		Cluster: cell.options.ClickHouseCluster, Name: DedicatedPrefix + cell.options.Name(), RedisPort: itoa(redisPort)}
 	shape, err := seed.LoadShapeEnv(cell.profile.Shape)
 	if err != nil {
 		return err

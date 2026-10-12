@@ -80,6 +80,7 @@ func cellFlags(name string, options *Options) *flag.FlagSet {
 	flags.StringVar(&options.RunDir, "run-dir", "", "where logs, shots and the report go (default .claude/tmp/upgradelab/cells/<cell>-<time>)")
 	flags.StringVar(&options.PostgresBase, "postgres-base", "", "Postgres server URL with credentials (default: haven db url)")
 	flags.StringVar(&options.ClickHouseBase, "clickhouse-base", "", "ClickHouse server URL with credentials (default: haven db url)")
+	flags.StringVar(&options.ClickHouseCluster, "clickhouse-cluster", "", "the -clickhouse-base server is a replica of this cluster: Replicated databases, CLICKHOUSE_CLUSTER on both releases")
 	flags.DurationVar(&options.Before, "before", 30*time.Second, "traffic on the old release before the cut")
 	flags.DurationVar(&options.AtCut, "at-cut", 10*time.Second, "traffic with the old worker paused, so jobs queue")
 	flags.DurationVar(&options.AfterReady, "after-ready", 20*time.Second, "traffic once head is ready")

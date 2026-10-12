@@ -103,6 +103,9 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 	if targets == nil {
 		targets = shape.PrivateTargets()
 	}
+	if input.Stores.Cluster != "" {
+		env["CLICKHOUSE_CLUSTER"] = input.Stores.Cluster
+	}
 	routePrivateTargets(env, input.Stores, targets)
 	routeObjects(env, input.Stores, shape.PrivateObjectTargets())
 	routeIdentityProvider(env, input.Stores, input.Profile)
