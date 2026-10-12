@@ -39,7 +39,7 @@ func writeContent(b *strings.Builder, m *scenario.Message, toolNames func(string
 		if name == "" {
 			name = toolNames(m.ToolCallID)
 		}
-		b.WriteString("[tool-result: " + name + " -> " + string(appendToolOutput(nil, m.Text())) + "]")
+		b.WriteString("[tool-result: " + name + " -> " + string(appendToolOutput(nil, m.Text(), m.IsError)) + "]")
 		return
 	}
 	var lines joiner
@@ -148,17 +148,23 @@ func toolInput(args string) any {
 }
 
 // appendToolOutput appends the AI SDK output of a tool result: JSON for an
-// object or array result, text otherwise.
-func appendToolOutput(b []byte, content string) []byte {
+// object or array result, text otherwise, as "error-json" / "error-text"
+// when the call failed.
+func appendToolOutput(b []byte, content string, isError bool) []byte {
+	kind := "text"
+	var value any = content
 	if jsjson.LooksLikeJSON(content) {
 		if v, err := jsjson.Parse(content); err == nil {
-			b = append(b, `{"type":"json","value":`...)
-			b = jsjson.Append(b, v)
-			return append(b, '}')
+			kind, value = "json", v
 		}
 	}
-	b = append(b, `{"type":"text","value":`...)
-	b = jsjson.AppendString(b, content)
+	if isError {
+		kind = "error-" + kind
+	}
+	b = append(b, `{"type":"`...)
+	b = append(b, kind...)
+	b = append(b, `","value":`...)
+	b = jsjson.Append(b, value)
 	return append(b, '}')
 }
 

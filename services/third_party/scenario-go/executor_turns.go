@@ -3,9 +3,6 @@ package scenario
 import (
 	"context"
 	"fmt"
-
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // newTurn ends the current turn span, resets the role queue and starts the
@@ -20,15 +17,7 @@ func (ex *Executor) newTurn() {
 		ex.pendingAgents[i] = true
 	}
 	turn := ex.state.incrementTurn()
-	_, span := ex.tracer.Start(ex.runCtx, "Scenario Turn", trace.WithAttributes(
-		attribute.String("langwatch.origin", "simulation"),
-		sdkAttributes[0], sdkAttributes[1],
-		attribute.String("scenario.run_id", ex.runID),
-		attribute.String("scenario.name", ex.cfg.Name),
-		attribute.String("scenario.id", ex.cfg.ID),
-		attribute.String(threadIDKey, ex.cfg.ThreadID),
-		attribute.Int("scenario.turn", turn),
-	))
+	_, span := ex.spans.start(ex.runCtx, "Scenario Turn", runSpanAttributes(ex.runID, ex.cfg, turn))
 	ex.turnSpan = span
 	ex.mu.Unlock()
 }
@@ -336,6 +325,9 @@ func noAgentError(role AgentRole, content []Message) error {
 type TurnHandle struct {
 	done chan struct{}
 	err  error
+	// taken is set (under Executor.mu) when an extension took the turn over
+	// with TakePendingAgentTurn: it reports the turn's error itself.
+	taken bool
 }
 
 // Done is closed when the turn finished.
@@ -357,13 +349,30 @@ func (h *TurnHandle) Finished() bool {
 	}
 }
 
+// startTurn runs an agent turn in the background. Every turn started stays
+// tracked until the run drains it, even when a later turn replaces it as the
+// pending one, so none outlives the run. A panic in the turn becomes its
+// error instead of crashing the process.
 func (ex *Executor) startTurn(run func() error) *TurnHandle {
 	h := &TurnHandle{done: make(chan struct{})}
 	ex.mu.Lock()
 	ex.pendingTurn = h
+	kept := ex.inflight[:0]
+	for _, t := range ex.inflight {
+		// Finished turns no longer matter unless their error is unreported.
+		if !t.Finished() || (t.err != nil && !t.taken) {
+			kept = append(kept, t)
+		}
+	}
+	ex.inflight = append(kept, h)
 	ex.mu.Unlock()
 	go func() {
 		defer close(h.done)
+		defer func() {
+			if p := recover(); p != nil {
+				h.err = fmt.Errorf("agent turn panicked: %v", p)
+			}
+		}()
 		h.err = run()
 	}()
 	return h
@@ -422,13 +431,30 @@ func (ex *Executor) TakePendingAgentTurn() *TurnHandle {
 	defer ex.mu.Unlock()
 	h := ex.pendingTurn
 	ex.pendingTurn = nil
+	if h != nil {
+		h.taken = true
+	}
 	return h
 }
 
+// awaitPendingTurn waits for every non-blocking turn still in flight,
+// including ones an extension took over or a later turn replaced, and
+// returns the first error no extension took responsibility for.
 func (ex *Executor) awaitPendingTurn() error {
-	h := ex.TakePendingAgentTurn()
-	if h == nil {
-		return nil
+	ex.mu.Lock()
+	turns := ex.inflight
+	ex.inflight = nil
+	ex.pendingTurn = nil
+	ex.mu.Unlock()
+	var first error
+	for _, h := range turns {
+		err := h.Wait()
+		ex.mu.Lock()
+		taken := h.taken
+		ex.mu.Unlock()
+		if err != nil && !taken && first == nil {
+			first = err
+		}
 	}
-	return h.Wait()
+	return first
 }

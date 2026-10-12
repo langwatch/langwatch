@@ -165,6 +165,9 @@ type wireBlock struct {
 	ToolUseID string  `json:"tool_use_id"`
 	Input     rawJSON `json:"input"`
 	Content   rawJSON `json:"content"`
+	// IsError is a tool_result's is_error, kept raw so a non-boolean value
+	// cannot fail the line.
+	IsError rawJSON `json:"is_error"`
 }
 
 // rawJSON holds an undecoded value. It aliases the line being parsed, so it

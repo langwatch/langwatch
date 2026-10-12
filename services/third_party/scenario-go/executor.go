@@ -3,11 +3,10 @@ package scenario
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
-	langwatch "github.com/langwatch/langwatch/sdks/go"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -26,10 +25,12 @@ type Executor struct {
 	state   *ExecutionState
 	hooks   hooks
 	emitter *eventEmitter
-	tracer  *langwatch.LangWatchTracer
-	runID   string
-	batchID string
-	start   time.Time
+	spans   spanStarter
+	// spanNames are the agent call span names, per agent index.
+	spanNames []string
+	runID     string
+	batchID   string
+	start     time.Time
 
 	values sync.Map
 
@@ -43,9 +44,13 @@ type Executor struct {
 	// merged is set when the result already holds the checkpoint criteria.
 	merged      bool
 	pendingTurn *TurnHandle
-	runCtx      context.Context
-	turnSpan    trace.Span
-	finished    bool
+	// inflight are the non-blocking turns not yet drained.
+	inflight []*TurnHandle
+	runCtx   context.Context
+	turnSpan trace.Span
+	finished bool
+	// finalized is set once the result finalizers ran.
+	finalized bool
 }
 
 // checkpoint is the outcome of an inline-criteria judge step.
@@ -60,13 +65,17 @@ func newExecutor(cfg ScenarioConfig, runID, batchID string, publish func(Event),
 		cfg:             cfg,
 		state:           newExecutionState(cfg),
 		hooks:           collectHooks(cfg),
-		tracer:          langwatch.Tracer(TracerName, trace.WithInstrumentationVersion(Version)),
+		spans:           newSpanStarter(),
+		spanNames:       make([]string, n),
 		runID:           runID,
 		batchID:         batchID,
 		pendingAgents:   make([]bool, n),
 		pendingMessages: make([][]Message, n),
 		agentTimes:      make([]time.Duration, n),
 		pendingRoles:    make([]AgentRole, 0, len(turnRoleOrder)),
+	}
+	for i, a := range cfg.Agents {
+		ex.spanNames[i] = agentSpanName(a)
 	}
 	ex.emitter = &eventEmitter{
 		base: eventBase{
@@ -157,14 +166,7 @@ func Assert(cond bool, msg string) error {
 // is then the error result.
 func (ex *Executor) execute(ctx context.Context) (res *ScenarioResult, err error) {
 	ex.start = time.Now()
-	runCtx, runSpan := ex.tracer.Start(ctx, "Scenario Run", trace.WithAttributes(
-		attribute.String("langwatch.origin", "simulation"),
-		sdkAttributes[0], sdkAttributes[1],
-		attribute.String("scenario.run_id", ex.runID),
-		attribute.String("scenario.name", ex.cfg.Name),
-		attribute.String("scenario.id", ex.cfg.ID),
-		attribute.String(threadIDKey, ex.cfg.ThreadID),
-	))
+	runCtx, runSpan := ex.spans.start(ctx, "Scenario Run", runSpanAttributes(ex.runID, ex.cfg, -1))
 	ex.mu.Lock()
 	ex.runCtx = runCtx
 	ex.mu.Unlock()
@@ -175,12 +177,28 @@ func (ex *Executor) execute(ctx context.Context) (res *ScenarioResult, err error
 	ex.emitter.runStarted(ex.cfg, ex.runAgents())
 
 	defer func() {
+		// A step that panicked or called runtime.Goexit (t.FailNow in a
+		// custom step) skipped every finish path: report the run as an error
+		// run anyway, so finalizers run and RUN_FINISHED is sent, then let
+		// the panic continue.
+		var panicked any
+		if !ex.isFinished() {
+			panicked = recover()
+			cause := errRunAborted
+			if panicked != nil {
+				cause = fmt.Errorf("scenario run panicked: %v", panicked)
+			}
+			res, err = ex.finishWithError(runCtx, cause)
+		}
 		ex.endTurnSpan()
 		ex.stopExtensions(runCtx)
 		if err != nil {
 			runSpan.SetStatus(codes.Error, err.Error())
 		}
 		runSpan.End()
+		if panicked != nil {
+			panic(panicked)
+		}
 	}()
 
 	if err := ex.startExtensions(runCtx); err != nil {
@@ -202,6 +220,9 @@ func (ex *Executor) execute(ctx context.Context) (res *ScenarioResult, err error
 			if err := ex.awaitPendingTurn(); err != nil {
 				return ex.finishWithError(runCtx, err)
 			}
+			// The verdict may have come while a non-blocking turn was in
+			// flight: the result carries the conversation as it ended.
+			r.Messages = ex.state.Messages()
 			ex.mu.Lock()
 			if !ex.merged {
 				cp := ex.compiledCheckpointsLocked()
@@ -237,6 +258,10 @@ func (ex *Executor) execute(ctx context.Context) (res *ScenarioResult, err error
 	return ex.finish(runCtx, r), nil
 }
 
+// errRunAborted is the error of a run whose script step exited its
+// goroutine (runtime.Goexit, as t.FailNow does) instead of returning.
+var errRunAborted = errors.New("scenario run aborted: a script step exited without returning (t.FailNow or runtime.Goexit)")
+
 const scriptEndedReasoning = "Reached end of script without conclusion, add one of the following:\n" +
 	"- Add `Scenario.judge()` to the script to force criteria judgement\n" +
 	"- Add `Scenario.succeed()` or `Scenario.fail()` to end the test with an explicit result\n" +
@@ -263,6 +288,8 @@ func (ex *Executor) startExtensions(ctx context.Context) error {
 }
 
 func (ex *Executor) stopExtensions(ctx context.Context) {
+	ctx, cancel := cleanupContext(ctx)
+	defer cancel()
 	for _, s := range ex.hooks.stoppers {
 		s.Stop(ctx, ex)
 	}

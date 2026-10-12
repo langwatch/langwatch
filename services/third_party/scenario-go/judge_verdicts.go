@@ -69,7 +69,12 @@ func criteriaParamNames(criteria []string) []string {
 	return out
 }
 
-// emptyObjectSchema is the schema of the argument-free judge tools.
+// emptyObjectSchema is the schema of the argument-free judge tools. It is
+// built fresh on every call on purpose: ToolDefinition.Parameters is a plain
+// map that provider modules and user LLM code receive and may modify (the
+// Anthropic provider hands the inner "properties" map to its SDK), so a
+// shared schema could change under later runs. Three small maps per call is
+// the price.
 func emptyObjectSchema() map[string]any {
 	return map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}
 }

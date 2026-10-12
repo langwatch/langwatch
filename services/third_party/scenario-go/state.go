@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/langwatch/scenario/go/internal/spandigest"
 )
 
 // ExecutionState is the live state of a scenario run: the conversation, the
@@ -14,8 +17,11 @@ import (
 // safe for concurrent use, so agents running a non-blocking turn may read it
 // while the script continues.
 type ExecutionState struct {
-	mu          sync.RWMutex
-	config      ScenarioConfig
+	mu     sync.RWMutex
+	config ScenarioConfig
+	// messages is append-only between rollbacks: an element below len is
+	// never written again, and a rollback moves the kept messages to a new
+	// array, so views handed out by messagesView stay valid and unchanged.
 	messages    []Message
 	rows        [][]byte // AG-UI JSON per message, encoded on demand
 	model       [][]byte // AI SDK model message JSON per message, on demand
@@ -23,6 +29,8 @@ type ExecutionState struct {
 	spans       func() []sdktrace.ReadOnlySpan
 	reads       *StateReads
 	onRollback  func(removed map[string]bool)
+	// digests keeps the judge's rendering of the run's ended spans.
+	digests *spandigest.Cache
 }
 
 func newExecutionState(cfg ScenarioConfig) *ExecutionState {
@@ -32,7 +40,17 @@ func newExecutionState(cfg ScenarioConfig) *ExecutionState {
 		rows:     make([][]byte, 0, 2*cfg.MaxTurns+2),
 		model:    make([][]byte, 0, 2*cfg.MaxTurns+2),
 		spans:    func() []sdktrace.ReadOnlySpan { return nil },
+		digests:  spandigest.NewCache(),
 	}
+}
+
+// spanDigests returns the run's span digest cache; nil (no caching) for a
+// nil state.
+func (s *ExecutionState) spanDigests() *spandigest.Cache {
+	if s == nil {
+		return nil
+	}
+	return s.digests
 }
 
 // Config returns the scenario configuration.
@@ -72,6 +90,16 @@ func (s *ExecutionState) Messages() []Message {
 	return slices.Clip(slices.Clone(s.messages))
 }
 
+// messagesView returns the conversation without copying it: a slice of the
+// stored messages capped at its length, so an append by the holder copies
+// instead of writing into the state. Holders must not modify its elements;
+// see the messages field for why the view never changes under them.
+func (s *ExecutionState) messagesView() []Message {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.messages[:len(s.messages):len(s.messages)]
+}
+
 // Len returns the number of messages.
 func (s *ExecutionState) Len() int {
 	s.mu.RLock()
@@ -82,6 +110,13 @@ func (s *ExecutionState) Len() int {
 // add stores a message, assigning its id (unless id is given) and turn, and
 // returns the stored message and its index.
 func (s *ExecutionState) add(m Message, id string) (Message, int) {
+	return s.addEncoded(m, id, nil)
+}
+
+// addEncoded is add with the message's model JSON (appendModelMessage of
+// m) already at hand, kept so chatMessagesInput does not encode it again;
+// nil encodes on demand.
+func (s *ExecutionState) addEncoded(m Message, id string, model []byte) (Message, int) {
 	m = m.clone()
 	if id == "" {
 		id = generateMessageID()
@@ -91,7 +126,7 @@ func (s *ExecutionState) add(m Message, id string) (Message, int) {
 	m.Turn = s.currentTurn
 	s.messages = append(s.messages, m)
 	s.rows = append(s.rows, nil)
-	s.model = append(s.model, nil)
+	s.model = append(s.model, model)
 	idx := len(s.messages) - 1
 	s.mu.Unlock()
 	return m, idx
@@ -100,16 +135,34 @@ func (s *ExecutionState) add(m Message, id string) (Message, int) {
 // aguiRowsJSON returns the AG-UI JSON of every message, encoding each one
 // at most once for the life of the run.
 func (s *ExecutionState) aguiRowsJSON() [][]byte {
+	var out [][]byte
+	s.withAGUIRowsJSON(func(rows [][]byte) { out = slices.Clone(rows) })
+	return out
+}
+
+// withAGUIRowsJSON calls f with the AG-UI JSON of every message, encoding
+// each one at most once for the life of the run, under the state lock and
+// without copying the list: f must not keep rows or call into the state.
+func (s *ExecutionState) withAGUIRowsJSON(f func(rows [][]byte)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := make([][]byte, len(s.messages))
 	for i := range s.messages {
 		if s.rows[i] == nil {
-			s.rows[i] = aguiRows(s.messages[i])[0].json
+			s.rows[i] = aguiRowOf(s.messages[i]).json
 		}
-		out[i] = s.rows[i]
 	}
-	return out
+	f(s.rows)
+}
+
+// keepAGUIRow stores the AG-UI JSON of the message at index, already
+// encoded by the caller, unless the message there is no longer the one with
+// id (a rollback in between).
+func (s *ExecutionState) keepAGUIRow(index int, id string, json []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if index < len(s.messages) && s.messages[index].ID == id && s.rows[index] == nil {
+		s.rows[index] = json
+	}
 }
 
 func (s *ExecutionState) setSpanProvider(f func() []sdktrace.ReadOnlySpan) { s.spans = f }
@@ -253,8 +306,14 @@ func (s *ExecutionState) RollbackMessagesTo(index int) ([]Message, error) {
 	s.mu.Lock()
 	index = min(index, len(s.messages))
 	removed := slices.Clone(s.messages[index:])
-	clear(s.messages[index:])
-	s.messages = s.messages[:index]
+	// A new array for the kept messages: views of the old one (agents
+	// holding messagesView) keep seeing the conversation they were given,
+	// and the next add cannot overwrite a removed message they still hold.
+	if index < len(s.messages) {
+		kept := make([]Message, index, cap(s.messages))
+		copy(kept, s.messages[:index])
+		s.messages = kept
+	}
 	clear(s.rows[index:])
 	s.rows = s.rows[:index]
 	clear(s.model[index:])
@@ -334,33 +393,45 @@ func (s *ExecutionState) noteMissingToolCall(name string) {
 func (s *ExecutionState) chatMessagesInput() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	size := 40
 	for i := range s.messages {
 		if s.model[i] == nil {
-			s.model[i] = appendModelMessage(nil, s.messages[i])
+			s.model[i] = encodeModelMessage(s.messages[i])
 		}
-		size += len(s.model[i]) + 1
 	}
-	b := make([]byte, 0, size)
-	b = append(b, `{"type":"chat_messages","value":[`...)
-	for i, enc := range s.model {
+	return chatMessagesJSON(s.model)
+}
+
+// encodeModelMessages returns the model JSON of each message, the pieces
+// of chatMessagesJSON that the state can keep (addEncoded).
+func encodeModelMessages(msgs []Message) [][]byte {
+	out := make([][]byte, len(msgs))
+	for i, m := range msgs {
+		out[i] = encodeModelMessage(m)
+	}
+	return out
+}
+
+// chatMessagesJSON joins encoded model messages as a chat_messages typed
+// value.
+func chatMessagesJSON(encoded [][]byte) string {
+	size := 40
+	for _, e := range encoded {
+		size += len(e) + 1
+	}
+	var b strings.Builder
+	b.Grow(size)
+	b.WriteString(`{"type":"chat_messages","value":[`)
+	for i, e := range encoded {
 		if i > 0 {
-			b = append(b, ',')
+			b.WriteByte(',')
 		}
-		b = append(b, enc...)
+		b.Write(e)
 	}
-	return string(append(b, "]}"...))
+	b.WriteString("]}")
+	return b.String()
 }
 
 // chatMessagesValue encodes messages as a chat_messages typed value.
 func chatMessagesValue(msgs []Message) string {
-	b := make([]byte, 0, 64*len(msgs)+40)
-	b = append(b, `{"type":"chat_messages","value":[`...)
-	for i, m := range msgs {
-		if i > 0 {
-			b = append(b, ',')
-		}
-		b = appendModelMessage(b, m)
-	}
-	return string(append(b, "]}"...))
+	return chatMessagesJSON(encodeModelMessages(msgs))
 }

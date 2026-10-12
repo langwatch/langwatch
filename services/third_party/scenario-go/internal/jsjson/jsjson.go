@@ -91,7 +91,11 @@ func (p *parser) value(depth int) (any, error) {
 	case c == 'n':
 		return p.literal("null", nil)
 	case c == '-' || (c >= '0' && c <= '9'):
-		return p.number()
+		f, err := p.number()
+		if err != nil {
+			return nil, err
+		}
+		return f, nil
 	}
 	return nil, errSyntax
 }
@@ -191,25 +195,25 @@ func (p *parser) array(depth int) (any, error) {
 	}
 }
 
-func (p *parser) number() (any, error) {
+func (p *parser) number() (float64, error) {
 	start := p.i
 	if p.s[p.i] == '-' {
 		p.i++
 	}
 	if p.i >= len(p.s) {
-		return nil, errSyntax
+		return 0, errSyntax
 	}
 	if p.s[p.i] == '0' {
 		p.i++
 	} else if p.s[p.i] >= '1' && p.s[p.i] <= '9' {
 		p.digits()
 	} else {
-		return nil, errSyntax
+		return 0, errSyntax
 	}
 	if p.i < len(p.s) && p.s[p.i] == '.' {
 		p.i++
 		if !p.digits() {
-			return nil, errSyntax
+			return 0, errSyntax
 		}
 	}
 	if p.i < len(p.s) && (p.s[p.i] == 'e' || p.s[p.i] == 'E') {
@@ -218,12 +222,12 @@ func (p *parser) number() (any, error) {
 			p.i++
 		}
 		if !p.digits() {
-			return nil, errSyntax
+			return 0, errSyntax
 		}
 	}
 	f, err := strconv.ParseFloat(p.s[start:p.i], 64)
 	if err != nil && !errors.Is(err, strconv.ErrRange) {
-		return nil, errSyntax
+		return 0, errSyntax
 	}
 	return f, nil
 }
@@ -542,4 +546,60 @@ func LooksLikeJSON(s string) bool {
 
 func isJSSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f'
+}
+
+// MaxDepth is the deepest nesting Parse accepts.
+const MaxDepth = maxDepth
+
+// Scanner reads a JSON document piece by piece with the grammar of Parse,
+// for callers that transcode it without building the value tree.
+type Scanner struct{ p parser }
+
+// NewScanner returns a scanner at the start of s.
+func NewScanner(s string) *Scanner { return &Scanner{p: parser{s: s}} }
+
+// SkipSpace skips whitespace.
+func (sc *Scanner) SkipSpace() { sc.p.skipSpace() }
+
+// Peek returns the next byte, without skipping whitespace.
+func (sc *Scanner) Peek() (byte, bool) {
+	if sc.p.i >= len(sc.p.s) {
+		return 0, false
+	}
+	return sc.p.s[sc.p.i], true
+}
+
+// Next consumes one byte.
+func (sc *Scanner) Next() { sc.p.i++ }
+
+// Offset is the read position; SetOffset rewinds to one.
+func (sc *Scanner) Offset() int     { return sc.p.i }
+func (sc *Scanner) SetOffset(i int) { sc.p.i = i }
+
+// String reads a string literal.
+func (sc *Scanner) String() (string, error) { return sc.p.str() }
+
+// Number reads a number.
+func (sc *Scanner) Number() (float64, error) { return sc.p.number() }
+
+// Literal reads true, false or null.
+func (sc *Scanner) Literal() (any, error) {
+	switch c, _ := sc.Peek(); c {
+	case 't':
+		return sc.p.literal("true", true)
+	case 'f':
+		return sc.p.literal("false", false)
+	case 'n':
+		return sc.p.literal("null", nil)
+	}
+	return nil, errSyntax
+}
+
+// Value parses the next value, at the given nesting depth, into a tree.
+func (sc *Scanner) Value(depth int) (any, error) { return sc.p.value(depth) }
+
+// Done reports whether only whitespace is left.
+func (sc *Scanner) Done() bool {
+	sc.p.skipSpace()
+	return sc.p.i == len(sc.p.s)
 }

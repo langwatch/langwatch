@@ -25,7 +25,7 @@ func (a *ClaudeCodeAgentAdapter) runTurn(ctx context.Context, promptMessages, hi
 	}
 
 	if ctx.Err() != nil {
-		return nil, fmt.Errorf("Claude Code CLI not started: %w", context.Cause(ctx))
+		return nil, fmt.Errorf("context ended before the Claude Code CLI started: %w", context.Cause(ctx))
 	}
 	dir := a.cfg.WorkingDirectory
 	bin := a.resolveBin()
@@ -61,8 +61,9 @@ func (a *ClaudeCodeAgentAdapter) runTurn(ctx context.Context, promptMessages, hi
 	stdout.flush()
 	if stopped {
 		if cause := context.Cause(turnCtx); !errors.Is(cause, ErrTimeout) {
-			return nil, fmt.Errorf("Claude Code CLI stopped: %w", cause)
+			return nil, fmt.Errorf("stopped the Claude Code CLI: %w", cause)
 		}
+		//lint:ignore ST1005 same message as the JS SDK's Claude Code adapter
 		return nil, fmt.Errorf("Claude Code CLI timed out after %s in %s: %w", a.timeout, dir, ErrTimeout)
 	}
 	if cmd.ProcessState == nil {
@@ -106,8 +107,9 @@ func (a *ClaudeCodeAgentAdapter) wait(ctx context.Context, cmd *exec.Cmd) (stopp
 func startError(bin, dir string, err error) error {
 	if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
 		if _, statErr := os.Stat(dir); statErr != nil {
-			return fmt.Errorf("Claude Code working directory: %w", statErr)
+			return fmt.Errorf("check the Claude Code working directory: %w", statErr)
 		}
+		//lint:ignore ST1005 same message as the JS SDK's Claude Code adapter
 		return fmt.Errorf("Claude Code CLI not found: %s. Install it or set ClaudeBin/CLAUDE_BIN: %w", bin, ErrCLINotFound)
 	}
 	return fmt.Errorf("start Claude Code CLI %s: %w", bin, err)
