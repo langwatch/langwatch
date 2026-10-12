@@ -52,6 +52,7 @@ type Exporter struct {
 	url         string
 	headers     map[string]string
 	client      *http.Client
+	ownsClient  bool // the client was created here, so Shutdown may close it
 	compression bool
 	retry       RetryConfig
 
@@ -64,9 +65,9 @@ var _ sdktrace.SpanExporter = (*Exporter)(nil)
 // New returns an Exporter for cfg. Zero retry fields take the defaults
 // documented on RetryConfig.
 func New(cfg Config) *Exporter {
-	client := cfg.HTTPClient
+	client, owns := cfg.HTTPClient, false
 	if client == nil {
-		client = &http.Client{Timeout: DefaultTimeout}
+		client, owns = &http.Client{Timeout: DefaultTimeout}, true
 	}
 	headers := make(map[string]string, len(cfg.Headers))
 	for k, v := range cfg.Headers {
@@ -76,6 +77,7 @@ func New(cfg Config) *Exporter {
 		url:         cfg.URL,
 		headers:     headers,
 		client:      client,
+		ownsClient:  owns,
 		compression: !cfg.DisableCompression,
 		retry:       cfg.Retry.withDefaults(),
 	}
@@ -117,7 +119,9 @@ func (e *Exporter) Shutdown(ctx context.Context) error {
 	e.mu.Lock()
 	e.shutdown = true
 	e.mu.Unlock()
-	e.client.CloseIdleConnections()
+	if e.ownsClient {
+		e.client.CloseIdleConnections()
+	}
 	return ctx.Err()
 }
 
