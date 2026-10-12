@@ -197,7 +197,7 @@ func (cell *run) runMidStep(ctx context.Context, options midStepOptions, pass mi
 // collectMidStep reads what the finished run left: the step's row, its worker lines, its events and the stores.
 func (cell *run) collectMidStep(ctx context.Context, options midStepOptions, result midStepRun) (midStepRun, error) {
 	result.final, _ = cell.readStep(ctx, options.step)
-	_ = waitFor(ctx, 15*time.Minute, func() bool {
+	_ = waitFor(ctx, 25*time.Minute, func() bool { // settle: queue work a killed worker held must come back
 		rows, err := Ledger(ctx, cell.stores)
 		return err == nil && len(Outstanding(rows)) == 0 && cell.queueDrained(ctx)
 	})
