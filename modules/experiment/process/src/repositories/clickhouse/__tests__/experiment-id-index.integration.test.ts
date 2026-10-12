@@ -3,7 +3,7 @@
 /**
  * Experiment lookups by id alone against the migrated ClickHouse (goose 00114): found through
  * the index, bounded to its range, reaching fewer parts than an unbounded read.
- * Needs LANGWATCH_TEST_CLICKHOUSE_URL; the suite migrates a database of its own.
+ * A native ClickHouse when LANGWATCH_TEST_CLICKHOUSE_URL is set, else a container; own database.
  */
 import { randomUUID } from "node:crypto";
 
@@ -19,7 +19,6 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
-  nativeClickHouseBaseUrl,
   startTestClickHouseEndpoints,
   partsAfterPartitionPruning,
 } from "@langwatch/clickhouse-client/testing";
@@ -34,8 +33,6 @@ import { ClickHouseExperimentIdLookupRepository } from "../clickhouse.experiment
 import { ClickHouseExperimentRunStateRepository } from "../clickhouse.experiment-run-state.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
 import { ClickHouseExperimentSession } from "../clickhouse.experiment-session.store.ts";
-
-const clickHouseConfigured = Boolean(nativeClickHouseBaseUrl(process.env));
 
 const DAY_MS = 86_400_000;
 const ON: IdIndexFlags = { isOn: () => true };
@@ -121,7 +118,6 @@ function writeGroups(): { id: string; atMs: number }[][] {
 }
 
 beforeAll(async () => {
-  if (!clickHouseConfigured) return;
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "experiment-id-index",
     names: ["schema"],
@@ -207,7 +203,7 @@ afterAll(async () => {
   await ch.close();
 });
 
-describe.skipIf(!clickHouseConfigured)("experiment lookups by id with the id index", () => {
+describe("experiment lookups by id with the id index", () => {
   describe("given a run written eight weeks ago", () => {
     /** @scenario "a lookup by id reads only the partitions the index names" */
     it("finds its experiment by run id alone inside the index's range", async () => {

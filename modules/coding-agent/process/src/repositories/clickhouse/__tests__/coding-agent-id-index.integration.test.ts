@@ -18,7 +18,6 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
-  nativeClickHouseBaseUrl,
   startTestClickHouseEndpoints,
   partsAfterPartitionPruning,
 } from "@langwatch/clickhouse-client/testing";
@@ -35,8 +34,6 @@ import { NoopCodingAgentReadMetricsService } from "../../../__tests__/support/co
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse.coding-agent-trace-session.repository.ts";
-
-const clickHouseConfigured = Boolean(nativeClickHouseBaseUrl(process.env));
 const DAY_MS = 86_400_000;
 const ON: IdIndexFlags = { isOn: () => true };
 
@@ -118,7 +115,6 @@ function sourceReadOf(table: string): QueryRequest {
 }
 
 beforeAll(async () => {
-  if (!clickHouseConfigured) return;
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "coding-agent-id-index",
     names: ["schema"],
@@ -227,7 +223,7 @@ afterAll(async () => {
   await ch.close();
 });
 
-describe.skipIf(!clickHouseConfigured)("coding-agent lookups by id with the id index", () => {
+describe("coding-agent lookups by id with the id index", () => {
   describe("given a session written eight weeks ago", () => {
     /** @scenario "a lookup by id reads only the partitions the index names" */
     it("finds it by session id alone and reads fewer parts than the unbounded read", async () => {

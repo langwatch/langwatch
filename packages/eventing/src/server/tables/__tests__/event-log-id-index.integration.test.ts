@@ -16,7 +16,6 @@ import {
   TenantGuard,
 } from "@langwatch/clickhouse-client";
 import {
-  nativeClickHouseBaseUrl,
   startTestClickHouseEndpoints,
   partsAfterPartitionPruning,
 } from "@langwatch/clickhouse-client/testing";
@@ -34,7 +33,6 @@ import {
   eventLogOccurredRange,
 } from "../event-log-id-index.ts";
 
-const clickHouseConfigured = Boolean(nativeClickHouseBaseUrl(process.env));
 const DAY_MS = 86_400_000;
 const EVENT_TYPE = "lw.test.thing_happened";
 const GOOSE = resolve(
@@ -166,7 +164,6 @@ const index = (): EventLogIdIndex => ({
 });
 
 beforeAll(async () => {
-  if (!clickHouseConfigured) return;
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "eventing-event-log-id-index",
     names: ["schema"],
@@ -206,6 +203,12 @@ beforeAll(async () => {
     });
   }
 
+  // A reused database keeps an earlier run's marker row (TenantId ''); start with none.
+  await driver.command({
+    tenantId,
+    sql: "ALTER TABLE event_log_id_index DELETE WHERE TenantId = '' SETTINGS mutations_sync = 2",
+  });
+
   await store("replayed", [...replayedDays.map(daysAgo), 0]);
   await store("last-month", [daysAgo(40), daysAgo(33), 0]);
   await store("unseen", [0, 0]);
@@ -219,7 +222,7 @@ beforeEach(() => {
 });
 
 afterAll(async () => {
-  if (!clickHouseConfigured || clickhouse === undefined) return;
+  if (clickhouse === undefined) return;
   for (const table of ["event_log", "event_log_id_index"]) {
     await clickhouse.command({
       tenantId,
@@ -229,7 +232,7 @@ afterAll(async () => {
   }
 });
 
-describe.skipIf(!clickHouseConfigured)("the event log's aggregate index", () => {
+describe("the event log's aggregate index", () => {
   describe("given an aggregate whose events span three weeks, a year ago", () => {
     /** @scenario "replaying an aggregate reads only the weeks its events span" */
     it("bounds the replay to those weeks and still applies its event with no occurred time", async () => {

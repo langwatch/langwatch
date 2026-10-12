@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { ClickHouseRetroactiveRetentionRepository } from "../clickhouse.retroactive-retention.repository.ts";
 
-const clickHouseUrl = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
+const clickHouseUrl = process.env.LANGWATCH_TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const database = `test_data_retention_${generate("test").toString().toLowerCase()}`;
 const tenantId = `project-${generate("test").toString()}`;
 const otherTenantId = `project-${generate("test").toString()}`;

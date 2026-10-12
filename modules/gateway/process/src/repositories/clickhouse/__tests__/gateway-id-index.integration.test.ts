@@ -16,7 +16,6 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
-  nativeClickHouseBaseUrl,
   startTestClickHouseEndpoints,
   partsAfterPartitionPruning,
 } from "@langwatch/clickhouse-client/testing";
@@ -28,8 +27,6 @@ import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../../rules/gateway-
 import { GatewayBudgetClickHouseRepository } from "../clickhouse.gateway-budget.repository.ts";
 import { ClickHouseGatewaySession } from "../clickhouse.gateway-session.store.ts";
 import { ClickHouseGatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";
-
-const clickHouseConfigured = Boolean(nativeClickHouseBaseUrl(process.env));
 const DAY_MS = 86_400_000;
 const ON: IdIndexFlags = { isOn: () => true };
 const tenantId = `id-index-${Math.random().toString(36).slice(2, 10)}`;
@@ -121,7 +118,6 @@ function spendRow({ id, occurredAtMs }: { id: string; occurredAtMs: number }) {
 }
 
 beforeAll(async () => {
-  if (!clickHouseConfigured) return;
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "gateway-id-index",
     names: ["ledger"],
@@ -207,7 +203,7 @@ afterAll(async () => {
   await ch.close();
 });
 
-describe.skipIf(!clickHouseConfigured)("gateway lookups by request id with the id index", () => {
+describe("gateway lookups by request id with the id index", () => {
   describe("given a request written eight weeks ago", () => {
     /** @scenario "a lookup by id reads only the partitions the index names" */
     it("reads it back for the fold inside the index's range", async () => {

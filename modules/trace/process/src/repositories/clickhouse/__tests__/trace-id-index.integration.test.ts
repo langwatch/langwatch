@@ -262,13 +262,13 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
         summary: lastRead({ table: "trace_summaries" }),
         spans: lastRead({ table: "stored_spans" }),
       };
-      statements = [];
-      await summaries.findByTraceId({ authorization, traceId });
-      await spans.findSpansByTraceId({ authorization, traceId });
       for (const table of ["trace_summaries", "stored_spans"] as const) {
         const parts = await prunedParts({
           bounded: table === "trace_summaries" ? bounded.summary : bounded.spans,
-          unbounded: lastRead({ table }),
+          unbounded: {
+            sql: `SELECT TraceId FROM ${table} WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}`,
+            params: { tenantId, traceId },
+          },
         });
         expect(parts.bounded).toBeLessThan(parts.unbounded);
       }
@@ -336,7 +336,7 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
 
   describe("given a trace whose short retention has passed, beside one kept forever", () => {
     /** @scenario "the index expires with the data it points at" */
-    it("drops the expired trace's index row on a merge and keeps the forever one", async () => {
+    it("never keeps the expired trace's index row, before or after a merge, and keeps the forever one", async () => {
       const expired = `trace-${nanoid()}`;
       const forever = `trace-${nanoid()}`;
       // One day's retention plus the index's seven days of slack is long past at thirty days.
@@ -345,7 +345,8 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
         spanRow({ traceId: expired, startMs: thirtyDaysAgo, retentionDays: 1 }),
         spanRow({ traceId: forever, startMs: thirtyDaysAgo, retentionDays: 0 }),
       ]);
-      expect((await indexRange({ index: "stored_spans_id_index", traceId: expired })).n).toBe(1);
+      // ClickHouse applies the TTL as it writes the part, so an expired row never lands at all.
+      expect((await indexRange({ index: "stored_spans_id_index", traceId: expired })).n).toBe(0);
 
       await ch.command({ query: "OPTIMIZE TABLE stored_spans_id_index FINAL" });
 

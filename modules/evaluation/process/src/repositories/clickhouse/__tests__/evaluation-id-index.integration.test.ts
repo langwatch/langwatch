@@ -153,18 +153,14 @@ describe.skipIf(!clickHouseUrl)("a lookup of an evaluation run by id alone", () 
       expect(read?.sql.match(/scheduledAtFrom/g)).toHaveLength(2);
       expect(outcomes).toEqual([{ table: "evaluation_runs", outcome: "index_hit" }]);
       if (read === undefined) throw new Error("no source read of evaluation_runs was sent");
-      statements = [];
-      await repository.getByEvaluationId({
-        authorization: ownProof({ projectId: tenantId }),
-        evaluationId: targetId,
-        retention,
-      });
-      const unflagged = statements.findLast((statement) =>
-        statement.sql.includes("FROM evaluation_runs AS t"),
-      );
-      if (unflagged === undefined) throw new Error("no read without the index was sent");
-      expect(await partsAfterPartitionPruning({ query: queryRows, request: read })).toBeLessThan(
-        await partsAfterPartitionPruning({ query: queryRows, request: unflagged }),
+      const unbounded = {
+        sql: "SELECT EvaluationId FROM evaluation_runs WHERE TenantId = {tenantId:String} AND EvaluationId = {evaluationId:String}",
+        params: { tenantId, evaluationId: targetId },
+      };
+      const boundedParts = await partsAfterPartitionPruning({ query: queryRows, request: read });
+      expect(boundedParts).toBe(1);
+      expect(boundedParts).toBeLessThan(
+        await partsAfterPartitionPruning({ query: queryRows, request: unbounded }),
       );
     });
 

@@ -3,7 +3,7 @@
 /**
  * Suite lookups by id alone against the migrated ClickHouse (goose 00116): found through
  * the index, bounded to its range, reaching fewer parts than an unbounded read.
- * Needs LANGWATCH_TEST_CLICKHOUSE_URL; the suite migrates a database of its own.
+ * A native ClickHouse when LANGWATCH_TEST_CLICKHOUSE_URL is set, else a container; own database.
  */
 import { randomUUID } from "node:crypto";
 
@@ -19,7 +19,6 @@ import {
 } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
-  nativeClickHouseBaseUrl,
   startTestClickHouseEndpoints,
 } from "@langwatch/clickhouse-client/testing";
 import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
@@ -28,8 +27,6 @@ import { nowInstant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ClickHouseSuiteRunRepository } from "../clickhouse.suite-run.repository.ts";
-
-const clickHouseConfigured = Boolean(nativeClickHouseBaseUrl(process.env));
 
 const DAY_MS = 86_400_000;
 const ON: IdIndexFlags = { isOn: () => true };
@@ -109,7 +106,6 @@ beforeEach(() => {
 const batchRunId = `${tenantId}-batch`;
 
 beforeAll(async () => {
-  if (!clickHouseConfigured) return;
   const [endpoint] = await startTestClickHouseEndpoints({
     suite: "suite-id-index",
     names: ["schema"],
@@ -178,7 +174,7 @@ afterAll(async () => {
   await ch.close();
 });
 
-describe.skipIf(!clickHouseConfigured)("suite lookups by id with the id index", () => {
+describe("suite lookups by id with the id index", () => {
   describe("given a suite run written eight weeks ago", () => {
     /** @scenario "a lookup by id reads only the partitions the index names" */
     it("reads the run's fold state by batch run id alone inside the index's range", async () => {
