@@ -5,7 +5,6 @@ import {
   assertNoInstantEvalJudgeModelNodes,
   copyWorkflowCommandSchema,
   createWorkflowCommandSchema,
-  dslWithoutHttpAgentSecrets,
   publishWorkflowCommandSchema,
   runWorkflowCommandSchema,
   saveWorkflowVersionCommandSchema,
@@ -30,10 +29,7 @@ import {
 import type * as workflowContractModule from "@langwatch/workflow-contract";
 
 import type { WorkflowDslMigration, WorkflowExecution, WorkflowId } from "../app/workflow.app.ts";
-import type {
-  PersistWorkflowVersionInput,
-  WorkflowRepository,
-} from "../repositories/workflow.repository.ts";
+import type { WorkflowRepository } from "../repositories/workflow.repository.ts";
 import {
   dslForTargetProject,
   freshCopyDsl,
@@ -48,9 +44,8 @@ import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service.ts";
 import { WorkflowDslService } from "./workflow-dsl.service.ts";
 import { WorkflowVersionHistoryService } from "./workflow-version-history.service.ts";
 
-/** KSUID resources for a workflow and a version row; the prefix is already on the database. */
+/** KSUID resource for a workflow row; the prefix is already on the database. */
 const WORKFLOW_KSUID_RESOURCE = "workflow";
-const WORKFLOW_VERSION_KSUID_RESOURCE = "workflowversion";
 
 type WorkflowServiceOptions = {
   repository: WorkflowRepository;
@@ -288,46 +283,8 @@ export class WorkflowService {
       projectId: command.projectId,
       includeVersion: true,
     });
-    const versions = await this.options.repository.findVersions({
-      workflowId: command.workflowId,
-      projectId: command.projectId,
-    });
-    const latest = versions[0];
-    const major = Number.parseInt((latest?.version ?? "0.0").split(".")[0] ?? "0", 10);
-    const dsl = dslWithoutHttpAgentSecrets({
-      ...command.dsl,
-      workflow_id: command.workflowId,
-      state: {},
-    });
-    const persist: PersistWorkflowVersionInput = {
-      id: this.id(WORKFLOW_VERSION_KSUID_RESOURCE),
-      workflowId: command.workflowId,
-      projectId: command.projectId,
-      parentId: workflow.currentVersionId,
-      version: command.autoSaved ? String(major + 1) : String(command.dsl.version),
-      autoSaved: command.autoSaved,
-      commitMessage: command.commitMessage,
-      authorId: command.authorId,
-      dsl,
-    };
-    const autoSaved = versions.find((version) => version.autoSaved);
-    const version = autoSaved
-      ? await this.options.repository.updateAutoSavedVersion({
-          ...persist,
-          id: autoSaved.id,
-        })
-      : await this.options.repository.createVersion(persist);
-    await this.options.repository.updateWorkflow({
-      id: command.workflowId,
-      projectId: command.projectId,
-      data: {
-        ...this.dsl.metadata(dsl),
-        currentVersionId: version.id,
-        ...(command.setAsLatestVersion === false ? {} : { latestVersionId: version.id }),
-      },
-    });
 
-    return version;
+    return this.versionHistory.save({ command, parentId: workflow.currentVersionId });
   }
 
   async publish(input: workflowContractModule.PublishWorkflowCommand): Promise<Workflow> {

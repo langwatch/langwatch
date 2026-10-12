@@ -1,31 +1,95 @@
 import { NotFoundError } from "@langwatch/handled-error";
 import {
+  dslWithoutHttpAgentSecrets,
   WorkflowNotFoundError,
+  type SaveWorkflowVersionCommand,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
   type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 
-import type { WorkflowDslMigration } from "../app/workflow.app.ts";
-import type { WorkflowRepository } from "../repositories/workflow.repository.ts";
+import type { WorkflowDslMigration, WorkflowId } from "../app/workflow.app.ts";
+import type {
+  PersistWorkflowVersionInput,
+  WorkflowRepository,
+} from "../repositories/workflow.repository.ts";
+import { WorkflowDslService } from "./workflow-dsl.service.ts";
 
-/** A workflow's version history, and moving its current version back to one of them. */
+/** KSUID resource for a version row; the prefix is already on the database. */
+const WORKFLOW_VERSION_KSUID_RESOURCE = "workflowversion";
+
+/** A workflow's version history: saving a version, reading them, and moving back to one. */
 export class WorkflowVersionHistoryService {
   static create({
     repository,
     dslMigration,
+    ids,
   }: {
     repository: WorkflowRepository;
     dslMigration: WorkflowDslMigration;
+    ids: WorkflowId;
   }): WorkflowVersionHistoryService {
-    return new WorkflowVersionHistoryService(repository, dslMigration);
+    return new WorkflowVersionHistoryService(repository, dslMigration, ids);
   }
 
   private constructor(
     private readonly repository: WorkflowRepository,
     private readonly dslMigration: WorkflowDslMigration,
+    private readonly ids: WorkflowId,
   ) {}
+
+  private readonly dsl = WorkflowDslService.create();
+
+  /** Numbers the version, reuses the auto-save slot, and moves the workflow's pointers. */
+  async save({
+    command,
+    parentId,
+  }: {
+    command: SaveWorkflowVersionCommand;
+    parentId: string | null;
+  }): Promise<WorkflowVersion> {
+    const versions = await this.repository.findVersions({
+      workflowId: command.workflowId,
+      projectId: command.projectId,
+    });
+    const latest = versions[0];
+    const major = Number.parseInt((latest?.version ?? "0.0").split(".")[0] ?? "0", 10);
+    const dsl = dslWithoutHttpAgentSecrets({
+      ...command.dsl,
+      workflow_id: command.workflowId,
+      state: {},
+    });
+    const persist: PersistWorkflowVersionInput = {
+      id: this.ids.next(WORKFLOW_VERSION_KSUID_RESOURCE),
+      workflowId: command.workflowId,
+      projectId: command.projectId,
+      parentId,
+      version: command.autoSaved ? String(major + 1) : String(command.dsl.version),
+      autoSaved: command.autoSaved,
+      commitMessage: command.commitMessage,
+      authorId: command.authorId,
+      dsl,
+    };
+    const autoSaved = versions.find((version) => version.autoSaved);
+    const version = autoSaved
+      ? await this.repository.updateAutoSavedVersion({
+          ...persist,
+          id: autoSaved.id,
+        })
+      : await this.repository.createVersion(persist);
+    await this.repository.updateWorkflow({
+      id: command.workflowId,
+      projectId: command.projectId,
+      data: {
+        ...this.dsl.metadata(dsl),
+        currentVersionId: version.id,
+        ...(command.setAsLatestVersion === false ? {} : { latestVersionId: version.id }),
+      },
+    });
+
+    return version;
+  }
 
   async getVersionHistory({
     workflow,
