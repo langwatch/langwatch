@@ -1,0 +1,115 @@
+name: publish-docker-private
+
+# Manual build of the one platform image from any ref into a PRIVATE GHCR package.
+# Arm64 only, as publish-docker-ecr.yml: every private SaaS consumer is Graviton.
+# No source label, so the package is not linked to this public repository.
+# The first push creates it; the last step fails the run if GitHub reports it public.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag or sha to build"
+        required: false
+        default: main
+        type: string
+      image_tag:
+        description: "Custom image tag (default: git-<short-sha> of the built ref)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Never cancel in flight: a superseded run may already have pushed layers.
+concurrency:
+  group: publish-docker-private-${{ inputs.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/langwatch/langwatch-private
+
+jobs:
+  build-and-push:
+    runs-on: arm64-runner-32gb
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      # `case` matches the whole string, newlines included, unlike `grep -E`.
+      # `latest` is rejected: this workflow never writes that tag.
+      - name: Resolve tag
+        id: meta
+        env:
+          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="${INPUT_IMAGE_TAG:-git-$(git rev-parse --short HEAD)}"
+          case "${IMAGE_TAG}" in
+            latest) echo "::error::image_tag must not be 'latest'"; exit 1 ;;
+            *[!A-Za-z0-9._-]* | [!A-Za-z0-9_]*)
+              echo "::error::image_tag is not a valid Docker tag"; exit 1 ;;
+          esac
+          if [ "${#IMAGE_TAG}" -gt 128 ]; then
+            echo "::error::image_tag is longer than 128 characters"; exit 1
+          fi
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: infra/docker/Dockerfile
+          push: true
+          platforms: linux/arm64/v8
+          provenance: false
+          cache-from: type=gha,scope=private-langwatch-arm64
+          cache-to: type=gha,mode=max,scope=private-langwatch-arm64
+          build-args: |
+            VERSION=${{ steps.meta.outputs.image_tag }}
+            SERVICE_VERSION=${{ steps.meta.outputs.image_tag }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.image_tag }}
+
+      - name: Write summary
+        env:
+          IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          REF: ${{ inputs.ref }}
+        run: |
+          {
+            echo "Published \`${IMAGE}:${IMAGE_TAG}\` (ref \`${REF}\`)"
+            echo ""
+            echo "- Tags: \`${IMAGE_TAG}\`"
+            echo "- Digest: \`${DIGEST}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if the package is public
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VISIBILITY=$(gh api /orgs/langwatch/packages/container/langwatch-private --jq .visibility)
+          echo "Package visibility: ${VISIBILITY}" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${VISIBILITY}" = "public" ]; then
+            echo "::error::ghcr.io/langwatch/langwatch-private is PUBLIC. Make it private in the org package settings and delete the pushed tag."
+            exit 1
+          fi
