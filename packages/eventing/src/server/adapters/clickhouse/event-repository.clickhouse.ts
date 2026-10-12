@@ -280,9 +280,9 @@ export class EventingClickHouseEventRepository implements EventRepository {
             AggregateId,
             ${EVENT_LOG_SELECT_COLUMNS}
           FROM event_log
-          WHERE TenantId IN {tenantIds:Array(String)}
+          WHERE TenantId IN ({tenantIds:Array(String)})
             AND AggregateType = {aggregateType:String}
-            AND AggregateId IN {aggregateIds:Array(String)}
+            AND AggregateId IN ({aggregateIds:Array(String)})
           ORDER BY TenantId ASC, AggregateId ASC, EventTimestamp ASC, EventId ASC
         `,
         query_params: { tenantIds, aggregateType, aggregateIds },

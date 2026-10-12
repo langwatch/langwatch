@@ -55,7 +55,7 @@ describe("EventingClickHouseEventRepository.findEventRecordsOfAggregates", () =>
       const request = query.mock.calls[0]?.[0];
       const where = String(request?.query).replace(/\s+/g, " ");
       expect(where).toContain(
-        "WHERE TenantId IN {tenantIds:Array(String)} AND AggregateType = {aggregateType:String} AND AggregateId IN {aggregateIds:Array(String)}",
+        "WHERE TenantId IN ({tenantIds:Array(String)}) AND AggregateType = {aggregateType:String} AND AggregateId IN ({aggregateIds:Array(String)})",
       );
       expect(request).toMatchObject({
         query_params: {
