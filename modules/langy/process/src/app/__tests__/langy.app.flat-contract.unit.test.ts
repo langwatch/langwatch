@@ -113,24 +113,24 @@ describe("LangyModule", () => {
   });
 
   /** @scenario "A pod that shuts down retires its long-poll shares before closing the session store" */
-  it("closes the long-poll sessions, then the session-state store, when the process shuts down", async () => {
+  it("closes the long-poll sessions, then the workspace channel, when the process shuts down", async () => {
     const owned: { name: string; close: () => void | Promise<void> }[] = [];
-    const repositories = MemoryLangyRepositories.create();
+    const channels = MemoryLangyChannels.create();
     const closed: string[] = [];
-    vi.spyOn(repositories.sessionState, "close").mockImplementation(async () => {
-      closed.push("session state");
+    vi.spyOn(channels.workspace, "close").mockImplementation(async () => {
+      closed.push("workspace channel");
     });
     vi.spyOn(LocalControlLongPollService.prototype, "close").mockImplementation(async () => {
       closed.push("long-poll sessions");
     });
     await createApp({
-      repositories,
+      channels,
       resources: { own: (name, close) => owned.push({ name, close }), ownService: () => void 0 },
     });
 
     for (const resource of [...owned].reverse()) await resource.close();
 
-    expect(closed).toEqual(["long-poll sessions", "session state"]);
+    expect(closed).toEqual(["long-poll sessions", "workspace channel"]);
   });
 
   it("keeps one service instance behind the application", async () => {
@@ -218,6 +218,7 @@ async function createApp({
   secrets = noSecrets,
   resources = { own: () => void 0, ownService: () => void 0 },
   repositories = MemoryLangyRepositories.create(),
+  channels = MemoryLangyChannels.create(),
   retention = createApiFixture<DataRetentionApi>(),
 }: {
   retention?: DataRetentionApi;
@@ -225,6 +226,7 @@ async function createApp({
   secrets?: ScopedSecrets;
   resources?: LangySetupResources;
   repositories?: ReturnType<typeof MemoryLangyRepositories.create>;
+  channels?: ReturnType<typeof MemoryLangyChannels.create>;
 } = {}): Promise<LangyModule> {
   const app = await LangyModule.create({
     dependencies: {
@@ -266,7 +268,7 @@ async function createApp({
     resources,
     secrets,
     repositories,
-    channels: MemoryLangyChannels.create(),
+    channels,
   });
   const registered = producerEventing().register(
     app.conversationPipeline({ participation: "produce" }),

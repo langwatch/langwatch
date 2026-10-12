@@ -4,14 +4,12 @@ import {
   localCallErrorSchema,
   localToolCallSchema,
 } from "@langwatch/langy-contract";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * What the platform keeps about one local tool call while it is in flight, and what one pod
  * tells another about a conversation's folder. Shape only: the dispatcher owns the transitions.
  */
 import { z } from "zod";
 
-import type { LangyLocalPresenceRepository } from "../repositories/langy-local-presence.repository.ts";
 import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
 import type { UserWaitBuffer } from "./langy-local-user-wait-record.rules.ts";
 
@@ -63,16 +61,6 @@ export type WorkspaceNudge = z.infer<typeof workspaceNudgeSchema>;
  * turn is still being worked on, and the activity line the panel reads.
  */
 export type LocalCallBuffer = Pick<LangyTokenBufferRepository, "appendStatus" | "heartbeat">;
-
-export interface LocalCallDispatcherOptions {
-  store: SessionStateStore;
-  presence: LangyLocalPresenceRepository;
-  buffer?: LocalCallBuffer;
-  now?: () => number;
-  /** Test knob: how long a first call waits for the folder to appear. */
-  offlineWaitMs?: number;
-  pollIntervalMs?: number;
-}
 
 /** Stands in for the live edge on a process with no Redis: the record still lands. */
 export function nullLocalBuffer(): UserWaitBuffer & LocalCallBuffer {

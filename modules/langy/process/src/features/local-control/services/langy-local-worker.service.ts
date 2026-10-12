@@ -32,7 +32,6 @@ import {
   conversationTitle,
   conversationUrl,
 } from "../../../rules/langy-local-session-text.rules.ts";
-import { reconcileSkipPolicy } from "../../../rules/langy-local-skip-policy.rules.ts";
 import type { LangyRestCallerService } from "../../../services/langy-rest-caller.service.ts";
 import type { LangyService } from "../../../services/langy.service.ts";
 import { ControlRequestService } from "./langy-local-control-request.service.ts";
@@ -131,8 +130,7 @@ export class LangyLocalWorkerService {
       projectId: input.projectId,
       conversationId,
     });
-    await reconcileSkipPolicy({
-      runtime: this.#runtime,
+    await this.#runtime.skipPolicy.reconcile({
       projectId: caller.projectId,
       conversationId,
       model: conversation.lastModel,
