@@ -383,11 +383,13 @@ func mainTabAcrossSwitch(record BrowserRecord, switched int64) bool {
 // mainPageAcrossSwitch: main's page, fetched just before the switch, loads its hashed assets from head,
 // which never built them (ADR-086's rolling-deploy skew; the lab has no LANGWATCH_ASSET_BASE). The
 // console line names no url, so only its 404 is matched; the http record beside it carries the path.
+// A stylesheet's 404 (text/plain) shows instead as a MIME refusal naming the asset.
 func mainPageAcrossSwitch(record BrowserRecord, switched int64) bool {
 	asset := strings.Contains(record.URL, "/assets/") &&
 		(record.Kind == "http" && record.Status == http.StatusNotFound || record.Kind == "requestfailed")
 	missing := record.Kind == "console" && strings.Contains(record.Text, "status of 404")
-	return (asset || missing) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+	style := record.Kind == "console" && strings.HasPrefix(record.Text, "Refused to apply style from ") && strings.Contains(record.Text, "/assets/")
+	return (asset || missing || style) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
 }
 
 // mainClientOutdated: main's page, fetched just before the switch, sends head its old enveloped tRPC input

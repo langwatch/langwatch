@@ -124,6 +124,7 @@ func TestMainPageAcrossSwitchIsWindowedAssetNotFound(t *testing.T) {
 		{Kind: "http", AtMs: 1_010, URL: "http://x/assets/index-Bty315CS.js", Status: 404},
 		{Kind: "requestfailed", AtMs: 1_010, URL: "http://x/assets/index-Bty315CS.js", Text: "net::ERR_ABORTED"},
 		{Kind: "console", AtMs: 1_010, URL: "http://x/", Text: "Failed to load resource: the server responded with a status of 404 (Not Found)"},
+		{Kind: "console", AtMs: 1_010, URL: "http://x/settings", Text: "Refused to apply style from 'http://x/assets/zod-uBOWI0as.css' because its MIME type ('text/plain') is not a supported stylesheet MIME type, and strict MIME checking is enabled."},
 	}
 	for _, record := range cases {
 		if !mainPageAcrossSwitch(record, 1_000) {
