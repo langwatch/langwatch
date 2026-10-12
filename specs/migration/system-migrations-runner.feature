@@ -46,6 +46,17 @@ Feature: Running system migrations across organizations
     When the pass is still working on it
     Then the claim is renewed rather than expiring mid-migration
 
+  # On the worker every pass runs on a queue list of its own and is paced by default (Alex,
+  # 2026-10-12): a migration that declares no limit waits at 5,000 of its own jobs, so its
+  # fan-out never buries live work. One that queues nothing pays only the cheap check.
+  @unit
+  Scenario: A migration that declares no pacing limit is paced by default on the worker
+    Given a migration that declares no pacing limit, over many organizations
+    And each organization's commands fan out into many jobs
+    When a worker's pass runs it on a queue list of its own
+    Then no more than the default limit plus a page of organizations' jobs are ever outstanding
+    And every organization is finalized
+
   @unit
   Scenario: An organization that fails mid-migration is parked and retried
     Given the migration throws for "org_acme"

@@ -61,7 +61,8 @@ export interface SystemMigration {
 
   /**
    * Pacing: a pass starts no new page of tenants while more than this many of its own jobs wait or
-   * run; without a queue list, of the whole queue's (Alex, 2026-10-12). Omitted means unpaced.
+   * run; without a queue list, of the whole queue's (Alex, 2026-10-12). Omitted, a pass on a queue
+   * list still waits at `DEFAULT_PAUSE_WHILE_QUEUED_ABOVE` of its own jobs; without, unpaced.
    */
   readonly pauseWhileQueuedAbove?: number;
 
