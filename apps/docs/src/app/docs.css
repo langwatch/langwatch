@@ -1300,13 +1300,13 @@ body {
 #try-it-form > div {
   gap: 12px;
 }
-.docs-json-key {
+.docs-line span.docs-json-key {
   color: var(--chakra-colors-blue-fg);
 }
-.docs-json-string {
+.docs-line span.docs-json-string {
   color: var(--chakra-colors-green-fg);
 }
-.docs-json-value {
+.docs-line span.docs-json-value {
   color: var(--chakra-colors-accent-fg);
 }
 

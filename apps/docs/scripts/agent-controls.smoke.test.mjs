@@ -109,6 +109,15 @@ await it("makes API data, skill actions and selection movement readable", async 
             await page.locator("header").getByText("Examples", { exact: true }).isVisible(),
           );
           assert.ok((await page.locator(".docs-json-key:visible").count()) > 0);
+          assert.ok(
+            await page
+              .locator(".docs-json-key:visible")
+              .first()
+              .evaluate(
+                (node) =>
+                  getComputedStyle(node).color !== getComputedStyle(node.closest("code")).color,
+              ),
+          );
           await page.getByRole("button", { name: "Try it", exact: true }).click();
           const fields = page.locator(".docs-request-fields").first();
           await fields.waitFor();
