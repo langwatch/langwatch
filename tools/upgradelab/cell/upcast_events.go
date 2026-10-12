@@ -76,7 +76,8 @@ func judgeUpcasts(final []LedgerRow, atCut, after map[string]int, i7 Verdict, re
 	}
 	var steps, unsettled, lost []string
 	rows := 0
-	for _, row := range final {
+	for i := range final {
+		row := &final[i]
 		if !strings.HasPrefix(row.ID, upcastStepPrefix) {
 			continue
 		}

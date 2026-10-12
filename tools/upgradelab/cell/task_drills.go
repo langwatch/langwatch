@@ -186,7 +186,8 @@ func (cell *run) upgradedState(ctx context.Context) (upgraded, error) {
 	}
 	rows, err := Ledger(ctx, cell.stores)
 	steps := map[string]string{}
-	for _, row := range rows {
+	for i := range rows {
+		row := &rows[i]
 		steps[row.ID] = row.Status
 	}
 	return upgraded{fingerprint: withoutLedger(fingerprint), steps: steps}, err
@@ -350,7 +351,7 @@ func (cell *run) heldLockDrill(ctx context.Context, table string, holdFor time.D
 	}
 	holdCtx, release := context.WithCancel(ctx)
 	defer release()
-	statement := fmt.Sprintf(`BEGIN; LOCK TABLE mydb."%s" IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(%d); COMMIT;`, strings.ReplaceAll(table, `"`, ""), int(holdFor.Seconds()))
+	statement := fmt.Sprintf(`BEGIN; LOCK TABLE mydb.%q IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(%d); COMMIT;`, strings.ReplaceAll(table, `"`, ""), int(holdFor.Seconds()))
 	held := make(chan error, 1)
 	go func() { _, err := psql(holdCtx, cell.stores.psqlURL(), statement); held <- err }()
 	granted := `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation WHERE c.relname = '` + strings.ReplaceAll(table, "'", "") + `' AND l.mode = 'AccessExclusiveLock' AND l.granted`
@@ -381,9 +382,11 @@ func (cell *run) heldLockDrill(ctx context.Context, table string, holdFor time.D
 // blockingLeft is every blocking step the task leaves undone; background steps belong to the worker.
 func blockingLeft(rows []LedgerRow) []LedgerRow {
 	var left []LedgerRow
-	for _, row := range Outstanding(rows) {
+	rowsRange := Outstanding(rows)
+	for i := range rowsRange {
+		row := &rowsRange[i]
 		if row.Mode == "blocking" {
-			left = append(left, row)
+			left = append(left, *row)
 		}
 	}
 	return left

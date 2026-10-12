@@ -54,6 +54,7 @@ func (cell *run) licensed() bool { return cell.profile.Shape == licensedShape }
 // main's door on self-hosted, the Stripe subscription row (SQL; Stripe has no lab door) on cloud.
 func (cell *run) grantEnterprise(ctx context.Context, org, subscription string) error {
 	if !cell.licensed() {
+		//nolint:dupword // SQL: createdAt, updatedAt and startDate each take now()
 		_, err := cell.orgSQLFor(ctx, org, `INSERT INTO mydb."Subscription" (id, "organizationId", plan, status, "startDate", "createdAt", "updatedAt") VALUES (`+sqlQuote(subscription)+`, %s, 'ENTERPRISE', 'ACTIVE', now(), now(), now())`)
 		if err != nil {
 			return fmt.Errorf("enterprise subscription (SQL): %w", err)

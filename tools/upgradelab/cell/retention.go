@@ -132,6 +132,7 @@ func (cell *run) privateRetentionOrg(ctx context.Context) (retentionOrg, error) 
 	}
 	org := retentionOrg{Label: "private-rule", Scope: "ORGANIZATION", RuleDays: 63, Target: label, OrganizationID: cell.private[label], ProjectID: client.Project}
 	email, _ := generate.SeedAccount(cell.options.Seed)
+	//nolint:dupword // SQL: createdAt and updatedAt both take now()
 	statement := fmt.Sprintf(`INSERT INTO mydb."OrganizationUser" ("userId", "organizationId", role, "createdAt", "updatedAt") SELECT id, %[2]s, 'ADMIN', now(), now() FROM mydb."User" WHERE email = %[1]s ON CONFLICT DO NOTHING;
 INSERT INTO mydb."TeamUser" ("userId", "teamId", role, "createdAt", "updatedAt") SELECT u.id, p."teamId", 'ADMIN', now(), now() FROM mydb."User" u, mydb."Project" p WHERE u.email = %[1]s AND p.id = %[3]s ON CONFLICT DO NOTHING;
 INSERT INTO mydb."RoleBinding" (id, "organizationId", "userId", role, "scopeType", "scopeId", "createdAt", "updatedAt") SELECT %[4]s, %[2]s, id, 'ADMIN', 'ORGANIZATION', %[2]s, now(), now() FROM mydb."User" WHERE email = %[1]s ON CONFLICT DO NOTHING;
@@ -151,6 +152,7 @@ func (cell *run) retentionOrganization(ctx context.Context, index int, org reten
 		return org, err
 	}
 	org.OrganizationID, org.ProjectID = made.org, made.project
+	//nolint:dupword // SQL: startDate, createdAt and updatedAt each take now()
 	statement := fmt.Sprintf(`INSERT INTO mydb."Subscription" (id, "organizationId", plan, status, "startDate", "createdAt", "updatedAt") VALUES (%s, %s, 'LAUNCH', 'ACTIVE', now(), now(), now())`,
 		sqlQuote(fmt.Sprintf("snap_retention_%d_%d", cell.options.Seed, index+1)), sqlQuote(org.OrganizationID))
 	if _, err := psql(ctx, cell.stores.psqlURL(), statement); err != nil {
@@ -222,7 +224,7 @@ func sqlQuote(value string) string { return "'" + strings.ReplaceAll(value, "'",
 // older than 31 days, so ClickHouse is the only door to an old partition.
 func (cell *run) retentionAge(ctx context.Context) error {
 	if cell.retention.err != nil {
-		return nil
+		return nil //nolint:nilerr // the failure is already recorded on the run and judged by the check
 	}
 	cell.retention.seeded = map[string]int{}
 	for _, table := range agedTables {
@@ -355,7 +357,7 @@ func (cell *run) countAged(ctx context.Context) (map[string]map[agedKey][2]int, 
 // retentionAtCut records each slice as the cut leaves it, with what main's own TTL may still expire.
 func (cell *run) retentionAtCut(ctx context.Context) error {
 	if cell.retention.err != nil {
-		return nil
+		return nil //nolint:nilerr // the failure is already recorded on the run and judged by the check
 	}
 	counts, err := cell.countAged(ctx)
 	if err != nil {

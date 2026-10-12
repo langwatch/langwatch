@@ -262,7 +262,7 @@ func (proc *Proc) Signal(sig syscall.Signal) {
 }
 
 // Kill sends SIGKILL to the group and to every descendant (pnpm starts node in a group of its own)
-// and returns every pid it signalled, the leader first.
+// and returns every pid it signaled, the leader first.
 func (proc *Proc) Kill() []int {
 	pids := append([]int{proc.command.Process.Pid}, proc.descendants()...)
 	proc.Signal(syscall.SIGKILL)

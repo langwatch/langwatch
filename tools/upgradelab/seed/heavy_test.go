@@ -131,10 +131,10 @@ func TestHeavyMakesOrganizationsBeforeTelemetryAndPaces(t *testing.T) {
 	server := heavyDoorServer(t, func(path string) bool {
 		mu.Lock()
 		defer mu.Unlock()
-		switch {
-		case path == "/api/trpc/onboarding.initializeOrganization":
+		switch path {
+		case "/api/trpc/onboarding.initializeOrganization":
 			order = append(order, "org")
-		case path == "/api/otel/v1/traces":
+		case "/api/otel/v1/traces":
 			order = append(order, "otel")
 		}
 		return true

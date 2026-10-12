@@ -266,9 +266,10 @@ func Ledger(ctx context.Context, stores Stores) ([]LedgerRow, error) {
 // Outstanding is every step not done or not-needed, operator steps aside (an operator starts those).
 func Outstanding(rows []LedgerRow) []LedgerRow {
 	var left []LedgerRow
-	for _, row := range rows {
+	for i := range rows {
+		row := &rows[i]
 		if row.Status != "done" && row.Status != "not-needed" && row.Mode != "operator" {
-			left = append(left, row)
+			left = append(left, *row)
 		}
 	}
 	return left
@@ -277,11 +278,13 @@ func Outstanding(rows []LedgerRow) []LedgerRow {
 // Reopened is every step done in before that is not done, or ran again, in after.
 func Reopened(before, after []LedgerRow) []string {
 	index := map[string]LedgerRow{}
-	for _, row := range after {
-		index[row.ID] = row
+	for i := range after {
+		row := &after[i]
+		index[row.ID] = *row
 	}
 	var reopened []string
-	for _, row := range before {
+	for i := range before {
+		row := &before[i]
 		now, ok := index[row.ID]
 		if row.Status == "done" && (!ok || now.Status != "done" || now.Attempt != row.Attempt || now.Finished != row.Finished) {
 			reopened = append(reopened, fmt.Sprintf("%s %s/%d -> %s/%d", row.ID, row.Status, row.Attempt, now.Status, now.Attempt))

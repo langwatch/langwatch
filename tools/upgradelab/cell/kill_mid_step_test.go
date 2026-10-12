@@ -117,8 +117,8 @@ not json from pnpm
 	if survived := (deathProof{killed: []int{100, 102}, survivors: []int{102}, loggedPids: []int{102}}); survived.died() {
 		t.Fatalf("a surviving pid must disprove the death")
 	}
-	if unsignalled := (deathProof{killed: []int{100}, loggedPids: []int{102}}); unsignalled.died() {
-		t.Fatalf("a logged pid that was never signalled must disprove the death")
+	if unsignaled := (deathProof{killed: []int{100}, loggedPids: []int{102}}); unsignaled.died() {
+		t.Fatalf("a logged pid that was never signaled must disprove the death")
 	}
 }
 
@@ -151,7 +151,7 @@ func TestKillReachesAChildInAGroupOfItsOwn(t *testing.T) {
 	}
 	killed := proc.Kill()
 	if len(killed) < 2 {
-		t.Fatalf("want the leader and its child signalled, got %v", killed)
+		t.Fatalf("want the leader and its child signaled, got %v", killed)
 	}
 	for len(alive(killed)) > 0 && time.Now().Before(deadline) {
 		time.Sleep(50 * time.Millisecond)

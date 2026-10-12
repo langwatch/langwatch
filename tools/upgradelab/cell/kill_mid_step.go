@@ -68,12 +68,12 @@ type killMoment struct {
 	death      deathProof
 }
 
-// deathProof is what shows the killed worker really ended: no signalled pid survives and its log
-// names only pids that were signalled, with no line stamped after the kill.
+// deathProof is what shows the killed worker really ended: no signaled pid survives and its log
+// names only pids that were signaled, with no line stamped after the kill.
 type deathProof struct {
 	killedAt   time.Time
-	killed     []int // the leader and every descendant, signalled with SIGKILL
-	survivors  []int // signalled pids still running once the wait ended
+	killed     []int // the leader and every descendant, signaled with SIGKILL
+	survivors  []int // signaled pids still running once the wait ended
 	loggedPids []int // pids the killed worker's log lines carry
 	linesAfter int   // log lines stamped after the kill
 }
@@ -91,7 +91,7 @@ func (proof deathProof) died() bool {
 }
 
 func (proof deathProof) String() string {
-	return fmt.Sprintf("signalled pids %v, still running %v, pids in its log %v, log lines after the kill %d", proof.killed, proof.survivors, proof.loggedPids, proof.linesAfter)
+	return fmt.Sprintf("signaled pids %v, still running %v, pids in its log %v, log lines after the kill %d", proof.killed, proof.survivors, proof.loggedPids, proof.linesAfter)
 }
 
 // readWorkerLog lists the pids a worker's JSON log lines carry and counts the lines stamped after killedAt.
@@ -281,7 +281,7 @@ func resumedSuffix(line string) string {
 }
 
 // killWhenMidStep polls the ledger every 100 ms and kills head's worker, node included, the first
-// time the step is running with a checkpoint saved, then waits for every signalled pid to end.
+// time the step is running with a checkpoint saved, then waits for every signaled pid to end.
 func (cell *run) killWhenMidStep(ctx context.Context, options midStepOptions) (killMoment, error) {
 	var moment killMoment
 	every := progressEvery(30 * time.Second)

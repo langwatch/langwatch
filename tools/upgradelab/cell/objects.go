@@ -195,7 +195,9 @@ func (cell *run) isolationVerdicts(ctx context.Context) []Verdict {
 
 // firstPrivateWrites is one stored private trace id and one created private dataset name.
 func (cell *run) firstPrivateWrites() (trace, dataset string) {
-	for _, call := range cell.privateTraffic.Calls() {
+	callsRange := cell.privateTraffic.Calls()
+	for i := range callsRange {
+		call := &callsRange[i]
 		switch {
 		case call.ok() && trace == "" && call.Kind == privatePrefix+"otlp-trace":
 			trace = call.ID
