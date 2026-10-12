@@ -28,11 +28,15 @@ try {
       timeout: 30_000,
       waitUntil: "domcontentloaded",
     });
+    // The boot screen covers the form until the app draws; a busy worker host can take a minute.
+    await page
+      .waitForSelector("#lw-boot", { state: "detached", timeout: 60_000 })
+      .catch(() => undefined);
     // Identifier first: the email, Continue, then the password appears.
     await page
       .locator('input[type="email"], input[name="email"]:not([type="hidden"])')
       .first()
-      .fill(email);
+      .fill(email, { timeout: 60_000 });
     const passwordField = page.locator('input[type="password"]').first();
     if (!(await passwordField.isVisible()))
       await page.locator('button[type="submit"]').first().click();
