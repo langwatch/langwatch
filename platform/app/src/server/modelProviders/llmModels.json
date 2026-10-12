@@ -1,6 +1,6 @@
 {
-  "updatedAt": "2026-10-08T16:08:10.274Z",
-  "modelCount": 531,
+  "updatedAt": "2026-10-12T02:34:25.244Z",
+  "modelCount": 523,
   "models": {
     "stepfun/step-5-preview": {
       "id": "stepfun/step-5-preview",
@@ -178,7 +178,7 @@
       "defaultParameters": {},
       "modality": "text+image->text",
       "mode": "chat",
-      "description": "Mistral Large 4 is a frontier multimodal (text and image input) model from Mistral AI built for reasoning, coding, and agentic workloads. It offers a 512K-token context window with up...",
+      "description": "Mistral Large 4 is a frontier multimodal (text and image input) model from Mistral AI built for reasoning, coding, and agentic workloads. It offers a 1M-token context window with up...",
       "supportsImageInput": true,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -286,6 +286,44 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "openai/gpt-6.1-sol-pro:batch": {
+      "id": "openai/gpt-6.1-sol-pro:batch",
+      "name": "OpenAI: GPT-6.1 Sol Pro (batch)",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.000001,
+        "outputCostPerToken": 0.000005,
+        "inputCacheReadPerToken": 5e-8,
+        "inputCacheWritePerToken": 0.00000125,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1050000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "defaultParameters": {
+        "temperature": null,
+        "topP": null,
+        "frequencyPenalty": null
+      },
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "GPT-6.1 Sol Pro is the same underlying model as , served with `reasoning.mode` set to `pro` for higher-quality responses on complex tasks. **Cost note:** pro mode spends far more...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "openai/gpt-6.1-sol": {
       "id": "openai/gpt-6.1-sol",
       "name": "OpenAI: GPT-6.1 Sol",
@@ -302,6 +340,40 @@
       "supportedParameters": [
         "include_reasoning",
         "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "defaultParameters": {},
+      "modality": "text+image+file->text",
+      "mode": "chat",
+      "description": "GPT-6.1 Sol is an upgrade to GPT-6 Sol from OpenAI, positioned below the flagship GPT-6 Astra in the GPT-6 series. It is suited for agentic coding, computer use, document-heavy professional...",
+      "supportsImageInput": true,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
+    "openai/gpt-6.1-sol:batch": {
+      "id": "openai/gpt-6.1-sol:batch",
+      "name": "OpenAI: GPT-6.1 Sol (batch)",
+      "provider": "openai",
+      "pricing": {
+        "inputCostPerToken": 0.000001,
+        "outputCostPerToken": 0.000005,
+        "inputCacheReadPerToken": 5e-8,
+        "inputCacheWritePerToken": 0.00000125,
+        "webSearchCostPerQuery": 0.01
+      },
+      "contextLength": 1050000,
+      "maxCompletionTokens": 128000,
+      "supportedParameters": [
+        "include_reasoning",
         "max_tokens",
         "reasoning",
         "reasoning_effort",
@@ -1436,12 +1508,12 @@
       "name": "DeepSeek: DeepSeek Pro Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 1.271e-7,
-        "outputCostPerToken": 0.000008,
-        "inputCacheReadPerToken": 9.53e-8
+        "inputCostPerToken": 2.5e-7,
+        "outputCostPerToken": 0.000005,
+        "inputCacheReadPerToken": 2e-7
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 393216,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -1481,9 +1553,9 @@
       "name": "DeepSeek: DeepSeek Flash Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 2.83e-8,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 1e-8
+        "inputCostPerToken": 2.64e-8,
+        "outputCostPerToken": 0.000001188,
+        "inputCacheReadPerToken": 2.64e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -1850,9 +1922,9 @@
       "name": "DeepSeek: DeepSeek V4.1 Flash",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 2.83e-8,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 1e-8
+        "inputCostPerToken": 3e-7,
+        "outputCostPerToken": 0.0000012,
+        "inputCacheReadPerToken": 6e-9
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -2169,6 +2241,43 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
+    "inclusionai/ling-3.0-flash-sante": {
+      "id": "inclusionai/ling-3.0-flash-sante",
+      "name": "inclusionAI: Ling 3.0 Flash Sante",
+      "provider": "inclusionai",
+      "pricing": {
+        "inputCostPerToken": 4.2e-8,
+        "outputCostPerToken": 1.232e-7,
+        "inputCacheReadPerToken": 8.4e-9
+      },
+      "contextLength": 262144,
+      "maxCompletionTokens": 32768,
+      "supportedParameters": [
+        "frequency_penalty",
+        "include_reasoning",
+        "logprobs",
+        "max_tokens",
+        "presence_penalty",
+        "reasoning",
+        "repetition_penalty",
+        "seed",
+        "stop",
+        "temperature",
+        "tool_choice",
+        "tools",
+        "top_k",
+        "top_logprobs",
+        "top_p"
+      ],
+      "defaultParameters": {},
+      "modality": "text->text",
+      "mode": "chat",
+      "description": "Ling 3.0 Flash Sante is a health and medicine-focused mixture-of-experts model from InclusionAI, built on Ling 3.0 Flash with 5.1B active parameters out of 124B total. It is designed for...",
+      "supportsImageInput": false,
+      "supportsAudioInput": false,
+      "supportsImageOutput": false,
+      "supportsAudioOutput": false
+    },
     "qwen/qwen3.8-max-0902": {
       "id": "qwen/qwen3.8-max-0902",
       "name": "Qwen: Qwen3.8 Max (0902)",
@@ -2176,8 +2285,7 @@
       "pricing": {
         "inputCostPerToken": 0.000002,
         "outputCostPerToken": 0.000006,
-        "inputCacheReadPerToken": 2.5e-7,
-        "inputCacheWritePerToken": 0.0000025
+        "inputCacheReadPerToken": 2.5e-7
       },
       "contextLength": 1000000,
       "maxCompletionTokens": 131072,
@@ -2496,9 +2604,9 @@
       "name": "Tencent: Hy4 preview",
       "provider": "tencent",
       "pricing": {
-        "inputCostPerToken": 7.506e-7,
-        "outputCostPerToken": 0.0000022509,
-        "inputCacheReadPerToken": 3.78e-8
+        "inputCostPerToken": 8.34e-7,
+        "outputCostPerToken": 0.000002501,
+        "inputCacheReadPerToken": 4.2e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 64000,
@@ -2546,16 +2654,13 @@
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
-        "logit_bias",
         "logprobs",
         "max_tokens",
-        "min_p",
         "presence_penalty",
         "reasoning",
         "repetition_penalty",
         "seed",
         "stop",
-        "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
@@ -2578,8 +2683,8 @@
       "provider": "~z-ai",
       "pricing": {
         "inputCostPerToken": 3.2e-8,
-        "outputCostPerToken": 0.000005372581,
-        "inputCacheReadPerToken": 2e-8
+        "outputCostPerToken": 0.0000012,
+        "inputCacheReadPerToken": 3.2e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -2625,8 +2730,7 @@
       "pricing": {
         "inputCostPerToken": 1.5e-7,
         "outputCostPerToken": 4.7e-7,
-        "inputCacheReadPerToken": 1.6e-8,
-        "inputCacheWritePerToken": 2e-7
+        "inputCacheReadPerToken": 1.6e-8
       },
       "contextLength": 1000000,
       "maxCompletionTokens": 131072,
@@ -2880,12 +2984,12 @@
       "name": "Z.ai: GLM Latest",
       "provider": "~z-ai",
       "pricing": {
-        "inputCostPerToken": 4.72e-8,
-        "outputCostPerToken": 0.000012,
-        "inputCacheReadPerToken": 4.39e-8
+        "inputCostPerToken": 7.9e-8,
+        "outputCostPerToken": 0.0000048,
+        "inputCacheReadPerToken": 5.9e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -2953,9 +3057,9 @@
       "name": "Z.ai: GLM 5.3",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 6.5e-8,
-        "outputCostPerToken": 0.0000042,
-        "inputCacheReadPerToken": 4.8e-8
+        "inputCostPerToken": 7.9e-8,
+        "outputCostPerToken": 0.0000048,
+        "inputCacheReadPerToken": 5.9e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -3042,13 +3146,12 @@
       "name": "Qwen: Qwen3.8 27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 4.25e-7,
-        "outputCostPerToken": 0.00000255,
-        "inputCacheReadPerToken": 8.5e-8,
-        "inputCacheWritePerToken": 5.3125e-7
+        "inputCostPerToken": 4e-8,
+        "outputCostPerToken": 0.0000023,
+        "inputCacheReadPerToken": 1.98e-8
       },
       "contextLength": 1000000,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3295,9 +3398,9 @@
       "name": "DeepSeek: DeepSeek V4 Pro 0813",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 6.6e-7,
-        "outputCostPerToken": 0.00000198,
-        "inputCacheReadPerToken": 2.2e-8
+        "inputCostPerToken": 0.00000132,
+        "outputCostPerToken": 0.00000396,
+        "inputCacheReadPerToken": 4.4e-8
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 393216,
@@ -3378,12 +3481,12 @@
       "name": "NVIDIA: Nemotron 3.5 Lightning",
       "provider": "nvidia",
       "pricing": {
-        "inputCostPerToken": 4.9e-8,
-        "outputCostPerToken": 1.4e-7,
-        "inputCacheReadPerToken": 2.45e-8
+        "inputCostPerToken": 7e-8,
+        "outputCostPerToken": 2e-7,
+        "inputCacheReadPerToken": 4e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -3562,9 +3665,9 @@
       "name": "DeepSeek: DeepSeek V4 Flash Latest",
       "provider": "~deepseek",
       "pricing": {
-        "inputCostPerToken": 6e-9,
-        "outputCostPerToken": 0.00000128,
-        "inputCacheReadPerToken": 6e-9
+        "inputCostPerToken": 6.32e-9,
+        "outputCostPerToken": 0.00000144,
+        "inputCacheReadPerToken": 6.32e-9
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -3606,9 +3709,9 @@
       "name": "DeepSeek: DeepSeek V4 Flash 0731",
       "provider": "deepseek",
       "pricing": {
-        "inputCostPerToken": 6e-9,
-        "outputCostPerToken": 0.00000128,
-        "inputCacheReadPerToken": 6e-9
+        "inputCostPerToken": 7.9e-9,
+        "outputCostPerToken": 6.4e-7,
+        "inputCacheReadPerToken": 7.9e-9
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -4200,9 +4303,9 @@
       "name": "MoonshotAI: Kimi K3",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 6.2e-7,
-        "outputCostPerToken": 0.0000123,
-        "inputCacheReadPerToken": 4.3e-7
+        "inputCostPerToken": 7.3e-7,
+        "outputCostPerToken": 0.00001,
+        "inputCacheReadPerToken": 5.5e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -4918,9 +5021,9 @@
       "name": "Tencent: Hy3",
       "provider": "tencent",
       "pricing": {
-        "inputCostPerToken": 8.25e-8,
-        "outputCostPerToken": 3.3e-7,
-        "inputCacheReadPerToken": 2.0625e-8
+        "inputCostPerToken": 1.32e-7,
+        "outputCostPerToken": 5.28e-7,
+        "inputCacheReadPerToken": 3.3e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 128000,
@@ -5228,12 +5331,12 @@
       "name": "Z.ai: GLM 5.2",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 3e-8,
-        "outputCostPerToken": 0.00001,
-        "inputCacheReadPerToken": 3e-8
+        "inputCostPerToken": 6e-8,
+        "outputCostPerToken": 0.000007,
+        "inputCacheReadPerToken": 5.9e-8
       },
       "contextLength": 1048576,
-      "maxCompletionTokens": 131072,
+      "maxCompletionTokens": 943718,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -5498,12 +5601,12 @@
       "name": "NVIDIA: Nemotron 3 Ultra",
       "provider": "nvidia",
       "pricing": {
-        "inputCostPerToken": 5e-7,
-        "outputCostPerToken": 0.0000022,
-        "inputCacheReadPerToken": 1e-7
+        "inputCostPerToken": 6e-7,
+        "outputCostPerToken": 0.0000024,
+        "inputCacheReadPerToken": 1.2e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 16384,
+      "maxCompletionTokens": 182520,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -6398,8 +6501,8 @@
       "provider": "~moonshotai",
       "pricing": {
         "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.000013,
-        "inputCacheReadPerToken": 4.5e-7
+        "outputCostPerToken": 0.0000165,
+        "inputCacheReadPerToken": 3e-7
       },
       "contextLength": 1048576,
       "maxCompletionTokens": 943718,
@@ -6594,12 +6697,12 @@
       "name": "Qwen: Qwen3.6 35B A3B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 1e-7,
+        "outputCostPerToken": 9.5e-7,
+        "inputCacheReadPerToken": 1e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 235929,
+      "maxCompletionTokens": 65536,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -6633,54 +6736,16 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "qwen/qwen3.6-max-preview": {
-      "id": "qwen/qwen3.6-max-preview",
-      "name": "Qwen: Qwen3.6 Max Preview",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 0.000001027,
-        "outputCostPerToken": 0.000006162,
-        "inputCacheWritePerToken": 0.00000128375
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen3.6-Max-Preview is a proprietary frontier model from Alibaba Cloud built on a sparse mixture-of-experts architecture with approximately 1 trillion total parameters. It is optimized for agentic coding, tool use, and...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "qwen/qwen3.6-27b": {
       "id": "qwen/qwen3.6-27b",
       "name": "Qwen: Qwen3.6 27B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.0000027
+        "inputCostPerToken": 3.2e-7,
+        "outputCostPerToken": 0.0000032
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 65536,
+      "maxCompletionTokens": 81920,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -7174,9 +7239,9 @@
       "name": "MoonshotAI: Kimi K2.6",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 4.375e-7,
-        "outputCostPerToken": 0.00000245,
-        "inputCacheReadPerToken": 1.211e-7
+        "inputCostPerToken": 6.5e-7,
+        "outputCostPerToken": 0.00000341,
+        "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -7358,9 +7423,9 @@
       "name": "Google: Gemma 4 26B A4B ",
       "provider": "gemini",
       "pricing": {
-        "inputCostPerToken": 9e-8,
-        "outputCostPerToken": 3e-7,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 6.75e-8,
+        "outputCostPerToken": 2.25e-7,
+        "inputCacheReadPerToken": 3.75e-8
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -8485,12 +8550,12 @@
       "name": "Qwen: Qwen3.5-35B-A3B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.5e-7,
-        "outputCostPerToken": 0.000001,
-        "inputCacheReadPerToken": 5e-8
+        "inputCostPerToken": 8e-8,
+        "outputCostPerToken": 7.5e-7,
+        "inputCacheReadPerToken": 4e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 235929,
+      "maxCompletionTokens": 32768,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -9015,12 +9080,12 @@
       "name": "Qwen: Qwen3.5 397B A17B",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.000003,
-        "inputCacheReadPerToken": 2.2e-7
+        "inputCostPerToken": 5.5e-7,
+        "outputCostPerToken": 0.0000035,
+        "inputCacheReadPerToken": 2.25e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 81920,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -9138,47 +9203,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "GLM-5 is Z.ai’s flagship open-source foundation model engineered for complex systems design and long-horizon agent workflows. Built for expert developers, it delivers production-grade performance on large-scale programming tasks, rivaling leading...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "qwen/qwen3-max-thinking": {
-      "id": "qwen/qwen3-max-thinking",
-      "name": "Qwen: Qwen3 Max Thinking",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 7.8e-7,
-        "outputCostPerToken": 0.0000039
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen3-Max-Thinking is the flagship reasoning model in the Qwen3 series, designed for high-stakes cognitive tasks that require deep, multi-step reasoning. By significantly scaling model capacity and reinforcement learning compute, it...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -9408,9 +9432,9 @@
       "name": "MoonshotAI: Kimi K2.5",
       "provider": "moonshotai",
       "pricing": {
-        "inputCostPerToken": 4.5e-7,
-        "outputCostPerToken": 0.00000225,
-        "inputCacheReadPerToken": 7e-8
+        "inputCostPerToken": 5e-7,
+        "outputCostPerToken": 0.0000025,
+        "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 262144,
       "maxCompletionTokens": 235929,
@@ -10332,7 +10356,7 @@
       "pricing": {
         "inputCostPerToken": 3e-7,
         "outputCostPerToken": 9e-7,
-        "inputCacheReadPerToken": 5.5e-8
+        "inputCacheReadPerToken": 5e-8
       },
       "contextLength": 131072,
       "maxCompletionTokens": 32768,
@@ -11088,10 +11112,11 @@
       "provider": "moonshotai",
       "pricing": {
         "inputCostPerToken": 6e-7,
-        "outputCostPerToken": 0.0000025
+        "outputCostPerToken": 0.0000025,
+        "inputCacheReadPerToken": 1.5e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 235929,
+      "maxCompletionTokens": 98304,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -11305,45 +11330,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "qwen/qwen3-vl-32b-instruct": {
-      "id": "qwen/qwen3-vl-32b-instruct",
-      "name": "Qwen: Qwen3 VL 32B Instruct",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 1.04e-7,
-        "outputCostPerToken": 4.16e-7
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.7,
-        "topP": 0.8,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "Qwen3-VL-32B-Instruct is a large-scale multimodal vision-language model designed for high-precision understanding and reasoning across text, images, and video. With 32 billion parameters, it combines deep visual perception with advanced text...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "ibm-granite/granite-4.0-h-micro": {
       "id": "ibm-granite/granite-4.0-h-micro",
       "name": "IBM: Granite 4.0 Micro",
@@ -11514,56 +11500,17 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "qwen/qwen3-vl-8b-thinking": {
-      "id": "qwen/qwen3-vl-8b-thinking",
-      "name": "Qwen: Qwen3 VL 8B Thinking",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 1.8e-7,
-        "outputCostPerToken": 0.0000021
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 1,
-        "topP": 0.95
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "Qwen3-VL-8B-Thinking is the reasoning-optimized variant of the Qwen3-VL-8B multimodal model, designed for advanced visual and textual reasoning across complex scenes, documents, and temporal sequences. It integrates enhanced multimodal alignment and...",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "qwen/qwen3-vl-8b-instruct": {
       "id": "qwen/qwen3-vl-8b-instruct",
       "name": "Qwen: Qwen3 VL 8B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 1.17e-7,
-        "outputCostPerToken": 4.55e-7
+        "inputCostPerToken": 2.5e-7,
+        "outputCostPerToken": 7.5e-7,
+        "inputCacheReadPerToken": 1.2e-7
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 32768,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -11700,27 +11647,22 @@
       "name": "Qwen: Qwen3 VL 30B A3B Thinking",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 0.0000024
+        "inputCostPerToken": 2.9e-7,
+        "outputCostPerToken": 0.000001
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 32768,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
-        "logprobs",
         "max_tokens",
-        "presence_penalty",
         "reasoning",
         "response_format",
-        "seed",
-        "stop",
         "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {
@@ -11873,12 +11815,12 @@
       "name": "Z.ai: GLM 4.6",
       "provider": "z-ai",
       "pricing": {
-        "inputCostPerToken": 4.3e-7,
-        "outputCostPerToken": 0.00000175,
-        "inputCacheReadPerToken": 8e-8
+        "inputCostPerToken": 5e-7,
+        "outputCostPerToken": 0.000002,
+        "inputCacheReadPerToken": 1e-7
       },
       "contextLength": 204800,
-      "maxCompletionTokens": 16384,
+      "maxCompletionTokens": 131072,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -12096,47 +12038,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "qwen/qwen3-vl-235b-a22b-thinking": {
-      "id": "qwen/qwen3-vl-235b-a22b-thinking",
-      "name": "Qwen: Qwen3 VL 235B A22B Thinking",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 4e-7,
-        "outputCostPerToken": 0.000004
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.8,
-        "topP": 0.95,
-        "frequencyPenalty": null
-      },
-      "modality": "text+image->text",
-      "mode": "chat",
-      "description": "Qwen3-VL-235B-A22B Thinking is a multimodal model that unifies strong text generation with visual understanding across images and video. The Thinking model is optimized for multimodal reasoning in STEM and math....",
-      "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "qwen/qwen3-vl-235b-a22b-instruct": {
       "id": "qwen/qwen3-vl-235b-a22b-instruct",
       "name": "Qwen: Qwen3 VL 235B A22B Instruct",
@@ -12176,88 +12077,6 @@
       "mode": "chat",
       "description": "Qwen3-VL-235B-A22B Instruct is an open-weight multimodal model that unifies strong text generation with visual understanding across images and video. The Instruct model targets general vision-language use (VQA, document parsing, chart/table...",
       "supportsImageInput": true,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "qwen/qwen3-max": {
-      "id": "qwen/qwen3-max",
-      "name": "Qwen: Qwen3 Max",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 7.8e-7,
-        "outputCostPerToken": 0.0000039,
-        "inputCacheReadPerToken": 1.56e-7,
-        "inputCacheWritePerToken": 9.75e-7
-      },
-      "contextLength": 262144,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 1,
-        "topP": 1,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen3-Max is an updated release built on the Qwen3 series, offering major improvements in reasoning, instruction following, multilingual support, and long-tail knowledge coverage compared to the January 2025 version. It...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "qwen/qwen3-coder-plus": {
-      "id": "qwen/qwen3-coder-plus",
-      "name": "Qwen: Qwen3 Coder Plus",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 6.5e-7,
-        "outputCostPerToken": 0.00000325,
-        "inputCacheReadPerToken": 1.3e-7,
-        "inputCacheWritePerToken": 8.125e-7
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 65536,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen3 Coder Plus is Alibaba's proprietary version of the Open Source Qwen3 Coder 480B A35B. It is a powerful coding agent model specializing in autonomous programming via tool calling and...",
-      "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
       "supportsAudioOutput": false
@@ -12348,7 +12167,7 @@
         "outputCostPerToken": 0.0000012
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 32768,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
@@ -12386,11 +12205,12 @@
       "name": "Qwen: Qwen3 Next 80B A3B Instruct",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 9e-8,
-        "outputCostPerToken": 0.0000011
+        "inputCostPerToken": 1e-7,
+        "outputCostPerToken": 0.0000011,
+        "inputCacheReadPerToken": 7e-8
       },
       "contextLength": 262144,
-      "maxCompletionTokens": 16384,
+      "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -12414,45 +12234,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "Qwen3-Next-80B-A3B-Instruct is an instruction-tuned chat model in the Qwen3-Next series optimized for fast, stable responses without “thinking” traces. It targets complex tasks across reasoning, code generation, knowledge QA, and multilingual...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "qwen/qwen-plus-2025-07-28": {
-      "id": "qwen/qwen-plus-2025-07-28",
-      "name": "Qwen: Qwen Plus 0728",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 2.6e-7,
-        "outputCostPerToken": 7.8e-7
-      },
-      "contextLength": 1000000,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "frequency_penalty",
-        "logprobs",
-        "max_tokens",
-        "presence_penalty",
-        "response_format",
-        "seed",
-        "stop",
-        "structured_outputs",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_logprobs",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": null,
-        "topP": null,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen Plus 0728, based on the Qwen3 foundation model, is a 1 million context hybrid reasoning model with a balanced performance, speed, and cost combination.",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -12487,40 +12268,6 @@
       "modality": "text->text",
       "mode": "chat",
       "description": "Kimi K2 0905 is the September update of [Kimi K2 0711](moonshotai/kimi-k2). It is a large-scale Mixture-of-Experts (MoE) language model developed by Moonshot AI, featuring 1 trillion total parameters with 32...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "qwen/qwen3-30b-a3b-thinking-2507": {
-      "id": "qwen/qwen3-30b-a3b-thinking-2507",
-      "name": "Qwen: Qwen3 30B A3B Thinking 2507",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 2e-7,
-        "outputCostPerToken": 0.0000024
-      },
-      "contextLength": 81920,
-      "maxCompletionTokens": 32768,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "response_format",
-        "seed",
-        "stop",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen3-30B-A3B-Thinking-2507 is a 30B parameter Mixture-of-Experts reasoning model optimized for complex tasks requiring extended multi-step thinking. The model is designed specifically for “thinking mode,” where internal reasoning traces are separated...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -13359,18 +13106,14 @@
       "maxCompletionTokens": 235929,
       "supportedParameters": [
         "frequency_penalty",
-        "logprobs",
         "max_tokens",
-        "presence_penalty",
         "response_format",
-        "seed",
         "stop",
         "structured_outputs",
         "temperature",
         "tool_choice",
         "tools",
         "top_k",
-        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
@@ -13498,19 +13241,17 @@
       "name": "Qwen: Qwen3 235B A22B Thinking 2507",
       "provider": "qwen",
       "pricing": {
-        "inputCostPerToken": 2.3e-7,
-        "outputCostPerToken": 0.0000023
+        "inputCostPerToken": 4.5e-7,
+        "outputCostPerToken": 0.0000035
       },
-      "contextLength": 131072,
-      "maxCompletionTokens": 117964,
+      "contextLength": 128000,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "include_reasoning",
         "max_tokens",
         "presence_penalty",
         "reasoning",
-        "response_format",
-        "seed",
         "stop",
         "temperature",
         "tool_choice",
@@ -14447,7 +14188,7 @@
         "inputCostPerToken": 1.2e-7,
         "outputCostPerToken": 5e-7
       },
-      "contextLength": 131072,
+      "contextLength": 40960,
       "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
@@ -14481,44 +14222,6 @@
       "supportsImageOutput": false,
       "supportsAudioOutput": false
     },
-    "qwen/qwen3-8b": {
-      "id": "qwen/qwen3-8b",
-      "name": "Qwen: Qwen3 8B",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 1.17e-7,
-        "outputCostPerToken": 4.55e-7
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 8192,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "response_format",
-        "seed",
-        "stop",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {
-        "temperature": 0.6,
-        "topP": 0.95,
-        "frequencyPenalty": null
-      },
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen3-8B is a dense 8.2B parameter causal language model from the Qwen3 series, designed for both reasoning-heavy tasks and efficient dialogue. It supports seamless switching between \"thinking\" mode for math,...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
     "qwen/qwen3-14b": {
       "id": "qwen/qwen3-14b",
       "name": "Qwen: Qwen3 14B",
@@ -14527,7 +14230,7 @@
         "inputCostPerToken": 1.2e-7,
         "outputCostPerToken": 2.4e-7
       },
-      "contextLength": 131072,
+      "contextLength": 40960,
       "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
@@ -14573,6 +14276,7 @@
         "frequency_penalty",
         "include_reasoning",
         "logit_bias",
+        "logprobs",
         "max_tokens",
         "min_p",
         "presence_penalty",
@@ -14585,47 +14289,15 @@
         "temperature",
         "tool_choice",
         "tools",
+        "top_a",
         "top_k",
+        "top_logprobs",
         "top_p"
       ],
       "defaultParameters": {},
       "modality": "text->text",
       "mode": "chat",
       "description": "Qwen3-32B is a dense 32.8B parameter causal language model from the Qwen3 series, optimized for both complex reasoning and efficient dialogue. It supports seamless switching between a \"thinking\" mode for...",
-      "supportsImageInput": false,
-      "supportsAudioInput": false,
-      "supportsImageOutput": false,
-      "supportsAudioOutput": false
-    },
-    "qwen/qwen3-235b-a22b": {
-      "id": "qwen/qwen3-235b-a22b",
-      "name": "Qwen: Qwen3 235B A22B",
-      "provider": "qwen",
-      "pricing": {
-        "inputCostPerToken": 4.55e-7,
-        "outputCostPerToken": 0.00000182
-      },
-      "contextLength": 131072,
-      "maxCompletionTokens": 8192,
-      "supportedParameters": [
-        "frequency_penalty",
-        "include_reasoning",
-        "max_tokens",
-        "presence_penalty",
-        "reasoning",
-        "response_format",
-        "seed",
-        "stop",
-        "temperature",
-        "tool_choice",
-        "tools",
-        "top_k",
-        "top_p"
-      ],
-      "defaultParameters": {},
-      "modality": "text->text",
-      "mode": "chat",
-      "description": "Qwen3-235B-A22B is a 235B parameter mixture-of-experts (MoE) model developed by Qwen, activating 22B parameters per forward pass. It supports seamless switching between a \"thinking\" mode for complex reasoning, math, and...",
       "supportsImageInput": false,
       "supportsAudioInput": false,
       "supportsImageOutput": false,
@@ -15959,7 +15631,7 @@
         "inputCacheReadPerToken": 2.8e-8
       },
       "contextLength": 163840,
-      "maxCompletionTokens": 16000,
+      "maxCompletionTokens": 16384,
       "supportedParameters": [
         "frequency_penalty",
         "logit_bias",
@@ -16101,8 +15773,9 @@
       "name": "Meta: Llama 3.3 70B Instruct",
       "provider": "meta-llama",
       "pricing": {
-        "inputCostPerToken": 1e-7,
-        "outputCostPerToken": 3.2e-7
+        "inputCostPerToken": 2.2e-7,
+        "outputCostPerToken": 5e-7,
+        "inputCacheReadPerToken": 1.1e-7
       },
       "contextLength": 131072,
       "maxCompletionTokens": 16384,
@@ -16855,7 +16528,7 @@
       "name": "Mistral: Mistral Nemo",
       "provider": "mistralai",
       "pricing": {
-        "inputCostPerToken": 1.9e-8,
+        "inputCostPerToken": 2.9e-8,
         "outputCostPerToken": 3e-8
       },
       "contextLength": 131072,
