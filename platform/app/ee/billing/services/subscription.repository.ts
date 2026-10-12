@@ -95,6 +95,7 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
           startDate: new Date(),
         }),
         lastPaymentFailedDate: null,
+        endDate: null,
       },
       include: { organization: true },
     });
@@ -189,6 +190,7 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
       data: {
         status: SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus,
         lastPaymentFailedDate: null,
+        endDate: null,
         maxMembers: input.maxMembers,
         maxMessagesPerMonth: input.maxMessagesPerMonth,
       },
