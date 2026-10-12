@@ -188,7 +188,10 @@ export class ReplayService {
    * The worker's half: runs a requested replay to its end. Fenced by the lock holder, so a
    * redelivered or duplicate request for a run that no longer holds the lock does nothing.
    */
-  async executeReplay(run: ProjectionReplayRun): Promise<void> {
+  async executeReplay(
+    run: ProjectionReplayRun,
+    { heartbeat }: { heartbeat?: () => void } = {},
+  ): Promise<void> {
     const lockHolder = await this.repo.getLockHolder();
     const status = await this.repo.getStatus();
     const holdsRun = lockHolder.kind === "held" && lockHolder.runId === run.runId;
@@ -201,7 +204,7 @@ export class ReplayService {
     }
 
     try {
-      await this.runReplay(run);
+      await this.runReplay({ params: run, heartbeat });
     } catch (err) {
       logger.error({ error: err, runId: run.runId }, "Unexpected replay orchestration error");
     }
@@ -221,7 +224,13 @@ export class ReplayService {
     return { cancelled: true };
   }
 
-  private async runReplay(params: ProjectionReplayRun): Promise<void> {
+  private async runReplay({
+    params,
+    heartbeat,
+  }: {
+    params: ProjectionReplayRun;
+    heartbeat?: () => void;
+  }): Promise<void> {
     let runtime;
     try {
       runtime = this.runtimeFactory.create();
@@ -255,7 +264,13 @@ export class ReplayService {
         await this.clearReplayMarkers({ runtime, runId: params.runId, selection });
       }
 
-      const result = await this.runWithHeartbeat({ runtime, params, selection });
+      heartbeat?.();
+      const result = await this.runWithHeartbeat({
+        runtime,
+        params,
+        selection,
+        onBatchProgress: heartbeat,
+      });
 
       // Mirror the catch-path guard: only a takeover by another run skips finalization. A free
       // lock — expired, no successor — still finalizes, so a completed run is never left
@@ -374,10 +389,13 @@ export class ReplayService {
     runtime,
     params,
     selection,
+    onBatchProgress,
   }: {
     runtime: OpsReplayRuntime;
     params: { runId: string; since: string; tenantIds: string[]; aggregateIds?: string[] };
     selection: ReplaySelection;
+    /** The outbox delivery's heartbeat, marked at every batch phase. */
+    onBatchProgress?: () => void;
   }) {
     const heartbeat = ReplayLockHeartbeatService.create({ repo: this.repo, runId: params.runId });
     heartbeat.start();
@@ -396,6 +414,7 @@ export class ReplayService {
         },
         {
           onProgress: (progress: ReplayProgress) => {
+            onBatchProgress?.();
             this.updateProgress({ runId: params.runId, progress }).catch((err) => {
               logger.warn({ error: err }, "Failed to update replay progress");
             });

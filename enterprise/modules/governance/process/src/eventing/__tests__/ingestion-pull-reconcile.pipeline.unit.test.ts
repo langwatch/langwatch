@@ -62,7 +62,17 @@ describe("ingestion pull reconciliation", () => {
         reconcile,
         deleteDispatchedBefore,
         now: () => BOOTED_AT,
-      })();
+      })(
+        { scheduledFor: BOOTED_AT },
+        {
+          processName: INGESTION_PULL_RECONCILE_PROCESS_NAME,
+          projectId: "global",
+          processKey: "global",
+          tenantId: "global",
+          messageKey: `reconcile:${BOOTED_AT}`,
+          attempt: 1,
+        },
+      );
       expect(reconcile).toHaveBeenCalledTimes(1);
       expect(deleteDispatchedBefore).toHaveBeenCalledWith(
         expect.objectContaining({ processName: INGESTION_PULL_RECONCILE_PROCESS_NAME }),

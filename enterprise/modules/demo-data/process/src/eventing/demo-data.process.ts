@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+import type { IntentContext, IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
 export const DEMO_DATA_PROCESS_NAME = "seedDemoRun";
@@ -28,7 +28,7 @@ export const demoDataWake: WakeHandler<DemoDataRunState, DemoDataIntents> = (_st
 });
 
 export interface DemoDataRunDeps {
-  readonly run: () => Promise<void>;
+  readonly run: (params: { heartbeat: () => void }) => Promise<void>;
   readonly deleteDispatchedBefore: (params: {
     processName: string;
     before: number;
@@ -37,10 +37,12 @@ export interface DemoDataRunDeps {
 }
 
 /** The prune is bookkeeping, and a failed one waits for the next day's. */
-export function runSeedDemo(deps: DemoDataRunDeps): () => Promise<void> {
-  return async (): Promise<void> => {
+export function runSeedDemo(
+  deps: DemoDataRunDeps,
+): (payload: unknown, context: IntentContext) => Promise<void> {
+  return async (_payload, context): Promise<void> => {
     const startedAt = deps.now();
-    await deps.run();
+    await deps.run({ heartbeat: () => context.heartbeat?.() });
     await deps
       .deleteDispatchedBefore({
         processName: DEMO_DATA_PROCESS_NAME,

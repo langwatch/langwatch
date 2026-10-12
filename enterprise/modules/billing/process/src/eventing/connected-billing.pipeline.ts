@@ -6,7 +6,6 @@
  */
 import {
   CONNECTED_BILLING_AGGREGATE_TYPE,
-  type BillingApi,
   type ConnectedCustomerOnboardedEventData,
   type ConnectedTermRenewedEventData,
 } from "@langwatch/enterprise-billing-contract";
@@ -66,7 +65,7 @@ function buildConnectedBilling({
   bootedAt = nowInstant().epochMilliseconds,
 }: EventingSetup<
   unknown,
-  Pick<BillingApi, "runConnectedBillingTick" | "invoicePendingSeatChanges">
+  Pick<BillingModule, "runConnectedBillingTick" | "invoicePendingSeatChanges">
 > & {
   bootedAt?: number;
 }): ConnectedBillingPipeline {
@@ -86,7 +85,7 @@ function buildConnectedBilling({
           "tick",
           connectedBillingTickSchema,
           runConnectedBillingTick({
-            tick: () => app.runConnectedBillingTick(),
+            tick: ({ heartbeat }) => app.runConnectedBillingTick({ heartbeat }),
             deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
             now: () => nowInstant().epochMilliseconds,
           }),

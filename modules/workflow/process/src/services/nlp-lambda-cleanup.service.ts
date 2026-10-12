@@ -35,13 +35,15 @@ export class NlpLambdaCleanupService {
     private readonly now: () => Instant,
   ) {}
 
-  async sweep(): Promise<NlpLambdaCleanupReport> {
+  /** `heartbeat` marks progress per function and log group, so a long sweep keeps its lease. */
+  async sweep({ heartbeat }: { heartbeat?: () => void } = {}): Promise<NlpLambdaCleanupReport> {
     const at = this.now();
     const functionCutoff = at.subtract({ milliseconds: FUNCTION_IDLE_DAYS * DAY_MS });
     const logGroupCutoff = at.subtract({ milliseconds: LOG_GROUP_IDLE_DAYS * DAY_MS });
     const report = { functionsDeleted: 0, logGroupsDeleted: 0, skippedUnknownActivity: 0 };
 
     for (const fn of await this.fleet.listFunctions({ namePrefix: NLP_LAMBDA_NAME_PREFIX })) {
+      heartbeat?.();
       const lastActivityAt = await this.fleet.findLastActivityAt({ functionName: fn.name });
       if (!lastActivityAt) {
         report.skippedUnknownActivity++;
@@ -69,6 +71,7 @@ export class NlpLambdaCleanupService {
     for (const functionName of await this.fleet.listLogGroups({
       namePrefix: NLP_LAMBDA_NAME_PREFIX,
     })) {
+      heartbeat?.();
       if (await this.fleet.functionExists({ functionName })) {
         continue;
       }

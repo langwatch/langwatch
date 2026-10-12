@@ -1,3 +1,4 @@
+import type { IntentContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:ops:group-queue-reaper");
@@ -9,18 +10,20 @@ const REAP_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface GroupQueueReapDeps {
   /** One reap; the service logs what it freed. */
-  reap: () => Promise<unknown>;
+  reap: (params: { heartbeat: () => void }) => Promise<unknown>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   now?: () => number;
 }
 
 /** A failed reap waits for the next wake; stranded groups only grow slowly. */
-export function runGroupQueueReap(deps: GroupQueueReapDeps): () => Promise<void> {
-  return async (): Promise<void> => {
+export function runGroupQueueReap(
+  deps: GroupQueueReapDeps,
+): (payload: unknown, context: IntentContext) => Promise<void> {
+  return async (_payload, context): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
 
     try {
-      await deps.reap();
+      await deps.reap({ heartbeat: () => context.heartbeat?.() });
     } catch (error) {
       logger.warn(
         { error: error instanceof Error ? error.message : String(error) },

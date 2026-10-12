@@ -885,6 +885,29 @@ describe("OutboxDispatcherService", () => {
       expect(takenAfterMs).toBeNull();
       expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
     });
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("defaults the limit to five minutes even under a longer lease", async () => {
+      const { logger, lines } = createTestLogger();
+      let finish: () => void = () => undefined;
+      const holder = new OutboxDispatcherService({
+        store,
+        handlers: {
+          "worker-dispatch": () => new Promise<void>((resolve) => (finish = resolve)),
+        },
+        leaseDurationMs: 30 * 60_000,
+        logger,
+      });
+
+      const run = holder.runOnce({ now: Date.now() });
+      await vi.advanceTimersByTimeAsync(11 * 60_000);
+      finish();
+      await run;
+
+      expect(lines.findLine("warn", "no heartbeat")).toEqual(
+        expect.objectContaining({ maxSilenceMs: 5 * 60_000 }),
+      );
+    });
   });
 
   describe("given a worker that leased a message and died", () => {

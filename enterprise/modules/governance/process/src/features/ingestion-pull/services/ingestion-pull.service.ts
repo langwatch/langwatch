@@ -19,7 +19,12 @@ export type IngestionPullRun = {
 };
 
 export interface IngestionPullRunner {
-  run(input: { sourceId: string; cursor: string | null }): Promise<IngestionPullRunResult>;
+  run(input: {
+    sourceId: string;
+    cursor: string | null;
+    /** Marks progress between the adapter's read and the write of what it read. */
+    heartbeat?: () => void;
+  }): Promise<IngestionPullRunResult>;
 }
 
 /** What one run read; the optional fields stay absent until the runner reports them. */
@@ -69,6 +74,7 @@ type IngestionPullExecution = {
   tenantId: string;
   attempt: number;
   pull: IngestionPullRun;
+  heartbeat?: () => void;
 };
 
 /** One pull attempt from the durable cursor; ports main's `createIngestionPullRunHandler`. */
@@ -122,6 +128,7 @@ export class IngestionPullService {
       result = await this.runPort.run({
         sourceId: input.pull.sourceId,
         cursor: input.pull.cursor,
+        heartbeat: input.heartbeat,
       });
     } catch (error) {
       await this.settleFailedPull({ input, error });

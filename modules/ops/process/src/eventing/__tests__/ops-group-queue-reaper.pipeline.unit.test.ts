@@ -95,7 +95,10 @@ describe("given ops's group-queue reaper declaration", () => {
 
     await deliver(process, NOW);
 
-    expect(reap).toHaveBeenCalledWith({ requestedBy: GROUP_QUEUE_REAPER_PIPELINE_NAME });
+    expect(reap).toHaveBeenCalledWith(
+      { requestedBy: GROUP_QUEUE_REAPER_PIPELINE_NAME },
+      { heartbeat: expect.any(Function) },
+    );
   });
 
   /** @scenario "A failed scheduled reap waits for the next wake" */

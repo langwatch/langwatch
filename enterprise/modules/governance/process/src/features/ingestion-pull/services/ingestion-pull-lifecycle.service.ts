@@ -108,8 +108,11 @@ export class IngestionPullLifecycleService {
 
   async reconcile({
     findPullProcessKeys,
+    heartbeat,
   }: {
     findPullProcessKeys: (input: { projectIds: string[] }) => Promise<string[]>;
+    /** Marked per source, so a long reconciliation keeps its outbox lease. */
+    heartbeat?: () => void;
   }): Promise<{ reconciled: number; failed: number }> {
     const projectIds = await this.projects.findInternalIds({
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
@@ -120,6 +123,7 @@ export class IngestionPullLifecycleService {
     let failed = 0;
 
     for (const source of sources) {
+      heartbeat?.();
       try {
         await this.sync(source);
         reconciled += 1;

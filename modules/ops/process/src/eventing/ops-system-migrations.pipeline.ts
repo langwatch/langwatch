@@ -75,8 +75,9 @@ export function buildSystemMigrations({
           }),
         )
         .on(systemMigrationPassRequestedEventSchema, systemMigrationPassRequested)
-        // One pass at a time on the dispatcher's short lease, renewed while a long pass runs,
-        // so a pass whose worker died is taken again within one lease.
+        // One pass at a time on a short, renewed lease. The pass heartbeats per page and tenant,
+        // but one tenant's migrateTenant (a large organization's parity sweep) has no progress
+        // hook and may run long in silence; the hour covers that single step.
         .outbox({ maxAttempts: 3, concurrency: 1, batchSize: 1, maxSilenceMs: 60 * 60 * 1000 }),
     )
     .build();

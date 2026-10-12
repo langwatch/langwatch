@@ -84,6 +84,8 @@ export interface InstantEvalRunExecutor {
      * whoever leases the message next, so the executor stops before it.
      */
     deadlineAt: number | null;
+    /** Marks progress between the page's read, judging and write. */
+    heartbeat?: () => void;
   }): Promise<InstantEvalPageOutcome>;
   /** Records the run's spend and answers what it came to. */
   finish(input: {
@@ -292,6 +294,7 @@ export function createInstantEvalJudgePageHandler(
         keyColumns: payload.keyColumns,
         // The page stops before its lease lapses, so no paid judgment runs twice.
         deadlineAt: intentContext.leaseExpiresAt ?? null,
+        heartbeat: () => intentContext.heartbeat?.(),
       });
     } catch (error) {
       await handleInstantEvalIntentFailure({ deps, payload, error, intentContext, context });

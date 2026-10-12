@@ -518,7 +518,7 @@ export type OpsReplayRunner = {
   getStatus(): Promise<ReplayStatus>;
   cancelReplay(): Promise<{ cancelled: boolean }>;
   /** The worker's half of a started run, fenced by the replay lock's holder. */
-  executeReplay(run: ProjectionReplayRun): Promise<void>;
+  executeReplay(run: ProjectionReplayRun, options?: { heartbeat?: () => void }): Promise<void>;
   connect(sender: ProjectionReplayRequestSender): void;
 };
 
@@ -601,7 +601,7 @@ export interface OpsSystemMigrationRunner {
   /** Asks a worker for one pass now, as the operator; resolves once the request is recorded. */
   startPass(input: { actorUserId: string }): Promise<void>;
   /** One pass on this worker: the hourly re-drive only when a tenant could still move. */
-  executePass(input: { redrive: boolean }): Promise<void>;
+  executePass(input: { redrive: boolean; heartbeat?: () => void }): Promise<void>;
   /** One pass of the tasks process's startup convergence, stopping at `signal`. */
   runConvergencePass(input: { signal: AbortSignal }): Promise<MigrationPassSummary>;
   assertLegacyWritersDrained(input: {
@@ -1687,7 +1687,11 @@ export class OpsModule implements OpsApi {
   }
 
   /** One pass of `ops_system_migrations`, on the worker hosting it; not on {@link OpsApi}. */
-  executeSystemMigrationPass(input: { redrive: boolean; followUp: boolean }): Promise<void> {
+  executeSystemMigrationPass(input: {
+    redrive: boolean;
+    followUp: boolean;
+    heartbeat: () => void;
+  }): Promise<void> {
     return this.#dependencies.systemMigrations.executePass(input);
   }
 
@@ -1702,8 +1706,8 @@ export class OpsModule implements OpsApi {
   }
 
   /** One requested run of `ops_projection_replay`, on its worker; not on {@link OpsApi}. */
-  executeReplay(run: ProjectionReplayRun): Promise<void> {
-    return this.#dependencies.ops.replay.executeReplay(run);
+  executeReplay(run: ProjectionReplayRun, options?: { heartbeat?: () => void }): Promise<void> {
+    return this.#dependencies.ops.replay.executeReplay(run, options);
   }
 
   /** Opens the replay's command once `ops_projection_replay` has registered and answered. */
@@ -2106,8 +2110,8 @@ export class OpsModule implements OpsApi {
   }
 
   /** The daily report's one send for `ops_usage_report`; never throws for a refusal. */
-  sendUsageReport(): Promise<string> {
-    return this.#checkup.usageReports.send();
+  sendUsageReport({ heartbeat }: { heartbeat?: () => void } = {}): Promise<string> {
+    return this.#checkup.usageReports.send({ heartbeat });
   }
 
   /** One tick of `ops_anomaly_detection`: surfaces and clears the tenants' rate anomalies. */
@@ -2134,9 +2138,10 @@ export class OpsModule implements OpsApi {
   /** Deletes the queue groups stranded long enough that no dispatch still holds them. */
   reapStrandedQueueGroups(
     input: ReapStrandedQueueGroupsInput,
+    { heartbeat }: { heartbeat?: () => void } = {},
   ): Promise<OpsQueueReapedStrandedGroups> {
     const audited = input.requestedBy !== GROUP_QUEUE_REAPER_PIPELINE_NAME;
-    return this.#dependencies.groupQueueReaper.reap({ ...input, audited });
+    return this.#dependencies.groupQueueReaper.reap({ ...input, audited, heartbeat });
   }
 
   get #signUpHealth(): SignUpHealthService {

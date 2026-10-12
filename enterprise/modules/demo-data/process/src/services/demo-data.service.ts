@@ -48,7 +48,10 @@ export class DemoDataService {
     return new DemoDataService(deps);
   }
 
-  async run(input: DemoDataRunInput): Promise<SeedRunReport> {
+  async run(
+    input: DemoDataRunInput,
+    { heartbeat }: { heartbeat?: () => void } = {},
+  ): Promise<SeedRunReport> {
     const allowlist = parseDemoOrgIds(this.#demoOrgIds);
     const organizationId = input.organizationId ?? allowlist[0];
     if (organizationId === undefined) {
@@ -62,6 +65,7 @@ export class DemoDataService {
     const organization = await this.#loadOrganization(organizationId);
     const actions: SeedRunReport["actions"] = [];
     for (const action of ACTIONS) {
+      heartbeat?.();
       const t0 = this.#now().epochMilliseconds;
       let outcome: SeedActionOutcome;
       try {
@@ -88,9 +92,9 @@ export class DemoDataService {
   }
 
   /** Main's CronJob ran on the demo instance alone: a deployment with no allowlist seeds nothing. */
-  async runScheduled(): Promise<void> {
+  async runScheduled({ heartbeat }: { heartbeat: () => void }): Promise<void> {
     if (this.#demoOrgIds === undefined || this.#demoOrgIds.trim() === "") return;
-    const report = await this.run({ execute: true });
+    const report = await this.run({ execute: true }, { heartbeat });
     if (reportHasFailures(report)) throw new Error("demo seed run had failures");
   }
 

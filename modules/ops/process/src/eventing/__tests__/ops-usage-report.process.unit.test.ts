@@ -58,7 +58,17 @@ describe("the usage report tick", () => {
     const deleteDispatchedBefore = vi.fn(async () => 0);
     const now = at("2026-09-21T12:10:00Z");
 
-    await runUsageReport({ send, deleteDispatchedBefore, now: () => now })();
+    await runUsageReport({ send, deleteDispatchedBefore, now: () => now })(
+      {},
+      {
+        processName: USAGE_REPORT_PROCESS_NAME,
+        projectId: "global",
+        processKey: "global",
+        tenantId: "global",
+        messageKey: `send:${now}`,
+        attempt: 1,
+      },
+    );
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(deleteDispatchedBefore).toHaveBeenCalledWith({

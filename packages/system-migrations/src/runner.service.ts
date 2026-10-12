@@ -95,9 +95,13 @@ export class SystemMigrationRunnerService {
 
   /** One full pass. Always runs: tenants claimed by another process are
    *  counted in `claimed` and left alone rather than the pass standing
-   *  down as a whole. */
-  async runPass(args?: { signal?: AbortSignal }): Promise<MigrationPassSummary> {
+   *  down as a whole. `heartbeat` marks each page, tenant and pacing poll. */
+  async runPass(args?: {
+    signal?: AbortSignal;
+    heartbeat?: () => void;
+  }): Promise<MigrationPassSummary> {
     const signal = args?.signal;
+    const heartbeat = args?.heartbeat;
     const summary: MigrationPassSummary = {
       tenantsSeen: 0,
       finalized: 0,
@@ -111,7 +115,7 @@ export class SystemMigrationRunnerService {
     };
     if (this.deps.migrations.length === 0) return summary;
 
-    await this.driveOnOwnList({ summary, signal });
+    await this.driveOnOwnList({ summary, signal, heartbeat });
     if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
       // Every organization read as claimed. Genuine when another pass is
       // sweeping the same page at the same moment - but it is also the only
@@ -158,6 +162,7 @@ export class SystemMigrationRunnerService {
   private async driveOnOwnList(args: {
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    heartbeat?: () => void;
   }): Promise<void> {
     const { runListedWork } = this.deps;
     if (this.pacingLimit() === undefined || runListedWork === undefined) {
@@ -208,17 +213,20 @@ export class SystemMigrationRunnerService {
   private async driveTenants(args: {
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    heartbeat?: () => void;
     list?: PassQueueRun;
   }): Promise<void> {
     let cursor: string | null = null;
     for (;;) {
+      args.heartbeat?.();
       const page = await this.deps.tenants.findTenantIdsAfter({
         cursor,
         limit: TENANT_PAGE_SIZE,
       });
       if (page.length === 0) return;
       cursor = page[page.length - 1] ?? null;
-      if (!(await this.waitForQueueRoom({ signal: args.signal, list: args.list }))) return;
+      const room = { signal: args.signal, heartbeat: args.heartbeat, list: args.list };
+      if (!(await this.waitForQueueRoom(room))) return;
       if (!(await this.drivePage({ ...args, page }))) return;
     }
   }
@@ -229,9 +237,11 @@ export class SystemMigrationRunnerService {
    */
   private async waitForQueueRoom({
     signal,
+    heartbeat,
     list,
   }: {
     signal?: AbortSignal;
+    heartbeat?: () => void;
     list?: PassQueueRun;
   }): Promise<boolean> {
     const limit = this.pacingLimit();
@@ -243,6 +253,7 @@ export class SystemMigrationRunnerService {
     if (limit === undefined || queuedJobs === undefined) return !signal?.aborted;
     for (;;) {
       if (signal?.aborted) return false;
+      heartbeat?.();
       const queued = await queuedJobs().catch((error: unknown) => {
         logger.warn(
           { error },
@@ -264,10 +275,12 @@ export class SystemMigrationRunnerService {
     page,
     summary,
     signal,
+    heartbeat,
   }: {
     page: string[];
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    heartbeat?: () => void;
   }): Promise<boolean> {
     // A failed read only costs the shortcut: every tenant then takes its claim, as before.
     const finished = await this.readFinished({ page }).catch((error: unknown) => {
@@ -298,6 +311,7 @@ export class SystemMigrationRunnerService {
             "tenant drive failed outside the migration; continuing the pass",
           );
         }
+        heartbeat?.();
       }
     };
     await Promise.all(Array.from({ length: width }, worker));

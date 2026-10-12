@@ -27,6 +27,8 @@ export interface TwoStepRequirementNotices {
     organizationId: string;
     actorUserId: string;
     required: boolean;
+    /** Marks each member's mail, so a large organization keeps its outbox lease. */
+    heartbeat?: () => void;
   }): Promise<void>;
 }
 

@@ -88,9 +88,9 @@ describe("given ops's projection-replay declaration", () => {
 
   /** @scenario "Starting a replay records it running and the worker executes it" */
   it("runs the execution on the worker once, never retrying a lapsed delivery", async () => {
-    const executeReplay = vi.fn<(input: ProjectionReplayRun) => Promise<void>>(() =>
-      Promise.resolve(),
-    );
+    const executeReplay = vi.fn<
+      (input: ProjectionReplayRun, options?: { heartbeat?: () => void }) => Promise<void>
+    >(() => Promise.resolve());
     const { process } = built(executeReplay);
 
     await process.config.intents?.execute?.run(run, {
@@ -102,7 +102,7 @@ describe("given ops's projection-replay declaration", () => {
       attempt: 1,
     });
 
-    expect(executeReplay).toHaveBeenCalledWith(run);
+    expect(executeReplay).toHaveBeenCalledWith(run, { heartbeat: expect.any(Function) });
     expect(process.config.outbox).toMatchObject({ maxAttempts: 1, concurrency: 1 });
   });
 });

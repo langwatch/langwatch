@@ -1,3 +1,4 @@
+import type { IntentContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:workers:usageStatsWorker");
@@ -9,7 +10,7 @@ const REPORT_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export interface UsageReportRunDeps {
   /** Takes and posts the report; reports its own outcome, and never throws for a refused post. */
-  readonly send: () => Promise<string>;
+  readonly send: (params: { heartbeat: () => void }) => Promise<string>;
   readonly deleteDispatchedBefore: (params: {
     processName: string;
     before: number;
@@ -17,10 +18,12 @@ export interface UsageReportRunDeps {
   readonly now: () => number;
 }
 
-export function runUsageReport(deps: UsageReportRunDeps): () => Promise<void> {
-  return async (): Promise<void> => {
+export function runUsageReport(
+  deps: UsageReportRunDeps,
+): (payload: unknown, context: IntentContext) => Promise<void> {
+  return async (_payload, context): Promise<void> => {
     const startedAt = deps.now();
-    const outcome = await deps.send();
+    const outcome = await deps.send({ heartbeat: () => context.heartbeat?.() });
     logger.info({ outcome }, "usage report tick");
 
     try {

@@ -625,10 +625,11 @@ export class LicensingModule implements LicensingApiContract {
     return this.#identity.getInstanceId();
   }
 
-  async syncLicenses(): Promise<void> {
+  async syncLicenses({ heartbeat }: { heartbeat?: () => void } = {}): Promise<void> {
     const organizationIds = await this.#install.findLicensedOrganizationIds();
-    await this.#refresh.syncAll(organizationIds);
+    await this.#refresh.syncAll(organizationIds, { heartbeat });
     for (const organizationId of organizationIds) {
+      heartbeat?.();
       await this.#install.publishUpstream(organizationId);
     }
   }

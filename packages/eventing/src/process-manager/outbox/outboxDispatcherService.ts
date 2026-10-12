@@ -74,8 +74,8 @@ export interface OutboxDispatcherServiceOptions {
   leaseDurationMs?: number;
   /**
    * How long a handler may run without a heartbeat before its lease stops being
-   * renewed, lapses and the message is redelivered. Default 5 minutes, never
-   * below `leaseDurationMs`, the silence a lease already allowed before renewal.
+   * renewed, lapses and the message is redelivered. Default 5 minutes; long work
+   * calls `heartbeat()` at its progress points instead of raising this.
    */
   maxSilenceMs?: number;
   /**
@@ -205,8 +205,7 @@ export class OutboxDispatcherService {
       1,
       Math.floor(this.leaseDurationMs / LEASE_RENEWALS_PER_LEASE),
     );
-    this.maxSilenceMs =
-      options.maxSilenceMs ?? Math.max(DEFAULT_MAX_SILENCE_MS, this.leaseDurationMs);
+    this.maxSilenceMs = options.maxSilenceMs ?? DEFAULT_MAX_SILENCE_MS;
     this.processNames = options.processNames;
     this.concurrency = Math.max(1, options.concurrency ?? 1);
     this.clock = options.clock ?? Date.now;

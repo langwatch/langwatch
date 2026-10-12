@@ -1,3 +1,5 @@
+import type { IntentContext } from "@langwatch/eventing";
+
 export const LICENSE_SYNC_PROCESS_NAME = "licenseSync";
 
 /** Outbox rows are bookkeeping, one per sync, pruned like every recurring process's. */
@@ -5,7 +7,7 @@ const SYNC_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface LicenseSyncRunDeps {
   /** One pass over every organization with a license to sync; records each failure itself. */
-  readonly sync: () => Promise<void>;
+  readonly sync: (params: { heartbeat: () => void }) => Promise<void>;
   readonly deleteDispatchedBefore: (params: {
     processName: string;
     before: number;
@@ -18,10 +20,12 @@ interface LicenseSyncRunDeps {
  * retries it and an operator sees it dead-lettered; the prune is bookkeeping,
  * and a failed one waits for the next day's.
  */
-export function runLicenseSync(deps: LicenseSyncRunDeps): () => Promise<void> {
-  return async (): Promise<void> => {
+export function runLicenseSync(
+  deps: LicenseSyncRunDeps,
+): (payload: unknown, context: IntentContext) => Promise<void> {
+  return async (_payload, context): Promise<void> => {
     const startedAt = deps.now();
-    await deps.sync();
+    await deps.sync({ heartbeat: () => context.heartbeat?.() });
     await deps
       .deleteDispatchedBefore({
         processName: LICENSE_SYNC_PROCESS_NAME,

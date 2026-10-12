@@ -1,4 +1,4 @@
-import type { ProcessStore } from "@langwatch/eventing";
+import type { IntentContext, ProcessStore } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -13,9 +13,13 @@ interface GithubBranchRecheckDeps {
   processStore: ProcessStore;
 }
 
-export function runGithubBranchRecheck(deps: GithubBranchRecheckDeps): () => Promise<void> {
-  return async (): Promise<void> => {
-    const rechecked = await deps.github.recheckDueBranches();
+export function runGithubBranchRecheck(
+  deps: GithubBranchRecheckDeps,
+): (payload: unknown, context: IntentContext) => Promise<void> {
+  return async (_payload, context): Promise<void> => {
+    const rechecked = await deps.github.recheckDueBranches({
+      heartbeat: () => context.heartbeat?.(),
+    });
     if (rechecked > 0) {
       logger.info({ rechecked }, "branch recheck tick complete");
     }

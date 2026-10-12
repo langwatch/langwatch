@@ -37,12 +37,13 @@ export class UsageWarningSweepService {
 
   private constructor(private readonly deps: UsageWarningSweepDeps) {}
 
-  async sweep(): Promise<void> {
+  async sweep({ heartbeat }: { heartbeat?: () => void } = {}): Promise<void> {
     if (!this.deps.isSaas) {
       this.deps.logger.debug("skipping usage limit notifications (not SaaS)");
       return;
     }
     for (const organizationId of await this.deps.organizationIds()) {
+      heartbeat?.();
       try {
         await this.checkOrganization(organizationId);
       } catch (error) {

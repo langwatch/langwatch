@@ -109,11 +109,13 @@ export class TopicClusteringRunner implements TopicClusteringRun {
     searchAfter: [number, string] | null;
     runId: string;
     page: number;
+    heartbeat?: () => void;
   }): Promise<TopicClusteringPageOutcome> {
     return clusterTopicsForProject(this.deps, {
       projectId: params.projectId,
       searchAfter: params.searchAfter ?? undefined,
       runContext: { runId: params.runId, page: params.page },
+      heartbeat: params.heartbeat,
     });
   }
 }
@@ -150,10 +152,12 @@ export const clusterTopicsForProject = async (
     projectId,
     searchAfter,
     runContext,
+    heartbeat,
   }: {
     projectId: string;
     searchAfter?: [number, string];
     runContext?: ClusteringRunContext;
+    heartbeat?: () => void;
   },
 ): Promise<ClusteringPageOutcome> => {
   const project = await deps.repository.findProject(projectId);
@@ -222,6 +226,7 @@ export const clusterTopicsForProject = async (
     ...(searchAfter ? { searchAfter } : {}),
   });
 
+  heartbeat?.();
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
 
   logger.info(
@@ -261,6 +266,7 @@ export const clusterTopicsForProject = async (
   const outcome = isIncrementalProcessing
     ? await incrementalClustering({ deps, projectId, traces, runContext })
     : await batchClusterTraces({ deps, projectId, traces, runContext });
+  heartbeat?.();
 
   logger.info({ projectId }, "done! project");
 

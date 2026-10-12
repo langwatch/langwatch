@@ -114,7 +114,13 @@ export class SystemMigrationPassService {
     });
   }
 
-  async runPass({ signal }: { signal?: AbortSignal }): Promise<MigrationPassSummary> {
+  async runPass({
+    signal,
+    heartbeat,
+  }: {
+    signal?: AbortSignal;
+    heartbeat?: () => void;
+  }): Promise<MigrationPassSummary> {
     const isSaaS = this.options.isSaaS();
     const enrollments = this.options.repositories.migrationEnrollments;
 
@@ -128,13 +134,14 @@ export class SystemMigrationPassService {
         ? null
         : await this.#cohorts.user({ isSaaS, enrollments, migrations: userMigrations });
 
-    const summary = await organization.runner.runPass({ signal });
+    const summary = await organization.runner.runPass({ signal, heartbeat });
 
     const merged =
       userCohort === null
         ? summary
         : await this.runUserLeg({
             signal,
+            heartbeat,
             summary,
             cohort: userCohort,
             migrations: userMigrations,
@@ -142,7 +149,12 @@ export class SystemMigrationPassService {
             lease: organization.lease,
           });
 
-    const withDeclared = await this.runDeclaredLeg({ signal, summary: merged, isSaaS });
+    const withDeclared = await this.runDeclaredLeg({
+      signal,
+      heartbeat,
+      summary: merged,
+      isSaaS,
+    });
     await this.sweepAbandonedNewborns();
     return withDeclared;
   }
@@ -150,10 +162,12 @@ export class SystemMigrationPassService {
   /** Declared tenant steps: per axis, one runner per tenant source, on the framework's state. */
   private async runDeclaredLeg({
     signal,
+    heartbeat,
     summary,
     isSaaS,
   }: {
     signal?: AbortSignal;
+    heartbeat?: () => void;
     summary: MigrationPassSummary;
     isSaaS: boolean;
   }): Promise<MigrationPassSummary> {
@@ -186,7 +200,7 @@ export class SystemMigrationPassService {
           cohort,
           migrations: bucket.migrations,
         });
-        merged = mergeSummaries(merged, await runner.runPass({ signal }));
+        merged = mergeSummaries(merged, await runner.runPass({ signal, heartbeat }));
         driven.push({ ids: bucket.migrations.map((migration) => migration.name), runner });
       }
     }
@@ -298,6 +312,7 @@ export class SystemMigrationPassService {
    */
   private async runUserLeg({
     signal,
+    heartbeat,
     summary,
     cohort,
     migrations,
@@ -305,6 +320,7 @@ export class SystemMigrationPassService {
     lease,
   }: {
     signal?: AbortSignal;
+    heartbeat?: () => void;
     summary: MigrationPassSummary;
     cohort: MigrationCohort;
     migrations: readonly SystemMigration[];
@@ -333,7 +349,7 @@ export class SystemMigrationPassService {
           tenants,
           cohort,
           migrations: bucket.migrations,
-        }).runPass({ signal }),
+        }).runPass({ signal, heartbeat }),
       );
     }
 
