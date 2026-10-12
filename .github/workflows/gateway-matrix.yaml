@@ -123,6 +123,8 @@ jobs:
       # The upgrade and the api both read ClickHouse through this one URL.
       CLICKHOUSE_URL: http://default:ci_password@localhost:8123/langwatch
       REDIS_URL: redis://localhost:6379
+      # The upgrade preflight and the api both refuse a missing api-key pepper; a fixed non-secret CI value.
+      API_KEY_PEPPER: synthetic-api-key-pepper
       LW_BASE_URL: http://localhost:5560
       # Provider creds — set as repo/org secrets, NOT committed.
       OPENAI_API_KEY: ${{ secrets.MATRIX_OPENAI_API_KEY }}
@@ -223,16 +225,16 @@ jobs:
       - name: Install Goose migration tool
         run: bash .github/scripts/install-goose.sh
 
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # The api refuses to boot without a 32-byte hex encryption key.
+        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Apply DB migrations
         working-directory: apps/tasks
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
         run: pnpm run task upgrade
-
-      - name: Generate a throwaway CREDENTIALS_SECRET
-        # The api refuses to boot without a 32-byte hex encryption key.
-        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
-        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Start control plane (background)
         working-directory: apps/api
