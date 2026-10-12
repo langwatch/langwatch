@@ -3,9 +3,9 @@ import { defineTextStyles } from "@chakra-ui/react";
 const tabular = { fontVariantNumeric: "tabular-nums" } as const;
 
 /**
- * The product type scale: 11 to 20px, weights 400, 500, 600. Titles are 600, labels 500;
- * prose styles carry no weight, so a recipe's own weight survives. Mono is for ids, code and
- * durations only. px-to-style mapping: dev/docs/best_practices/type-scale.md.
+ * Type scale 11 to 20px, weights 400/500/600: titles 600 except the page header title (500),
+ * labels 500; prose styles carry no weight. Mono only for ids, code and durations.
+ * px-to-style mapping: dev/docs/best_practices/type-scale.md.
  */
 export const productTextStyles = defineTextStyles({
   pageTitle: {
@@ -14,7 +14,7 @@ export const productTextStyles = defineTextStyles({
   },
   pageTitleCompact: {
     description: "The page title in a compact (48px) header",
-    value: { fontSize: "16px", lineHeight: "24px", fontWeight: "600", letterSpacing: "-0.01em" },
+    value: { fontSize: "16px", lineHeight: "24px", fontWeight: "500", letterSpacing: "-0.01em" },
   },
   sectionTitle: {
     description: "A section heading inside a page or drawer",

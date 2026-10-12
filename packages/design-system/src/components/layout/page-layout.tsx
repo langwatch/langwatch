@@ -184,7 +184,8 @@ function Header({
         minHeight={`pageHeader.${size}`}
         maxHeight="none"
         paddingX={PAGE_INSET}
-        paddingY={described ? 3 : { base: 0, mdDown: 2 }}
+        paddingTop={described ? 3 : 0}
+        paddingBottom={described ? 3 : { base: 0, mdDown: 2 }}
         flexWrap="wrap"
         rowGap={2}
         css={{

@@ -37,7 +37,7 @@ Feature: Sticky glass page titles
     When headers have no actions, one action, or several actions
     Then every header row is 48 pixels high
     And every title box starts 24 pixels from the left and 10 pixels from the top
-    And titles are 16 pixel semibold with a 28 pixel line box
+    And titles are 16 pixel medium weight, not bold, with a 28 pixel line box
     And buttons are outlined and 32 pixels high
     And a page cannot select compact sizing inside that area
 
@@ -60,7 +60,7 @@ Feature: Sticky glass page titles
   Scenario: Full-screen tools may use compact headers
     Given a standalone tool with no sidebar siblings
     Then its compact header is 48 pixels high
-    And its title is 15 pixel semibold and its buttons are 28 pixels high
+    And its title is 16 pixel medium weight and its buttons are 28 pixels high
 
   @browser @unimplemented
   Scenario: Rounded shell cards contain sticky headers during scrolling

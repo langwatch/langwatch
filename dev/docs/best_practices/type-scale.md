@@ -12,7 +12,7 @@ Sizes: 11, 12, 13, 14, 16, 18, 20 px. Weights: 400, 500, 600, nothing else.
 | `textStyle`        | Size / line | Weight | Use it for                                                       |
 | ------------------ | ----------- | ------ | ---------------------------------------------------------------- |
 | `pageTitle`        | 20 / 28     | 600    | The one title of a page (PageLayout sets it; never set it again) |
-| `pageTitleCompact` | 16 / 24     | 600    | A page title in the compact 48px header                          |
+| `pageTitleCompact` | 16 / 24     | 500    | Every page header title (48px header)                            |
 | `sectionTitle`     | 16 / 24     | 600    | A section heading in a page, drawer or dialog title              |
 | `cardTitle`        | 14 / 20     | 600    | A card's or panel's title                                        |
 | `metric`           | 18 / 24     | 600    | A headline number (tabular figures)                              |
