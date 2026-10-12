@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
-import { Toolbar } from "../toolbar.tsx";
+import { Toolbar, toolbarCompactness } from "../toolbar.tsx";
 
 vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -40,15 +40,19 @@ vi.mock("../../onboarding/spotlights/spotlight-overlay.tsx", () => ({
 }));
 
 vi.mock("../columns-dropdown.tsx", () => ({
-  ColumnsDropdown: () => <div data-testid="columns" />,
+  ColumnsDropdown: ({ showLabel }: { showLabel?: boolean }) => (
+    <div data-testid="columns" data-show-label={showLabel ? "" : undefined} />
+  ),
+}));
+const drawer = vi.hoisted(() => ({ openDrawer: vi.fn() }));
+vi.mock("@langwatch/browser-host/drawer", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useDrawer: () => drawer,
 }));
 vi.mock("../grouping-select.tsx", () => ({
   GroupingSelect: () => <div data-testid="grouping" />,
 }));
-vi.mock("../density-toggle.tsx", () => ({ DensityToggle: () => <div data-testid="density" /> }));
-vi.mock("../toolbar-more-menu.tsx", () => ({
-  ToolbarMoreMenu: () => <div data-testid="more" />,
-}));
+vi.mock("../density-select.tsx", () => ({ DensitySelect: () => <div data-testid="density" /> }));
 vi.mock("../live-indicator.tsx", () => ({ LiveIndicator: () => <div data-testid="live" /> }));
 vi.mock("../time-range-picker.tsx", () => ({
   TimeRangePicker: () => <div data-testid="time-range" />,
@@ -86,5 +90,36 @@ describe("the toolbar row", () => {
       expect(getByTestId("grouping").parentElement).toBe(timeCluster);
       expect(getByTestId("density").parentElement).toBe(timeCluster);
     });
+  });
+});
+
+describe("the toolbar actions", () => {
+  /** @scenario "The toolbar keeps its actions in sight" */
+  it("shows Automate and the shortcuts button in the bar, with no overflow menu", async () => {
+    const { getByRole, queryByRole } = renderWithDesignSystem(<Toolbar />);
+
+    const automate = getByRole("button", { name: "Create an automation from the current filter" });
+    expect(automate).toHaveTextContent("Automate");
+    expect(getByRole("button", { name: "Keyboard shortcuts" })).toBeInTheDocument();
+    expect(queryByRole("button", { name: "More toolbar actions" })).toBeNull();
+
+    automate.click();
+    expect(drawer.openDrawer).toHaveBeenCalledWith(
+      "automation",
+      expect.objectContaining({ initialSource: "trace" }),
+    );
+  });
+});
+
+describe("toolbarCompactness", () => {
+  const at = (width: number) =>
+    toolbarCompactness({ width, hasSampleToggle: false, hasTourLabel: false });
+
+  /** @scenario "The toolbar keeps its actions in sight" */
+  it("spells Columns when wide and sheds labels, then chevrons, as the bar narrows", () => {
+    expect(at(1400)).toEqual({ wide: true, labelsCompact: false, chevronsCompact: false });
+    expect(at(1100)).toEqual({ wide: false, labelsCompact: false, chevronsCompact: false });
+    expect(at(900)).toEqual({ wide: false, labelsCompact: true, chevronsCompact: false });
+    expect(at(600)).toEqual({ wide: false, labelsCompact: true, chevronsCompact: true });
   });
 });

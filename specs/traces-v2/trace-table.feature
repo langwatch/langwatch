@@ -795,11 +795,19 @@ Rule: Density toggle
     And padding is generous
 
   @integration
-  Scenario: Density toggle shows both densities at once
-    Then the toolbar shows a "Compact" and a "Comfortable" segment, each with an icon and label
-    And hovering a segment explains what that density shows and that D switches it
-    And clicking a segment switches the table's density in one click
-    And the labels drop to icons only while the toolbar is too narrow
+  Scenario: Density select names the current density
+    Then the toolbar shows a "Density" select beside "Group by", reading the current density
+    And opening it offers "Compact" and "Comfortable", each explaining what that density shows
+    And choosing one switches the table's density
+    And the select drops to its icon alone while the toolbar is too narrow
+
+  @integration
+  Scenario: The toolbar keeps its actions in sight
+    Given the user may manage automations
+    Then the toolbar shows an "Automate" button that opens an automation from the current filter
+    And a keyboard shortcuts button sits beside it, with no overflow menu
+    And "Automate" drops to its icon while the toolbar is too narrow
+    And the columns button spells "Columns" after its icon while the toolbar is wide
 
   @unit
   Scenario: Density preference persists across sessions

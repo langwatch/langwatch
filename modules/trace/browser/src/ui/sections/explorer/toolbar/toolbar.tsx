@@ -20,24 +20,25 @@ import { useTourEntryPoints } from "../onboarding/index.ts";
 import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay.tsx";
 import { PAGE_SHORTCUTS } from "../traces-page/page-keyboard-shortcuts.tsx";
 import { ColumnsDropdown } from "./columns-dropdown.tsx";
-import { DensityToggle } from "./density-toggle.tsx";
+import { DensitySelect } from "./density-select.tsx";
 import { GroupingSelect } from "./grouping-select.tsx";
 import { LensTabs } from "./lens-tabs.tsx";
 import { LiveIndicator } from "./live-indicator.tsx";
 import { TimeRangePicker } from "./time-range-picker.tsx";
-import { ToolbarMoreMenu } from "./toolbar-more-menu.tsx";
+import { AutomateButton, KeyboardShortcutsButton } from "./toolbar-actions.tsx";
 
-// Toolbar widths (the bar's own measured width, not the viewport) below which the right
-// clusters shed labels, then chevrons, so the lens tabs keep the room. Lenses that still do
-// not fit move whole into the lens overflow menu. Grouping and density keep their labels
-// longest: they are how people learn what the controls do.
-const TOOLBAR_LABELS_MIN_WIDTH = 960;
-const TOOLBAR_CHEVRONS_MIN_WIDTH = 720;
+// Toolbar widths (the bar's own measured width, not the viewport). Above the wide one the
+// Columns button spells its label; below the others the right clusters shed labels, then
+// chevrons, so the lens tabs keep the room. Lenses that still do not fit move into the lens
+// overflow menu. Grouping and density keep their labels longest.
+const TOOLBAR_WIDE_MIN_WIDTH = 1280;
+const TOOLBAR_LABELS_MIN_WIDTH = 1040;
+const TOOLBAR_CHEVRONS_MIN_WIDTH = 800;
 // Room the optional controls take, so the thresholds hold when they are on the bar.
 const SAMPLE_TOGGLE_WIDTH = 120;
 const TOUR_LABEL_WIDTH = 100;
 
-function toolbarCompactness({
+export function toolbarCompactness({
   width,
   hasSampleToggle,
   hasTourLabel,
@@ -45,11 +46,12 @@ function toolbarCompactness({
   width: number;
   hasSampleToggle: boolean;
   hasTourLabel: boolean;
-}): { labelsCompact: boolean; chevronsCompact: boolean } {
-  if (width <= 0) return { labelsCompact: false, chevronsCompact: false };
+}): { wide: boolean; labelsCompact: boolean; chevronsCompact: boolean } {
+  if (width <= 0) return { wide: false, labelsCompact: false, chevronsCompact: false };
   const optional =
     (hasSampleToggle ? SAMPLE_TOGGLE_WIDTH : 0) + (hasTourLabel ? TOUR_LABEL_WIDTH : 0);
   return {
+    wide: width >= TOOLBAR_WIDE_MIN_WIDTH + optional,
     labelsCompact: width < TOOLBAR_LABELS_MIN_WIDTH + optional,
     chevronsCompact: width < TOOLBAR_CHEVRONS_MIN_WIDTH + optional,
   };
@@ -204,7 +206,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const { labelsCompact, chevronsCompact } = toolbarCompactness({
+  const { wide, labelsCompact, chevronsCompact } = toolbarCompactness({
     width: toolbarWidth,
     hasSampleToggle: !hideSampleDataAction && showSampleDataToggle,
     hasTourLabel: isNewAccount,
@@ -316,12 +318,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
         <TimeRangePicker compact={labelsCompact} />
         <LiveIndicator />
         <GroupingSelect compact={chevronsCompact} />
-        <DensityToggle compact={chevronsCompact} />
+        <DensitySelect compact={chevronsCompact} />
       </HStack>
       <ToolbarDivider />
-      {/* Cluster 3: which columns show, getting data out, and help. */}
+      {/* Cluster 3: which columns show, getting data out, automating it, and help. */}
       <HStack gap={1} flexShrink={0}>
-        <ColumnsDropdown compact={chevronsCompact} />
+        <ColumnsDropdown compact={chevronsCompact} showLabel={wide} />
         {onExportAll && (
           <Tooltip
             content="Export the current view to CSV or JSON"
@@ -340,6 +342,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             </IconButton>
           </Tooltip>
         )}
+        <AutomateButton compact={labelsCompact} />
+        <ToolbarDivider />
         <Tooltip
           content={spotlightsActive ? "End the guided tour" : "Start the guided tour of this page"}
           positioning={{ placement: "bottom" }}
@@ -353,7 +357,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
             onClick={handleShowMeAround}
           />
         </Tooltip>
-        <ToolbarMoreMenu />
+        <KeyboardShortcutsButton />
       </HStack>
     </Flex>
   );

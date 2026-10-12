@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The toolbar's grouping select, density toggle, time-range popover and columns picker.
+ * The toolbar's grouping select, density select, time-range popover and columns picker.
  * @see specs/traces-v2/trace-table.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { useDensityStore } from "../../../../../features/explorer/behavior/density.store.ts";
 import { ColumnPickerContent } from "../column-picker-content.tsx";
-import { DensityToggle } from "../density-toggle.tsx";
+import { DensitySelect } from "../density-select.tsx";
 import { GroupingSelect } from "../grouping-select.tsx";
 import { TimeRangePicker } from "../time-range-picker.tsx";
 import "@testing-library/jest-dom/vitest";
@@ -88,20 +88,34 @@ describe("the grouping select in a coding-agent scope", () => {
   });
 });
 
-describe("the density toggle", () => {
-  /** @scenario "Density toggle shows both densities at once" */
-  it("labels both densities and switches with one click", async () => {
+describe("the density select", () => {
+  /** @scenario "Density select names the current density" */
+  it("reads the current density, offers both with a hint, and switches on choice", async () => {
     useDensityStore.getState().setDensity("comfortable");
-    renderWithDesignSystem(<DensityToggle />);
+    renderWithDesignSystem(<DensitySelect />);
 
-    const compact = screen.getByRole("radio", { name: "Compact" });
-    expect(screen.getByRole("radio", { name: "Comfortable" })).toBeChecked();
-    expect(screen.getByText("Compact")).toBeVisible();
-    expect(screen.getByText("Comfortable")).toBeVisible();
+    const trigger = screen.getByRole("button", { name: "Density: Comfortable" });
+    expect(trigger).toHaveTextContent("Comfortable");
 
-    await userEvent.click(compact);
+    await userEvent.click(trigger);
+    const items = await screen.findAllByRole("menuitemradio");
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining("Compact"),
+      expect.stringContaining("Comfortable"),
+    ]);
+    expect(items[0]).toHaveTextContent(/More traces on screen/);
+
+    await userEvent.click(items[0]!);
 
     expect(useDensityStore.getState().density).toBe("compact");
+  });
+
+  it("keeps only the icon when compact", () => {
+    useDensityStore.getState().setDensity("compact");
+    renderWithDesignSystem(<DensitySelect compact />);
+
+    const trigger = screen.getByRole("button", { name: "Density: Compact" });
+    expect(trigger).not.toHaveTextContent("Compact");
   });
 });
 
