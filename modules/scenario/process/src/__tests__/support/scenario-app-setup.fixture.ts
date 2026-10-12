@@ -1,5 +1,6 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioServerConfig } from "@langwatch/scenario-contract";
@@ -28,6 +29,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   nlpServiceUrl: void 0,
   publicBaseUrl: void 0,
   rawSocketPort: 0,
+  goRunnerPath: void 0,
   nlpTimeouts: { maxTimeoutMs: void 0 },
   childParentEnvironment: {
     path: void 0,
@@ -61,6 +63,7 @@ export function scenarioExecutorPeers() {
     workflows: createApiFixture<WorkflowApi>(),
     apiKeys: createApiFixture<ApiKeyApi>(),
     gateway: createApiFixture<GatewayApi>(),
+    featureFlags: createApiFixture<FeatureFlagApi>(),
   };
 }
 

@@ -11,6 +11,10 @@ JSON line of its stdout with the same `parseResult`. It runs the job on the Go s
 cd services && go build -o scenariorunner ./scenariorunner/cmd/scenariorunner
 ```
 
+The worker image builds it in the `scenariorunner` stage of `infra/docker/Dockerfile` and names its
+path in `SCENARIO_GO_RUNNER_PATH`. A project's non-voice runs move to it while the
+`release_scenario_go_runner_enabled` flag is on (`specs/scenarios/go-scenario-runner-choice.feature`).
+
 It is its own binary, not a `service` subcommand: the mono-binary refuses to boot with
 `LANGWATCH_API_KEY` set, and a run's minted key arrives in exactly that variable.
 
