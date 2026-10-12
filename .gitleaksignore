@@ -56,3 +56,8 @@ e361040a34adcefc378718482969f16445ac70e9:modules/agent/process/src/transport/__t
 53c229dcf1a1106317544e0de7ed32b7387f1367:services/paymentsim/paymentsim_test.go:stripe-access-token:106
 92fb5a1a350349f390de4db5777371913fb29771:.claude/skills/paymentsim/SKILL.md:stripe-access-token:19
 92fb5a1a350349f390de4db5777371913fb29771:tools/thuishaven/README.md:stripe-access-token:238
+
+# The relay id key wiring test set `cfg.Voice.RelayIDKey` to a punctuated digit
+# string that clears the generic-api-key entropy bar. It was never a credential;
+# the fixture now reads strings.Repeat("k", 32), so only this commit carries it.
+67a8bd5e47e4f66a52cd08354d9193536bb3df11:services/aigateway/deps_media_relay_test.go:generic-api-key:25

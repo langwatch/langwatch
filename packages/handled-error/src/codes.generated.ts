@@ -268,6 +268,18 @@ export const goErrorCodes = {
    */
   invalid_dataset: { service: "nlpgo", httpStatus: 400 },
   /**
+   * ErrInvalidSignature — means the signature does not match the request.
+   *
+   * @source services/aigateway/domain/internal_auth.go
+   */
+  invalid_signature: { service: "aigateway", httpStatus: 401 },
+  /**
+   * ErrInvalidTimestamp — means the timestamp header is not unix seconds.
+   *
+   * @source services/aigateway/domain/internal_auth.go
+   */
+  invalid_timestamp: { service: "aigateway", httpStatus: 401 },
+  /**
    * ErrInvalidWorkflow — signals a malformed workflow JSON (cycles, unknown
    * node ids on edges, column-length mismatches in a dataset).
    *
@@ -309,6 +321,12 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/errors.go
    */
   missing_model: { service: "aigateway", httpStatus: 400 },
+  /**
+   * ErrMissingSignature — means the signature or timestamp header is absent.
+   *
+   * @source services/aigateway/domain/internal_auth.go
+   */
+  missing_signature: { service: "aigateway", httpStatus: 401 },
   /**
    * ErrModelNotAllowed
    *
@@ -497,6 +515,13 @@ export const goErrorCodes = {
    */
   ssrf_blocked: { service: "nlpgo", httpStatus: 400 },
   /**
+   * ErrTimestampOutOfWindow — means the signed timestamp is outside the replay
+   * window.
+   *
+   * @source services/aigateway/domain/internal_auth.go
+   */
+  timestamp_out_of_window: { service: "aigateway", httpStatus: 401 },
+  /**
    * ErrUnauthorized — signals a missing or invalid internal bearer secret on
    * /chat. The manager binds the cluster service surface, so this is the wall
    * against any pod that can route to it.
@@ -581,6 +606,30 @@ export const goErrorCodes = {
    * @source services/aigateway/domain/voice_broker.go
    */
   voice_broker_unavailable: { service: "aigateway", httpStatus: 503 },
+  /**
+   * ErrVoiceRelayForbidden — refuses a Twilio socket. It is the same answer
+   * for every reason (unknown, expired, replayed, foreign), so a caller
+   * probing for relay ids learns nothing from the difference.
+   *
+   * @source services/aigateway/domain/voice_media_relay.go
+   */
+  voice_relay_forbidden: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrVoiceRelayLicenseRequired — means a Twilio media relay was opened with
+   * a key that is not a license token. Only a license (or a signed request
+   * from the control plane) may open one.
+   *
+   * @source services/aigateway/domain/voice_media_relay.go
+   */
+  voice_relay_license_required: { service: "aigateway", httpStatus: 403 },
+  /**
+   * ErrVoiceRelayUnavailable — means this gateway cannot open another media
+   * relay right now: it is draining, full, or the scope holds its maximum of
+   * relays still waiting for Twilio. Nothing was opened.
+   *
+   * @source services/aigateway/domain/voice_media_relay.go
+   */
+  voice_relay_unavailable: { service: "aigateway", httpStatus: 503 },
   /**
    * ErrWorkerNotReady — signals a freshly spawned worker did not become ready
    * within LANGY_READINESS_TIMEOUT_MS.

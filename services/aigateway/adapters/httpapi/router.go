@@ -30,6 +30,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaymetrics"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/mediarelay"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/ottlserver"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/voicesession"
 	"github.com/langwatch/langwatch/services/aigateway/app"
@@ -95,6 +96,9 @@ type RouterDeps struct {
 	// VoiceRelay relays vendor voice sockets for clients on the WebSocket
 	// transport. Optional; when nil the socket routes are not mounted.
 	VoiceRelay *voicesession.Manager
+	// MediaRelay joins a worker's relay socket to Twilio's media stream.
+	// Optional; when nil the media relay routes are not mounted.
+	MediaRelay *mediarelay.Hub
 }
 
 // WebhookRelay hands one vendor delivery to the control plane byte for byte.
@@ -177,6 +181,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 		// customers keep behind a VPN.
 		if deps.WebhookRelay != nil {
 			v1.Post("/convai/webhook/{model_provider_id}", elevenLabsWebhookHandler(deps))
+		}
+
+		// Twilio media relay: its own auth per route, so outside the group below.
+		if deps.MediaRelay != nil {
+			mountMediaRelayRoutes(v1, deps)
 		}
 
 		v1.Group(func(v1 chi.Router) {
@@ -2195,6 +2204,10 @@ func registerErrorStatuses() {
 
 func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrInvalidAPIKey, http.StatusUnauthorized)
+	herr.RegisterStatus(domain.ErrMissingSignature, http.StatusUnauthorized)
+	herr.RegisterStatus(domain.ErrInvalidSignature, http.StatusUnauthorized)
+	herr.RegisterStatus(domain.ErrInvalidTimestamp, http.StatusUnauthorized)
+	herr.RegisterStatus(domain.ErrTimestampOutOfWindow, http.StatusUnauthorized)
 	herr.RegisterStatus(domain.ErrKeyRevoked, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrKeyDisabled, http.StatusForbidden)
 	herr.RegisterStatus(domain.ErrKeyExpired, http.StatusForbidden)
@@ -2266,4 +2279,8 @@ func registerErrorStatusesOnce() {
 	herr.RegisterStatus(domain.ErrRealtimeRegistryUnavailable, http.StatusServiceUnavailable)
 	// 503 with Retry-After: this instance is draining or full, another is not.
 	herr.RegisterStatus(domain.ErrVoiceBrokerUnavailable, http.StatusServiceUnavailable)
+	herr.RegisterStatus(domain.ErrVoiceRelayLicenseRequired, http.StatusForbidden)
+	herr.RegisterStatus(domain.ErrVoiceRelayForbidden, http.StatusForbidden)
+	// 503 with Retry-After, like the broker above.
+	herr.RegisterStatus(domain.ErrVoiceRelayUnavailable, http.StatusServiceUnavailable)
 }

@@ -84,6 +84,12 @@ func faultForCode(code herr.Code) Fault {
 		// The license is live; the service it asked for is outside the
 		// contract. Only the customer can widen that.
 		domain.ErrConnectServiceNotEntitled,
+		// A relay open with the wrong kind of key, or Twilio's socket with an
+		// id that is not joinable: both are the caller's to fix.
+		domain.ErrVoiceRelayLicenseRequired, domain.ErrVoiceRelayForbidden,
+		// A request to the signed internal channel the caller signed wrongly.
+		domain.ErrMissingSignature, domain.ErrInvalidSignature,
+		domain.ErrInvalidTimestamp, domain.ErrTimestampOutOfWindow,
 		domain.ErrNoProviderConfigured,
 		domain.ErrEndUserRequired,
 		// The customer's own OpenAI sign-in died and only they can restore it,

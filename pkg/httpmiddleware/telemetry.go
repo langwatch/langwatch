@@ -26,7 +26,7 @@ func Telemetry() func(http.Handler) http.Handler {
 
 			ctx := clog.With(r.Context(),
 				zap.String("method", r.Method),
-				zap.String("path", r.URL.Path),
+				zap.String("path", RedactPath(r.URL.Path)),
 				zap.String("remote", r.RemoteAddr),
 				zap.String("request_id", requestID),
 			)

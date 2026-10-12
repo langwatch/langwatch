@@ -257,6 +257,12 @@ jobs:
       - name: Assert shutdown values render as the pod needs them
         run: ./charts/gateway/tests/shutdown-values.sh
 
+      # The relay hop: the pod IP and hop port reach the container, the
+      # port is exposed to gateway pods only, and the optional id key is a
+      # secretKeyRef.
+      - name: Assert the relay hop values render as the pod needs them
+        run: ./charts/gateway/tests/relay-hop.sh
+
       # A plain install creates no gateway Ingress and no ingress-nginx
       # annotations, an enabled one carries the class the operator picked,
       # and the PDB never blocks a node drain at any replica count.

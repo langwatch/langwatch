@@ -49,7 +49,7 @@ func Recover() func(http.Handler) http.Handler {
 				}
 
 				ctx := clog.With(r.Context(),
-					zap.String("path", r.URL.Path),
+					zap.String("path", RedactPath(r.URL.Path)),
 					zap.String("method", r.Method),
 					zap.String("request_id", GetRequestID(r.Context())),
 					zap.String("remote", r.RemoteAddr),

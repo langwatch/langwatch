@@ -171,6 +171,7 @@ sum by (code) (rate(gateway_client_rejects_total{vk_id="<vk-id>"}[15m]))
 | `gateway_voice_sessions_supervised`           | gauge   | `kind`              | Brokered voice calls this pod meters from its own server-side socket, by `live` or `realtime`. Media does not pass through the pod |
 | `gateway_voice_sessions_ended_total`          | counter | `kind`, `reason`    | Supervised calls that ended. `reason` is `vendor_closed`, `budget_exceeded`, `key_revoked`, `sideband_lost`, `drain` or `session_closed`. Every reason but `vendor_closed` is the gateway ending the call |
 | `gateway_voice_usage_reports_total`           | counter | `outcome`           | Usage reports sent for supervised calls. `outcome` is `recorded`, `duplicate`, `closed`, `already_closed`, `error` or `dropped`. `error` is retried; `dropped` is usage lost because one call's retry queue was full |
+| `gateway_voice_media_relay_total`             | counter | `outcome`           | Twilio media relay outcomes. `outcome` is `opened`, `paired`, `refused_auth`, `refused_unknown`, `refused_expired`, `refused_replay`, `refused_unpaired`, `expired_unpaired`, `drained_unpaired`, `dropped`, `completed`, or across pods `hop_joined`, `refused_owner_unreachable`, `refused_owner_invalid` and `refused_hop_busy`. A hopped call counts `hop_joined` on the pod Twilio reached and `paired` on the owner, so do not sum them. A hop the owner pod refuses counts as `refused_unknown` on the pod Twilio reached. A hop dial abandoned by Twilio is not counted. The relay id is never a label |
 
 ### Control plane
 

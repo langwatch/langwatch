@@ -51,7 +51,9 @@ var sigBufPool = sync.Pool{
 	New: func() any { return &sigBuf{canonical: make([]byte, 0, 256)} },
 }
 
-// Sign adds HMAC signature headers to a request.
+// Sign adds HMAC signature headers to a request. It keeps its own
+// allocation-free canonical string; TestSignature_EqualsWhatSignerStamps guards
+// parity with Signature.
 //
 // Canonical string matches the control-plane verifier:
 //
