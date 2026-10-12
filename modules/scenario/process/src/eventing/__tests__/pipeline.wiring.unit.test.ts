@@ -161,7 +161,11 @@ describe("the simulation processing pipeline", () => {
 
       await lane?.handle(SPAN_EVENT, { tenantId: "project-1", aggregateId: "trace-1" });
 
-      expect(findSummary).toHaveBeenCalledWith({ projectId: "project-1", traceId: "trace-1" });
+      expect(findSummary).toHaveBeenCalledWith({
+        projectId: "project-1",
+        traceId: "trace-1",
+        occurredAtMs: 7_000,
+      });
       expect(computeRunMetrics).toHaveBeenCalledExactlyOnceWith({
         tenantId: "project-1",
         scenarioRunId: "run-1",
