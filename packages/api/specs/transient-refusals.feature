@@ -33,6 +33,13 @@ Feature: Transient refusals keep their body, and JSON text is parsed at the door
       And the body names no ECONNRESET, no host and no URL
       And the failure is logged under the code clickhouse_unavailable, with the raw reason
 
+    @unit
+    Scenario: A ClickHouse overload refusal is logged at warn, not error
+      Given a REST route or tRPC procedure that fails with clickhouse_overloaded at 503
+      When the boundary logs the failed call
+      Then it is logged at warn
+      But another platform-fault 503 stays at error
+
   Rule: Every other undeclared 5xx stays masked
 
     @integration

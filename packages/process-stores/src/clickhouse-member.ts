@@ -330,6 +330,7 @@ export function buildClickHouse(options: {
     reporter,
     limiter: admission,
     unavailableErrorFactory: new UnavailableRefusal(),
+    overloadErrorFactory: new OverloadedRefusal(),
     privateRoutes: new Map(
       (config.privateRoutes ?? []).map((route) => [route.organizationId, route.url]),
     ),

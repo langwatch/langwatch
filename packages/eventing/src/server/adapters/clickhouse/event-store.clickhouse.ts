@@ -4,6 +4,7 @@ import { getLangWatchTracer } from "langwatch";
 
 import type { Event } from "../../../domain/types.ts";
 import type { RetentionPolicy, RetentionPolicyResolver } from "../../../runtime.types.ts";
+import { classifyClickHouseError, ErrorCategory } from "../../../services/errorHandling.ts";
 import { AbstractEventStore } from "../../../stores/abstractEventStore.ts";
 import type { EventStoreReadContext } from "../../../stores/eventStore.types.ts";
 import type {
@@ -86,13 +87,9 @@ export class EventingClickHouseEventStore<
     context: Record<string, unknown>,
     error: unknown,
   ): void {
-    this.logger.error(
-      {
-        ...context,
-        error,
-      },
-      `Failed: ${name}`,
-    );
+    // A transient failure is retried by the queue; only one that is not stays an error here.
+    const level = classifyClickHouseError(error) === ErrorCategory.RECOVERABLE ? "warn" : "error";
+    this.logger[level]({ ...context, error }, `Failed: ${name}`);
   }
 
   protected override logWarning(

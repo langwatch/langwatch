@@ -304,3 +304,10 @@ Feature: Private ClickHouse Routing
     When the ClickHouse answers again
     Then the next read on the same process succeeds on the same vendor client
     And no client, socket or route is kept in a failed state
+
+  @unit
+  Scenario: A read the ClickHouse server refuses as too many simultaneous queries is refused as clickhouse_overloaded
+    Given the ClickHouse server refuses every read with code 202 "Too many simultaneous queries"
+    When a read runs out of retries on that refusal
+    Then the read fails with the handled 503 "clickhouse_overloaded"
+    And the server's refusal is kept as its reason

@@ -4,7 +4,10 @@
  * sits outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
-import type { ClickHouseStatementAdmission } from "./managed-client.ts";
+import type {
+  ClickHouseOverloadErrorFactory,
+  ClickHouseStatementAdmission,
+} from "./managed-client.ts";
 import { CLICKHOUSE_COLUMNS_QUERY, ClickHouseColumns } from "./present-columns.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
 import { TRANSIENT_NETWORK_CODES } from "./resilience.ts";
@@ -34,6 +37,8 @@ export interface ClickHouseQueryClientOptions {
   privateRouteVariables?: readonly PrivateRouteVariable[] | undefined;
   /** Builds the handled refusal for a read whose server stopped answering; raw by default. */
   unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
+  /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
+  overloadErrorFactory?: ClickHouseOverloadErrorFactory | undefined;
 }
 
 /** The handled refusal for a read whose server did not answer once retries ran out. */
@@ -45,6 +50,14 @@ export abstract class ClickHouseUnavailableErrorFactory {
 function isConnectionFailure(error: unknown): error is Error {
   const code = (error as { code?: unknown } | null)?.code;
   return error instanceof Error && typeof code === "string" && TRANSIENT_NETWORK_CODES.has(code);
+}
+
+/** ClickHouse's own overload refusal: TOO_MANY_SIMULTANEOUS_QUERIES (202). */
+const SERVER_OVERLOAD_CODES: ReadonlySet<string> = new Set(["202"]);
+
+function isServerOverload(error: unknown): error is Error {
+  const code = (error as { code?: unknown } | null)?.code;
+  return error instanceof Error && typeof code === "string" && SERVER_OVERLOAD_CODES.has(code);
 }
 
 const now = (): number => globalThis.performance.now();
@@ -60,6 +73,7 @@ export class ClickHouseQueryClient {
   private readonly routeVariables: readonly PrivateRouteVariable[];
   private readonly columnLists = new Map<string, ClickHouseColumns>();
   private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
+  private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
 
   constructor({
     driver,
@@ -71,6 +85,7 @@ export class ClickHouseQueryClient {
     privateRoutes,
     privateRouteVariables,
     unavailableErrorFactory,
+    overloadErrorFactory,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
@@ -81,6 +96,7 @@ export class ClickHouseQueryClient {
     this.routes = privateRoutes ?? new Map();
     this.routeVariables = privateRouteVariables ?? [];
     this.unavailable = unavailableErrorFactory;
+    this.overloaded = overloadErrorFactory;
   }
 
   /**
@@ -157,6 +173,9 @@ export class ClickHouseQueryClient {
         ? withSlot()
         : this.tracer.trace({ request, task: withSlot }));
     } catch (error) {
+      if (this.overloaded !== undefined && isServerOverload(error)) {
+        throw this.overloaded.create({ cause: error });
+      }
       if (this.unavailable === undefined || !isConnectionFailure(error)) throw error;
       throw this.unavailable.create({ cause: error });
     }
