@@ -145,4 +145,18 @@ describe("a glass drawer in a browser", () => {
     expect(getComputedStyle(body()).paddingTop).toBe("16px");
     expect(document.querySelector("[data-chrome]")).toBeNull();
   });
+
+  /** @scenario "A drawer title is medium weight with no rule under the header" */
+  it.each([true, false])(
+    "draws a medium-weight title with no rule under it (glass %s)",
+    async (glass) => {
+      renderDrawer({ glass });
+      const title = await screen.findByText("Production key");
+      const headerPart = title.closest(".chakra-drawer__header");
+      if (!headerPart) throw new Error("no header part");
+
+      expect(getComputedStyle(title).fontWeight).toBe("500");
+      expect(getComputedStyle(headerPart).borderBottomWidth).toBe("0px");
+    },
+  );
 });

@@ -206,6 +206,12 @@ Feature: Drawer and dialog shapes
     Then it gets the translucent bands
     And the same drawer with the glass switch turned off keeps the solid look
 
+  @integration @browser
+  Scenario: A drawer title is medium weight with no rule under the header
+    Given a drawer with a title, glass on or off
+    Then the title renders at medium weight
+    And no border is drawn under the header while nothing scrolls beneath it
+
   @integration
   Scenario: A glass drawer overlays its header band and footer on the one scrolling body
     Given a drawer under the glass switch with a toolbar, a footer and a long body

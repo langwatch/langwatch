@@ -576,7 +576,7 @@ function DrawerFrame({
     <>
       <StudioIsolatedErrorBoundary scope={errorScope ?? title} resetKeys={resetKeys}>
         <DrawerHeaderBand glass={glass} edge={chrome.edges.top} bandRef={chrome.headerRef}>
-          <ChakraDrawer.Header borderBottomWidth={glass ? 0 : void 0}>
+          <ChakraDrawer.Header>
             <DrawerHeaderRow
               onBack={onBack}
               title={title}
