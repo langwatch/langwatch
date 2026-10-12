@@ -51,6 +51,10 @@ every blocking step their image declares is `done` or `not-needed` (the serving
 gate). Background steps run on the worker and need no deploy step. The contract
 the private deploy must meet is `dev/docs/runbooks/upgrade-on-deploy.md`.
 
+Amended 2026-10-11 (Alex, slice 2): the worker runs the upgrade in its own process, over its
+installed modules booted in the tasks role, and `pnpm task upgrade` is a run-once worker that
+starts it to run the upgrade once and exits 0, 1 or 3. The deploy's Job runs that command as before.
+
 ### 2. One model, keyed by step id (D1)
 
 A step is identified by its id, never reused. What ran is the ledger, keyed by
@@ -160,7 +164,8 @@ F-6). The operator override of §3 is wired into `oldWritersGoneFor` (Alex, 2026
   by the database clock. Both live in the ledger schema, in the runner-owned
   `_langwatch_serving_roster_override` table.
 - **Who records it.** `pnpm task upgrade old-writers-gone` asserts and `pnpm task upgrade
-pre-roster-rollback` records a rollback and reopens done background steps. The cloud deploy
+pre-roster-rollback` records a rollback and reopens done background steps. Both stay reads and
+writes of the tasks app, not runs; only a run starts the worker (2026-10-11). The cloud deploy
   asserts after its rollout; the chart's post-upgrade hook does so once the rollout has finished,
   opt-in because it needs RBAC and its own ServiceAccount token; docker compose recreates the app
   and workers independently and relies on the grace. Ops' `assertSystemMigrationLegacyWritersDrained`
@@ -192,6 +197,25 @@ image runs. So:
 - **Action needed, not a Done button.** Most upgrades need nothing from anyone. When an operator
   step of the running version is unfinished, Home shows an "Action needed for updates" bar inside
   its card, in the slot pending join requests use, to whoever holds `ops:view`.
+
+### 8. Amendment 2026-10-11: nothing is deleted automatically
+
+2026-10-11: nothing is deleted automatically; a drop is an operator step confirmed in Ops once
+safe; every step runs after old writers are gone (Alex). The upgrade no longer runs background
+steps inline before a contract (which ran them while old pods could still serve): it runs schema
+and blocking steps only, registers operator steps pending and never runs them. The migration-safety
+guards refuse a new `DROP TABLE` or `DROP COLUMN` in a Prisma folder or goose file above the newest
+`langwatch@v*` tag; released history keeps its drops. Specs: `packages/upgrade/specs/contract-order.feature`,
+`specs/ops/migration-safety.feature`.
+
+### 9. Amendment 2026-10-11: jobs start once the blocking part is done
+
+2026-10-11 (Alex, T0-F11): the worker takes jobs as soon as the schema and the blocking steps are
+done; LangWatchQL setup and the system-migrations pass request finish alongside in the same run,
+under its lease, and a failure among them is logged and recorded on the run without holding jobs.
+`pnpm task upgrade` still waits for the whole run and exits by its outcome. The pass request waits
+on its queue jobs ahead of any backlog, which the now-consuming worker runs. Spec:
+`specs/upgrade/in-app-upgrade.feature`.
 
 ## Alternatives considered
 

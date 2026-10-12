@@ -32,6 +32,7 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   JobDelivery,
+  ListedWork,
 } from "./queues/index.ts";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory.ts";
 import type { ReplayService } from "./replay/replayService.ts";
@@ -665,6 +666,15 @@ export class EventSourcing {
   }
 
   /**
+   * Runs `work` so the queue jobs it sends, and the jobs those cause, run ahead of any backlog,
+   * and returns once they have all run. A queue with no list of its own just runs the work.
+   */
+  runListedWork<Result>(input: ListedWork<Result>): Promise<Result> {
+    const queue = this._globalQueue;
+    return queue?.runListedWork ? queue.runListedWork(input) : input.work();
+  }
+
+  /**
    * Gracefully closes all pipelines, the projection registry, and the global queue.
    */
   async close(): Promise<void> {
@@ -933,12 +943,12 @@ export class EventSourcing {
     };
   }
 
-  /** Refuses a job this worker cannot route: retried, then dead-lettered once spent. */
+  /** Refuses a job this worker cannot route; the queue hands it back unspent (Alex, 2026-10-12). */
   private rejectUnroutableJob(payload: Record<string, unknown>, queueName: string): never {
     const identity = EventSourcing.jobIdentity(payload);
-    logger.error(
+    logger.warn(
       identity,
-      "No handler registered for this job in this worker; rejecting it for retry rather than dropping it",
+      "No handler registered for this job in this worker; handing it back for a worker that has one",
     );
     throw new UnroutableQueuedJobError({
       queueName,
@@ -947,7 +957,7 @@ export class EventSourcing {
     });
   }
 
-  /** Reads a dequeued job; an event type this worker does not declare is logged, then retried. */
+  /** Reads a dequeued job; an event type this worker does not declare is logged, handed back. */
   private readDequeued<T>({
     read,
     payload,
@@ -968,7 +978,7 @@ export class EventSourcing {
             declaredBy: error.declaredBy,
             attempt: delivery?.attempt ?? null,
           },
-          "Queued event type is not declared on this worker; retrying so a worker that declares it takes the job",
+          "Queued event type is not declared on this worker; handing it back so a worker that declares it takes the job",
         );
       }
       throw error;

@@ -629,6 +629,6 @@ paths = [
   '''^\.claude/skills/paymentsim/SKILL\.md$''',
   '''^tools/thuishaven/README\.md$''',
   '''^tools/thuishaven/domain/overlay\.go$''',
-  '''^services/paymentsim/paymentsim_test\.go$''',
+  '''^services/(sims/)?paymentsim/paymentsim_test\.go$''',
   '''^enterprise/modules/billing/process/src/__tests__/billing-paymentsim\.integration\.test\.ts$''',
 ]

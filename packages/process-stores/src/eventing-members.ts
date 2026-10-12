@@ -342,6 +342,7 @@ function eventingQueueFactory(options: {
   return createEventingGroupQueueFactory({
     dependencies,
     consumersEnabled: options.consumersEnabled,
+    listedConsumer: true,
   });
 }
 
@@ -365,6 +366,7 @@ class ProcessQueueContext implements GroupQueueContext {
       organizationId: metadata.organizationId,
       projectId: metadata.projectId,
       userId: metadata.userId,
+      queueDispatchScopeKey: metadata.queueDispatchScopeKey,
     };
   }
 

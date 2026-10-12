@@ -96,6 +96,8 @@ export type SystemMigrationsServiceDependencies = {
     enrolledAutomatically: boolean;
     /** Organization or user axis; omitted means organization. See ADR-101 §6. */
     tenant?: "organization" | "user";
+    /** Its `migrated` tenants are kept in step, never held (Alex, 2026-10-12); omitted, false. */
+    migratedIsSteady?: boolean;
   }[];
   /** Read per call, so the answer is never a boot-time capture. */
   isSaaS: () => boolean;

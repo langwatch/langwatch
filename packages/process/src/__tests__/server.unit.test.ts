@@ -195,20 +195,20 @@ describe("Server", () => {
     });
   });
 
-  describe("given a server closed before it listened", () => {
-    describe("when components were hosted", () => {
+  describe("given a server whose boot was refused before it listened", () => {
+    describe("when the server closes", () => {
       /** @scenario "A server closed before it listened releases what was already live" */
-      it("stops a component with no start and leaves one that waits for listen", async () => {
+      it("stops a component with no start and leaves one that never started", async () => {
         const server = await startServer();
         const live = vi.fn();
-        const waiting = vi.fn();
-        server.with({ name: "live from hosting", stop: live });
-        server.with({ name: "starts on listen", start: () => undefined, stop: waiting });
+        const unstarted = vi.fn();
+        server.with({ name: "telemetry", stop: live });
+        server.with({ name: "runtime", start: () => undefined, stop: unstarted });
 
         await server.close();
 
-        expect(live).toHaveBeenCalledTimes(1);
-        expect(waiting).not.toHaveBeenCalled();
+        expect(live).toHaveBeenCalledOnce();
+        expect(unstarted).not.toHaveBeenCalled();
       });
     });
   });

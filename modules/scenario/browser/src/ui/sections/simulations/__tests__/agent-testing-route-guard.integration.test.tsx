@@ -7,12 +7,12 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ flagEnabled: true, permitted: true }));
+const state = vi.hoisted(() => ({ flagEnabled: true, flagLoading: false, permitted: true }));
 
 vi.mock("@langwatch/feature-flag-client", () => ({
   useFeatureFlag: ({ name: flag }: { name: string }) => ({
     enabled: flag === "release_ui_agent_testing_v2_enabled" && state.flagEnabled,
-    isLoading: false,
+    isLoading: state.flagLoading,
   }),
 }));
 
@@ -37,10 +37,23 @@ import AgentTestingRoute from "../agent-testing.screen.tsx";
 afterEach(() => {
   cleanup();
   state.flagEnabled = true;
+  state.flagLoading = false;
   state.permitted = true;
 });
 
 describe("the Agent Testing route", () => {
+  describe("given the release flag is still being read", () => {
+    /** @scenario "While the flag is still being read the page shows it is loading" */
+    it("shows the loading screen rather than an empty page", () => {
+      state.flagEnabled = false;
+      state.flagLoading = true;
+      renderWithDesignSystem(<AgentTestingRoute />);
+
+      expect(screen.getByTestId("loading-screen")).toBeInTheDocument();
+      expect(screen.queryByText(/this page does not exist/)).toBeNull();
+    });
+  });
+
   describe("given the release flag is off", () => {
     /** @scenario "With the flag off the Agent Testing route is not reachable" */
     it("does not show the page, and shows a page a person can read", () => {

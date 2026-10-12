@@ -13,7 +13,7 @@ import (
 // script of stable locators and the app queries each one caused
 // (apps/haven-web/scripts/browser-record.ts); this file is its CLI half.
 
-const recordUsage = "usage: haven browser record <start|stop|export> --lane <name> | record export <script> --playwright <out.spec.ts>"
+const recordUsage = "usage: haven browser record <start|stop|save> --lane <name> [--out <file>] | record export <script> --playwright <out.spec.ts>"
 
 // recordVerb turns `record <sub> ...` into the daemon verb (or "export", which is local).
 func recordVerb(inv invocation) (string, invocation, error) {
@@ -21,7 +21,7 @@ func recordVerb(inv invocation) (string, invocation, error) {
 		return "", inv, errors.New(recordUsage)
 	}
 	switch sub := inv.args[1]; sub {
-	case "start", "stop":
+	case "start", "stop", "save":
 		inv.args = append([]string{"record-" + sub}, inv.args[2:]...)
 		return "record-" + sub, inv, nil
 	case "export":

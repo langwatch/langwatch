@@ -82,7 +82,8 @@ type QueueSummary struct {
 	PeakAtMs    int64         `json:"peakAtMs"`
 	DrainedMs   int64         `json:"drainedAfterWorkerMs"` // -1: never within the limit and staying
 	SlopePerMin float64       `json:"slopeLast10MinPerMin"`
-	Final       int           `json:"finalDepth"` // -1: no reading
+	Final       int           `json:"finalDepth"`  // -1: no reading
+	FinalNotDue int           `json:"finalNotDue"` // jobs scheduled later at the last reading, left out of Final
 	ReadErrors  int           `json:"readErrors"`
 	FirstError  string        `json:"firstReadError,omitempty"`
 	ByQueue     string        `json:"byQueueAtEnd"`
@@ -154,7 +155,15 @@ var invariantNames = map[string]string{
 	"E13": "a custom role made on main keeps its permissions and bindings on head",
 	"E14": "SCIM: users and a group provisioned on main keep their membership on head through main's token, and a push on head lands",
 	"E11": "an organization on main's old per-organization SSO (legacy columns, no connection) is grandfathered onto a connection, its member signs in on head and Ops shows the migration inventory",
+	"E15": "the mixed legacy-SSO organization's administrator sees the hint to move its legacy domain in SSO settings",
+	"A1":  "tenant oddities: the held organization stays held alone and Ops > Upgrades > Organizations names it (Home's Action needed card is for operator steps, not held organizations)",
+	"A2":  "tenant oddities: plaintext provider keys are sealed and still read through head",
+	"A3":  "tenant oddities: dataset rows main kept in Postgres are kept and read through head",
+	"A4":  "tenant oddities: an organization with prompts and no tags gets its tags and its prompt still opens",
+	"Q1":  "queued-jobs-v1: every job main queued before the switch, in main's format, ran on head's worker or was left safely (none still due in its group, none dead-lettered, none blocked)",
+	"V1":  "upcast-events: every stored type head reads through an upcast is settled in its ledger, main's rows under it are kept, and I7 refused none",
 	"F1":  "empty origin: every data step ends done over zero rows (or not-needed)",
+	"F3":  "empty origin: an organization made just after ready keeps its founder (membership and role bindings) after settle",
 	"R2":  "the oldest aged trace each organization keeps reads back through head's API",
 	"R1":  "aged data: no organization's age slice loses rows across the upgrade beyond what main's own retention TTL expires",
 	"E5":  "the seed account is a platform operator after the upgrade (ADMIN_EMAILS set, or the sole-organization bootstrap)",

@@ -114,7 +114,7 @@ describe("the connected billing panel", () => {
   });
 
   describe("given a seat change whose invoice is still pending", () => {
-    /** @scenario "A seat invoice that failed at the payment provider is retried without doubling" */
+    /** @scenario "A seat invoice that failed at the payment provider is retried once a day" */
     it("badges the customer so finance knows an invoice is still coming", () => {
       render(
         <ConnectedBillingState

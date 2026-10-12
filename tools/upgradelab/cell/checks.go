@@ -41,9 +41,9 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Queue = cell.queueSummary(ctx)
 	cell.report.Notes = append(cell.report.Notes, lostByPhase(cell.allCalls(), cell.report.Phases, visible)...)
 	cell.report.Verdicts = append(cell.report.Verdicts,
-		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
+		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final, cell.drills.retried), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
-		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), queueVerdict(cell.report.Queue), cell.opsVerdict(final))
+		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic, cell.downExcused()), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), queueVerdict(cell.report.Queue), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.ssoVerdicts(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.legacyVerdicts(ctx, final)...)
@@ -52,9 +52,14 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.licensedSSOVerdicts(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.scimVerdict(ctx, final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.retentionVerdict(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.oddityVerdicts(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.heldTenantVerdicts(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.queuedJobsVerdict(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.damageVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.signupVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict(), cell.storedEventsVerdict(ctx))
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.upcastVerdict(ctx, final)...) // after I7, which it reads
 	for index := range cell.report.Verdicts {
 		cell.report.Verdicts[index].Scenarios = scenarioIDs[cell.report.Verdicts[index].ID]
 	}
@@ -99,9 +104,16 @@ func ledgerVerdict(rows []LedgerRow) Verdict {
 		fmt.Sprintf("%d steps, outstanding: %v", len(rows), names))
 }
 
-func reopenedVerdict(atReady, final []LedgerRow) Verdict {
-	reopened := Reopened(atReady, final)
-	return verdict("I2b", len(reopened) == 0, fmt.Sprintf("%d steps done at ready; reopened: %v", countDone(atReady), reopened))
+// reopenedVerdict leaves out the step the retry drill failed and retried on purpose (D3 judges it).
+func reopenedVerdict(atReady, final []LedgerRow, drilled string) Verdict {
+	reopened := slices.DeleteFunc(Reopened(atReady, final), func(each string) bool {
+		return drilled != "" && strings.HasPrefix(each, drilled+" ")
+	})
+	note := ""
+	if drilled != "" {
+		note = fmt.Sprintf(" (the retry drill's own step %s left to D3)", drilled)
+	}
+	return verdict("I2b", len(reopened) == 0, fmt.Sprintf("%d steps done at ready; reopened: %v%s", countDone(atReady), reopened, note))
 }
 
 func countDone(rows []LedgerRow) int {
@@ -208,7 +220,20 @@ var acceptedLogs = []acceptedLog{
 	{"UpgradeInProgressError", "expected 503 upgrade_in_progress while steps run", true},
 }
 
-var logTime = regexp.MustCompile(`"time":(\d{13})`)
+var logTime = regexp.MustCompile(`(?:"time":"?|^\[)(\d{13}|\d{4}-\d\d-\d\dT[0-9:.]+Z)`)
+
+// lineEpochMs is a log line's pino time (epoch ms or ISO), and whether it had one.
+func lineEpochMs(line string) (int64, bool) {
+	match := logTime.FindStringSubmatch(line)
+	if match == nil {
+		return 0, false
+	}
+	if epoch, err := strconv.ParseInt(match[1], 10, 64); err == nil {
+		return epoch, true
+	}
+	at, err := time.Parse(time.RFC3339Nano, match[1])
+	return at.UnixMilli(), err == nil
+}
 
 // accepts answers the accepted entry that covers line, if any; atMs bounds are ms from origin.
 func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog, bool) {
@@ -219,14 +244,28 @@ func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog,
 		if !each.Window {
 			return each, true
 		}
-		if match := logTime.FindStringSubmatch(line); match != nil && switched >= 0 && ready >= 0 {
-			epoch, _ := strconv.ParseInt(match[1], 10, 64)
+		if epoch, ok := lineEpochMs(line); ok && switched >= 0 && ready >= 0 {
 			if at := epoch - origin.UnixMilli(); at >= switched && at <= ready {
 				return each, true
 			}
 		}
 	}
 	return acceptedLog{}, false
+}
+
+// downSignatures: what a line says when it met the private target H8's gate held closed.
+var downSignatures = []string{"ClickHouseUnavailableError", "clickhouse_unavailable", "Cannot connect to ClickHouse at", "[@clickhouse/client][Connection]", "read ECONNRESET"}
+
+// downWindowGrace: a query held at the closed gate fails as it reopens, so its line lands just after upAt.
+const downWindowGrace = int64(5_000)
+
+// inDownWindow: a ClickHouse-unavailable error line logged while H8's gate held the private target closed (as N2 does).
+func inDownWindow(line string, downAt, upAt int64, origin time.Time) bool {
+	if upAt <= 0 || !slices.ContainsFunc(downSignatures, func(each string) bool { return strings.Contains(line, each) }) {
+		return false
+	}
+	epoch, ok := lineEpochMs(line)
+	return ok && epoch-origin.UnixMilli() >= downAt && epoch-origin.UnixMilli() <= upAt+downWindowGrace
 }
 
 // logVerdict counts error lines in head's logs: new ones fail I9, accepted ones are counted apart with their reason.
@@ -248,6 +287,14 @@ func (cell *run) logVerdict() Verdict {
 			}
 			if each, ok := accepts(line, switched, ready, cell.origin); ok {
 				accepted[each.Signature+" ("+each.Reason+")"]++
+				continue
+			}
+			if cell.overlay(OverlayOperatorDamage) && refusalLine(line, ready, cell.origin) {
+				accepted["the upgrade refused on planted operator damage (judged by D1 to D3)"]++
+				continue
+			}
+			if inDownWindow(line, cell.down.downAtMs, cell.down.upAtMs, cell.origin) {
+				accepted["ClickHouseUnavailableError (the private target H8 closed on purpose; judged by H8)"]++
 				continue
 			}
 			counts[name]++
@@ -295,7 +342,8 @@ func unansweredVerdict(calls []Call) Verdict {
 	return verdict("N6", len(unanswered) == 0, fmt.Sprintf("unanswered per kind: %v", unanswered))
 }
 
-func droppedVerdict(summaries []KindSummary) Verdict {
+// droppedVerdict (N2) leaves out the down organization's failed calls inside the H8 window: H8 judges those.
+func droppedVerdict(summaries []KindSummary, excused int) Verdict {
 	failed, sent, retries, window := 0, 0, 0, int64(0)
 	var detail []string
 	for _, each := range summaries {
@@ -307,7 +355,7 @@ func droppedVerdict(summaries []KindSummary) Verdict {
 			detail = append(detail, fmt.Sprintf("%s %d/%d", each.Kind, each.Failed, each.Sent))
 		}
 	}
-	return verdict("N2", failed == 0, fmt.Sprintf("%d of %d failed: %v; %d upgrade_in_progress retries, longest retry window %d ms", failed, sent, detail, retries, window))
+	return verdict("N2", failed-excused <= 0, fmt.Sprintf("%d of %d failed: %v, of them %d the down organization's inside the H8 window (left to H8); %d upgrade_in_progress retries, longest retry window %d ms", failed, sent, detail, excused, retries, window))
 }
 
 // lostByPhase notes, per kind, which api phase each lost write was sent in, and its first and last ms.
@@ -420,7 +468,7 @@ func summariseQueue(samples []QueueSample, pausedAt, workerAt int64) QueueSummar
 		}
 	}
 	if len(samples) > 0 {
-		summary.Final = samples[len(samples)-1].Depth
+		summary.Final, summary.FinalNotDue = samples[len(samples)-1].Depth, samples[len(samples)-1].NotDue
 	}
 	return summary
 }
@@ -430,8 +478,8 @@ func summariseQueue(samples []QueueSample, pausedAt, workerAt int64) QueueSummar
 func queueVerdict(queue QueueSummary) Verdict {
 	drained := queue.DrainedMs >= 0 && queue.Final >= 0 && queue.Final <= queue.Limit
 	return verdict("N4", drained,
-		fmt.Sprintf("group-queue jobs: baseline %d (limit %d), %d at the cut (-1: unread), peak %d at %d ms, at baseline and staying there %d ms after head's worker started (-1: never), %d at the end (-1: no reading), slope over the last 10 min %.1f jobs/min; %d of %d reads failed%s",
-			queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.SlopePerMin, queue.ReadErrors, queue.ReadErrors+len(queue.Samples), errSuffix(queue.FirstError)))
+		fmt.Sprintf("group-queue jobs: baseline %d (limit %d), %d at the cut (-1: unread), peak %d at %d ms, at baseline and staying there %d ms after head's worker started (-1: never), %d due at the end (-1: no reading; %d more scheduled later, not counted), slope over the last 10 min %.1f jobs/min; %d of %d reads failed%s",
+			queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.FinalNotDue, queue.SlopePerMin, queue.ReadErrors, queue.ReadErrors+len(queue.Samples), errSuffix(queue.FirstError)))
 }
 
 // opsVerdict: the Upgrades page answered a state, and after settle a finished one.
@@ -448,6 +496,8 @@ func (cell *run) opsVerdict(final []LedgerRow) Verdict {
 	want := "Up to date"
 	if len(Outstanding(final)) > 0 {
 		want = "Finishing in background"
+	} else if (cell.overlay(OverlayTenantOddities) || cell.overlay(OverlayHeldTenants)) && cell.odd.err == nil {
+		want = "Needs attention" // the planted held organization (A1)
 	}
 	return verdict("O1", states["settled"] == want, fmt.Sprintf("want %q settled; state by phase: %v", want, states))
 }
@@ -473,10 +523,20 @@ func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
 		}
 		privateStored = private
 	}
+	otherStored := map[string]map[string]bool{}
+	if cell.otherPrivate != nil {
+		if otherStored, err = StoredIDs(ctx, cell.stores, cell.otherPrivateLabel, cell.otherPrivate.Client.Project); err != nil {
+			return nil, err
+		}
+	}
 	visible := map[string]bool{}
 	seen := evidence{stored: stored, versions: cell.promptVersions(ctx)}
 	for _, call := range cell.allCalls() {
 		if !call.Write || !call.ok() {
+			continue
+		}
+		if strings.HasPrefix(call.Kind, otherPrivatePrefix) {
+			visible[call.Kind+"/"+call.ID] = otherStored[storedTable[strings.TrimPrefix(call.Kind, otherPrivatePrefix)]][call.ID]
 			continue
 		}
 		if strings.HasPrefix(call.Kind, privatePrefix) {
@@ -580,7 +640,9 @@ func (cell *run) targetsVerdict(ctx context.Context) Verdict {
 
 // browserVerdict: the signed-in walk saw no console error and no failed request outside the accepted list.
 func (cell *run) browserVerdict() Verdict {
-	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], FirstAt(cell.report.Phases, "ready"))
+	// upgrade_in_progress stays expected after ready while H8's private target catches up (T7-F18).
+	stepsRunUntil := max(FirstAt(cell.report.Phases, "ready"), cell.down.caughtMs)
+	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], stepsRunUntil, cell.profile.StopStart)
 	if err != nil || walks == 0 {
 		return Verdict{ID: "B1", Name: invariantNames["B1"], Result: "inconclusive", Detail: fmt.Sprintf("%d completed walks; %s", walks, errText(err))}
 	}
@@ -588,7 +650,7 @@ func (cell *run) browserVerdict() Verdict {
 	for _, each := range findings[:min(len(findings), 3)] {
 		first = append(first, fmt.Sprintf("%s %s %d %.120s at %s (%d ms, %s)", each.Kind, each.URL, each.Status, each.Text, each.Step, each.AtMs, PhaseAt(cell.report.Phases, each.AtMs)))
 	}
-	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run), other %v", walks, len(findings), first, expected, tolerated))
+	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run or a private target catches up), other %v", walks, len(findings), first, expected, tolerated))
 }
 
 // readModelVerdict (I5): the projections an upgrade must leave filled. Any failed part fails it; a part
@@ -686,6 +748,7 @@ func (cell *run) storedEventsVerdict(ctx context.Context) Verdict {
 		"STORED_EVENTS_CLICKHOUSE_URLS": strings.Join(urls, ","),
 		"STORED_EVENTS_REPORT":          reportPath,
 		"VITEST_MAX_WORKERS":            "2",
+		"NX_DAEMON":                     "false", // the suite's setup builds through nx; a daemon would outlive the cell
 	})
 	out, runErr := command.CombinedOutput()
 	_ = os.WriteFile(cell.logPath("stored-events"), out, 0o600)

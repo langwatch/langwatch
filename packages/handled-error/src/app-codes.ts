@@ -268,8 +268,6 @@ export const APP_ERROR_CODES = [
   "experiment_workflow_not_found",
   "export_failed",
   "external_id_conflict",
-  "federated_password_account_missing",
-  "federated_password_change_unavailable",
   "filter_field_unknown",
   "filter_parse_error",
   "filter_too_complex",

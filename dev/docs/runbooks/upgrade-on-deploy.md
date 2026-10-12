@@ -11,7 +11,7 @@
 ## Status
 
 The contract is fixed now; the pieces it names land in slices. All five have landed:
-the workers run `upgrade` at start (the chart's pre-roll Job does too, when upgrades are serialised), and every admitted api and worker writes its roster entry
+the workers run the upgrade in their own process at start (the chart's pre-roll Job runs `pnpm task upgrade`, a run-once worker, when upgrades are serialised), and every admitted api and worker writes its roster entry
 (15 s refresh, 10 minutes stale).
 
 | Piece                                                                          | Lands with                                                   |
@@ -54,8 +54,9 @@ the workers run `upgrade` at start (the chart's pre-roll Job does too, when upgr
    database needs that schema created for it beforehand, owned by the role.
 
 If the deploy applies the chart with `serializeUpgrades` on, items 1 to 4 need nothing
-beyond the chart's pre-roll Job, which runs `upgrade`
-(`charts/langwatch/templates/app/migrate-pre-roll-job.yaml:22-23`). Without
+beyond the chart's pre-roll Job, which runs `start:prepare:db`, that is `pnpm task upgrade`: it
+starts the worker to run the upgrade once in its own process and exits 0, 1 or 3
+(`charts/langwatch/templates/app/migrate-pre-roll-job.yaml`, Alex, 2026-10-11). Without
 `serializeUpgrades` the Job does not render, and the deploy must cover items 1 to 4 itself.
 
 ## What happens during a rollout
@@ -193,8 +194,10 @@ It answers the ids it reopened; running it twice reopens nothing more.
 ## One runner at a time
 
 Only one process runs the upgrade at once, because of the runner lease: a row lease in the
-ledger schema, with a heartbeat and a TTL, that every worker, the pre-roll Job and a manual
-`pnpm task upgrade` must take (`packages/upgrade/src/runner/runner-lease.ts`). Prisma's own
+ledger schema, with a heartbeat and a TTL, that every worker takes when it runs the upgrade in its
+own process, and so does the run-once worker the pre-roll Job and a manual `pnpm task upgrade`
+start (`packages/upgrade/src/runner/runner-lease.ts`). LangWatchQL provisioning, which the run
+starts as `pnpm task upgrade lwql-provision`, runs under that run's lease and takes none of its own. Prisma's own
 advisory lock is a second guard for the schema. A runner that does not get the lease waits,
 asks again every few seconds, names the holder every 30 s, and gives up after 10 minutes.
 

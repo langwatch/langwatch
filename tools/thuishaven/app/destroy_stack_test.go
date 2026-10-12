@@ -42,6 +42,37 @@ func TestDestroyStack(t *testing.T) {
 		})
 	})
 
+	t.Run("given the stack's Redis DB", func(t *testing.T) {
+		t.Run("when it is destroyed, its own Redis DB is flushed so the next stack starts with no queued jobs", func(t *testing.T) {
+			_, _, _, o := newOrch([]domain.Stack{
+				{Slug: mine, WorktreeDir: "/repos/langwatch", RedisDB: 4},
+				{Slug: neighbor, WorktreeDir: "/repos/langwatch", RedisDB: 2},
+			})
+			rds := &fakeRedis{}
+			o.rds, o.cfg.ShouldManageRedis = rds, true
+			if err := o.DestroyStack(ctx, mine); err != nil {
+				t.Fatalf("DestroyStack: %v", err)
+			}
+			if !slices.Equal(rds.flushed, []int{4}) {
+				t.Errorf("flushed %v, want only [4]", rds.flushed)
+			}
+		})
+		t.Run("when another registered stack shares that DB, it is left alone", func(t *testing.T) {
+			_, _, _, o := newOrch([]domain.Stack{
+				{Slug: mine, WorktreeDir: "/repos/langwatch", RedisDB: 4},
+				{Slug: neighbor, WorktreeDir: "/repos/langwatch", RedisDB: 4},
+			})
+			rds := &fakeRedis{}
+			o.rds, o.cfg.ShouldManageRedis = rds, true
+			if err := o.DestroyStack(ctx, mine); err != nil {
+				t.Fatalf("DestroyStack: %v", err)
+			}
+			if len(rds.flushed) != 0 {
+				t.Errorf("flushed %v, want nothing while %q still uses db 4", rds.flushed, neighbor)
+			}
+		})
+	})
+
 	t.Run("given a slug no stack is registered under", func(t *testing.T) {
 		t.Run("when it is destroyed, the databases a dead boot left behind still go", func(t *testing.T) {
 			ch, pg, _, o := newOrch([]domain.Stack{{Slug: neighbor, WorktreeDir: "/repos/langwatch", LauncherPID: 99}})

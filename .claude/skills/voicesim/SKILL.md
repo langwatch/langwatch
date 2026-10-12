@@ -9,7 +9,7 @@ user-invocable: true
 Fakes ElevenLabs Conversational AI (the signed-URL mint and the conversation socket) and
 OpenAI's `pcm` speech and transcription. Every answer is canned: tones for audio, four
 scripted agent lines, one fixed caller transcript. Keys are accepted and never checked: a dev
-shim, never expose it. Code: `services/voicesim`, console `apps/voicesim-web`.
+shim, never expose it. Code: `services/sims/voicesim`, console `apps/sims/src/voice`.
 
 ## Run it
 
@@ -56,7 +56,7 @@ A call id is `conv_voicesim_0001`, `0002`, ... An unfaked provider path answers 
 
 - Caps: `VOICESIM_MAX_CALLS` (default 200, oldest dropped) and `VOICESIM_MAX_EVENTS_PER_CALL`
   (default 500, the rest counted as `droppedEvents`).
-- Drive the loopback port directly; `go test ./services/voicesim` covers the protocol.
+- Drive the loopback port directly; `go test ./services/sims/voicesim` covers the protocol.
 - The Twilio phone transport is not faked.
 
 ## From a terminal or agent

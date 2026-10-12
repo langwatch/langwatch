@@ -8,8 +8,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/0xdeafcafe/moron/tui"
-
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/hubtui"
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
@@ -17,10 +15,9 @@ import (
 )
 
 // runHub is bare `haven` in a terminal: the interactive hub. Opening a stack's
-// git view — or handing off to the cleanup picker — quits the hub, runs the
-// other full-screen program, and re-enters the hub when it closes: two
-// full-screen programs take turns rather than nesting. Agents get the plain
-// list; a TUI is useless to them.
+// viewer or the cleanup picker quits the hub, runs the other full-screen
+// program, and re-enters the hub when it closes: two full-screen programs take
+// turns rather than nesting. Agents get the plain list; a TUI is useless to them.
 func runHub(ctx context.Context, d deps) error {
 	if d.isAgent {
 		return d.orch.Status(false, d.worktree, false)
@@ -41,12 +38,6 @@ func runHub(ctx context.Context, d deps) error {
 		case out.RunCleanup:
 			if err := runInteractiveClean(ctx, newCleanRun(d, invocation{})); err != nil {
 				fmt.Fprintf(os.Stderr, "haven: cleanup failed: %v\n", err)
-			}
-		case out.OpenGitDir != "":
-			if err := tui.Run(out.OpenGitDir); err != nil {
-				// A stale row (e.g. the worktree dir was deleted underneath us)
-				// shouldn't end the session — surface the error and re-enter the hub.
-				fmt.Fprintf(os.Stderr, "haven: git view for %s failed: %v\n", out.OpenGitDir, err)
 			}
 		default:
 			return nil

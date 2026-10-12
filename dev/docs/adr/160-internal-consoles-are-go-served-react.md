@@ -38,6 +38,8 @@ Go API is only for working on the console itself.
 | `apps/analyticssim-web` | `services/analyticssim`                 | `analytics.<slug>.langwatch.localhost`                  |
 | `apps/voicesim-web`     | `services/voicesim`                     | `voice.<slug>.langwatch.localhost`                      |
 
+Since 2026-10-12 the simulator consoles are one multi-page app, `apps/sims` (a page per sim under `src/<sim>/`), built once into `services/sims/simconsole/dist`; each simulator, now under `services/sims/<sim>sim`, embeds that build and serves its own page at the same URL.
+
 All of them, plus the mail room's chrome and the Storybook manager theme, draw
 from one package, `@langwatch/design-system-internal` (and read the clock through
 `@langwatch/time`, as everything else does): the hub's paper look as

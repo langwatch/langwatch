@@ -161,6 +161,35 @@ describe("external member peer links", () => {
     });
   });
 
+  describe("when the SDK's peer is only in pnpm's hoisted store", () => {
+    it("links the SDK to the hoisted instance", async () => {
+      // The production install prunes the SDK's devDependency copy of
+      // @opentelemetry/api, and the api declares none of its own.
+      const appRoot = await makeAppTree();
+      const hoisted = join(
+        appRoot,
+        "node_modules",
+        ".pnpm",
+        "node_modules",
+        "@opentelemetry",
+        "api",
+      );
+      mkdirSync(hoisted, { recursive: true });
+      writeFileSync(join(hoisted, "package.json"), "{}");
+      mkdirSync(join(appRoot, "sdks", "typescript"), { recursive: true });
+      writeFileSync(
+        join(appRoot, "sdks", "typescript", "package.json"),
+        JSON.stringify({ name: "langwatch", peerDependencies: { "@opentelemetry/api": "^1.9.0" } }),
+      );
+
+      const linked = linkExternalMemberPeers(appRoot);
+
+      expect(linked).toContain("typescript:@opentelemetry/api");
+      const linkPath = join(appRoot, "sdks", "typescript", "node_modules", "@opentelemetry", "api");
+      expect(existsSync(join(linkPath, "package.json"))).toBe(true);
+    });
+  });
+
   describe("when a member declares a peer the app does not carry", () => {
     it("skips it", async () => {
       const appRoot = await makeAppTree();

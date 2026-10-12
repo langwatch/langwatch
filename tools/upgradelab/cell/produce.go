@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -122,7 +123,7 @@ func Produce(ctx context.Context, options ProduceOptions) (string, error) {
 		return FromBuild(options.FromDir).Ensure(ctx, cell.logPath("from-build"))
 	}
 	cell.runSteps(ctx, []step{{"build", build}, {"stores", cell.freshStores}, {"from-schema", cell.fromSchema}, {"from-up", cell.fromUp},
-		{"seed", cell.seedTier}, {"traffic-before", cell.trafficBefore}, {"cut", cell.cut},
+		{"seed", cell.seedTier}, {"drain", cell.drainQueue}, {"trickle", cell.trickle}, {"traffic-before", cell.trafficBefore}, {"cut", cell.cut},
 		{"capture", func(ctx context.Context) error { return cell.capture(ctx, dir) }}})
 	cell.finishTraffic()
 	writeErr := cell.write()
@@ -132,18 +133,18 @@ func Produce(ctx context.Context, options ProduceOptions) (string, error) {
 	return dir, writeErr
 }
 
-// tierHeavy is tier M: seedgen's medium, through main's doors (seed.Heavy).
-const tierHeavy = "M"
+// heavyTiers seed through main's doors (seed.Heavy): M is seedgen's medium, L the cloud long tail on seedgen's large.
+var heavyTiers = map[string]string{"M": "medium", "L": "large"}
 
 // seedTier seeds tier S as the cell does; tier M adds the heavy tenancy by SQL and then the product's
 // own doors at volume, against this cell's URL.
 func (cell *run) seedTier(ctx context.Context) error {
-	if cell.options.Tier != tierHeavy {
+	if heavyTiers[cell.options.Tier] == "" {
 		return cell.seed(ctx)
 	}
 	cell.anchor = time.Now().UTC().Truncate(24 * time.Hour)
 	shape := cell.profile.Shape
-	tenancy := seed.BuildTenancy(seed.TenancyInput{Shape: shape, Seed: cell.options.Seed, Anchor: cell.anchor, Cloud: shape == "saas" || shape == "hybrid", Volume: tierHeavy})
+	tenancy := seed.BuildTenancy(seed.TenancyInput{Shape: shape, Seed: cell.options.Seed, Anchor: cell.anchor, Cloud: shape == "saas" || shape == "hybrid", Volume: cell.options.Tier})
 	sum := sha256.Sum256([]byte(tenancy.SQL()))
 	cell.tenancy, cell.recipe = tenancy, snapshot.Recipe{Version: seed.RecipeVersion, Hash: hex.EncodeToString(sum[:])}
 	if err := psqlFile(ctx, cell.stores.psqlURL(), tenancy.SQL()); err != nil {
@@ -163,10 +164,79 @@ func (cell *run) seedTier(ctx context.Context) error {
 	if err := cell.basePrompt(ctx); err != nil {
 		cell.report.Notes = append(cell.report.Notes, "base prompt (prompt-update writes to it): "+err.Error())
 	}
-	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: tenancy, Seed: cell.options.Seed, Anchor: cell.anchor})
+	pace := &seed.Pace{Depth: func(ctx context.Context) (int, error) { return QueueDepth(ctx, cell.stores.RedisPort) },
+		Above: cell.options.PaceAbove, Within: cell.options.DrainWithin}
+	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: tenancy, Seed: cell.options.Seed,
+		Anchor: cell.anchor, Spans: seed.HeavySpans(cell.options.Tier), Size: heavyTiers[cell.options.Tier], Pace: pace, Log: cell.options.Stdout})
 	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("heavy seed sent %v, refused %v", result.Sent, result.Refused))
+	cell.madeKeys = result.Made
 	if err != nil {
 		cell.report.Notes = append(cell.report.Notes, "heavy seed: "+err.Error())
+		if errors.Is(err, seed.ErrOrganizationsRefused) || errors.Is(err, seed.ErrPaceExpired) {
+			return fmt.Errorf("heavy seed: %w", err)
+		}
+	}
+	return nil
+}
+
+// drainState is the drain wait's verdict on one queue reading.
+type drainState int
+
+const (
+	drainWaiting drainState = iota
+	drainDone
+	drainExpired
+)
+
+// drainVerdict judges one reading: done at or below near; expired once waited passes limit; an
+// unread depth (readErr) is never done.
+func drainVerdict(depth int, readErr error, near int, waited, limit time.Duration) drainState {
+	switch {
+	case readErr == nil && depth <= near:
+		return drainDone
+	case waited >= limit:
+		return drainExpired
+	}
+	return drainWaiting
+}
+
+const drainPoll = 15 * time.Second
+
+// drainQueue waits for main's worker to work the seed burst's backlog down to near zero, logging
+// progress, so the snapshot carries what a real install holds at upgrade time.
+func (cell *run) drainQueue(ctx context.Context) error {
+	start, lastLog := time.Now(), time.Time{}
+	for {
+		depth, err := QueueDepth(ctx, cell.stores.RedisPort)
+		switch drainVerdict(depth, err, cell.options.DrainNear, time.Since(start), cell.options.DrainWithin) {
+		case drainDone:
+			cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("queue drained to %d in %s", depth, time.Since(start).Round(time.Second)))
+			return nil
+		case drainExpired:
+			return fmt.Errorf("main's queue still held %d jobs (read error: %v) after -drain-within %s", depth, err, cell.options.DrainWithin)
+		}
+		if cell.options.Stdout != nil && time.Since(lastLog) >= time.Minute {
+			fmt.Fprintf(cell.options.Stdout, "upgradelab: draining main's queue: %d jobs left after %s\n", depth, time.Since(start).Round(time.Second))
+			lastLog = time.Now()
+		}
+		if err := sleep(ctx, drainPoll); err != nil {
+			return err
+		}
+	}
+}
+
+// trickle sends Trickle spans of live telemetry (a different seed from the burst, so ids differ), so
+// the cut still catches a few hundred in-flight jobs. Tier S has no heavy seed and sends none.
+func (cell *run) trickle(ctx context.Context) error {
+	if heavyTiers[cell.options.Tier] == "" || cell.options.Trickle <= 0 {
+		return nil
+	}
+	email, password := generate.SeedAccount(cell.options.Seed)
+	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: cell.tenancy,
+		Seed: cell.options.Seed + 1000, Anchor: time.Now().UTC(), Spans: cell.options.Trickle, TelemetryOnly: true})
+	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("trickle sent %v, refused %v", result.Sent, result.Refused))
+	if err != nil {
+		cell.report.Notes = append(cell.report.Notes, "trickle: "+err.Error())
 	}
 	return nil
 }
@@ -184,7 +254,7 @@ func (cell *run) capture(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	allow := append(cell.tenancy.APIKeys(), cell.seeder.Context.APIKey)
+	allow := append(append(cell.tenancy.APIKeys(), cell.seeder.Context.APIKey), cell.madeKeys...)
 	for _, name := range shape.SecretNames {
 		allow = append(allow, shape.Secrets[name])
 	}
@@ -194,7 +264,7 @@ func (cell *run) capture(ctx context.Context, dir string) error {
 	}
 	meta := snapshot.Manifest{ID: CacheKey(cell.options), Recipe: cell.recipe, Release: cell.options.Release, Image: "source",
 		Shape: snapshot.Shape{Name: cell.profile.Shape, Env: shape.Values, SecretNames: shape.SecretNames}, Overlays: []string{},
-		Seed: cell.options.Seed, Anchor: cell.anchor, GeneratorCommit: HeadCommit(cell.options.HeadDir), PostgresSchema: "mydb"}
+		Seed: cell.options.Seed, Anchor: cell.anchor, GeneratorCommit: HeadCommit(cell.options.HeadDir), PostgresSchema: "mydb", QueueDepthAtCut: cell.cutDepth}
 	if _, err := snapshot.Capture(ctx, snapshot.CaptureInput{Dir: filepath.Join(partial, entrySnapshot), Stores: stores, Meta: meta,
 		Scrubber: snapshot.Scrubber{Allow: allow}}); err != nil {
 		return err
@@ -252,9 +322,11 @@ func (cell *run) restore(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := snapshot.Restore(ctx, snapshot.RestoreInput{Dir: filepath.Join(dir, entrySnapshot), Stores: stores}); err != nil {
+	restored, err := snapshot.Restore(ctx, snapshot.RestoreInput{Dir: filepath.Join(dir, entrySnapshot), Stores: stores})
+	if err != nil {
 		return err
 	}
+	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("snapshot queue depth at its cut: %d (-1 unread)", restored.QueueDepthAtCut))
 	fingerprint, err := snapshot.TakeFingerprint(ctx, stores)
 	if err != nil {
 		return err

@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -164,6 +166,7 @@ func (o *Orchestrator) Keep(ctx context.Context, slug string, plan KeeperPlan) e
 	pid := o.sys.Getpid()
 	st.LauncherPID, st.LauncherStart = pid, o.sys.ProcessStart(pid)
 	st.OwnerPID, st.OwnerStart = plan.OwnerPID, plan.OwnerStart
+	st.KeeperReplans = true
 	st.UpdatedAt = o.sys.Now()
 	if err := o.store.SaveStack(st); err != nil {
 		return err
@@ -179,7 +182,10 @@ func (o *Orchestrator) Keep(ctx context.Context, slug string, plan KeeperPlan) e
 	if plan.Seed != nil {
 		go o.seedWhenReady(ctx, *plan.Seed)
 	}
-	o.sup.Supervise(ctx, plan.Children)
+	replans := make(chan os.Signal, 1)
+	signal.Notify(replans, syscall.SIGHUP)
+	defer signal.Stop(replans)
+	o.superviseLive(ctx, keeperRun{slug: slug, children: plan.Children, replans: replans})
 	cancel()
 	<-beat
 	o.dropKeptStack(st)
@@ -283,15 +289,41 @@ func (o *Orchestrator) handOver(ctx context.Context, st domain.Stack, plan Keepe
 	if o.daemon == nil {
 		return errors.New("no daemon client configured")
 	}
+	deadline := time.Now().Add(keeperAskWindow)
+	for {
+		err := o.askKeeper(ctx, st)
+		if err != nil && o.keeperTook(st.Slug, plan.ProvisionerPID) {
+			return nil // a timed-out ask the daemon still carried out
+		}
+		if !errors.Is(err, ErrDaemonNotReady) || !time.Now().Before(deadline) {
+			if err != nil {
+				return fmt.Errorf("the daemon did not start the keeper: %w", err)
+			}
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(keeperAskEvery):
+		}
+	}
+}
+
+// keeperAskWindow is how long an up keeps asking: a daemon rebuilt mid-boot hands
+// over to its successor (up to successorWait), which then has to come up.
+const (
+	keeperAskWindow = 2 * successorWait
+	keeperAskEvery  = 250 * time.Millisecond
+)
+
+// askKeeper is one ask of whichever daemon runs now, started first if none does.
+func (o *Orchestrator) askKeeper(ctx context.Context, st domain.Stack) error {
 	o.ensureDaemon(st.WorktreeDir)
 	info, ok := o.store.Daemon()
 	if !ok || !o.daemonAlive() {
-		return errors.New("no haven daemon is running to start the keeper (see haven.log in the haven home)")
+		return fmt.Errorf("%w: no haven daemon is running (see haven.log in the haven home)", ErrDaemonNotReady)
 	}
-	if err := o.daemon.StartKeeper(ctx, info.Port, st.Slug); err != nil {
-		return fmt.Errorf("the daemon did not start the keeper: %w", err)
-	}
-	return nil
+	return o.daemon.StartKeeper(ctx, info.Port, st.Slug)
 }
 
 // StartKeeper is the daemon's half of the hand-over: it starts slug's keeper
@@ -339,15 +371,20 @@ func (o *Orchestrator) spawnKeeper(st domain.Stack) error {
 	return nil
 }
 
+// keeperTook is whether slug's record names a live launcher other than the provisioner.
+func (o *Orchestrator) keeperTook(slug string, provisioner int) bool {
+	st, ok := o.stackBySlug(slug)
+	return ok && st.LauncherPID != provisioner && st.LauncherPID != 0 && o.launcherIsOurs(st)
+}
+
 // awaitKeeper waits until the record names a launcher that is ours and is not
 // the provisioner, until ctx's deadline. A canceled ctx (Ctrl-C) returns at once (ruling R4).
 func (o *Orchestrator) awaitKeeper(ctx context.Context, slug string, provisioner int) error {
 	for {
-		st, ok := o.stackBySlug(slug)
-		if !ok {
+		if _, ok := o.stackBySlug(slug); !ok {
 			return fmt.Errorf("stack %q was torn down during the hand-over", slug)
 		}
-		if st.LauncherPID != provisioner && st.LauncherPID != 0 && o.launcherIsOurs(st) {
+		if o.keeperTook(slug, provisioner) {
 			return nil
 		}
 		select {
@@ -375,5 +412,32 @@ func (o *Orchestrator) reloadAfterFirstSeed(ctx context.Context, seed KeeperSeed
 	sayPhase(seed.Since, "reloading the worker so it fills the seeded project's analytics key")
 	if err := o.Reload(ctx, UpParams{ExplicitSlug: seed.Job.Slug}, "worker"); err != nil {
 		sayPhase(seed.Since, fmt.Sprintf("worker reload failed (continuing): %v", err))
+	}
+}
+
+// keeperBasics are the only variables a keeper may keep from the daemon that
+// started it, and only when the up's own environment lacks them.
+var keeperBasics = []string{"PATH", "HOME", "USER", "LOGNAME", "TMPDIR"}
+
+// ApplyPlanEnv replaces this process's environment with the plan's: the `haven
+// up` caller's, never the daemon's. Whatever the daemon was started with
+// (IS_SAAS, a licence key) must not reach a stack whose up did not set it.
+func ApplyPlanEnv(plan KeeperPlan) {
+	inherited := map[string]string{}
+	for _, key := range keeperBasics {
+		if v, ok := os.LookupEnv(key); ok {
+			inherited[key] = v
+		}
+	}
+	os.Clearenv()
+	for _, kv := range plan.Env {
+		if k, v, ok := strings.Cut(kv, "="); ok {
+			_ = os.Setenv(k, v)
+		}
+	}
+	for key, v := range inherited {
+		if _, isSet := os.LookupEnv(key); !isSet {
+			_ = os.Setenv(key, v)
+		}
 	}
 }

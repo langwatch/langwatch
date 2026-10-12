@@ -27,7 +27,7 @@ type MigrationDeclaration = Pick<
   | "requiresOperatorConfirmation"
   | "runsAutomaticallyOnSelfHosted"
   | "enrolledAutomatically"
-> & { tenant: "organization" | "user" };
+> & { tenant: "organization" | "user"; migratedIsSteady: boolean };
 
 /** What the migrations page reads of one migration: its declaration plus its tenant axis. */
 export function declarationOf({
@@ -44,6 +44,7 @@ export function declarationOf({
     requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
     runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
     enrolledAutomatically: migration.enrolledAutomatically,
+    migratedIsSteady: migration.migratedIsSteady ?? false,
     tenant,
   };
 }

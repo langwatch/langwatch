@@ -21,6 +21,11 @@ import {
 
 const AUTH_CODE_TTL_SECONDS = 600;
 
+function aggregateRefusalOutcome(): McpApprovalOutcome {
+  const { message, code } = new AggregateProjectHasNoCredentialError();
+  return { kind: "aggregate-project-has-no-credential", message, code };
+}
+
 /** 256 bits, the length every other one-time OAuth credential here is minted at. */
 const AUTH_CODE_BYTES = 32;
 
@@ -162,13 +167,7 @@ export class McpAuthorizationService {
 
     // ADR-177 decision 7: the code carries the project's base key, and these kinds hold none.
     if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
-      if (!isAggregateProjectKind(project.kind)) return { kind: "denied" };
-      const refusal = new AggregateProjectHasNoCredentialError();
-      return {
-        kind: "aggregate-project-has-no-credential",
-        message: refusal.message,
-        code: refusal.code,
-      };
+      return isAggregateProjectKind(project.kind) ? aggregateRefusalOutcome() : { kind: "denied" };
     }
 
     if (!this.#collaborators.codes.isAvailable()) return { kind: "unavailable" };

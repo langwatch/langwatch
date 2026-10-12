@@ -22,6 +22,7 @@ function process(
         ses: { enabled: undefined, region: undefined, endpoint: undefined },
         smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
         publicBaseUrl: "https://app.langwatch.test",
+        webPushServiceBase: undefined,
         outboundProxy: {
           HTTPS_PROXY: undefined,
           https_proxy: undefined,

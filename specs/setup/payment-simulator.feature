@@ -9,7 +9,7 @@ Feature: paymentsim, a local stand-in for Stripe
   twice or with the wrong secret, and read metered usage back as exact totals.
   It checks no credential beyond its presence: it is a dev shim.
 
-  # Bound by Go tests in services/paymentsim, tools/thuishaven/domain and
+  # Bound by Go tests in services/sims/paymentsim, tools/thuishaven/domain and
   # cmd/service. Billing's own handling of these deliveries is bound in
   # enterprise/modules/billing; the rows against paymentsim are bound in billing-process's
   # billing-paymentsim.integration.test.ts, which skips where no Go toolchain is present.

@@ -518,6 +518,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     cursor,
     limit,
     filters = {},
+    SKIP_COLD_SCAN_CHECK,
   }: {
     tenantIds: string[];
     fromMs?: number;
@@ -525,6 +526,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
     cursor?: string | null;
     limit: number;
     filters?: SpendFilters;
+    SKIP_COLD_SCAN_CHECK?: true;
   }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
     if (tenantIds.length === 0) return { rows: [], nextCursor: null };
     const client = await this.resolveClient(tenantIds[0]!);
@@ -556,6 +558,7 @@ export class ClickHouseGatewaySpendEventsRepository extends GatewaySpendEventsRe
       query_params: params,
       format: "JSONEachRow",
       tenantIds,
+      ...(SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK } : {}),
     });
     const raw = (await result.json()) as Record<string, unknown>[];
     const rows = raw.map((row) => ClickHouseGatewaySpendEventsRepository.mapSpendEventRow(row));

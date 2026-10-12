@@ -321,6 +321,19 @@ export class PrismaProjectRepository
     };
   }
 
+  async findLiveWithTeamByIds(ids: readonly string[]): Promise<ProjectWithTeam[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: [...ids] }, archivedAt: null },
+      include: { team: true },
+      orderBy: { id: "asc" },
+    });
+    return rows.map(({ team, ...projectRow }) => ({
+      ...this.mapProjectRequired(projectRow),
+      team,
+    }));
+  }
+
   async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
     await this.prisma.project.update({ where: { id }, data });
   }

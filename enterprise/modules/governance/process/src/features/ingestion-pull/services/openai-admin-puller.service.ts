@@ -50,6 +50,7 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { z } from "zod";
 
 import type { GovernanceHttpClient } from "../../../channels/governance-http.channel.ts";
+import { REAL_VENDOR_BASES, type VendorBases } from "../../../rules/vendor-bases.rules.ts";
 import {
   cursorSchema,
   defaultStartingAt,
@@ -80,12 +81,15 @@ export class OpenAiAdminPullerService implements PullerAdapter<OpenAiAdminPullCo
 
   private readonly pages: OpenAiAdminCostPageService;
 
-  private constructor(http: GovernanceHttpClient) {
-    this.pages = OpenAiAdminCostPageService.create(http);
+  private constructor(http: GovernanceHttpClient, vendorBases: VendorBases) {
+    this.pages = OpenAiAdminCostPageService.create(http, vendorBases.openAiAdmin);
   }
 
-  static create(http: GovernanceHttpClient): OpenAiAdminPullerService {
-    return new OpenAiAdminPullerService(http);
+  static create(
+    http: GovernanceHttpClient,
+    vendorBases: VendorBases = REAL_VENDOR_BASES,
+  ): OpenAiAdminPullerService {
+    return new OpenAiAdminPullerService(http, vendorBases);
   }
 
   validateConfig(config: unknown): OpenAiAdminPullConfig {

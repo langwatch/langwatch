@@ -18,14 +18,14 @@ The GitHub integration: app installations, their webhooks, and the pull requests
 
 ## What github owns
 
-| Kind                           | Name                                                                                         | Declared at                                                                    |
-| ------------------------------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Postgres, accessed not claimed | `GithubBranchPullRequestCheck`, `GithubInstallation`, `GithubPullRequest`                    | `process/src/repositories/prisma/prisma.github-pull-requests.repository.ts:55` |
-| Stores required                |                                                                                              | `process/src/channels/http/http.github.channels.ts:11`                         |
-| Stores required                | prisma, redis                                                                                | `process/src/repositories/live/live.github.repositories.ts:11`                 |
-| Stores required                | prisma                                                                                       | `process/src/repositories/prisma/prisma.github.repositories.ts:13`             |
-| Secrets                        | GITHUB_LANGY_PRIVATE_KEY                                                                     | `process/src/app/github.app.ts:176`                                            |
-| Config                         | `appId` (GITHUB_LANGY_APP_ID), `host` (GITHUB_LANGY_HOST), `appSlug` (GITHUB_LANGY_APP_SLUG) | `contract/src/github.config.ts:11`                                             |
+| Kind                           | Name                                                                                                                                                               | Declared at                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Postgres, accessed not claimed | `GithubBranchPullRequestCheck`, `GithubInstallation`, `GithubPullRequest`                                                                                          | `process/src/repositories/prisma/prisma.github-pull-requests.repository.ts:55` |
+| Stores required                |                                                                                                                                                                    | `process/src/channels/http/http.github.channels.ts:11`                         |
+| Stores required                | prisma, redis                                                                                                                                                      | `process/src/repositories/live/live.github.repositories.ts:11`                 |
+| Stores required                | prisma                                                                                                                                                             | `process/src/repositories/prisma/prisma.github.repositories.ts:13`             |
+| Secrets                        | GITHUB_LANGY_PRIVATE_KEY                                                                                                                                           | `process/src/app/github.app.ts:176`                                            |
+| Config                         | `appId` (GITHUB_LANGY_APP_ID), `host` (GITHUB_LANGY_HOST), `appSlug` (GITHUB_LANGY_APP_SLUG), `apiBase` (GITHUB_LANGY_API_BASE), `webBase` (GITHUB_LANGY_WEB_BASE) | `contract/src/github.config.ts:16`                                             |
 
 Anything else github needs belongs to another module and is reached through its `*Api`.
 

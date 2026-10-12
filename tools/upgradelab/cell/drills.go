@@ -135,6 +135,9 @@ func (cell *run) drillVerdicts(final []LedgerRow) []Verdict {
 		verdicts = append(verdicts, verdict("D2", state.killedAtMs > 0 && state.restartErr == "" && ready > int64(state.killedAtMs),
 			fmt.Sprintf("worker killed at %d ms with %d of %d steps done, restarted%s; ready at %d ms", state.killedAtMs, state.killedDone, state.killedTotal, errSuffix(state.restartErr), ready)))
 	}
+	if cell.drill(DrillOldWorker) {
+		verdicts = append(verdicts, cell.oldWorkerVerdict())
+	}
 	if cell.drill(DrillRetry) {
 		state, finalStatus := cell.drills, ""
 		for _, row := range final {

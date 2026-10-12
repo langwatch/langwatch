@@ -78,6 +78,8 @@ export interface ProjectRepository {
   findById(id: string): Promise<Project | null>;
   findOrganizationId(projectId: string): Promise<string | undefined>;
   findWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  /** `findWithTeam` for many projects in one read; archived and unknown ones are left out. */
+  findLiveWithTeamByIds(ids: readonly string[]): Promise<ProjectWithTeam[]>;
   updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
   touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;

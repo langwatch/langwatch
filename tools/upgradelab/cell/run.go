@@ -2,7 +2,9 @@ package cell
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,12 +33,18 @@ type Options struct {
 	Deployment, Tier, Shape, Release string
 	Seed                             int64
 	FromDir, HeadDir, RunDir         string
+	ViaDir                           string // a release between from and head the operator upgrades to first (UM-21); empty: none
 	PostgresBase, ClickHouseBase     string
+	ClickHouseCluster                string        // CLICKHOUSE_CLUSTER for both releases; ClickHouseBase is then a replica of that cluster
 	Before, AtCut, AfterReady        time.Duration // traffic on main, with main's worker paused, after head is ready
 	ReadyWithin, SettleWithin        time.Duration
 	WorkerDelay, Rate, Hold          time.Duration
+	WalkEvery                        time.Duration // the browser walker's pause between rounds
+	DrainWithin                      time.Duration // produce: bound on main draining its queue after the seed burst
+	DrainNear, Trickle, PaceAbove    int           // produce: depth that counts as drained; spans sent live before the cut
 	SwitchOn, ServiceBin             string
 	Drills                           []string // DrillAPIEarly, DrillWorkerRestart, DrillRetry
+	TaskDrill                        string   // upgradelab drill's -drill; it names the stores
 	Ledger                           []string // #8553 rows this cell claims and reports to
 	FromSnapshot                     string   // a produce entry directory or cache key: restore instead of seeding
 	Overlays                         []string // planted on top of the shape (OverlayRetention)
@@ -67,7 +75,13 @@ type run struct {
 	traffic            *Traffic
 	privateTraffic     *Traffic // a private organization's project (hybrid), on privateLabel's stores
 	privateLabel       string
+	otherPrivate       *Traffic // the second private organization's project (tier M), on otherPrivateLabel's stores
+	otherPrivateLabel  string
+	routeRecords       string // H7: the organizations head's worker recorded as privately routed
 	drills             drillState
+	oldWorker          oldWorkerState // the old-worker-lingers drill
+	fromMetricsPort    int            // main's worker metrics door
+	fromMetricsKey     string         // a per-cell key for it: a production worker refuses its door without one
 	poller             *Poller
 	queue              []QueueSample
 	queueMu            sync.Mutex
@@ -81,12 +95,17 @@ type run struct {
 	fromPort, headPort int
 	private            map[string]string // label -> organization on that private ClickHouse target
 	tenancy            seed.Tenancy
+	madeKeys           []string      // API keys of the projects the heavy seed made through the product
 	apiCrashes         []int64       // ms from start of each head api exit before ready
 	granted            chan struct{} // closed once the seed account is a platform operator on head
 	recipe             snapshot.Recipe
 	anchor             time.Time
 	sso                ssoSeed
 	retention          retentionState
+	odd                oddSeed        // the tenant-oddities overlay
+	damage             damageState    // the operator-damage overlay
+	queuedAtCut        queuedJobs     // the queued-jobs-v1 overlay: main's jobs when its worker paused
+	typesAtCut         map[string]int // the upcast-events overlay: event_log rows per stored type at the cut
 	legacy             legacySeed
 	legacyOrg          legacyOrgSeed
 	license            TestLicense
@@ -97,6 +116,7 @@ type run struct {
 	signupUsersBefore  int
 	signupUsersErr     error
 	signupSessions     map[string]*seed.Seeder // each sign-up signed in once
+	emptyOrg           emptyOrgAnswer          // the seed account's organization, made just after ready
 	memberNotice       bool                    // the member notice showed while the retry drill's step was failed
 	gates              map[string]*Gate        // private-down drill: a gate in front of each private target
 	down               downState
@@ -117,7 +137,21 @@ func (options Options) Name() string {
 	for _, overlay := range options.Overlays {
 		name += "_" + overlay
 	}
+	if options.TaskDrill != "" { // a task drill beside a cell of the same seed must not empty its stores
+		name += "_" + options.TaskDrill
+	}
 	return strings.ToLower(strings.ReplaceAll(name, "-", "_"))
+}
+
+// StoreName is the cell's database name, upgradelab_<cell>; past Postgres's 63-byte identifier limit, the tail
+// becomes a hash of the whole name so many overlays still name one database of their own.
+func StoreName(cell string) string {
+	name := DedicatedPrefix + cell
+	if len(name) <= 63 {
+		return name
+	}
+	sum := sha256.Sum256([]byte(name))
+	return name[:63-17] + "_" + hex.EncodeToString(sum[:8])
 }
 
 // Run executes the cell and writes report.json and report.md into RunDir; the error is operational only.
@@ -137,10 +171,28 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 		origin = []step{{"stores", cell.freshStores}, {"restore", cell.restore}, {"from-up", cell.fromUp}, {"sign-in", cell.resumeSeed}}
 	}
 	before, cut := []step{{"traffic-before", cell.trafficBefore}}, []step{{"cut", cell.cut}}
+	if options.ViaDir != "" {
+		cut = append(cut, step{"via", cell.viaRelease})
+	}
 	if cell.overlay(OverlayRetention) {
 		origin = append(origin, step{"retention-rules", cell.retentionRules})
 		before = append(before, step{"retention-age", cell.retentionAge})
 		cut = append(cut, step{"retention-cut", cell.retentionAtCut})
+	}
+	if cell.overlay(OverlayTenantOddities) {
+		origin = append(origin, step{"oddities-plant", cell.plantOddities})
+	}
+	if cell.heldOnly() {
+		origin = append(origin, step{"held-plant", cell.plantHeldTenant})
+	}
+	if cell.overlay(OverlayQueuedJobs) {
+		cut = append(cut, step{"queued-jobs-cut", cell.noteQueuedAtCut})
+	}
+	if cell.overlay(OverlayUpcastEvents) {
+		cut = append(cut, step{"stored-types-cut", cell.noteStoredTypesAtCut})
+	}
+	if cell.overlay(OverlayOperatorDamage) {
+		origin = append(origin, step{"damage-plant", cell.plantDamage})
 	}
 	steps := slices.Concat([]step{{"build", cell.buildBoth}}, origin, before, cut, []step{
 		{"switch", cell.switchToHead}, {"ready", cell.awaitReady},
@@ -184,6 +236,11 @@ func (cell *run) buildBoth(ctx context.Context) error {
 	if err := FromBuild(cell.options.FromDir).Ensure(ctx, cell.logPath("from-build")); err != nil {
 		return err
 	}
+	if cell.options.ViaDir != "" {
+		if err := FromBuild(cell.options.ViaDir).Ensure(ctx, cell.logPath("via-build")); err != nil {
+			return err
+		}
+	}
 	return HeadBuild(cell.options.HeadDir).Ensure(ctx, cell.logPath("head-build"))
 }
 
@@ -211,12 +268,13 @@ func (cell *run) partialChecks(ctx context.Context) {
 	defer stop()
 	cell.report.Queue = cell.queueSummary(read)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.partialVerdicts()...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.damageVerdicts(read)...)
 	cell.report.Notes = append(cell.report.Notes, "stopped early: writes were not checked (Visible and Lost read unchecked); only the verdicts that need no settled stores were judged")
 }
 
 // partialVerdicts are the checks a stopped cell can still judge from its traffic, phases and queue readings.
 func (cell *run) partialVerdicts() []Verdict {
-	verdicts := []Verdict{cell.holdingVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic),
+	verdicts := []Verdict{cell.holdingVerdict(), cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic, cell.downExcused()),
 		ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), queueVerdict(cell.report.Queue)}
 	for index := range verdicts {
 		verdicts[index].Scenarios = scenarioIDs[verdicts[index].ID]
@@ -240,8 +298,14 @@ func prepare(options Options) (*run, error) {
 		if !contains(Overlays, overlay) {
 			return nil, fmt.Errorf("unknown overlay %q: want one of %v", overlay, Overlays)
 		}
+		if (overlay == OverlayTenantOddities || overlay == OverlayHeldTenants) && !profile.SSO {
+			return nil, fmt.Errorf("the %s overlay needs an SSO deployment (cloud-sso or cloud-legacy-sso)", overlay)
+		}
 	}
-	for _, dir := range []string{options.FromDir, options.HeadDir} {
+	for _, dir := range []string{options.FromDir, options.HeadDir, options.ViaDir} {
+		if dir == "" {
+			continue
+		}
 		if err := CheckSourceDir(dir); err != nil {
 			return nil, err
 		}
@@ -250,6 +314,9 @@ func prepare(options Options) (*run, error) {
 		return nil, err
 	}
 	profile.NoAdminEmails = options.NoAdminEmails
+	if contains(options.Overlays, OverlayTenantOddities) {
+		profile.Objects = true // datasets move to object storage, which a cloud install has
+	}
 	cell := &run{options: options, profile: profile, origin: time.Now(), marks: map[string]int64{}, granted: make(chan struct{}), cutDepth: -1}
 	cell.report = &Report{Cell: options.Name(), Deployment: options.Deployment, Tier: options.Tier, Shape: options.Shape,
 		Release: options.Release, Head: options.HeadDir, HeadCommit: HeadCommit(options.HeadDir), Started: cell.origin.UTC().Format(time.RFC3339)}
@@ -275,12 +342,12 @@ func (cell *run) freshStores(ctx context.Context) error {
 		return err
 	}
 	cell.stores = Stores{PostgresBase: cell.options.PostgresBase, ClickHouseBase: cell.options.ClickHouseBase,
-		Name: DedicatedPrefix + cell.options.Name(), RedisPort: itoa(redisPort)}
+		Cluster: cell.options.ClickHouseCluster, Name: StoreName(cell.options.Name()), RedisPort: itoa(redisPort)}
 	shape, err := seed.LoadShapeEnv(cell.profile.Shape)
 	if err != nil {
 		return err
 	}
-	cell.private = PrivateTargetsFor(shape.PrivateTargets(), cell.options.Tier)
+	cell.private = PrivateTargetsFor(shape.PrivateTargets(), cell.options.Tier, cell.options.FromSnapshot != "")
 	for label := range cell.private {
 		cell.stores.Private = append(cell.stores.Private, label)
 	}
@@ -366,13 +433,20 @@ func (cell *run) envWith(extra map[string]string) []string {
 	return Env(merged)
 }
 
+// fromEnvWith is envWith for main's processes, which read their log level from PINO_LOG_LEVEL.
+func (cell *run) fromEnvWith(extra map[string]string) []string {
+	merged := map[string]string{"PINO_LOG_LEVEL": "info"}
+	maps.Copy(merged, extra)
+	return cell.envWith(merged)
+}
+
 // fromSchema migrates the stores as the old release does before it serves (main: FromStartup).
 func (cell *run) fromSchema(ctx context.Context) error {
 	var log []byte
 	defer func() { _ = os.WriteFile(cell.logPath("from-schema"), log, 0o600) }()
 	for _, script := range FromStartup {
 		command := exec.CommandContext(ctx, "pnpm", append([]string{"-s", "run"}, script...)...) // #nosec G204 -- fixed argv.
-		command.Dir, command.Env = filepath.Join(cell.options.FromDir, "platform", "app"), cell.envWith(nil)
+		command.Dir, command.Env = filepath.Join(cell.options.FromDir, "platform", "app"), cell.fromEnvWith(nil)
 		out, err := command.CombinedOutput()
 		log = append(log, out...)
 		if err != nil {
@@ -385,10 +459,11 @@ func (cell *run) fromSchema(ctx context.Context) error {
 func (cell *run) fromUp(ctx context.Context) error {
 	dir := filepath.Join(cell.options.FromDir, "platform", "app")
 	base := map[string]string{"PORT": itoa(cell.fromPort)}
-	worker := map[string]string{"PORT": itoa(cell.fromPort), "WORKER_METRICS_PORT": itoa(mustPort())}
+	cell.fromMetricsPort, cell.fromMetricsKey = mustPort(), labMetricsKey()
+	worker := map[string]string{"PORT": itoa(cell.fromPort), "WORKER_METRICS_PORT": itoa(cell.fromMetricsPort), "METRICS_API_KEY": cell.fromMetricsKey}
 	for _, spec := range []ProcSpec{
-		{Name: "from-app", Args: FromAppArgs, Env: cell.envWith(base)},
-		{Name: "from-worker", Args: FromWorkerArgs, Env: cell.envWith(worker)},
+		{Name: "from-app", Args: FromAppArgs, Env: cell.fromEnvWith(base)},
+		{Name: "from-worker", Args: FromWorkerArgs, Env: cell.fromEnvWith(worker)},
 	} {
 		spec.Dir, spec.Log = dir, cell.logPath(spec.Name)
 		proc, err := Start(spec)
@@ -479,6 +554,9 @@ func (cell *run) useSeed(session http.Header) error {
 	if private, label, ok := cell.privateClient(); ok {
 		cell.privateTraffic, cell.privateLabel = &Traffic{Client: private, Kinds: PrivateMix(cell.options.Rate), Origin: cell.origin, Hold: cell.options.Hold}, label
 	}
+	if other, label, ok := cell.privateClientAt(1); ok {
+		cell.otherPrivate, cell.otherPrivateLabel = &Traffic{Client: other, Kinds: OtherPrivateMix(cell.options.Rate), Origin: cell.origin, Hold: cell.options.Hold}, label
+	}
 	return nil
 }
 
@@ -510,6 +588,9 @@ func (cell *run) trafficBefore(ctx context.Context) error {
 		if cell.privateTraffic != nil {
 			private.Go(func() { cell.privateTraffic.Run(trafficCtx) })
 		}
+		if cell.otherPrivate != nil {
+			private.Go(func() { cell.otherPrivate.Run(trafficCtx) })
+		}
 		cell.traffic.Run(trafficCtx)
 		private.Wait()
 		close(cell.trafficDone)
@@ -524,10 +605,13 @@ func (cell *run) trafficBefore(ctx context.Context) error {
 
 // allCalls is every call the cell's traffic sent, the private project's included.
 func (cell *run) allCalls() []Call {
-	if cell.privateTraffic == nil {
-		return cell.traffic.Calls()
+	calls := cell.traffic.Calls()
+	for _, each := range []*Traffic{cell.privateTraffic, cell.otherPrivate} {
+		if each != nil {
+			calls = append(calls, each.Calls()...)
+		}
 	}
-	return append(cell.traffic.Calls(), cell.privateTraffic.Calls()...)
+	return calls
 }
 
 func sleep(ctx context.Context, span time.Duration) error {
@@ -540,19 +624,19 @@ func sleep(ctx context.Context, span time.Duration) error {
 }
 
 func (cell *run) sampleQueueOnce(ctx context.Context) {
-	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
+	depth, notDue, err := QueueDueDepth(ctx, cell.stores.RedisPort, drainLimit(queueBase))
 	cell.queueMu.Lock()
 	defer cell.queueMu.Unlock()
 	if err != nil {
 		cell.queueReads.fail(err)
 		return
 	}
-	cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth})
+	cell.queue = append(cell.queue, QueueSample{AtMs: time.Since(cell.origin).Milliseconds(), Depth: depth, NotDue: notDue})
 }
 
 // queueDrained reads the depth now and asks whether it is within the slack of the baseline.
 func (cell *run) queueDrained(ctx context.Context) bool {
-	depth, err := QueueDepth(ctx, cell.stores.RedisPort)
+	depth, _, err := QueueDueDepth(ctx, cell.stores.RedisPort, drainLimit(queueBase))
 	return err == nil && depth <= drainLimit(queueBase)
 }
 
@@ -577,6 +661,7 @@ func (cell *run) cut(ctx context.Context) error {
 	} else {
 		cell.report.Notes = append(cell.report.Notes, "queue depth at the cut: "+err.Error())
 	}
+	cell.noteStores(ctx, "at the cut")
 	fingerprint, err := cell.fingerprint(ctx)
 	cell.before = fingerprint
 	cell.placementAtCut(ctx)
@@ -627,7 +712,7 @@ func (cell *run) startObservers(ctx context.Context) {
 	if cell.options.Shots && !cell.emptyOrigin() { // the walker signs in, and an empty install has no account until ready
 		email, password := generate.SeedAccount(cell.options.Seed)
 		cell.walker, _ = StartWalker(ctx, WalkSpec{Dir: filepath.Join(cell.options.HeadDir, "apps", "ui"), RunDir: cell.options.RunDir,
-			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: 10 * time.Second})
+			URL: cell.url(), Email: email, Password: password, Origin: cell.origin, Every: cell.options.WalkEvery})
 	}
 }
 
@@ -681,7 +766,9 @@ func (cell *run) switchToHead(ctx context.Context) error {
 	if err := sleep(ctx, cell.options.WorkerDelay-time.Since(apiStarted)); err != nil {
 		return err
 	}
-	cell.proc("from-worker").Stop(20 * time.Second)
+	if !cell.keepOldWorker(ctx) {
+		cell.proc("from-worker").Stop(20 * time.Second)
+	}
 	cell.mark("headWorkerStarted")
 	if len(cell.gates) > 0 {
 		cell.downWG.Add(1)
@@ -701,6 +788,7 @@ func (cell *run) rollOver(ctx context.Context) error {
 	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
 		cell.reviveAPI()
 		cell.restartWorkerMidUpgrade(ctx)
+		cell.watchDamage(ctx)
 		status, _, err := get(ctx, httpClient, cell.headURL()+cell.options.SwitchOn)
 		return (err == nil && status/100 == 2) || cell.headDied()
 	})
@@ -740,7 +828,10 @@ func (cell *run) switchEarly(ctx context.Context) error {
 
 func (cell *run) stopFrom() {
 	cell.proc("from-app").Stop(20 * time.Second)
-	cell.proc("from-worker").Stop(20 * time.Second)
+	if !cell.drill(DrillOldWorker) { // the drill stops it oldWorkerLinger after the switch
+		cell.proc("from-worker").Stop(20 * time.Second)
+	}
+	cell.stopVia()
 	cell.mark("fromStopped")
 }
 
@@ -776,7 +867,8 @@ func (cell *run) reviveAPI() {
 }
 
 func (cell *run) startHeadWorker() error {
-	return cell.startHead("head-worker", "apps/worker", map[string]string{"WORKER_METRICS_PORT": itoa(mustPort()), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort())})
+	// VOICE_WS_PORT: the raw socket door defaults to 3300, which a parallel cell's worker may hold.
+	return cell.startHead("head-worker", "apps/worker", map[string]string{"WORKER_METRICS_PORT": itoa(mustPort()), "OTEL_EXPORTER_PROMETHEUS_PORT": itoa(mustPort()), "VOICE_WS_PORT": itoa(mustPort())})
 }
 
 func (cell *run) startHead(name, app string, extra map[string]string) error {
@@ -792,6 +884,7 @@ func (cell *run) awaitReady(ctx context.Context) error {
 	err := waitFor(ctx, cell.options.ReadyWithin, func() bool {
 		cell.reviveAPI()
 		cell.restartWorkerMidUpgrade(ctx)
+		cell.watchDamage(ctx)
 		return FirstAt(cell.poller.Timeline(), "ready") >= 0 || cell.headDied()
 	})
 	if err != nil || cell.headDied() {
@@ -805,7 +898,10 @@ func (cell *run) awaitReady(ctx context.Context) error {
 		cell.emptyAccount(ctx)
 	}
 	cell.grantOperator(ctx)
+	cell.lingerOldWorker(ctx)
 	cell.assertOldWritersGone(ctx)
+	cell.headTask(ctx, "upgrade-status-at-ready", "upgrade", "status")
+	cell.noteStores(ctx, "at ready")
 	ledger, err := Ledger(ctx, cell.stores)
 	cell.atReady = ledger
 	if err != nil {
@@ -925,7 +1021,7 @@ func (cell *run) shootPage(ctx context.Context, phase string, extra map[string]a
 	if phase == "down" {
 		return "", ""
 	}
-	if signIn {
+	if _, own := extra["url"]; signIn && !own { // a caller naming its own url manages its own sign-in
 		select { // a signed-in shot before the grant shows "Access Restricted"
 		case <-cell.granted:
 		case <-ctx.Done():

@@ -2373,7 +2373,7 @@ interface Input {
   includePrivateDataplane?: boolean;
   confirm?: "ENROLL";
 }
-// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:223
+// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:225
 interface Output {
   enrolled: {
     id: string;
@@ -2400,7 +2400,7 @@ interface Input {
   migrationName: string;
   confirm?: "RUN";
 }
-// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:239
+// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:241
 interface Output {
   status: "migrated" | "finalized" | "parked" | "rolled_back" | null;
   waiting: boolean;

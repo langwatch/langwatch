@@ -143,22 +143,23 @@ Declared at `src/eventing/web-push.pipeline.ts:98`.
 
 ## Configuration
 
-| Kind   | Leaf            | Environment variable | Declared at                                 |
-| ------ | --------------- | -------------------- | ------------------------------------------- |
-| secret | `sendgrid`      | `SENDGRID_API_KEY`   | `src/app/notification.app.ts:57`            |
-| secret | `smtpUrl`       | `SMTP_URL`           | `src/app/notification.app.ts:58`            |
-| secret | `smtpPassword`  | `SMTP_PASSWORD`      | `src/app/notification.app.ts:59`            |
-| secret | `resend`        | `RESEND_API_KEY`     | `src/app/notification.app.ts:60`            |
-| config | `defaultFrom`   | `EMAIL_DEFAULT_FROM` | `../contract/src/notification.config.ts:14` |
-| config | `provider`      | `EMAIL_PROVIDER`     | `../contract/src/notification.config.ts:15` |
-| config | `ses.enabled`   | `USE_AWS_SES`        | `../contract/src/notification.config.ts:17` |
-| config | `ses.region`    | `AWS_REGION`         | `../contract/src/notification.config.ts:18` |
-| config | `ses.endpoint`  | `AWS_SES_ENDPOINT`   | `../contract/src/notification.config.ts:19` |
-| config | `smtp.host`     | `SMTP_HOST`          | `../contract/src/notification.config.ts:22` |
-| config | `smtp.port`     | `SMTP_PORT`          | `../contract/src/notification.config.ts:23` |
-| config | `smtp.user`     | `SMTP_USER`          | `../contract/src/notification.config.ts:24` |
-| config | `smtp.secure`   | `SMTP_SECURE`        | `../contract/src/notification.config.ts:25` |
-| config | `publicBaseUrl` | `BASE_HOST`          | `../contract/src/notification.config.ts:28` |
-| config | `outboundProxy` | `HTTPS_PROXY`        | `../contract/src/notification.config.ts:30` |
+| Kind   | Leaf                 | Environment variable    | Declared at                                 |
+| ------ | -------------------- | ----------------------- | ------------------------------------------- |
+| secret | `sendgrid`           | `SENDGRID_API_KEY`      | `src/app/notification.app.ts:57`            |
+| secret | `smtpUrl`            | `SMTP_URL`              | `src/app/notification.app.ts:58`            |
+| secret | `smtpPassword`       | `SMTP_PASSWORD`         | `src/app/notification.app.ts:59`            |
+| secret | `resend`             | `RESEND_API_KEY`        | `src/app/notification.app.ts:60`            |
+| config | `defaultFrom`        | `EMAIL_DEFAULT_FROM`    | `../contract/src/notification.config.ts:20` |
+| config | `provider`           | `EMAIL_PROVIDER`        | `../contract/src/notification.config.ts:21` |
+| config | `ses.enabled`        | `USE_AWS_SES`           | `../contract/src/notification.config.ts:23` |
+| config | `ses.region`         | `AWS_REGION`            | `../contract/src/notification.config.ts:24` |
+| config | `ses.endpoint`       | `AWS_SES_ENDPOINT`      | `../contract/src/notification.config.ts:25` |
+| config | `smtp.host`          | `SMTP_HOST`             | `../contract/src/notification.config.ts:28` |
+| config | `smtp.port`          | `SMTP_PORT`             | `../contract/src/notification.config.ts:29` |
+| config | `smtp.user`          | `SMTP_USER`             | `../contract/src/notification.config.ts:30` |
+| config | `smtp.secure`        | `SMTP_SECURE`           | `../contract/src/notification.config.ts:31` |
+| config | `publicBaseUrl`      | `BASE_HOST`             | `../contract/src/notification.config.ts:34` |
+| config | `outboundProxy`      | `HTTPS_PROXY`           | `../contract/src/notification.config.ts:36` |
+| config | `webPushServiceBase` | `WEB_PUSH_SERVICE_BASE` | `../contract/src/notification.config.ts:38` |
 
 <!-- readme:generated:end -->

@@ -1,12 +1,13 @@
 /** Pins every outcome of a claimed job as the ordered calls it makes; see ADR-090 and ADR-080. */
 
+import { nowInstant } from "@langwatch/time";
 import { Redis as IORedis } from "ioredis";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { EnvelopeBlobLifecycle } from "../envelopeBlobLifecycle.ts";
-import { NonRetryableGroupQueueError } from "../errors.ts";
-import { GroupQueueProcessor } from "../groupQueue.ts";
+import { HandBackGroupQueueError, NonRetryableGroupQueueError } from "../errors.ts";
+import { GroupQueueProcessor, HAND_BACK_CONFIG, handBackOutcome } from "../groupQueue.ts";
 import { PayloadTooLargeError } from "../jobEnvelope.ts";
 import { type DrainedJob, GroupStagingScripts } from "../scripts.ts";
 import { TransientBlobStoreError } from "../tieredBlobStore.ts";
@@ -314,5 +315,102 @@ describe("given a coalesced batch that fails", () => {
 
       expect(named(calls, "handler.processBatch").length).toBeGreaterThan(1);
     });
+  });
+});
+
+describe("given a claimed job this worker has no handler for", () => {
+  const callsNamed = (calls: unknown[], name: string): unknown[][] =>
+    calls.flatMap((call) =>
+      Array.isArray(call) && call[0] === name ? [call[1] as unknown[]] : [],
+    );
+  const handedBackJob = (handedBackSince?: number): string =>
+    JSON.stringify({
+      id: "job-1",
+      groupId: GROUP,
+      __jobName: "job",
+      __attempt: 1,
+      ...(handedBackSince === undefined ? {} : { __handedBackSince: handedBackSince }),
+    });
+  const runHandedBack = async (handedBackSince?: number) => {
+    const { processor, calls } = recordingProcessor({
+      process: async () => {
+        throw new HandBackGroupQueueError("no handler registered in this worker");
+      },
+    });
+    const warn = vi.spyOn(processor["logger"], "warn");
+    const error = vi.spyOn(processor["logger"], "error");
+    await processor["processClaimedJob"]({
+      stagedJobId: "job-1",
+      groupId: GROUP,
+      jobDataJson: handedBackJob(handedBackSince),
+      originalScore: 1000,
+    });
+    return { calls, warn, error };
+  };
+
+  describe("when the handler hands it back", () => {
+    /** @scenario "A handed-back job keeps its attempt count and its group is not blocked" */
+    it("re-stages it on the same attempt without counting a failure", async () => {
+      const { calls, warn } = await runHandedBack();
+
+      expect(callsNamed(calls, "scripts.retryRestage")).toEqual([
+        [expect.objectContaining({ attempt: 1 })],
+      ]);
+      expect(callsNamed(calls, "blob.encode")).toEqual([
+        [
+          expect.objectContaining({
+            jobData: expect.objectContaining({
+              __attempt: 1,
+              __handedBackSince: expect.any(Number),
+            }),
+          }),
+        ],
+      ]);
+      expect(callsNamed(calls, "scripts.recordGroupFailure")).toHaveLength(0);
+      expect(callsNamed(calls, "scripts.restageAndBlock")).toHaveLength(0);
+      expect(warn.mock.calls.map((call) => call[1])).toContain(
+        "No handler for this job in this worker; handed it back without using an attempt",
+      );
+    });
+  });
+
+  describe("when it was first handed back longer ago than the window", () => {
+    /** @scenario "A job handed back for longer than the window spends attempts at error" */
+    it("retries it on the next attempt, counts the failure and logs at error", async () => {
+      const since = nowInstant().epochMilliseconds - HAND_BACK_CONFIG.windowMs - 60_000;
+      const { calls, error } = await runHandedBack(since);
+
+      expect(callsNamed(calls, "scripts.recordGroupFailure")).toHaveLength(1);
+      expect(callsNamed(calls, "scripts.retryRestage")).toEqual([
+        [expect.objectContaining({ attempt: 2 })],
+      ]);
+      expect(callsNamed(calls, "blob.encode")).toEqual([
+        [
+          expect.objectContaining({
+            jobData: expect.objectContaining({ __attempt: 2, __handedBackSince: since }),
+          }),
+        ],
+      ]);
+      expect(error.mock.calls.map((call) => call[1])).toContain(
+        "No worker has run this job since it was first handed back; spending its attempts so it surfaces",
+      );
+    });
+  });
+});
+
+describe("handBackOutcome", () => {
+  /** @scenario "The hand-back window starts at the first hand-back" */
+  it("starts the window at the first hand-back and keeps a later start unchanged", () => {
+    expect(handBackOutcome({ handedBackSince: undefined, now: 5_000 })).toEqual({
+      kind: "hand-back",
+      since: 5_000,
+    });
+    expect(handBackOutcome({ handedBackSince: 1_000, now: 5_000 })).toEqual({
+      kind: "hand-back",
+      since: 1_000,
+    });
+    expect(
+      handBackOutcome({ handedBackSince: 1_000, now: 1_000 + HAND_BACK_CONFIG.windowMs }),
+    ).toEqual({ kind: "spend-attempt", since: 1_000 });
   });
 });

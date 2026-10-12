@@ -11,6 +11,8 @@ import { dirname } from "node:path";
 import { createInterface } from "node:readline";
 import { clearTimeout, setTimeout } from "node:timers";
 
+import { nowInstant } from "@langwatch/time";
+
 import { exitCause } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import type { ServiceName, ServicePaths } from "./paths.ts";
@@ -27,6 +29,8 @@ export type SupervisedHandle = {
   name: string;
   pid: number;
   child: ChildProcess;
+  /** True once the supervisor gave up on it: it died before healthy or spent its restarts. */
+  readonly crashed: boolean;
   stop(): Promise<void>;
 };
 
@@ -38,6 +42,9 @@ export type RestartPolicy = {
   /** Uptime after which the restart counter resets to zero. */
   steadyUptimeMs: number;
 };
+
+/** Windows has no process groups to signal; there the child alone is stopped, as before. */
+const OWN_PROCESS_GROUP = process.platform !== "win32";
 
 export const DEFAULT_RESTART_POLICY: RestartPolicy = {
   maxRestarts: 3,
@@ -60,12 +67,24 @@ type SupervisionState = {
   pidPath: string;
   currentChild: ChildProcess;
   stopped: boolean;
+  crashed: boolean;
   hasBeenHealthy: boolean;
   restartCount: number;
   backoffTimer: NodeJS.Timeout | null;
   steadyTimer: NodeJS.Timeout | null;
   untap: () => void;
 };
+
+// Every supervisor still running, in launch order, so a shutdown during boot
+// reaches the children whose start helper has not returned a handle yet.
+const running = new Set<SupervisionState>();
+
+/** Stops every supervised service still running, the last launched first. */
+export async function stopEverySupervised(): Promise<void> {
+  for (const state of [...running].reverse()) {
+    await stopSupervised(state);
+  }
+}
 
 // Supervise a child process. Tee stdout/stderr to log file, emit log events
 // on bus. Crash policy: boot failure before healthy, retried with backoff after.
@@ -95,6 +114,7 @@ export function supervise({
     firstChild: first.child,
   });
   superviseAttempt(state, first);
+  running.add(state);
 
   return {
     name: spec.name,
@@ -103,6 +123,9 @@ export function supervise({
     },
     get child() {
       return state.currentChild;
+    },
+    get crashed() {
+      return state.crashed;
     },
     stop: () => stopSupervised(state),
   };
@@ -131,6 +154,7 @@ function makeSupervisionState({
     pidPath,
     currentChild: firstChild,
     stopped: false,
+    crashed: false,
     hasBeenHealthy: false,
     restartCount: 0,
     backoffTimer: null,
@@ -155,7 +179,8 @@ function launchAttempt({ spec, logPath }: { spec: SpawnSpec; logPath: string }):
     env: spec.env,
     cwd: spec.cwd,
     stdio: ["ignore", "pipe", "pipe"],
-    detached: false,
+    // Its own process group, so a stop reaches what a wrapper (pnpm, sh) started under it.
+    detached: OWN_PROCESS_GROUP,
   });
   return { child, logStream };
 }
@@ -281,6 +306,8 @@ function emitCrashed(state: SupervisionState, { code, signal, logStream }: ExitI
   );
   logStream.end();
   state.untap();
+  running.delete(state);
+  state.crashed = true;
   state.bus.emit({
     type: "crashed",
     service: state.spec.name,
@@ -292,6 +319,7 @@ function emitCrashed(state: SupervisionState, { code, signal, logStream }: ExitI
 async function stopSupervised(state: SupervisionState): Promise<void> {
   if (state.stopped) return;
   state.stopped = true;
+  running.delete(state);
   state.untap();
   if (state.backoffTimer) {
     // The child already exited and a respawn is pending: cancel it. No
@@ -307,13 +335,49 @@ async function stopSupervised(state: SupervisionState): Promise<void> {
 }
 
 async function killWithEscalation(child: ChildProcess): Promise<void> {
-  const hasExited = child.exitCode !== null || child.signalCode !== null;
-  if (hasExited || !child.pid || child.killed) return;
-  child.kill("SIGTERM");
-  const exited = await waitForExit(child, 10_000);
-  if (exited) return;
-  child.kill("SIGKILL");
-  await waitForExit(child, 5_000);
+  if (!OWN_PROCESS_GROUP) {
+    const hasExited = child.exitCode !== null || child.signalCode !== null;
+    if (hasExited || !child.pid || child.killed) return;
+    child.kill("SIGTERM");
+    if (await waitForExit(child, 10_000)) return;
+    child.kill("SIGKILL");
+    await waitForExit(child, 5_000);
+    return;
+  }
+  const group = child.pid;
+  if (!group || !isGroupAlive(group)) return;
+  signalGroup(group, "SIGTERM");
+  if (await waitForGroupExit(group, 10_000)) return;
+  signalGroup(group, "SIGKILL");
+  await waitForGroupExit(group, 5_000);
+}
+
+function signalGroup(group: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(-group, signal);
+  } catch {
+    // The group is already gone.
+  }
+}
+
+function isGroupAlive(group: number): boolean {
+  try {
+    process.kill(-group, 0);
+    return true;
+  } catch (err) {
+    // EPERM: a member exists that this process may not signal; it is still alive.
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/** Waits until no process is left in the group: the wrapper and everything it started. */
+async function waitForGroupExit(group: number, timeoutMs: number): Promise<boolean> {
+  const deadline = nowInstant().epochMilliseconds + timeoutMs;
+  while (nowInstant().epochMilliseconds < deadline) {
+    if (!isGroupAlive(group)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return !isGroupAlive(group);
 }
 
 function pipeLines({

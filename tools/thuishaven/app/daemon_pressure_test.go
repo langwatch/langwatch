@@ -31,7 +31,7 @@ func govern(o *Orchestrator) {
 // twoStacks returns a focused stack (most recently updated, so first) and an
 // unfocused one behind it, both live.
 func twoStacks() (*fakeStore, *fakeSystem) {
-	store := &fakeStore{stacks: []domain.Stack{
+	store := &fakeStore{focus: "focused", stacks: []domain.Stack{
 		{Slug: "focused", LauncherPID: 100},
 		{Slug: "background", LauncherPID: 200},
 	}}
@@ -126,7 +126,7 @@ func TestGovernorDemotesEveryStackButTheFocusedOne(t *testing.T) {
 func TestGovernorNeverSignalsAZeroLauncher(t *testing.T) {
 	t.Run("given a registered stack whose launcher pid was never recorded", func(t *testing.T) {
 		newStore := func() *fakeStore {
-			return &fakeStore{stacks: []domain.Stack{
+			return &fakeStore{focus: "focused", stacks: []domain.Stack{
 				{Slug: "focused", LauncherPID: 100},
 				{Slug: "unrecorded", LauncherPID: 0},
 			}}

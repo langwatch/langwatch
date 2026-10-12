@@ -74,27 +74,6 @@ describe("explainHandledError", () => {
       expect(description).toBe('There\'s no field called "trace.durationn".');
     });
 
-    /** @scenario "An Auth0 misconfiguration names the setting an administrator must change" */
-    it.each([
-      ["insufficient_scope", "enable the update:users scope"],
-      ["password_grant_not_enabled", "Advanced Settings → Grant Types"],
-      ["not_configured", "Set AUTH0_ISSUER"],
-      ["failed", "check the sign-in configuration"],
-      [42, "check the sign-in configuration"],
-    ])("names the Auth0 fix for reason %s", (reason, fix) => {
-      const { title, description } = explainHandledError(
-        shape({
-          code: "federated_password_change_unavailable",
-          meta: { reason },
-          httpStatus: 502,
-          fault: "platform",
-        }),
-      );
-
-      expect(title).toBe("We couldn't change your password");
-      expect(description).toContain(fix);
-    });
-
     /** @scenario "meta is read only where the client knows its shape" */
     it("titles a refused test fire as not sent, its reason naming the fix", () => {
       const { title, description } = explainHandledError(
@@ -1173,5 +1152,56 @@ describe("webhook_endpoint_invalid", () => {
     );
 
     expect(description).toContain("reserved");
+  });
+});
+
+describe("codex_auth_failed", () => {
+  const codex = (kind: string) =>
+    explainHandledError(shape({ code: "codex_auth_failed", httpStatus: 401, meta: { kind } }));
+
+  describe("when the OpenAI session ran out", () => {
+    it("says to sign in to Codex again, never to check a key", () => {
+      const { title, description } = codex("refresh_rejected");
+
+      expect(title).toBe("Your OpenAI session expired");
+      expect(description).toContain("Sign in to Codex again");
+      expect(description).not.toContain("key");
+    });
+  });
+
+  describe("when the device code expired before approval", () => {
+    it("says the code expired and offers a new one", () => {
+      const { title, description } = codex("sign_in_expired");
+
+      expect(title).toBe("The sign-in code expired");
+      expect(description).toContain("Start the sign-in again");
+    });
+  });
+
+  describe("when the failure is OpenAI's own", () => {
+    it("keeps the generic sign-in line", () => {
+      const { title, description } = codex("http");
+
+      expect(title).toBe("OpenAI sign-in didn't go through");
+      expect(description).toContain("Connect it again");
+    });
+  });
+});
+
+describe("provider_usage_limit_reached", () => {
+  it("explains the plan's allowance, never the key", () => {
+    const { title, description } = explainSerializedError({
+      code: "provider_usage_limit_reached",
+      kind: "provider_usage_limit_reached",
+      retryable: false,
+      meta: { provider: "openai_codex" },
+      httpStatus: 429,
+      fault: "customer",
+      reasons: [],
+    });
+
+    expect(title).toBe("That plan is over its usage limit");
+    expect(description).toContain("allowance resets");
+    expect(description).not.toContain("copied the whole key");
   });
 });

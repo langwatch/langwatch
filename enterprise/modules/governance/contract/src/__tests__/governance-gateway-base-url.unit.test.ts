@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { governanceGatewayBaseUrl } from "../governance.config.ts";
 
+const noVendorBases = {
+  openAiAdminApiBase: undefined,
+  anthropicAdminApiBase: undefined,
+  microsoftLoginBase: undefined,
+  microsoftGraphApiBase: undefined,
+  databricksWorkspaceBase: undefined,
+  dataverseEnvironmentBase: undefined,
+};
+
 describe("where an issued personal key tells its holder to send traffic", () => {
   it("prefers the public gateway URL over the legacy base URL", () => {
     expect(
@@ -15,6 +24,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
           blockLocalHttpCalls: false,
           allowedProxyHosts: [],
           ingestRateLimitDisabled: false,
+          ...noVendorBases,
         },
       }),
     ).toBe("https://gw.example");
@@ -32,6 +42,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
           blockLocalHttpCalls: false,
           allowedProxyHosts: [],
           ingestRateLimitDisabled: false,
+          ...noVendorBases,
         },
       }),
     ).toBe("https://old.example");
@@ -46,6 +57,7 @@ describe("where an issued personal key tells its holder to send traffic", () => 
       blockLocalHttpCalls: false,
       allowedProxyHosts: [],
       ingestRateLimitDisabled: false,
+      ...noVendorBases,
     };
 
     expect(governanceGatewayBaseUrl({ config: { ...unset, isSaas: true } })).toBe(

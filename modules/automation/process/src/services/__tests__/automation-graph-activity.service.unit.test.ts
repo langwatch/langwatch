@@ -33,6 +33,9 @@ import { AutomationWebhookSecretsService } from "../automation-webhook-secrets.s
 const storesConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
+  queueConcurrency: undefined,
+  queueTenantCap: undefined,
+  queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,
   clickhousePool: {
     override: undefined,

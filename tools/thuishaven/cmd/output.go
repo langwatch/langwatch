@@ -204,10 +204,27 @@ func runStatus(_ context.Context, d deps, inv invocation) error {
 		_, werr := os.Stdout.Write(raw)
 		return werr
 	}
-	for _, name := range []string{"jobs", "stores"} {
-		report[name] = statusTabRows(d, slug, name)
+	report["stores"] = statusTabRows(d, slug, "stores")
+	if d.isAgent {
+		report["jobs"] = agentJobRows(d, slug)
+	} else {
+		report["jobs"] = statusTabRows(d, slug, "jobs")
 	}
 	return json.NewEncoder(os.Stdout).Encode(report)
+}
+
+// agentJobTail is how many output lines an agent's status keeps per job.
+const agentJobTail = 20
+
+// agentJobRows is the jobs an agent reads: the last run per job and the tail
+// of its output, not every run of this up with each one's whole log.
+func agentJobRows(d deps, slug string) any {
+	tab, ok := statusTab(d, slug, "jobs")
+	jobs, isJobs := tab.(*viewer.JobsTab)
+	if !ok || !isJobs {
+		return []any{}
+	}
+	return jobs.LatestRuns(agentJobTail)
 }
 
 // statusTab is one viewer tab for this stack, polled once, as the tab commands read it.
@@ -217,7 +234,8 @@ func statusTab(d deps, slug, name string) (viewer.Tab, bool) {
 	}
 	m := newViewerModel(slug, d.orch.LogPath(slug), d.orch.LogDir(slug))
 	m.enableDashboard(d.sessionActions(slug), false)
-	m.ingest()
+	// No ingest: neither jobs nor stores reads the parsed log tail, so its
+	// whole-log parse was paid for nothing on every status.
 	tab, ok := m.tabs[name]
 	if ok {
 		tab.Poll()

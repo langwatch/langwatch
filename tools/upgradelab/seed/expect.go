@@ -8,7 +8,7 @@ import (
 )
 
 // RecipeVersion is the generator recipe this upgradelab writes and reads; a manifest's recipe.version.
-const RecipeVersion = 1
+const RecipeVersion = 3 // 3: organizations first, a tenth of the telemetry sent in waves; 2: drain before the cut, then a small trickle
 
 // CheckRecipe refuses a recipe version this upgradelab does not know, naming it and the known one.
 func CheckRecipe(version int) error {

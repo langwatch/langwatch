@@ -18,6 +18,8 @@ const organizationInitializedSchemaDefinition = z
     teamId: z.string().min(1),
     organizationId: z.string().min(1),
     projectSlug: z.string().nullable(),
+    /** False while the founder's grants are still landing: the screen waits, then continues. */
+    grantsConfirmed: z.boolean(),
   })
   .strict();
 export interface OrganizationInitializedSchema extends Named<

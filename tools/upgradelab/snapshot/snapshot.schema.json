@@ -116,6 +116,7 @@
       }
     },
     "objectCount": { "type": "integer" },
+    "queueDepthAtCut": { "type": "integer" },
     "expect": {
       "type": "object",
       "required": ["exitCode", "outcome", "steps"],

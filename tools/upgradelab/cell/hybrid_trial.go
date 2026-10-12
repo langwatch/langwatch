@@ -10,6 +10,7 @@ import (
 	neturl "net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -122,12 +123,16 @@ func GatedURL(url string, port int) string {
 	return parsed.String()
 }
 
-// PrivateTargetsFor adds a second private organization at tier M (trial T7, UM-11: two private targets);
-// the hybrid tenancy holds a fifth organization from M up.
-func PrivateTargetsFor(shape map[string]string, tier string) map[string]string {
+// PrivateTargetsFor adds a second private organization at tier M (trial T7, UM-11: two private targets). Only a tier M
+// snapshot holds the heavy tenancy's fifth organization; a live cell seeds tier S's four, so there the second
+// target takes organization 3, which exists (T7-F9: a route to an organization that does not exist got no traffic).
+func PrivateTargetsFor(shape map[string]string, tier string, fromSnapshot bool) map[string]string {
 	targets := maps.Clone(shape)
 	if tier == "M" && len(targets) > 0 {
-		targets["snap2"] = "snap_hybrid_org_5"
+		targets["snap2"] = "snap_hybrid_org_3"
+		if fromSnapshot {
+			targets["snap2"] = "snap_hybrid_org_5"
+		}
 	}
 	return targets
 }
@@ -181,36 +186,50 @@ func (cell *run) targetStates(ctx context.Context) (map[string]TargetState, erro
 	return ParseTargetStates(out), nil
 }
 
-// downState is what the private-down drill saw.
+// downState is what the private-down drill saw: which target went down, and when it caught up.
 type downState struct {
-	downAtMs, upAtMs int64
-	whileDown        map[string]TargetState
-	sharedDone       bool
-	readyWhileDown   bool
-	err              string
+	label                      string
+	downAtMs, upAtMs, caughtMs int64
+	whileDown                  map[string]TargetState
+	sharedDone                 bool
+	readyWhileDown             bool
+	err                        string
 }
 
-// holdPrivateDown (H8) takes every private target down as head's worker starts the upgrade, waits until the
-// shared target has no open step (at most five minutes), records what each target shows, then brings it back.
+// downTarget is the ledger target of the private label the drill takes down.
+func (cell *run) downTarget() string { return "private:" + cell.private[cell.down.label] }
+
+// holdPrivateDown (H8) takes the first private target down as head's worker starts the upgrade (any other private
+// target stays up), waits until the shared target has no open step and head is ready (at most eight minutes),
+// records what each target shows, brings it back, then waits for it to catch up (at most ten minutes).
 func (cell *run) holdPrivateDown(ctx context.Context) {
 	defer cell.downWG.Done()
-	for _, gate := range cell.gates {
-		gate.SetDown(true)
-	}
+	cell.down.label = slices.Sorted(maps.Keys(cell.gates))[0]
+	cell.gates[cell.down.label].SetDown(true)
 	cell.down.downAtMs = time.Since(cell.origin).Milliseconds()
-	cell.awaitSharedDone(ctx, time.Now().Add(5*time.Minute))
-	_ = sleep(ctx, 20*time.Second) // the private target stays down a while after the shared one finished
+	cell.awaitSharedDone(ctx, time.Now().Add(8*time.Minute))
+	_ = sleep(ctx, 20*time.Second) // the private target stays down a while after the rest finished
 	if states, err := cell.targetStates(ctx); err == nil {
 		cell.down.whileDown = states
 	}
-	cell.down.readyWhileDown = cell.poller != nil && FirstAt(cell.poller.Timeline(), "ready") >= 0
-	for _, gate := range cell.gates {
-		gate.SetDown(false)
-	}
+	cell.down.readyWhileDown = cell.readyReached()
+	cell.gates[cell.down.label].SetDown(false)
 	cell.down.upAtMs = time.Since(cell.origin).Milliseconds()
+	_ = waitFor(ctx, 10*time.Minute, func() bool {
+		states, err := cell.targetStates(ctx)
+		if state, ok := states[cell.downTarget()]; err == nil && ok && state.Open == 0 {
+			cell.down.caughtMs = time.Since(cell.origin).Milliseconds()
+			return true
+		}
+		return false
+	})
 }
 
-// awaitSharedDone polls the ledger until the shared target has no open step or the deadline passes.
+func (cell *run) readyReached() bool {
+	return cell.poller != nil && FirstAt(cell.poller.Timeline(), "ready") >= 0
+}
+
+// awaitSharedDone polls the ledger until the shared target has no open step and head is ready, or the deadline passes.
 func (cell *run) awaitSharedDone(ctx context.Context, deadline time.Time) {
 	for time.Now().Before(deadline) && ctx.Err() == nil {
 		states, err := cell.targetStates(ctx)
@@ -218,32 +237,53 @@ func (cell *run) awaitSharedDone(ctx context.Context, deadline time.Time) {
 			cell.down.err = err.Error()
 		} else if cell.down.whileDown, cell.down.err = states, ""; states["shared"].Total > 0 && states["shared"].Open == 0 {
 			cell.down.sharedDone = true
-			return
+			if cell.readyReached() {
+				return
+			}
 		}
 		_ = sleep(ctx, 2*time.Second)
 	}
 }
 
-// downVerdict (H8): while a private target was down the shared target finished and the private one was held,
-// shared traffic kept succeeding, and once it came back every target finished.
+// downVerdict (H8): while one private target was down it was held, the shared target and every other private
+// target finished, head became ready, no other organization's call failed, and once back it caught up.
 func (cell *run) downVerdict(ctx context.Context) Verdict {
 	final, err := cell.targetStates(ctx)
-	privateHeld, allDone := false, err == nil && len(final) == 1+len(cell.private)
+	down := cell.downTarget()
+	privateHeld, othersDone, allDone := cell.down.whileDown[down].Open > 0, len(cell.down.whileDown) == 1+len(cell.private), err == nil && len(final) == 1+len(cell.private)
 	for target, state := range cell.down.whileDown {
-		privateHeld = privateHeld || (target != "shared" && state.Open > 0)
+		othersDone = othersDone && (target == down || state.Open == 0)
 	}
 	for _, state := range final {
 		allDone = allDone && state.Open == 0
 	}
 	sharedFailed, privateAnswered := callsInWindow(cell.allCalls(), cell.down.downAtMs, cell.down.upAtMs)
-	detail := fmt.Sprintf("down %d..%d ms; while down: %v (shared finished: %t, ready reached: %t); after: %v %s; shared calls failed in the window: %d %v; private answers in the window: %v %s",
-		cell.down.downAtMs, cell.down.upAtMs, cell.down.whileDown, cell.down.sharedDone, cell.down.readyWhileDown, final, errText(err),
+	detail := fmt.Sprintf("%s down %d..%d ms, caught up at %d ms (0: never); while down: %v (shared finished: %t, others finished: %t, ready reached: %t); after: %v %s; other organizations' calls failed in the window: %d %v; the down organization's answers in the window: %v %s",
+		down, cell.down.downAtMs, cell.down.upAtMs, cell.down.caughtMs, cell.down.whileDown, cell.down.sharedDone, othersDone, cell.down.readyWhileDown, final, errText(err),
 		len(sharedFailed), sharedFailed[:min(len(sharedFailed), 5)], countStrings(privateAnswered), cell.down.err)
 	if !privateHeld && (cell.down.sharedDone || cell.down.readyWhileDown) {
 		return Verdict{ID: "H8", Name: invariantNames["H8"], Result: "inconclusive", Detail: "the private target never showed an open step while down; " + detail}
 	}
-	// No ledger row and no ready while down: the whole upgrade waited on the private target.
-	return verdict("H8", cell.down.sharedDone && allDone && len(sharedFailed) == 0, detail)
+	return verdict("H8", privateHeld && othersDone && cell.down.readyWhileDown && cell.down.caughtMs > 0 && allDone && len(sharedFailed) == 0 && OnlyRefusals(privateAnswered), detail)
+}
+
+// downExcused counts the down organization's failed calls inside the H8 window, which N2 leaves to H8.
+func (cell *run) downExcused() int {
+	if cell.down.upAtMs == 0 || cell.privateTraffic == nil {
+		return 0
+	}
+	excused := 0
+	for _, call := range cell.privateTraffic.Calls() {
+		if !call.ok() && call.AtMs >= cell.down.downAtMs && call.AtMs <= cell.down.upAtMs {
+			excused++
+		}
+	}
+	return excused
+}
+
+// OnlyRefusals is true when every answer is a 2xx or a 503: a down target is refused, never a bare 500.
+func OnlyRefusals(statuses []string) bool {
+	return !slices.ContainsFunc(statuses, func(status string) bool { return !strings.HasPrefix(status, "2") && status != "503" })
 }
 
 // callsInWindow answers the shared calls that failed between from and to, and the private calls' statuses.
@@ -445,12 +485,13 @@ func collectorEval(ctx context.Context, client Client, n int) (*http.Request, st
 
 // routeProbe is one H7 variant: head's api booted with the private route missing or malformed.
 type routeProbe struct {
-	Variant    string         `json:"variant"`
-	Booted     bool           `json:"booted"`
-	BootNote   string         `json:"bootNote,omitempty"`
-	Answers    map[string]int `json:"answers,omitempty"`
-	Bodies     []string       `json:"bodies,omitempty"`
-	LogMatches []string       `json:"logMatches,omitempty"`
+	Variant    string            `json:"variant"`
+	Booted     bool              `json:"booted"`
+	BootNote   string            `json:"bootNote,omitempty"`
+	Answers    map[string]int    `json:"answers,omitempty"`
+	Bodies     []string          `json:"bodies,omitempty"`
+	Codes      map[string]string `json:"codes,omitempty"`
+	LogMatches []string          `json:"logMatches,omitempty"`
 }
 
 // routeBrokenDrill (H7) boots a second head api twice beside the settled cell, once without the private
@@ -460,15 +501,27 @@ func (cell *run) routeBrokenDrill(ctx context.Context) error {
 		return nil
 	}
 	trace, _ := cell.firstPrivateWrites()
-	for label, organization := range cell.private {
-		key := "CLICKHOUSE_URL__" + label + "__" + organization
-		for _, variant := range []string{"missing", "malformed"} {
-			cell.routeProbes = append(cell.routeProbes, cell.probeRoute(ctx, routeBreak{variant: variant, key: key, trace: trace}))
-		}
+	_ = waitFor(ctx, 7*time.Minute, func() bool { return cell.routesRecorded(ctx) >= len(cell.private) })
+	// Only the organization whose key and trace the probe asks with: breaking another's route probed a healthy one (T7-F20).
+	key := "CLICKHOUSE_URL__" + cell.privateLabel + "__" + cell.private[cell.privateLabel]
+	for _, variant := range []string{"missing", "malformed"} {
+		cell.routeProbes = append(cell.routeProbes, cell.probeRoute(ctx, routeBreak{variant: variant, key: key, trace: trace}))
 	}
 	misplaced, _, err := cell.placement(ctx)
 	cell.routeAfter, cell.routeAfterErr = misplaced, err
 	return nil
+}
+
+// routesRecorded reads which organizations head's worker recorded as privately routed (T7-F2/F3), keeping the rows
+// for the report, and answers how many carry a ClickHouse label.
+func (cell *run) routesRecorded(ctx context.Context) int {
+	out, err := psql(ctx, cell.stores.psqlURL(), `SELECT id, coalesce("privateClickHouseLabel", '-'), coalesce("privateS3Label", '-'), "privateDataplaneSeenAt" IS NOT NULL FROM mydb."Organization" WHERE "privateClickHouseLabel" IS NOT NULL OR "privateS3Label" IS NOT NULL ORDER BY id`)
+	if err != nil {
+		cell.routeRecords = "read failed: " + err.Error()
+		return 0
+	}
+	cell.routeRecords = strings.ReplaceAll(strings.TrimSpace(out), "\n", "; ")
+	return len(slices.DeleteFunc(strings.Split(strings.TrimSpace(out), "\n"), func(line string) bool { return !strings.Contains(line, "|") }))
 }
 
 // brokenRouteEnv is env with the private route dropped (missing) or replaced by a value that is no URL (malformed).
@@ -528,9 +581,21 @@ func (cell *run) askProbe(ctx context.Context, probe *routeProbe, broken routeBr
 		"search": {http.MethodPost, base + "/api/traces/search", client.APIKey, fmt.Sprintf(`{"startDate": %d, "endDate": %d, "pageSize": 5}`, now-86_400_000, now)},
 	}
 	for kind, read := range reads {
-		status, text := readAs(ctx, read)
+		// /healthz answers before the api serves: wait out its "is starting" 503 (T7-F19).
+		var status int
+		var text string
+		_ = waitFor(ctx, 2*time.Minute, func() bool {
+			status, text = readAs(ctx, read)
+			return status != http.StatusServiceUnavailable || !strings.Contains(text, "is starting")
+		})
 		probe.Answers[kind] = status
 		probe.Bodies = append(probe.Bodies, fmt.Sprintf("%s: %.200s", kind, text))
+		if match := errorCode.FindStringSubmatch(text); match != nil {
+			if probe.Codes == nil {
+				probe.Codes = map[string]string{}
+			}
+			probe.Codes[kind] = match[1]
+		}
 	}
 	request, _, err := otlpTrace(ctx, client, 9_000_001)
 	if err != nil {
@@ -557,15 +622,17 @@ func logLines(path string, needles []string, limit int) []string {
 	return found
 }
 
-// RefusedClearly is true when the probe never served the private organization from another target. It refused to boot,
-// or answered the private reads with an error that is not a plain 2xx or 404 (a 404 is the shared target answering).
+// errorCode is the code of a canonical error body.
+var errorCode = regexp.MustCompile(`"code":"([a-z_]+)"`)
+
+// RefusedClearly is true when the probe never served the private organization from another target: it refused to boot,
+// or answered each private read 503 private_dataplane_unavailable (T7-F2/F3); a 2xx, a 404 or a bare 500 is not clear.
 func RefusedClearly(probe routeProbe) bool {
 	if !probe.Booted {
 		return true
 	}
 	for _, kind := range []string{"trace", "search"} {
-		status := probe.Answers[kind]
-		if status/100 == 2 || status == http.StatusNotFound || status == 0 {
+		if probe.Answers[kind] != http.StatusServiceUnavailable || probe.Codes[kind] != "private_dataplane_unavailable" {
 			return false
 		}
 	}
@@ -582,7 +649,7 @@ func (cell *run) routeVerdict() Verdict {
 		refused = refused && RefusedClearly(probe)
 	}
 	return verdict("H7", refused && cell.routeAfterErr == nil && len(cell.routeAfter) == 0,
-		fmt.Sprintf("probes %+v; misplaced after the probes: %v %s", cell.routeProbes, cell.routeAfter, errText(cell.routeAfterErr)))
+		fmt.Sprintf("recorded routes [%s]; probes %+v; misplaced after the probes: %v %s", cell.routeRecords, cell.routeProbes, cell.routeAfter, errText(cell.routeAfterErr)))
 }
 
 // dataplanesVerdict (H9): Ops > Upgrades opens a Dataplanes tab listing every private target by organization.
@@ -593,6 +660,8 @@ func (cell *run) dataplanesVerdict(ctx context.Context) Verdict {
 	organizations := slices.Sorted(maps.Values(cell.private)) // the tab names each target private:<organization>
 	text, file := cell.shootPage(ctx, "dataplanes", map[string]any{"open": "Dataplanes", "expect": "private:" + organizations[0]})
 	missing := slices.DeleteFunc(slices.Clone(organizations), func(organization string) bool { return strings.Contains(text, "private:"+organization) })
-	return verdict("H9", strings.HasPrefix(text, "selected tab: Dataplanes\n") && len(missing) == 0,
-		fmt.Sprintf("%s; targets missing from the tab: %v; text: %.400q", file, missing, text[max(0, strings.Index(text, "Target")):]))
+	table := text[max(0, strings.Index(text, "Target")):]
+	shared := strings.Contains(strings.ToLower(table), "shared") // T7-F5: the shared target is listed too
+	return verdict("H9", strings.HasPrefix(text, "selected tab: Dataplanes\n") && len(missing) == 0 && shared,
+		fmt.Sprintf("%s; targets missing from the tab: %v; shared listed: %t; text: %.700q", file, missing, shared, table))
 }

@@ -44,7 +44,7 @@ export const newest = (summaries: readonly Summary[]): Summary | undefined =>
  */
 export const mail: Action = async (context) => {
   const { mailUrl } = context;
-  if (mailUrl === undefined) throw new Error("this side has no mail sink (services/mailsim)");
+  if (mailUrl === undefined) throw new Error("this side has no mail sink (services/sims/mailsim)");
   const query = new URLSearchParams({ to: argument({ context, name: "to" }) });
   if (context.args.subject !== undefined) query.set("subject", context.args.subject);
   const { request } = context.side.page;

@@ -26,13 +26,25 @@ export class IdentityIdentifierBackfillMigrationService implements SystemMigrati
   // Cloud startup includes every user without operator enrollment.
   readonly enrolledAutomatically = true;
 
-  static create(
-    backfill: Pick<IdentityBackfillService, "migrateUser">,
-  ): IdentityIdentifierBackfillMigrationService {
-    return new IdentityIdentifierBackfillMigrationService(backfill);
+  // Paced by the queue: its commands are the worker's to append, so it waits while they pile up.
+  readonly pauseWhileQueuedAbove: number;
+
+  static create({
+    backfill,
+    maxQueuedJobs,
+  }: {
+    backfill: Pick<IdentityBackfillService, "migrateUser">;
+    maxQueuedJobs: number;
+  }): IdentityIdentifierBackfillMigrationService {
+    return new IdentityIdentifierBackfillMigrationService(backfill, maxQueuedJobs);
   }
 
-  private constructor(private readonly backfill: Pick<IdentityBackfillService, "migrateUser">) {}
+  private constructor(
+    private readonly backfill: Pick<IdentityBackfillService, "migrateUser">,
+    maxQueuedJobs: number,
+  ) {
+    this.pauseWhileQueuedAbove = maxQueuedJobs;
+  }
 
   async migrateTenant({ tenantId }: { tenantId: string }): Promise<TenantMigrationOutcome> {
     // Nothing here consults `previous`: the pass re-reads the legacy rows

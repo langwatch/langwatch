@@ -35,6 +35,12 @@ function readLaneReserveShare(value: unknown): number | undefined {
   return undefined;
 }
 
+/** Blank means unset, so an empty chart value keeps the default instead of reading as 0. */
+const unsetWhenBlank = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().optional(),
+);
+
 export const storesOwner = {
   name: "stores",
   config: Config.define((c) => ({
@@ -51,6 +57,12 @@ export const storesOwner = {
       "SHUTDOWN_DRAIN_TIMEOUT_MS",
       z.preprocess(readDrainTimeoutMs, z.number().int().positive().optional()),
     ),
+    /** Queue policy, main's names: jobs run at once per worker (default 100). */
+    queueConcurrency: c.env("GLOBAL_QUEUE_CONCURRENCY", unsetWhenBlank),
+    /** Per-tenant in-flight soft cap (default 50); "0" turns the cap off. */
+    queueTenantCap: c.env("LANGWATCH_DISPATCH_TENANT_CAP", unsetWhenBlank),
+    /** Fleet in-flight budget the tenants share; unset or "0" keeps the fixed cap. */
+    queueGlobalBudget: c.env("LANGWATCH_DISPATCH_GLOBAL_BUDGET", unsetWhenBlank),
     clickhousePool: {
       override: c.env("CLICKHOUSE_MAX_OPEN_CONNECTIONS", z.coerce.number().optional()),
       replicas: c.env("CLICKHOUSE_CLIENT_REPLICAS", z.coerce.number().optional()),

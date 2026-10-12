@@ -37,6 +37,7 @@ interface OrganizationInitializationDependencies {
     Readonly<{
       organization: Readonly<{ id: string; name: string }>;
       team: Readonly<{ id: string; slug: string; name: string }>;
+      grantsConfirmed: boolean;
     }>
   >;
   ensurePersonalWorkspace(
@@ -97,6 +98,7 @@ export class OrganizationInitializationService {
         teamName: created.team.name,
         teamId: created.team.id,
         organizationId: created.organization.id,
+        grantsConfirmed: created.grantsConfirmed,
       };
     } catch (error) {
       this.deps.signals.reportError(error);

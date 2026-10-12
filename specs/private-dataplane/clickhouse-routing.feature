@@ -194,6 +194,13 @@ Feature: Private ClickHouse Routing
     Then resolution fails with an error naming the tenant
     And the shared client is not returned
 
+  @unit
+  Scenario: An organization created after a process booted resolves on its next lookup
+    Given a long-lived worker that looked up an organization before it was created
+    When the organization is created and the worker looks it up again
+    Then the lookup reads Postgres again and answers that organization
+    # T0-F11: a refusal is never remembered, so a new tenant is never stuck unroutable.
+
   # ---------------------------------------------------------------------------
   # Access discipline
   # ---------------------------------------------------------------------------
@@ -282,3 +289,25 @@ Feature: Private ClickHouse Routing
     When the routed client is resolved for that tenant
     Then it answers the shared ClickHouse
     And no project, organization or user is looked up to get there
+
+  @unit
+  Scenario: A read whose ClickHouse stops answering is refused as clickhouse_unavailable
+    Given the private ClickHouse for "org123" drops every connection
+    When a read for one of its projects runs out of retries on "read ECONNRESET"
+    Then the read fails with the handled 503 "clickhouse_unavailable"
+    And the dropped connection is kept as its reason
+    But a ClickHouse server error is passed through unchanged
+
+  @unit
+  Scenario: A ClickHouse that comes back answers again with no restart
+    Given a read refused as clickhouse_unavailable because its ClickHouse refused or dropped the connection
+    When the ClickHouse answers again
+    Then the next read on the same process succeeds on the same vendor client
+    And no client, socket or route is kept in a failed state
+
+  @unit
+  Scenario: A read the ClickHouse server refuses as too many simultaneous queries is refused as clickhouse_overloaded
+    Given the ClickHouse server refuses every read with code 202 "Too many simultaneous queries"
+    When a read runs out of retries on that refusal
+    Then the read fails with the handled 503 "clickhouse_overloaded"
+    And the server's refusal is kept as its reason

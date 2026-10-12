@@ -35,6 +35,19 @@ Feature: The deployment's sign-in providers mount on Better Auth
     Then google, github and auth0 are all mounted
 
   @unit
+  Scenario: A social provider reaches the real host unless a base is set
+    Given google and github are mounted and no sign-in base is set
+    When Better Auth builds the google and github sign-in links
+    Then both links point at the real provider
+
+  @unit
+  Scenario: A social provider reaches the base a deployment names
+    Given google and github are mounted and a sign-in base is set for each
+    When Better Auth builds a sign-in link and exchanges the code
+    Then the link and the token, user and email calls all go to that base
+    And gitlab and microsoft take their base as issuer and authority
+
+  @unit
   Scenario: Email mode mounts no social provider whatever credentials linger
     Given AUTH_PROVIDER is "email"
     And a google client id and secret are set

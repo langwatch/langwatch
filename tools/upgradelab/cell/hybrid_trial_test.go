@@ -108,7 +108,9 @@ func TestRefusedClearlyTellsARefusalFromAFallback(t *testing.T) {
 		want  bool
 	}{
 		{routeProbe{Booted: false}, true},
-		{routeProbe{Booted: true, Answers: map[string]int{"trace": 503, "search": 500}}, true},
+		{routeProbe{Booted: true, Answers: map[string]int{"trace": 503, "search": 503}, Codes: map[string]string{"trace": "private_dataplane_unavailable", "search": "private_dataplane_unavailable"}}, true},
+		{routeProbe{Booted: true, Answers: map[string]int{"trace": 503, "search": 500}}, false}, // a bare 500 is not a clear refusal (T7-F3)
+		{routeProbe{Booted: true, Answers: map[string]int{"trace": 503, "search": 503}, Codes: map[string]string{"trace": "upgrade_in_progress", "search": "private_dataplane_unavailable"}}, false},
 		{routeProbe{Booted: true, Answers: map[string]int{"trace": 404, "search": 200}}, false},
 		{routeProbe{Booted: true, Answers: map[string]int{"trace": 500, "search": 200}}, false},
 		{routeProbe{Booted: true, Answers: map[string]int{}}, false},
@@ -169,13 +171,25 @@ func TestCallsInWindowSplitsSharedFailuresFromPrivateAnswers(t *testing.T) {
 
 func TestPrivateTargetsForAddsASecondTargetAtTierM(t *testing.T) {
 	shape := map[string]string{"snap": "snap_hybrid_org_4"}
-	if got := PrivateTargetsFor(shape, "S"); len(got) != 1 {
+	if got := PrivateTargetsFor(shape, "S", false); len(got) != 1 {
 		t.Errorf("S = %v", got)
 	}
-	if got := PrivateTargetsFor(shape, "M"); len(got) != 2 || got["snap2"] != "snap_hybrid_org_5" || len(shape) != 1 {
+	if got := PrivateTargetsFor(shape, "M", false); len(got) != 2 || got["snap2"] != "snap_hybrid_org_3" {
+		t.Errorf("live M targets = %v, want snap2 on organization 3, which a live cell seeds", got)
+	}
+	if got := PrivateTargetsFor(shape, "M", true); len(got) != 2 || got["snap2"] != "snap_hybrid_org_5" || len(shape) != 1 {
 		t.Errorf("M = %v (shape %v)", got, shape)
 	}
-	if got := PrivateTargetsFor(map[string]string{}, "M"); len(got) != 0 {
+	if got := PrivateTargetsFor(map[string]string{}, "M", false); len(got) != 0 {
 		t.Errorf("a shape with no private target gained one at M: %v", got)
+	}
+}
+
+func TestOnlyRefusalsTellsA503FromABare500(t *testing.T) {
+	if !OnlyRefusals([]string{"200", "201", "503"}) {
+		t.Error("2xx and 503 answers are refusals, want true")
+	}
+	if OnlyRefusals([]string{"200", "500"}) {
+		t.Error("a bare 500 while the target is down is not a clear refusal, want false")
 	}
 }

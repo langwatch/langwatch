@@ -339,6 +339,7 @@ function ProviderCredentialsArea({
   return (
     <CodexSignIn
       onFailed={(code) => onFailed?.({ provider: provider.provider, code })}
+      modelProviderId={provider.id}
       projectId={projectId}
       scopes={state.scopes}
       setAsCodingDefaults={false}

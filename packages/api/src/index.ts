@@ -33,6 +33,7 @@ export {
   PlatformSurfaceHiddenError,
   ScopeInputMismatchError,
   setLedgerCurrent,
+  setOrganizationsCatchingUp,
   UnsupportedMediaTypeError,
 } from "./errors.ts";
 

@@ -27,6 +27,9 @@ const TENANT_STATES = [
   { value: "rolled_back", label: "Rolled back", color: "gray" },
 ] as const;
 
+/** A `migrated` row of a step whose steady state that is: kept in step, not held. */
+const KEPT_IN_STEP = { value: "migrated", label: "Kept in step", color: "gray" } as const;
+
 type TenantState = (typeof TENANT_STATES)[number]["value"];
 
 function stateOf(value: string) {
@@ -37,7 +40,7 @@ function stateOf(value: string) {
 export function UpgradeTenantList({
   steps,
 }: {
-  steps: readonly { name: string; title: string }[];
+  steps: readonly { name: string; title: string; migratedIsSteady: boolean }[];
 }) {
   const [step, setStep] = useState<string | undefined>(void 0);
   const [state, setState] = useState<TenantState | undefined>(void 0);
@@ -50,6 +53,11 @@ export function UpgradeTenantList({
   );
   const rows = tenants.data?.pages.flatMap((page) => page.items) ?? [];
   const titleOf = (name: string) => steps.find((known) => known.name === name)?.title ?? name;
+  const stateOfRow = (row: { migrationName: string; status: string }) =>
+    row.status === "migrated" &&
+    steps.some((known) => known.name === row.migrationName && known.migratedIsSteady)
+      ? KEPT_IN_STEP
+      : stateOf(row.status);
 
   return (
     <Stack gap={3} data-testid="upgrade-tenant-list">
@@ -93,6 +101,7 @@ export function UpgradeTenantList({
         isLoading={tenants.isLoading}
         rows={rows}
         titleOf={titleOf}
+        stateOfRow={stateOfRow}
       />
       {tenants.hasNextPage && (
         <Button
@@ -116,11 +125,14 @@ function TenantRows({
   isLoading,
   rows,
   titleOf,
+  stateOfRow,
 }: {
   error: unknown;
   isLoading: boolean;
   rows: readonly TenantRow[];
   titleOf: (name: string) => string;
+  /** A steady step's `migrated` row reads kept in step, not held. */
+  stateOfRow: (row: TenantRow) => { label: string; color: string } | undefined;
 }) {
   if (error)
     return <HandledErrorAlert error={error} fallbackTitle="Couldn't load the organizations" />;
@@ -144,7 +156,7 @@ function TenantRows({
       </Table.Header>
       <Table.Body>
         {rows.map((row) => {
-          const known = stateOf(row.status);
+          const known = stateOfRow(row);
           return (
             <Table.Row
               key={`${row.migrationName}:${row.tenantId}`}

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
-	"github.com/langwatch/langwatch/services/llmsim"
+	"github.com/langwatch/langwatch/services/sims/llmsim"
 )
 
 func bedrockSimCred(endpoint string) domain.Credential {

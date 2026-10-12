@@ -92,6 +92,20 @@ Feature: Each soak round proves the upgrade is safe on production-shaped data un
     And the same failure before the switch, later than a minute after, or on another socket stays a finding
 
   @unit
+  Scenario: The console echo of an expected upgrade_in_progress 503 is counted apart, one per 503
+    Given the walk records an expected upgrade_in_progress 503 between the switch and ready
+    When the browser also logs "status of 503" to the console for that load
+    Then that console line is counted apart with the 503 it echoes
+    And console 503 lines beyond the number of expected 503s, or outside the window, stay findings
+
+  @unit
+  Scenario: A stop-start install's downtime 502s are tolerated, a rolling deploy's are findings
+    Given a self-hosted install stops its old release before head's api starts
+    When the walk sees a 502 or an aborted load while the api is down
+    Then it is counted apart as the expected stop-start downtime
+    And the same failure once head answers, or on a rolling deploy, stays a finding
+
+  @unit
   Scenario: Main's page loading its assets from head just after the switch is tolerated
     Given the walker's tab fetched main's page just before the switch
     When its /assets/* requests reach head within a minute after the switch and head answers 404

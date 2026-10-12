@@ -127,6 +127,9 @@ func (System) TerminateGroup(pid int) {
 // Reload signals pid to reload in place.
 func (System) Reload(pid int) { _ = syscall.Kill(pid, syscall.SIGUSR2) }
 
+// Replan sends a keeper SIGHUP: reread its plan and apply the difference.
+func (System) Replan(pid int) { _ = syscall.Kill(pid, syscall.SIGHUP) }
+
 // PIDsOnPort lists the pids LISTENing on a TCP port, via lsof (macOS has no
 // /proc; lsof is the same "ask the OS's own tool" approach used elsewhere).
 func (System) PIDsOnPort(port int) []int {
@@ -251,6 +254,9 @@ func (s System) MemStat() domain.MemStat {
 		if pageSize, occupied, ok := domain.ParseVMStat(string(out)); ok {
 			m.CompressedBytes = occupied * pageSize
 		}
+		if available, ok := domain.ParseVMStatAvailable(string(out)); ok {
+			m.AvailableBytes = available
+		}
 	}
 	if out, err := probe("sysctl", "-n", "vm.swapusage"); err == nil {
 		if used, total, ok := domain.ParseSwapUsage(string(out)); ok {
@@ -259,6 +265,10 @@ func (s System) MemStat() domain.MemStat {
 	}
 	return m
 }
+
+// LoadAverage is the 1-minute load average, or -1 when unreadable: a sysctl
+// on macOS, /proc/loadavg on Linux, no process spawned either way.
+func (System) LoadAverage() float64 { return loadAverage() }
 
 // probeTimeout bounds every external command the governor shells out to.
 //
@@ -275,33 +285,39 @@ func probe(name string, args ...string) ([]byte, error) {
 	return exec.CommandContext(ctx, name, args...).Output()
 }
 
-// DemoteGroup moves every process in pid's group into the throttled background
-// band, and RestoreGroup moves them back out.
+// DemoteGroup lowers every process in pid's group to nice 10, and
+// RestoreGroup asks for nice 0 back. Nice, not `taskpolicy -b`: background QoS
+// pins the stack to Apple Silicon's efficiency cores.
 //
-// It walks the group rather than signaling the launcher, because the policy is
-// inherited by processes forked AFTER it is set — it does not reach back into a
-// tree that is already running, and a live stack is exactly that: vite, node
-// and workers already spawned under the launcher. Signaling the launcher alone
-// would demote the launcher alone.
-func (s System) DemoteGroup(pid int) { s.retierGroup(pid, "-b") }
+// It walks the group because a priority reaches only processes forked after it.
+func (s System) DemoteGroup(pid int) { s.reniceGroup(pid, demotedNice) }
 
-// RestoreGroup undoes DemoteGroup. A process spawned while its stack was
-// demoted inherits the band, so restoring walks the group again rather than
-// trying to remember what was demoted.
-func (s System) RestoreGroup(pid int) { s.retierGroup(pid, "-B") }
-
-func (System) retierGroup(pid int, flag string) {
+// RestoreGroup undoes DemoteGroup. Raising priority back needs root, so for a
+// normal user the group stays at nice 10 until it restarts; it also clears the
+// background band an older haven may have set.
+func (s System) RestoreGroup(pid int) {
+	s.reniceGroup(pid, 0)
 	if runtime.GOOS != "darwin" || pid <= 0 {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
 	defer cancel()
 	for _, member := range groupMembers(pid) {
-		// Best effort per process: one that exits between listing and signaling
-		// is not an error, and must not stop the rest of the group being moved.
-		// The deadline is shared across the group for the same reason it exists at
-		// all — this runs on the daemon's tick and must always return to it.
-		_ = exec.CommandContext(ctx, "taskpolicy", flag, "-p", strconv.Itoa(member)).Run()
+		_ = exec.CommandContext(ctx, "taskpolicy", "-B", "-p", strconv.Itoa(member)).Run()
+	}
+}
+
+// demotedNice is a demoted stack's priority: below interactive work, on every core.
+const demotedNice = 10
+
+// reniceGroup sets nice on each member, best effort: one that exits between
+// listing and setting must not stop the rest of the group being moved.
+func (System) reniceGroup(pid, nice int) {
+	if runtime.GOOS != "darwin" || pid <= 0 {
+		return
+	}
+	for _, member := range groupMembers(pid) {
+		_ = syscall.Setpriority(syscall.PRIO_PROCESS, member, nice)
 	}
 }
 

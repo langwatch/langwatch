@@ -71,12 +71,26 @@ describe("SignIn already-authenticated redirect", () => {
   });
 
   describe("given a same-origin relative callbackUrl", () => {
+    /** @scenario "A signed-in visitor on the sign-in page is sent where they were going" */
     it("preserves it as the redirect destination", async () => {
       searchParamsRef.current = new URLSearchParams("callbackUrl=/settings/members");
       renderPage();
 
       await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
       expect(replace).toHaveBeenCalledWith("/settings/members");
+      expect(routeMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given no callbackUrl", () => {
+    /** @scenario "A signed-in visitor on the sign-in page is sent where they were going" */
+    it("sends the visitor home", async () => {
+      searchParamsRef.current = new URLSearchParams("");
+      renderPage();
+
+      await waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+      expect(replace).toHaveBeenCalledWith("/");
+      expect(routeMock).not.toHaveBeenCalled();
     });
   });
 });

@@ -51,15 +51,15 @@ describe("given a governed file", () => {
     });
   });
 
-  describe("when the file is a dev runtime entry", () => {
-    /** @scenario "The dev runtime's entries are exempt" */
+  describe("when the file is the dev runtime entry", () => {
+    /** @scenario "The dev runtime's entry is exempt" */
     it("reports nothing there and still reports its siblings", () => {
-      const code = 'const entry = await import("./backend.entrypoint.main.ts");';
+      const code = 'const entry = await import("./app.entrypoint.main.ts");';
       const devRuntime = "tools/dev-runtime/src";
 
-      expect(report(code, `${devRuntime}/backend.entrypoint.ts`)).toEqual([]);
       expect(report(code, `${devRuntime}/app.entrypoint.ts`)).toEqual([]);
-      expect(report(code, `${devRuntime}/backend.entrypoint.main.ts`)).toHaveLength(1);
+      expect(report(code, `${devRuntime}/app.entrypoint.main.ts`)).toHaveLength(1);
+      expect(report(code, `${devRuntime}/backend.entrypoint.ts`)).toHaveLength(1);
     });
   });
 

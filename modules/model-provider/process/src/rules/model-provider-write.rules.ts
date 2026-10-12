@@ -1,4 +1,8 @@
-import type { ModelProvider, ModelProviderWriteInput } from "@langwatch/model-provider-contract";
+import {
+  findModelProviderDefinition,
+  type ModelProvider,
+  type ModelProviderWriteInput,
+} from "@langwatch/model-provider-contract";
 
 type ProviderModelsForWrite = {
   customModels: ModelProvider["customModels"];
@@ -46,7 +50,10 @@ export function rateLimitsForWrite(
   };
 }
 
+/** A new row's default name: the registry's name, the one the drawer shows, else the key. */
 export function humanize(provider: string): string {
+  const registered = findModelProviderDefinition(provider)?.name;
+  if (registered) return registered;
   return provider.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 

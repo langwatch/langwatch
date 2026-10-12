@@ -311,6 +311,28 @@ describe("memory gateway twins", () => {
     ]);
   });
 
+  /** @scenario "List view shows priority-ordered rules with matcher + action badges" */
+  it("lists cache rules in the order the gateway checks them, lowest number first", async () => {
+    const store = MemoryGatewayStore.create();
+    const rules = MemoryGatewayCacheRuleRepository.create({
+      store,
+      changes: MemoryGatewayChangeEventsRepository.create(),
+      audit: MemoryGatewayAuditRepository.create(store),
+    });
+    for (const priority of [200, 50, 100]) {
+      await rules.create({
+        organizationId: ORG,
+        name: `p${priority}`,
+        priority,
+        matchers: {},
+        action: { mode: "respect" },
+        actorUserId: "usr_1",
+      });
+    }
+
+    expect((await rules.findAll(ORG)).map((rule) => rule.priority)).toEqual([50, 100, 200]);
+  });
+
   describe("given debits in the budget ledger twin", () => {
     const debit = (overrides: { gatewayRequestId: string; amountNanoUsd: number; at: string }) => ({
       tenantId: PROJECT,

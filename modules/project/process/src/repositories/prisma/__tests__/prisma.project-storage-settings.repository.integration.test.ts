@@ -50,6 +50,7 @@ describe.skipIf(!DB_URL)("the live project repositories over Postgres", () => {
           findWithOrgAdmin: async () => null,
           findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
+          findLiveWithTeamByIds: async () => [],
         },
       }),
       repository: repositories.projects,

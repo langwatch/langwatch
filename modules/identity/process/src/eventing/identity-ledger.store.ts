@@ -98,15 +98,18 @@ interface IdentityLedgerWriterDeps {
   eventing: IdentityEventing;
   /** A test hands the sender in directly rather than composing a port for it. */
   stagedSender?: (name: string) => Promise<IdentityStagedSender | null>;
-  /** The read-your-writes window; production uses the constants above. */
-  convergence?: { timeoutMs: number; pollMs: number };
+  /**
+   * The read-your-writes window; production uses the constants above. `null` stages only: a
+   * caller that proves its own writes on a later pass, the identifier backfill, never waits.
+   */
+  convergence?: { timeoutMs: number; pollMs: number } | null;
 }
 
 export class IdentityLedgerStore implements IdentityLedger {
   private readonly projectionStore: IdentityLedgerWriterDeps["projectionStore"];
   private readonly heads: IdentityLedgerWriterDeps["heads"];
   private readonly stagedSender: (name: string) => Promise<IdentityStagedSender | null>;
-  private readonly convergence: { timeoutMs: number; pollMs: number };
+  private readonly convergence: { timeoutMs: number; pollMs: number } | null;
 
   static create(deps: IdentityLedgerWriterDeps): IdentityLedgerStore {
     return new IdentityLedgerStore(deps);
@@ -121,10 +124,10 @@ export class IdentityLedgerStore implements IdentityLedger {
         deps.eventing
           .resolvePipelineCommand({ pipeline: IDENTITY_PIPELINE_NAME, command })
           .then((resolved) => (resolved.kind === "registered" ? resolved.sender : null)));
-    this.convergence = deps.convergence ?? {
-      timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS,
-      pollMs: IDENTITY_CONVERGENCE_POLL_MS,
-    };
+    this.convergence =
+      deps.convergence === undefined
+        ? { timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS, pollMs: IDENTITY_CONVERGENCE_POLL_MS }
+        : deps.convergence;
   }
 
   async commit({
@@ -196,7 +199,8 @@ export class IdentityLedgerStore implements IdentityLedger {
   }): Promise<void> {
     const { userId, tenantId } = command.data;
     await this.stage({ command });
-    await this.awaitFold({ userId, tenantId, events });
+    if (this.convergence === null) return;
+    await this.awaitFold({ userId, tenantId, convergence: this.convergence, events });
   }
 
   /**
@@ -221,10 +225,12 @@ export class IdentityLedgerStore implements IdentityLedger {
   private async awaitFold({
     userId,
     tenantId,
+    convergence,
     events,
   }: {
     userId: string;
     tenantId: string;
+    convergence: { timeoutMs: number; pollMs: number };
     events: IdentityEvent[];
   }): Promise<void> {
     const last = events[events.length - 1];
@@ -232,10 +238,10 @@ export class IdentityLedgerStore implements IdentityLedger {
     const context = { aggregateId: userId, tenantId: createTenantId(tenantId) };
     // Wall-clock, not injectable business time: a frozen test clock would
     // otherwise make this loop unable to time out.
-    const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
+    const deadline = nowInstant().epochMilliseconds + convergence.timeoutMs;
     let isReached = await this.foldReached({ userId, context, last });
     while (!isReached && nowInstant().epochMilliseconds < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
+      await new Promise((resolve) => setTimeout(resolve, convergence.pollMs));
       isReached = await this.foldReached({ userId, context, last });
     }
     if (isReached) return;

@@ -17,7 +17,7 @@ function catchUpOver({ behind, holder = null }: { behind: string[][]; holder?: u
     findLeaseHolder: async () => holder,
     upgrade: async () => {
       runs.push(Date.now());
-      return { exitCode: 0, logTail: [] };
+      return { code: "done" as const, logTail: [] };
     },
     warn: (message) => warned.push(message),
     everyMs: EVERY_MS,

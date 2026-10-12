@@ -645,6 +645,27 @@ export class ProviderUnreachableError extends HandledError {
   }
 }
 
+/** Why a Codex sign-in or refresh failed; the presentation copy branches on it. */
+export type CodexAuthFailureKind =
+  | "http"
+  | "malformed"
+  | "timed_out"
+  | "refresh_rejected"
+  | "sign_in_expired"
+  | "sign_in_denied";
+
+/** The kinds the customer ends by signing in again, rather than an OpenAI fault. */
+const CUSTOMER_CODEX_FAILURES: ReadonlySet<CodexAuthFailureKind> = new Set([
+  "sign_in_expired",
+  "sign_in_denied",
+]);
+
+const CODEX_FAILURE_STATUS: Partial<Record<CodexAuthFailureKind, number>> = {
+  refresh_rejected: 401,
+  sign_in_expired: 400,
+  sign_in_denied: 403,
+};
+
 /** HandledError so the sign-in UI shows `message` verbatim without logging an unhandled 500. */
 export class CodexAuthError extends HandledError {
   /** The issuer's HTTP status for kind "http" — what separates an OAuth
@@ -652,14 +673,14 @@ export class CodexAuthError extends HandledError {
   public readonly status?: number;
 
   constructor(
-    public readonly kind: "http" | "malformed" | "timed_out" | "refresh_rejected",
+    public readonly kind: CodexAuthFailureKind,
     message: string,
     options?: { status?: number },
   ) {
     super("codex_auth_failed", message, {
       meta: { kind },
-      fault: "provider",
-      httpStatus: kind === "refresh_rejected" ? 401 : 502,
+      fault: CUSTOMER_CODEX_FAILURES.has(kind) ? "customer" : "provider",
+      httpStatus: CODEX_FAILURE_STATUS[kind] ?? 502,
     });
     this.name = "CodexAuthError";
     this.status = options?.status;

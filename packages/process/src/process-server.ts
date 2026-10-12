@@ -37,7 +37,7 @@ import { processSurface } from "./transport/process-surface.ts";
 
 /** What `run` may be handed: a booted worker also lists its steps. */
 type RunnableApplication = ServedApplication &
-  Partial<Pick<BootedApplication, "migrationSteps" | "role">>;
+  Partial<Pick<BootedApplication, "migrationSteps" | "role" | "runListedWork">>;
 
 type ParsedConfig = Readonly<Record<string, unknown>>;
 
@@ -272,7 +272,8 @@ export class ProcessServer implements ProcessBoot {
       handler: application.handler,
       start: async () => {
         await application.start();
-        running = background.start(steps);
+        const runListedWork = application.runListedWork?.bind(application);
+        running = background.start(steps, runListedWork ? { runListedWork } : undefined);
       },
       stop: async () => {
         await running?.stop();

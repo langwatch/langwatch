@@ -1,7 +1,11 @@
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import { hasNoResults, shouldShowNoResponse } from "../model/scenario-run-status.utils.ts";
+import {
+  hasNoResults,
+  isFinishedRunStatus,
+  shouldShowNoResponse,
+} from "../model/scenario-run-status.utils.ts";
 
 // Regression: #2295
 describe("hasNoResults()", () => {
@@ -93,5 +97,25 @@ describe("shouldShowNoResponse()", () => {
         }),
       ).toBe(false);
     });
+  });
+});
+
+describe("isFinishedRunStatus()", () => {
+  it.each([
+    ScenarioRunStatus.SUCCESS,
+    ScenarioRunStatus.FAILED,
+    ScenarioRunStatus.ERROR,
+    ScenarioRunStatus.CANCELLED,
+  ])("returns true for %s", (status) => {
+    expect(isFinishedRunStatus(status)).toBe(true);
+  });
+
+  it.each([
+    ScenarioRunStatus.IN_PROGRESS,
+    ScenarioRunStatus.STALLED,
+    ScenarioRunStatus.PENDING_EVALUATION,
+    undefined,
+  ])("returns false for %s", (status) => {
+    expect(isFinishedRunStatus(status)).toBe(false);
   });
 });

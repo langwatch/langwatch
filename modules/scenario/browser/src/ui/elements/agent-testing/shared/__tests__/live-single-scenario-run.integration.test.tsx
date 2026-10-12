@@ -198,7 +198,7 @@ vi.mock("../../../../../behavior/use-simulation-streaming-state.ts", () => ({
   useSimulationStreamingState: () => ({
     streamingMessages: mockStreaming.value,
     handleStreamingEvent: vi.fn(),
-    clearCompleted: vi.fn(),
+    reconcileWithServer: vi.fn(),
   }),
 }));
 

@@ -28,6 +28,19 @@ export class MemoryTenantStepStateRepository implements SystemMigrationStateRepo
     return record;
   }
 
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    return tenantIds.flatMap((tenantId) => {
+      const record = this.records.get(keyOf({ migrationName, tenantId }));
+      return record ? [record] : [];
+    });
+  }
+
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     this.records.set(keyOf(record), record);
   }

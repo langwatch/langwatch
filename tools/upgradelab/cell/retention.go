@@ -18,7 +18,7 @@ import (
 const OverlayRetention = "retention"
 
 // Overlays a cell accepts (-overlays), applied on top of its shape.
-var Overlays = []string{OverlayRetention}
+var Overlays = []string{OverlayRetention, OverlayTenantOddities, OverlayOperatorDamage, OverlayHeldTenants, OverlayUpcastEvents, OverlayQueuedJobs}
 
 // agedSlices are the ages in days the overlay writes rows at: each lands in an old weekly partition of its own.
 var agedSlices = []int{30, 61, 95, 400}
@@ -121,7 +121,10 @@ func (cell *run) retentionRules(ctx context.Context) error {
 }
 
 // privateRetentionOrg sets an organization rule on the hybrid private organization, whose rows live on its own
-// target: the seed account joins it as an admin first, as an operator would to set the rule.
+// target: the seed account joins it as an admin (membership and organization role binding) on a paid plan first,
+// as an operator would to set the rule. Main decides from the Grant projection, so the grant row goes in beside the
+// binding (T7-F8: main refused the rule without organization:manage). A built-in role leaves legacyRole empty, as the
+// product writes it; set, the authz-engine proof held the organization forever (T7-F15).
 func (cell *run) privateRetentionOrg(ctx context.Context) (retentionOrg, error) {
 	client, label, ok := cell.privateClient()
 	if !ok {
@@ -130,8 +133,12 @@ func (cell *run) privateRetentionOrg(ctx context.Context) (retentionOrg, error) 
 	org := retentionOrg{Label: "private-rule", Scope: "ORGANIZATION", RuleDays: 63, Target: label, OrganizationID: cell.private[label], ProjectID: client.Project}
 	email, _ := generate.SeedAccount(cell.options.Seed)
 	statement := fmt.Sprintf(`INSERT INTO mydb."OrganizationUser" ("userId", "organizationId", role, "createdAt", "updatedAt") SELECT id, %[2]s, 'ADMIN', now(), now() FROM mydb."User" WHERE email = %[1]s ON CONFLICT DO NOTHING;
-INSERT INTO mydb."TeamUser" ("userId", "teamId", role, "createdAt", "updatedAt") SELECT u.id, p."teamId", 'ADMIN', now(), now() FROM mydb."User" u, mydb."Project" p WHERE u.email = %[1]s AND p.id = %[3]s ON CONFLICT DO NOTHING`,
-		sqlQuote(email), sqlQuote(org.OrganizationID), sqlQuote(org.ProjectID))
+INSERT INTO mydb."TeamUser" ("userId", "teamId", role, "createdAt", "updatedAt") SELECT u.id, p."teamId", 'ADMIN', now(), now() FROM mydb."User" u, mydb."Project" p WHERE u.email = %[1]s AND p.id = %[3]s ON CONFLICT DO NOTHING;
+INSERT INTO mydb."RoleBinding" (id, "organizationId", "userId", role, "scopeType", "scopeId", "createdAt", "updatedAt") SELECT %[4]s, %[2]s, id, 'ADMIN', 'ORGANIZATION', %[2]s, now(), now() FROM mydb."User" WHERE email = %[1]s ON CONFLICT DO NOTHING;
+INSERT INTO mydb."Grant" (id, "organizationId", "principalType", "principalId", "roleKey", source, "scopeType", "scopeId", "occurredAt") SELECT %[4]s, %[2]s, 'USER', id, 'admin', 'migration', 'ORGANIZATION', %[2]s, now() FROM mydb."User" WHERE email = %[1]s ON CONFLICT DO NOTHING;
+INSERT INTO mydb."Subscription" (id, "organizationId", plan, status, "startDate", "createdAt", "updatedAt") VALUES (%[5]s, %[2]s, 'LAUNCH', 'ACTIVE', now(), now(), now()) ON CONFLICT DO NOTHING`,
+		sqlQuote(email), sqlQuote(org.OrganizationID), sqlQuote(org.ProjectID),
+		sqlQuote(fmt.Sprintf("snap_private_rule_binding_%d", cell.options.Seed)), sqlQuote(fmt.Sprintf("snap_private_rule_plan_%d", cell.options.Seed)))
 	if _, err := psql(ctx, cell.stores.psqlURL(), statement); err != nil {
 		return org, fmt.Errorf("seed account membership (SQL): %w", err)
 	}

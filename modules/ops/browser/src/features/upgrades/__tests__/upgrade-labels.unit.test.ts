@@ -126,14 +126,20 @@ describe("groupStepsByRelease()", () => {
 });
 
 describe("heldOrganizationCount()", () => {
+  const held = (tenantId: string) => ({ tenantId, status: "migrated" });
+
   describe("when one organization is held by two steps and another is parked", () => {
     /** @scenario "Held organizations are counted once however many steps hold them" */
     it("counts each organization once", () => {
       expect(
         heldOrganizationCount([
-          { tenant: "organization", attention: [{ tenantId: "org-a" }, { tenantId: "org-b" }] },
-          { tenant: "organization", attention: [{ tenantId: "org-a" }] },
-          { tenant: "organization", attention: [] },
+          {
+            tenant: "organization",
+            migratedIsSteady: false,
+            attention: [held("org-a"), { tenantId: "org-b", status: "parked" }],
+          },
+          { tenant: "organization", migratedIsSteady: false, attention: [held("org-a")] },
+          { tenant: "organization", migratedIsSteady: false, attention: [] },
         ]),
       ).toBe(2);
     });
@@ -144,8 +150,27 @@ describe("heldOrganizationCount()", () => {
     it("counts only organization-rooted holds", () => {
       expect(
         heldOrganizationCount([
-          { tenant: "organization", attention: [{ tenantId: "org-a" }] },
-          { tenant: "user", attention: [{ tenantId: "user-1" }, { tenantId: "user-2" }] },
+          { tenant: "organization", migratedIsSteady: false, attention: [held("org-a")] },
+          {
+            tenant: "user",
+            migratedIsSteady: false,
+            attention: [held("user-1"), held("user-2")],
+          },
+        ]),
+      ).toBe(1);
+    });
+  });
+
+  describe("when a step's migrated is its steady state", () => {
+    /** @scenario "A step that never finalizes by design keeps its users in step, not held" */
+    it("counts none of its migrated tenants as held, and still counts a parked one", () => {
+      expect(
+        heldOrganizationCount([
+          {
+            tenant: "organization",
+            migratedIsSteady: true,
+            attention: [held("org-a"), { tenantId: "org-b", status: "parked" }],
+          },
         ]),
       ).toBe(1);
     });

@@ -147,6 +147,16 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
     return this.clientFor(shared.url);
   }
 
+  /** The organisation naming a private endpoint's client, as its migrations do; none for shared. */
+  privateTargetOf(client: Client): string | undefined {
+    for (const [url, created] of this.clientByUrl) {
+      if (created !== client) continue;
+      const target = this.endpointByUrl.get(url)?.target;
+      return target === "shared" ? undefined : target;
+    }
+    return undefined;
+  }
+
   /** Builds each physical endpoint once for migrations, schema checks and shutdown. */
   instances(): readonly ClickHouseInstance<Client>[] {
     this.assertOpen();

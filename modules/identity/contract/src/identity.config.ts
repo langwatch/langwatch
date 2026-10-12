@@ -34,6 +34,11 @@ export const identityConfig = Config.define((c) => ({
   passkeysEnabled,
   mfaEnrollmentOpen,
   localPasswords,
+  /** The identifier backfill queues no new users while more jobs wait (Alex, 2026-10-12). */
+  identifierBackfillMaxQueuedJobs: c.env(
+    "IDENTITY_BACKFILL_MAX_QUEUED_JOBS",
+    z.coerce.number().int().positive().default(5_000),
+  ),
 }));
 
 export type IdentityServerConfig = ConfigOf<typeof identityConfig>;
