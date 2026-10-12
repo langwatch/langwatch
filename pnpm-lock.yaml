@@ -17541,6 +17541,9 @@ importers:
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../secrets
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -17554,9 +17557,6 @@ importers:
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../test-harness
-      '@langwatch/time':
-        specifier: workspace:*
-        version: link:../time
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
