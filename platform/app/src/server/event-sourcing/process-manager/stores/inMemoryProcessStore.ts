@@ -12,7 +12,10 @@ import type {
   PersistedProcessInstance,
   ProcessCommit,
   ProcessStore,
+  ProcessTransaction,
+  TransactResult,
 } from "./processStore.types";
+import { safeDiagnosticError } from "../failureDiagnostic";
 
 interface StoredMessage extends OutboxMessageRecord {
   /** Epoch ms until which the message is exclusively leased; 0 = unleased. */
@@ -141,6 +144,48 @@ export class InMemoryProcessStore implements ProcessStore {
   }
 
   /**
+   * Read-modify-write with no window between the two. Every call here is
+   * synchronous, so the read this hands to `apply` cannot go stale before the
+   * write lands — which is the property the Postgres adapter buys with its
+   * advisory lock, and the reason neither can report a revision conflict.
+   */
+  async transact<State = unknown>(
+    transaction: ProcessTransaction<State>,
+  ): Promise<TransactResult> {
+    const { ref, sourceEventId } = transaction;
+
+    if (
+      sourceEventId !== null &&
+      this.inbox.has(inboxKey({ ref, sourceEventId }))
+    ) {
+      return { outcome: "duplicateEvent" };
+    }
+
+    const existing = this.instances.get(refKey(ref)) as
+      | PersistedProcessInstance<State>
+      | undefined;
+    const applied = transaction.apply(existing ?? null);
+
+    const result = await this.commit<State>({
+      ref,
+      tenantId: transaction.tenantId,
+      ...(transaction.userId ? { userId: transaction.userId } : {}),
+      sourceEventId,
+      expectedRevision: existing?.revision ?? 0,
+      state: applied.state,
+      nextWakeAt: applied.nextWakeAt,
+      messages: applied.messages,
+      now: transaction.now,
+    });
+    if (result.outcome === "revisionConflict") {
+      throw safeDiagnosticError(
+        `process transact reported a revision conflict on ${ref.processName}/${ref.processKey}`,
+      );
+    }
+    return result;
+  }
+
+  /**
    * The transient path: intents only, no instance and no inbox marker. The
    * durable adapter drops its transaction here too; this one is atomic per
    * call regardless, so the shared insert is the whole implementation.
@@ -211,6 +256,30 @@ export class InMemoryProcessStore implements ProcessStore {
         message.projectId === params.ref.projectId &&
         message.processKey === params.ref.processKey,
     );
+  }
+
+  async countPendingMessages(params: {
+    ref: ProcessRef;
+    intentType: string;
+  }): Promise<{ count: number; nextAttemptAt: number | null }> {
+    let count = 0;
+    let nextAttemptAt: number | null = null;
+    for (const message of this.messages.values()) {
+      if (
+        message.processName !== params.ref.processName ||
+        message.projectId !== params.ref.projectId ||
+        message.processKey !== params.ref.processKey ||
+        message.intentType !== params.intentType ||
+        message.status !== "pending"
+      ) {
+        continue;
+      }
+      count += 1;
+      if (nextAttemptAt === null || message.nextAttemptAt < nextAttemptAt) {
+        nextAttemptAt = message.nextAttemptAt;
+      }
+    }
+    return { count, nextAttemptAt };
   }
 
   async leaseDueMessages(params: {
@@ -378,15 +447,14 @@ export class InMemoryProcessStore implements ProcessStore {
     before: number;
     limit: number;
   }): Promise<number> {
-    // Reaped by `updatedAt`, the same column the durable store uses, which
-    // the markFailed that retired the row stamped. `discarded` rides the same
-    // family for the reason given on the durable store: no other predicate
-    // matches it, so leaving it out makes it immortal.
+    // Reaped by `updatedAt`, the same column the durable store uses. Only
+    // `discarded` is reaped, for the reason given on the durable store: a
+    // dead row is undelivered work nobody agreed to lose, retained until it
+    // delivers or an operator discards it and starts this clock.
     return this.deleteOutboxBatch(
       params,
       (message) =>
-        (message.status === "dead" || message.status === "discarded") &&
-        message.updatedAt < params.before,
+        message.status === "discarded" && message.updatedAt < params.before,
     );
   }
 

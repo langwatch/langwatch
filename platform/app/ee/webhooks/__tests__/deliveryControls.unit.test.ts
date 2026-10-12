@@ -15,7 +15,10 @@ describe("webhook delivery control bounds", () => {
   /** @scenario Out of bounds delivery controls are rejected with the bound in the error */
   it("rejects out-of-bounds values naming the allowed range", async () => {
     // Validation throws before any prisma call; an empty object proves it.
-    const service = new WebhookEndpointService({ prisma: {} as PrismaClient });
+    const service = new WebhookEndpointService({
+      prisma: {} as PrismaClient,
+      processStore: { requeueDeadMessages: async () => 0 },
+    });
     await expect(
       service.create({
         organizationId: "org_test",
