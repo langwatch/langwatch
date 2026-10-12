@@ -117,9 +117,9 @@ describe("toolbarCompactness", () => {
 
   /** @scenario "The toolbar keeps its actions in sight" */
   it("spells Columns when wide and sheds labels, then chevrons, as the bar narrows", () => {
-    expect(at(1400)).toEqual({ wide: true, labelsCompact: false, chevronsCompact: false });
-    expect(at(1100)).toEqual({ wide: false, labelsCompact: false, chevronsCompact: false });
-    expect(at(900)).toEqual({ wide: false, labelsCompact: true, chevronsCompact: false });
-    expect(at(600)).toEqual({ wide: false, labelsCompact: true, chevronsCompact: true });
+    expect(at(1500)).toEqual({ wide: true, labelsCompact: false, chevronsCompact: false });
+    expect(at(1430)).toEqual({ wide: false, labelsCompact: false, chevronsCompact: false });
+    expect(at(1300)).toEqual({ wide: false, labelsCompact: true, chevronsCompact: false });
+    expect(at(1000)).toEqual({ wide: false, labelsCompact: true, chevronsCompact: true });
   });
 });

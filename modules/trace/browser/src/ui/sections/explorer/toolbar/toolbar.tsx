@@ -27,14 +27,15 @@ import { LiveIndicator } from "./live-indicator.tsx";
 import { TimeRangePicker } from "./time-range-picker.tsx";
 import { AutomateButton, KeyboardShortcutsButton } from "./toolbar-actions.tsx";
 
-// Toolbar widths (the bar's own measured width, not the viewport). Above the wide one the
-// Columns button spells its label; below the others the right clusters shed labels, then
-// chevrons, so the lens tabs keep the room. Lenses that still do not fit move into the lens
-// overflow menu. Grouping and density keep their labels longest.
-const TOOLBAR_WIDE_MIN_WIDTH = 1280;
-const TOOLBAR_LABELS_MIN_WIDTH = 1040;
-const TOOLBAR_CHEVRONS_MIN_WIDTH = 800;
-// Room the optional controls take, so the thresholds hold when they are on the bar.
+// Toolbar widths (the bar's own measured width, not the viewport) at which each level of
+// the right clusters still leaves LENS_STRIP_ROOM for the lens tabs (All to Cost in the
+// default set): the clusters' measured width at that level plus the lens room. Lens tabs
+// matter more than labels, so labels go first, then chevrons; only then do lenses overflow.
+const LENS_STRIP_ROOM = 560;
+const TOOLBAR_WIDE_MIN_WIDTH = 900 + LENS_STRIP_ROOM;
+const TOOLBAR_LABELS_MIN_WIDTH = 850 + LENS_STRIP_ROOM;
+const TOOLBAR_CHEVRONS_MIN_WIDTH = 580 + LENS_STRIP_ROOM;
+// Extra room the optional controls take while they show their labels.
 const SAMPLE_TOGGLE_WIDTH = 120;
 const TOUR_LABEL_WIDTH = 100;
 
@@ -53,7 +54,7 @@ export function toolbarCompactness({
   return {
     wide: width >= TOOLBAR_WIDE_MIN_WIDTH + optional,
     labelsCompact: width < TOOLBAR_LABELS_MIN_WIDTH + optional,
-    chevronsCompact: width < TOOLBAR_CHEVRONS_MIN_WIDTH + optional,
+    chevronsCompact: width < TOOLBAR_CHEVRONS_MIN_WIDTH,
   };
 }
 
@@ -318,7 +319,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
         <TimeRangePicker compact={labelsCompact} />
         <LiveIndicator />
         <GroupingSelect compact={chevronsCompact} />
-        <DensitySelect compact={chevronsCompact} />
+        <DensitySelect compact={labelsCompact} />
       </HStack>
       <ToolbarDivider />
       {/* Cluster 3: which columns show, getting data out, automating it, and help. */}
