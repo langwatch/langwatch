@@ -115,6 +115,7 @@ import {
   useLangyGithubRedrive,
   useLangyTurnFailure,
 } from "../../behavior/panel/use-langy-turn-failure.ts";
+import { useOpenDrawerEdge } from "../../behavior/panel/use-open-drawer-edge.ts";
 import { useGuidedTour } from "../../behavior/use-guided-tour.ts";
 import { useLangyChatEngine } from "../../behavior/use-langy-chat-engine.ts";
 import { useLangyFreshness } from "../../behavior/use-langy-freshness.ts";
@@ -224,6 +225,10 @@ function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () => void
     releaseDelayMs: LANGY_DODGE_STAGGER_MS,
     immediate: reduceMotion,
   });
+  const measuredEdge = useOpenDrawerEdge({ active: dodgeLeft });
+  // A drawer that fills the screen leaves no page to sit on: stay in the corner.
+  const drawerEdge =
+    measuredEdge !== null && measuredEdge < window.innerWidth - 120 ? measuredEdge : null;
   // The orb leans + glows toward the cursor as it approaches (the one place a Langy
   // surface reacts to the pointer — a hover affordance on the target itself, not
   // ambient chrome). Disabled under reduced motion.
@@ -260,11 +265,9 @@ function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () => void
         aria-keyshortcuts="Meta+I Control+I"
         position="fixed"
         bottom="20px"
-        // Bottom-right by default; hops to bottom-left while a drawer holds the
-        // right edge so it never sits on the drawer or the table pager. (The
-        // proximity hook owns `transform`, and left/right can't cross-fade, so
-        // this repositions rather than slides.)
-        {...(dodgeLeft ? { left: "20px" } : { right: "20px" })}
+        // Bottom-right by default; while a drawer holds the right edge it sits just
+        // left of the drawer, over the page, never on the drawer or the sidebar.
+        right={`${dodgeLeft && drawerEdge !== null ? drawerEdge + 20 : 20}px`}
         // Keep modal/dialog layers above Langy. Chakra's modal stack starts at
         // the modal layer, while Langy remains a persistent app companion.
         zIndex={1200}
