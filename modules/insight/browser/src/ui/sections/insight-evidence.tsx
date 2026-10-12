@@ -5,10 +5,9 @@
  */
 
 import { LwqlReplayChartToken } from "@langwatch/analytics-client";
-import { useLent } from "@langwatch/browser-host/lent";
+import { Lent, useLent } from "@langwatch/browser-host/lent";
 import { Box, Text } from "@langwatch/design-system/primitives";
 import type { InsightEntry } from "@langwatch/insight-contract";
-import { Suspense } from "react";
 
 import { replayCaption } from "../../model/insight-presentation.ts";
 
@@ -30,19 +29,21 @@ export function InsightEvidence({ entry }: { entry: InsightEntry }) {
       overflow="hidden"
     >
       <Box paddingX={2} paddingTop={2} paddingBottom={1}>
-        <Suspense fallback={null}>
-          <Chart
-            sql={lwql}
-            window={{
+        {/* Through Lent, so a chart whose code will not load leaves the page usable. */}
+        <Lent
+          of={LwqlReplayChartToken}
+          props={{
+            sql: lwql,
+            window: {
               start: replay.start,
               end: replay.end,
               granularitySeconds: replay.granularitySeconds,
-            }}
-            parameters={replay.parameters}
-            name={entry.board?.widget?.name ?? entry.title}
-            isResultNoteHidden
-          />
-        </Suspense>
+            },
+            parameters: replay.parameters,
+            name: entry.board?.widget?.name ?? entry.title,
+            isResultNoteHidden: true,
+          }}
+        />
       </Box>
       <Text as="figcaption" paddingX={3} paddingBottom={2} textStyle="micro" color="fg.subtle">
         {replayCaption({ replay, fromBoard: Boolean(entry.board) })}
