@@ -146,6 +146,8 @@ DEV_ENV_FILE ?= .env
 SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim paymentsim lambdasim githubsim
 SIM_CONSOLES = $(if $(filter combined,$(svc)),$(if $(args),$(filter $(SIMULATORS),$(args)),$(SIMULATORS)),$(filter $(SIMULATORS),$(svc)))
 BUILD_SIM_CONSOLES = $(if $(SIM_CONSOLES),$(NX) run @langwatch/sims:build --outputStyle=static || echo "@langwatch/sims did not build; each console names the fix",true)
+# pipefail needs bash; CI runners default to dash.
+service: SHELL := /bin/bash
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@$(BUILD_SIM_CONSOLES)
