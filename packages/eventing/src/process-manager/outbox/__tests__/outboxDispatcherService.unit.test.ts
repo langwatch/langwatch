@@ -784,11 +784,14 @@ describe("OutboxDispatcherService", () => {
         await vi.advanceTimersByTimeAsync(60_000);
         await rival.runOnce({ now: Date.now() });
       }
+      // Each renewal counts as progress, so the worker never takes this drain for stuck.
+      const quietMs = Date.now() - holder.lastProgressAt();
       finish();
       const report = await run;
 
       expect(rivalHandler).not.toHaveBeenCalled();
       expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
+      expect(quietMs).toBeLessThanOrEqual(40_000);
       expect(await store.findMessagesByRef({ ref: pilotRef })).toEqual([
         expect.objectContaining({ status: "dispatched", attempts: 1 }),
       ]);

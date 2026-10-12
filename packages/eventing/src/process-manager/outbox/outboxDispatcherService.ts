@@ -179,6 +179,8 @@ export class OutboxDispatcherService {
   private readonly leaseSafetyMarginMs: number;
   private readonly tracer: Tracer;
   private readonly logger: Logger;
+  /** Wall-clock instant of the last lease, settled delivery or successful renewal. */
+  private lastProgress = 0;
 
   constructor(options: OutboxDispatcherServiceOptions) {
     this.store = options.store;
@@ -198,12 +200,18 @@ export class OutboxDispatcherService {
     this.logger = options.logger ?? createLogger("langwatch:event-sourcing:process-outbox");
   }
 
+  /** When this dispatcher last moved: a drain still renewing its lease is alive, not stuck. */
+  lastProgressAt(): number {
+    return this.lastProgress;
+  }
+
   async runOnce(params: { now: number; limit?: number }): Promise<DispatchReport> {
     // The store anchors `leasedUntil` at `now`, which is captured BEFORE the
     // lease query runs, so the budget clock starts before it too: a slow
     // lease query (degraded Postgres is exactly when this matters) spends
     // lease budget and must not be counted as free.
     const leaseStartedAt = this.clock();
+    this.lastProgress = leaseStartedAt;
     const leased = await this.store.leaseDueMessages({
       now: params.now,
       limit: params.limit ?? 10,
@@ -226,6 +234,7 @@ export class OutboxDispatcherService {
           leaseStartedAt,
           report,
         });
+        this.lastProgress = this.clock();
       }
       return report;
     }
@@ -243,6 +252,7 @@ export class OutboxDispatcherService {
           leaseStartedAt,
           report,
         });
+        this.lastProgress = this.clock();
       }
     });
     await Promise.all(workers);
@@ -626,7 +636,10 @@ export class OutboxDispatcherService {
           now: now + (this.clock() - startedAt),
           leaseDurationMs: this.leaseDurationMs,
         });
-        if (applied) return;
+        if (applied) {
+          this.lastProgress = this.clock();
+          return;
+        }
         lost = true;
         this.logger.warn(
           fields,

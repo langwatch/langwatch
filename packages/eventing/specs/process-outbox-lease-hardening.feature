@@ -52,6 +52,13 @@ Feature: Process outbox lease hardening
     And the abandonment is counted
     And a drain that is merely slow but under the threshold is not abandoned
 
+  @unit @stuck-drain
+  Scenario: A drain still renewing its lease is never taken for stuck
+    Given a drain whose delivery runs for an hour and renews its lease throughout
+    When the stuck-drain threshold passes many times over
+    Then the worker raises no stuck-drain alarm
+    And a drain that stops renewing is abandoned once the threshold passes with no progress
+
   @unit @poll-phase
   Scenario: Outbox workers registered together do not poll in lockstep
     Given several process managers whose outbox workers start in the same tick
