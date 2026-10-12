@@ -1,6 +1,6 @@
 /**
- * Picks which runner starts a scenario run: the Go runner when the project's flag is on and its
- * binary is on disk, the Node child otherwise. Voice always runs on the Node child.
+ * Picks which child channel starts a scenario run: the Go runner when the project's flag is on and
+ * its binary is on disk, the Node child otherwise. Voice always runs on the Node child.
  * @see specs/scenarios/go-scenario-runner-choice.feature
  */
 
@@ -14,23 +14,28 @@ import type {
   ScenarioChildEnvironment,
   ScenarioChildExecutionSession,
 } from "../../../app/scenario.app.ts";
+import type {
+  ScenarioChildChannel,
+  ScenarioChildNonceRegistry,
+  ScenarioChildRunPool,
+  ScenarioGoChildChannel,
+} from "../../../channels/scenario-child.channel.ts";
 import type { ExecutionJobData } from "../../../services/scenario-execution-pool.service.ts";
+import type { VoicePublicUrl } from "../../voice/services/voice-public-url.service.ts";
 
 const logger = createLogger("langwatch:scenarios:child-choice");
 
 export const SCENARIO_GO_RUNNER_FLAG_KEY = "release_scenario_go_runner_enabled";
 
-/** The Go runner, and where its binary is: absent when the deployment names none. */
-export interface ScenarioGoRunner extends ScenarioChildBootstrap {
-  readonly binaryPath: string | undefined;
-}
-
 export class ScenarioChildChoiceService implements ScenarioChildBootstrap {
   static create(options: {
-    node: ScenarioChildBootstrap;
-    go: ScenarioGoRunner;
+    node: ScenarioChildChannel;
+    go: ScenarioGoChildChannel;
     featureFlags: Pick<FeatureFlagApi, "isEnabled">;
     binaryExists?: (binaryPath: string) => boolean;
+    pool: ScenarioChildRunPool;
+    nonces: ScenarioChildNonceRegistry;
+    voicePublicUrl?: () => Promise<VoicePublicUrl>;
   }): ScenarioChildChoiceService {
     return new ScenarioChildChoiceService(options);
   }
@@ -39,10 +44,13 @@ export class ScenarioChildChoiceService implements ScenarioChildBootstrap {
 
   private constructor(
     private readonly options: {
-      node: ScenarioChildBootstrap;
-      go: ScenarioGoRunner;
+      node: ScenarioChildChannel;
+      go: ScenarioGoChildChannel;
       featureFlags: Pick<FeatureFlagApi, "isEnabled">;
       binaryExists?: (binaryPath: string) => boolean;
+      pool: ScenarioChildRunPool;
+      nonces: ScenarioChildNonceRegistry;
+      voicePublicUrl?: () => Promise<VoicePublicUrl>;
     },
   ) {}
 
@@ -51,10 +59,11 @@ export class ScenarioChildChoiceService implements ScenarioChildBootstrap {
     environment: ScenarioChildEnvironment;
   }): Promise<ScenarioChildExecutionSession> => {
     const runner = (await this.#choose(input.jobData)) ?? this.options.node;
-    return runner.start(input);
+    const { pool, nonces, voicePublicUrl } = this.options;
+    return runner.start({ ...input, pool, nonces, voicePublicUrl });
   };
 
-  async #choose(jobData: ExecutionJobData): Promise<ScenarioChildBootstrap | undefined> {
+  async #choose(jobData: ExecutionJobData): Promise<ScenarioChildChannel | undefined> {
     if (jobData.target.type === "voice") return void 0;
     if (!(await this.#flagOn(jobData.projectId))) return void 0;
     const { go } = this.options;

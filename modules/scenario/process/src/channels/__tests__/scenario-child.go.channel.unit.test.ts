@@ -14,13 +14,13 @@ import {
 } from "@langwatch/scenario-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { ScenarioExecutionRunner } from "../app/scenario.app.ts";
-import { GoScenarioChildService } from "../features/child/services/go-scenario-child.service.ts";
-import type { ScenarioChildProcessConfig } from "../features/child/services/node-scenario-child.service.ts";
+import type { ScenarioExecutionRunner } from "../../app/scenario.app.ts";
 import {
   ScenarioExecutionPoolService,
   type ExecutionJobData,
-} from "../services/scenario-execution-pool.service.ts";
+} from "../../services/scenario-execution-pool.service.ts";
+import { GoScenarioChildChannel } from "../scenario-child.go.channel.ts";
+import type { ScenarioChildProcessConfig } from "../scenario-child.node.channel.ts";
 
 /** Stands in for the Go binary: echoes the environment it was given and the job it read. */
 const STAND_IN = `#!/usr/bin/env node
@@ -98,7 +98,7 @@ const childJob: ChildProcessJobData = {
   parameters: {},
 };
 
-describe("GoScenarioChildService", () => {
+describe("GoScenarioChildChannel", () => {
   let directory = "";
   let binaryPath = "";
   const probe = "LANGWATCH_WORKER_SECRET_PROBE";
@@ -133,9 +133,10 @@ describe("GoScenarioChildService", () => {
     const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
     pool.connect(new HeldRunner());
     pool.submit(jobData);
-    const runner = GoScenarioChildService.create({ config: config(), binaryPath, pool });
+    const runner = GoScenarioChildChannel.create({ config: config(), binaryPath });
     const session = await runner.start({
       jobData,
+      pool,
       environment: { labels: ["a"], telemetry: { endpoint: "https://x.test", apiKey: "run-key" } },
     });
     const result = await session.execute(childJob);

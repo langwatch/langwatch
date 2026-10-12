@@ -14,11 +14,9 @@ import {
   type ScenarioExecutionRunner,
   type ScenarioProcessorServiceMetrics,
 } from "../app/scenario.app.ts";
-import {
-  type NodeScenarioChildService,
-  buildOtelResourceAttributes,
-  parseChildProcessResult,
-} from "../features/child/services/node-scenario-child.service.ts";
+import { buildOtelResourceAttributes } from "../channels/scenario-child.node.channel.ts";
+import { parseChildProcessResult } from "../channels/scenario-child.supervisor.channel.ts";
+import type { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
 import {
   ScenarioExecutionPoolService,
   type ExecutionJobData,
@@ -77,7 +75,7 @@ class HoldingExecutionRunner implements ScenarioExecutionRunner {
 function processorFixture() {
   const pool = ScenarioExecutionPoolService.create({ concurrency: 1 });
   const execution = createApiFixture<ScenarioExecutionService>();
-  const childProcesses = createApiFixture<NodeScenarioChildService>();
+  const childProcesses = createApiFixture<ScenarioChildChoiceService>();
   const finishUnsuccessfulRun = vi.fn().mockResolvedValue(undefined);
   const cancellations = new TestCancellationSubscriber();
   execution.finishUnsuccessfulRun = finishUnsuccessfulRun;
