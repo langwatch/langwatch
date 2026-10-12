@@ -58,10 +58,20 @@ jobs:
             "" | *[!A-Za-z0-9._/@-]* | refs/pull/* | -*)
               echo "::error::ref must be a branch or tag name of this repository"; exit 1 ;;
           esac
+          # An explicit refs/heads/ or refs/tags/ prefix is kept; a bare name tries the branch, then the tag.
+          case "${INPUT_REF}" in
+            refs/heads/* | refs/tags/*) CANDIDATES="${INPUT_REF}" ;;
+            *) CANDIDATES="refs/heads/${INPUT_REF} refs/tags/${INPUT_REF}" ;;
+          esac
           NAME="${INPUT_REF#refs/heads/}"; NAME="${NAME#refs/tags/}"
-          REFS=$(git ls-remote "${REPO_URL}" "refs/heads/${NAME}" "refs/tags/${NAME}")
-          # An annotated tag lists its object and, as `^{}`, the commit; take the commit.
-          SHA=$(printf '%s\n' "${REFS}" | awk '/\^\{\}$/ {print $1; found=1; exit} NR==1 {first=$1} END {if (!found) print first}' | head -n1)
+          SHA=""
+          for CANDIDATE in ${CANDIDATES}; do
+            # An annotated tag lists its object and, as `^{}`, the commit; take the commit.
+            SHA=$(git ls-remote "${REPO_URL}" "${CANDIDATE}" "${CANDIDATE}^{}" |
+              awk -v ref="${CANDIDATE}" '$2 == ref "^{}" {print $1; exit} $2 == ref {first=$1} END {if (first) print first}' |
+              head -n1)
+            [ -n "${SHA}" ] && break
+          done
           if [ -z "${SHA}" ]; then
             echo "::error::'${NAME}' is not a branch or tag of this repository"; exit 1
           fi

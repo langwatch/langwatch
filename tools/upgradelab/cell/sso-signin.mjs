@@ -59,9 +59,22 @@ async function checkCookie(browser, member) {
     .catch(() => undefined);
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
   // The boot screen stays over the page until the app draws; judge the app, not the boot screen.
-  await page
+  const bootStuck = await page
     .waitForSelector("#lw-boot", { state: "detached", timeout: 30_000 })
-    .catch(() => undefined);
+    .then(
+      () => false,
+      () => true,
+    );
+  if (bootStuck) {
+    await snap(page, member, "cookie");
+    await context.close();
+    return emit({
+      ...base,
+      ok: false,
+      url: page.url(),
+      detail: "the boot screen never left within 30 s",
+    });
+  }
   const at = new URL(page.url());
   const blank = (await page.innerText("body").catch(() => "")).trim() === "";
   let outcome = "neither";

@@ -209,7 +209,7 @@ func progress(pass, format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "%s UD-1 %s: %s\n", time.Now().Format("15:04:05"), pass, fmt.Sprintf(format, args...))
 }
 
-// progressEvery runs say at most once per interval, the first call included.
+// progressEvery runs say at most once per interval, so a poll loop's status never floods stderr.
 func progressEvery(interval time.Duration) func(say func()) {
 	var last time.Time
 	return func(say func()) {
