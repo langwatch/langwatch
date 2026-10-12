@@ -1,28 +1,23 @@
 import { getProjectSlug } from "../helpers";
-import { expect, test, type Locator } from "../test.ts";
+import { expect, test, type Page } from "../test.ts";
 
-const expectNormalTextLink = async (link: Locator) => {
+// The design system's empty state owns the docs link's wording and tone; the page, its address.
+const expectDocumentationLink = async (page: Page, href: string) => {
+  const link = page.locator(`a[href="${href}"]`).first();
   await expect(link).toBeVisible();
-  await expect(link).toHaveCSS("text-decoration-line", "underline");
-  const linkColor = await link.evaluate(
-    (element: HTMLElement) => window.getComputedStyle(element).color,
-  );
-  const textColor = await link
-    .locator("xpath=..")
-    .evaluate((element: HTMLElement) => window.getComputedStyle(element).color);
-  expect(linkColor).toBe(textColor);
+  await expect(link).toHaveAttribute("target", "_blank");
 };
 
-test("documentation links use normal text with an underline and section carets stay dim", async ({
+test("empty pages link to their documentation and section carets stay dim", async ({
   page,
 }, testInfo) => {
   const projectSlug = await getProjectSlug(page);
 
   await page.goto(`/${projectSlug}/online-evaluations`);
-  const onlineDocumentation = page.getByRole("link", {
-    name: "online evaluations documentation",
-  });
-  await expectNormalTextLink(onlineDocumentation);
+  await expectDocumentationLink(
+    page,
+    "https://docs.langwatch.ai/evaluations/online-evaluation/overview",
+  );
   await expect(page.getByRole("link", { name: "Online Evals" })).toBeVisible();
   const observeSection = page.getByRole("button", { name: "Collapse Observe" });
   await expect(observeSection.locator("svg")).toHaveCount(0);
@@ -37,19 +32,13 @@ test("documentation links use normal text with an underline and section carets s
   });
 
   await page.goto(`/${projectSlug}/evaluations`);
-  const experimentDocumentation = page.getByRole("link", {
-    name: "experiments documentation",
-  });
-  await expectNormalTextLink(experimentDocumentation);
+  await expectDocumentationLink(page, "https://langwatch.ai/docs/evaluations/experiments/overview");
   await page.screenshot({
     path: testInfo.outputPath("experiments-underlined-link.png"),
   });
 
   await page.goto(`/${projectSlug}/datasets`);
-  const datasetDocumentation = page.getByRole("link", {
-    name: "documentation",
-  });
-  await expectNormalTextLink(datasetDocumentation);
+  await expectDocumentationLink(page, "https://docs.langwatch.ai/datasets/overview");
   await page.screenshot({
     path: testInfo.outputPath("datasets-underlined-link.png"),
   });
