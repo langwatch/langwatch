@@ -1,4 +1,5 @@
 import {
+  LangyAgentNotConfiguredError,
   LangyAgentUnavailableError,
   LangyEmptyMessageError,
   LangyIdempotencyMismatchError,
@@ -86,7 +87,7 @@ export class LangyTurnStartService {
   private requireRuntime() {
     const { worker, accessStore, handoffStore } = this.deps;
     if (!worker) {
-      throw new LangyAgentUnavailableError("Agent not configured");
+      throw new LangyAgentNotConfiguredError();
     }
 
     return { worker, accessStore, handoffStore };

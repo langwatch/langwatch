@@ -52,6 +52,11 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       // the browser as coded TRPCErrors from the create/continue mutations.
       "langy_model_not_configured",
       "langy_model_not_allowed",
+      // Refusals that answer the same way every time: no retry action.
+      "langy_agent_not_configured",
+      "langy_not_enabled",
+      "langy_skill_not_available",
+      "langy_dispatch_rejected",
       "langy_egress_misconfigured",
       "langy_insufficient_scope",
       "langy_turn_in_progress",
@@ -1099,4 +1104,35 @@ describe("isLangyConversationPending", () => {
   it("waits twenty seconds before a missing conversation stops reading as lagging", () => {
     expect(LANGY_CONVERSATION_PENDING_GRACE_MS).toBe(20_000);
   });
+});
+
+describe("refusals no retry can change", () => {
+  /** @scenario A deployment with no Langy agent says so instead of an unexpected error */
+  it("names a deployment without a Langy agent and offers no retry", () => {
+    const card = explainLangyError(domain({ code: "langy_agent_not_configured", httpStatus: 503 }));
+    expect(card.title).toBe("Langy isn't set up on this deployment");
+    expect(card.description).toContain("haven up +langy");
+    expect(card.render).toBe("card");
+    expect(card.action).toBeUndefined();
+  });
+
+  /** @scenario A deployment with no Langy agent says so instead of an unexpected error */
+  it("reads the code off a refusal whose tRPC envelope was dropped", () => {
+    const resolved = resolveLiveTurnError({
+      error: new Error("langy_agent_not_configured"),
+      durableLastError: null,
+    });
+    expect(resolved.code).toBe("langy_agent_not_configured");
+  });
+
+  /** @scenario Refusals that answer the same way every time offer no retry */
+  it.each(["langy_not_enabled", "langy_skill_not_available", "langy_dispatch_rejected"])(
+    "offers no retry for %s",
+    (code) => {
+      const card = explainLangyError(domain({ code }));
+      expect(card.render).toBe("card");
+      expect(card.action).toBeUndefined();
+      expect(card.title).not.toBe("Langy couldn't finish that");
+    },
+  );
 });

@@ -494,3 +494,15 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given the live connection drops before Langy can say what went wrong
     When the turn's failure is already on the conversation's record
     Then the user sees the card naming that recorded failure, not a generic apology
+
+  @unit
+  Scenario: A deployment with no Langy agent says so instead of an unexpected error
+    Given the api runs without a Langy agent and refuses the turn with langy_agent_not_configured
+    When the refusal reaches the panel, with or without its tRPC envelope
+    Then the card reads "Langy isn't set up on this deployment" and says how to enable the agent
+    And it offers no "Try again", since a retry is refused the same way
+
+  @unit
+  Scenario: Refusals that answer the same way every time offer no retry
+    Given a turn refused with langy_not_enabled, langy_skill_not_available or langy_dispatch_rejected
+    Then the card shows that code's registered copy and no "Try again" action

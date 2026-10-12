@@ -817,6 +817,12 @@ const registry = {
       "The agent rejected this turn's request as invalid, it will not be retried; send a new message",
     ],
   },
+  langy_agent_not_configured: {
+    tips: [
+      "Self-hosted: enable the Langy agent in your deployment, then reload",
+      "Local development: run `haven up +langy` and reload the api",
+    ],
+  },
   langy_agent_unavailable: {
     tips: ["Retry in a few seconds — the agent is down, mid-deploy, or restarting"],
   },

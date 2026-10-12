@@ -306,6 +306,22 @@ export class LangyDispatchRejectedError extends HandledError {
   }
 }
 
+/**
+ * This deployment runs no Langy agent at all: nothing to dispatch a turn to, and no retry
+ * can change that. Distinct from `langy_agent_unavailable`, which is a transient outage.
+ */
+export class LangyAgentNotConfiguredError extends HandledError {
+  declare readonly code: "langy_agent_not_configured";
+  constructor() {
+    super("langy_agent_not_configured", "No Langy agent is configured on this deployment.", {
+      httpStatus: 503,
+      fault: "platform",
+      ...remediation("langy_agent_not_configured"),
+    });
+    this.name = "LangyAgentNotConfiguredError";
+  }
+}
+
 /** The agent/transport is temporarily unavailable (HTTP 503). */
 export class LangyAgentUnavailableError extends HandledError {
   declare readonly code: "langy_agent_unavailable";

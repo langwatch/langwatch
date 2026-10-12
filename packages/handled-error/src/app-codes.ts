@@ -407,6 +407,7 @@ export const APP_ERROR_CODES = [
   "langwatch_cloud_only",
   "langy_agent_at_capacity",
   "langy_agent_errored",
+  "langy_agent_not_configured",
   "langy_agent_session_lost",
   "langy_agent_unavailable",
   "langy_api_actor_missing",
