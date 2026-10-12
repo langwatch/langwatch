@@ -138,6 +138,8 @@ describe("given an insight from a board with a query, a window from Jul 5 to Aug
         window: { start: REPLAY.start, end: REPLAY.end, granularitySeconds: 86_400 },
         parameters: { model: "gpt-5" },
         name: "Errors by day",
+        // The workbench's note about its table means nothing under an insight.
+        isResultNoteHidden: true,
       });
       expect(
         evidence.getByText(

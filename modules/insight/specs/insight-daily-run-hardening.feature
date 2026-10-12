@@ -16,7 +16,15 @@ Feature: The daily insights run before a wider rollout
       When the run is carried out
       Then it is recorded as nothing with the reason no_new_traces
       And Langy is never called and no insight is filed
-      And the project was asked once for its newest trace since the window's start
+      And the project was asked once for its newest trace since the window's start, leaving out Langy's
+
+    # A run's own turn is traced into the project as Langy's; it is no reason to read the board again.
+    @unit
+    Scenario: A project whose only new traces are Langy's own asks Langy nothing
+      Given a member with analytics:view, a board with widgets and a project whose only new traces are Langy's turns
+      When the run is carried out
+      Then it is recorded as nothing with the reason no_new_traces
+      And Langy is never called
 
     @unit
     Scenario: A member without access is skipped before the project's traces are asked

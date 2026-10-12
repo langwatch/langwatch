@@ -40,6 +40,7 @@ export function InsightEvidence({ entry }: { entry: InsightEntry }) {
             }}
             parameters={replay.parameters}
             name={entry.board?.widget?.name ?? entry.title}
+            isResultNoteHidden
           />
         </Suspense>
       </Box>

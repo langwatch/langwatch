@@ -73,6 +73,7 @@ describe("given a member with analytics:view and a board with widgets", () => {
           projectId: PROJECT,
           source: "trace",
           since: dailyRunWindows({ slot, timezone: "UTC" }).window.start,
+          excludeOrigins: ["langy"],
         },
       ]);
       expect((await schedule.settingOf()).lastRun).toMatchObject({
@@ -104,6 +105,23 @@ describe("given a member with analytics:view and a board with widgets", () => {
         { instrument: RUNS, value: 1, attributes: { outcome: "nothing", reason: "no_new_traces" } },
       ]);
       expect(durations).toHaveLength(1);
+    });
+  });
+
+  describe("when the project's only new traces are Langy's own turns", () => {
+    beforeEach(() => {
+      installed.world.newTraceOrigins = ["langy"];
+    });
+
+    /** @scenario "A project whose only new traces are Langy's own asks Langy nothing" */
+    it("records nothing with no_new_traces and asks Langy nothing", async () => {
+      await schedule.runDay({ day: 0 });
+
+      expect(installed.langy.starts).toEqual([]);
+      expect((await schedule.settingOf()).lastRun).toMatchObject({
+        outcome: "nothing",
+        reason: "no_new_traces",
+      });
     });
   });
 

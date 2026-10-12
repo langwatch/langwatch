@@ -1,8 +1,8 @@
 Feature: Unattended Langy turns
   A module may start a Langy turn for a person who is not at the keyboard, such as a
   scheduled insights run. The turn acts as that person, with the permissions they hold
-  when it starts, and it can only read: its key holds a short allowlist of view permissions
-  and no GitHub token. Its conversation is the person's own, marked as a run, and it never
+  when it starts, and it can only read: its key holds a short allowlist of view permissions,
+  trace ingest so the run's own turn shows as a trace, and no GitHub token. Its conversation is the person's own, marked as a run, and it never
   notifies them. Every later turn in a run conversation keeps the same limits: its history
   holds trace text nobody vetted. To go on with full powers the person starts a new
   conversation.
@@ -14,14 +14,23 @@ Feature: Unattended Langy turns
       Given a person who may view, update and delete in a project
       When an unattended turn is started for them
       Then the key the worker gets holds the view permissions a board read needs, of those they hold
-      And it holds no permission whose action is not view
+      And it holds trace ingest, so the relay can send the run's turn as a trace
+      And it holds no other permission whose action is not view
 
     @unit
     Scenario: The unattended allowlist is pinned to what a board read needs
       Given the permissions an unattended key may ask for
       When the list is read
-      Then it is exactly analytics, traces, cost, evaluations, scenarios, annotations, experiments, prompts and gatewayUsage view
+      Then it is exactly analytics, traces, cost, evaluations, scenarios, annotations, experiments, prompts and gatewayUsage view, and traces create
       And it holds no team, organization, project, audit log, dataset or secret permission
+
+    # Ingest asks only the project and the permission, so "its own trace only" cannot be expressed.
+    @unit
+    Scenario: An unattended key may send its run's trace and write nothing else
+      Given the permissions an unattended key may ask for
+      When the actions that are not view are read
+      Then the only one is traces create
+      And trace update, delete and share, and any prompt or dataset write, are left out
 
     @unit
     Scenario: An unattended key holds only what reading a board needs

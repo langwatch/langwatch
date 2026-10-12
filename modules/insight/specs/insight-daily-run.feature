@@ -394,8 +394,8 @@ Feature: The daily insights run
       Given the person has an open insight for the board from an earlier run
       When a later run's finding names that insight as the one it repeats
       Then the insight is renewed once and no insight is filed
-      And it keeps its id, its title, its tone and the day it was filed
-      And it takes the later run's body, validity, conversation and message
+      And it keeps its id, its title and the day it was filed
+      And it takes the later run's body, tone, validity, conversation and message
       And the run's row reads nothing with none filed and 1 renewed
 
     @unit
@@ -469,8 +469,14 @@ Feature: The daily insights run
     Scenario: A renewed insight keeps its id and reads as seen again
       Given a filed insight and a renewal of it by a later run
       When both events are folded
-      Then the row is the same insight with the renewal's body, validity, window and source
+      Then the row is the same insight with the renewal's body, tone, validity, window and source
       And it holds when it was renewed beside when it was filed
+
+    @unit
+    Scenario: A renewal stored before tones were renewed keeps the insight's tone
+      Given a filed insight and a renewal of it stored without a tone
+      When both events are folded
+      Then the row keeps the tone it was filed with
 
     @unit
     Scenario: A late repeat of an older renewal changes nothing

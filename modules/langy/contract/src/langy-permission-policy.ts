@@ -232,13 +232,14 @@ export function langyCandidatePermissions(): AuthzPermission[] {
 }
 
 /**
- * What an unattended turn's key may hold, each with the read that needs it. A board read is a
- * widget's definition and its LangWatchQL queries: `analytics:view` opens both doors, and each
- * other entry is the second permission a LangWatchQL view asks for. Nothing joins by default.
+ * What an unattended turn's key may hold, each with what needs it. `analytics:view` opens a board
+ * and its LangWatchQL queries; each other view is the second permission a view asks for. The one
+ * write, `traces:create`, cannot be held to the run's own trace (insight ADR-004).
  */
 const UNATTENDED_PERMISSION_NEEDS = {
   "analytics:view": "reads a board and its widgets, and runs a LangWatchQL query",
   "traces:view": "the LangWatchQL views traces, spans, trace_metrics and topics",
+  "traces:create": "the relay sends the run's own turn trace into the person's project",
   "cost:view": "cost columns of those views, and the view costs",
   "evaluations:view": "the LangWatchQL views evaluations, evaluation_metrics and monitors",
   "scenarios:view": "the LangWatchQL view simulations",
@@ -251,7 +252,7 @@ const UNATTENDED_PERMISSION_NEEDS = {
 /**
  * The ceiling of an unattended turn, and of every turn in a run conversation: an explicit
  * allowlist, never "every view". A run reads customer trace text with nobody watching, so text
- * that steers it finds no write to use and little beyond the board to read.
+ * that steers it finds no write but a trace in the same project, and little beyond the board.
  */
 export function langyUnattendedPermissions(): AuthzPermission[] {
   const allowlist = Object.keys(UNATTENDED_PERMISSION_NEEDS) as AuthzPermission[];

@@ -15,7 +15,13 @@ import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { useLwqlReplay } from "../../behavior/use-lwql-replay.ts";
 import { LazyLangWatchQLWidgetChart } from "./langwatch-ql-dashboard-widget.tsx";
 
-export function LwqlReplayChart({ sql, window, parameters, name }: LwqlReplayChartProps) {
+export function LwqlReplayChart({
+  sql,
+  window,
+  parameters,
+  name,
+  isResultNoteHidden = false,
+}: LwqlReplayChartProps) {
   const host = useAnalyticsHost();
   const { result, error } = useLwqlReplay({
     projectId: host.project()?.id,
@@ -45,5 +51,12 @@ export function LwqlReplayChart({ sql, window, parameters, name }: LwqlReplayCha
       </HStack>
     );
   }
-  return <LazyLangWatchQLWidgetChart columns={columns} rows={result.rows} ariaLabel={name} />;
+  return (
+    <LazyLangWatchQLWidgetChart
+      columns={columns}
+      rows={result.rows}
+      ariaLabel={name}
+      isResultNoteHidden={isResultNoteHidden}
+    />
+  );
 }

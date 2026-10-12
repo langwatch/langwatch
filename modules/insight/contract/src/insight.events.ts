@@ -46,13 +46,14 @@ export const insightFiledEventDataSchema: InsightFiledEventDataSchema =
 export type InsightFiledEventData = z.infer<typeof insightFiledEventDataSchema>;
 
 /**
- * A later run found the insight still true. Its words, validity, window and source become the
- * run's; its id, title, tone and owner stay. It names no reader, so nobody's seen, done or
- * kept state moves.
+ * A later run found the insight still true. Its words, tone, validity, window and source become
+ * the run's; its id, title and owner stay. It names no reader, so nobody's seen, done or kept
+ * state moves. `tone` came later: an event stored before it reads as null and keeps the tone.
  */
 const insightRenewedEventDataSchemaDefinition = z.object({
   insightId: z.string().min(1),
   body: z.string(),
+  tone: insightToneSchema.nullable().default(null),
   validDays: z.number().int().positive(),
   /** The window the insight's query replays over from now on; null when it keeps no query. */
   replay: insightReplaySchema.nullable(),

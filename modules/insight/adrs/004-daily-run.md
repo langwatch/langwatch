@@ -15,8 +15,8 @@ start the same run.
 
 A run reads customer trace text with nobody watching. That text may carry
 instructions. So the run is built on two facts that do not depend on Langy behaving:
-Langy holds no write permission, and nothing Langy says decides who an insight is
-for.
+Langy holds no write permission but sending a trace, and nothing Langy says decides who
+an insight is for.
 
 ## Decision
 
@@ -44,8 +44,11 @@ gate is asked a second time when Langy has answered, before anything is filed: a
 who lost access during the turn files nothing and the run ends `skipped`.
 
 **Langy only reads.** The run starts a turn with `LangyApi.startUnattendedTurn`. That
-turn's key holds only the short list of `view` permissions a board read needs, it is
-never borrowed from a running worker, and it carries no GitHub token. Every later turn
+turn's key holds only the short list of `view` permissions a board read needs, and
+`traces:create` so the run's own turn reaches the person's project as a trace. Trace
+ingest asks only the project and the permission, so the key cannot be held to the run's
+own trace; a steered run could at most add a trace to that project. The key is never
+borrowed from a running worker, and it carries no GitHub token. Every later turn
 in the run's conversation keeps the same key ceiling. Filing is the
 one write of a run, and the insight module does it.
 
@@ -116,8 +119,8 @@ newest insight with the finding's key. Never by title. Only the person's own ins
 for this board are candidates, filed before the run, and open at the run's slot or
 marked done; so an id of another person, another board or no insight is ignored and the
 finding is filed as new. A match that is open is renewed: one `renewed` event on the
-insight's own stream with the run's body, validity, window and source, stamped with the
-run's slot. The insight keeps its id, title, tone, pointer and query; a query it keeps
+insight's own stream with the run's body, tone, validity, window and source, stamped with
+the run's slot. The insight keeps its id, title, pointer and query; a query it keeps
 replays over the run's window with the values it was filed with. A match the person
 marked done makes the run quiet for that finding: no renewal and no new insight. An
 expired insight is no match, so finding it again is filed as news, unread. A second

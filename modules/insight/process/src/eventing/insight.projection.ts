@@ -74,8 +74,8 @@ function applyFiled(state: InsightState, event: InsightFiledEvent): InsightState
 function applyRenewed(state: InsightState, event: InsightRenewedEvent): InsightState {
   // A renewal older than the one the row holds is a late repeat of an earlier run's.
   if (state.renewedAt !== null && event.occurredAt < state.renewedAt) return state;
-  const { insightId: _insightId, ...renewed } = event.data;
-  return { ...state, ...renewed, renewedAt: event.occurredAt };
+  const { insightId: _insightId, tone, ...renewed } = event.data;
+  return { ...state, ...renewed, tone: tone ?? state.tone, renewedAt: event.occurredAt };
 }
 
 export function applyInsightEvent(

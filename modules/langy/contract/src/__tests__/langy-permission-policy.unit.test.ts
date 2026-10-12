@@ -211,6 +211,7 @@ describe("langyUnattendedPermissions", () => {
       expect(langyUnattendedPermissions()).toEqual([
         "analytics:view",
         "traces:view",
+        "traces:create",
         "cost:view",
         "evaluations:view",
         "scenarios:view",
@@ -221,13 +222,27 @@ describe("langyUnattendedPermissions", () => {
       ]);
     });
 
-    it("holds view permissions Langy may hold in a chat, and no other action", () => {
+    /** @scenario "An unattended key may send its run's trace and write nothing else" */
+    it("holds permissions Langy may hold in a chat, each a view but trace ingest", () => {
       const candidates = langyCandidatePermissions();
+      const writes = langyUnattendedPermissions().filter(
+        (permission) => splitPermission(permission).action !== "view",
+      );
 
+      expect(writes).toEqual(["traces:create"]);
       for (const permission of langyUnattendedPermissions()) {
-        expect(splitPermission(permission).action).toBe("view");
         expect(candidates).toContain(permission);
       }
+    });
+
+    it.each([
+      "traces:update",
+      "traces:delete",
+      "traces:share",
+      "prompts:create",
+      "datasets:create",
+    ])("leaves the write %s out", (permission) => {
+      expect(langyUnattendedPermissions()).not.toContain(permission);
     });
 
     it.each([

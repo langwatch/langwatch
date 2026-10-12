@@ -45,6 +45,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "zod": "catalog:"
   },

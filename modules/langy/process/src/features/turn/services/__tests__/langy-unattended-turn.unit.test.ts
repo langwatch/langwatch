@@ -224,19 +224,20 @@ describe("an unattended Langy turn", () => {
       "datasets:view",
       "analytics:view",
       "traces:view",
+      "traces:create",
       "traces:update",
       "prompts:update",
       "datasets:delete",
     ];
 
     /** @scenario "An unattended turn's key holds view permissions only" */
-    it("hands the worker a key holding the view permissions a board read needs and no other", async () => {
+    it("hands the worker a key holding a board read's views and its run's trace ingest, no other", async () => {
       const keys = sessionKeysHolding(held);
       const fixture = makeFixture({ sessionKeys: keys.service });
 
       await fixture.start(unattendedTurn);
 
-      expect(keys.created).toEqual([["analytics:view", "traces:view"]]);
+      expect(keys.created).toEqual([["analytics:view", "traces:view", "traces:create"]]);
       expect(fixture.dispatch).toHaveBeenCalledWith(
         expect.objectContaining({
           credentials: expect.objectContaining({

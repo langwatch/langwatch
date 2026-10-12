@@ -450,7 +450,9 @@ describe("LangySessionKeyService", () => {
       const [chat, unattended] = granted;
       expect(chat).toContain("prompts:update");
       expect(unattended).not.toContain("prompts:update");
-      expect(unattended!.every((permission) => permission.endsWith(":view"))).toBe(true);
+      expect(unattended!.filter((permission) => !permission.endsWith(":view"))).toEqual([
+        "traces:create",
+      ]);
       expect(unattended!.length).toBeGreaterThan(0);
     });
 
@@ -462,7 +464,10 @@ describe("LangySessionKeyService", () => {
       await mint("unattended");
       const minted = granted[0]!;
       expect(minted).toContain("traces:view");
-      expect(minted.every((permission) => permission.endsWith(":view"))).toBe(true);
+      // Trace ingest is the one write a run's key may hold, and only if the person holds it.
+      expect(minted.filter((permission) => !permission.endsWith(":view"))).toEqual(
+        minted.includes("traces:create") ? ["traces:create"] : [],
+      );
 
       member.grants = memberGrants(null);
 

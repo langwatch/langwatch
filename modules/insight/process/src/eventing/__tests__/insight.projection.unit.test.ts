@@ -137,7 +137,7 @@ describe("given an insight a run filed with a key and a query", () => {
     },
   });
 
-  /** A renewal of that insight by the run of `days` days later. */
+  /** A renewal of that insight by the run of `days` days later, stored before tones renewed. */
   const renewedAfter = (days: number, body = "Checkout errors are still twice the usual.") =>
     InsightRenewedEventSchema.parse({
       ...STORED_BEFORE_POINTERS,
@@ -159,19 +159,29 @@ describe("given an insight a run filed with a key and a query", () => {
 
   describe("when a later run renews it", () => {
     /** @scenario "A renewed insight keeps its id and reads as seen again" */
-    it("is the same insight with the renewal's words, validity, window and source", () => {
-      const renewal = renewedAfter(1);
+    it("is the same insight with the renewal's words, tone, validity, window and source", () => {
+      const stored = renewedAfter(1);
+      const renewal = { ...stored, data: { ...stored.data, tone: "good" as const } };
 
       expect(PROJECTION.eventTypes).toContain(INSIGHT_EVENT_TYPES.RENEWED);
       expect(PROJECTION.key?.(renewal)).toBe("insight-1");
       expect(applyInsightEvent(filed, renewal)).toEqual({
         ...filed,
         body: "Checkout errors are still twice the usual.",
+        tone: "good",
         validDays: 3,
         replay: { start: FILED_AT, end: FILED_AT + DAY_MS, ...WINDOW },
         source: { conversationId: "conversation-1", messageId: "message-1" },
         renewedAt: FILED_AT + DAY_MS,
       });
+    });
+
+    /** @scenario "A renewal stored before tones were renewed keeps the insight's tone" */
+    it("keeps the tone the insight was filed with", () => {
+      const renewal = renewedAfter(1);
+
+      expect(renewal.data.tone).toBeNull();
+      expect(applyInsightEvent(filed, renewal).tone).toBe("bad");
     });
 
     /** @scenario "Renewal changes nothing the person did with the insight" */

@@ -27,8 +27,9 @@ Two Postgres projections:
 
 - `InsightProjection`: the insight and whose it is (owner, title, body, tone,
   topic, validity, source, the key a run matches a repeat by). Folded from `filed`
-  and `renewed`. A renewal keeps the id, the title, the tone and `filedAt`, takes
-  the later run's body, validity, window and source, and sets `renewedAt`. A
+  and `renewed`. A renewal keeps the id, the title and `filedAt`, takes the later
+  run's body, tone, validity, window and source, and sets `renewedAt`. A renewal
+  stored before it carried a tone reads as null and keeps the insight's tone. A
   renewal stamped before the one the row holds is a late repeat and changes nothing.
 - `InsightReaderProjection`: one row per insight and reader, keyed
   `insightId:userId`, holding `seenAt`, `archivedAt` and `keptAt`. An insight has

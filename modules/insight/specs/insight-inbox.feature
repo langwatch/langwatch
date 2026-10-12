@@ -258,6 +258,7 @@ Feature: The insights inbox
       Given an insight from a board with a query, a window from Jul 5 to Aug 3 and the period "Last 30 days"
       When a member opens the card
       Then under the chart it reads "Replayed with: Jul 5 to Aug 3 · Last 30 days. The board as it was set when Langy filed this."
+      And the workbench's note about switching to its table is not shown, only told to a screen reader
 
     @integration
     Scenario: A reader the query is refused for sees the refusal, not the numbers

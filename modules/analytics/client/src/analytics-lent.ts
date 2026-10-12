@@ -113,6 +113,8 @@ export type LwqlReplayChartProps = {
   parameters?: Readonly<Record<string, string | number | boolean>>;
   /** How the chart is described to a reader who cannot see it. */
   name: string;
+  /** Keeps the workbench's note about its table for screen readers only; a peer shows no table. */
+  isResultNoteHidden?: boolean;
 };
 
 export const LwqlReplayChartToken =

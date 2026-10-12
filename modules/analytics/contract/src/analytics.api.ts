@@ -102,11 +102,13 @@ export interface AnalyticsApi {
   /**
    * When the project's newest trace or evaluation since `since` occurred, from the analytics
    * tables this module owns; empty when none did. The graph-alert heartbeat reads it.
+   * `excludeOrigins` leaves out traces of those origins; an evaluation read ignores it.
    */
   findLastOccurredAt(input: {
     readonly projectId: string;
     readonly source: AnalyticsMetricSource;
     readonly since: Instant;
+    readonly excludeOrigins?: readonly string[];
   }): Promise<Instant[]>;
   isLangWatchQLAvailable(): boolean;
   /**

@@ -122,6 +122,7 @@ describe("given the person has an open insight for the board from an earlier run
         {
           ...filed,
           body: "Cost on checkout stayed at 96 dollars.",
+          tone: "watch",
           validDays: 3,
           source: { conversationId: "conversation-2", messageId: "message-of-turn-2" },
           renewedAt: DAY_2,

@@ -19,6 +19,7 @@ import type {
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, Temporal } from "@langwatch/time";
+import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 import type {
   InsightDailyRunExecutor,
@@ -186,7 +187,10 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     return { gate, board, windows };
   }
 
-  /** Asked after the gate and before Langy: a project that took no trace costs no model call. */
+  /**
+   * Asked after the gate and before Langy: a project that took no trace costs no model call.
+   * Langy's own traces are left out, so a run's own turn never makes the next day look busy.
+   */
   private async hasNewTraces({
     projectId,
     windows,
@@ -198,6 +202,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       projectId,
       source: "trace",
       since: Temporal.Instant.fromEpochMilliseconds(windows.window.start),
+      excludeOrigins: [LANGY_TRACE_ORIGIN],
     });
     return newest.length > 0;
   }
@@ -359,6 +364,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
       occurredAt: input.slot,
       insightId: insight.id,
       body: finding.body,
+      tone: finding.tone,
       validDays: finding.validDays,
       replay:
         insight.lwql === null

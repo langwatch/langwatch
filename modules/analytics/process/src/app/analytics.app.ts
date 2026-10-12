@@ -570,6 +570,7 @@ export class AnalyticsModule
     readonly projectId: string;
     readonly source: AnalyticsMetricSource;
     readonly since: Instant;
+    readonly excludeOrigins?: readonly string[];
   }): Promise<Instant[]> {
     return this.#dependencies.recency.findLastOccurredAt(input);
   }

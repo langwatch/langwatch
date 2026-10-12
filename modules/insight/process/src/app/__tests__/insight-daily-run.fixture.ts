@@ -278,6 +278,8 @@ export function runWorld() {
     lwql: { refused: new Set<string>(), protectionsError: null as Error | null },
     /** Whether the project took any trace since a run's window began. */
     hasNewTraces: true,
+    /** The origins of those traces; a read that leaves them all out finds none. */
+    newTraceOrigins: ["application"] as string[],
     /** The projects of the member's organisation, as the project module lists them. */
     organizationProjects: [PROJECT],
     langy: {
@@ -406,11 +408,17 @@ function scriptedDashboard(world: RunWorld) {
 function scriptedAnalytics(world: RunWorld) {
   const validations: { sql: string; protections: unknown; timeWindow: unknown }[] = [];
   const protectionAsks: { userId: string; projectId: string }[] = [];
-  const traceAsks: { projectId: string; source: string; since: number }[] = [];
+  const traceAsks: {
+    projectId: string;
+    source: string;
+    since: number;
+    excludeOrigins: readonly string[];
+  }[] = [];
   const analytics = createApiFixture<AnalyticsApi>({
-    findLastOccurredAt: async ({ projectId, source, since }) => {
-      traceAsks.push({ projectId, source, since: since.epochMilliseconds });
-      return world.hasNewTraces ? [since.add({ hours: 1 })] : [];
+    findLastOccurredAt: async ({ projectId, source, since, excludeOrigins = [] }) => {
+      traceAsks.push({ projectId, source, since: since.epochMilliseconds, excludeOrigins });
+      const counted = world.newTraceOrigins.filter((origin) => !excludeOrigins.includes(origin));
+      return world.hasNewTraces && counted.length > 0 ? [since.add({ hours: 1 })] : [];
     },
     resolveProtections: async (input) => {
       protectionAsks.push(input);
