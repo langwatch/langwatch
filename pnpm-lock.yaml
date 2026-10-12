@@ -17825,6 +17825,9 @@ importers:
 
   packages/system-migrations:
     dependencies:
+      '@langwatch/eventing':
+        specifier: workspace:*
+        version: link:../eventing
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability

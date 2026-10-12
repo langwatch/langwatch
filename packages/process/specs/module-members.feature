@@ -7,7 +7,7 @@ Feature: What a process hands its modules
   Scenario: A process hands a module one peer by its token
     Given a process that answers for a peer itself and hands it in by its token
     When a module that depends on that peer boots
-    Then the module is given the very instance the process handed in, unwrapped
+    Then an api-role module is given the very instance the process handed in, unwrapped
     And the same token handed in twice is refused at the second call, naming the token
 
   @unit

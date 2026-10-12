@@ -98,6 +98,7 @@ Feature: Process outbox lease hardening
     Then the holder stops renewing the lease and logs a warning naming the process and message
     And once the lease lapses another dispatcher leases and delivers the message
     And a handler that keeps calling a repository past the same limit keeps its lease
+    And a hung handler whose only activity is a lock renewal armed outside the delivery loses its lease
 
   @unit @lease-renewal
   Scenario: Only calls made inside a delivery mark its progress

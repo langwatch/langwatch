@@ -24,6 +24,9 @@
   ],
   "references": [
     {
+      "path": "../eventing/tsconfig.build.json"
+    },
+    {
       "path": "../time/tsconfig.build.json"
     },
     {

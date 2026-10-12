@@ -21,6 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*"
   },

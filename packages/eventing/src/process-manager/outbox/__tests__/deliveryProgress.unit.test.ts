@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { runDeliveryMarkingProgress, trackDeliveryProgress } from "../deliveryProgress.ts";
+import {
+  runDeliveryMarkingProgress,
+  runOutsideDelivery,
+  trackDeliveryProgress,
+} from "../deliveryProgress.ts";
 
 class Rows {
   readonly #rows: string[] = [];
@@ -60,6 +64,21 @@ describe("trackDeliveryProgress", () => {
       await runDeliveryMarkingProgress({ markProgress, run: () => Promise.resolve() });
 
       await expect(repository.insert("outside")).resolves.toBe(1);
+      expect(markProgress).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a delivery arms work outside itself", () => {
+    /** @scenario "Only calls made inside a delivery mark its progress" */
+    it("marks nothing for the calls that work makes", async () => {
+      const repository = trackDeliveryProgress(new Rows());
+      const markProgress = vi.fn();
+
+      await runDeliveryMarkingProgress({
+        markProgress,
+        run: () => runOutsideDelivery(() => repository.insert("renewal")),
+      });
+
       expect(markProgress).not.toHaveBeenCalled();
     });
   });

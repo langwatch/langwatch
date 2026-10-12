@@ -21,6 +21,14 @@ export function runDeliveryMarkingProgress<Result>({
 }
 
 /**
+ * Runs `start` outside any delivery, so a timer it arms (a lock or claim renewal) never
+ * marks the delivery that happened to start it: a hung handler still goes silent.
+ */
+export function runOutsideDelivery<Result>(start: () => Result): Result {
+  return currentDelivery.exit(start);
+}
+
+/**
  * The dependency with each call marking the current delivery's progress when it
  * starts and when its promise settles. Outside a delivery a call passes straight
  * through. Lazy thenables (a Prisma query) are never awaited, so never run early.

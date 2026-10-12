@@ -1,3 +1,4 @@
+import { runOutsideDelivery } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
@@ -437,16 +438,19 @@ export class SystemMigrationRunnerService {
   } {
     let lost = false;
     const ttlMs = this.deps.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS;
-    const timer = setInterval(() => {
-      void this.deps.lease
-        .renew({ name: claimName, ttlMs })
-        .then((held) => {
-          if (!held) lost = true;
-        })
-        .catch(() => {
-          lost = true;
-        });
-    }, this.deps.leaseRenewIntervalMs ?? DEFAULT_LEASE_RENEW_INTERVAL_MS);
+    // A renewal is not the pass's progress: a hung tenant step must still go silent.
+    const timer = runOutsideDelivery(() =>
+      setInterval(() => {
+        void this.deps.lease
+          .renew({ name: claimName, ttlMs })
+          .then((held) => {
+            if (!held) lost = true;
+          })
+          .catch(() => {
+            lost = true;
+          });
+      }, this.deps.leaseRenewIntervalMs ?? DEFAULT_LEASE_RENEW_INTERVAL_MS),
+    );
     // Never let a heartbeat alone hold the process open at shutdown.
     timer.unref?.();
     return { claimLost: () => lost, stop: () => clearInterval(timer) };

@@ -12,7 +12,7 @@ import {
 } from "../../__tests__/helpers/pilotProcess.fixture.ts";
 import { ProcessManagerService } from "../../processManagerService.ts";
 import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore.ts";
-import { trackDeliveryProgress } from "../deliveryProgress.ts";
+import { runOutsideDelivery, trackDeliveryProgress } from "../deliveryProgress.ts";
 import {
   type DispatchableMessage,
   type DispatchReport,
@@ -54,17 +54,59 @@ function repositoryCaller({ calling, stepMs }: { calling: boolean; stepMs: numbe
   return { handler, finish: () => (finished = true) };
 }
 
+/** A hung handler whose only activity is a lock renewal on a real timer, armed as `arm` says. */
+function lockRenewingHang({
+  everyMs,
+  arm,
+}: {
+  everyMs: number;
+  arm: (start: () => NodeJS.Timeout) => NodeJS.Timeout;
+}) {
+  const renew = vi.fn(() => Promise.resolve(true));
+  const lock = trackDeliveryProgress({ renew });
+  let release: () => void = () => undefined;
+  const handler = async (): Promise<void> => {
+    const timer = arm(() => setInterval(() => void lock.renew(), everyMs));
+    await new Promise<void>((resolve) => (release = resolve));
+    clearInterval(timer);
+  };
+  return { handler, finish: () => release(), renew };
+}
+
+/** Holds a hung handler on real timers past a short silence limit; answers whether it warned. */
+async function holdHungOnRealTimers({
+  store,
+  arm,
+}: {
+  store: InMemoryProcessStore;
+  arm: (start: () => NodeJS.Timeout) => NodeJS.Timeout;
+}) {
+  const { logger, lines } = createTestLogger();
+  const hang = lockRenewingHang({ everyMs: 10, arm });
+  const holder = new OutboxDispatcherService({
+    store,
+    handlers: { "worker-dispatch": hang.handler },
+    leaseDurationMs: 90,
+    maxSilenceMs: 60,
+    logger,
+  });
+  const run = holder.runOnce({ now: Date.now() });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  hang.finish();
+  await run;
+  return { renewals: hang.renew.mock.calls.length, warned: lines.findLine("warn", "no call") };
+}
+
 /** Runs a holder for three minutes beside a polling rival; reports when the rival took over. */
 async function holdBesideRival({
   store,
-  calling,
+  caller,
 }: {
   store: InMemoryProcessStore;
-  calling: boolean;
+  caller: { handler: () => Promise<void>; finish: () => void };
 }) {
   const { leaseDurationMs, maxSilenceMs, stepMs } = SILENCE;
   const { logger, lines } = createTestLogger();
-  const caller = repositoryCaller({ calling, stepMs });
   const holder = new OutboxDispatcherService({
     store,
     handlers: { "worker-dispatch": caller.handler },
@@ -868,7 +910,10 @@ describe("OutboxDispatcherService", () => {
 
     /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
     it("stops renewing once silent past the limit, so another dispatcher redelivers it", async () => {
-      const { report, takenAfterMs, lines } = await holdBesideRival({ store, calling: false });
+      const { report, takenAfterMs, lines } = await holdBesideRival({
+        store,
+        caller: repositoryCaller({ calling: false, stepMs }),
+      });
 
       expect(takenAfterMs).toBeGreaterThan(maxSilenceMs);
       expect(takenAfterMs).toBeLessThanOrEqual(maxSilenceMs + 2 * stepMs + leaseDurationMs);
@@ -884,7 +929,10 @@ describe("OutboxDispatcherService", () => {
 
     /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
     it("keeps the lease for a handler that keeps calling a repository past the same limit", async () => {
-      const { report, takenAfterMs } = await holdBesideRival({ store, calling: true });
+      const { report, takenAfterMs } = await holdBesideRival({
+        store,
+        caller: repositoryCaller({ calling: true, stepMs }),
+      });
 
       expect(takenAfterMs).toBeNull();
       expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
@@ -911,6 +959,25 @@ describe("OutboxDispatcherService", () => {
       expect(lines.findLine("warn", "no call through its dependencies")).toEqual(
         expect.objectContaining({ maxSilenceMs: 5 * 60_000 }),
       );
+    });
+  });
+
+  describe("given a hung handler whose only activity is a lock renewal timer", () => {
+    beforeEach(commitStartedTurn);
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("stops renewing past the limit when the timer was armed outside the delivery", async () => {
+      const { renewals, warned } = await holdHungOnRealTimers({ store, arm: runOutsideDelivery });
+
+      expect(renewals).toBeGreaterThan(5);
+      expect(warned).toEqual(expect.objectContaining({ maxSilenceMs: 60 }));
+    });
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("keeps renewing when the same timer was armed inside it, which is why renewals opt out", async () => {
+      const { warned } = await holdHungOnRealTimers({ store, arm: (start) => start() });
+
+      expect(warned).toBeUndefined();
     });
   });
 

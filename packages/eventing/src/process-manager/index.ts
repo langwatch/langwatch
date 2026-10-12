@@ -1,6 +1,7 @@
 export { ensureJsonSafe, JsonSafetyError, type JsonValue } from "./json.ts";
 export {
   runDeliveryMarkingProgress,
+  runOutsideDelivery,
   trackDeliveryProgress,
   type DispatchableMessage,
   type DispatchReport,

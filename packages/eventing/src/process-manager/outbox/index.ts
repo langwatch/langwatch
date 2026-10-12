@@ -1,4 +1,8 @@
-export { runDeliveryMarkingProgress, trackDeliveryProgress } from "./deliveryProgress.ts";
+export {
+  runDeliveryMarkingProgress,
+  runOutsideDelivery,
+  trackDeliveryProgress,
+} from "./deliveryProgress.ts";
 export {
   type DispatchableMessage,
   type DispatchReport,
