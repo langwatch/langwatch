@@ -86,10 +86,12 @@ func TestBrowserFindingsCountsThirdPartyNoiseApart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "browser.jsonl")
 	lines := `{"kind":"console","text":"Loading the script 'https://static.hotjar.com/c.js' violates the following Content Security Policy"}` + "\n" +
 		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_BLOCKED_BY_ORB"}` + "\n" +
-		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_FAILED"}` + "\n"
+		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_FAILED"}` + "\n" +
+		`{"kind":"requestfailed","url":"http://x/api/trpc/traces.spanTreePaginated?input=%7B%7D","text":"net::ERR_ABORTED"}` + "\n" +
+		`{"kind":"requestfailed","url":"http://x/api/trpc/traces.spanTreePaginated?input=%7B%7D","text":"net::ERR_FAILED"}` + "\n"
 	_ = os.WriteFile(path, []byte(lines), 0o600)
 	_, _, tolerated, findings, err := BrowserFindings(path, -1, -1, false)
-	if err != nil || len(findings) != 1 || findings[0].Text != "net::ERR_FAILED" || len(tolerated) != 2 {
+	if err != nil || len(findings) != 2 || findings[0].Text != "net::ERR_FAILED" || len(tolerated) != 3 {
 		t.Errorf("findings %+v tolerated %v err %v", findings, tolerated, err)
 	}
 }

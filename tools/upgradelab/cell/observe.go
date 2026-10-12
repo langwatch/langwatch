@@ -416,6 +416,7 @@ type browserNoise struct {
 var acceptedBrowserNoise = []browserNoise{
 	{[]string{"static.hotjar.com"}, "third-party analytics, same on main"},
 	{[]string{"static.reo.dev", "ERR_BLOCKED_BY_ORB"}, "third-party analytics, same on main"},
+	{[]string{"/api/trpc/", "?input=", "net::ERR_ABORTED"}, "a tRPC read the page cancelled itself (navigation or a re-keyed query); its answer is judged by N2 and the api log"},
 }
 
 // BrowserFindings reads browser.jsonl: the walks completed and every error outside the accepted list.
