@@ -74,11 +74,12 @@ describe("given the deployment has no classifier", () => {
 describe("given the Instant Evals flag is off for the project", () => {
   /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
   it("says Instant Evals aren't enabled yet, offers Contact us, and dismisses on Not now", () => {
+    const onClose = vi.fn();
     const onSkip = vi.fn();
     render(
       <InstantEvalRefusalPopover
         refusal={{ kind: "unreleased" }}
-        onClose={vi.fn()}
+        onClose={onClose}
         onSkip={onSkip}
         onEnable={vi.fn()}
         isEnabling={false}
@@ -100,7 +101,8 @@ describe("given the Instant Evals flag is off for the project", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
 
-    expect(onSkip).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSkip).not.toHaveBeenCalled();
   });
 
   it("renders nothing while there is no refusal", () => {
@@ -128,11 +130,12 @@ describe("given Instant Evals are off for a self-serve organization", () => {
   /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
   it("explains where the text goes, and Enable throws the switch", () => {
     const onEnable = vi.fn();
+    const onClose = vi.fn();
     const onSkip = vi.fn();
     render(
       <InstantEvalRefusalPopover
         refusal={{ kind: "opt_in" }}
-        onClose={vi.fn()}
+        onClose={onClose}
         onSkip={onSkip}
         onEnable={onEnable}
         isEnabling={false}
@@ -156,7 +159,8 @@ describe("given Instant Evals are off for a self-serve organization", () => {
     expect(onEnable).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
-    expect(onSkip).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSkip).not.toHaveBeenCalled();
   });
 });
 

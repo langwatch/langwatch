@@ -85,7 +85,6 @@ export const DensitySelect: React.FC<{ compact?: boolean }> = ({ compact = false
   );
 };
 
-/** The two densities as radio items, each with the hint that says what it changes. */
 const DensityMenuContent: React.FC<{
   density: Density;
   onSelect: (density: Density) => void;

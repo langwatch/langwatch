@@ -1,6 +1,7 @@
 import { toaster } from "@langwatch/design-system/toaster";
 import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contract";
 import {
+  combineQueries,
   isRouteKind,
   type ModelTrouble,
   queryWithoutInstantEvalChip,
@@ -426,7 +427,7 @@ export function useSubmitSearch({
     (payload: InstantEvalRoutePayload) => {
       const seq = ++submitSeqRef.current;
       onSupersede();
-      const text = `${payload.otherQuery} ${payload.sentence}`.trim();
+      const text = combineQueries({ base: payload.otherQuery, addition: payload.sentence });
       if (!splitBareWords(text).sentence || isSamplePreview) {
         applyQueryText(requoteBareTerms(text));
         return;

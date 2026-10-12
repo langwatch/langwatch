@@ -58,7 +58,7 @@ interface InstantEvalRefusalPopoverProps {
   refusal: InstantEvalRefusal | null;
   /** A click outside or Escape: the popover closes and the eval chip stays. */
   onClose: () => void;
-  /** The secondary button: the words are routed again without the eval. */
+  /** The secondary button when it reads "Skip": the words are routed again without the eval. */
   onSkip: () => void;
   /** The organization's switch, pressed by the `opt_in` popover only. */
   onEnable: () => void;
@@ -195,6 +195,8 @@ export function InstantEvalRefusalPopover({
   const copy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
   const action = copy?.action;
   const actionHref = action?.href;
+  // Only a button that says Skip routes the words again; "Not now" just closes.
+  const onDismiss = copy?.dismiss === "Skip" ? onSkip : onClose;
   return (
     <PopoverRoot
       open={refusal !== null}
@@ -223,7 +225,7 @@ export function InstantEvalRefusalPopover({
                   <Button asChild size="sm" colorPalette="orange">
                     <RoutedLink href={actionHref}>{action?.label}</RoutedLink>
                   </Button>
-                  <Button size="sm" variant="outline" onClick={onSkip}>
+                  <Button size="sm" variant="outline" onClick={onDismiss}>
                     {copy.dismiss}
                   </Button>
                   {copy.more && (
@@ -288,7 +290,7 @@ export function InstantEvalRefusalPopover({
                       </Button>
                     </RoutedLink>
                   )}
-                  <Button size="xs" variant="ghost" onClick={onSkip}>
+                  <Button size="xs" variant="ghost" onClick={onDismiss}>
                     {copy.dismiss}
                   </Button>
                 </HStack>
