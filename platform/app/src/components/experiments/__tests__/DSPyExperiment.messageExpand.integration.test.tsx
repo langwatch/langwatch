@@ -83,8 +83,7 @@ describe("given a Messages cell with a truncated prompt", () => {
       await screen.findByRole("button", { name: "View full message" }),
     );
 
-    expect(
-      await screen.findByText(new RegExp(LONG_PROMPT.slice(0, 50))),
-    ).toBeTruthy();
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain(LONG_PROMPT);
   });
 });

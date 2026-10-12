@@ -11,12 +11,21 @@ export function ExpandedTextDialog({
   open,
   onOpenChange,
   textExpanded,
+  collapseStrings = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   textExpanded: string | undefined;
+  /** Whether the formatted JSON view still collapses long strings past
+   *  react-json-view's own 1000-char default. A caller whose whole point is
+   *  showing an otherwise-truncated value in full — e.g. a DSPy prompt cell
+   *  that already truncates at 140 chars — sets this false so the dialog's
+   *  default view is actually the untruncated value, not just the raw/copy
+   *  escape hatch. */
+  collapseStrings?: boolean;
 }) {
   const [isFormatted, setIsFormatted] = useState(true);
+  const collapseStringsAfterLength = collapseStrings ? 1000 : false;
 
   return (
     <Dialog.Root
@@ -49,7 +58,11 @@ export function ExpandedTextDialog({
         >
           {open && textExpanded && isFormatted ? (
             isJson(textExpanded) ? (
-              <RenderInputOutput value={textExpanded} showTools={"copy-only"} />
+              <RenderInputOutput
+                value={textExpanded}
+                showTools={"copy-only"}
+                collapseStringsAfterLength={collapseStringsAfterLength}
+              />
             ) : (
               <Markdown>
                 {typeof textExpanded === "string"

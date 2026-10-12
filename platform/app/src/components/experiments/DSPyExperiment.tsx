@@ -1111,6 +1111,7 @@ export const RunDetails = React.memo(
             setExpandedMessages(open ? expandedMessages : undefined)
           }
           textExpanded={expandedMessages}
+          collapseStrings={false}
         />
       </VStack>
     );
