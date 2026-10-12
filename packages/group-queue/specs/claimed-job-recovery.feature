@@ -59,6 +59,14 @@ Feature: GroupQueue brings back a job whose worker died while running it
     And the second worker's claimed record, active key and staged jobs are as they were
 
   @integration
+  Scenario: A former owner's failure keeps the payload lease the recovering worker relies on
+    Given a job whose payload is offloaded to the blob store under a lease
+    And a worker whose claim on it was recovered by a second worker while its handler ran
+    When the first worker's handler fails for good and it blocks or dead-letters the job
+    Then the lease the recovered job carries is still held
+    And the payload blob keeps its full lifetime instead of the release grace window
+
+  @integration
   Scenario: A worker that still owns its claim completes it after its active key lapsed
     Given a worker whose active key lapsed but whose job nobody has recovered yet
     When the worker finishes and completes

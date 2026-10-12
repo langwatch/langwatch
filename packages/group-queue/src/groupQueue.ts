@@ -1771,17 +1771,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         // keeping it buys a later worker nothing.
         bodyPreserved: false,
       });
-      await this.blobLifecycle.releaseLease({
-        values: [jobDataJson],
-        groupId,
-      });
-      await this.scripts.complete({
+      const completed = await this.scripts.complete({
         groupId,
         stagedJobId,
         jobName,
         dropped: true,
         claimToken,
       });
+      // A recovering worker's job carries this value and its lease; only the owner releases it.
+      if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
       // Kept alongside gq_jobs_dropped_total: this counter is the
       // specific "a retry-encode blip lost it" diagnostic, not a
       // genuine non-retryable process() error. Oncall triaging a
@@ -1901,8 +1899,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         message: "Hand-back re-encode failed; releasing old lease and discarding job",
         bodyPreserved: false,
       });
-      await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
-      await this.scripts.complete({ groupId, stagedJobId, jobName, dropped: true, claimToken });
+      const completed = await this.scripts.complete({
+        groupId,
+        stagedJobId,
+        jobName,
+        dropped: true,
+        claimToken,
+      });
+      if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
       return;
     }
     // Before the re-stage, as on the retry path: a heartbeat tick would overwrite its TTL.
@@ -1976,7 +1980,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // When the group tripped the quarantine breaker, block it with the descriptive quarantine
     // error rather than the raw job error, so /ops shows why the group is blocked.
     const lastError = quarantineError ?? error;
-    const deadPayloads =
+    const { deadPayloads, claimLost } =
       this.onExhausted?.(payload) === "dead-letter"
         ? await this.deadLetterClaimedJob({ job, lastError, offender })
         : await this.blockClaimedJob({ job, lastError });
@@ -1992,6 +1996,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           }),
       ),
     );
+    // The recovering worker's job carries this value and its lease (claimed-job-recovery.feature).
+    if (claimLost) return;
     await this.blobLifecycle.releaseLease({
       values: [jobDataJson],
       groupId,
@@ -2005,8 +2011,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }: {
     job: ClaimedJob<Payload>;
     lastError: Error;
-  }): Promise<Payload[]> {
-    await this.handleExhaustedRetries({
+  }): Promise<{ deadPayloads: Payload[]; claimLost: boolean }> {
+    const blocked = await this.handleExhaustedRetries({
       groupId: job.groupId,
       stagedJobId: job.stagedJobId,
       payload: job.payload,
@@ -2016,7 +2022,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       contextMetadata: job.contextMetadata,
       routingLabels: job.routingLabels,
     });
-    return job.batchPayloads ?? [job.payload];
+    return { deadPayloads: job.batchPayloads ?? [job.payload], claimLost: !blocked };
   }
 
   /**
@@ -2032,7 +2038,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     job: ClaimedJob<Payload>;
     lastError: Error;
     offender: string | undefined;
-  }): Promise<Payload[]> {
+  }): Promise<{ deadPayloads: Payload[]; claimLost: boolean }> {
     const { groupId, stagedJobId, payload, contextMetadata, jobName, routingLabels } = job;
     const score = this.restageScore(job.originalScore);
     const batchJobIds = job.batchJobIds.length > 0 ? job.batchJobIds : [stagedJobId];
@@ -2096,7 +2102,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         },
         "Job exhausted after its claim was recovered by another worker; leaving the group to that worker",
       );
-      return deadPayloads;
+      return { deadPayloads, claimLost: true };
     }
     // The chain is over for this group: the next job starts with a fresh budget and streak.
     await this.scripts.clearGroupFailures(groupId).catch(() => {});
@@ -2114,7 +2120,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       },
       "Job dead-lettered after exhausted retries; its group drains on",
     );
-    return deadPayloads;
+    return { deadPayloads, claimLost: false };
   }
 
   /**
@@ -2605,7 +2611,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     lastError: Error | undefined;
     contextMetadata: GroupQueueContextMetadata | undefined;
     routingLabels: Record<string, string>;
-  }): Promise<void> {
+  }): Promise<boolean> {
     // The re-staged job keeps its original ready score so an operator sees it
     // where it belongs in the queue - unless that score is not a usable
     // timestamp, in which case re-staging it would park the group at the epoch
@@ -2644,7 +2650,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         { queueName: this.queueName, groupId, stagedJobId, error: lastError },
         "Job exhausted its retries after its claim was recovered by another worker; not blocking the group",
       );
-      return;
+      return false;
     }
 
     gqGroupsBlockedTotal.inc(routingLabels);
@@ -2664,6 +2670,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       },
       "Group blocked after exhausted retries, job re-staged",
     );
+    return true;
   }
 
   /**
@@ -2703,8 +2710,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).
-    await this.scripts.complete({ groupId, stagedJobId, dropped: true, claimToken });
-    await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
+    const completed = await this.scripts.complete({
+      groupId,
+      stagedJobId,
+      dropped: true,
+      claimToken,
+    });
+    // A recovering worker's job carries this value and its lease; only the owner releases it.
+    if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
   }
 
   /**

@@ -3,10 +3,15 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { BLOB_RELEASE_GRACE_TTL_SECONDS } from "../blobConstants.ts";
+import { blobLeaseSetKey, redisBlobKey } from "../blobKeys.ts";
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { deadLetterJob } from "../deadLetter.ts";
+import { NonRetryableGroupQueueError } from "../errors.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
-import { GroupStagingScripts } from "../scripts.ts";
+import { readEnvelopeLease } from "../jobEnvelope.ts";
+import { type DispatchResult, GroupStagingScripts } from "../scripts.ts";
+import { InMemoryObjectStore, mintTestUri } from "./blob-test-doubles.ts";
 
 type TestPayload = { id: string; groupId: string };
 
@@ -273,6 +278,71 @@ describe("GroupQueue claimed-job recovery", () => {
         "j3",
       );
     });
+  });
+
+  describe("given an offloaded job whose claim was recovered while the first worker's handler ran", () => {
+    /** The first worker fails the job for good; the recovering worker's lease must survive it. */
+    async function failAfterRecovery(outcome: "block" | "dead-letter") {
+      const q = freshQueue();
+      const groupId = "proj1/agg";
+      let recovered: DispatchResult | null = null;
+      const processor = new GroupQueueProcessor<TestPayload & { value: string }>(
+        {
+          name: q.name,
+          groupKey: (p) => p.groupId,
+          identify: (p) => p.id,
+          onExhausted: () => outcome,
+          process: async () => {
+            await redis.del(q.activeKey(groupId));
+            recovered = await q.scripts.dispatch({ nowMs: Date.now() + 60_000, activeTtlSec: 60 });
+            throw new NonRetryableGroupQueueError("handler failed for good");
+          },
+        },
+        redis,
+        {
+          consumerEnabled: false,
+          objectStoreFor: () => new InMemoryObjectStore(),
+          mintUri: mintTestUri,
+          resolveStorageDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
+        },
+      );
+      processors.push(processor);
+      // Over the inline ceiling, under the object-store threshold: a Redis-tier blob.
+      await processor.send({ id: "job-1", groupId, value: "x".repeat(8 * 1024) });
+      // A second job keeps the group on the ready set, so a later claim finds the lapsed one.
+      await processor.send({ id: "job-2", groupId, value: "" });
+      const first = await q.scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 60 });
+      const lease = readEnvelopeLease(first!.jobDataJson);
+      expect(lease?.ref.tier).toBe("redis");
+
+      await processor["processClaimedJob"](first!);
+
+      expect(recovered!.jobDataJson).toBe(first!.jobDataJson);
+      const leaseKey = blobLeaseSetKey({
+        queueName: q.name,
+        projectId: lease!.ref.projectId,
+        hash: lease!.ref.hash,
+      });
+      const blobKey = redisBlobKey({
+        queueName: q.name,
+        projectId: lease!.ref.projectId,
+        hash: lease!.ref.hash,
+      });
+      return {
+        holderScore: await redis.zscore(leaseKey, lease!.holderId),
+        blobTtl: await redis.ttl(blobKey),
+      };
+    }
+
+    /** @scenario "A former owner's failure keeps the payload lease the recovering worker relies on" */
+    it.each(["block", "dead-letter"] as const)(
+      "keeps the recovered job's lease and the blob's lifetime when it would %s",
+      async (outcome) => {
+        const { holderScore, blobTtl } = await failAfterRecovery(outcome);
+        expect(holderScore).not.toBeNull();
+        expect(blobTtl).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+      },
+    );
   });
 
   describe("given a worker whose active key lapsed before anyone recovered its claim", () => {
