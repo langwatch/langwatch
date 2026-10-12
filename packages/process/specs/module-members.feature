@@ -34,3 +34,11 @@ Feature: What a process hands its modules
     Given a module whose live repository tier reads a leaf of the module's config
     When the process boots with that module's config stated
     Then the live tier is built with the module's parsed config beside its stores
+
+  @unit
+  Scenario: A worker's module dependencies mark the running delivery's progress
+    Given a module whose repositories, channels, peers and store clients a worker hands it
+    When the module calls one of them while an outbox delivery runs
+    Then the call marks that delivery's progress when it starts and when it settles
+    And the same call outside any delivery passes straight through
+    And an api or tasks process hands the module its dependencies untracked

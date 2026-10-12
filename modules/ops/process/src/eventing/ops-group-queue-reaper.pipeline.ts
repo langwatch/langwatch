@@ -5,6 +5,7 @@ import {
   type EventingSetup,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import type { OpsApi } from "@langwatch/ops-contract";
 
 import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
@@ -28,7 +29,7 @@ export function buildGroupQueueReaper({
   processStore,
 }: EventingSetup<
   unknown,
-  Pick<OpsModule, "reapStrandedQueueGroups">
+  Pick<OpsApi, "reapStrandedQueueGroups">
 >): StaticPipelineDefinition<never> {
   return definePipeline({
     name: GROUP_QUEUE_REAPER_PIPELINE_NAME,
@@ -44,11 +45,8 @@ export function buildGroupQueueReaper({
           "reap",
           groupQueueReapSchema,
           runGroupQueueReap({
-            reap: ({ heartbeat }) =>
-              app.reapStrandedQueueGroups(
-                { requestedBy: GROUP_QUEUE_REAPER_PIPELINE_NAME },
-                { heartbeat },
-              ),
+            reap: () =>
+              app.reapStrandedQueueGroups({ requestedBy: GROUP_QUEUE_REAPER_PIPELINE_NAME }),
             deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
           }),
         )

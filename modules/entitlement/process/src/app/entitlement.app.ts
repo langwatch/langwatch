@@ -367,7 +367,7 @@ export class EntitlementModule implements EntitlementApiContract {
     deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   }): StaticPipelineDefinition<never> {
     return buildUsageWarningPipeline({
-      sweep: ({ heartbeat }) => this.#warnings.sweep({ heartbeat }),
+      sweep: () => this.#warnings.sweep(),
       deleteDispatchedBefore: deps.deleteDispatchedBefore,
     });
   }

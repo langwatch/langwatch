@@ -75,9 +75,9 @@ export function buildSystemMigrations({
           }),
         )
         .on(systemMigrationPassRequestedEventSchema, systemMigrationPassRequested)
-        // One pass at a time on a short, renewed lease. The pass heartbeats per page and tenant,
-        // but one tenant's migrateTenant (a large organization's parity sweep) has no progress
-        // hook and may run long in silence; the hour covers that single step.
+        // One pass at a time on a short, renewed lease. Every repository call a tenant step makes
+        // marks progress, but one query of a large organization's parity sweep may run long in
+        // silence; the hour covers that single call.
         .outbox({ maxAttempts: 3, concurrency: 1, batchSize: 1, maxSilenceMs: 60 * 60 * 1000 }),
     )
     .build();

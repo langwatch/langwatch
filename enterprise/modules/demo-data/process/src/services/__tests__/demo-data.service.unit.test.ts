@@ -17,6 +17,6 @@ describe("DemoDataService", () => {
       now: () => nowInstant(),
     });
 
-    await expect(service.runScheduled({ heartbeat: () => undefined })).resolves.toBeUndefined();
+    await expect(service.runScheduled()).resolves.toBeUndefined();
   });
 });

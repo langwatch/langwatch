@@ -19,12 +19,10 @@ export class RedisGroupQueueReaperRepository extends GroupQueueReaperRepository 
   reapStrandedGroups({
     minAgeHours,
     signal,
-    heartbeat,
   }: {
     minAgeHours: number;
     signal?: AbortSignal;
-    heartbeat?: () => void;
   }): Promise<ReapStrandedGroupsReport> {
-    return reapStrandedGroups({ redis: this.redis, apply: true, minAgeHours, signal, heartbeat });
+    return reapStrandedGroups({ redis: this.redis, apply: true, minAgeHours, signal });
   }
 }

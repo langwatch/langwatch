@@ -195,7 +195,6 @@ export class IngestionPullWorkerService {
     sourceId: string;
     cursor: string | null;
     pulledUsage?: PulledUsageDispatcher;
-    heartbeat?: () => void;
   }): Promise<IngestionPullRunResult> {
     const source = await this.sources.findById(input.sourceId);
     if (!source) {
@@ -218,9 +217,7 @@ export class IngestionPullWorkerService {
       };
     }
 
-    input.heartbeat?.();
     const { adapterId, result } = await this.runAdapter({ source, cursor: input.cursor });
-    input.heartbeat?.();
 
     if (result.errorCount > 0) {
       const cursorAdvanced = result.cursor !== null && result.cursor !== input.cursor;

@@ -93,7 +93,7 @@ export const identityEventing = defineEventingModule({
             "sweep",
             ssoDomainReproofSweepSchema,
             runSsoDomainReproofSweep({
-              sweep: ({ heartbeat }) => app.ssoDomainReproof().sweep({ heartbeat }),
+              sweep: () => app.ssoDomainReproof().sweep(),
               deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
             }),
           )

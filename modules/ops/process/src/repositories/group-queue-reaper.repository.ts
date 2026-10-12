@@ -6,6 +6,5 @@ export abstract class GroupQueueReaperRepository {
   abstract reapStrandedGroups(params: {
     minAgeHours: number;
     signal?: AbortSignal;
-    heartbeat?: () => void;
   }): Promise<ReapStrandedGroupsReport>;
 }

@@ -27,7 +27,7 @@ export const ingestionPullListingIntentSchema = z.object({
 type IngestionPullRunIntent = z.infer<typeof ingestionPullRunIntentSchema>;
 type IngestionPullListingPayload = z.infer<typeof ingestionPullListingIntentSchema>;
 
-type IntentContext = { projectId: string; attempt: number; heartbeat?: () => void };
+type IntentContext = { projectId: string; attempt: number };
 
 export class IngestionPullIntent {
   private constructor(private readonly execution: IngestionPullService) {}
@@ -41,7 +41,6 @@ export class IngestionPullIntent {
       tenantId: context.projectId,
       attempt: context.attempt,
       pull: payload,
-      heartbeat: () => context.heartbeat?.(),
     });
   }
 }

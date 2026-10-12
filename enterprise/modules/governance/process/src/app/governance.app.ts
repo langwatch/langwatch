@@ -1122,12 +1122,10 @@ export class GovernanceModule implements GovernanceRestApi {
   /** Main's boot reconciliation (`pipelineSet.ts:132-150`): every source's schedule sent to its pull process. */
   reconcileIngestionPulls({
     findPullProcessKeys,
-    heartbeat,
   }: {
     findPullProcessKeys: (input: { projectIds: string[] }) => Promise<string[]>;
-    heartbeat?: () => void;
   }): Promise<{ reconciled: number; failed: number }> {
-    return this.pullLifecycle.reconcile({ findPullProcessKeys, heartbeat });
+    return this.pullLifecycle.reconcile({ findPullProcessKeys });
   }
 
   /** pulled_usage_processing per role; the worker hosts the rollup, its charges and the watch. */

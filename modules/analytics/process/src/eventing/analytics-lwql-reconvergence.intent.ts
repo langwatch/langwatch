@@ -1,4 +1,3 @@
-import type { IntentContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
@@ -19,15 +18,13 @@ interface LwqlReconvergenceRunDeps {
 /** Re-provisions only when neither the config store nor an app-owned model holds the identity. */
 export function runLwqlReconvergence(
   deps: LwqlReconvergenceRunDeps,
-): (payload: { final: boolean; fillKeyMap: boolean }, context: IntentContext) => Promise<void> {
-  return async ({ final, fillKeyMap }, context): Promise<void> => {
-    context.heartbeat?.();
+): (payload: { final: boolean; fillKeyMap: boolean }) => Promise<void> {
+  return async ({ final, fillKeyMap }): Promise<void> => {
     if (fillKeyMap) {
       await deps.fillKeyMap().catch((error: unknown) => {
         logger.warn({ error }, "lwql key-map fill at boot failed; the next boot fills again");
       });
     }
-    context.heartbeat?.();
     const owner = await deps.probe().catch((): LwqlAccessModelOwner => "config_store");
     if (owner === "config_store" && final) {
       logger.warn(
@@ -36,7 +33,6 @@ export function runLwqlReconvergence(
     }
     if (owner !== "none") return;
     // Awaited, never fired and forgotten: the worker's drain waits on this intent.
-    context.heartbeat?.();
     await deps.converge();
   };
 }

@@ -19,15 +19,6 @@ import {
 
 const BOOTED_AT = 1_700_000_000_000;
 
-const INTENT_CONTEXT = {
-  processName: LWQL_RECONVERGENCE_PROCESS_NAME,
-  projectId: "global",
-  processKey: "global",
-  tenantId: "global",
-  messageKey: "reconverge:0",
-  attempt: 1,
-};
-
 function wake(state: LwqlReconvergenceState, at: number) {
   const reconverge = vi.fn((messageKey: string, payload: JsonValue) => ({
     messageKey,
@@ -86,10 +77,10 @@ describe("given the access-model reconvergence watch", () => {
       const fillKeyMap = () => Promise.resolve();
       return {
         converge,
-        done: runLwqlReconvergence({ probe, converge, fillKeyMap })(
-          { final: false, fillKeyMap: false },
-          INTENT_CONTEXT,
-        ),
+        done: runLwqlReconvergence({ probe, converge, fillKeyMap })({
+          final: false,
+          fillKeyMap: false,
+        }),
       };
     };
 
@@ -119,7 +110,7 @@ describe("given the access-model reconvergence watch", () => {
         probe: () => Promise.resolve("none"),
         converge,
         fillKeyMap: () => Promise.resolve(),
-      })({ final: false, fillKeyMap: false }, INTENT_CONTEXT);
+      })({ final: false, fillKeyMap: false });
       order.push("intent resolved");
       expect(order).toEqual(["converged", "intent resolved"]);
     });
@@ -154,17 +145,17 @@ describe("given the access-model reconvergence watch", () => {
         order.push("filled");
       });
       const converge = vi.fn(() => Promise.resolve());
-      await runLwqlReconvergence({ probe, converge, fillKeyMap })(
-        { final: false, fillKeyMap: true },
-        INTENT_CONTEXT,
-      );
+      await runLwqlReconvergence({ probe, converge, fillKeyMap })({
+        final: false,
+        fillKeyMap: true,
+      });
       expect(order).toEqual(["filled", "probed"]);
 
       const failing = vi.fn(() => Promise.reject(new Error("ECONNREFUSED")));
-      await runLwqlReconvergence({ probe, converge, fillKeyMap: failing })(
-        { final: false, fillKeyMap: true },
-        INTENT_CONTEXT,
-      );
+      await runLwqlReconvergence({ probe, converge, fillKeyMap: failing })({
+        final: false,
+        fillKeyMap: true,
+      });
       expect(converge).toHaveBeenCalledTimes(2);
     });
 
@@ -174,7 +165,7 @@ describe("given the access-model reconvergence watch", () => {
         probe: () => Promise.resolve("config_store"),
         converge: () => Promise.resolve(),
         fillKeyMap,
-      })({ final: false, fillKeyMap: false }, INTENT_CONTEXT);
+      })({ final: false, fillKeyMap: false });
       expect(fillKeyMap).not.toHaveBeenCalled();
     });
   });

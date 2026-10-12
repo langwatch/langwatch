@@ -194,9 +194,7 @@ export class InstantEvalJudgePageService {
     const { keyPage, rows, isReadAhead } = await this.#takePageAndReadAhead({ loaded, input });
     if (keyPage.keys.length === 0) return EMPTY_INSTANT_EVAL_PAGE;
 
-    input.heartbeat?.();
     const { judged, stop } = await this.#judgeKeys({ loaded, rows, input });
-    input.heartbeat?.();
     const cut = cutPageAtStop({ judged, keys: keyPage.keys });
     const counters = await this.#write({
       loaded,

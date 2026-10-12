@@ -44,7 +44,6 @@ export async function reapStrandedGroups({
   minAgeHours = 6,
   apply = false,
   signal,
-  heartbeat,
   now = () => nowInstant().epochMilliseconds,
 }: {
   redis: GroupQueueRedis;
@@ -52,8 +51,6 @@ export async function reapStrandedGroups({
   minAgeHours?: number;
   apply?: boolean;
   signal?: AbortSignal;
-  /** Marked per scanned key and per delete, so a scheduled caller keeps its lease. */
-  heartbeat?: () => void;
   now?: () => number;
 }): Promise<ReapStrandedGroupsReport> {
   const readyKey = `${keyPrefix}ready`;
@@ -64,7 +61,6 @@ export async function reapStrandedGroups({
   const groups: StrandedGroup[] = [];
   for await (const jobsKey of scan({ redis, match: `${keyPrefix}group:*:jobs` })) {
     if (signal?.aborted) break;
-    heartbeat?.();
     const groupId = jobsKey.slice(`${keyPrefix}group:`.length, -":jobs".length);
     const stranded = await isStranded({
       redis,
@@ -105,7 +101,6 @@ export async function reapStrandedGroups({
   let failedDeletes = 0;
   for (const group of groups) {
     if (signal?.aborted) break;
-    heartbeat?.();
     try {
       await redis.del(group.jobsKey, group.dataKey);
       deletedGroups += 1;
@@ -122,7 +117,6 @@ export async function reapStrandedGroups({
   // per-group DECRBY would only compound the error.
   let totalPendingNow = 0;
   for await (const jobsKey of scan({ redis, match: `${keyPrefix}group:*:jobs` })) {
-    heartbeat?.();
     totalPendingNow += await redis.zcard(jobsKey);
   }
   await redis.set(totalPendingKey, String(totalPendingNow));

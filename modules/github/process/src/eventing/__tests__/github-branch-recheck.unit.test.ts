@@ -124,17 +124,7 @@ describe("githubBranchRecheck process", () => {
         const deps = createDeps();
         const recheck = vi.spyOn(deps.github, "recheckDueBranches").mockResolvedValue(4);
 
-        await runGithubBranchRecheck(deps)(
-          {},
-          {
-            processName: GITHUB_BRANCH_RECHECK_PROCESS_NAME,
-            projectId: "global",
-            processKey: GITHUB_BRANCH_RECHECK_PROCESS_NAME,
-            tenantId: "global",
-            messageKey: "recheck:0",
-            attempt: 1,
-          },
-        );
+        await runGithubBranchRecheck(deps)();
 
         expect(recheck).toHaveBeenCalledOnce();
       });

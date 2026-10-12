@@ -1,4 +1,4 @@
-import type { IntentContext, IntentSpec, WakeHandler } from "@langwatch/eventing";
+import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
 export const NLP_LAMBDA_CLEANUP_PROCESS_NAME = "workflowNlpLambdaCleanup";
@@ -30,7 +30,7 @@ export const nlpLambdaCleanupWake: WakeHandler<NlpLambdaCleanupState, NlpLambdaC
 });
 
 export interface NlpLambdaCleanupRunDeps {
-  readonly sweep: (params: { heartbeat: () => void }) => Promise<void>;
+  readonly sweep: () => Promise<void>;
   readonly deleteDispatchedBefore: (params: {
     processName: string;
     before: number;
@@ -39,12 +39,10 @@ export interface NlpLambdaCleanupRunDeps {
 }
 
 /** The prune is bookkeeping, and a failed one waits for the next day's. */
-export function runNlpLambdaCleanup(
-  deps: NlpLambdaCleanupRunDeps,
-): (payload: unknown, context: IntentContext) => Promise<void> {
-  return async (_payload, context): Promise<void> => {
+export function runNlpLambdaCleanup(deps: NlpLambdaCleanupRunDeps): () => Promise<void> {
+  return async (): Promise<void> => {
     const startedAt = deps.now();
-    await deps.sweep({ heartbeat: () => context.heartbeat?.() });
+    await deps.sweep();
     await deps
       .deleteDispatchedBefore({
         processName: NLP_LAMBDA_CLEANUP_PROCESS_NAME,

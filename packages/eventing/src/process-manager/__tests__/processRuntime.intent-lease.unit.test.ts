@@ -33,7 +33,6 @@ describe("buildIntentHandlers", () => {
           attempt: 1,
           leaseExpiresAt: 45_000,
         },
-        heartbeat: () => undefined,
       });
 
       expect(run).toHaveBeenCalledWith(

@@ -57,7 +57,7 @@ export class SsoDomainReproofService {
    * One sweep. Every domain is independent: a lookup that throws or a
    * command a guard refuses stops that domain and nothing else.
    */
-  async sweep({ heartbeat }: { heartbeat?: () => void } = {}): Promise<SsoDomainReproofOutcome> {
+  async sweep(): Promise<SsoDomainReproofOutcome> {
     const targets = await this.deps.targets.findDomainsProvedByRecord({
       limit: SSO_DOMAIN_REPROOF_BATCH,
     });
@@ -71,7 +71,6 @@ export class SsoDomainReproofService {
       failed: [],
     };
     for (const target of targets) {
-      heartbeat?.();
       try {
         await this.reread({ target, outcome });
       } catch (error) {

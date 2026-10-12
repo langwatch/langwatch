@@ -37,7 +37,7 @@ function buildUsageReport({
   processStore,
 }: EventingSetup<unknown, Pick<OpsModule, "sendUsageReport">>): StaticPipelineDefinition<never> {
   return buildOpsUsageReportPipeline({
-    send: ({ heartbeat }) => app.sendUsageReport({ heartbeat }),
+    send: () => app.sendUsageReport(),
     deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
     now: () => nowInstant().epochMilliseconds,
   });

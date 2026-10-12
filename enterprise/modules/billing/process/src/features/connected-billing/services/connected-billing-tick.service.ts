@@ -34,11 +34,8 @@ export class ConnectedBillingTickService {
     return new ConnectedBillingTickService(jobs);
   }
 
-  /** `heartbeat` marks each job and each renewal, so a long tick keeps its outbox lease. */
-  async run({ heartbeat }: { heartbeat?: () => void } = {}): Promise<void> {
-    heartbeat?.();
+  async run(): Promise<void> {
     await this.runJob("seatChanges", () => this.jobs.seats.retryFailedSeatInvoices());
-    heartbeat?.();
     await this.runJob("monthlyStatements", async () => {
       if (!this.jobs.statements) {
         logger.warn("no statement mail is composed in this process; monthly statements wait");
@@ -46,10 +43,8 @@ export class ConnectedBillingTickService {
       }
       await this.jobs.statements.run();
     });
-    heartbeat?.();
     await this.runJob("renewals", async () => {
       for (const organizationId of await this.pendingRenewalOrganizationIds()) {
-        heartbeat?.();
         await this.jobs.renewals.completeRenewalIfDue({ organizationId });
       }
     });

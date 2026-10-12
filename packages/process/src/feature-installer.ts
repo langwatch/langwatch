@@ -37,6 +37,7 @@ import {
   type ChannelRegistry,
   type ChannelsFor,
 } from "./channel-registry.ts";
+import { trackedForRole } from "./delivery-progress.ts";
 /** One feature installer. A feature declares its config, the contract services */
 import { processProjectionReplayer } from "./migration/projection-replayer.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
@@ -1511,9 +1512,12 @@ class RepositoryAppBuilder<
           if (!args.repositorySelection) {
             throw new Error(`Module "${name}" was installed without a repository tier.`);
           }
-          const repositories = instantiateRepositories(registry, {
-            ...args.repositorySelection,
-            config: args.config,
+          const repositories = trackedForRole({
+            role: args.role,
+            dependency: instantiateRepositories(registry, {
+              ...args.repositorySelection,
+              config: args.config,
+            }),
           });
           return { ...(await setup.install({ ...args, repositories })), repositories };
         },
@@ -2284,12 +2288,15 @@ function declaringChannels<Declaration extends Readonly<{ name: string; install:
   const declaring: ChannelInstall = async (args) => {
     const selection = args.repositorySelection;
     if (!selection) throw new Error(`Module "${name}" was installed without a store tier.`);
-    const channels = await instantiateChannels(registry, {
-      tier: selection.tier,
-      members: selection.members,
-      config: args.config,
-      secrets: args.secrets ?? undeclaredSecrets(name),
-      resolve: args.resolve,
+    const channels = trackedForRole({
+      role: args.role,
+      dependency: await instantiateChannels(registry, {
+        tier: selection.tier,
+        members: selection.members,
+        config: args.config,
+        secrets: args.secrets ?? undeclaredSecrets(name),
+        resolve: args.resolve,
+      }),
     });
     return install({ ...args, channels });
   };

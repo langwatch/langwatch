@@ -1,4 +1,4 @@
-import type { IntentContext, IntentSpec, WakeHandler } from "@langwatch/eventing";
+import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
 import { z } from "zod";
 
 export const USAGE_WARNING_SWEEP_PROCESS_NAME = "entitlementUsageWarningSweep";
@@ -30,7 +30,7 @@ export const usageWarningSweepWake: WakeHandler<
 });
 
 export interface UsageWarningSweepRunDeps {
-  readonly sweep: (params: { heartbeat: () => void }) => Promise<void>;
+  readonly sweep: () => Promise<void>;
   readonly deleteDispatchedBefore: (params: {
     processName: string;
     before: number;
@@ -39,12 +39,10 @@ export interface UsageWarningSweepRunDeps {
 }
 
 /** The prune is bookkeeping, and a failed one waits for the next day's. */
-export function runUsageWarningSweep(
-  deps: UsageWarningSweepRunDeps,
-): (payload: unknown, context: IntentContext) => Promise<void> {
-  return async (_payload, context): Promise<void> => {
+export function runUsageWarningSweep(deps: UsageWarningSweepRunDeps): () => Promise<void> {
+  return async (): Promise<void> => {
     const startedAt = deps.now();
-    await deps.sweep({ heartbeat: () => context.heartbeat?.() });
+    await deps.sweep();
     await deps
       .deleteDispatchedBefore({
         processName: USAGE_WARNING_SWEEP_PROCESS_NAME,

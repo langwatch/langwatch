@@ -208,11 +208,9 @@ export class SystemMigrationsService {
   async executePass({
     redrive,
     followUp = false,
-    heartbeat,
   }: {
     redrive: boolean;
     followUp?: boolean;
-    heartbeat?: () => void;
   }): Promise<void> {
     if (redrive && this.passCompletedInProcess && !(await this.deps.hasTenantAwaitingRedrive())) {
       logger.debug(
@@ -220,12 +218,12 @@ export class SystemMigrationsService {
       );
       return;
     }
-    let summary = await this.deps.runPass({ heartbeat });
+    let summary = await this.deps.runPass({});
     this.passCompletedInProcess = true;
     let advancedInRun = summary.advanced > 0;
     for (let pass = 1; summary.advanced > 0 && pass < PASSES_PER_RUN; pass++) {
       await pauseBetweenPasses();
-      summary = await this.deps.runPass({ heartbeat });
+      summary = await this.deps.runPass({});
       advancedInRun ||= summary.advanced > 0;
     }
     logger.info({ summary, redrive, followUp }, "system migration pass complete");

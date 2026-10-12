@@ -65,7 +65,7 @@ export function buildIntentHandlers(
 ): Record<string, IntentHandler> {
   const handlers: Record<string, IntentHandler> = {};
   for (const [intentType, spec] of Object.entries(config.intents)) {
-    handlers[intentType] = async ({ message, heartbeat }) => {
+    handlers[intentType] = async ({ message }) => {
       await spec.run(spec.schema.parse(message.payload), {
         processName: message.processName,
         projectId: message.projectId,
@@ -74,7 +74,6 @@ export function buildIntentHandlers(
         messageKey: message.messageKey,
         attempt: message.attempt,
         leaseExpiresAt: message.leaseExpiresAt,
-        heartbeat,
       });
     };
   }

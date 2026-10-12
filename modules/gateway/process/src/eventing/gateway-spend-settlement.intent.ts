@@ -75,7 +75,6 @@ export function runSpendSettlementSweep(
     let settled = 0;
     let failed = 0;
     for (const admission of open) {
-      context.heartbeat?.();
       try {
         await deps.sendSettleSpend(settleCommandFor(admission, now));
         settled++;

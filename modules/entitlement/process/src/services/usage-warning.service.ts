@@ -23,8 +23,8 @@ import {
 export interface UsageWarning {
   /** Reports sent whenever a threshold is crossed and recorded; nothing below them all. */
   sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;
-  /** Main's daily check of every organization; Cloud only. `heartbeat` marks each one. */
-  sweep(params?: { heartbeat?: () => void }): Promise<void>;
+  /** Main's daily check of every organization; Cloud only. */
+  sweep(): Promise<void>;
 }
 
 /** Decides the threshold and the per-project counts, and records them as entitlement's fact. */
@@ -86,8 +86,8 @@ export class UsageWarningService implements UsageWarning {
     return this.#decide({ ...input, projectCounts });
   }
 
-  sweep(params: { heartbeat?: () => void } = {}): Promise<void> {
-    return this.#sweep.sweep(params);
+  sweep(): Promise<void> {
+    return this.#sweep.sweep();
   }
 
   async #decide(input: CountedUsageReading): Promise<UsageLimitWarning> {

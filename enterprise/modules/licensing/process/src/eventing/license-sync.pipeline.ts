@@ -91,7 +91,7 @@ export function buildLicenseSync({
           "sync",
           licenseSyncSchema,
           runLicenseSync({
-            sync: ({ heartbeat }) => app.syncLicenses({ heartbeat }),
+            sync: () => app.syncLicenses(),
             deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
             now: () => nowInstant().epochMilliseconds,
           }),

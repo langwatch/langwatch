@@ -25,6 +25,7 @@ import type {
   OutboxMessageIdentity,
   ProcessStore,
 } from "../stores/processStore.types.ts";
+import { runDeliveryMarkingProgress } from "./deliveryProgress.ts";
 
 /** What an intent handler receives: identity + payload, never store rows. */
 export interface DispatchableMessage {
@@ -52,11 +53,7 @@ export interface DispatchableMessage {
  * markDispatched redelivers the same messageKey, so handlers must be
  * idempotent on it.
  */
-export type IntentHandler = (params: {
-  message: DispatchableMessage;
-  /** Marks progress: the lease is renewed only while the last mark is within `maxSilenceMs`. */
-  heartbeat: () => void;
-}) => Promise<void>;
+export type IntentHandler = (params: { message: DispatchableMessage }) => Promise<void>;
 
 export interface OutboxDispatcherServiceOptions {
   store: ProcessStore;
@@ -73,9 +70,9 @@ export interface OutboxDispatcherServiceOptions {
    */
   leaseDurationMs?: number;
   /**
-   * How long a handler may run without a heartbeat before its lease stops being
-   * renewed, lapses and the message is redelivered. Default 5 minutes; long work
-   * calls `heartbeat()` at its progress points instead of raising this.
+   * How long a handler may run without a call through its module's dependencies
+   * (`trackDeliveryProgress`) before its lease stops being renewed and lapses.
+   * Default 5 minutes; raise it only where one call may legitimately run longer.
    */
   maxSilenceMs?: number;
   /**
@@ -122,7 +119,7 @@ const LEASE_SAFETY_MARGIN_FRACTION = 0.2;
 /** One delivery's lease renewal; `isLost` once a renewal was refused. */
 interface LeaseRenewal {
   isLost: () => boolean;
-  heartbeat: () => void;
+  markProgress: () => void;
   stop: () => Promise<void>;
 }
 
@@ -532,9 +529,8 @@ export class OutboxDispatcherService {
       const { leaseLost } = await this.runHoldingLease({
         message,
         now,
-        run: ({ heartbeat }) =>
+        run: () =>
           handler({
-            heartbeat,
             message: {
               processName: message.processName,
               projectId: message.projectId,
@@ -608,12 +604,12 @@ export class OutboxDispatcherService {
   }: {
     message: LeasedOutboxMessageRecord;
     now: number;
-    run: (params: { heartbeat: () => void }) => Promise<void>;
+    run: () => Promise<void>;
   }): Promise<{ leaseLost: boolean }> {
     const renewal = this.startLeaseRenewal({ message, now });
     let failure: { error: unknown } | null = null;
     try {
-      await run({ heartbeat: renewal.heartbeat });
+      await runDeliveryMarkingProgress({ markProgress: renewal.markProgress, run });
     } catch (error) {
       failure = { error };
     } finally {
@@ -637,7 +633,7 @@ export class OutboxDispatcherService {
     now: number;
   }): LeaseRenewal {
     const startedAt = this.clock();
-    let lastHeartbeatAt = startedAt;
+    let lastProgressAt = startedAt;
     let lost = false;
     let stopped = false;
     let timer: NodeJS.Timeout | null = null;
@@ -674,13 +670,13 @@ export class OutboxDispatcherService {
       }
     };
     const silentTooLong = (): boolean => {
-      const silenceMs = this.clock() - lastHeartbeatAt;
+      const silenceMs = this.clock() - lastProgressAt;
       if (silenceMs <= this.maxSilenceMs) return false;
       stopped = true;
       this.logger.warn(
         { ...fields, silenceMs: Math.round(silenceMs), maxSilenceMs: this.maxSilenceMs },
-        "Outbox handler sent no heartbeat within its silence limit; its lease is no " +
-          "longer renewed and will lapse, so the message is redelivered",
+        "Outbox handler made no call through its dependencies within its silence limit; " +
+          "its lease is no longer renewed and will lapse, so the message is redelivered",
       );
       return true;
     };
@@ -696,8 +692,8 @@ export class OutboxDispatcherService {
     arm();
     return {
       isLost: () => lost,
-      heartbeat: () => {
-        lastHeartbeatAt = this.clock();
+      markProgress: () => {
+        lastProgressAt = this.clock();
       },
       stop: async () => {
         stopped = true;

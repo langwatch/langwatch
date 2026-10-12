@@ -48,9 +48,8 @@ function buildIngestionPullReconcile({
           "reconcile",
           ingestionPullReconcileSchema,
           runIngestionPullReconcile({
-            reconcile: ({ heartbeat }) =>
+            reconcile: () =>
               app.reconcileIngestionPulls({
-                heartbeat,
                 findPullProcessKeys: ({ projectIds }) =>
                   processStore.findProcessKeys({
                     processName: INGESTION_PULL_PROCESS_NAME,

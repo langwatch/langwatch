@@ -1023,9 +1023,9 @@ export class BillingModule
   }
 
   /** Every row it reads and every invoice it raises is Cloud's: an install runs nothing. */
-  async runConnectedBillingTick({ heartbeat }: { heartbeat?: () => void } = {}): Promise<void> {
+  async runConnectedBillingTick(): Promise<void> {
     if (!this.#isSaas) return;
-    await this.#connectedBilling().tick.run({ heartbeat });
+    await this.#connectedBilling().tick.run();
   }
 
   /** Off Cloud nothing is invoiced; on Cloud a missing payment key is a deployment fault. */

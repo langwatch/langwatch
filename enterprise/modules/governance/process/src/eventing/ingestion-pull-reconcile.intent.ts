@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { IntentContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 const logger = createLogger("langwatch:governance:ingestion-pull-reconcile");
@@ -11,9 +10,7 @@ export const INGESTION_PULL_RECONCILE_PROCESS_NAME = "ingestionPullReconcile";
 const RECONCILE_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface IngestionPullReconcileRunDeps {
-  readonly reconcile: (params: {
-    heartbeat: () => void;
-  }) => Promise<{ reconciled: number; failed: number }>;
+  readonly reconcile: () => Promise<{ reconciled: number; failed: number }>;
   readonly deleteDispatchedBefore: (params: {
     processName: string;
     before: number;
@@ -24,12 +21,10 @@ interface IngestionPullReconcileRunDeps {
 /** A source that fails to reconcile waits for the next boot, as main's did; the prune is bookkeeping. */
 export function runIngestionPullReconcile(
   deps: IngestionPullReconcileRunDeps,
-): (payload: unknown, context: IntentContext) => Promise<void> {
-  return async (_payload, context): Promise<void> => {
+): () => Promise<void> {
+  return async (): Promise<void> => {
     const startedAt = deps.now();
-    const { reconciled, failed } = await deps.reconcile({
-      heartbeat: () => context.heartbeat?.(),
-    });
+    const { reconciled, failed } = await deps.reconcile();
     if (failed > 0) {
       logger.warn(
         { reconciled, failed },

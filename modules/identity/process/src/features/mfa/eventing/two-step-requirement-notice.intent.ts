@@ -15,7 +15,6 @@ export function runNotifyMembers(deps: {
       organizationId: payload.organizationId,
       actorUserId: payload.actorUserId,
       required: payload.required,
-      heartbeat: () => context.heartbeat?.(),
     });
   };
 }

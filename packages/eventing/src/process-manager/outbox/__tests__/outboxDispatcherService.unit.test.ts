@@ -12,6 +12,7 @@ import {
 } from "../../__tests__/helpers/pilotProcess.fixture.ts";
 import { ProcessManagerService } from "../../processManagerService.ts";
 import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore.ts";
+import { trackDeliveryProgress } from "../deliveryProgress.ts";
 import {
   type DispatchableMessage,
   type DispatchReport,
@@ -40,26 +41,33 @@ function withoutRenewals(store: InMemoryProcessStore): InMemoryProcessStore {
 /** A short lease and silence limit, polled in steps, so a test walks minutes in a few ticks. */
 const SILENCE = { leaseDurationMs: 30_000, maxSilenceMs: 60_000, stepMs: 10_000 } as const;
 
+/** A handler that, until finished, waits a step and, when calling, reads a tracked repository. */
+function repositoryCaller({ calling, stepMs }: { calling: boolean; stepMs: number }) {
+  const repository = trackDeliveryProgress({ read: () => Promise.resolve("row") });
+  let finished = false;
+  const handler = async (): Promise<void> => {
+    while (!finished) {
+      if (calling) await repository.read();
+      await new Promise((resolve) => setTimeout(resolve, stepMs));
+    }
+  };
+  return { handler, finish: () => (finished = true) };
+}
+
 /** Runs a holder for three minutes beside a polling rival; reports when the rival took over. */
 async function holdBesideRival({
   store,
-  beating,
+  calling,
 }: {
   store: InMemoryProcessStore;
-  beating: boolean;
+  calling: boolean;
 }) {
   const { leaseDurationMs, maxSilenceMs, stepMs } = SILENCE;
   const { logger, lines } = createTestLogger();
-  let finish: () => void = () => undefined;
-  let heartbeat: () => void = () => undefined;
+  const caller = repositoryCaller({ calling, stepMs });
   const holder = new OutboxDispatcherService({
     store,
-    handlers: {
-      "worker-dispatch": (params) => {
-        heartbeat = params.heartbeat;
-        return new Promise<void>((resolve) => (finish = resolve));
-      },
-    },
+    handlers: { "worker-dispatch": caller.handler },
     leaseDurationMs,
     maxSilenceMs,
     logger,
@@ -75,11 +83,11 @@ async function holdBesideRival({
   let takenAfterMs: number | null = null;
   for (let elapsed = stepMs; elapsed <= 180_000; elapsed += stepMs) {
     await vi.advanceTimersByTimeAsync(stepMs);
-    if (beating) heartbeat();
     await rival.runOnce({ now: Date.now() });
     takenAfterMs ??= rivalHandler.mock.calls.length > 0 ? Date.now() - startedAt : null;
   }
-  finish();
+  caller.finish();
+  await vi.advanceTimersByTimeAsync(stepMs);
   return { report: await run, takenAfterMs, lines };
 }
 
@@ -815,12 +823,8 @@ describe("OutboxDispatcherService", () => {
 
     /** @scenario "A long-running intent keeps its lease while it runs" */
     it("renews the lease so no other dispatcher takes the message for the whole hour", async () => {
-      let finish: () => void = () => undefined;
-      let heartbeat: () => void = () => undefined;
-      const handler = vi.fn<IntentHandler>((params) => {
-        heartbeat = params.heartbeat;
-        return new Promise<void>((resolve) => (finish = resolve));
-      });
+      const caller = repositoryCaller({ calling: true, stepMs: 60_000 });
+      const handler = vi.fn<IntentHandler>(caller.handler);
       const holder = new OutboxDispatcherService({
         store,
         handlers: { "worker-dispatch": handler },
@@ -834,12 +838,12 @@ describe("OutboxDispatcherService", () => {
       const run = holder.runOnce({ now: Date.now() });
       for (let minute = 0; minute < 60; minute += 1) {
         await vi.advanceTimersByTimeAsync(60_000);
-        heartbeat();
         await rival.runOnce({ now: Date.now() });
       }
       // Each renewal counts as progress, so the worker never takes this drain for stuck.
       const quietMs = Date.now() - holder.lastProgressAt();
-      finish();
+      caller.finish();
+      await vi.advanceTimersByTimeAsync(60_000);
       const report = await run;
 
       expect(rivalHandler).not.toHaveBeenCalled();
@@ -864,12 +868,12 @@ describe("OutboxDispatcherService", () => {
 
     /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
     it("stops renewing once silent past the limit, so another dispatcher redelivers it", async () => {
-      const { report, takenAfterMs, lines } = await holdBesideRival({ store, beating: false });
+      const { report, takenAfterMs, lines } = await holdBesideRival({ store, calling: false });
 
       expect(takenAfterMs).toBeGreaterThan(maxSilenceMs);
       expect(takenAfterMs).toBeLessThanOrEqual(maxSilenceMs + 2 * stepMs + leaseDurationMs);
       expect(report.fenced).toEqual(["dispatch:turn_1:1"]);
-      expect(lines.findLine("warn", "no heartbeat")).toEqual(
+      expect(lines.findLine("warn", "no call through its dependencies")).toEqual(
         expect.objectContaining({
           processName: pilotRef.processName,
           messageKey: "dispatch:turn_1:1",
@@ -879,8 +883,8 @@ describe("OutboxDispatcherService", () => {
     });
 
     /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
-    it("keeps the lease for a handler that sends heartbeats past the same limit", async () => {
-      const { report, takenAfterMs } = await holdBesideRival({ store, beating: true });
+    it("keeps the lease for a handler that keeps calling a repository past the same limit", async () => {
+      const { report, takenAfterMs } = await holdBesideRival({ store, calling: true });
 
       expect(takenAfterMs).toBeNull();
       expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
@@ -904,7 +908,7 @@ describe("OutboxDispatcherService", () => {
       finish();
       await run;
 
-      expect(lines.findLine("warn", "no heartbeat")).toEqual(
+      expect(lines.findLine("warn", "no call through its dependencies")).toEqual(
         expect.objectContaining({ maxSilenceMs: 5 * 60_000 }),
       );
     });

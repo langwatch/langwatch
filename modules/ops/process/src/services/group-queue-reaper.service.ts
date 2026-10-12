@@ -33,15 +33,12 @@ export class GroupQueueReaperService {
   async reap({
     requestedBy,
     audited,
-    heartbeat,
   }: {
     requestedBy: string;
     audited: boolean;
-    heartbeat?: () => void;
   }): Promise<OpsQueueReapedStrandedGroups> {
     const report = await this.repository.reapStrandedGroups({
       minAgeHours: STRANDED_MIN_AGE_HOURS,
-      heartbeat,
     });
     const counts = {
       strandedGroups: report.strandedGroups,

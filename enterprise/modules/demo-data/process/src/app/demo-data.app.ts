@@ -53,7 +53,7 @@ export class DemoDataModule implements DemoDataApiContract {
     deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   }): StaticPipelineDefinition<never> {
     return buildDemoDataPipeline({
-      run: ({ heartbeat }) => this.#seeds.runScheduled({ heartbeat }),
+      run: () => this.#seeds.runScheduled(),
       deleteDispatchedBefore: deps.deleteDispatchedBefore,
     });
   }

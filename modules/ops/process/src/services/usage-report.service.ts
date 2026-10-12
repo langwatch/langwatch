@@ -80,8 +80,7 @@ export class UsageReportService {
     return endpointFor(await this.deps.install.getConnectDeployment());
   }
 
-  /** `heartbeat` marks each step (scope, collection, post), so the send keeps its lease. */
-  async send({ heartbeat }: { heartbeat?: () => void } = {}): Promise<UsageReportSendOutcome> {
+  async send(): Promise<UsageReportSendOutcome> {
     const { install, channel } = this.deps;
     if (this.deps.isSaas || this.deps.disabled) return "switched_off";
     const connect = await install.getConnectDeployment();
@@ -96,7 +95,6 @@ export class UsageReportService {
     const instanceId = await install.getInstanceId();
     const [identity] = await install.findInstanceIdentity();
     try {
-      heartbeat?.();
       const payload = await this.deps.collection.collect({
         organizationIds,
         instanceId,
@@ -106,7 +104,6 @@ export class UsageReportService {
         switches: switchesOf(identity),
         now: this.deps.now(),
       });
-      heartbeat?.();
       const answer = await channel.post({
         endpoint: endpointFor(connect),
         body: { event: USAGE_REPORT_EVENT, ...payload },

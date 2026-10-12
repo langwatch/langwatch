@@ -1,4 +1,3 @@
-import type { IntentContext } from "@langwatch/eventing";
 import type { SsoDomainReproofOutcome } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -10,7 +9,7 @@ const logger = createLogger("langwatch:identity:sso-domain-reproof:sweep");
 const SWEEP_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface SsoDomainReproofSweepDeps {
-  sweep: (params: { heartbeat: () => void }) => Promise<SsoDomainReproofOutcome>;
+  sweep: () => Promise<SsoDomainReproofOutcome>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   now?: () => number;
 }
@@ -49,12 +48,10 @@ function report(outcome: SsoDomainReproofOutcome): void {
   }
 }
 
-export function runSsoDomainReproofSweep(
-  deps: SsoDomainReproofSweepDeps,
-): (payload: unknown, context: IntentContext) => Promise<void> {
-  return async (_payload, context): Promise<void> => {
+export function runSsoDomainReproofSweep(deps: SsoDomainReproofSweepDeps): () => Promise<void> {
+  return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
-    report(await deps.sweep({ heartbeat: () => context.heartbeat?.() }));
+    report(await deps.sweep());
 
     try {
       await deps.deleteDispatchedBefore({

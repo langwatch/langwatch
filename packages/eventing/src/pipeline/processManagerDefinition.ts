@@ -79,8 +79,6 @@ export interface IntentContext {
   attempt: number;
   /** When the delivery's outbox lease lapses; absent where no dispatcher leased it. */
   leaseExpiresAt?: number;
-  /** Marks progress so the lease keeps being renewed past `maxSilenceMs`; absent as above. */
-  heartbeat?: () => void;
 }
 
 export type IntentExecutor<Payload> = (payload: Payload, context: IntentContext) => Promise<void>;

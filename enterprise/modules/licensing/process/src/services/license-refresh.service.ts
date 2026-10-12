@@ -70,15 +70,11 @@ export class LicenseRefreshService {
    * license that names none is not synced, which is how an install on an
    * offline license makes no call.
    */
-  async syncAll(
-    organizationIds: readonly string[],
-    { heartbeat }: { heartbeat?: () => void } = {},
-  ): Promise<void> {
+  async syncAll(organizationIds: readonly string[]): Promise<void> {
     if (!this.deps.host) return;
 
     const pending: string[] = [];
     for (const organizationId of organizationIds) {
-      heartbeat?.();
       const entitled = await this.deps.install.findEntitledServices(organizationId);
       if (entitled.length === 0) continue;
       if (!(await this.syncAndRecord({ organizationId, retryPending: true }))) {
@@ -89,7 +85,6 @@ export class LicenseRefreshService {
 
     await (this.deps.wait ?? waitFor)(PENDING_RETRY_MS);
     for (const organizationId of pending) {
-      heartbeat?.();
       await this.syncAndRecord({ organizationId, retryPending: false });
     }
   }

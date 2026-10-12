@@ -36,13 +36,11 @@ export class OrganizationMfaNotifierService implements TwoStepRequirementNotices
     organizationId,
     actorUserId,
     required,
-    heartbeat,
   }: {
     notificationKey: string;
     organizationId: string;
     actorUserId: string;
     required: boolean;
-    heartbeat?: () => void;
   }): Promise<void> {
     const [organization, members, [actor]] = await Promise.all([
       this.deps.accounts.getOrganizationSetting({ organizationId }),
@@ -51,19 +49,14 @@ export class OrganizationMfaNotifierService implements TwoStepRequirementNotices
     ]);
     const actorName = actor?.name ?? actor?.email ?? "An administrator";
     const { destinations, failures } = await this.resolveDestinations(members);
-    heartbeat?.();
-    const deliveries = await settleInBatches(
-      [...destinations.values()],
-      async ({ userId, email }) => {
-        await this.deps.mail.sendRequirementChanged({
-          to: email,
-          organizationName: organization.name,
-          actorName,
-          required,
-          idempotencyKey: `${notificationKey}:${userId}`,
-        });
-        heartbeat?.();
-      },
+    const deliveries = await settleInBatches([...destinations.values()], ({ userId, email }) =>
+      this.deps.mail.sendRequirementChanged({
+        to: email,
+        organizationName: organization.name,
+        actorName,
+        required,
+        idempotencyKey: `${notificationKey}:${userId}`,
+      }),
     );
     failures.push(
       ...deliveries.flatMap((result) => (result.status === "rejected" ? [result.reason] : [])),

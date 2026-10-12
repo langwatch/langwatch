@@ -1296,20 +1296,20 @@ export class WorkflowModule implements WorkflowApi, WorkflowBrowserApi {
     deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   }): StaticPipelineDefinition<never> {
     return buildNlpLambdaCleanupPipeline({
-      sweep: ({ heartbeat }) => this.#sweepQuietNlpLambdas({ heartbeat }),
+      sweep: () => this.#sweepQuietNlpLambdas(),
       deleteDispatchedBefore: deps.deleteDispatchedBefore,
     });
   }
 
   /** A deployment with no Lambda account has no engines of its own to sweep. */
-  async #sweepQuietNlpLambdas({ heartbeat }: { heartbeat: () => void }): Promise<void> {
+  async #sweepQuietNlpLambdas(): Promise<void> {
     const fleet = this.#infrastructure.nlpLambdaFleet;
     if (!fleet) {
       logger.info("no NLP Lambda fleet composed; the daily sweep has nothing to read");
       return;
     }
 
-    await NlpLambdaCleanupService.create({ fleet, logger }).sweep({ heartbeat });
+    await NlpLambdaCleanupService.create({ fleet, logger }).sweep();
   }
 
   // ── the platform's own links ──────────────────────────────────────────────

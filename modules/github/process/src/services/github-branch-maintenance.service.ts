@@ -26,8 +26,7 @@ export class GithubBranchMaintenanceService {
 
   private constructor(private readonly deps: GithubBranchMaintenanceDeps) {}
 
-  /** `heartbeat` marks each branch's GitHub round trip, so the pass keeps its outbox lease. */
-  async recheckDueBranches({ heartbeat }: { heartbeat?: () => void } = {}): Promise<number> {
+  async recheckDueBranches(): Promise<number> {
     const now = this.deps.now?.() ?? nowInstant().epochMilliseconds;
     const due = await this.deps.repository.findRecheckDue({
       now: Temporal.Instant.fromEpochMilliseconds(now),
@@ -36,7 +35,6 @@ export class GithubBranchMaintenanceService {
     });
 
     for (const row of due) {
-      heartbeat?.();
       const target = this.tryTarget(row);
       if (target) {
         await this.deps.mapping.map(target);

@@ -49,9 +49,7 @@ export function buildProjectionReplay({
     .withProcessManager(PROJECTION_REPLAY_PROCESS_NAME, (pm) =>
       pm
         .state(projectionReplayStateSchema, PROJECTION_REPLAY_INITIAL_STATE)
-        .intent("execute", projectionReplayRunSchema, (run, context) =>
-          app.executeReplay(run, { heartbeat: () => context.heartbeat?.() }),
-        )
+        .intent("execute", projectionReplayRunSchema, (run) => app.executeReplay(run))
         .on(projectionReplayRequestedEventSchema, onProjectionReplayRequested)
         // One run at a time, never retried: a lapsed lease retires the delivery, not re-runs it.
         .outbox({
