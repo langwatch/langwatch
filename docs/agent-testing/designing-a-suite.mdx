@@ -1,5 +1,5 @@
 ---
-title: "Test Suite Design: choose, check and schedule your scenarios"
+title: Test Suite Design
 sidebarTitle: Test suite design
 keywords: langwatch, agent testing, test suite design, scenario suite, test design, coverage, seed data, judge, code checks, flaky, repeats, run tiers, cost, cache, prompt injection, scheduled agent
 description: Choose which behaviors a test suite covers, seed data you can check, check numbers with code before the judge, and decide how often each scenario runs and what it costs.
@@ -62,6 +62,7 @@ from decimal import Decimal
 import pytest
 import scenario
 
+# RefundAgent and refunds_for_order stand in for your own agent adapter and database read.
 def one_refund_for_the_double_charge(state: scenario.ScenarioState) -> None:
     calls = state.tool_calls("issue_refund")
     assert len(calls) == 1
@@ -142,12 +143,15 @@ Do not lower the number of repetitions that must pass until the scenario passes,
 | Tier | When | What runs | Repeats |
 |---|---|---|---|
 | **Pull request** | A change to the agent's prompt, tools or the data it reads. | Only the affected scenarios, chosen by a path filter in your CI or by a [label](/agent-testing/test-suites#test-suites-and-labels). | 1 |
-| **Nightly** | On a schedule. | The whole test suite. | 1 |
+| **Nightly** | On a schedule, for example a cron trigger in your CI that runs the [CLI](/agent-testing/run-from-ci#from-the-cli). | The whole test suite. | 1 |
 | **Pre-release** | Before a release. | The whole test suite and the reworded variants. | 5, with the pass counts above |
 
 ```bash
 langwatch run-plan run --target http:agent_abc123 --label refunds \
   --name "Refunds pull request" --note "$(git log -1 --pretty=%s | cut -c1-200)" --wait
+
+# Pre-release: the whole test suite, 5 repetitions per scenario.
+langwatch run-plan run --target http:agent_abc123 --name "Refunds pre-release" --repeat 5 --wait
 ```
 
 Give each tier its own plan name with `--name`, so each tier keeps its own pass rate history on [Results](/agent-testing/results). In code, set one `set_id` (`setId` in TypeScript) for the test suite and a `batch_id` (`batchId`) for each CI run, such as `GITHUB_RUN_ID`, as shown in [Write Scenarios in Code](/agent-testing/scenarios-in-code#4-grouping-your-scenarios-into-test-suites-and-batches). For the wait and the exit code, see [Run from CI](/agent-testing/run-from-ci).
@@ -157,5 +161,3 @@ Give each tier its own plan name with `--name`, so each tier keeps its own pass 
 - Use cheaper models for the user simulator and the judge on routine scenarios, with `--simulator-model` and `--judge-model` on the run. Give the safety, injection and high-risk scenarios a strong judge, with **Override models** on the scenario or the `model` argument of `scenario.JudgeAgent` in code.
 - Read the cost of the first nightly runs on [Results](/agent-testing/results), then decide how much each tier may spend.
 - The [Scenario cache](https://langwatch.ai/scenario/basics/cache) (Python only) replays recorded model calls, which saves cost while you build a scenario. In the tiers above, leave `cache_key` unset and keep `@scenario.cache()` off the agent under test, because a cached agent replays its old replies and the test suite still passes after the agent regresses.
-
-Also check: [Scenarios](/agent-testing/scenarios), [Evaluators](/agent-testing/evaluators), [Run plans](/agent-testing/run-plans), [Red Teaming](/agent-testing/red-teaming).
