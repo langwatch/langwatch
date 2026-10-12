@@ -111,7 +111,9 @@ transient network errors with exponential backoff (honoring `Retry-After`)
 for up to a minute, bounded by the export context. Wrap it in
 `sdktrace.NewBatchSpanProcessor` (or `sdktrace.WithBatcher`) to batch spans.
 It is built on the standard library, so the root module does not depend on
-gRPC or the generated OTLP protobuf packages.
+gRPC or the generated OTLP protobuf packages. Byte-slice attributes travel as
+base64 `stringValue`s: the LangWatch receiver accepts `bytesValue` only in
+protobuf bodies, so an OTLP/JSON `bytesValue` would drop the span.
 
 ### OTLP/protobuf transport
 

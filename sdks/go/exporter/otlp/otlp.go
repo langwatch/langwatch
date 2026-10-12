@@ -1,18 +1,8 @@
-// Package otlp sends LangWatch spans through the official OpenTelemetry
-// otlptracehttp exporter (OTLP/HTTP with protobuf bodies).
-//
-// The root langwatch package's default exporter speaks OTLP/JSON over the
-// standard library so that importing it does not link gRPC and the generated
-// OTLP protobuf packages, which otlptracehttp pulls in. Use this package when
-// those are already in your binary, or when you depend on otlptracehttp's own
-// behavior, such as the OTEL_EXPORTER_OTLP_* environment variables (TLS
-// certificates, timeout, compression) or its retry policy.
-//
-//	exporter, err := otlp.NewExporter(ctx, langwatch.WithFilters(langwatch.ExcludeHTTPRequests()))
-//
-// or, composed with any other langwatch constructor:
-//
-//	exporter, err := langwatch.NewDefaultExporter(ctx, otlp.WithTransport())
+// Package otlp sends LangWatch spans through the official otlptracehttp
+// exporter (OTLP/protobuf), for programs that already link gRPC or rely on
+// its OTEL_EXPORTER_OTLP_* variables or retry policy. It is its own module so
+// the root SDK does not depend on gRPC. Use NewExporter, or WithTransport on
+// any langwatch constructor; the SDK README has examples.
 package otlp
 
 import (
