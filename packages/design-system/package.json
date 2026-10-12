@@ -78,6 +78,14 @@
       "types": "./dist/system/index.d.ts",
       "default": "./src/system/index.ts"
     },
+    "./selected-system": {
+      "types": "./dist/system/create-selected-system.d.ts",
+      "default": "./src/system/create-selected-system.ts"
+    },
+    "./system-provider": {
+      "types": "./dist/provider/system-provider.d.ts",
+      "default": "./src/provider/system-provider.tsx"
+    },
     "./product-colours": {
       "types": "./dist/system/product-colours.d.ts",
       "default": "./src/system/product-colours.ts"
