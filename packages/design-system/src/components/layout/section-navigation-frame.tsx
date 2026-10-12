@@ -194,6 +194,7 @@ export function SectionNavigationRail({
   onNavigate,
   collapsed = false,
   footer,
+  showTitle = true,
 }: SectionNavigationRailProps) {
   const runs: readonly SectionNavigationGroup[] = [{ links }, ...groups].filter(
     (run) => run.links.length > 0 || (!collapsed && (run.extra !== void 0 || run.add !== void 0)),
@@ -223,24 +224,28 @@ export function SectionNavigationRail({
       paddingBottom={2}
     >
       {/* An eyebrow, not a second page title: the content's header owns the one 20px title. */}
-      <Text
-        data-testid="section-navigation-title"
-        display="flex"
-        alignItems="center"
-        height={SECTION_HEADER_HEIGHT}
-        minHeight={SECTION_HEADER_HEIGHT}
-        flexShrink={0}
-        paddingX={5}
-        fontSize="13px"
-        lineHeight="20px"
-        fontWeight="semibold"
-        color="fg.muted"
-        title={label}
-        overflow="hidden"
-        whiteSpace="nowrap"
-      >
-        {label}
-      </Text>
+      {showTitle ? (
+        <Text
+          data-testid="section-navigation-title"
+          display="flex"
+          alignItems="center"
+          height={SECTION_HEADER_HEIGHT}
+          minHeight={SECTION_HEADER_HEIGHT}
+          flexShrink={0}
+          paddingX={5}
+          fontSize="13px"
+          lineHeight="20px"
+          fontWeight="semibold"
+          color="fg.muted"
+          title={label}
+          overflow="hidden"
+          whiteSpace="nowrap"
+        >
+          {label}
+        </Text>
+      ) : (
+        <Box height={4} flexShrink={0} />
+      )}
       {/* On a phone the rail is a strip that scrolls sideways; the fades mark hidden entries. */}
       <Box
         ref={stripBox}
@@ -273,10 +278,12 @@ export function SectionNavigationRail({
                 {run.label && !collapsed ? (
                   <Text
                     display={{ base: "none", md: "block" }}
-                    fontSize="12px"
+                    fontSize="10px"
                     lineHeight="16px"
-                    fontWeight="medium"
-                    color="nav.fgMuted"
+                    fontWeight="semibold"
+                    textTransform="uppercase"
+                    letterSpacing="0.025em"
+                    color="fg.muted"
                     paddingX={2}
                     paddingBottom="6px"
                   >
@@ -320,6 +327,8 @@ type SectionNavigationRailProps = {
   collapsed?: boolean;
   /** Pinned under the entries (a period picker, the fold toggle); the entries scroll above it. */
   footer?: ReactNode;
+  /** False when a page header above the rail already names the section. */
+  showTitle?: boolean;
 };
 
 const SECTION_HEADER_HEIGHT = "pageHeader.lg";

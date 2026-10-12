@@ -1,10 +1,10 @@
 /**
- * The one header line of the Agent Testing page: the page title, then the tabs, left-aligned.
+ * The one header line of the Agent Testing page, across its full width: the page title on the
+ * left and the tabs in the middle. The content of either tab starts under it.
  * @see specs/features/agent-testing/page-structure.feature
  */
 import { PageLayout, type PageTab } from "@langwatch/design-system/page-layout";
-import { Box, Stack, Text } from "@langwatch/design-system/primitives";
-import { SectionNavigationHeader } from "@langwatch/design-system/section-navigation-frame";
+import { Box, Grid, GridItem, HStack, Text } from "@langwatch/design-system/primitives";
 
 import type { AgentTestingTab } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import type { OpenPlanTitle } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
@@ -48,34 +48,46 @@ export function AgentTestingHeader({
   ];
 
   return (
-    <SectionNavigationHeader>
-      {/* Below md the name sits over the note and wraps; the tabs drop to their own row. */}
-      <Stack
-        direction={{ base: "column", md: "row" }}
-        alignItems={{ base: "stretch", md: "baseline" }}
-        gap={{ base: 0.5, md: 2 }}
-        width={{ base: "full", md: "auto" }}
-        minWidth={0}
-        maxWidth="full"
+    <PageLayout.Header>
+      {/* The outer columns share the free width, so the tabs sit in the middle of the page. */}
+      <Grid
+        width="full"
+        alignSelf="stretch"
+        templateColumns={{ base: "1fr", md: "1fr auto 1fr" }}
+        alignItems="center"
+        columnGap={4}
       >
-        <Box minWidth={0} flex="0 1 auto">
-          <PageLayout.Heading title={openPlan?.name} data-testid="agent-testing-title">
-            {openPlan?.name ?? (tab === "results" ? "Results" : title)}
-          </PageLayout.Heading>
-        </Box>
-        {openPlan ? (
-          <Text textStyle="caption" color="fg.muted" data-testid="agent-testing-title-note">
-            {openPlan.note}
-          </Text>
-        ) : null}
-      </Stack>
-      <PageLayout.Tabs
-        stackOnMobile
-        label="Agent testing pages"
-        tabs={tabs}
-        activeHref={tabHrefs[tab]}
-        onNavigate={(href) => onTabChange(href === tabHrefs.results ? "results" : "cases")}
-      />
-    </SectionNavigationHeader>
+        <GridItem minWidth={0}>
+          <HStack gap={2} minWidth={0} alignItems="baseline">
+            <Box minWidth={0} flex="0 1 auto">
+              <PageLayout.Heading title={openPlan?.name} data-testid="agent-testing-title">
+                {openPlan?.name ?? title}
+              </PageLayout.Heading>
+            </Box>
+            {openPlan ? (
+              <Text
+                textStyle="caption"
+                color="fg.muted"
+                flexShrink={0}
+                whiteSpace="nowrap"
+                data-testid="agent-testing-title-note"
+              >
+                {openPlan.note}
+              </Text>
+            ) : null}
+          </HStack>
+        </GridItem>
+        <GridItem alignSelf="stretch" display="flex">
+          <PageLayout.Tabs
+            stackOnMobile
+            label="Agent testing pages"
+            tabs={tabs}
+            activeHref={tabHrefs[tab]}
+            onNavigate={(href) => onTabChange(href === tabHrefs.results ? "results" : "cases")}
+          />
+        </GridItem>
+        <GridItem display={{ base: "none", md: "block" }} />
+      </Grid>
+    </PageLayout.Header>
   );
 }

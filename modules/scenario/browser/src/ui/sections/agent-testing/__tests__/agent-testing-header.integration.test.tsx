@@ -1,5 +1,5 @@
 /**
- * The Agent Testing header is one line: the page title, then the tabs.
+ * The Agent Testing header is one line: the page title, then the tabs in the middle.
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/page-structure.feature
  */
@@ -30,7 +30,7 @@ describe("<AgentTestingHeader/>", () => {
     it("holds the title, then the tabs", () => {
       renderHeader({ tab: "results" });
 
-      const title = screen.getByRole("heading", { name: "Results" });
+      const title = screen.getByRole("heading", { name: "Agent testing" });
       const tabs = screen.getByRole("navigation", { name: "Agent testing pages" });
 
       expect(comesBefore(title, tabs)).toBe(true);
@@ -96,7 +96,7 @@ describe("<AgentTestingHeader/>", () => {
       expect(
         comesBefore(title, screen.getByRole("navigation", { name: "Agent testing pages" })),
       ).toBe(true);
-      expect(screen.queryByRole("heading", { name: "Results" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Agent testing" })).not.toBeInTheDocument();
     });
 
     /** @scenario "A long run plan name stays on one line" */
@@ -113,7 +113,7 @@ describe("<AgentTestingHeader/>", () => {
     });
 
     /** @scenario "Leaving the run plan gives the page title back" */
-    it("reads Results again once the plan is left", () => {
+    it("reads the page title again once the plan is left", () => {
       const view = renderHeader({
         tab: "results",
         openPlan: { name: "Checkout", note: "Run plan" },
@@ -128,7 +128,7 @@ describe("<AgentTestingHeader/>", () => {
         />,
       );
 
-      expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Agent testing" })).toBeInTheDocument();
       expect(screen.queryByTestId("agent-testing-title-note")).not.toBeInTheDocument();
     });
   });
