@@ -5,27 +5,31 @@
  * Single-letter keys keep JSON under 100 bytes per delta.
  *
  * Keys:
- *   e = event type  (S=start, C=content, E=end)
+ *   e = event type  (S=start, C=content, E=end, R=snapshot stored)
  *   r = scenarioRunId
  *   b = batchRunId
- *   m = messageId
+ *   m = messageId   (absent on R)
  *   d = delta       (C only)
  *   c = content     (E only)
  *   l = role        (S only)
  *   i = messageIndex (S only, optional)
+ *
+ * R is sent after a MESSAGE_SNAPSHOT is stored: viewers drop every preview of
+ * the run and refetch it. Clients that predate R ignore it.
  */
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type CompactEventType = "S" | "C" | "E";
+export type CompactEventType = "S" | "C" | "E" | "R";
 
 export interface CompactStreamingEvent {
   e: CompactEventType;
   r: string;
   b: string;
-  m: string;
+  /** Absent on R, which names a run rather than a message. */
+  m?: string;
   d?: string;
   c?: string;
   l?: string;
@@ -85,6 +89,18 @@ export function encodeEnd(fields: {
   return JSON.stringify(obj);
 }
 
+/** A message snapshot was stored: it, not the streamed previews, is the run's truth. */
+export function encodeReset(fields: {
+  scenarioRunId: string;
+  batchRunId: string;
+}): string {
+  return JSON.stringify({
+    e: "R",
+    r: fields.scenarioRunId,
+    b: fields.batchRunId,
+  } satisfies CompactStreamingEvent);
+}
+
 // ---------------------------------------------------------------------------
 // Decode (SSE → client)
 // ---------------------------------------------------------------------------
@@ -94,5 +110,5 @@ export function isCompactStreamingEvent(
 ): parsed is CompactStreamingEvent {
   if (typeof parsed !== "object" || parsed === null) return false;
   const p = parsed as Record<string, unknown>;
-  return p.e === "S" || p.e === "C" || p.e === "E";
+  return p.e === "S" || p.e === "C" || p.e === "E" || p.e === "R";
 }

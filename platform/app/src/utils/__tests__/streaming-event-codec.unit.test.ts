@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   encodeContent,
   encodeEnd,
+  encodeReset,
   encodeStart,
   isCompactStreamingEvent,
 } from "../streaming-event-codec";
@@ -136,6 +137,16 @@ describe("streaming-event-codec", () => {
     });
   });
 
+  describe("encodeReset()", () => {
+    it("names the run and batch, and no message", () => {
+      const result = JSON.parse(
+        encodeReset({ scenarioRunId: "run_1", batchRunId: "batch_1" }),
+      );
+
+      expect(result).toEqual({ e: "R", r: "run_1", b: "batch_1" });
+    });
+  });
+
   describe("isCompactStreamingEvent()", () => {
     describe("when parsed has e='S'", () => {
       it("returns true", () => {
@@ -158,6 +169,12 @@ describe("streaming-event-codec", () => {
         expect(
           isCompactStreamingEvent({ e: "E", r: "r", b: "b", m: "m" }),
         ).toBe(true);
+      });
+    });
+
+    describe("when parsed has e='R'", () => {
+      it("returns true without a message id", () => {
+        expect(isCompactStreamingEvent({ e: "R", r: "r", b: "b" })).toBe(true);
       });
     });
 

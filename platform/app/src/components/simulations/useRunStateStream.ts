@@ -7,10 +7,35 @@ import { useEffect } from "react";
 import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { api, type RouterOutputs } from "~/utils/api";
-import { getRunStatePollInterval } from "./run-state-polling";
+import {
+  getRunStatePollInterval,
+  isFinishedRunStatus,
+} from "./run-state-polling";
 
 /** The run record as the run-state read returns it. */
 export type ScenarioRunState = RouterOutputs["scenarios"]["getRunState"];
+
+/**
+ * Stored content as the text a preview would show: a string, or the text
+ * parts of a content array (stored as JSON). A START row holds "".
+ */
+export function storedDisplayText(content: unknown): string {
+  if (typeof content === "string") {
+    if (!content.startsWith("[")) return content.trim();
+    try {
+      return storedDisplayText(JSON.parse(content));
+    } catch {
+      return content.trim();
+    }
+  }
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((part: { type?: unknown; text?: unknown }) =>
+      part?.type === "text" && typeof part.text === "string" ? part.text : "",
+    )
+    .join("")
+    .trim();
+}
 
 export function useRunStateStream({
   scenarioRunId,
@@ -21,7 +46,7 @@ export function useRunStateStream({
   projectId: string | undefined;
   isOpen: boolean;
 }) {
-  const { streamingMessages, handleStreamingEvent, clearCompleted } =
+  const { streamingMessages, handleStreamingEvent, reconcileWithServer } =
     useSimulationStreamingState(scenarioRunId ?? undefined);
 
   const isWatching = !!projectId && !!scenarioRunId && isOpen;
@@ -54,16 +79,19 @@ export function useRunStateStream({
     },
   );
 
-  // Clear streaming messages once server data includes them
+  // Settle streamed previews against the stored run once it moves on.
   useEffect(() => {
-    if (scenarioState?.messages) {
-      clearCompleted(
-        scenarioState.messages
-          .map((m: { id?: string }) => m.id)
-          .filter((id): id is string => !!id),
-      );
-    }
-  }, [scenarioState?.messages, clearCompleted]);
+    if (!scenarioState) return;
+    reconcileWithServer({
+      serverMessages: (scenarioState.messages ?? []).map(
+        (m: { id?: string; content?: unknown }) => ({
+          id: m.id ?? "",
+          text: storedDisplayText(m.content),
+        }),
+      ),
+      isFinished: isFinishedRunStatus(scenarioState.status),
+    });
+  }, [scenarioState, reconcileWithServer]);
 
   return {
     scenarioState,

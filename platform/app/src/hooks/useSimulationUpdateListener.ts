@@ -229,7 +229,7 @@ export function useSimulationUpdateListener({
             return;
           }
 
-          // Compact streaming events: { e: "S"|"C"|"E", r, b, m, ... }
+          // Compact streaming events: { e: "S"|"C"|"E"|"R", r, b, m?, ... }
           if (isCompactStreamingEvent(parsed)) {
             if (filter?.batchRunId && parsed.b !== filter.batchRunId) return;
             if (filter?.scenarioRunId && parsed.r !== filter.scenarioRunId)
@@ -237,9 +237,17 @@ export function useSimulationUpdateListener({
 
             if (onStreamingEvent) {
               onStreamingEvent(parsed);
+              // A stored snapshot dropped the previews: read what it stored.
+              if (parsed.e === "R") {
+                void applyRunUpdate({
+                  scenarioRunId: parsed.r,
+                  status: undefined,
+                });
+                scheduleUpdate();
+              }
               return;
             }
-            // No streaming handler: skip CONTENT, refetch for START/END
+            // No streaming handler: skip CONTENT, refetch for START/END/R
             if (parsed.e === "C") return;
             scheduleUpdate();
             return;

@@ -295,6 +295,66 @@ describe("useSimulationUpdateListener()", () => {
     });
   });
 
+  describe("when a streaming handler is set", () => {
+    function renderWithHandler() {
+      const onStreamingEvent = vi.fn();
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch: refetchSpy,
+          filter: { scenarioRunId: "run_1" },
+          onStreamingEvent,
+        }),
+      );
+      return onStreamingEvent;
+    }
+
+    describe("when a stored snapshot frame arrives", () => {
+      /** @scenario "A stored message snapshot frame refetches the run" */
+      it("hands it on and refetches the run's stored state", () => {
+        const onStreamingEvent = renderWithHandler();
+
+        act(() => {
+          capturedOnData?.({
+            event: JSON.stringify({ e: "R", r: "run_1", b: "batch_1" }),
+          });
+        });
+
+        expect(onStreamingEvent).toHaveBeenCalledWith({
+          e: "R",
+          r: "run_1",
+          b: "batch_1",
+        });
+        expect(mockInvalidateRunState).toHaveBeenCalledWith({
+          scenarioRunId: "run_1",
+        });
+        expect(refetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a message delta arrives", () => {
+      it("hands it on without a refetch", () => {
+        const onStreamingEvent = renderWithHandler();
+
+        act(() => {
+          capturedOnData?.({
+            event: JSON.stringify({
+              e: "C",
+              r: "run_1",
+              b: "batch_1",
+              m: "m1",
+              d: "x",
+            }),
+          });
+        });
+
+        expect(onStreamingEvent).toHaveBeenCalledTimes(1);
+        expect(mockInvalidateRunState).not.toHaveBeenCalled();
+        expect(refetchSpy).not.toHaveBeenCalled();
+      });
+    });
+  });
+
   describe("when an SSE event fires", () => {
     it("invalidates getSuiteRunData so RunHistoryPanel refreshes", () => {
       renderHook(() =>

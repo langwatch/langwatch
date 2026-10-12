@@ -27,6 +27,7 @@ import {
 import {
   encodeContent,
   encodeEnd,
+  encodeReset,
   encodeStart,
 } from "~/utils/streaming-event-codec";
 import { blockTraceUsageExceededMiddleware } from "../../middleware";
@@ -128,11 +129,8 @@ secured.access(requires("scenarios:create")).post(
 
     // Broadcast START/END directly so the frontend gets them immediately
     // (the subscriber's debounced broadcast is too slow and causes CONTENT
-    // deltas to be dropped). Works regardless of event-sourcing flag.
-    if (
-      event.type === ScenarioEventType.TEXT_MESSAGE_START ||
-      event.type === ScenarioEventType.TEXT_MESSAGE_END
-    ) {
+    // deltas to be dropped). A stored snapshot tells viewers to drop previews.
+    if (isLiveFrameEvent(event.type)) {
       await broadcastStreamingEvent(project.id, event);
     }
 
@@ -408,6 +406,15 @@ async function dispatchSimulationEvent(
   }
 }
 
+/** Persisted events that also go to viewers at once, after dispatch. */
+export function isLiveFrameEvent(type: string): boolean {
+  return (
+    type === ScenarioEventType.TEXT_MESSAGE_START ||
+    type === ScenarioEventType.TEXT_MESSAGE_END ||
+    type === ScenarioEventType.MESSAGE_SNAPSHOT
+  );
+}
+
 /** Streaming events are broadcast-only, not persisted via event-sourcing */
 function isStreamingEvent(type: string): boolean {
   return (
@@ -528,7 +535,7 @@ async function pMapLimited<T>({
   await Promise.all(executing);
 }
 
-async function broadcastStreamingEvent(
+export async function broadcastStreamingEvent(
   projectId: string,
   event: ScenarioEvent,
 ): Promise<void> {
@@ -556,6 +563,11 @@ async function broadcastStreamingEvent(
         batchRunId: event.batchRunId,
         messageId: event.messageId,
         content: event.content,
+      });
+    } else if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
+      payload = encodeReset({
+        scenarioRunId: event.scenarioRunId,
+        batchRunId: event.batchRunId,
       });
     } else {
       // Tool call events — full payload for now

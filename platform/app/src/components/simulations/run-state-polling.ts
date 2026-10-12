@@ -21,6 +21,13 @@ const TERMINAL_STATUSES = new Set<ScenarioRunStatus>([
   ScenarioRunStatus.CANCELLED,
 ]);
 
+/** A finished run's record is final: nothing more streams into it. */
+export function isFinishedRunStatus(
+  status: ScenarioRunStatus | undefined,
+): boolean {
+  return status !== undefined && TERMINAL_STATUSES.has(status);
+}
+
 export function getRunStatePollInterval({
   status,
   sseConnected,
@@ -29,7 +36,7 @@ export function getRunStatePollInterval({
   status: ScenarioRunStatus | undefined;
   sseConnected: boolean;
 }): number | false {
-  if (status !== undefined && TERMINAL_STATUSES.has(status)) return false;
+  if (isFinishedRunStatus(status)) return false;
 
   // Stalled runs only revive when new events arrive; SSE covers that.
   if (status === ScenarioRunStatus.STALLED) {

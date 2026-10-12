@@ -308,8 +308,19 @@ function flattenMessages(
   streamingMessages?: StreamingMessage[],
 ): DisplayItem[] {
   const items: DisplayItem[] = [];
+  const previews = new Map(
+    (streamingMessages ?? [])
+      .filter((sm) => sm.status === "streaming" || sm.content)
+      .map((sm) => [sm.messageId, sm]),
+  );
 
   for (const msg of messages) {
+    // A preview stays until the stored row matches it; until then it shows.
+    const live = msg.id ? previews.get(msg.id) : undefined;
+    if (live) {
+      items.push(streamingItem(live));
+      continue;
+    }
     if (msg.role === "user" || msg.role === "assistant") {
       // Support both snake_case (OpenAI/chatMessageSchema) and camelCase (AG-UI MessageSchema)
       const msgAny = msg as Record<string, unknown>;
@@ -353,16 +364,20 @@ function flattenMessages(
     const serverIds = new Set(messages.map((m) => m.id).filter(Boolean));
     for (const sm of streamingMessages) {
       if (serverIds.has(sm.messageId)) continue;
-      items.push({
-        kind: "text",
-        id: sm.messageId,
-        role: sm.role,
-        content: sm.content || "\u2026",
-      });
+      items.push(streamingItem(sm));
     }
   }
 
   return items;
+}
+
+function streamingItem(sm: StreamingMessage): DisplayItem {
+  return {
+    kind: "text",
+    id: sm.messageId,
+    role: sm.role,
+    content: sm.content || "\u2026",
+  };
 }
 
 function flattenContent(msg: RawMessage): DisplayItem[] {

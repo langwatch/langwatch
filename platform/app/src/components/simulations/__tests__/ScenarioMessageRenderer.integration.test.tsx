@@ -11,6 +11,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
 import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 
@@ -628,6 +629,81 @@ describe("<ScenarioMessageRenderer/>", () => {
 
       // The raw part shape never leaks into a bubble as text.
       expect(screen.queryByText(/input_audio/)).toBeNull();
+    });
+  });
+  describe("when a lagging stored row holds part of a completed preview", () => {
+    it("shows the preview's final text", () => {
+      render(
+        <Wrapper>
+          <ScenarioMessageRenderer
+            messages={
+              [
+                { id: "msg_done", role: "assistant", content: "It ships" },
+              ] as ScenarioMessageSnapshotEvent["messages"]
+            }
+            streamingMessages={[
+              {
+                messageId: "msg_done",
+                role: "assistant",
+                content: "It ships tomorrow",
+                status: "complete",
+              },
+            ]}
+            variant="drawer"
+            projectId={PROJECT_ID}
+          />
+        </Wrapper>,
+      );
+
+      expect(screen.getByText("It ships tomorrow")).toBeInTheDocument();
+      expect(screen.queryByText("It ships")).toBeNull();
+    });
+  });
+
+  describe("when the stored run holds an empty row for a streamed message", () => {
+    const renderStreaming = (streamingMessages: StreamingMessage[]) =>
+      render(
+        <Wrapper>
+          <ScenarioMessageRenderer
+            messages={
+              [
+                { id: "msg_user", role: "user", content: "Where is my order?" },
+                { id: "msg_live", role: "assistant", content: "" },
+              ] as ScenarioMessageSnapshotEvent["messages"]
+            }
+            streamingMessages={streamingMessages}
+            variant="drawer"
+            projectId={PROJECT_ID}
+          />
+        </Wrapper>,
+      );
+
+    it("shows the streamed text in that row's place", () => {
+      renderStreaming([
+        {
+          messageId: "msg_live",
+          role: "assistant",
+          content: "It ships tomorrow",
+          status: "streaming",
+        },
+      ]);
+
+      expect(screen.getByText("It ships tomorrow")).toBeInTheDocument();
+    });
+
+    describe("when the streamed message has completed before the stored END", () => {
+      it("keeps showing the final text", () => {
+        renderStreaming([
+          {
+            messageId: "msg_live",
+            role: "assistant",
+            content: "It ships tomorrow",
+            status: "complete",
+          },
+        ]);
+
+        expect(screen.getByText("It ships tomorrow")).toBeInTheDocument();
+      });
     });
   });
 });
