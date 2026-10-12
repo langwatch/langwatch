@@ -664,6 +664,17 @@ export const designSystemConfig = defineConfig({
           pink: { value: { _light: "{colors.pink.500}", _dark: "{colors.pink.700}" } },
         },
 
+        // Evaluation status dots, accents and fills: one colour per status, the same in
+        // both modes. An error is one step deeper than a failed verdict.
+        evaluation: {
+          pending: { value: "{colors.gray.400}" },
+          running: { value: "{colors.blue.400}" },
+          passed: { value: "{colors.green.500}" },
+          failed: { value: "{colors.red.500}" },
+          processed: { value: "{colors.blue.500}" },
+          error: { value: "{colors.red.600}" },
+          skipped: { value: "{colors.gray.300}" },
+        },
         // Foreground semantic tokens - proper contrast in dark mode
         fg: {
           DEFAULT: {
@@ -676,8 +687,6 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
-          // A status dot with nothing to report yet (an evaluator that has not run).
-          pending: { value: "{colors.gray.400}" },
           // Text on a saturated fill in both modes: avatar initials, the development badge.
           onColor: { value: "white" },
           // Status text, one per meaning.
