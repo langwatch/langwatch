@@ -532,8 +532,8 @@ export class DashboardModule implements DashboardApi {
    * The rollout gate over the widget surface. Analytics owns what a widget
    * means, so it owns whether the project may author one at all.
    */
-  assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void> {
-    return this.#analytics.assertCustomChartPlaygroundEnabled(input);
+  assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void> {
+    return this.#analytics.assertDashboardWidgetsEnabled(input);
   }
 
   /** The project's custom chart widgets, or one board's, the organization's boards included. */

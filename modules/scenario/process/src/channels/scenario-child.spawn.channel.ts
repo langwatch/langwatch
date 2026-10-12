@@ -19,9 +19,9 @@ interface SpawnConfig {
  * Spawn command resolver: production uses bundle or tsx fallback, dev uses bundle if
  * current else tsx (edit child -> next spawn uses tsx, no rebuild needed).
  */
-export class ChildProcessSpawnService {
-  static create(): ChildProcessSpawnService {
-    return new ChildProcessSpawnService();
+export class ScenarioChildSpawn {
+  static create(): ScenarioChildSpawn {
+    return new ScenarioChildSpawn();
   }
 
   private constructor() {}

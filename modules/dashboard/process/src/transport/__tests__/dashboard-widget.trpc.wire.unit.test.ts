@@ -213,11 +213,11 @@ describe("the dashboard widgets tRPC namespace", () => {
     });
   });
 
-  describe("when the project has the custom-chart playground switched off", () => {
-    /** @scenario "Every dashboard widget procedure is refused while the custom-chart playground is off" */
-    it("refuses every widget procedure with the playground's own code", async () => {
+  describe("when the project has dashboard widgets closed", () => {
+    /** @scenario "Every dashboard widget procedure is refused while dashboard widgets are closed" */
+    it("refuses every widget procedure with the widget surface's own code", async () => {
       const analytics = createDashboardTestAnalytics({
-        assertCustomChartPlaygroundEnabled: async () => {
+        assertDashboardWidgetsEnabled: async () => {
           throw new CustomChartPlaygroundNotEnabledError();
         },
       });

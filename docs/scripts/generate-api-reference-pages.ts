@@ -79,7 +79,7 @@ const UNDOCUMENTED_CHECKUP =
   "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
 
 const UNDOCUMENTED_DASHBOARD_WIDGETS =
-  "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
+  "Live surface gated behind the release_dashboards and release_lwql_workbench feature flags, deliberately undocumented until release.";
 
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";

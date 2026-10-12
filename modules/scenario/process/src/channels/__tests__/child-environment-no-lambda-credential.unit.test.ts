@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildChildEnvironment,
   type ScenarioChildProcessConfig,
-} from "../features/child/services/node-scenario-child.service.ts";
+} from "../scenario-child.node.channel.ts";
 
 /** Set for real on the parent, so a forward added later picks them up and fails here. */
 const TENANT_WIDE_PARENT_ENV = {

@@ -10,9 +10,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../../testing.tsx";
 
-const { projectRef, deniedRef } = vi.hoisted(() => ({
+const { projectRef, deniedRef, flagsOnRef } = vi.hoisted(() => ({
   projectRef: { current: { id: "proj-1", slug: "proj", kind: "application" } },
   deniedRef: { current: new Set<string>() },
+  flagsOnRef: { current: new Set<string>() },
 }));
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", async (importOriginal) => ({
@@ -46,7 +47,7 @@ vi.mock("../../../../behavior/use-dashboards.ts", () => ({
 }));
 
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: () => ({ enabled: false }),
+  useFeatureFlag: (flag: { name: string }) => ({ enabled: flagsOnRef.current.has(flag.name) }),
 }));
 
 // The layout is the page chrome; what the body hands it is under test.
@@ -70,7 +71,7 @@ vi.mock("../../filter-sidebar.tsx", () => ({ FilterSidebar: () => null }));
 vi.mock("../../dashboard-auto-refresh-menu.tsx", () => ({ DashboardAutoRefreshMenu: () => null }));
 vi.mock(
   "../../../../features/dashboard-widget/ui/sections/create-dashboard-widget-drawer.tsx",
-  () => ({ CreateDashboardWidgetDrawer: () => null }),
+  () => ({ CreateDashboardWidgetDrawer: () => <div data-testid="widget-drawer" /> }),
 );
 
 import { ReportsContent } from "../analytics-reports.screen.tsx";
@@ -93,6 +94,7 @@ const renderReports = () =>
 afterEach(() => {
   cleanup();
   deniedRef.current = new Set();
+  flagsOnRef.current = new Set();
 });
 
 describe("<ReportsContent/>", () => {
@@ -144,6 +146,24 @@ describe("<ReportsContent/>", () => {
       expect(screen.queryByRole("button", { name: /Add chart/ })).toBeNull();
       expect(screen.queryByText(/Click \+ Add chart/)).toBeNull();
     });
+  });
+});
+
+describe("<ReportsContent/> Add chart", () => {
+  /** @scenario "The legacy reports page offers the widget drawer only with Dashboards and LangWatchQL on" */
+  it.each([
+    [["release_dashboards", "release_lwql_workbench"], true],
+    [["release_dashboards"], false],
+    [["release_lwql_workbench"], false],
+    [["release_custom_chart_playground"], false],
+  ])("with %j on, opens the widget drawer: %s", (on, opensDrawer) => {
+    projectRef.current = { id: "proj-1", slug: "proj", kind: "application" };
+    flagsOnRef.current = new Set(on);
+
+    renderReports();
+
+    expect(screen.queryByTestId("widget-drawer") !== null).toBe(opensDrawer);
+    expect(screen.getByTestId("analytics-add-chart").hasAttribute("href")).toBe(!opensDrawer);
   });
 });
 

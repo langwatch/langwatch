@@ -48,12 +48,12 @@ getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsRes
 filterOptions(input: { readonly projectId: string; readonly field: string; readonly startDate: number; readonly endDate: number; readonly query?: string; readonly key?: string; readonly subkey?: string; readonly filters?: Record<string, unknown>; }): Promise<AnalyticsFilterOption[]>;
 ```
 
-#### `assertCustomChartPlaygroundEnabled`
+#### `assertDashboardWidgetsEnabled`
 
-Refuses the dashboard-widget surface while its project rollout is disabled.
+Refuses the dashboard-widget surface unless Dashboards and LangWatchQL are both on.
 
 ```typescript
-assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
+assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
 ```
 
 #### `upsertEvaluationAnalytics`
@@ -486,8 +486,8 @@ Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:51`.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                              |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:354`           |
-| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:355`           |
+| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:353`           |
+| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:354`           |
 | config | `langwatchQl.url`             | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`        | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`        | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

@@ -8,8 +8,8 @@ import (
 )
 
 // SimulationResult is the last line a simulation writes. The parent's
-// parseResult reads success, reasoning, error, agentInstance and
-// isCutAtLimit off it (node-scenario-child.service.ts).
+// parseChildProcessResult reads success, reasoning, error, agentInstance and
+// isCutAtLimit off it (scenario-child.supervisor.channel.ts).
 type SimulationResult struct {
 	Success       bool
 	Reasoning     string

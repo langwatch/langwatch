@@ -1740,9 +1740,9 @@ const presentations = {
     describe: () => "Check it is the license signing key and was copied in full.",
   },
   custom_chart_playground_not_enabled: {
-    title: "Custom chart playground isn't switched on here",
+    title: "Dashboard widgets aren't switched on here",
     describe: () =>
-      "This project doesn't have the custom chart playground enabled yet. Ask your administrator to switch it on.",
+      "This project needs both Dashboards and LangWatchQL switched on for dashboard widgets. Ask your administrator to switch them on.",
   },
   custom_graph_writes_disabled_for_playground: {
     title: "Dashboard graph editing is off while the playground is on",
