@@ -183,6 +183,7 @@ export const SearchBar: React.FC = () => {
   const [suggestionOpen, setSuggestionOpen] = useState(false);
   const [cursorAnchorX, setCursorAnchorX] = useState(0);
   const [editorFocused, setEditorFocused] = useState(false);
+  const [hasUnsubmittedText, setHasUnsubmittedText] = useState(false);
   // When the user fires ⌘+⏎ on a typed query, we punt the text into AI
   // mode AND ask the composer to submit immediately. Tracked separately
   // from `aiMode` because the same flag would otherwise re-fire on every
@@ -426,6 +427,8 @@ export const SearchBar: React.FC = () => {
           handleClear={handleClear}
           handleEditorAiShortcut={handleEditorAiShortcut}
           hasContent={hasContent}
+          hasUnsubmittedText={editorMounted && hasUnsubmittedText}
+          setHasUnsubmittedText={setHasUnsubmittedText}
           instantEvalBusy={instantEvalBusy}
           langyRoutesAsk={langyRoutesAsk}
           onOpenLangyAsk={openLangyAsk}
@@ -721,6 +724,8 @@ function StructuredSearchBar({
   handleClear,
   handleEditorAiShortcut,
   hasContent,
+  hasUnsubmittedText,
+  setHasUnsubmittedText,
   instantEvalBusy,
   langyRoutesAsk,
   onOpenLangyAsk,
@@ -755,6 +760,9 @@ function StructuredSearchBar({
   handleClear: (event: React.MouseEvent) => void;
   handleEditorAiShortcut: (currentText: string) => void;
   hasContent: boolean;
+  /** Typed text Enter has not searched: the submit hint shows only then. */
+  hasUnsubmittedText: boolean;
+  setHasUnsubmittedText: (hasUnsubmittedText: boolean) => void;
   /** An `eval` chip's run is being estimated, started or judged: the chip sweeps. */
   instantEvalBusy: boolean;
   langyRoutesAsk: boolean;
@@ -831,6 +839,7 @@ function StructuredSearchBar({
               onSuggestionOpenChange={setSuggestionOpen}
               onCursorAnchorChange={setCursorAnchorX}
               onFocusChange={setEditorFocused}
+              onUnsubmittedTextChange={setHasUnsubmittedText}
             />
           ) : (
             <PlaceholderEditor
@@ -840,7 +849,7 @@ function StructuredSearchBar({
               onTokenClick={setTokenAnchor}
             />
           )}
-          {hasContent && editorFocused && !suggestionOpen && !askAiNeedsProviderPrimer && (
+          {hasUnsubmittedText && editorFocused && !suggestionOpen && !askAiNeedsProviderPrimer && (
             <SearchSubmitHint anchorX={cursorAnchorX} />
           )}
         </Box>

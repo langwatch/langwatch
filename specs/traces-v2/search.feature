@@ -99,6 +99,13 @@ Rule: Search bar layout and behavior
     Then the hint after the text reads "⏎ Enter to search"
     And no other key submits the search
 
+  @unit
+  Scenario: The inline hint shows only while typed text is unsubmitted
+    Given the user typed "foo bar baz" in the search bar
+    When the user presses Enter and the bar shows the resulting chip
+    Then the "⏎ Enter to search" hint is gone
+    And it comes back only once the user types text that was not searched
+
   @integration
   Scenario: Typing does not trigger live search
     When the user types "@status:err" without pressing Enter
