@@ -181,5 +181,5 @@ replace (
 	github.com/langwatch/langwatch/sdks/go => ../sdks/go
 )
 
-// The Go scenario SDK is not pushed yet; this local replace is swapped for a pinned version once its branch is.
-replace github.com/langwatch/scenario/go => /Users/lw/Source/github.com/langwatch/scenario-go-sdk/go
+// The Go scenario SDK is vendored until it is published; then pin it and delete third_party/scenario-go.
+replace github.com/langwatch/scenario/go => ./third_party/scenario-go
