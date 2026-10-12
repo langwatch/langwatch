@@ -6,7 +6,6 @@ import { useRequiredSession } from "../../../../behavior/auth-session.ts";
 import { useTraceHost } from "../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LANGY_RELEASE_FLAG } from "../../../../model/langy-release-flag.ts";
-import { OrganizationUserRole } from "../../../../model/prisma-types.ts";
 
 /**
  * Langy's visibility gate — "does this user have Langy?". Three layers:
@@ -23,24 +22,19 @@ export interface LangyVisibility {
 
 /** The gate, with its own uncertainty exposed. See {@link LangyVisibility}. */
 export function useLangyVisibility(): LangyVisibility {
-  const { data: session, status: sessionStatus } = useRequiredSession();
-  const { team, project, organization, organizationRole } = useOrganizationTeamProject({
+  const { status: sessionStatus } = useRequiredSession();
+  const { project, organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
   });
   const traceHost = useTraceHost();
   const { demoProjectSlug } = useUiDeployment();
 
-  const user = session?.user;
   // The server refuses Langy on the demo project outright, so rendering the panel there
-  // would only produce a chat where every send 403s.
+  // would only produce a chat where every send 403s. Membership is the permission's to
+  // answer: the host carries no member list, and `langy:view` is only held by a member.
   const isDemoProject = !!demoProjectSlug && demoProjectSlug === project?.slug;
-  const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === user?.id;
-  const userIsPartOfTeam =
-    isOnOwnPersonalProject ||
-    (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
-    organizationRole === OrganizationUserRole.ADMIN;
-  const mayReadLangy = userIsPartOfTeam && !isDemoProject && traceHost.hasPermission("langy:view");
+  const mayReadLangy = !isDemoProject && traceHost.hasPermission("langy:view");
 
   // Skip the flag query entirely for callers who are already excluded; the answer is
   // decided without a round-trip.
