@@ -7,11 +7,11 @@ import {
   LuPlay,
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import {
   type TraceAnchor,
   useAnchoredAnnotations,
 } from "../../hooks/useAnchoredAnnotations";
+import { useSpanPlaygroundHref } from "../../hooks/useSpanPlaygroundHref";
 import type { useTextTranslation } from "../../hooks/useTextTranslation";
 import { FieldCommentButton } from "./anchoredComments/FieldCommentButton";
 import {
@@ -134,7 +134,7 @@ function useIOActionGates({
 }) {
   const { hasPermission } = useOrganizationTeamProject();
   const annotations = useAnchoredAnnotations();
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  const playgroundHrefFor = useSpanPlaygroundHref();
 
   const canAnnotate = hasPermission("annotations:manage");
   return {
@@ -147,7 +147,7 @@ function useIOActionGates({
     // creates a fresh tab when not. One button, smart default.
     playgroundHref:
       spanType === "llm" && spanId && mode === "input"
-        ? (buildUrl(spanId)?.toString() ?? "")
+        ? playgroundHrefFor(spanId)
         : "",
   };
 }

@@ -43,3 +43,16 @@ Feature: Langy prompts for a model when the project has none configured
     When the user opens the Langy panel
     Then the inline model setup is not shown
     And the conversation surface is left intact
+
+  # A page can hand Langy a question ("Ask Langy to set it up"). With no model
+  # configured the server refuses the turn, so the question stays queued behind
+  # the setup prompt and is sent once a model resolves.
+  @integration
+  Scenario: A question handed to Langy waits for a model instead of failing
+    Given a project with no model provider configured
+    When a page opens Langy with a question
+    Then the panel shows a prompt to add a model provider
+    And the question is not sent
+    And the question is shown above the prompt, with a line saying it is sent once a model is set up
+    When a model resolves for the project
+    Then the question is sent once

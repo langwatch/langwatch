@@ -149,6 +149,9 @@ export type CioEventName =
   | "onboarding_path_gateway"
   | "onboarding_path_governance"
   | "guided_onboarding_path_completed"
+  // Any authenticated usage, at most once per hour per user. Counted by
+  // campaign conversion goals.
+  | "app_active"
   // Self-hosted lead signals (ADR-141, section 10). One per install, not one
   // per report: a campaign keyed on these fires when something changed.
   | "self_hosted_seats_crossed_threshold"

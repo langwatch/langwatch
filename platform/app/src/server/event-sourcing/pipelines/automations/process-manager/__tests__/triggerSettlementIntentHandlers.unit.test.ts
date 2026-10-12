@@ -158,7 +158,7 @@ function makeDeps(activeTrigger: TriggerSummary) {
       get: vi.fn(async (traceId: string) => folds.get(traceId) ?? null),
       store: vi.fn(),
     },
-    evaluationRuns: { findByTraceId: vi.fn().mockResolvedValue([]) },
+    findEvaluations: vi.fn().mockResolvedValue([]),
     deriveEvents: vi.fn().mockResolvedValue([]),
     traceById: vi.fn(async (_projectId: string, traceId: string) =>
       fullTrace(traceId),

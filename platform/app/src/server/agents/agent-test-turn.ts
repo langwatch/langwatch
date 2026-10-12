@@ -21,6 +21,7 @@ import {
 } from "~/server/connected-agents/constants";
 import { AgentCallTimeoutError } from "~/server/connected-agents/errors";
 import { getConnectedAgentRuntime } from "~/server/connected-agents/runtime";
+import { inProcessExecuteSyncTransport } from "~/server/nlpgo/inProcessExecuteSyncTransport";
 import {
   AGENT_TEST_SCENARIO_ID,
   getAgentTestSetId,
@@ -237,6 +238,10 @@ export async function sendAgentTestTurn({
     nlpServiceUrl: prefetch.data.nlpServiceUrl,
     projectApiKey: prefetch.telemetry.apiKey,
     parameters: params ?? {},
+    // This runs in the control plane, so it reaches nlpgo the way the control
+    // plane always does. Posting to the relay route instead would have the
+    // app call its own endpoint to get back to where it already is.
+    executeSyncTransport: inProcessExecuteSyncTransport({ projectId }),
   });
   const startedAt = Date.now();
   const output = await withinCallDeadline(

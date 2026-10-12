@@ -1,7 +1,6 @@
 import { useCallback } from "react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useDrawerStore } from "../stores/drawerStore";
+import { useTraceQueryArgs } from "./useTraceQueryArgs";
 
 /**
  * Returns a callback that prefetches span detail for a given span id under
@@ -10,24 +9,28 @@ import { useDrawerStore } from "../stores/drawerStore";
  * the user clicks.
  */
 export function usePrefetchSpanDetail() {
-  const { project } = useOrganizationTeamProject();
-  const traceId = useDrawerStore((s) => s.traceId);
-  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
+  // The same arguments `useSpanDetail` reads with, so the prefetch lands in
+  // the cache entry the click reads, the member included on an aggregate.
+  // Taken apart into primitives so the callback keeps its identity across
+  // renders: span rows are memoised on it.
+  const { isReady, projectId, traceId, occurredAtMs, tenantId } =
+    useTraceQueryArgs();
   const utils = api.useUtils();
 
   return useCallback(
     (spanId: string) => {
-      if (!project?.id || !traceId || !spanId) return;
+      if (!isReady || !traceId || !spanId) return;
       void utils.tracesV2.spanDetail.prefetch(
         {
-          projectId: project.id,
+          projectId,
           traceId,
-          spanId,
           ...(occurredAtMs !== null ? { occurredAtMs } : {}),
+          ...(tenantId !== null ? { tenantId } : {}),
+          spanId,
         },
         { staleTime: 300_000 },
       );
     },
-    [project?.id, traceId, occurredAtMs, utils],
+    [isReady, projectId, traceId, occurredAtMs, tenantId, utils],
   );
 }

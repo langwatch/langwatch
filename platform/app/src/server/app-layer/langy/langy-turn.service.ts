@@ -58,6 +58,8 @@ import { mintRunToken } from "~/server/app-layer/langy/streaming/langyFrameAuth"
 import type { LangyTokenBuffer } from "~/server/app-layer/langy/streaming/langyTokenBuffer";
 import type { LangyTurnAccessStore } from "~/server/app-layer/langy/streaming/langyTurnAccess";
 import type { LangyTurnHandoffStore } from "~/server/app-layer/langy/streaming/langyTurnHandoff";
+import type { ProjectKindReader } from "~/server/app-layer/permissions/aggregate-admin-gate";
+import { AggregateProjectIsReadOnlyError } from "~/server/app-layer/projects/errors";
 import type { Session } from "~/server/auth";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FeatureFlagKey } from "~/server/featureFlag/registry";
@@ -454,6 +456,12 @@ export interface LangyTurnServiceDeps {
    * turn runs on this model, never on the worker's own built-in default.
    */
   resolveModel: (args: { projectId: string }) => Promise<{ modelId: string }>;
+  /**
+   * Reads a project's kind, so a turn on an aggregate project, which takes no
+   * writes (ADR-144 decision 8), is refused before anything is written,
+   * resolved or minted under it.
+   */
+  projectKinds: Pick<ProjectKindReader, "kindOf">;
   /** Direct fast-path dispatch plus durable process-effect recovery. `cancel`
    * is the best-effort worker abort behind a user Stop (ADR-078); `warm` is
    * the fire-and-forget panel-open pre-boot
@@ -749,6 +757,13 @@ export class LangyTurnService {
         logger.debug(
           { error, projectId, conversationId },
           "langy warm skipped, session key scope refusal, first message will surface it",
+        );
+      } else if (error instanceof AggregateProjectIsReadOnlyError) {
+        // An aggregate takes no turns at all; the first message carries the
+        // read-only refusal. Expected on every panel open there, so no stack.
+        logger.debug(
+          { projectId, code: error.code },
+          "langy warm skipped, aggregate project refuses turns",
         );
       } else {
         logger.warn(

@@ -181,6 +181,15 @@ Feature: Departments - org-chart spend attribution across people, teams, and pro
     When the admin creates the first department
     Then the department column appears on the members and teams pages
 
+  # The control also sits on settings pages every member can open, while the
+  # department lists need `governance:view`.
+  @bdd @departments @ui
+  Scenario: The department lists are not requested without the grant to read them
+    Given a member of acme-corp who does not hold `governance:view`
+    When they open a settings page that carries the department control
+    Then neither the departments nor their assignments are requested
+    And the page shows no department column
+
   # ---------------------------------------------------------------------------
   # SCIM auto-assignment (enterprise standard)
   # ---------------------------------------------------------------------------

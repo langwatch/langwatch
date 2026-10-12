@@ -444,6 +444,13 @@ export const timeseriesSeriesInput = z.object({
   groupByKey: z.optional(z.string()),
   timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
   timeZone: z.string(),
+  /**
+   * Leave the previous period out of the scan. A chart that draws no
+   * comparison sets it so the read covers one window instead of two; the
+   * response then carries an empty `previousPeriod`. Absent means the previous
+   * period is computed, so stored graphs and server-side readers keep it.
+   */
+  shouldSkipPreviousPeriod: z.optional(z.boolean()),
 });
 
 export type TimeseriesSeriesInputType = z.infer<typeof timeseriesSeriesInput>;

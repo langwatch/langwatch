@@ -3,6 +3,8 @@
 // Filter conditions (WHERE clause builders for trace listing)
 export {
   clickHouseFilterConditions,
+  customMetadataKeyCondition,
+  customMetadataValueCondition,
   generateClickHouseFilterConditions,
 } from "./filter-conditions";
 // Filter definitions (query builders for filter options)
@@ -21,6 +23,7 @@ export type {
   ClickHouseFilterDefinition,
   ClickHouseFilterQueryParams,
   ClickHouseFilterTable,
+  CustomMetadataConditionInput,
   FilterConditionBuilder,
   FilterConditionResult,
   FilterOption,

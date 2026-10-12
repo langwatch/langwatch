@@ -344,10 +344,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     }
 
+    // One write. The save carries `enabled`, the credentials and the scope
+    // together, so there is never a stored provider that is switched on and
+    // holds no key, and the step completes only once the key is stored.
     const submitForm = () => {
       void actions
-        .setEnabled(true)
-        .then(() => actions.submit())
+        .submit()
         .catch((err) =>
           logger.error(err, "failed to submit model provider settings"),
         );
@@ -498,7 +500,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                 >
                   <option value="">Select default model...</option>
                   {chatModelOptions.map((model) => (
-                    <option key={model.value} value={model.value}>
+                    <option
+                      key={model.value}
+                      value={`${backendModelProviderKey}/${model.value}`}
+                    >
                       {model.label}
                     </option>
                   ))}
@@ -530,7 +535,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                   >
                     <option value="">Select default model...</option>
                     {state.customModels.map((model) => (
-                      <option key={model.modelId} value={model.modelId}>
+                      <option
+                        key={model.modelId}
+                        value={`${backendModelProviderKey}/${model.modelId}`}
+                      >
                         {model.displayName}
                       </option>
                     ))}

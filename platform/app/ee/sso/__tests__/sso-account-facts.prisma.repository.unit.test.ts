@@ -68,6 +68,7 @@ describe("PrismaSsoAccountFactsRepository", () => {
       repository.findLatestForConnection({
         organizationId: "org_other",
         connectionId: "ssoc_acme",
+        issuer: null,
       }),
     ).resolves.toBeNull();
     expect(ssoConnection.findFirst).toHaveBeenCalledWith({
@@ -90,6 +91,7 @@ describe("PrismaSsoAccountFactsRepository", () => {
       repository.findLatestForConnection({
         organizationId: "org_acme",
         connectionId: "ssoc_acme",
+        issuer: "https://idp.acme.example",
       }),
     ).resolves.toEqual({
       accountId: "account_1",
@@ -97,7 +99,10 @@ describe("PrismaSsoAccountFactsRepository", () => {
       atMs: createdAt.getTime(),
     });
     expect(account.findFirst).toHaveBeenCalledWith({
-      where: { provider: "ssoc_acme" },
+      where: {
+        provider: "ssoc_acme",
+        OR: [{ issuer: "https://idp.acme.example" }, { issuer: null }],
+      },
       select: { id: true, userId: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });

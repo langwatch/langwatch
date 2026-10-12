@@ -19,6 +19,7 @@ import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { createInnerTRPCContext } from "~/server/api/trpc";
 import { getServerAuthSession } from "~/server/auth";
+import { newPrivacyPolicyRequestMemo } from "~/server/data-privacy/privacyPolicyRequestMemo";
 import type { NextApiRequest } from "~/types/next-stubs";
 
 type NodeServerEnv = {
@@ -185,6 +186,9 @@ const handler = async (c: Context<NodeServerEnv>) => {
           session,
           permissionChecked: false,
           publiclyShared: false,
+          // One per HTTP request, so a batch of calls shares it and the
+          // next request starts empty.
+          privacyPolicyMemo: newPrivacyPolicyRequestMemo(),
         });
       },
       // The wire deliberately says nothing about an unknown failure (ADR-045),

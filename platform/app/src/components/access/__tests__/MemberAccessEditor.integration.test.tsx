@@ -35,6 +35,7 @@ const OrganizationUserRole = {
   ADMIN: "ADMIN",
   MEMBER: "MEMBER",
   EXTERNAL: "EXTERNAL",
+  DEVELOPER: "DEVELOPER",
 } as const;
 const RoleBindingScopeType = {
   ORGANIZATION: "ORGANIZATION",
@@ -58,6 +59,7 @@ const {
   mockToasterCreate,
   mockListForUserData,
   mockListForMemberData,
+  mockNextSeat,
 } = vi.hoisted(() => ({
   mockUpdateMemberRole: vi.fn(),
   mockApplyMemberBindings: vi.fn(),
@@ -82,6 +84,8 @@ const {
   mockListForMemberData: {
     current: [] as Array<unknown>,
   },
+  // The seat the stubbed seat selector picks when clicked.
+  mockNextSeat: { current: "EXTERNAL" as string },
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -143,7 +147,7 @@ vi.mock("../../settings/OrganizationUserRoleField", () => ({
       type="button"
       data-testid="org-role-field"
       data-value={value}
-      onClick={() => onChange(OrganizationUserRole.EXTERNAL)}
+      onClick={() => onChange(mockNextSeat.current as OrganizationUserRole)}
     >
       Change role
     </button>
@@ -265,6 +269,7 @@ describe("<MemberAccessEditor/>", () => {
     vi.clearAllMocks();
     mockListForUserData.current = [];
     mockListForMemberData.current = [];
+    mockNextSeat.current = OrganizationUserRole.EXTERNAL;
     mockUpdateMemberRole.mockResolvedValue({
       success: true,
       teamsLeftWithoutAdmin: [],
@@ -680,6 +685,41 @@ describe("<MemberAccessEditor/>", () => {
 
         expect(screen.queryByText("Data Scientist")).toBeNull();
         expect(screen.getByText("VIEWER")).toBeTruthy();
+      });
+    });
+  });
+
+  describe("given access rows were staged before the seat changed", () => {
+    describe("when the admin picks a Developer seat", () => {
+      beforeEach(() => {
+        mockNextSeat.current = OrganizationUserRole.DEVELOPER;
+      });
+
+      /** @scenario The access dialog offers no shared access once the seat is Developer */
+      it("replaces the access input row with the Developer notice", () => {
+        renderDialog();
+
+        expect(screen.getByTestId("stub-add-binding")).toBeTruthy();
+        expect(screen.queryByTestId("developer-no-access")).toBeNull();
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+
+        expect(screen.getByTestId("developer-no-access").textContent).toContain(
+          "A Developer seat works in its own project only",
+        );
+        expect(screen.queryByTestId("stub-add-binding")).toBeNull();
+      });
+
+      /** @scenario The access dialog offers no shared access once the seat is Developer */
+      it("drops every staged row", () => {
+        renderDialog();
+
+        fireEvent.click(screen.getByTestId("stub-add-custom-binding"));
+        expect(screen.getByText("Data Scientist")).toBeTruthy();
+
+        fireEvent.click(screen.getByTestId("org-role-field"));
+
+        expect(screen.queryByText("Data Scientist")).toBeNull();
       });
     });
   });

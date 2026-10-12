@@ -40,7 +40,7 @@ function resolve({
   teams?: {
     isPersonal: boolean;
     members: { userId: string }[];
-    projects: { slug: string }[];
+    projects: { slug: string; kind?: string }[];
   }[];
   organizationRole?: OrganizationUserRole;
 }) {
@@ -115,6 +115,22 @@ describe("resolveLlmOpsProjectSlug", () => {
 
     it("reports no home when the organization has no team at all", () => {
       expect(resolve({ teams: [] })).toBeNull();
+    });
+  });
+
+  describe("given the reader's team lists an aggregate before its ordinary project", () => {
+    it("opens the ordinary project, never the aggregate", () => {
+      const withAggregateFirst = {
+        ...OWN_TEAM,
+        projects: [
+          { slug: "company-view", kind: "aggregate" },
+          { slug: "acme-app" },
+        ],
+      };
+
+      expect(
+        resolve({ ambientProject: undefined, teams: [withAggregateFirst] }),
+      ).toBe("acme-app");
     });
   });
 });

@@ -20,16 +20,19 @@
  *                           on this process fail rather than the whole worker.
  *                           A port conflict therefore still surfaces here, on
  *                           a worker that has no public URL at all.
- *   - VOICE_TUNNEL          the literal "false" (case-insensitive) turns off
- *                           the quick-tunnel fallback below; anything else,
- *                           including unset, leaves it on. Defaults ON
- *                           because a worker with nothing configured should
- *                           come up reachable rather than crash-loop, and an
- *                           operator who wants the stable-hostname production
- *                           path just sets VOICE_PUBLIC_BASE_URL, which always
- *                           takes precedence over the tunnel. When
- *                           VOICE_PUBLIC_BASE_URL is unset and this is on,
- *                           the worker opens a free cloudflared "quick
+ *   - VOICE_TUNNEL          "true" or "false" (case-insensitive) turns the
+ *                           quick-tunnel fallback below on or off. Unset, or
+ *                           any other value, takes the default: on for
+ *                           LangWatch Cloud (IS_SAAS) and for local
+ *                           development (NODE_ENV not "production"), off for a
+ *                           self-hosted production install, which then makes
+ *                           no call to Cloudflare unless the operator opts in.
+ *                           An operator who wants voice on a self-hosted
+ *                           install sets VOICE_PUBLIC_BASE_URL (the
+ *                           stable-hostname path, which always takes
+ *                           precedence over the tunnel) or VOICE_TUNNEL=true.
+ *                           When VOICE_PUBLIC_BASE_URL is unset and this is
+ *                           on, the worker opens a free cloudflared "quick
  *                           tunnel" at boot (see ./voice-public-url-tunnel)
  *                           and uses the resulting URL. This module only
  *                           reads the toggle; opening the tunnel is the
@@ -57,7 +60,7 @@ export interface VoiceWorkerEnv {
   voiceWsPort: number;
   /** The public https origin Twilio dials back, or undefined when unset. */
   voicePublicBaseUrl: string | undefined;
-  /** False only for the literal "false" (case-insensitive); defaults true. */
+  /** Explicit "true"/"false" wins; otherwise on for SaaS and development only. */
   voiceTunnelEnabled: boolean;
 }
 
@@ -111,12 +114,21 @@ export function readVoiceWorkerEnv(
     ? publicBaseUrl.data
     : undefined;
 
-  const voiceTunnelEnabled =
-    (env.VOICE_TUNNEL ?? "").trim().toLowerCase() !== "false";
+  const voiceTunnelEnabled = readVoiceTunnelToggle(env);
 
   return {
     voiceWsPort,
     voicePublicBaseUrl,
     voiceTunnelEnabled,
   };
+}
+
+function readVoiceTunnelToggle(env: NodeJS.ProcessEnv): boolean {
+  const explicit = (env.VOICE_TUNNEL ?? "").trim().toLowerCase();
+  if (explicit === "true") return true;
+  if (explicit === "false") return false;
+
+  const isSaas =
+    env.IS_SAAS === "1" || env.IS_SAAS?.trim().toLowerCase() === "true";
+  return isSaas || env.NODE_ENV !== "production";
 }

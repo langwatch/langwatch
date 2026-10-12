@@ -26,6 +26,8 @@ import path from "node:path";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
+import type { EvaluationRunClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
 import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
@@ -44,10 +46,12 @@ import { StoredObjectsRepository } from "~/server/stored-objects/stored-objects.
 import type { MintStorageUri } from "~/server/stored-objects/stored-objects.service";
 import { StoredObjectsService } from "~/server/stored-objects/stored-objects.service";
 import { mintFileUri } from "~/server/stored-objects/uri";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
 } from "~/test-utils/clickhouseTestApp";
+import { evaluationRunRepositoryFor } from "~/test-utils/evaluationRunRepository";
 import { getTestClickHouseClient } from "../../../event-sourcing/__tests__/integration/testContainers";
 import {
   EVAL_INPUTS_HARD_CEILING_BYTES,
@@ -58,8 +62,13 @@ import {
   resolveInputsMarker,
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload";
-import { EvaluationRunClickHouseRepository } from "../repositories/evaluation-run.clickhouse.repository";
 import type { EvaluationRunData } from "../types";
+
+/** A viewer who may read captured input and output. */
+const CONTENT_VISIBLE = {
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
 
 // Route the stored-objects repository (which resolves its client internally)
 // to the shared test client. Everything else uses injected clients.
@@ -169,7 +178,7 @@ beforeAll(async () => {
     clickhouseClientModule.getClickHouseClientForTenant,
   ).mockResolvedValue(ch);
 
-  evalRepo = new EvaluationRunClickHouseRepository({
+  evalRepo = evaluationRunRepositoryFor({
     resolveClient: async () => ch,
   });
   eventRepo = new EventRepositoryClickHouse(async () => ch);
@@ -331,10 +340,16 @@ describe("evaluation inputs offload (integration)", () => {
       const service = new EvaluationService({
         resolveInputsMarker: ({ projectId, inputs }) =>
           resolveInputsMarker({ projectId, inputs, storedObjects }),
-        repository: new TraceEvaluationsClickHouseRepository(async () => ch),
+        repository: new TraceEvaluationsClickHouseRepository({
+          resolveClient: async () => ch,
+          clickhouse: new AuthorizedClickHouse({
+            resolveClient: async () => ch,
+          }),
+        }),
       });
       const readInputs = await service.getEvaluationInputs({
-        projectId: tenantId,
+        protections: CONTENT_VISIBLE,
+        authorization: ownProof({ projectId: tenantId }),
         evaluationId,
       });
 

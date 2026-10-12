@@ -1,9 +1,11 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
+import type { JoinerRole } from "@langwatch/identity";
 import {
   IdentityChip,
   IdentityRow,
   IdentityRowList,
 } from "~/components/access/IdentityRow";
+import { orgRoleOptions } from "~/components/settings/OrganizationUserRoleField";
 
 /** One waiting request, as the panel needs it. The requester's ADDRESS is not
  *  here — the domain is what was matched and what an admin is deciding on. */
@@ -13,6 +15,9 @@ export interface PendingJoinRequest {
   domain: string;
   requestedAt: Date;
   expiresAt: Date | null;
+  /** The seat an approval lands this request in (ADR-143 v6). Shown, never
+   *  edited: approval carries no role choice. */
+  seat: JoinerRole;
 }
 
 interface JoinRequestsTableProps {
@@ -95,6 +100,10 @@ export function JoinRequestRow({
             label={request.domain}
             title="The domain their verified address is on."
           />
+          <IdentityChip
+            label={seatLabel(request.seat)}
+            title="The seat they land in if you approve. A request made from the terminal lands as a Developer; one made on the web lands your organization's joiner seat."
+          />
           <Text fontSize="xs" color="fg.muted">
             Asked {formatDay(request.requestedAt)}
             {request.expiresAt
@@ -127,6 +136,11 @@ export function JoinRequestRow({
       }
     />
   );
+}
+
+/** The same word the invitations tab uses for the seat. */
+function seatLabel(seat: JoinerRole): string {
+  return orgRoleOptions.find((option) => option.value === seat)?.label ?? seat;
 }
 
 /** Spelled out, never abbreviated: "24 Aug 2026", not "24/08". */

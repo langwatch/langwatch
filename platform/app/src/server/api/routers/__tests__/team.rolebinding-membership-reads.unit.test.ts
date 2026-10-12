@@ -18,7 +18,17 @@ vi.mock("~/server/app-layer/app", async () => {
   const { appPermissionsMock } = await import(
     "~/test-utils/appPermissionsMock"
   );
-  return appPermissionsMock();
+  const mocked = appPermissionsMock();
+  // The listings ask the caller's organisation role to decide whether an
+  // aggregate project is shown (ADR-144); these tests are about membership,
+  // so the caller is simply an admin.
+  return {
+    ...mocked,
+    getApp: () => ({
+      ...mocked.getApp(),
+      organizations: { getUserOrgRole: async () => "ADMIN" },
+    }),
+  };
 });
 
 vi.mock(

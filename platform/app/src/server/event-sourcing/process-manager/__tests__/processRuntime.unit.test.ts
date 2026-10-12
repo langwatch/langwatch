@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { createTenantId } from "../../domain/tenantId";
@@ -9,6 +9,7 @@ import {
   type AutomationEvent,
   triggerMatchRecordedEventSchema,
 } from "../../pipelines/automations/schemas/events";
+import { ProcessOutboxWorker } from "../outbox/processOutboxWorker";
 import {
   ProcessRuntime,
   SCHEDULED_SINGLETON_PROJECT_ID,
@@ -78,7 +79,118 @@ function physicalEvent(id: string) {
   });
 }
 
+/** The same trigger match under its own logical key and trace. */
+function tracedEvent({ id, traceId }: { id: string; traceId: string }) {
+  const event = physicalEvent(id);
+  return {
+    ...event,
+    idempotencyKey: `trigger-1:${traceId}:30000-0`,
+    data: { ...event.data, traceId },
+  };
+}
+
+/** Records which process manager's outbox worker each notify() nudged. */
+function spyOnOutboxNudges(): string[] {
+  const nudged: string[] = [];
+  vi.spyOn(ProcessOutboxWorker.prototype, "notify").mockImplementation(
+    function (this: ProcessOutboxWorker) {
+      nudged.push(String(Reflect.get(this, "name")));
+    },
+  );
+  return nudged;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
+
 describe("ProcessRuntime", () => {
+  describe("given a process manager mounted with consumers enabled", () => {
+    /** @scenario "A commit that inserted no intent does not nudge the outbox" */
+    it("nudges its outbox only for a commit that inserted an intent", async () => {
+      const nudged = spyOnOutboxNudges();
+      const store = new InMemoryProcessStore();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: true });
+      const definition = buildProcessManager<AutomationEvent>({
+        name: "tallyOnly",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .intent("noop", z.object({}), async () => {})
+            .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state, data, ctx) => ({
+              state: { count: state.count + 1 },
+              intents:
+                data.traceId === "send"
+                  ? [ctx.intents.noop(`noop:${state.count}`, {})]
+                  : [],
+            })),
+      });
+      const [subscriber] = runtime.registerPipeline<AutomationEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([["tallyOnly", definition]]),
+      }).subscribers;
+      const context = { tenantId, aggregateId: "trigger-1", isReplay: false };
+
+      await subscriber!.handle(
+        tracedEvent({ id: "quiet-1", traceId: "quiet" }),
+        context,
+      );
+      expect(nudged).toEqual([]);
+
+      await subscriber!.handle(
+        tracedEvent({ id: "send-1", traceId: "send" }),
+        context,
+      );
+      expect(nudged).toEqual(["tallyOnly"]);
+      await runtime.stop();
+    });
+  });
+
+  describe("given two scheduled process managers share one runtime", () => {
+    /** @scenario "A wake nudges only the outbox of the process it woke" */
+    it("nudges only the outbox of the process whose wake inserted an intent", async () => {
+      vi.useFakeTimers();
+      const nudged = spyOnOutboxNudges();
+      const store = new InMemoryProcessStore();
+      const runtime = new ProcessRuntime({ store, consumersEnabled: true });
+      const sweeping = buildProcessManager<AutomationEvent>({
+        name: "sweeping",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .schedule({ everyMs: 1 })
+            .intent("sweep", z.object({}), async () => {})
+            .onWake((state, ctx) => ({
+              state,
+              intents: [ctx.intents.sweep(`sweep:${ctx.at}`, {})],
+            })),
+      });
+      const resting = buildProcessManager<AutomationEvent>({
+        name: "resting",
+        applier: (pm) =>
+          pm
+            .state({ count: 0 })
+            .schedule({ everyMs: 1 })
+            .onWake((state) => ({ state }))
+            .intent("noop", z.object({}), async () => {}),
+      });
+
+      runtime.registerPipeline<AutomationEvent>({
+        pipelineName: "automations",
+        processManagers: new Map([
+          ["sweeping", sweeping],
+          ["resting", resting],
+        ]),
+      });
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      expect(nudged).toContain("sweeping");
+      expect(nudged).not.toContain("resting");
+      await runtime.stop();
+    });
+  });
+
   describe("given duplicate physical rows share one logical event key", () => {
     it("evolves the process exactly once", async () => {
       const store = new InMemoryProcessStore();

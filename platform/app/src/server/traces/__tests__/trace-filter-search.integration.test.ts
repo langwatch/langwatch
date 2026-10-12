@@ -18,11 +18,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
+import { tenantScope } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { TRACE_FILTER_EXAMPLES } from "~/server/app-layer/traces/query-language/examples";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import {
+  expandFragmentForProject,
+  expandStatementForProject,
+} from "~/test-utils/authorizationProofs";
 import {
   startTestContainers,
   stopTestContainers,
@@ -130,13 +134,22 @@ async function search({
   const compiled =
     filter === undefined
       ? undefined
-      : translateFilterToClickHouse(filter, tenantId, WINDOW);
+      : translateFilterToClickHouse(filter, WINDOW);
   if (filter !== undefined && !compiled) {
     throw new Error(`the fixture filter compiled to nothing: ${filter}`);
   }
+  // The legacy service assembles its own statement, so the fragment's tenant
+  // markers are expanded here, as the API boundary does before handing one in.
+  const filterWhere = compiled
+    ? expandFragmentForProject({
+        fragment: compiled.sql,
+        params: compiled.params,
+        projectId: tenantId,
+      })
+    : undefined;
 
   const result = await service.getAllTracesForProject(input, openProtections, {
-    ...(compiled ? { filterWhere: compiled } : {}),
+    ...(filterWhere ? { filterWhere } : {}),
   });
   return result.groups
     .flat()
@@ -193,12 +206,17 @@ describe("every filter example the reference publishes", () => {
   it.each(
     TRACE_FILTER_EXAMPLES.map((example) => [example.id, example.text]),
   )("runs %s", async (_id, text) => {
-    const compiled = translateFilterToClickHouse(text, tenantId, WINDOW);
+    const compiled = translateFilterToClickHouse(text, WINDOW);
     expect(compiled).not.toBeNull();
+    const statement = expandStatementForProject({
+      query: `SELECT count() AS matches FROM trace_summaries ts WHERE ${tenantScope("OccurredAt")} AND ${compiled?.sql}`,
+      queryParams: compiled?.params ?? {},
+      projectId: tenantId,
+    });
     await expect(
       ch.query({
-        query: `SELECT count() AS matches FROM trace_summaries ts WHERE TenantId = {tenantId:String} AND ${compiled?.sql}`,
-        query_params: compiled?.params ?? {},
+        query: statement.query,
+        query_params: statement.queryParams,
         format: "JSONEachRow",
       }),
     ).resolves.toBeDefined();

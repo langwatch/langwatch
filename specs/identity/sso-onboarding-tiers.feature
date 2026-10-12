@@ -237,11 +237,11 @@ Feature: Enterprise single sign-on onboarding - three tiers, in priority order
     And the words name activating a licence, and name no environment variable, host or internal service
 
   @unit
-  Scenario: A licence activated while the installation is running takes effect at the next restart
-    Given a self-hosted installation that was unlicensed when it started
+  Scenario: A licence activated while the installation is running reaches setup within a minute
+    Given a self-hosted installation whose licence gate still denies
     When a genuine licence is activated and single sign-on setup is opened
-    Then setup stays unavailable until the installation restarts
-    And the page says a restart is needed and does not pretend otherwise
+    Then setup stays unavailable until the gate reads the licence
+    And the page says single sign-on turns on within a minute and does not say there is no licence
 
   @integration
   Scenario: The only connection on an installation still leaves a way in

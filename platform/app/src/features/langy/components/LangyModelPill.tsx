@@ -28,6 +28,7 @@ import {
 } from "~/components/modelProviders/iconsMap";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useOverlayZIndex } from "~/hooks/useOverlayZIndex";
 import { LANGY_CHAT_FEATURE_KEY } from "~/server/modelProviders/codexRestrictions";
 import { getModelById, modelProviders } from "~/server/modelProviders/registry";
 import {
@@ -206,6 +207,7 @@ export const LangyModelPill = memo(function LangyModelPill({
   // The catalogue is the right list and the wrong front door — see
   // logic/langyModelSuggestions.ts. A short derived shortlist leads; everything
   // else waits behind "More models".
+  const { zIndex } = useOverlayZIndex();
   const searching = query.trim().length > 0;
   const { suggested, more } = useMemo(
     () =>
@@ -417,14 +419,21 @@ export const LangyModelPill = memo(function LangyModelPill({
         </Box>
       </Tooltip>
       <Portal>
-        <Combobox.Positioner>
+        <Combobox.Positioner
+          ref={(node: HTMLElement | null) => {
+            // Zag sets --z-index from its own layer stack, which lands under
+            // the panel when Langy rides beside a drawer (z 1600). The list
+            // takes the shared overlay layer, like every menu and popover.
+            node?.style.setProperty("z-index", zIndex, "important");
+          }}
+        >
           <Combobox.Content
             minWidth="240px"
             maxHeight="340px"
             overflowY="auto"
             padding={0}
             borderRadius="12px"
-            background="bg.panel/96"
+            background="bg.panel"
             borderWidth="1px"
             borderColor="border.muted"
             boxShadow="lg"

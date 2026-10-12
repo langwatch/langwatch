@@ -1089,10 +1089,21 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		// The control plane emits ModelProvider.id. Config materialization puts
 		// that same ID in Credential.ID; ProviderID is only the provider type
 		// (for example "openai") and is not a cache invalidation join key.
+		//
+		// Matching on the id alone only reaches bundles that already carry
+		// the provider. A provider that was just created, enabled, or granted
+		// a wider scope is in no bundle yet, yet it can join the chain of any
+		// key in its organization, so every bundle of the polled organization
+		// is evicted too. Without that, a key keeps answering
+		// model_provider_not_bound for the new provider until the 60 second
+		// ETag revalidation catches up.
 		if ch.ModelProviderID == "" {
 			return
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
+			if organizationID != "" && b.OrganizationID == organizationID {
+				return true
+			}
 			for _, c := range b.Config.Credentials {
 				if c.ID == ch.ModelProviderID {
 					return true

@@ -418,6 +418,25 @@ Feature: Redacting personal data from traces
     Then the analysis service never received that value
     And the stored attribute still reads as it was sent
 
+  # The span kind is one word from a fixed list - "agent", "workflow", "llm" and
+  # the rest - and the name detector reads some of those words as first names,
+  # so top-level spans stored "[PERSON]" as their kind. A known kind cannot
+  # carry personal data, so it is held back from every pass. The hold-out goes
+  # on the exact list, not the shape: anyone can write the span kind attribute,
+  # so a name written under it is analysed like any other value.
+  @unit
+  Scenario: A known span kind is never sent for analysis
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a span kind attribute holding a known kind
+    Then the analysis service never received that value
+    And the stored attribute still reads as it was sent
+
+  @unit
+  Scenario: A name written under the span kind attribute is still redacted
+    Given the resolved PII level for "web-app" is strict
+    When a trace is ingested with a person's name under the span kind attribute
+    Then the stored attribute is replaced by its marker
+
   # The reserved names are not a namespace anyone owns. Attributes arrive on the
   # ingestion endpoint spelled exactly as the sender wrote them, so a sender can
   # put an email address under a trace identifier name - by mistake or on

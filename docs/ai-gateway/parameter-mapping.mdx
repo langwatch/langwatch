@@ -66,7 +66,7 @@ A dropped parameter is reported in three places:
 | `prompt_cache_key` | dropped | dropped | dropped |  |
 | `prompt_cache_retention` | dropped | dropped | dropped |  |
 | `reasoning_effort` | mapped | mapped | mapped | bedrock: mapped for Anthropic (thinking) and Nova; refused for other families; a customer VPC endpoint maps Anthropic only |
-| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); a customer VPC endpoint enforces json_schema for Anthropic models only; gemini: json_object and json_schema both enforced |
+| `response_format` | mapped | mapped | mapped | anthropic: json_schema enforced; json_object refused (no parseable-JSON guarantee); bedrock: json_schema enforced; json_object refused (no parseable-JSON guarantee); the Converse lane (customer VPC endpoints, OpenAI models) enforces json_schema for Anthropic models and OpenAI GPT-5 and later, not gpt-oss; gemini: json_object and json_schema both enforced |
 | `safety_identifier` | dropped | dropped | dropped |  |
 | `seed` | dropped | dropped | dropped |  |
 | `service_tier` | dropped | dropped | dropped | anthropic: "auto" passes natively; other values dropped; bedrock: dropped (AWS validates a different enum); gemini: dropped |

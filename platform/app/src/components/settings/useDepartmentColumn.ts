@@ -1,4 +1,5 @@
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { NOT_TARGETED } from "~/server/featureFlag/targeting";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -21,7 +22,14 @@ export function useDepartmentColumn(organizationId: string) {
     enabled: !!organizationId,
   });
 
-  const enabled = !!organizationId && ffOn;
+  // The control also renders on pages every member can open, and the lists
+  // behind it need `governance:view`. Without the grant there is nothing to
+  // read, so nothing is asked.
+  const { hasPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const canRead = hasPermission("governance:view");
+  const enabled = !!organizationId && ffOn && canRead;
 
   const listQuery = api.departments.list.useQuery(
     { organizationId },
@@ -47,7 +55,7 @@ export function useDepartmentColumn(organizationId: string) {
   );
 
   return {
-    show: ffOn && departments.length > 0,
+    show: ffOn && canRead && departments.length > 0,
     departments,
     byUser,
     byTeam,

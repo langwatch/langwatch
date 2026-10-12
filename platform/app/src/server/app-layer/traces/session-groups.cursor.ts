@@ -44,6 +44,8 @@ const SORT_COLUMNS = Object.keys(SORT_COLUMN_KEYS) as [
 const sessionGroupsCursorSchema = z.object({
   sortValue: z.number().finite(),
   conversationId: z.string().min(1),
+  /** Absent on a cursor minted before the tenant was carried. */
+  tenantId: z.string().min(1).optional(),
   sortColumn: z.enum(SORT_COLUMNS),
   sortDirection: z.enum(["asc", "desc"]),
 });
@@ -102,6 +104,7 @@ export function keysetCursorFor({
   return {
     sortValue: cursor.sortValue,
     conversationId: cursor.conversationId,
+    ...(cursor.tenantId !== undefined ? { tenantId: cursor.tenantId } : {}),
   };
 }
 

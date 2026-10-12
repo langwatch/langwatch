@@ -1,6 +1,10 @@
 import {
   explainHandledError,
   type HandledErrorShape,
+  PROVIDER_CONFIG_PROBLEMS,
+  PROVIDER_CREDENTIAL_REASONS,
+  PROVIDER_INVALID_REQUEST_REASONS,
+  PROVIDER_MODEL_MISSING_REASONS,
   readHandledError,
   UNKNOWN_ERROR_PRESENTATION,
 } from "~/features/errors";
@@ -143,6 +147,10 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   "langy_egress_misconfigured",
   "langy_insufficient_scope",
   "langy_turn_in_progress",
+  // The project is an aggregate, which takes no writes, and a turn writes a
+  // conversation under it. Refused before anything is written, with the
+  // shared read-only refusal rather than a Langy code of its own.
+  "aggregate_project_is_read_only",
   // Sending faster than the per-user limit allows. Explicit copy matters more
   // here than almost anywhere: the generic default titles every unknown kind
   // "Langy couldn't finish that" and hands it a "Try again" button, which tells
@@ -224,14 +232,29 @@ const PLAN_LIMIT_REASONS: ReadonlySet<string> = new Set([
  * `decodeProviderErrorBody`): `rate_limit_exceeded` from OpenAI and Azure
  * OpenAI, `rate_limit_error` from Anthropic, `RESOURCE_EXHAUSTED` from
  * Google. A real 429 arrives this way far more often than as the bare
- * `upstream_rate_limited`. A provider body with a code this list does not
- * name stays on the generic card: promotion is by exact code, never by the
- * presence of an upstream failure alone.
+ * `upstream_rate_limited`.
+ *
+ * The proxy's own `llm_upstream_error` promotes on its own: it already says
+ * the provider answered with a failure, whatever discriminant sits beneath
+ * it. The discriminants only select which sentence the card says, and one no
+ * list names gets the generic provider line. Promotion is still by exact
+ * code, never by reading a message.
  *
  * `llm_upstream_error` already writes one sentence per group, so promoting to
  * it reuses that copy rather than restating it here.
  */
 const UPSTREAM_PROVIDER_REASONS: ReadonlySet<string> = new Set([
+  // The proxy's own code for "the provider answered with a failure". Its
+  // reason beneath is the provider's discriminant, which may be one no list
+  // here names (Bedrock's "access_denied"), so the code itself is what says
+  // the provider refused.
+  "llm_upstream_error",
+  // The gateway's own codes for a provider failure it named in its envelope
+  // rather than forwarding the provider's body: an unusable answer, no
+  // answer in time, or no connection at all.
+  "provider_error",
+  "provider_timeout",
+  "provider_connection_failed",
   "upstream_stream_error",
   "upstream_bad_request",
   "upstream_unauthorized",
@@ -303,6 +326,63 @@ export function promoteModelUnavailableError(
   return hasReasonKind(domain.reasons, MODEL_UNAVAILABLE_REASONS)
     ? { ...domain, code: "langy_model_unavailable" }
     : domain;
+}
+
+/**
+ * The gateway's code for a provider slot that cannot serve the request as it
+ * is set up: no API key saved, no endpoint, no deployment for the model.
+ */
+const PROVIDER_CONFIG_REASON = "provider_config_invalid";
+
+/** A model id as a menu offers it: short, and made of identifier characters. */
+const MODEL_ID_PATTERN = /^[\w./:@-]{1,120}$/;
+
+/**
+ * A turn that died because the provider behind the chosen model is not set up
+ * says which setting is missing, and offers the provider settings.
+ *
+ * The gateway stops these before any request leaves, so the provider never
+ * refused anything and there is nothing to retry: a provider saved without its
+ * API key fails the same way on every turn until the key is added. Left on
+ * `langy_agent_errored` the card said only that the reply failed and offered
+ * another try.
+ *
+ * The code is re-keyed to the gateway's own, so the panel says the sentence
+ * every other surface says for it. Two fields are carried off the reason and
+ * nothing else: `problem`, only when it is one of the enumerated values, and
+ * `model`, only when it reads as a model id. The reason's `message` is never
+ * read.
+ */
+export function promoteProviderConfigError(
+  domain: LangyDomainError,
+): LangyDomainError {
+  if (domain.code !== "langy_agent_errored") return domain;
+  const reason = findReason(domain.reasons, PROVIDER_CONFIG_REASON);
+  if (!reason) return domain;
+
+  const meta: Record<string, unknown> = {};
+  const problem = reason.meta?.problem;
+  if (typeof problem === "string" && PROVIDER_CONFIG_PROBLEMS.has(problem)) {
+    meta.problem = problem;
+  }
+  const model = reason.meta?.model;
+  if (typeof model === "string" && MODEL_ID_PATTERN.test(model)) {
+    meta.model = model;
+  }
+  return { ...domain, code: PROVIDER_CONFIG_REASON, meta };
+}
+
+/** The first reason in the chain, at any depth, of this kind. */
+function findReason(
+  reasons: LangySerializedReason[] | undefined,
+  kind: string,
+): LangySerializedReason | undefined {
+  for (const reason of reasons ?? []) {
+    if (reason.kind === kind) return reason;
+    const nested = findReason(reason.reasons, kind);
+    if (nested) return nested;
+  }
+  return undefined;
 }
 
 /** Does any reason in the chain, at any depth, carry one of these kinds? */
@@ -602,7 +682,9 @@ export function explainLangyError(
   // also carries an upstream status keeps its own card. "Not reachable at all"
   // is checked before "reached and refused" for the same reason.
   const domain = promoteUpstreamProviderError(
-    promoteModelUnavailableError(promoteCodexAgentError(received)),
+    promoteProviderConfigError(
+      promoteModelUnavailableError(promoteCodexAgentError(received)),
+    ),
   );
   // Always carried through for debugging, regardless of the matched case.
   const debug = {
@@ -647,6 +729,26 @@ export function explainLangyError(
       // still landing on `langy_agent_errored` is a rejection we cannot name,
       // so the registry's line plus the trace id is the honest answer.
       return { ...copy, render: "card", action: retry, ...debug };
+    }
+
+    case "llm_upstream_error": {
+      // The provider was reached and refused. A refused key, a model it
+      // does not serve or a request it reads as invalid fails the same way
+      // every time, so the card offers the model settings; anything else (a
+      // rate limit, an outage) can pass, so it offers another try.
+      const deterministic =
+        hasReasonKind(domain.reasons, PROVIDER_CREDENTIAL_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS) ||
+        hasReasonKind(domain.reasons, PROVIDER_INVALID_REQUEST_REASONS);
+      return {
+        ...copy,
+        render: "card",
+        action: deterministic
+          ? { label: "Configure model", kind: "configure-model" }
+          : retry,
+        traceId: domain.traceId,
+        ...debug,
+      };
     }
 
     case "langy_worker_spawn_failed":
@@ -711,6 +813,18 @@ export function explainLangyError(
         ...debug,
       };
 
+    case "provider_config_invalid":
+      // The provider behind the chosen model is missing a setting, and the
+      // gateway stopped the call before it left. Deterministic, so no retry:
+      // the card opens the provider settings, where the fix is.
+      return {
+        ...copy,
+        render: "card",
+        action: { label: "Open model providers", kind: "configure-model" },
+        traceId: domain.traceId,
+        ...debug,
+      };
+
     case "langy_egress_misconfigured":
       // Fail-closed network policy: Langy refuses to run rather than leak. Not a
       // user error and not a retry — an admin has to fix the policy.
@@ -739,6 +853,12 @@ export function explainLangyError(
       // resets, so the useful moves are waiting or switching models; retry is
       // still offered for after the reset.
       return { ...copy, render: "card", action: retry, ...debug };
+
+    case "aggregate_project_is_read_only":
+      // An aggregate reads other projects and takes no writes, so a turn on it
+      // is refused every time. No retry, which would be refused the same way:
+      // the shared copy says to open the project the data belongs to.
+      return { ...copy, render: "card", ...debug };
 
     case "langy_turn_in_progress":
       // One turn at a time per conversation. A retry would just 409 again, so

@@ -17,6 +17,7 @@
 import os from "os";
 import path from "path";
 import { env } from "~/env.mjs";
+import { NLP_INTERNAL_SECRET_ENV } from "../../nlpgo/internalSecret";
 import {
   NLP_FETCH_MAX_TIMEOUT_ENV,
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV,
@@ -107,6 +108,14 @@ export function buildChildProcessEnv(
     // engine's ceiling the way it did in the production bug this fixes.
     [NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV]:
       process.env[NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV],
+    // The secret nlpgo authenticates this hop with. The code and workflow
+    // adapters and the model factory all run INSIDE this child and build
+    // their own requests to the engine, and this allowlist is the only route
+    // from the operator's environment into it. Without the forward, an
+    // install that configures the secret gets a 401 on every simulation run
+    // against a workflow or code agent while the engine is reached fine from
+    // the parent, which is the worst shape such a bug can take.
+    [NLP_INTERNAL_SECRET_ENV]: process.env[NLP_INTERNAL_SECRET_ENV],
     ...scenarioVars,
   };
 

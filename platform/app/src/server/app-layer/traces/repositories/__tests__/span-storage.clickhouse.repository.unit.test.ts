@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 import {
   deserializeAttributes,
   mapSpanSummaryRow,
-  SpanStorageClickHouseRepository,
   type SpanSummaryQueryRow,
   serializeAttributes,
 } from "../span-storage.clickhouse.repository";
@@ -241,11 +243,9 @@ describe("given a requested span-read limit", () => {
 describe("SpanStorageClickHouseRepository single-trace reads", () => {
   function repoWithSpyClient() {
     const query = vi.fn().mockResolvedValue({ json: async () => [] });
-    const repo = new SpanStorageClickHouseRepository((async () => ({
+    const repo = spanStorageRepositoryFor((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ClickHouseClientResolver);
     return { repo, query };
   }
 
@@ -256,7 +256,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
       // the hint-less path first issues a trace_summaries time-resolve query
       // (covered by the integration suite), which is not what this asserts.
       await repo.getSpansByTraceId({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         occurredAtMs: Date.now(),
       });
@@ -268,7 +268,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
     it("caps query memory on the normalized-spans read", async () => {
       const { repo, query } = repoWithSpyClient();
       await repo.getNormalizedSpansByTraceId({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         occurredAtMs: Date.now(),
       });
@@ -280,7 +280,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
     it("caps query memory on the single-span read", async () => {
       const { repo, query } = repoWithSpyClient();
       await repo.getSpanByIds({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         spanId: "s-1",
         occurredAtMs: Date.now(),
@@ -337,11 +337,9 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       query.mockResolvedValueOnce({ json: async () => rows });
     }
     query.mockResolvedValue({ json: async () => [] });
-    const repo = new SpanStorageClickHouseRepository((async () => ({
+    const repo = spanStorageRepositoryFor((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ClickHouseClientResolver);
     return { repo, query };
   }
 
@@ -352,7 +350,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       ]);
 
       const page = await repo.findSpanSummariesPage({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         limit: 2,
         occurredAtMs: Date.now(),
@@ -371,7 +369,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       ]);
 
       const page = await repo.findSpanSummariesPage({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         limit: 2,
         occurredAtMs: Date.now(),
@@ -388,7 +386,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       const { repo, query } = repoWithSpyClient([[summaryRow("s-2")]]);
 
       await repo.findSpanSummariesPage({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         limit: 2,
         cursor: { startTimeMs: 1_700_000_000_000, spanId: "s-1" },
@@ -413,7 +411,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       const { repo, query } = repoWithSpyClient([[summaryRow("s-2")]]);
 
       await repo.findSpanSummariesPage({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         limit: 2,
         cursor: { startTimeMs: 1_700_000_000_000, spanId: "s-1" },
@@ -437,7 +435,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       const { repo, query } = repoWithSpyClient([[]]);
 
       const page = await repo.findSpanSummariesPage({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         limit: 2,
         cursor: { startTimeMs: 1_700_000_000_000, spanId: "s-1" },
@@ -455,7 +453,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       const { repo, query } = repoWithSpyClient([[summaryRow("s-1")]]);
 
       await repo.findSpanSummariesPage({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         limit: 2,
         occurredAtMs,
@@ -475,7 +473,7 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
       const { repo, query } = repoWithSpyClient([[], [summaryRow("s-1")]]);
 
       const page = await repo.findSpanSummariesPage({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         limit: 2,
         occurredAtMs: 1_700_000_000_000,
@@ -493,16 +491,14 @@ describe("SpanStorageClickHouseRepository span-summary pages", () => {
 describe("SpanStorageClickHouseRepository bounded light readers", () => {
   function repoWithSpyClient() {
     const query = vi.fn().mockResolvedValue({ json: async () => [] });
-    const repo = new SpanStorageClickHouseRepository((async () => ({
+    const repo = spanStorageRepositoryFor((async () => ({
       query,
-    })) as unknown as ConstructorParameters<
-      typeof SpanStorageClickHouseRepository
-    >[0]);
+    })) as unknown as ClickHouseClientResolver);
     return { repo, query };
   }
 
   const byTrace = {
-    tenantId: "p-1",
+    authorization: ownProof({ projectId: "p-1" }),
     traceId: "t-1",
     occurredAtMs: Date.now(),
   };
@@ -537,7 +533,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
     it("caps the read at the light-row ceiling", async () => {
       const { repo, query } = repoWithSpyClient();
       await repo.findSpanSummariesSince({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         sinceUpdatedAtMs: Date.now(),
       });
@@ -554,7 +550,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
       // stay frozen at its first projection.
       const { repo, query } = repoWithSpyClient();
       await repo.findSpanSummariesSince({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         sinceUpdatedAtMs: 1_700_000_000_000,
       });
@@ -572,7 +568,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
     it("selects the row version so the client can advance its high-water mark", async () => {
       const { repo, query } = repoWithSpyClient();
       await repo.findSpanSummariesSince({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         sinceUpdatedAtMs: 0,
       });
@@ -587,7 +583,7 @@ describe("SpanStorageClickHouseRepository bounded light readers", () => {
     it("caps the read at the derivation ceiling", async () => {
       const { repo, query } = repoWithSpyClient();
       await repo.findSpansSince({
-        tenantId: "p-1",
+        authorization: ownProof({ projectId: "p-1" }),
         traceId: "t-1",
         sinceStartTimeMs: Date.now(),
       });

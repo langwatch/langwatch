@@ -1,3 +1,4 @@
+import { internalActor } from "@langwatch/actor";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -5,6 +6,7 @@ import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
+import type { AuthorizationService } from "~/server/app-layer/authz/authorization.service";
 import { AutomationCustomGraphService } from "~/server/app-layer/automations/custom-graph.service";
 import { sendRenderedSlackMessage } from "~/server/app-layer/automations/delivery/sendSlackWebhook";
 import { postSlackChatMessage } from "~/server/app-layer/automations/delivery/slackWebApi";
@@ -83,6 +85,7 @@ export function buildAutomationDispatchPorts({
   traces,
   traceSummaryRepository,
   resolveClickHouseClient,
+  authorization,
 }: {
   prisma: PrismaClient;
   redis: Redis | Cluster | null;
@@ -95,6 +98,9 @@ export function buildAutomationDispatchPorts({
   /** The composition root's ClickHouse resolver — the heartbeat's recency
    *  probe reads through it. Passed down, never imported. */
   resolveClickHouseClient: ClickHouseClientResolver;
+  /** Mints the own-only proof the settle confirm's event read is fenced by
+   *  (ADR-144 block C); the confirm names its project from the match. */
+  authorization: Pick<AuthorizationService, "authorizeInternal">;
 }): AutomationDispatchPorts {
   // Fail loud if BASE_HOST is missing: every alert dispatch interpolates it
   // into deep links; an empty baseHost silently ships broken links.
@@ -108,14 +114,26 @@ export function buildAutomationDispatchPorts({
   // Shared trace fold store — dispatch re-reads it for the settle confirm.
   // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
   // client falls back to the uncached store.
+  // The dispatch reads committed fold state outside a fold step, so the
+  // store's read proof names the dispatch as the reader (ADR-144 block C).
+  const uncachedTraceSummaryStore = new TraceSummaryStore({
+    repository: traceSummaryRepository,
+    authorize: ({ projectId, purpose }) =>
+      authorization.authorizeInternal({
+        actor: internalActor(
+          "event-sourcing/pipelines/automations/automationDispatch.wiring",
+        ),
+        projectId,
+        permission: "traces:view",
+        purpose,
+      }),
+  });
   const traceSummaryStore: FoldProjectionStore<TraceSummaryData> =
     redis && !(redis instanceof Cluster)
-      ? new RedisCachedFoldStore(
-          new TraceSummaryStore(traceSummaryRepository),
-          redis,
-          { keyPrefix: "trace_summaries" },
-        )
-      : new TraceSummaryStore(traceSummaryRepository);
+      ? new RedisCachedFoldStore(uncachedTraceSummaryStore, redis, {
+          keyPrefix: "trace_summaries",
+        })
+      : uncachedTraceSummaryStore;
 
   const traceReadDerivation = new TraceReadDerivationService(traces.spans);
 
@@ -258,8 +276,30 @@ export function buildAutomationDispatchPorts({
     projects,
     baseHost,
     traceSummaryStore,
-    evaluationRuns: evaluations.runs,
-    deriveEvents: (params) => traceReadDerivation.deriveEvents(params),
+    findEvaluations: async ({ tenantId, traceId }) =>
+      evaluations.runs.findByTraceId({
+        authorization: await authorization.authorizeInternal({
+          actor: internalActor(
+            "app-layer/automations/dispatch/confirmSettledMatch",
+          ),
+          projectId: tenantId,
+          permission: "traces:view",
+          purpose: { kind: "operator", entry: "confirmSettledMatch" },
+        }),
+        traceId,
+      }),
+    deriveEvents: async ({ tenantId, ...params }) =>
+      traceReadDerivation.deriveEvents({
+        authorization: await authorization.authorizeInternal({
+          actor: internalActor(
+            "app-layer/automations/dispatch/confirmSettledMatch",
+          ),
+          projectId: tenantId,
+          permission: "traces:view",
+          purpose: { kind: "operator", entry: "confirmSettledMatch" },
+        }),
+        ...params,
+      }),
     emailHourlyCap: env.TRIGGER_EMAIL_HOURLY_CAP,
     consumeEmailCapSlot: ({ projectId, triggerId, now, dedupKey }) =>
       consumeEmailCapSlot({

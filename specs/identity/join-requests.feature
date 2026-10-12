@@ -66,7 +66,7 @@ Feature: Join requests - asking to join the organization your colleagues already
     Given "sam" has a PENDING request to join "acme"
     When "ana" approves it
     Then the request is APPROVED and records that "ana" resolved it
-    And "sam" is a member of "acme" with the organization's default role
+    And "sam" is a member of "acme" in the seat the request showed: the organization's joiner seat, or Developer for a request made from the terminal
     And "sam" is told they are in, by email and in the product
 
   @integration
@@ -81,7 +81,7 @@ Feature: Join requests - asking to join the organization your colleagues already
   Scenario: Approval never carries a role choice
     Given "sam" has a PENDING request to join "acme"
     When "ana" approves it
-    Then the only role on offer is the organization's default one
+    Then no role is on offer; the seat follows from the organization's joiner seat and where the request was made
     And raising "sam" above it is a separate, later act
 
   @integration

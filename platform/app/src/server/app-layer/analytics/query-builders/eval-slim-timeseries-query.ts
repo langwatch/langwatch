@@ -19,23 +19,24 @@
  *     (multi-tenancy contract);
  *   * filter on the partition column `OccurredAt` so ClickHouse prunes
  *     partitions (clickhouse-queries best-practices);
- *   * dedup the slim table via the IN-tuple pattern — eval slim is
- *     `ReplacingMergeTree(UpdatedAt)`.
+ *   * dedup the slim table to the latest version of each evaluation (eval
+ *     slim is `ReplacingMergeTree(UpdatedAt)`) with the spillable `argMax`
+ *     collapse of `latestVersionSubquery`.
  */
 
+import { latestVersionSubquery } from "~/server/analytics/clickhouse/latest-version-dedup";
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
-import type { FilterField } from "~/server/filters/types";
 import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "../types";
 import {
-  collectStringValues,
   dateTrunc,
   hasFilterValues,
   isPercentile,
   percentileFor,
+  referencedAliasColumns,
 } from "./_shared";
 
 const SLIM_TABLE = "evaluation_analytics" as const;
@@ -133,9 +134,14 @@ function evalSlimGroupByExpression(groupBy?: string): string | null {
 
 // isPercentile + percentileFor moved to _shared.
 
+/**
+ * Eval slim aggregation expression. Percentiles use `quantileTDigest`, like
+ * the trace slim builder: the read spans the whole range, and an exact
+ * quantile keeps every value of the group in memory.
+ */
 function evalSlimAggExpression(agg: AggregationTypes, column: string): string {
   if (isPercentile(agg)) {
-    return `quantileExact(${percentileFor(agg)})(${column})`;
+    return `quantileTDigest(${percentileFor(agg)})(${column})`;
   }
   switch (agg) {
     case "sum":
@@ -155,82 +161,50 @@ function evalSlimAggExpression(agg: AggregationTypes, column: string): string {
 }
 
 /**
- * Build a deduped FROM-clause for the eval slim table — IN-tuple dedup
- * against `(TenantId, EvaluationId, UpdatedAt)` because slim is
- * `ReplacingMergeTree(UpdatedAt)`. Same pattern as the trace slim builder.
+ * Deduped FROM-clause for the eval slim table: the latest version of each
+ * evaluation in range (slim is `ReplacingMergeTree(UpdatedAt)`), collapsed
+ * with the spillable `argMax` form of {@link latestVersionSubquery}, carrying
+ * only the columns the outer query reads. Same pattern as the trace slim
+ * builder.
  */
-function dedupedSlim(alias: string, dateClause: string): string {
-  return `(
-    SELECT *
-    FROM ${SLIM_TABLE}
-    WHERE TenantId = {tenantId:String}
-      ${dateClause}
-      AND (TenantId, EvaluationId, UpdatedAt) IN (
-        SELECT TenantId, EvaluationId, max(UpdatedAt)
-        FROM ${SLIM_TABLE}
-        WHERE TenantId = {tenantId:String}
-          ${dateClause}
-        GROUP BY TenantId, EvaluationId
-      )
-  ) ${alias}`;
+function dedupedSlim({
+  alias,
+  dateClause,
+  expressions,
+}: {
+  alias: string;
+  dateClause: string;
+  expressions: readonly string[];
+}): string {
+  const keyColumns = ["TenantId", "EvaluationId"];
+  const columns = referencedAliasColumns({ alias, expressions, keyColumns });
+  return latestVersionSubquery({
+    table: SLIM_TABLE,
+    alias,
+    keyColumns,
+    columns: columns.map((name) => ({ name })),
+    where: `TenantId = {tenantId:String} ${dateClause}`,
+  });
 }
 
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 
 /**
- * Translate the small slice of filter fields the eval slim natively
- * serves into a WHERE fragment + params. Anything else MUST have been
- * rejected by `pickAnalyticsTable` already.
+ * The eval slim serves no filter fields: its Attributes carry only the
+ * evaluation events' own metadata, never the trace's, so `pickAnalyticsTable`
+ * routes every filtered query to `evaluation_runs`. A filter reaching here is
+ * a routing bug.
  */
 function buildEvalSlimFilterClauses(
   filters: AnalyticsTimeseriesBuilderInput["filters"],
 ): { whereClause: string; params: Record<string, unknown> } {
-  if (!filters) return { whereClause: "", params: {} };
-
-  const clauses: string[] = [];
-  const params: Record<string, unknown> = {};
-  let paramIdx = 0;
-  const next = (prefix: string) => `evalslim_${prefix}_${paramIdx++}`;
-
-  for (const [rawField, rawValue] of Object.entries(filters)) {
-    if (!hasFilterValues(rawValue)) continue;
-    const field = rawField as FilterField;
-
-    switch (field) {
-      case "metadata.key": {
-        const keys = collectStringValues(rawValue);
-        if (keys.length === 0) break;
-        const exprs = keys.map((k, i) => {
-          const p = next(`metaKey${i}`);
-          params[p] = k;
-          return `mapContains(${ea}.Attributes, {${p}:String})`;
-        });
-        clauses.push(`(${exprs.join(" OR ")})`);
-        break;
-      }
-      case "metadata.value": {
-        if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
-        for (const [metaKey, vals] of Object.entries(rawValue)) {
-          if (!Array.isArray(vals) || vals.length === 0) continue;
-          const pKey = next("metaValueKey");
-          params[pKey] = metaKey;
-          const pVals = next("metaValueVals");
-          params[pVals] = vals;
-          clauses.push(
-            `${ea}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`,
-          );
-        }
-        break;
-      }
-      default:
-        throw new Error(
-          `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
-        );
-    }
+  for (const [field, value] of Object.entries(filters ?? {})) {
+    if (!hasFilterValues(value)) continue;
+    throw new Error(
+      `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
+    );
   }
-
-  const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
-  return { whereClause, params };
+  return { whereClause: "", params: {} };
 }
 
 /**
@@ -303,7 +277,11 @@ export function buildEvalSlimTimeseriesQuery(
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
-    FROM ${dedupedSlim(ea, SLIM_DATE_FILTER_BOTH_PERIODS)}
+    FROM ${dedupedSlim({
+      alias: ea,
+      dateClause: SLIM_DATE_FILTER_BOTH_PERIODS,
+      expressions: selectExprs,
+    })}
     WHERE ${ea}.TenantId = {tenantId:String}
       AND (
         (${ea}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ea}.OccurredAt < {currentEnd:DateTime64(3)})

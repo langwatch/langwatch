@@ -14,6 +14,7 @@ import {
   CONNECTION_ACTIVATED_EVENT_TYPE,
   CONNECTION_ARRIVAL_POLICY_SET_EVENT_TYPE,
   CONNECTION_DISCARDED_EVENT_TYPE,
+  CONNECTION_IDP_UPDATED_EVENT_TYPE,
   CONNECTION_REGISTERED_EVENT_TYPE,
   CONNECTION_RENAMED_EVENT_TYPE,
   CONNECTION_RESUMED_EVENT_TYPE,
@@ -68,6 +69,7 @@ import {
   SET_ARRIVAL_POLICY_COMMAND_TYPE,
   type SelectMigrationRouteCommandData,
   type SetArrivalPolicyCommandData,
+  SSO_IDP_EDITABLE_STATES,
   SsoConnectionActivationBlockedError,
   SsoConnectionAlreadyRegisteredError,
   type SsoConnectionCommandType,
@@ -88,6 +90,8 @@ import {
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SuspendConnectionCommandData,
   TEARDOWN_REQUESTED_EVENT_TYPE,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  type UpdateConnectionIdpCommandData,
   VERIFICATION_REQUESTED_EVENT_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
@@ -243,6 +247,9 @@ const ALLOWED_FROM: Record<
     "SUSPENDED",
     "TEARDOWN_PENDING",
   ],
+  // Shared with the settings card, so the Edit control and this guard
+  // cannot disagree about where it works.
+  [UPDATE_CONNECTION_IDP_COMMAND_TYPE]: SSO_IDP_EDITABLE_STATES,
 };
 
 export interface SsoConnectionGuardsDeps {
@@ -1296,6 +1303,68 @@ export class SsoConnectionGuards {
         data: {
           connectionId: data.connectionId,
           name,
+          actor: data.actor,
+          source: data.source,
+        },
+      },
+    ];
+  }
+
+  /**
+   * The identity provider's dialing information, replaced on the same
+   * connection id, so the redirect address registered at the provider, the
+   * domains and their proofs, the arrival policy and the linked accounts all
+   * stay.
+   *
+   * The new values were already checked (discovery, metadata) and stored by
+   * the caller; this decides only whether the connection may take them.
+   * A grandfathered connection is refused: it dials the deployment's legacy
+   * provider and has no settings of its own to replace. The protocol cannot
+   * change either, because the engine row, the service provider details the
+   * customer copied and the sign-in path all depend on it.
+   *
+   * Settings identical to the current ones cost no fact.
+   */
+  async updateConnectionIdp(
+    data: UpdateConnectionIdpCommandData,
+  ): Promise<SsoConnectionFactInput[]> {
+    const state = await this.require(data, UPDATE_CONNECTION_IDP_COMMAND_TYPE);
+    if (state.source !== "self-serve") {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId} is grandfathered and has no identity provider settings to replace`,
+      );
+    }
+    const { idp } = data;
+    const fitsProtocol =
+      state.type === "oidc"
+        ? idp.issuer !== null &&
+          idp.clientIdRef !== null &&
+          idp.secretRef !== null &&
+          idp.certRefs.length === 0
+        : idp.clientIdRef === null &&
+          idp.secretRef === null &&
+          idp.certRefs.length === 1;
+    if (!fitsProtocol) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${data.connectionId} speaks ${state.type}; the protocol cannot change on an existing connection`,
+      );
+    }
+    const current = state.idpMetadata;
+    if (
+      current.issuer === idp.issuer &&
+      current.clientIdRef === idp.clientIdRef &&
+      current.secretRef === idp.secretRef &&
+      current.certRefs.length === idp.certRefs.length &&
+      current.certRefs.every((ref, index) => ref === idp.certRefs[index])
+    ) {
+      return [];
+    }
+    return [
+      {
+        type: CONNECTION_IDP_UPDATED_EVENT_TYPE,
+        data: {
+          connectionId: data.connectionId,
+          idp,
           actor: data.actor,
           source: data.source,
         },

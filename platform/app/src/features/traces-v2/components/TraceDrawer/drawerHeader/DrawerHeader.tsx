@@ -68,6 +68,7 @@ import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
 import { EditableTraceName } from "./EditableTraceName";
+import { MemberProjectChip } from "./MemberProjectChip";
 import { MetricPill } from "./MetricPill";
 import {
   type CategorizedPin,
@@ -1022,6 +1023,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             />
           )}
           <StatusChip trace={trace} statusColor={statusColor} />
+          <MemberProjectChip />
           <SyntheticTraceBadge attributes={trace.attributes} />
         </HStack>
 

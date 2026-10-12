@@ -18,13 +18,18 @@ const mockGetFacetValues = vi.fn();
 const mockGetAllTracesForProject = vi.fn();
 const mockGetById = vi.fn();
 
-vi.mock("~/server/app-layer/app", () => {
+vi.mock("~/server/app-layer/app", async () => {
+  const { ownProof } = await import("~/test-utils/authorizationProofs");
   const app = () => ({
     traces: {
       list: {
         getDiscover: mockGetDiscover,
         getFacetValues: mockGetFacetValues,
       },
+    },
+    authorization: {
+      authorizeInternal: async ({ projectId }: { projectId: string }) =>
+        ownProof({ projectId }),
     },
   });
   return { getApp: app, tryGetApp: app };
@@ -153,6 +158,16 @@ describe("GET /facets", () => {
       expect(body.facets[0]?.topValues).toHaveLength(1);
       expect(body.pending).toBe(false);
       expect(mockGetFacetValues).not.toHaveBeenCalled();
+    });
+
+    it("reads through a proof fenced to the key's own project", async () => {
+      await facets();
+      const { authorization } = mockGetDiscover.mock.calls[0]?.[0] as {
+        authorization: { grants: { projectId?: string; kind: string }[] };
+      };
+      expect(authorization.grants).toEqual([
+        expect.objectContaining({ projectId: "project-123", kind: "own" }),
+      ]);
     });
 
     it("defaults the window to the last day", async () => {

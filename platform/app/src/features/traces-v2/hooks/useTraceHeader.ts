@@ -27,6 +27,7 @@ export function useTraceHeaderCanonical() {
   const { isLive, isReady, queryArgs } = useTraceQueryArgs();
   const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
   const backfillOccurredAtMs = useDrawerStore((s) => s.backfillOccurredAtMs);
+  const backfillTenantId = useDrawerStore((s) => s.backfillTenantId);
   // SSE-aware polling: when `useTraceFreshness` has an active
   // subscription, `trace_summary_updated` events invalidate this query
   // push-style and any timer is redundant. The prompt-pending fallback
@@ -90,6 +91,19 @@ export function useTraceHeaderCanonical() {
       backfillOccurredAtMs(resolvedTimestamp);
     }
   }, [occurredAtMs, resolvedTimestamp, backfillOccurredAtMs]);
+
+  // The same backfill for the owning member: a deep link into an aggregate
+  // carries no member, the header's summary read picks one, and the drawer's
+  // other reads follow it rather than each picking again (ADR-144 block F).
+  const resolvedTenantId =
+    query.data?.traceId === queryArgs.traceId
+      ? query.data.projectId
+      : undefined;
+  useEffect(() => {
+    if (resolvedTenantId && resolvedTenantId !== queryArgs.projectId) {
+      backfillTenantId(resolvedTenantId);
+    }
+  }, [resolvedTenantId, queryArgs.projectId, backfillTenantId]);
 
   if (shared)
     return asSharedQueryResult(shared.header) as unknown as typeof query;

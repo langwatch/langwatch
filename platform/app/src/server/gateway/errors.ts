@@ -476,3 +476,21 @@ export class GatewayBudgetCycleAnchorInvalidError extends HandledError {
     this.name = "GatewayBudgetCycleAnchorInvalidError";
   }
 }
+
+/**
+ * A key named an aggregate project as its trace destination (ADR-144). An
+ * aggregate reads its member projects through grants and owns no traces, so
+ * nothing is ever sent to it; the key must name one of the members instead.
+ */
+export class GatewayTraceProjectNotADestinationError extends HandledError {
+  declare readonly code: "gateway_trace_project_not_a_destination";
+
+  constructor() {
+    super(
+      "gateway_trace_project_not_a_destination",
+      "That project reads traces from other projects and does not receive traces of its own",
+      { httpStatus: 400, fault: "customer" },
+    );
+    this.name = "GatewayTraceProjectNotADestinationError";
+  }
+}

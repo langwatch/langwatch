@@ -57,9 +57,14 @@ export const createSaaSPlanProvider = (db: PrismaClient): SaaSPlanProvider => {
       // is not a plan anyone bought. Answering Enterprise here would hand a
       // deployment that reached this line by mistake every entitlement the
       // top tier carries, signed webhook delivery included.
+      // The creation caps are cloud Free policy, so they are dropped here too:
+      // self-hosted is uncapped with or without a license.
       if (!env.IS_SAAS) {
         return {
           ...getFreePlanLimits(),
+          maxScenarios: undefined,
+          maxScenarioSets: undefined,
+          maxEvaluators: undefined,
           overrideAddingLimitations,
         };
       }

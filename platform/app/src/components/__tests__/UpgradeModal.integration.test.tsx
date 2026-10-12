@@ -119,6 +119,36 @@ describe("<UpgradeModal />", () => {
       expect(onClose).toHaveBeenCalled();
     });
 
+    /** @scenario The upgrade modal names the cap that was reached */
+    it("names the cloud Free scenario cap with the real counts", () => {
+      renderWithProviders(
+        <UpgradeModal
+          open={true}
+          onClose={onClose}
+          variant={{
+            mode: "limit",
+            limitType: "scenarios",
+            current: 3,
+            max: 3,
+          }}
+        />,
+      );
+
+      expect(
+        screen.getAllByText(
+          "You've reached the limit of 3 scenarios on your current plan.",
+        ).length,
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText("Current usage: 3 / 3").length,
+      ).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText(/everything you already have keeps working/i)
+          .length,
+      ).toBeGreaterThan(0);
+      expect(screen.queryByText(/disable a membership/i)).toBeNull();
+    });
+
     it("omits the current-usage line when max is not a finite number", () => {
       const unlimitedVariant: UpgradeModalVariant = {
         mode: "limit",

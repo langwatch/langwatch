@@ -22,6 +22,15 @@ export type PlanInfo = {
   maxMembers: number;
   maxMembersLite: number;
   maxMessagesPerMonth: number;
+  /**
+   * Creation caps for scenarios, simulations (distinct scenario sets) and
+   * custom evaluators. Only the cloud Free plan sets them. Absent means
+   * uncapped, which is every paid cloud plan and every self-hosted plan, with
+   * or without a license. They are never read from a signed license.
+   */
+  maxScenarios?: number;
+  maxScenarioSets?: number;
+  maxEvaluators?: number;
   canPublish: boolean;
   /**
    * Webhook endpoints platform (signed outbound event delivery). An

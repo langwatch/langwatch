@@ -1280,10 +1280,7 @@ export const automationRouter = createTRPCRouter({
           : null;
       if (filterQuery !== null) {
         try {
-          translateFilterToClickHouse(filterQuery, input.projectId, {
-            from: 0,
-            to: 0,
-          });
+          translateFilterToClickHouse(filterQuery, { from: 0, to: 0 });
         } catch (err) {
           throw new TRPCError({
             code: "BAD_REQUEST",

@@ -8,10 +8,11 @@
  */
 
 import type { AuthzPermission as Permission } from "@langwatch/authz";
-import { ValidationError } from "@langwatch/handled-error";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
+import { AnnotationService } from "~/server/annotations/annotation.service";
 import {
   ANNOTATION_ANCHOR_SCOPES,
   type AnnotationAnchorScope,
@@ -195,23 +196,22 @@ secured.access(annotationsManageAuth).delete("/annotations/:id", async (c) => {
 
   try {
     const annotationId = c.req.param("id");
-    await prisma.annotation.delete({
-      where: { id: annotationId, projectId: project.id },
+    await AnnotationService.create({ prisma }).delete({
+      id: annotationId,
+      projectId: project.id,
     });
     markUsed();
     return c.json({ status: "success", message: "Annotation deleted." });
   } catch (e) {
+    // A refusal the caller can act on (unknown id → 404) goes to the app's
+    // error handler as-is. Anything else is ours: log it, and keep the
+    // database's own message out of the response.
+    if (HandledError.isHandled(e)) throw e;
     logger.error(
       { error: e, projectId: project.id },
       "error deleting annotation",
     );
-    return c.json(
-      {
-        status: "error",
-        message: e instanceof Error ? e.message : "ID not found.",
-      },
-      500,
-    );
+    return c.json({ status: "error", message: "Internal server error." }, 500);
   }
 });
 
@@ -363,15 +363,16 @@ secured
         );
       }
 
-      const addAnnotation = await prisma.annotation.create({
-        data: {
-          id: nanoid(),
-          comment,
-          projectId: project.id,
-          isThumbsUp,
-          traceId: trace,
-          email,
-        },
+      const addAnnotation = await AnnotationService.create({ prisma }).create({
+        id: nanoid(),
+        projectId: project.id,
+        traceId: trace,
+        userId: null,
+        email,
+        comment,
+        isThumbsUp,
+        scoreOptions: null,
+        expectedOutput: null,
       });
 
       markUsed();

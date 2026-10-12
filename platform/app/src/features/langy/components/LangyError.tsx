@@ -1,5 +1,5 @@
 import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
-import { AlertCircle, ChevronRight, RotateCcw } from "lucide-react";
+import { AlertCircle, ChevronRight, RotateCcw, Settings } from "lucide-react";
 import { useState } from "react";
 import { LangyCard } from "~/features/asaplangy";
 import { useLangyDevMode } from "../hooks/useLangyDevMode";
@@ -7,6 +7,9 @@ import type {
   LangyErrorPresentation,
   LangySerializedReason,
 } from "../logic/langyErrorExplainer";
+
+/** Where a provider's key, endpoint, deployments and default models are edited. */
+export const MODEL_PROVIDERS_SETTINGS_HREF = "/settings/model-providers";
 
 // The retry sits behind the same restrained warm hairline the accent cards use
 // (asaplangy CARD.accentBorder) — the accent is present on the action, calm
@@ -41,19 +44,45 @@ export function LangyError({
 }) {
   if (presentation.render === "suppress") return null;
 
-  const action = presentation.action ? (
-    <Button
-      size="xs"
-      variant="outline"
-      borderColor={CALM_ACCENT_BORDER}
-      color="orange.fg"
-      fontWeight="560"
-      onClick={() => onAction?.(presentation.action!.kind)}
-    >
-      <RotateCcw size={12} aria-hidden="true" />
-      {presentation.action.label}
-    </Button>
-  ) : null;
+  // The settings action is a real link, so it says where it goes, opens in a
+  // new tab on request, and still works on a surface that passes no handler.
+  // A caller that does handle it (the panel, which moves without unmounting)
+  // takes over the click.
+  const action =
+    presentation.action?.kind === "configure-model" ? (
+      <Button
+        size="xs"
+        variant="outline"
+        borderColor={CALM_ACCENT_BORDER}
+        color="orange.fg"
+        fontWeight="560"
+        asChild
+      >
+        <a
+          href={MODEL_PROVIDERS_SETTINGS_HREF}
+          onClick={(event) => {
+            if (!onAction || isModifiedClick(event)) return;
+            event.preventDefault();
+            onAction("configure-model");
+          }}
+        >
+          <Settings size={12} aria-hidden="true" />
+          {presentation.action.label}
+        </a>
+      </Button>
+    ) : presentation.action ? (
+      <Button
+        size="xs"
+        variant="outline"
+        borderColor={CALM_ACCENT_BORDER}
+        color="orange.fg"
+        fontWeight="560"
+        onClick={() => onAction?.(presentation.action!.kind)}
+      >
+        <RotateCcw size={12} aria-hidden="true" />
+        {presentation.action.label}
+      </Button>
+    ) : null;
 
   if (presentation.render === "inline") {
     // The quietest error: an activity-weight line beside the message, rust dot,
@@ -237,6 +266,23 @@ function ErrorDetails({
         </VStack>
       ) : null}
     </VStack>
+  );
+}
+
+/** A click the browser should handle itself: a new tab, a new window, a download. */
+function isModifiedClick(event: {
+  button: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+}): boolean {
+  return (
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
   );
 }
 

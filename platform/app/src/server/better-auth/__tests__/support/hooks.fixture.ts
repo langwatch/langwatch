@@ -52,11 +52,15 @@ export const hooksOver = ({
   arrivalConnection = null,
   arrivalOrganization = null,
   governingConnectionId = null,
+  governingMethodId,
 }: {
   user?: DatabaseHookUser | null;
   organization?: LegacyOrganization | null;
   /** The connection the ROUTER says governs the address, or null for none. */
   governingConnectionId?: string | null;
+  /** The method the router dials for it. Omitted, it is the connection's own
+   *  id, the self-serve shape; `auth0` is the grandfathered one. */
+  governingMethodId?: string;
   accountCount?: number;
   federationAllowed?: boolean;
   memberships?: number;
@@ -88,7 +92,10 @@ export const hooksOver = ({
     .mockResolvedValue(
       governingConnectionId === null
         ? null
-        : { connectionId: governingConnectionId },
+        : {
+            connectionId: governingConnectionId,
+            methodId: governingMethodId ?? governingConnectionId,
+          },
     );
   const accounts = {
     countForUser: vi.fn().mockResolvedValue(accountCount),
@@ -106,7 +113,7 @@ export const hooksOver = ({
       occurredAtMs: 1_756_000_000_000,
       state: "pending",
     };
-    return "created" as const;
+    return { outcome: "created", seat: "MEMBER" } as const;
   });
   const applyPendingInvite = vi.fn().mockResolvedValue(pendingInvite);
   const requestFromSsoArrival = vi.fn().mockResolvedValue(null);

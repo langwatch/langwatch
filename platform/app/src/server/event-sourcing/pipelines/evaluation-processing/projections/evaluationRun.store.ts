@@ -3,15 +3,36 @@ import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import {
+  type FoldReadAuthorizer,
+  foldReadPurpose,
+} from "../../trace-processing/projections/foldReadAuthorization";
 
 /**
  * Thin FoldProjectionStore adapter for evaluation runs.
  * Delegates directly to EvaluationRunRepository (no mapper needed — projection uses camelCase types).
+ *
+ * Writes name the tenant from the store context. The read-back is fenced by
+ * a proof (ADR-144 block F): the store asks `authorize` for an own-only one
+ * on the context's tenant, the way the trace summary store does, so the fold
+ * reads back exactly the row it wrote.
  */
 export class EvaluationRunStore
   implements FoldProjectionStore<EvaluationRunData>
 {
-  constructor(private readonly repo: EvaluationRunRepository) {}
+  private readonly repo: EvaluationRunRepository;
+  private readonly authorize: FoldReadAuthorizer;
+
+  constructor({
+    repository,
+    authorize,
+  }: {
+    repository: EvaluationRunRepository;
+    authorize: FoldReadAuthorizer;
+  }) {
+    this.repo = repository;
+    this.authorize = authorize;
+  }
 
   async store(
     state: EvaluationRunData,
@@ -62,7 +83,10 @@ export class EvaluationRunStore
     context: ProjectionStoreContext,
   ): Promise<EvaluationRunData | null> {
     return await this.repo.getByEvaluationId({
-      tenantId: String(context.tenantId),
+      authorization: await this.authorize({
+        projectId: String(context.tenantId),
+        purpose: foldReadPurpose({ context, entry: "EvaluationRunStore.get" }),
+      }),
       evaluationId: aggregateId,
     });
   }

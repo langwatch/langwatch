@@ -133,4 +133,56 @@ describe("DataPrivacyPolicyCache", () => {
       expect(cacheSet).toHaveBeenCalledWith("project_1", null);
     });
   });
+
+  describe("when several reads of one project miss the cache at once", () => {
+    it("resolves it from the repository once and answers every read", async () => {
+      cacheGet.mockResolvedValue(undefined);
+      const cache = buildCache();
+
+      const answers = await Promise.all([
+        cache.resolve("project_1"),
+        cache.resolve("project_1"),
+        cache.resolve("project_1"),
+      ]);
+
+      expect(answers).toEqual([null, null, null]);
+      expect(repository.getProjectScopeFacts).toHaveBeenCalledTimes(1);
+    });
+
+    it("resolves different projects separately", async () => {
+      cacheGet.mockResolvedValue(undefined);
+      const cache = buildCache();
+
+      await Promise.all([
+        cache.resolve("project_1"),
+        cache.resolve("project_2"),
+      ]);
+
+      expect(repository.getProjectScopeFacts).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when a project is invalidated while its read is in flight", () => {
+    it("starts a fresh resolution for the next read", async () => {
+      cacheGet.mockResolvedValue(undefined);
+      const cache = buildCache();
+
+      const first = cache.resolve("project_1");
+      cache.invalidate("project_1");
+      await Promise.all([first, cache.resolve("project_1")]);
+
+      expect(repository.getProjectScopeFacts).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("when a resolution fails", () => {
+    it("lets the next read try again", async () => {
+      cacheGet.mockResolvedValue(undefined);
+      repository.getProjectScopeFacts.mockRejectedValueOnce(new Error("down"));
+      const cache = buildCache();
+
+      await expect(cache.resolve("project_1")).rejects.toThrow("down");
+      await expect(cache.resolve("project_1")).resolves.toBeNull();
+    });
+  });
 });

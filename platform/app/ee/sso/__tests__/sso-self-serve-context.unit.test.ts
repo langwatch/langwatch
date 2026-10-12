@@ -26,7 +26,7 @@ function resolverFor({
     } as unknown as FeatureFlagService,
     licenseProof: { currentLicenseKey: async () => null },
     isHosted: () => hosted,
-    licensedAtStartup: async () => true,
+    licenseGate: async () => true,
     licenseAuthority: new LicenseDomainClaimAuthority({
       isHosted: () => hosted,
       organizations: organizationsCounted(organizations),

@@ -18,6 +18,8 @@ import { ValidationError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 import {
   startTestContainers,
   stopTestContainers,
@@ -26,7 +28,6 @@ import {
   deriveUnmappedCostSuggestion,
   previewCostRuleMatchingSpans,
 } from "../model-cost-span-preview.service";
-import { SpanStorageClickHouseRepository } from "../repositories/span-storage.clickhouse.repository";
 import { createCostEnrichmentDeps } from "../span-cost-enrichment.service";
 import { SpanStorageService } from "../span-storage.service";
 
@@ -118,9 +119,7 @@ function makeTraceSummaryRow({
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  spans = new SpanStorageService(
-    new SpanStorageClickHouseRepository(async () => ch),
-  );
+  spans = new SpanStorageService(spanStorageRepositoryFor(async () => ch));
 
   await ch.insert({
     table: "trace_summaries",
@@ -264,6 +263,7 @@ describe("previewCostRuleMatchingSpans", () => {
     it("lists the matching model with sample spans, tokens, and an example cost", async () => {
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: "^bedrock/eu\\.anthropic\\.claude-sonnet-4-6$",
@@ -298,6 +298,7 @@ describe("previewCostRuleMatchingSpans", () => {
     it("reads token counts from the legacy prompt/completion attribute aliases", async () => {
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: "^eu\\.anthropic\\.claude-sonnet-4-6-v1:0$",
@@ -315,6 +316,7 @@ describe("previewCostRuleMatchingSpans", () => {
     it("returns no example cost when no rates were entered yet", async () => {
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: "^bedrock/eu\\.anthropic\\.claude-sonnet-4-6$",
@@ -329,6 +331,7 @@ describe("previewCostRuleMatchingSpans", () => {
       // misleading $0.00; the preview shows a dash instead.
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: "^gpt-5-mini$",
@@ -351,6 +354,7 @@ describe("previewCostRuleMatchingSpans", () => {
       // `anthropic/claude-sonnet-4-6` before matching, same as ingestion.
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: "anthropic/claude-sonnet-4-6",
@@ -366,6 +370,7 @@ describe("previewCostRuleMatchingSpans", () => {
     it("prefers the response model over the request model", async () => {
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: `^response-model-${ns}$`,
@@ -383,6 +388,7 @@ describe("previewCostRuleMatchingSpans", () => {
     it("excludes spans outside the preview window", async () => {
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: `^stale-model-${ns}$`,
@@ -397,6 +403,7 @@ describe("previewCostRuleMatchingSpans", () => {
     it("never includes another tenant's spans", async () => {
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: ".*",
@@ -411,6 +418,7 @@ describe("previewCostRuleMatchingSpans", () => {
     it("ranks token-bearing spans ahead of token-less ones in the sample list", async () => {
       const preview = await previewCostRuleMatchingSpans({
         spans,
+        authorization: ownProof({ projectId: tenantId }),
         input: {
           projectId: tenantId,
           regex: ".*",
@@ -434,6 +442,7 @@ describe("previewCostRuleMatchingSpans", () => {
       await expect(
         previewCostRuleMatchingSpans({
           spans,
+          authorization: ownProof({ projectId: tenantId }),
           input: {
             projectId: tenantId,
             // Deliberately catastrophic pattern (exponential backtracking):

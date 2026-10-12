@@ -1,3 +1,4 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
@@ -20,6 +21,8 @@ import {
   type ResolvedDataPrivacy,
 } from "~/server/data-privacy/dataPrivacy.types";
 import { getDataPrivacyPolicyService } from "~/server/data-privacy/dataPrivacyPolicy.service";
+import { policyProjectIdsOf } from "~/server/data-privacy/policyProjectIdsOf";
+import type { PrivacyPolicyRequestMemo } from "~/server/data-privacy/privacyPolicyRequestMemo";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_VISIBILITY_DAYS } from "../../../ee/licensing/constants";
@@ -206,13 +209,33 @@ function restrictLabelFor(
     : null;
 }
 
+/**
+ * What this viewer may see of a project's traces.
+ *
+ * The privacy policy is the strictest across the projects the read's proof
+ * names (ADR-144 decision 9): on an aggregate that is the aggregate's own
+ * policy and every member's, and on a proof narrowed to one member it is the
+ * aggregate's and that member's. A route that narrowed its proof passes it as
+ * `authorization`; otherwise the route's own proof on the context applies,
+ * and with none at all (a share link, a REST caller) the project's own
+ * policy does, as before. Who the viewer is (groups, team role, owner) is
+ * still read on the shown project, since that is the project they opened.
+ */
 export async function getUserProtectionsForProject(
   ctx: {
     prisma: PrismaClient;
     session: Session | null;
     publiclyShared?: boolean;
+    authorization?: Authorization;
+    privacyPolicyMemo?: PrivacyPolicyRequestMemo;
   },
-  { projectId }: { projectId: string } & Record<string, unknown>,
+  {
+    projectId,
+    authorization,
+  }: { projectId: string; authorization?: Authorization } & Record<
+    string,
+    unknown
+  >,
 ): Promise<Protections> {
   // Cost visibility follows the caller's own permission, never the fact that a
   // share link was presented. An anonymous viewer of a public link sees no
@@ -240,8 +263,12 @@ export async function getUserProtectionsForProject(
   let policy: ResolvedDataPrivacy = PLATFORM_DEFAULT_DATA_PRIVACY;
   if (process.env.LANGWATCH_DATA_PRIVACY_ENFORCEMENT !== "off") {
     try {
-      policy = await getDataPrivacyPolicyService().getResolvedForProject({
-        projectId,
+      policy = await getDataPrivacyPolicyService().getResolvedForProjects({
+        projectIds: policyProjectIdsOf({
+          projectId,
+          authorization: authorization ?? ctx.authorization,
+        }),
+        memo: ctx.privacyPolicyMemo,
       });
     } catch (error) {
       // Fail closed: a resolver/cache/db failure must not expose content that a

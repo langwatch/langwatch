@@ -11,6 +11,7 @@ import {
   LicenseEnforcementRepository,
 } from "./license-enforcement.repository";
 import type { MinimalUser } from "./license-enforcement.service";
+import { buildSeatLimitInfo, type SeatLimitInfo } from "./seat-limit";
 
 /** Threshold at which to show a warning (80% of limit) */
 export const MESSAGE_LIMIT_WARNING_THRESHOLD = 0.8;
@@ -112,7 +113,10 @@ export interface UsageStats {
   maxMonthlyUsageLimit: number;
   membersCount: number;
   membersLiteCount: number;
+  /** Developer seats (ADR-143): shown beside the metered seats, never capped. */
+  membersDeveloperCount: number;
   messageLimitInfo: MessageLimitInfo;
+  seatLimitInfo: SeatLimitInfo;
   usageUnit: UsageUnit;
 }
 
@@ -164,6 +168,7 @@ export class UsageStatsService {
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
+      membersDeveloperCount,
       usageUnit,
     ] = await Promise.all([
       this.traceUsageService.getCurrentMonthCountForDisplay({ organizationId }),
@@ -172,6 +177,7 @@ export class UsageStatsService {
       this.getMaxMonthlyUsageLimit(organizationId),
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
+      this.repository.getMembersDeveloperCount(organizationId),
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
@@ -196,6 +202,12 @@ export class UsageStatsService {
       activePlan.maxMessagesPerMonth,
     );
 
+    const seatLimitInfo = buildSeatLimitInfo({
+      plan: activePlan,
+      membersCount,
+      membersLiteCount,
+    });
+
     return {
       currentMonthMessagesCount: resolvedCount,
       currentMonthCost,
@@ -203,7 +215,9 @@ export class UsageStatsService {
       maxMonthlyUsageLimit,
       membersCount,
       membersLiteCount,
+      membersDeveloperCount,
       messageLimitInfo,
+      seatLimitInfo,
       usageUnit,
     };
   }

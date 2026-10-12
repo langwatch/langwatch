@@ -4,6 +4,7 @@ import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import {
   MenuContent,
   MenuItem,
@@ -49,6 +50,7 @@ export const LensTabs: React.FC = () => {
   const revertLens = useExplorerStore((s) => s.revertLens);
   const isDraft = useExplorerStore((s) => s.isDraft);
   const errorCount = useErrorCount();
+  const canSaveLenses = useProjectAcceptsWrites();
 
   const [pendingLensId, setPendingLensId] = useState<string | null>(null);
   // Save-as-new from the unsaved-changes prompt routes through the shared
@@ -268,7 +270,7 @@ export const LensTabs: React.FC = () => {
       <UnsavedLensDialog
         open={pendingLensId !== null}
         lensName={activeLens?.name ?? ""}
-        onSaveAsNew={resolvePendingSaveAsNew}
+        onSaveAsNew={canSaveLenses ? resolvePendingSaveAsNew : undefined}
         onDiscard={resolvePendingDiscard}
         onCancel={() => setPendingLensId(null)}
       />

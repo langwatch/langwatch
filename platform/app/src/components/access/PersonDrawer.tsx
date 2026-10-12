@@ -140,6 +140,11 @@ function PersonDetail({
                 Lite Member
               </Badge>
             ) : null}
+            {person.role === "DEVELOPER" ? (
+              <Badge colorPalette="teal" size="sm">
+                Developer
+              </Badge>
+            ) : null}
             {person.user.deactivatedAt ? (
               <Badge colorPalette="red" size="sm">
                 Deactivated

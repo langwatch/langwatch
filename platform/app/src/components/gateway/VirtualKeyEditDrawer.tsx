@@ -56,6 +56,7 @@ import {
   expiryIncompleteReason,
   resolveExpiresAt,
 } from "./virtualKeyExpiration";
+import { virtualKeyProjectOptions } from "./virtualKeyProjectOptions";
 import {
   parseTagsCsv,
   TAGS_CSV_MAX_LENGTH,
@@ -193,14 +194,7 @@ export function VirtualKeyEditDrawer({
     [organization?.teams],
   );
   const availableProjects = useMemo(
-    () =>
-      organization?.teams?.flatMap((t) =>
-        t.projects.map((p) => ({
-          id: p.id,
-          name: `${p.name} · ${t.name}`,
-          teamId: t.id,
-        })),
-      ) ?? [],
+    () => virtualKeyProjectOptions(organization?.teams),
     [organization?.teams],
   );
   const viewTracesHref = useMemo(

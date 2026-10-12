@@ -11,7 +11,7 @@
  * identifiers back has to be one rule consulted twice, because a rule that only
  * one engine knows about is a rule the other engine will undo.
  *
- * Two questions are asked, in this order.
+ * Three questions are asked, in this order.
  *
  *   1. Does the attribute NAME reserve it, AND does the value look like the
  *      address that name promises? A short list of trace and span identifier
@@ -19,7 +19,12 @@
  *      are not a protected namespace — the OTLP endpoint takes attributes as the
  *      caller wrote them — so the value still has to be hex or decimal before
  *      the name is allowed to turn the personal-data pass off.
- *   2. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
+ *   2. Is it the SPAN KIND attribute holding one of the known kinds? Each is a
+ *      fixed word (`agent`, `workflow`, `llm`, …) that cannot carry personal
+ *      data, but the name detector reads some of them as first names. The gate
+ *      is the exact list, not a shape, because anyone can write that key: a
+ *      name written under it is still analysed.
+ *   3. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
  *      digest, a ULID, a `prefix_<random>` record id. Nothing in such a value
  *      is personal data, so there is nothing for either engine to find.
  *      Exclusively: a value that merely CONTAINS one is prose, and prose is
@@ -44,11 +49,15 @@
  * fills in themselves — user, customer, thread and conversation identifiers.
  * Customers routinely put an email address or a full name in them, and a name on
  * the reserved list would mean storing that in the clear. They are covered by
- * question 2 like every other attribute: an opaque value is held back, personal
+ * question 3 like every other attribute: an opaque value is held back, personal
  * data is still redacted.
  */
 
-import { METADATA_SUBKEY_PREFIXES } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import {
+  ATTR_KEYS,
+  METADATA_SUBKEY_PREFIXES,
+} from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { spanTypesSchema } from "~/server/tracer/types";
 
 const HAS_LETTER = /[A-Za-z]/;
 const HAS_DIGIT = /\d/;
@@ -399,9 +408,34 @@ export function reservesModelOrToolName({
 }
 
 /**
+ * Whether this attribute is the span kind ({@link ATTR_KEYS.SPAN_TYPE})
+ * carrying one of the known kinds (`llm`, `tool`, `agent`, `workflow`, ...).
+ * The name/place pass reads some of those words as a first name, so under the
+ * strict level top-level spans stored `[PERSON]` as their kind and lost it in
+ * the trace view.
+ *
+ * Gated on the exact list ({@link spanTypesSchema}), not on shape: the name is
+ * not a namespace anyone owns, and a known kind is a fixed word that cannot
+ * carry personal data, so it is safe to hold back from every pass. Anything
+ * else written under this name is analysed as usual.
+ */
+export function reservesSpanType({
+  key,
+  value,
+}: {
+  key: string;
+  value: string;
+}): boolean {
+  return (
+    key.toLowerCase() === ATTR_KEYS.SPAN_TYPE &&
+    spanTypesSchema.safeParse(value).success
+  );
+}
+
+/**
  * Whether one attribute is held back from PII analysis altogether: reserved by
- * name as a trace address, or a value that is exclusively one opaque
- * identifier token.
+ * name as a trace address, a known span kind, or a value that is exclusively
+ * one opaque identifier token.
  *
  * A model or tool name is NOT held back here. It is still analysed for
  * everything except names and places ({@link reservesModelOrToolName}), so a
@@ -417,5 +451,9 @@ export function isHeldOutIdentifierAttribute({
   key: string;
   value: string;
 }): boolean {
-  return reservesTraceAddress({ key, value }) || isOpaqueIdentifierValue(value);
+  return (
+    reservesTraceAddress({ key, value }) ||
+    reservesSpanType({ key, value }) ||
+    isOpaqueIdentifierValue(value)
+  );
 }

@@ -13,8 +13,8 @@
  * host refuses as `connect_wrong_instance`.
  */
 
-import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { configuredSignedLicenseKey } from "../../configuredLicenseKey";
 import { licenseTokenFromKey } from "../../licenseToken";
 import { readConnectConfig } from "./connectConfig";
 import type { ConnectCredential } from "./connectTransport";
@@ -33,7 +33,7 @@ export async function resolveConnectCredential({
   });
   if (!organization) return null;
 
-  const licenseKey = organization.license ?? env.LANGWATCH_LICENSE_KEY ?? null;
+  const licenseKey = organization.license ?? configuredSignedLicenseKey();
   if (!licenseKey) return null;
 
   if (!readConnectConfig().permitted) return null;

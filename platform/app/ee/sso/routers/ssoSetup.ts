@@ -1,6 +1,9 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { auditLog } from "@ee/audit-log/auditLog";
-import { ssoIdpRegistrationSchema } from "@ee/sso/sso-idp-registration";
+import {
+  ssoIdpRegistrationSchema,
+  ssoIdpUpdateSchema,
+} from "@ee/sso/sso-idp-registration";
 import {
   ssoArrivalPolicySchema,
   ssoMigrationRouteSchema,
@@ -545,6 +548,49 @@ export const ssoSetupRouter = createTRPCRouter({
         organizationId: input.organizationId,
         connectionId: input.connectionId,
         name: input.name,
+        actor,
+      });
+    }),
+
+  /**
+   * The connection's current identity provider settings, for the edit form.
+   * `sso:manage` rather than `sso:view`: it carries the client id, which only
+   * the person who may change it needs. Never the client secret.
+   */
+  identityProvider: protectedProcedure
+    .input(connectionInput)
+    .permission("sso:manage")
+    .query(({ input }) =>
+      ssoSelfServe().getIdentityProvider({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+      }),
+    ),
+
+  /**
+   * Replace an existing connection's identity provider settings, keeping
+   * its id and therefore the redirect address registered at the provider.
+   *
+   * Gated like `register`, because these settings decide where sign-ins
+   * go. The audit row leaves the input out for the same reason too: it can
+   * carry a client secret.
+   */
+  updateIdentityProvider: enterpriseSsoProcedure
+    .input(connectionInput.extend({ idp: ssoIdpUpdateSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const actor = await audited({
+        ctx,
+        action: "updateIdentityProvider",
+        args: {
+          organizationId: input.organizationId,
+          connectionId: input.connectionId,
+          protocol: input.idp.protocol,
+        },
+      });
+      return ssoSelfServe().updateIdentityProvider({
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        idp: input.idp,
         actor,
       });
     }),

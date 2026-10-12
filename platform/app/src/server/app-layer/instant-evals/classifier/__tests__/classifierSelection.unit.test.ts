@@ -14,8 +14,11 @@ import { ConnectInstantEvalClassifier } from "@ee/licensing/connect/install/conn
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getInstantEvalClassifier,
+  instantEvalJudgeRoute,
   isInstantEvalClassifierAvailableForOrganization,
   isInstantEvalClassifierConfigured,
+  isInstantEvalLicensedForOrganization,
+  isSelfHostedJudgingThroughConnect,
   resetInstantEvalClassifier,
 } from "../index";
 import { JevInstantEvalClassifier } from "../jev.client";
@@ -87,6 +90,70 @@ describe("given an install with Connect switched off for an audit", () => {
         NullInstantEvalClassifier,
       );
       expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given an install with its own judge key and the release flag off", () => {
+  describe("when the access read asks whether the license releases Instant Evals", () => {
+    /** @scenario "An install with its own judge key still waits for the release flag" */
+    it("answers no without reading the organization, so the flag still decides", async () => {
+      env.JEV_API_KEY = "a key of this install's own";
+
+      expect(instantEvalJudgeRoute()).toBe("own_key");
+      await expect(
+        isInstantEvalLicensedForOrganization("any-organization"),
+      ).resolves.toBe(false);
+    });
+  });
+});
+
+describe("given an install that judges through LangWatch", () => {
+  describe("when the access read asks whether the license releases Instant Evals", () => {
+    /** @scenario "A license that names Instant Evals releases them without the flag" */
+    it("answers what the hosted classifier says the organization may use", async () => {
+      expect(instantEvalJudgeRoute()).toBe("connect");
+      const available = vi
+        .spyOn(
+          ConnectInstantEvalClassifier.prototype,
+          "isAvailableForOrganization",
+        )
+        .mockResolvedValue(true);
+
+      await expect(
+        isInstantEvalLicensedForOrganization("licensed-organization"),
+      ).resolves.toBe(true);
+      expect(available).toHaveBeenCalledWith("licensed-organization");
+      available.mockRestore();
+    });
+  });
+});
+
+describe("given the hosted service with no judge key of its own", () => {
+  describe("when the access read asks whether the license releases Instant Evals", () => {
+    it("answers no without reading the organization, since the hosted service has no license", async () => {
+      env.IS_SAAS = true;
+      const available = vi.spyOn(
+        ConnectInstantEvalClassifier.prototype,
+        "isAvailableForOrganization",
+      );
+
+      expect(isSelfHostedJudgingThroughConnect()).toBe(false);
+      await expect(
+        isInstantEvalLicensedForOrganization("any-organization"),
+      ).resolves.toBe(false);
+      expect(available).not.toHaveBeenCalled();
+      available.mockRestore();
+    });
+  });
+});
+
+describe("given an install with Connect switched off", () => {
+  describe("when the popover asks where the judge runs", () => {
+    it("says nothing can judge until Connect or a key is set", () => {
+      env.LANGWATCH_CONNECT_DISABLED = true;
+
+      expect(instantEvalJudgeRoute()).toBe("disconnected");
     });
   });
 });

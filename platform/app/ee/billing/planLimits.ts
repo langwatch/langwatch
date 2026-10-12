@@ -9,6 +9,20 @@ import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
  */
 export const UNLIMITED_MESSAGES = 999_999_999;
 
+/**
+ * Creation caps on the cloud Free plan. Paid plans leave them unset, which
+ * means uncapped. Organizations already above a cap keep what they have;
+ * only creating one more is refused.
+ */
+export const FREE_PLAN_CREATION_CAPS = {
+  maxScenarios: 3,
+  maxScenarioSets: 3,
+  maxEvaluators: 3,
+} as const satisfies Pick<
+  PlanInfo,
+  "maxScenarios" | "maxScenarioSets" | "maxEvaluators"
+>;
+
 const PAID_FEATURES = {
   maxMembersLite: 9999,
   canPublish: true,
@@ -77,6 +91,9 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     maxMembers: 2,
     maxMessagesPerMonth: 50_000,
     maxMembersLite: 0,
+    // Cloud Free only. Self-hosted resolves its plan from the license
+    // provider and never reads this table, so it stays uncapped.
+    ...FREE_PLAN_CREATION_CAPS,
     canPublish: true,
     prices: {
       USD: 0,

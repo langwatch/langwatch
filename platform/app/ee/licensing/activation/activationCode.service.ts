@@ -26,8 +26,8 @@ import {
   activationCodeHash,
   activationCodeHint,
   mintActivationCode,
-  normaliseActivationCode,
 } from "./activationCode";
+import { normaliseActivationCode } from "./activationCodeShape";
 import {
   type ActivationCodeRecord,
   type ActivationCodeRepository,

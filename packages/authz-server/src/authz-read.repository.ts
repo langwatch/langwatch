@@ -12,8 +12,11 @@ import type {
   ShareableResourceKind,
 } from "@langwatch/authz";
 
-/** OrganizationUser.role, or null when no membership row exists. */
-export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL";
+/**
+ * OrganizationUser.role, or null when no membership row exists. DEVELOPER is
+ * the seat ADR-143 adds: a personal team and nothing shared.
+ */
+export type OrganizationRole = "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
 
 /**
  * The membership row as stored: its role, and whether an admin has disabled

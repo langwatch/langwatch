@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ownProofAuthorizer } from "~/test-utils/authorizationProofs";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 import { createMockFoldProjectionStore } from "../../services/__tests__/testHelpers";
@@ -164,7 +165,10 @@ describe("fold projection contracts", () => {
     /** @scenario the redelivery watermark survives the write path */
     it("persists the applied-event-id watermark next to the row", async () => {
       const repo = makeRepo();
-      const store = new TraceAnalyticsStore(repo as never);
+      const store = new TraceAnalyticsStore({
+        repository: repo as never,
+        authorize: ownProofAuthorizer,
+      });
 
       await store.store(signalState(), context(["evt-1", "evt-2"]));
 
@@ -175,7 +179,10 @@ describe("fold projection contracts", () => {
     /** @scenario the watermark round-trips through the read-back */
     it("reads the same watermark back with the state", async () => {
       const repo = makeRepo();
-      const store = new TraceAnalyticsStore(repo as never);
+      const store = new TraceAnalyticsStore({
+        repository: repo as never,
+        authorize: ownProofAuthorizer,
+      });
       await store.store(signalState(), context(["evt-1"]));
       const writtenRow = (repo.upsert.mock.calls[0] as unknown[])[0];
       repo.findByTraceIdWithApplied.mockResolvedValue({
@@ -198,7 +205,10 @@ describe("fold projection contracts", () => {
     /** @scenario absence is authoritative because nothing is ever gated out */
     it("writes a dimension-only state too, flagged HasSignal=false", async () => {
       const repo = makeRepo();
-      const store = new TraceAnalyticsStore(repo as never);
+      const store = new TraceAnalyticsStore({
+        repository: repo as never,
+        authorize: ownProofAuthorizer,
+      });
 
       await store.store(dimensionOnlyState(), context());
 
@@ -211,7 +221,10 @@ describe("fold projection contracts", () => {
 
     it("flags a state with real telemetry HasSignal=true", async () => {
       const repo = makeRepo();
-      const store = new TraceAnalyticsStore(repo as never);
+      const store = new TraceAnalyticsStore({
+        repository: repo as never,
+        authorize: ownProofAuthorizer,
+      });
 
       await store.store(signalState(), context());
 

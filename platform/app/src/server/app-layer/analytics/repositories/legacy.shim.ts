@@ -31,6 +31,7 @@ import type { TimeseriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { tenantAnalyticsLimiter } from "~/server/clickhouse/tenantStatementLimit";
 import { AnalyticsClientUnavailableError } from "../errors";
 import { adjustTimeScaleForBucketCap } from "../query-builders/_shared";
 import type { TimeseriesReadOptions } from "../types";
@@ -76,7 +77,7 @@ export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
       endDate,
     });
 
-    const { sql, params } = buildTimeseriesQuery({
+    const { sql, params, settings } = buildTimeseriesQuery({
       projectId: input.projectId,
       startDate,
       endDate,
@@ -93,17 +94,23 @@ export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
     });
 
     try {
-      const result = await client.query({
-        query: sql,
-        query_params: params,
-        format: "JSONEachRow",
-        clickhouse_settings: {
-          ...ANALYTICS_CLICKHOUSE_SETTINGS,
-          log_comment: "analytics:timeseries:legacy-shim",
-          ...maxResultRowsSettings(options?.maxResultRows),
+      const rows = await tenantAnalyticsLimiter.run({
+        tenantId: input.projectId,
+        task: async () => {
+          const result = await client.query({
+            query: sql,
+            query_params: params,
+            format: "JSONEachRow",
+            clickhouse_settings: {
+              ...ANALYTICS_CLICKHOUSE_SETTINGS,
+              ...settings,
+              log_comment: "analytics:timeseries:legacy-shim",
+              ...maxResultRowsSettings(options?.maxResultRows),
+            },
+          });
+          return (await result.json()) as Array<Record<string, unknown>>;
         },
       });
-      const rows = (await result.json()) as Array<Record<string, unknown>>;
       return parseTimeseriesRows({
         rows,
         series: input.series,

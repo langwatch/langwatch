@@ -271,6 +271,49 @@ describe("drawerStore.backfillOccurredAtMs", () => {
   });
 });
 
+describe("drawerStore.tenantId", () => {
+  describe("given a row of an aggregate opens the drawer naming its member", () => {
+    describe("when the header later names a member", () => {
+      it("keeps the member the row named", () => {
+        useDrawerStore
+          .getState()
+          .openTrace("trace-1", 1_700_000_000_000, { tenantId: "member-a" });
+
+        useDrawerStore.getState().backfillTenantId("member-b");
+
+        expect(useDrawerStore.getState().tenantId).toBe("member-a");
+      });
+    });
+  });
+
+  describe("given a deep link opens the drawer naming no member", () => {
+    describe("when the header names the member it read", () => {
+      it("follows that member", () => {
+        useDrawerStore.getState().openTrace("trace-1");
+        expect(useDrawerStore.getState().tenantId).toBeNull();
+
+        useDrawerStore.getState().backfillTenantId("member-b");
+
+        expect(useDrawerStore.getState().tenantId).toBe("member-b");
+      });
+    });
+  });
+
+  describe("given another trace opens without a member", () => {
+    describe("when the drawer moves to it", () => {
+      it("drops the previous trace's member", () => {
+        useDrawerStore
+          .getState()
+          .openTrace("trace-1", null, { tenantId: "member-a" });
+
+        useDrawerStore.getState().openTrace("trace-2");
+
+        expect(useDrawerStore.getState().tenantId).toBeNull();
+      });
+    });
+  });
+});
+
 describe("drawerStore.closeDrawer", () => {
   describe("given an open trace drawer", () => {
     describe("when closeDrawer fires", () => {

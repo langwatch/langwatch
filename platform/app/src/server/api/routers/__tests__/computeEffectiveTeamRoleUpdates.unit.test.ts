@@ -93,6 +93,37 @@ describe("computeEffectiveTeamRoleUpdates()", () => {
     });
   });
 
+  describe("when new org role is DEVELOPER", () => {
+    /** @scenario Downgrading a Full member to Developer removes shared access */
+    it("computes no correction, because the repository deletes the rows instead", () => {
+      const result = computeEffectiveTeamRoleUpdates({
+        requestedTeamRoleUpdates: [],
+        currentMemberships: [
+          { teamId: "team-1", role: TeamUserRole.ADMIN },
+          { teamId: "team-2", role: TeamUserRole.VIEWER },
+        ],
+        newOrganizationRole: OrganizationUserRole.DEVELOPER,
+      });
+
+      expect(result).toEqual([]);
+    });
+
+    /** @scenario A Developer cannot be given a role on a shared team */
+    it("passes a requested team role through unchanged, for the repository to refuse by name", () => {
+      const result = computeEffectiveTeamRoleUpdates({
+        requestedTeamRoleUpdates: [
+          { teamId: "team-1", role: TeamUserRole.MEMBER },
+        ],
+        currentMemberships: [{ teamId: "team-1", role: TeamUserRole.ADMIN }],
+        newOrganizationRole: OrganizationUserRole.DEVELOPER,
+      });
+
+      expect(result).toEqual([
+        { teamId: "team-1", role: TeamUserRole.MEMBER, origin: "requested" },
+      ]);
+    });
+  });
+
   describe("when no requested updates are present", () => {
     describe("when new org role is EXTERNAL", () => {
       /** @scenario All team assignments respect Lite Member restrictions */

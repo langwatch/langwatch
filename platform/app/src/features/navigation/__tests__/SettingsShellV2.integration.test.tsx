@@ -197,6 +197,11 @@ vi.mock("~/utils/api", () => ({
       mine: { useQuery: () => ({ data: undefined, isPending: false }) },
       dismissOffer: { useMutation: () => ({ mutate: vi.fn() }) },
       request: { useMutation: () => ({ mutate: vi.fn() }) },
+      admitAutomatically: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    invite: {
+      pendingForMe: { useQuery: () => ({ data: [], isPending: false }) },
+      acceptInvite: { useMutation: () => ({ mutate: vi.fn() }) },
     },
     useUtils: () => ({
       joinRequests: {

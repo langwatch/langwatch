@@ -14,6 +14,7 @@
  * reason for extracting it and has not been built, so this is one definition
  * with one consumer, not yet a shared one.
  */
+import type { Authorization } from "@langwatch/actor";
 import { getApp } from "~/server/app-layer/app";
 import { isInstantEvalField } from "./instantEvalChips";
 import { FIELD_VALUES, SEARCH_FIELDS } from "./metadata";
@@ -24,7 +25,8 @@ const DYNAMIC_VALUES_LIMIT = 20;
 const SAMPLES_SHOWN = 8;
 
 export interface FieldCatalogueInput {
-  projectId: string;
+  /** The proof the sample-value facet reads apply. */
+  authorization: Authorization;
   timeRange: { from: number; to: number };
 }
 
@@ -75,7 +77,7 @@ async function fetchDynamicCategoricalValues(
   const results = await Promise.allSettled(
     facetFields.map((facetKey) =>
       app.traces.list.getFacetValues({
-        tenantId: input.projectId,
+        authorization: input.authorization,
         timeRange: input.timeRange,
         facetKey,
         limit: DYNAMIC_VALUES_LIMIT,

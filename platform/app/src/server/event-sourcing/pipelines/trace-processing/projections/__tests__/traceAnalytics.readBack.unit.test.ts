@@ -3,6 +3,7 @@ import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/reposit
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import { ownProofAuthorizer } from "~/test-utils/authorizationProofs";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   projectAnalyticsStateToRow,
@@ -193,8 +194,11 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       .fn()
       .mockResolvedValue({ row, appliedEventIds: ["evt-1", "evt-2"] });
     const store = new TraceAnalyticsStore({
-      findByTraceIdWithApplied,
-    } as unknown as ConstructorParameters<typeof TraceAnalyticsStore>[0]);
+      repository: {
+        findByTraceIdWithApplied,
+      } as unknown as TraceAnalyticsRepository,
+      authorize: ownProofAuthorizer,
+    });
     return { store, findByTraceIdWithApplied };
   }
 
@@ -351,8 +355,11 @@ describe("TraceAnalyticsStore read-back version gate", () => {
       // rebuilt". Reporting a version rejection as `absent` spent the
       // window-fallback signal on a schema condition.
       const store = new TraceAnalyticsStore({
-        findByTraceIdWithApplied: vi.fn().mockResolvedValue(null),
-      } as unknown as ConstructorParameters<typeof TraceAnalyticsStore>[0]);
+        repository: {
+          findByTraceIdWithApplied: vi.fn().mockResolvedValue(null),
+        } as unknown as TraceAnalyticsRepository,
+        authorize: ownProofAuthorizer,
+      });
 
       const { state, miss } = await store.getWithApplied("trace-rb", context);
 
@@ -510,7 +517,10 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
       it("resumes the classification from the committed row instead of losing it", async () => {
         const { repo, rows } = recordingRepo();
         const fold = new TraceAnalyticsFoldProjection({
-          store: new TraceAnalyticsStore(repo),
+          store: new TraceAnalyticsStore({
+            repository: repo,
+            authorize: ownProofAuthorizer,
+          }),
         });
         // A loader that fails the test if the executor still replays history:
         // the whole point of the always-write row is that it never needs to.

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BindingMissingError } from "../../authz-grants.repository";
 import { type GrantFact } from "../facts";
 import {
+  grantConditionFromDb,
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
   grantFactToRow,
@@ -322,6 +323,60 @@ describe("compat share link mapping", () => {
       expect(
         grantFactToCompatShareLink({ grant: termless, organizationId: ORG }),
       ).toBeNull();
+    });
+  });
+});
+
+describe("shared grant condition (ADR-144)", () => {
+  const sharedFact = (): GrantFact =>
+    fact({
+      grantId: "grant_shared_1",
+      principal: { type: "project", id: "proj_aggregate" },
+      roleKey: "project-reader",
+      scope: { type: "PROJECT", id: "proj_member" },
+      source: "grants-service",
+      condition: { type: "trace", from: "2026-10-01T00:00:00.000Z" },
+    });
+
+  describe("when a shared fact is projected and read back", () => {
+    it("carries the condition through the row unchanged", () => {
+      const row = grantFactToRow({ grant: sharedFact(), organizationId: ORG });
+      expect(row.condition).toEqual({
+        type: "trace",
+        from: "2026-10-01T00:00:00.000Z",
+      });
+      expect(grantRowToFact(row)).toEqual(sharedFact());
+    });
+  });
+
+  describe("when an own fact is projected", () => {
+    it("leaves the condition absent and reads back without one", () => {
+      const row = grantFactToRow({ grant: fact(), organizationId: ORG });
+      expect(row).not.toHaveProperty("condition");
+      expect(grantRowToFact(row)).not.toHaveProperty("condition");
+    });
+  });
+
+  describe("when the stored column does not parse as a condition", () => {
+    it("treats it as no condition rather than widening the window", () => {
+      for (const stored of [
+        null,
+        "trace",
+        [],
+        { type: "metric" },
+        { type: "trace", from: 42 },
+        { type: "trace", where: { eq: 1 } },
+        // Strings the event wire would refuse: not ISO instants.
+        { type: "trace", from: "yesterday" },
+        { type: "trace", until: "2026-13-45" },
+        { type: "trace", from: "1760000000000" },
+      ]) {
+        expect(grantConditionFromDb(stored)).toBeUndefined();
+      }
+      expect(grantConditionFromDb({ type: "span", until: "2026-12-31T00:00:00Z" })).toEqual({
+        type: "span",
+        until: "2026-12-31T00:00:00Z",
+      });
     });
   });
 });

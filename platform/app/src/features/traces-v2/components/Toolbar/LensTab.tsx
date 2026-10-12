@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import {
   MenuContent,
   MenuContextTrigger,
@@ -157,6 +158,57 @@ const BuiltInTooltip: React.FC<BuiltInTooltipProps> = ({
 };
 
 /**
+ * The body of the unsaved-changes popover: what the changes are, and what can
+ * be done with them. Saving as a new lens is offered only where the project
+ * takes lens writes.
+ */
+const DraftDotOptions: React.FC<{
+  lensName: string;
+  canSaveLenses: boolean;
+  onDiscard: () => void;
+  onSaveAsNew: () => void;
+}> = ({ lensName, canSaveLenses, onDiscard, onSaveAsNew }) => (
+  <PopoverBody>
+    <Stack gap={3}>
+      <Text textStyle="sm" color="fg.muted" lineHeight="1.4">
+        You've changed columns, filters or sort on{" "}
+        <Text as="span" color="fg" fontWeight="semibold">
+          {lensName}
+        </Text>
+        .{" "}
+        {canSaveLenses
+          ? "These edits live in your browser only. Save them as a new lens to keep them, or discard to snap back."
+          : "These edits live in your browser only. Discard them to snap back."}
+      </Text>
+      <HStack gap={2} justify="flex-end">
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDiscard();
+          }}
+        >
+          Discard changes
+        </Button>
+        {canSaveLenses && (
+          <Button
+            size="xs"
+            colorPalette="orange"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSaveAsNew();
+            }}
+          >
+            Save as new lens
+          </Button>
+        )}
+      </HStack>
+    </Stack>
+  </PopoverBody>
+);
+
+/**
  * Orange dot marking a lens with unsaved local edits. Clicking the dot
  * opens a popover explaining "changes made" and offering Discard /
  * Save as new lens. Replaces the previous bare dot — which carried the
@@ -169,13 +221,20 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
 }) => {
   const revertLens = useExplorerStore((s) => s.revertLens);
   const createLens = useExplorerStore((s) => s.createLens);
+  // An aggregate project takes no lens writes (ADR-144): its dot still offers
+  // to discard the changes, but not to save them as a new lens.
+  const canSaveLenses = useProjectAcceptsWrites();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   return (
     <>
       <Tooltip
-        content="Unsaved changes. Click to discard or save as new lens."
+        content={
+          canSaveLenses
+            ? "Unsaved changes. Click to discard or save as new lens."
+            : "Unsaved changes. Click to discard them."
+        }
         positioning={{ placement: "bottom" }}
       >
         <Box display="inline-flex" marginLeft={0.5}>
@@ -228,53 +287,31 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
               />
             </PopoverTrigger>
             <PopoverContent width="280px">
-              <PopoverBody>
-                <Stack gap={3}>
-                  <Text textStyle="sm" color="fg.muted" lineHeight="1.4">
-                    You've changed columns, filters or sort on{" "}
-                    <Text as="span" color="fg" fontWeight="semibold">
-                      {lensName}
-                    </Text>
-                    . These edits live in your browser only. Save them as a new
-                    lens to keep them, or discard to snap back.
-                  </Text>
-                  <HStack gap={2} justify="flex-end">
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        revertLens(lensId);
-                        setPopoverOpen(false);
-                      }}
-                    >
-                      Discard changes
-                    </Button>
-                    <Button
-                      size="xs"
-                      colorPalette="orange"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPopoverOpen(false);
-                        setSaveDialogOpen(true);
-                      }}
-                    >
-                      Save as new lens
-                    </Button>
-                  </HStack>
-                </Stack>
-              </PopoverBody>
+              <DraftDotOptions
+                lensName={lensName}
+                canSaveLenses={canSaveLenses}
+                onDiscard={() => {
+                  revertLens(lensId);
+                  setPopoverOpen(false);
+                }}
+                onSaveAsNew={() => {
+                  setPopoverOpen(false);
+                  setSaveDialogOpen(true);
+                }}
+              />
             </PopoverContent>
           </PopoverRoot>
         </Box>
       </Tooltip>
-      <LensNameDialog
-        open={saveDialogOpen}
-        onOpenChange={setSaveDialogOpen}
-        title="Save changes as new lens"
-        defaultName={`${lensName} (copy)`}
-        onSubmit={(name) => createLens(name)}
-      />
+      {canSaveLenses && (
+        <LensNameDialog
+          open={saveDialogOpen}
+          onOpenChange={setSaveDialogOpen}
+          title="Save changes as new lens"
+          defaultName={`${lensName} (copy)`}
+          onSubmit={(name) => createLens(name)}
+        />
+      )}
     </>
   );
 };
@@ -351,6 +388,7 @@ const BuiltInLensMenuItems: React.FC<{
   const revertLens = useExplorerStore((s) => s.revertLens);
   const createLens = useExplorerStore((s) => s.createLens);
   const deleteLens = useExplorerStore((s) => s.deleteLens);
+  const canSaveLenses = useProjectAcceptsWrites();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   // "All" is the table's home base — if a user could dismiss it
@@ -362,14 +400,16 @@ const BuiltInLensMenuItems: React.FC<{
 
   return (
     <>
-      <MenuItem
-        value="save-as-new"
-        onClick={() => setSaveDialogOpen(true)}
-        fontWeight={isDraft ? "semibold" : undefined}
-      >
-        <LuFilePlus />
-        {isDraft ? "Save changes as new lens…" : "Save as new lens…"}
-      </MenuItem>
+      {canSaveLenses && (
+        <MenuItem
+          value="save-as-new"
+          onClick={() => setSaveDialogOpen(true)}
+          fontWeight={isDraft ? "semibold" : undefined}
+        >
+          <LuFilePlus />
+          {isDraft ? "Save changes as new lens…" : "Save as new lens…"}
+        </MenuItem>
+      )}
       <MenuItem
         value="revert"
         onClick={() => revertLens(lensId)}
@@ -379,6 +419,8 @@ const BuiltInLensMenuItems: React.FC<{
         Revert local changes
       </MenuItem>
       <MenuSeparator />
+      {/* Hiding a built-in lens is kept in this browser, never on the
+          server, so it stays available on an aggregate project. */}
       <MenuItem
         value="delete"
         onClick={() => !isUndeletable && canDelete && deleteLens(lensId)}
@@ -411,7 +453,21 @@ const UserLensMenuItems: React.FC<{
   const createLens = useExplorerStore((s) => s.createLens);
   const duplicateLens = useExplorerStore((s) => s.duplicateLens);
   const deleteLens = useExplorerStore((s) => s.deleteLens);
+  const canSaveLenses = useProjectAcceptsWrites();
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+
+  if (!canSaveLenses) {
+    return (
+      <MenuItem
+        value="revert"
+        onClick={() => revertLens(lensId)}
+        disabled={!isDraft}
+      >
+        <LuUndo2 />
+        Revert local changes
+      </MenuItem>
+    );
+  }
 
   return (
     <>

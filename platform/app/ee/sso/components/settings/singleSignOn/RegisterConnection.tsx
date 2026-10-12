@@ -41,7 +41,7 @@ import { ServiceProviderDetails } from "./ServiceProviderDetails";
  * addresses, bring back what it hands you.
  */
 
-interface RegisterForm {
+export interface RegisterForm {
   providerId: string;
   issuer: string;
   clientId: string;
@@ -52,7 +52,7 @@ interface RegisterForm {
   certificate: string;
 }
 
-const EMPTY_FORM: RegisterForm = {
+export const EMPTY_FORM: RegisterForm = {
   providerId: "",
   issuer: "",
   clientId: "",
@@ -63,7 +63,7 @@ const EMPTY_FORM: RegisterForm = {
   certificate: "",
 };
 
-type UpdateField = (key: keyof RegisterForm) => (value: string) => void;
+export type UpdateField = (key: keyof RegisterForm) => (value: string) => void;
 
 /**
  * The identity-provider half of the form, in the shape the command takes.
@@ -301,6 +301,15 @@ function ProviderPicker({
   );
 }
 
+function consolePathFor(
+  preset: IdentityProviderPreset,
+  protocol: SsoProtocol,
+): string | null {
+  return protocol === "saml" && preset.samlConsolePath
+    ? preset.samlConsolePath
+    : preset.consolePath;
+}
+
 /** Act two: their console's side — where to create the app, and the
  *  addresses to hand it, scoped to the protocol in play. */
 function ProviderConsoleAct({
@@ -321,8 +330,8 @@ function ProviderConsoleAct({
             : `Set it up in ${preset.name}`}
         </Heading>
         <Text color="fg.muted" fontSize="sm">
-          {preset.consolePath
-            ? `In ${preset.name}, create the app under ${preset.consolePath}, and give it these addresses when it asks.`
+          {consolePathFor(preset, protocol)
+            ? `In ${preset.name}, create the app under ${consolePathFor(preset, protocol)}, and give it these addresses when it asks.`
             : "Create an app for LangWatch in your identity provider, and give it these addresses when it asks."}
         </Text>
       </VStack>
@@ -427,14 +436,17 @@ function CredentialsAct({
   );
 }
 
-function OidcFields({
+export function OidcFields({
   preset,
   form,
   update,
+  secretHint,
 }: {
   preset: IdentityProviderPreset;
   form: RegisterForm;
   update: UpdateField;
+  /** Shown under the secret when a blank one keeps the stored secret. */
+  secretHint?: string;
 }) {
   return (
     <>
@@ -445,6 +457,9 @@ function OidcFields({
           value={form.issuer}
           onChange={(event) => update("issuer")(event.target.value)}
         />
+        {preset.issuerHint && (
+          <Field.HelperText>{preset.issuerHint}</Field.HelperText>
+        )}
       </Field.Root>
       <Field.Root>
         <Field.Label>Client id</Field.Label>
@@ -460,12 +475,13 @@ function OidcFields({
           value={form.clientSecret}
           onChange={(event) => update("clientSecret")(event.target.value)}
         />
+        {secretHint && <Field.HelperText>{secretHint}</Field.HelperText>}
       </Field.Root>
     </>
   );
 }
 
-function SamlFields({
+export function SamlFields({
   preset,
   form,
   update,

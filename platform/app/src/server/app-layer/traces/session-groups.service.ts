@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/actor";
+import { ownProjectIdOf } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { withHiddenOrigins } from "./hidden-origins";
 import type {
   SessionGroupRow,
@@ -98,6 +100,8 @@ export interface SessionGroupCodingAgentDto {
 
 export interface SessionGroupDto {
   conversationId: string;
+  /** The project the session belongs to; on an aggregate, the member. */
+  projectId: string;
   traceCount: number;
   totalCost: number;
   totalTokens: number;
@@ -135,7 +139,8 @@ export interface SessionGroupsResult {
 }
 
 interface SessionGroupsParams {
-  tenantId: string;
+  /** The route's proof; the rollup reads through it. */
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort?: { columnId: string; direction: "asc" | "desc" };
   pageSize: number;
@@ -173,6 +178,7 @@ export function mapSessionGroupRowToDto({
 }): SessionGroupDto {
   return {
     conversationId: row.conversationId,
+    projectId: row.tenantId,
     traceCount: row.traceCount,
     totalCost: row.totalCost,
     totalTokens: row.totalTokens,
@@ -232,7 +238,7 @@ export class SessionGroupsService {
       SORT_COLUMN_MAP[params.sort?.columnId ?? ""] ?? DEFAULT_SORT.column;
     const sortDirection = params.sort?.direction ?? DEFAULT_SORT.direction;
     const page = await this.repository.findSessionGroups({
-      tenantId: params.tenantId,
+      authorization: params.authorization,
       timeRange: params.timeRange,
       sort: { column: sortColumn, direction: sortDirection },
       // One sentinel row past the page so `nextCursor` is exact.
@@ -251,12 +257,17 @@ export class SessionGroupsService {
       ? page.rows.slice(0, params.pageSize)
       : page.rows;
 
-    const enrichments = await this.enrich({
-      tenantId: params.tenantId,
-      rows: visibleRows,
+    // A session's coding-agent counters live under the project that owns
+    // it, which on an aggregate is the member the fenced read found it in.
+    // Pull request links resolve the organisation, which every member of an
+    // aggregate shares with the project the proof was minted for.
+    const projectId = ownProjectIdOf({
+      authorization: params.authorization,
+      reads: "traces",
     });
+    const enrichments = await this.enrich({ rows: visibleRows });
     await this.linkPullRequests({
-      tenantId: params.tenantId,
+      tenantId: projectId,
       rows: visibleRows,
       enrichments,
     });
@@ -284,6 +295,7 @@ export class SessionGroupsService {
                 column: sortColumn,
               }),
               conversationId: lastRow.conversationId,
+              tenantId: lastRow.tenantId,
               sortColumn,
               sortDirection,
             })
@@ -297,10 +309,8 @@ export class SessionGroupsService {
    * conversations, and a failed lookup must not take the whole list down.
    */
   private async enrich({
-    tenantId,
     rows,
   }: {
-    tenantId: string;
     rows: SessionGroupRow[];
   }): Promise<(SessionGroupCodingAgentDto | null)[]> {
     const results: (SessionGroupCodingAgentDto | null)[] = [];
@@ -310,7 +320,7 @@ export class SessionGroupsService {
         chunk.map((row) =>
           this.codingAgentSessions
             .getBySessionId({
-              projectId: tenantId,
+              projectId: row.tenantId,
               sessionId: row.conversationId,
               startedAtMs: row.startedAtMs,
             })

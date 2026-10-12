@@ -37,12 +37,14 @@ function landOn({
   error,
   description,
   marker = CONNECTION_ID,
+  extra = {},
 }: {
   error: string;
   description?: string;
   marker?: string;
+  extra?: Record<string, string>;
 }) {
-  const params = new URLSearchParams({ error, ssoTest: marker });
+  const params = new URLSearchParams({ error, ssoTest: marker, ...extra });
   if (description) params.set("error_description", description);
   window.history.replaceState(
     {},
@@ -151,6 +153,48 @@ describe("given a test sign-in refused because the administrator's account addre
       expect(words).toMatch(/verify the domain on this connection/i);
       expect(words).toMatch(/email_verified/);
       expect(screen.queryByText(/sent you back with an error/i)).toBeNull();
+    });
+  });
+});
+
+describe("given a test sign-in refused because the ID token names another issuer", () => {
+  const expected = "https://login.microsoftonline.com/app-tenant/v2.0";
+  const received = "https://login.microsoftonline.com/home-tenant/v2.0";
+
+  describe("when both issuers come back on the page", () => {
+    /** @scenario "An ID token from another issuer is refused with both issuers named" */
+    it("quotes the issuer the connection expects and the one the provider sent", () => {
+      landOn({
+        error: "sso_issuer_mismatch",
+        extra: { expected_issuer: expected, received_issuer: received },
+      });
+      draw();
+
+      const words =
+        screen.getByTestId("test-sign-in-failure").textContent ?? "";
+      expect(words).toMatch(/names a different issuer/i);
+      expect(words).toContain(`This connection expects: ${expected}`);
+      expect(words).toContain(`Your identity provider sent: ${received}`);
+      expect(words).toMatch(/not common or organizations/);
+    });
+  });
+
+  describe("when the issuers are missing or not https addresses", () => {
+    it("leaves them out instead of quoting the query string", () => {
+      landOn({
+        error: "sso_issuer_mismatch",
+        extra: {
+          expected_issuer: "javascript:alert(1)",
+          received_issuer: "http://login.example/v2.0",
+        },
+      });
+      draw();
+
+      const words =
+        screen.getByTestId("test-sign-in-failure").textContent ?? "";
+      expect(words).toMatch(/names a different issuer/i);
+      expect(words).not.toContain("javascript:");
+      expect(words).not.toContain("http://login.example");
     });
   });
 });

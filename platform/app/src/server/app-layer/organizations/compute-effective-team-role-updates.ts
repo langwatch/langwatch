@@ -46,6 +46,11 @@ export type EffectiveTeamRoleUpdate = TeamRoleUpdate & {
  * 4. No requested updates + MEMBER org role: auto-upgrade all VIEWER
  *    memberships to MEMBER.
  * 5. No requested updates + other org role (e.g. ADMIN): no changes needed.
+ * 6. DEVELOPER org role (ADR-143): no correction at all. A Developer holds no
+ *    shared team, so there is no role to correct TO; the repository deletes
+ *    the shared rows instead. Requested updates are passed through so the
+ *    repository refuses them by name, the way it refuses any shared role for
+ *    the seat.
  */
 export function computeEffectiveTeamRoleUpdates(params: {
   requestedTeamRoleUpdates: TeamRoleUpdate[];
@@ -68,6 +73,10 @@ export function computeEffectiveTeamRoleUpdates(params: {
       customRoleId: undefined,
       origin: "seat-correction",
     }));
+
+  if (newOrganizationRole === OrganizationUserRole.DEVELOPER) {
+    return requested;
+  }
 
   if (requested.length > 0) {
     if (newOrganizationRole !== OrganizationUserRole.EXTERNAL) {

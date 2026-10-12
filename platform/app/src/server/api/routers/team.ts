@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { TeamUserRole } from "~/generated/prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
 import { probeOrganizationPermission } from "~/server/app-layer/permissions/imperative";
 import { PERSONAL_TEAM_ARCHIVE_REFUSAL } from "~/server/app-layer/teams/team.service";
 import { TeamService } from "~/server/teams/team.service";
@@ -83,6 +84,10 @@ export const teamRouter = createTRPCRouter({
         organizationId: input.organizationId,
         callerId,
         callerHasManage,
+        callerOrganizationRole: await getApp().organizations.getUserOrgRole({
+          userId: callerId,
+          organizationId: input.organizationId,
+        }),
       });
 
       // Email-privacy redaction is request-scoped (depends on the caller), so it
@@ -118,6 +123,10 @@ export const teamRouter = createTRPCRouter({
       const service = new TeamService({ prisma: ctx.prisma });
       return service.getTeamsWithRoleBindings({
         organizationId: input.organizationId,
+        callerOrganizationRole: await getApp().organizations.getUserOrgRole({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+        }),
       });
     }),
 
@@ -141,6 +150,10 @@ export const teamRouter = createTRPCRouter({
       const team = await service.getTeamWithMembers({
         slug: input.slug,
         organizationId: input.organizationId,
+        callerOrganizationRole: await getApp().organizations.getUserOrgRole({
+          userId: callerId,
+          organizationId: input.organizationId,
+        }),
       });
 
       if (!team) {
@@ -256,7 +269,7 @@ export const teamRouter = createTRPCRouter({
       // without a personal workspace in that organization for good.
       const team = await prisma.team.findUnique({
         where: { id: input.teamId },
-        select: { isPersonal: true },
+        select: { isPersonal: true, organizationId: true },
       });
       if (!team) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
@@ -271,6 +284,12 @@ export const teamRouter = createTRPCRouter({
       await prisma.team.update({
         where: { id: input.teamId },
         data: { archivedAt: new Date() },
+      });
+      // ADR-144: the team's aggregates stop and its projects leave every
+      // aggregate, as archiving each project would do.
+      await getApp().projects.afterTeamArchive({
+        teamId: input.teamId,
+        organizationId: team.organizationId,
       });
       return { success: true };
     }),

@@ -93,6 +93,7 @@ describe("automation dispatch wiring smoke", () => {
         resolveClickHouseClient: async () => {
           throw new Error("no ClickHouse in this test");
         },
+        authorization: {} as never,
       });
 
       expect(ports.settlementDeps).toEqual(

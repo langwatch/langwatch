@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { type DrawerViewMode, useDrawerStore } from "../stores/drawerStore";
+import {
+  type DrawerViewMode,
+  type TraceHistoryEntry,
+  useDrawerStore,
+} from "../stores/drawerStore";
+import { traceDrawerParams } from "../utils/traceDrawerParams";
 import { guardTraceEditExit } from "../utils/traceEditMode";
 
 /**
@@ -27,6 +32,7 @@ export function useTraceDrawerNavigation() {
       toTraceId,
       toTimestamp,
       toViewMode,
+      toTenantId,
       persistViewMode = true,
     }: {
       fromTraceId: string;
@@ -47,6 +53,14 @@ export function useTraceDrawerNavigation() {
       toTimestamp?: number;
       toViewMode?: DrawerViewMode;
       /**
+       * The member that owns the trace navigated to, on an aggregate. Every
+       * caller today walks a conversation's turns, which the conversation
+       * read already keeps on one member, so it defaults to the member the
+       * drawer is on; the trace navigated away from keeps its own on the
+       * back stack.
+       */
+      toTenantId?: string | null;
+      /**
        * When false, apply `toViewMode` for this navigation only without
        * persisting it as the remembered default — e.g. peeking at a
        * conversation turn's Summary shouldn't make Summary the user's tab.
@@ -62,25 +76,55 @@ export function useTraceDrawerNavigation() {
       // Moving to another trace leaves the correction behind, so an unsaved
       // one asks first and the navigation waits on the answer.
       guardTraceEditExit(() => {
+        const fromTenantId = useDrawerStore.getState().tenantId;
+        const tenantId = toTenantId === undefined ? fromTenantId : toTenantId;
         pushTraceHistory({
           traceId: fromTraceId,
           viewMode: fromViewMode,
           occurredAtMs: fromTimestamp,
+          ...(fromTenantId !== null ? { tenantId: fromTenantId } : {}),
         });
         if (toViewMode) {
           if (persistViewMode) setViewMode(toViewMode);
           else useDrawerStore.getState().setViewModeTransient(toViewMode);
         }
         // Push into the store immediately so drawer hooks render with the
-        // right traceId/occurredAtMs before the URL change settles.
-        useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);
-        openDrawer("traceV2Details", {
-          traceId: toTraceId,
-          ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
-        });
+        // right traceId/occurredAtMs/member before the URL change settles.
+        useDrawerStore
+          .getState()
+          .openTrace(toTraceId, toTimestamp ?? null, { tenantId });
+        openDrawer(
+          "traceV2Details",
+          traceDrawerParams({
+            traceId: toTraceId,
+            occurredAtMs: toTimestamp,
+            tenantId,
+          }),
+        );
       });
     },
     [openDrawer, pushTraceHistory, setViewMode],
+  );
+
+  /** Reopen a back-stack entry: its trace, its view mode, its member. */
+  const reopenEntry = useCallback(
+    (entry: TraceHistoryEntry) => {
+      setViewMode(entry.viewMode);
+      useDrawerStore
+        .getState()
+        .openTrace(entry.traceId, entry.occurredAtMs ?? null, {
+          tenantId: entry.tenantId ?? null,
+        });
+      openDrawer(
+        "traceV2Details",
+        traceDrawerParams({
+          traceId: entry.traceId,
+          occurredAtMs: entry.occurredAtMs,
+          tenantId: entry.tenantId,
+        }),
+      );
+    },
+    [openDrawer, setViewMode],
   );
 
   // Going back is going to another trace, so it asks about an unsaved
@@ -91,37 +135,19 @@ export function useTraceDrawerNavigation() {
     guardTraceEditExit(() => {
       const previous = popTraceHistory();
       if (!previous) return;
-      setViewMode(previous.viewMode);
-      useDrawerStore
-        .getState()
-        .openTrace(previous.traceId, previous.occurredAtMs ?? null);
-      openDrawer("traceV2Details", {
-        traceId: previous.traceId,
-        ...(previous.occurredAtMs !== undefined
-          ? { t: String(previous.occurredAtMs) }
-          : {}),
-      });
+      reopenEntry(previous);
     });
-  }, [openDrawer, popTraceHistory, setViewMode]);
+  }, [popTraceHistory, reopenEntry]);
 
   const goBackTo = useCallback(
     (index: number) => {
       guardTraceEditExit(() => {
         const target = popTraceHistoryTo(index);
         if (!target) return;
-        setViewMode(target.viewMode);
-        useDrawerStore
-          .getState()
-          .openTrace(target.traceId, target.occurredAtMs ?? null);
-        openDrawer("traceV2Details", {
-          traceId: target.traceId,
-          ...(target.occurredAtMs !== undefined
-            ? { t: String(target.occurredAtMs) }
-            : {}),
-        });
+        reopenEntry(target);
       });
     },
-    [openDrawer, popTraceHistoryTo, setViewMode],
+    [popTraceHistoryTo, reopenEntry],
   );
 
   return {

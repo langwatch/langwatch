@@ -25,6 +25,8 @@ import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
+import { ProjectService } from "../../../app-layer/projects/project.service";
+import { PrismaProjectRepository } from "../../../app-layer/projects/repositories/project.prisma.repository";
 import { PlanProviderService } from "../../../app-layer/subscription/plan-provider";
 import { prisma } from "../../../db";
 import {
@@ -53,6 +55,8 @@ describe("user.persona-home customization integration", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: async (): Promise<PlanInfo> => FREE_PLAN,
       }),
+      // The picker's first project is the project repository's landing pick.
+      projects: new ProjectService(new PrismaProjectRepository(prisma)),
     });
 
     await prisma.organization.create({

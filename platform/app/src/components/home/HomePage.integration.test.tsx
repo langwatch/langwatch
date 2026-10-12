@@ -57,6 +57,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   // about which home composition resolves.
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
+    project: { id: "project-1" },
     hasPermission: () => false,
   }),
 }));

@@ -1,16 +1,18 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import {
-  ConcurrencyLimiter,
-  QueueFullError,
-} from "@langwatch/clickhouse-client";
+import { ConcurrencyLimiter } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
-import { ClickHouseOverloadedError } from "~/server/app-layer/traces/errors";
-import { toError } from "~/utils/posthogErrorCapture";
+import { DEFAULT_LANE_RESERVE_SHARE } from "./connectionPool";
 import {
   incrementClickHouseStatementsShed,
+  type LimiterLane,
   observeClickHouseStatementWait,
   registerClickHouseLimiter,
 } from "./metrics";
+import {
+  createStatementWait,
+  type StatementWait,
+  statementRefusal,
+} from "./statementWait";
 
 const logger = createLogger("langwatch:clickhouse:statement-limit");
 
@@ -52,6 +54,68 @@ export const STATEMENT_WAIT_TIMEOUT_MS = 20_000;
 
 type LimitedOperation = "query" | "insert" | "command" | "exec";
 
+function clamp(value: number, low: number, high: number): number {
+  return Math.min(high, Math.max(low, value));
+}
+
+/**
+ * Work-conserving caps for the insert and read lanes over one slot budget.
+ *
+ * The earlier design cut the budget into two hard halves, which stranded the
+ * machine: an insert-only or read-only process could reach only its own half
+ * while the other sat idle. ADR-114 §2 settled that a lone producer may use the
+ * whole budget, so the lanes have to BORROW rather than OWN.
+ *
+ * The lever is a reserve, not a share. `reserve` slots are held back for the
+ * OTHER kind of work, and a lane may hold everything else — `laneCap =
+ * N - reserve`. So a lone lane borrows all but `reserve`, and whichever lane
+ * saturates, the other still finds `reserve` slots free: the guarantee hard
+ * lanes gave, without the idle capacity they left on the floor.
+ *
+ * The reserve is clamped so neither extreme can erase it — at least one slot, so
+ * a lane cannot be configured out of existence, and at most half the budget, so
+ * the slots held back for one lane never exceed what that lane may itself use.
+ * A budget under two slots cannot hold both a reserve and a working lane, so it
+ * returns `null`; the caller then keeps one shared bound rather than starving
+ * either kind.
+ */
+export function statementLaneCaps({
+  maxConcurrent,
+  reserveShare,
+}: {
+  maxConcurrent: number;
+  reserveShare: number;
+}): { reserve: number; laneCap: number } | null {
+  if (maxConcurrent < 2) return null;
+  const reserve = clamp(
+    Math.round(maxConcurrent * reserveShare),
+    1,
+    Math.floor(maxConcurrent / 2),
+  );
+  return { reserve, laneCap: maxConcurrent - reserve };
+}
+
+/**
+ * One kind of work's lane: the cap limiter it must enter before the total
+ * limiter, and a count of what it is running right now.
+ *
+ * `cap` bounds how many of this kind may hold or wait on a total slot, which is
+ * what keeps the other kind's reserve free. It is `null` only for the single
+ * shared "all" lane of a budget too small to split, where there is nothing to
+ * reserve against and the total limiter is the whole bound.
+ *
+ * `running` counts the statements this lane holds on the driver right now. A
+ * Lane is shared by reference, so `run` mutates this field in place as it
+ * admits and releases - no box needed.
+ */
+interface Lane {
+  lane: LimiterLane;
+  cap: ConcurrencyLimiter | null;
+  capMax: number;
+  maxQueued: number;
+  running: number;
+}
+
 /**
  * The subset of a statement's parameters this layer reads. Every ClickHouse
  * driver method takes an options object that may carry an abort signal; nothing
@@ -64,6 +128,137 @@ interface StatementParams {
 function signalOf(params: unknown): AbortSignal | undefined {
   if (!params || typeof params !== "object") return undefined;
   return (params as StatementParams).abort_signal;
+}
+
+function buildLane({
+  lane,
+  capMax,
+  hasCap,
+  maxQueued,
+}: {
+  lane: LimiterLane;
+  capMax: number;
+  hasCap: boolean;
+  maxQueued: number;
+}): Lane {
+  return {
+    lane,
+    capMax,
+    maxQueued,
+    running: 0,
+    cap: hasCap
+      ? new ConcurrencyLimiter({ maxConcurrent: capMax, maxQueued })
+      : null,
+  };
+}
+
+/** The limiters a process runs its statements through, and how to route one. */
+interface Lanes {
+  total: ConcurrencyLimiter;
+  totalMax: number;
+  reserve: number;
+  lanes: Lane[];
+  laneFor: (operation: LimitedOperation) => Lane;
+}
+
+/**
+ * The total stays the pool size so the split never adds load the server's
+ * max_concurrent_queries budget was not sized for. The per-kind caps sit one
+ * reserve below it so a flood of either kind cannot take the slots the other
+ * needs. Under two slots, any reserve would starve one kind outright, so a
+ * single shared bound is the honest fallback.
+ */
+function buildLanes({
+  maxConcurrent,
+  reserveShare,
+  maxQueuedOverride,
+}: {
+  maxConcurrent: number;
+  reserveShare: number;
+  /** Test-only: pin every queue depth so a test need not issue the real one. */
+  maxQueuedOverride: number | undefined;
+}): Lanes {
+  const totalMaxQueued =
+    maxQueuedOverride ??
+    Math.max(MIN_QUEUE_DEPTH, maxConcurrent * QUEUE_DEPTH_PER_SLOT);
+  const total = new ConcurrencyLimiter({
+    maxConcurrent,
+    maxQueued: totalMaxQueued,
+  });
+
+  const caps = statementLaneCaps({ maxConcurrent, reserveShare });
+  if (!caps) {
+    // One shared bound, one queue: the total IS the whole budget, so its queue
+    // is the single wait depth and there is nothing to split.
+    const all = buildLane({
+      lane: "all",
+      capMax: maxConcurrent,
+      hasCap: false,
+      maxQueued: totalMaxQueued,
+    });
+    return {
+      total,
+      totalMax: maxConcurrent,
+      reserve: 0,
+      lanes: [all],
+      laneFor: () => all,
+    };
+  }
+
+  // Split across two lane queues: each lane queue holds half the old single-queue
+  // bound, floor included, so the two together equal that bound at every budget
+  // (also below 16 slots, where the MIN_QUEUE_DEPTH floor applies). The total
+  // keeps its own queue, but a statement reaches it only from inside a lane cap,
+  // so that queue can hold at most `2 * laneCap - maxConcurrent` statements —
+  // the lane slots in excess of the total. The combined wait depth is therefore
+  // the old bound plus that small remainder, not twice the lane depth.
+  const laneMaxQueued = maxQueuedOverride ?? Math.floor(totalMaxQueued / 2);
+  const insert = buildLane({
+    lane: "insert",
+    capMax: caps.laneCap,
+    hasCap: true,
+    maxQueued: laneMaxQueued,
+  });
+  const read = buildLane({
+    lane: "read",
+    capMax: caps.laneCap,
+    hasCap: true,
+    maxQueued: laneMaxQueued,
+  });
+  return {
+    total,
+    totalMax: maxConcurrent,
+    reserve: caps.reserve,
+    lanes: [insert, read],
+    laneFor: (op) => (op === "insert" ? insert : read),
+  };
+}
+
+/**
+ * A lane's metrics: what it is running on the driver, and everything waiting
+ * behind its cap — both the statements still waiting for a cap slot and those
+ * holding one but blocked on the shared total limiter.
+ */
+function laneStats({
+  lane,
+  total,
+}: {
+  lane: Lane;
+  total: ConcurrencyLimiter;
+}): { lane: LimiterLane; inFlight: number; queued: number } {
+  if (!lane.cap) {
+    return {
+      lane: lane.lane,
+      inFlight: lane.running,
+      queued: total.stats().queued,
+    };
+  }
+  const { inFlight, queued } = lane.cap.stats();
+  return {
+    lane: lane.lane,
+    inFlight: lane.running,
+    queued: queued + inFlight - lane.running,
+  };
 }
 
 /**
@@ -81,29 +276,60 @@ function signalOf(params: unknown): AbortSignal | undefined {
  * What changes is where the queueing happens: in a queue that is finite, timed
  * and counted, rather than inside the connection pool where it had no timeout,
  * no metric and no ceiling.
+ *
+ * The axis of the split is statement KIND — inserts versus reads (`query`,
+ * `command` and `exec`) — which is orthogonal to ADR-114 §2's per-producer fair
+ * share: that bounds WHO issues the work, this bounds WHAT KIND it is. One total
+ * limiter is the hard ceiling and is never exceeded. Each kind has its own cap
+ * one reserve below the total, so whichever kind saturates, the other always
+ * finds that reserve free — yet a lone kind still borrows every slot except the
+ * other kind's small reserve, so an insert-only or read-only process is not
+ * throttled to half the pool. A budget under two slots cannot reserve and stays
+ * one shared bound.
  */
 export function withStatementLimit<T extends ClickHouseClient>({
   client,
   maxConcurrent,
   instance,
+  reserveShare = DEFAULT_LANE_RESERVE_SHARE,
   waitTimeoutMs = STATEMENT_WAIT_TIMEOUT_MS,
+  maxQueued,
 }: {
   client: T;
   maxConcurrent: number;
   instance: string;
+  /** Fraction of `maxConcurrent` each kind keeps in reserve for the other. */
+  reserveShare?: number;
   /** Overridable so a test can prove the bound without spending it. */
   waitTimeoutMs?: number;
+  /**
+   * Overridable so a test can fill a wait queue without issuing the production
+   * depth of statements. Production never sets it — the depth is derived from
+   * the budget. Applies to both the lane caps and the total.
+   */
+  maxQueued?: number;
 }): T {
-  const maxQueued = Math.max(
-    MIN_QUEUE_DEPTH,
-    maxConcurrent * QUEUE_DEPTH_PER_SLOT,
-  );
-  const limiter = new ConcurrencyLimiter({ maxConcurrent, maxQueued });
+  const { total, totalMax, reserve, lanes, laneFor } = buildLanes({
+    maxConcurrent,
+    reserveShare,
+    maxQueuedOverride: maxQueued,
+  });
 
-  registerClickHouseLimiter(instance, () => limiter.stats());
+  registerClickHouseLimiter(instance, () =>
+    lanes.map((l) => laneStats({ lane: l, total })),
+  );
 
   logger.info(
-    { instance, maxConcurrent, maxQueued },
+    {
+      instance,
+      maxConcurrent,
+      reserve,
+      lanes: lanes.map((l) => ({
+        lane: l.lane,
+        cap: l.capMax,
+        maxQueued: l.maxQueued,
+      })),
+    },
     "ClickHouse statement concurrency bounded",
   );
 
@@ -121,10 +347,13 @@ export function withStatementLimit<T extends ClickHouseClient>({
     // chain answer for it.
     if (typeof inner !== "function") continue;
 
+    const lane = laneFor(operation);
+
     (limited as Record<string, unknown>)[operation] = (params: unknown) =>
       run({
-        limiter,
-        maxConcurrent,
+        lane,
+        total,
+        totalMax,
         instance,
         operation,
         signal: signalOf(params),
@@ -150,78 +379,51 @@ export function withStatementLimit<T extends ClickHouseClient>({
   return limited;
 }
 
-/** An armed wait: what the limiter blocks on, and how it ended. */
-interface ArmedWait {
-  signal: AbortSignal | undefined;
-  /** True only if OUR timer fired — never merely that the signal aborted. */
-  hasTimedOut: () => boolean;
-  dispose: () => void;
-}
-
-const NOT_ARMED = (signal: AbortSignal | undefined): ArmedWait => ({
-  signal,
-  hasTimedOut: () => false,
-  dispose: () => {
-    // Nothing was armed, so there is nothing to clear.
-  },
-});
-
 /**
- * Arm the wait bound, but only when the limiter is ALREADY saturated.
+ * Enter the lane cap, then the shared total, then run. The lane cap bounds how
+ * many of this kind can hold or wait on a total slot, which is what keeps the
+ * other kind's reserve reachable. The "all" lane has no cap and enters the
+ * total directly.
  *
- * On the ordinary path a slot is free and `acquire` resolves without waiting at
- * all, so arming anything would cost a timer and an `AbortSignal.any` per
- * statement — millions a day — to bound a wait that never happens.
- *
- * A plain timer rather than `AbortSignal.timeout` for two reasons: it can be
- * CLEARED the moment the statement is admitted, where a timeout signal holds
- * its timer for the full duration regardless, and a saturated limiter would
- * accumulate one per queued statement; and it is fakeable, so the test for this
- * does not have to spend twenty real seconds proving it.
+ * The wait is armed per limiter, at the moment it is entered: a slot free when
+ * the statement was issued can be taken by the time its lane cap grants, so the
+ * only truthful saturation check is the one taken right before each `run`.
  */
-function armWait({
-  limiter,
-  maxConcurrent,
-  signal,
-  waitTimeoutMs,
+function acquire({
+  lane,
+  total,
+  totalMax,
+  onDriver,
+  wait,
 }: {
-  limiter: ConcurrencyLimiter;
-  maxConcurrent: number;
-  signal: AbortSignal | undefined;
-  waitTimeoutMs: number;
-}): ArmedWait {
-  if (limiter.stats().inFlight < maxConcurrent) return NOT_ARMED(signal);
-
-  const controller = new AbortController();
-  let hasFired = false;
-  const timer = setTimeout(() => {
-    hasFired = true;
-    controller.abort();
-  }, waitTimeoutMs);
-  // Never a reason to hold the process open: if nothing else is running there
-  // is no statement ahead of this one to wait for.
-  timer.unref?.();
-
-  return {
-    signal: signal
-      ? AbortSignal.any([signal, controller.signal])
-      : controller.signal,
-    hasTimedOut: () => hasFired,
-    dispose: () => clearTimeout(timer),
+  lane: Lane;
+  total: ConcurrencyLimiter;
+  totalMax: number;
+  onDriver: () => Promise<unknown>;
+  wait: StatementWait;
+}): Promise<unknown> {
+  const runInTotal = () => {
+    wait.armIfSaturated(total.stats().inFlight >= totalMax);
+    return total.run({ task: onDriver, signal: wait.signal });
   };
+  if (!lane.cap) return runInTotal();
+  wait.armIfSaturated(lane.cap.stats().inFlight >= lane.capMax);
+  return lane.cap.run({ task: runInTotal, signal: wait.signal });
 }
 
 async function run({
-  limiter,
-  maxConcurrent,
+  lane,
+  total,
+  totalMax,
   instance,
   operation,
   signal,
   waitTimeoutMs,
   task,
 }: {
-  limiter: ConcurrencyLimiter;
-  maxConcurrent: number;
+  lane: Lane;
+  total: ConcurrencyLimiter;
+  totalMax: number;
   instance: string;
   operation: LimitedOperation;
   signal: AbortSignal | undefined;
@@ -229,57 +431,48 @@ async function run({
   task: () => Promise<unknown>;
 }): Promise<unknown> {
   const queuedAt = performance.now();
-  let admitted = false;
+  let isAdmitted = false;
 
-  const wait = armWait({ limiter, maxConcurrent, signal, waitTimeoutMs });
+  // One wait covers both limiters, armed lazily by `acquire` as each is
+  // entered. A statement reaches the total only from inside its lane cap's
+  // task, so up front the total's count is not yet the one it will meet - a
+  // same-tick batch would all read a total no statement has entered and none
+  // would arm.
+  const wait = createStatementWait({ signal, waitTimeoutMs });
+
+  const onDriver = async () => {
+    // Admission is the innermost point - both the lane cap and the total have
+    // granted a slot - so the wait is over and `isAdmitted` is set only here.
+    isAdmitted = true;
+    lane.running += 1;
+    wait.dispose();
+    observeClickHouseStatementWait(
+      instance,
+      operation,
+      (performance.now() - queuedAt) / 1000,
+    );
+    try {
+      return await task();
+    } finally {
+      lane.running -= 1;
+    }
+  };
 
   try {
-    return await limiter.run({
-      task: () => {
-        admitted = true;
-        // The wait is over the moment the slot is taken; holding the timer past
-        // here would abort nothing and keep one alive per admitted statement.
-        wait.dispose();
-        observeClickHouseStatementWait(
-          instance,
-          operation,
-          (performance.now() - queuedAt) / 1000,
-        );
-        return task();
-      },
-      signal: wait.signal,
-    });
+    return await acquire({ lane, total, totalMax, onDriver, wait });
   } catch (error) {
-    // Only a refusal is translated. Once admitted, the statement's own errors
-    // belong to the layers below - translating them here would relabel a
-    // memory limit or a syntax error as overload.
-    if (!admitted && error instanceof QueueFullError) {
-      incrementClickHouseStatementsShed(instance, operation);
-      logger.warn(
-        { instance, operation, maxQueued: error.maxQueued },
-        "Refused a ClickHouse statement: concurrency wait queue full",
-      );
-      throw new ClickHouseOverloadedError({ reasons: [toError(error)] });
-    }
-    // A wait that ran out is the same verdict as a full queue — the server has
-    // no capacity for this statement — so it gets the same transient error.
-    // Checked against OUR timeout, never the aborted-ness of the composed
-    // signal: a caller cancelling its own request must keep surfacing as the
-    // cancellation it is, not be relabelled as overload.
-    if (!admitted && wait.hasTimedOut()) {
-      incrementClickHouseStatementsShed(instance, operation);
-      logger.warn(
-        {
-          instance,
-          operation,
-          waitedMs: Math.round(performance.now() - queuedAt),
-          timeoutMs: waitTimeoutMs,
-        },
-        "Refused a ClickHouse statement: waited too long for a slot",
-      );
-      throw new ClickHouseOverloadedError({ reasons: [toError(error)] });
-    }
-    throw error;
+    const refusal = statementRefusal({
+      error,
+      isAdmitted,
+      hasTimedOut: wait.hasTimedOut(),
+      queuedAt,
+      waitTimeoutMs,
+      logger,
+      subject: "a ClickHouse statement",
+      logFields: { instance, operation },
+      onShed: () => incrementClickHouseStatementsShed(instance, operation),
+    });
+    throw refusal ?? error;
   } finally {
     wait.dispose();
   }

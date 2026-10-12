@@ -81,6 +81,7 @@ const GRANT_FACT_COLUMNS = {
   createdByUserId: true,
   expiresAt: true,
   maxViews: true,
+  condition: true,
   occurredAt: true,
 } as const;
 
@@ -501,7 +502,7 @@ export class PrismaAuthzGrantsWriteRepository
         "id", "organizationId", "principalType", "principalId", "roleKey",
         "legacyRole", "source", "scopeType", "scopeId", "token", "permission",
         "resourceKind", "projectId", "createdByUserId", "expiresAt",
-        "maxViews", "occurredAt", "updatedAt"
+        "maxViews", "condition", "occurredAt", "updatedAt"
       ) SELECT
         ${row.id}, ${row.organizationId},
         ${row.principalType}::"GrantPrincipalType", ${row.principalId},
@@ -509,6 +510,7 @@ export class PrismaAuthzGrantsWriteRepository
         ${row.scopeType}::"GrantScopeType", ${row.scopeId}, ${row.token},
         ${row.permission}, ${row.resourceKind}, ${row.projectId},
         ${row.createdByUserId}, ${row.expiresAt}, ${row.maxViews},
+        ${row.condition == null ? null : JSON.stringify(row.condition)}::jsonb,
         ${row.occurredAt}, NOW()
       WHERE ${membershipGuard}
       ON CONFLICT ("id") DO UPDATE SET
@@ -527,6 +529,7 @@ export class PrismaAuthzGrantsWriteRepository
         "createdByUserId" = EXCLUDED."createdByUserId",
         "expiresAt"       = EXCLUDED."expiresAt",
         "maxViews"        = EXCLUDED."maxViews",
+        "condition"       = EXCLUDED."condition",
         "occurredAt"      = EXCLUDED."occurredAt",
         "updatedAt"       = NOW()
       WHERE "Grant"."occurredAt" < EXCLUDED."occurredAt"

@@ -80,6 +80,7 @@ import {
   estimateCost,
   getMatchingLLMModelCost,
 } from "~/server/tracer/collector/cost";
+import { createSemaphore } from "~/server/utils/semaphore";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { generateOtelSpanId, generateOtelTraceId } from "~/utils/trace";
@@ -106,7 +107,6 @@ import {
   mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
 } from "./resultMapper";
-import { createSemaphore } from "./semaphore";
 import {
   type CarriedOverCell,
   type EvaluationV3Event,

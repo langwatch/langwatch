@@ -68,9 +68,16 @@ export interface PasskeySignUpVerificationPort {
   claimAddressProof(args: { token: string; email: string }): Promise<boolean>;
 }
 
+/** The `code` a passkey sign-up the installation's sign-up policy refuses
+ *  carries; the sign-up screen renders the registry copy for it. */
+export const PASSKEY_SIGNUP_RESTRICTED = "auth_sign_up_restricted";
+
 export interface PasskeySignUpRegistrationDeps {
   eligibility: {
     isAllowed(email: string, method: "passkey"): Promise<boolean>;
+    /** Whether the installation's sign-up policy (`SIGN_UP_MODE`,
+     *  `SIGN_UP_ALLOWED_DOMAINS`) admits a new account at this address. */
+    policyAdmits(email: string): Promise<boolean>;
   };
   directory: PasskeySignUpDirectoryPort;
   accounts: PasskeySignUpAccountsPort;
@@ -238,6 +245,7 @@ export class PasskeySignUpRegistration {
         message: "Verify this email address before creating a passkey.",
       });
     }
+    await this.refuseIfPolicyRefuses(email);
     await this.refuseIfRegistered(email);
 
     return {
@@ -310,6 +318,7 @@ export class PasskeySignUpRegistration {
         message: "This address must use its organization's sign-in method.",
       });
     }
+    await this.refuseIfPolicyRefuses(email);
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. This is the one that
     // answers in WORDS; the decision that actually holds is taken inside the
@@ -351,6 +360,19 @@ export class PasskeySignUpRegistration {
       // what somebody scanning a list of passkeys recognises.
       name: email,
     };
+  }
+
+  /**
+   * Refuses an address the installation's sign-up policy does not admit, with
+   * its own code rather than the organization-managed refusal: the remedy is
+   * an invitation, not another sign-in method.
+   */
+  private async refuseIfPolicyRefuses(email: string): Promise<void> {
+    if (await this.deps.eligibility.policyAdmits(email)) return;
+    throw new APIError("FORBIDDEN", {
+      code: PASSKEY_SIGNUP_RESTRICTED,
+      message: "Accounts on this installation are created by invitation.",
+    });
   }
 
   /**

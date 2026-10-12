@@ -284,6 +284,93 @@ describe("the grants ledger's wire boundary", () => {
     });
   });
 
+  /**
+   * ADR-144: the one foreign placement a `project` principal may take, and
+   * every neighbour of it that must stay refused. Same-organisation
+   * placement is the writer's question (it needs storage); the wire checks
+   * shape only.
+   */
+  describe("when a project reads another project (ADR-144)", () => {
+    const SHARED_READ = {
+      principal: { type: "project", id: "proj_aggregate" },
+      roleKey: "project-reader",
+      scope: { type: "PROJECT", id: "proj_member" },
+      condition: { type: "trace", from: "2026-10-01T00:00:00.000Z" },
+      source: "aggregate-reconciler",
+    } as const;
+
+    it("accepts a project-reader on a foreign project carrying a condition with no where", () => {
+      expect(parse({}, SHARED_READ).success).toBe(true);
+      expect(
+        parse({}, { ...SHARED_READ, condition: { type: "trace", where: "" } })
+          .success,
+      ).toBe(true);
+    });
+
+    it("refuses every other role key on the foreign placement", () => {
+      for (const roleKey of ["admin", "member", "viewer", "custom:role_1"]) {
+        expect(parse({}, { ...SHARED_READ, roleKey }).success).toBe(false);
+      }
+    });
+
+    it("refuses a project-reader placed on a team or an organization", () => {
+      for (const scope of [
+        { type: "TEAM", id: "team_client_a" },
+        { type: "ORGANIZATION", id: ORG },
+      ]) {
+        expect(parse({}, { ...SHARED_READ, scope }).success).toBe(false);
+      }
+    });
+
+    it("refuses a project-reader placement without a condition", () => {
+      const { condition: _condition, ...withoutCondition } = SHARED_READ;
+      expect(parse({}, withoutCondition).success).toBe(false);
+    });
+
+    /** @scenario "A where clause is refused until the filter compiler exists" */
+    it("refuses a condition with a non-empty where until the filter compiler exists", () => {
+      expect(
+        parse(
+          {},
+          {
+            ...SHARED_READ,
+            condition: { type: "trace", where: 'attributes["env"] == "prod"' },
+          },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("refuses a condition whose type or dates are outside the vocabulary", () => {
+      expect(
+        parse({}, { ...SHARED_READ, condition: { type: "metric" } }).success,
+      ).toBe(false);
+      expect(
+        parse(
+          {},
+          { ...SHARED_READ, condition: { type: "trace", from: "yesterday" } },
+        ).success,
+      ).toBe(false);
+    });
+
+    it("refuses the shared read's marks on any other grant", () => {
+      // A user cannot hold project-reader, and an own grant cannot carry a window.
+      expect(parse({}, { roleKey: "project-reader" }).success).toBe(false);
+      expect(parse({}, { condition: { type: "trace" } }).success).toBe(false);
+      // The self-grant is a credential, not a read; it carries no condition.
+      expect(
+        parse(
+          {},
+          {
+            principal: { type: "project", id: "proj_chatbot" },
+            roleKey: "project-reader",
+            scope: { type: "PROJECT", id: "proj_chatbot" },
+            condition: { type: "trace" },
+          },
+        ).success,
+      ).toBe(false);
+    });
+  });
+
   describe("when a string field arrives empty", () => {
     it("refuses a grant id that names nothing", () => {
       expect(parse({}, { grantId: "" }).success).toBe(false);

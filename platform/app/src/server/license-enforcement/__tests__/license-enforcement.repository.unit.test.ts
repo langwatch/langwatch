@@ -325,6 +325,49 @@ describe("LicenseEnforcementRepository", () => {
     });
   });
 
+  describe("getMembersDeveloperCount", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2024-03-15T12:00:00.000Z"));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario Developers are counted and never capped */
+    it("counts DEVELOPER users and pending DEVELOPER invites, and nothing else", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.ADMIN },
+        { userId: "u2", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u3", role: OrganizationUserRole.DEVELOPER },
+        { userId: "u4", role: OrganizationUserRole.DEVELOPER },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        { role: OrganizationUserRole.DEVELOPER, teamAssignments: null },
+        { role: OrganizationUserRole.MEMBER, teamAssignments: null },
+      ]);
+
+      expect(await repository.getMembersDeveloperCount(organizationId)).toBe(3);
+    });
+
+    it("never moves the Full or Lite counts", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([
+        { userId: "u1", role: OrganizationUserRole.MEMBER },
+        { userId: "u2", role: OrganizationUserRole.EXTERNAL },
+        { userId: "u3", role: OrganizationUserRole.DEVELOPER },
+      ]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([
+        { role: OrganizationUserRole.DEVELOPER, teamAssignments: null },
+      ]);
+
+      expect(await repository.getMemberCount(organizationId)).toBe(1);
+      expect(await repository.getMembersLiteCount(organizationId)).toBe(1);
+    });
+  });
+
   describe("getMembersLiteCount", () => {
     beforeEach(() => {
       vi.useFakeTimers();

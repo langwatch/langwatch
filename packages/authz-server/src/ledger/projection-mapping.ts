@@ -9,6 +9,7 @@ import type {
   TeamUserRole,
 } from "@langwatch/authz";
 
+import { type GrantCondition, grantConditionSchema } from "@langwatch/actor";
 import { BindingMissingError } from "../authz-grants.repository";
 import type {
   GrantEventSource,
@@ -77,7 +78,23 @@ const RESOURCE_KIND_FROM_DB: Record<
 };
 
 /**
- * The stored column is a plain `TEXT` — Prisma has no enum behind it, and the
+ * A stored grant condition, parsed. The column is JSONB with no schema
+ * behind it, so a row's condition has to PARSE through the same schema the
+ * event wire uses before it becomes a fact: an object that names a type the
+ * vocabulary lacks, carries a non-string field, or has a `from`/`until` that
+ * is not an ISO instant returns `undefined`. `grantRowToFact` then builds the
+ * fact with no condition, and the shared-read minter leaves the row out of
+ * every proof, so a malformed window is never read as a wider one.
+ */
+export function grantConditionFromDb(
+  value: unknown,
+): GrantCondition | undefined {
+  const parsed = grantConditionSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+}
+
+/**
+ * The stored column is a plain `TEXT`: Prisma has no enum behind it, and the
  * row can be read back from a database an older writer, a hand-run statement
  * or a partially applied migration also touched. So the value is PARSED, not
  * asserted: `undefined` for anything that is not one of the two kinds, which
@@ -85,7 +102,7 @@ const RESOURCE_KIND_FROM_DB: Record<
  *
  * Casting instead put `RESOURCE_KIND_FROM_DB[<anything>]` in front of the
  * engine as `kind: undefined`, which reads as a resource grant that names no
- * kind of thing — a share row that matches whichever resource is asked about.
+ * kind of thing, a share row that matches whichever resource is asked about.
  */
 function resourceKindFromDb(
   value: string | null,
@@ -116,8 +133,17 @@ export interface GrantRowShape {
   createdByUserId: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
+  /** The shared grant's window (ADR-144); absent on own grants, which is
+   *  what lets the row go straight into a Prisma create. */
+  condition?: GrantCondition;
   occurredAt: Date;
 }
+
+/** A row as storage hands it back: the JSONB column is untyped until
+ *  `grantRowToFact` parses it, so a reader never has to pretend otherwise. */
+export type GrantRowRead = Omit<GrantRowShape, "condition"> & {
+  condition?: unknown;
+};
 
 export function grantFactToRow({
   grant,
@@ -148,12 +174,14 @@ export function grantFactToRow({
         ? new Date(grant.resource.expiresAtMs)
         : null,
     maxViews: grant.resource?.maxViews ?? null,
+    ...(grant.condition !== undefined ? { condition: grant.condition } : {}),
     occurredAt: new Date(grant.occurredAtMs),
   };
 }
 
-export function grantRowToFact(row: GrantRowShape): GrantFact {
+export function grantRowToFact(row: GrantRowRead): GrantFact {
   const resourceKind = resourceKindFromDb(row.resourceKind);
+  const condition = grantConditionFromDb(row.condition);
   return {
     grantId: row.id,
     principal: {
@@ -189,6 +217,7 @@ export function grantRowToFact(row: GrantRowShape): GrantFact {
           },
         }
       : {}),
+    ...(condition !== undefined ? { condition } : {}),
     source: row.source as GrantEventSource,
     occurredAtMs: row.occurredAt.getTime(),
   };

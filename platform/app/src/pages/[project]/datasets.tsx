@@ -26,6 +26,7 @@ import {
   Upload,
 } from "react-feather";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { AggregateReadOnlyNotice } from "~/components/projects/AggregateReadOnlyNotice";
 import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import { ListTable } from "~/components/ui/ListTable";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -33,6 +34,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { LangyContextTarget } from "~/features/langy/components/LangyContextTarget";
 import { datasetContextChip } from "~/features/langy/logic/langyContextChips";
 import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { useRouter } from "~/utils/compat/next-router";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
@@ -84,6 +86,7 @@ function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
   const bulkUploadModal = useDisclosure();
   const { project } = useOrganizationTeamProject();
+  const projectIsAggregate = isAggregateProjectKind(project?.kind);
   const { isLiteMember } = useLiteMemberGuard();
   const router = useRouter();
   const queryClient = api.useUtils();
@@ -215,25 +218,31 @@ function DatasetsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </InputGroup>
-        <UploadOrCreateDatasetMenu
-          onUpload={() => bulkUploadModal.onOpen()}
-          onCreate={() => {
-            setEditDataset(undefined);
-            addEditDatasetDrawer.onOpen();
-          }}
-        >
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="upload-or-create-dataset"
+        {!projectIsAggregate && (
+          <UploadOrCreateDatasetMenu
+            onUpload={() => bulkUploadModal.onOpen()}
+            onCreate={() => {
+              setEditDataset(undefined);
+              addEditDatasetDrawer.onOpen();
+            }}
           >
-            <Upload height={17} width={17} strokeWidth={2.5} /> Upload or create
-            dataset <ChevronDown size={16} />
-          </Button>
-        </UploadOrCreateDatasetMenu>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="upload-or-create-dataset"
+            >
+              <Upload height={17} width={17} strokeWidth={2.5} /> Upload or
+              create dataset <ChevronDown size={16} />
+            </Button>
+          </UploadOrCreateDatasetMenu>
+        )}
       </PageLayout.Header>
       <Box width="full" maxW="calc(100vw - 200px)" paddingX={6} paddingY={6}>
-        {datasets.data && datasets.data.length === 0 ? (
+        {projectIsAggregate ? (
+          // An aggregate (ADR-144) keeps no datasets of its own, and the
+          // server refuses one created under it.
+          <AggregateReadOnlyNotice />
+        ) : datasets.data && datasets.data.length === 0 ? (
           <NoDataInfoBlock
             title="No datasets yet"
             description="Upload or create datasets on your messages to do further analysis or to train your own models."

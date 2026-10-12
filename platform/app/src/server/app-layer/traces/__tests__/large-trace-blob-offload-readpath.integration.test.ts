@@ -88,6 +88,7 @@ import {
   resolveOffloadedTraces,
   type WarnLogger,
 } from "~/server/traces/resolve-offloaded-traces";
+import { ownProof } from "~/test-utils/authorizationProofs";
 
 // Gate identically to the canonical event_log integration test: skip when no
 // real ClickHouse is reachable, run against the testcontainer otherwise.
@@ -348,7 +349,10 @@ describe.skipIf(!hasTestcontainers)(
           },
         );
 
-        const spans = await service.getSpansByTraceId({ tenantId, traceId });
+        const spans = await service.getSpansByTraceId({
+          authorization: ownProof({ projectId: tenantId }),
+          traceId,
+        });
 
         // The mapper keeps a non-JSON langwatch.input string as { type: "text" }.
         expect(spans).toHaveLength(1);

@@ -114,7 +114,7 @@ describe("useTraceListEvents", () => {
       it("merges each trace's events onto its own row", () => {
         resolveWith({
           data: {
-            t1: {
+            "proj-1:t1": {
               names: [{ name: "thumbs_up_down", count: 1, firstTimestamp: 5 }],
               totalCount: 1,
               distinctCount: 1,
@@ -133,6 +133,38 @@ describe("useTraceListEvents", () => {
         });
         // A trace the read said nothing about recorded nothing.
         expect(result.current[1]?.events).toEqual(NO_TRACE_EVENTS);
+      });
+    });
+
+    describe("when two members of an aggregate list a trace under the same id", () => {
+      /** @scenario "Two members with the same trace id each list their own events" */
+      it("gives each member's row only its own member's events", () => {
+        resolveWith({
+          data: {
+            "member-a:shared": {
+              names: [{ name: "vote", count: 1, firstTimestamp: 5 }],
+              totalCount: 1,
+              distinctCount: 1,
+            },
+            "member-b:shared": {
+              names: [{ name: "tool.output", count: 2, firstTimestamp: 7 }],
+              totalCount: 2,
+              distinctCount: 1,
+            },
+          },
+        });
+        const rowOf = (projectId: string) => ({ ...row("shared"), projectId });
+
+        const { result } = renderHook(() =>
+          useTraceListEvents({ rows: [rowOf("member-a"), rowOf("member-b")] }),
+        );
+
+        expect(result.current[0]?.events.groups).toEqual([
+          { name: "vote", count: 1, firstTimestamp: 5 },
+        ]);
+        expect(result.current[1]?.events.groups).toEqual([
+          { name: "tool.output", count: 2, firstTimestamp: 7 },
+        ]);
       });
     });
 
@@ -160,7 +192,7 @@ describe("useTraceListEvents", () => {
         // false, and none of it is keyed by a trace on the new page.
         resolveWith({
           data: {
-            "old-page-trace": {
+            "proj-1:old-page-trace": {
               names: [{ name: "tool.output", count: 1, firstTimestamp: 1 }],
               totalCount: 1,
               distinctCount: 1,

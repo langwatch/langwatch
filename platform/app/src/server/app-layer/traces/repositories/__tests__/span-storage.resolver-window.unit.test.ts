@@ -8,7 +8,8 @@
  * seconds per lookup for traces that are minutes old.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
 
 function createCapturingClient(
   resolverResponses: Array<string | number | null>,
@@ -46,12 +47,10 @@ describe("SpanStorageClickHouseRepository trace OccurredAt resolver", () => {
     it("resolves from the windowed probe and never scans unbounded", async () => {
       const occurredAtMs = Date.now() - 60_000;
       const { client, queries } = createCapturingClient([occurredAtMs]);
-      const repo = new SpanStorageClickHouseRepository(
-        async () => client as never,
-      );
+      const repo = spanStorageRepositoryFor(async () => client as never);
 
       await repo.getSpanByIds({
-        tenantId: "project_test",
+        authorization: ownProof({ projectId: "project_test" }),
         traceId: "trace_recent",
         spanId: "span_1",
       });
@@ -73,12 +72,10 @@ describe("SpanStorageClickHouseRepository trace OccurredAt resolver", () => {
         null,
         oldOccurredAtMs,
       ]);
-      const repo = new SpanStorageClickHouseRepository(
-        async () => client as never,
-      );
+      const repo = spanStorageRepositoryFor(async () => client as never);
 
       await repo.getSpanByIds({
-        tenantId: "project_test",
+        authorization: ownProof({ projectId: "project_test" }),
         traceId: "trace_old",
         spanId: "span_1",
       });

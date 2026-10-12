@@ -72,23 +72,26 @@ const NO_TOOL_SPANS = new Map();
 interface Props {
   traceId: string;
   conversationId: string | null;
+  tenantId: string | null;
 }
 
 function setup({
   traceId = "turn-3",
   conversationId = "session-a",
+  tenantId = null,
 }: Partial<Props> = {}) {
   return renderHook(
     (props: Props) =>
       useSessionScrollback({
         projectId: "project-1",
+        tenantId: props.tenantId,
         traceId: props.traceId,
         occurredAtMs: 3_000,
         conversationId: props.conversationId,
         openedTranscript: OPENED_ENTRIES,
         openedToolSpans: NO_TOOL_SPANS,
       }),
-    { initialProps: { traceId, conversationId } },
+    { initialProps: { traceId, conversationId, tenantId } },
   );
 }
 
@@ -135,6 +138,32 @@ describe("useSessionScrollback", () => {
           { projectId: "project-1", traceId: "turn-2", occurredAtMs: 2_000 },
           { staleTime: 60_000 },
         );
+      });
+
+      describe("when the drawer is on a member of an aggregate project", () => {
+        it("reads the earlier turn from that member", async () => {
+          const { result } = setup({ tenantId: "member-project" });
+
+          await act(async () => {
+            result.current.loadEarlier();
+          });
+
+          const memberRead = {
+            projectId: "project-1",
+            traceId: "turn-2",
+            occurredAtMs: 2_000,
+            tenantId: "member-project",
+          };
+          expect(fetchTranscript).toHaveBeenCalledWith(memberRead, {
+            staleTime: 60_000,
+          });
+          expect(fetchSpans).toHaveBeenCalledWith(memberRead, {
+            staleTime: 60_000,
+          });
+          expect(fetchEvents).toHaveBeenCalledWith(memberRead, {
+            staleTime: 60_000,
+          });
+        });
       });
 
       it("prepends its entries above the opened turn, with a boundary between", async () => {
@@ -256,7 +285,11 @@ describe("useSessionScrollback", () => {
         act(() => {
           result.current.loadEarlier();
         });
-        rerender({ traceId: "turn-2", conversationId: "session-a" });
+        rerender({
+          traceId: "turn-2",
+          conversationId: "session-a",
+          tenantId: null,
+        });
 
         await act(async () => {
           releaseTranscript({ entries: EARLIER_ENTRIES });
@@ -275,7 +308,11 @@ describe("useSessionScrollback", () => {
         });
         expect(result.current.entries).toHaveLength(3);
 
-        rerender({ traceId: "turn-2", conversationId: "session-a" });
+        rerender({
+          traceId: "turn-2",
+          conversationId: "session-a",
+          tenantId: null,
+        });
 
         expect(result.current.entries).toEqual(OPENED_ENTRIES);
         expect(result.current.earlierCount).toBe(1);
@@ -295,7 +332,11 @@ describe("useSessionScrollback", () => {
           result.current.loadEarlier();
         });
 
-        rerender({ traceId: "turn-2", conversationId: "session-a" });
+        rerender({
+          traceId: "turn-2",
+          conversationId: "session-a",
+          tenantId: null,
+        });
         await act(async () => {
           releaseTranscript({ entries: EARLIER_ENTRIES });
         });
@@ -303,7 +344,11 @@ describe("useSessionScrollback", () => {
         // Stepping back finds the turn was never prepended. A read that lands
         // after the reader moved belongs to the ledger they were on, and
         // committing it would grow that history behind their back.
-        rerender({ traceId: "turn-3", conversationId: "session-a" });
+        rerender({
+          traceId: "turn-3",
+          conversationId: "session-a",
+          tenantId: null,
+        });
         expect(result.current.entries).toEqual(OPENED_ENTRIES);
       });
     });

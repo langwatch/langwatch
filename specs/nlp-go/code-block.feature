@@ -170,6 +170,37 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When I invoke the workflow 5 times in succession
       Then every invocation returns x=1
 
+  Rule: Every execution runs a freshly materialized runner
+
+    # The runner script and its bundled `dspy` stand-in are written from the
+    # engine's own embedded copy into a directory created for that one
+    # execution, and the directory is removed when the execution ends. The
+    # trust anchor is the embedded bytes held in the engine process, which
+    # user code cannot reach, so what a later execution runs never depends on
+    # what an earlier one left on disk.
+
+    @unit
+    Scenario: user code cannot change what a later execution runs
+      Given one executor serving several executions
+      And a first code node whose body rewrites the runner script on disk
+      When the executor runs that request and then a second ordinary request
+      Then the second request returns its declared output
+      And the second request is unaffected by the rewrite
+
+    @unit
+    Scenario: user code cannot change the dspy stand-in a later execution imports
+      Given one executor serving several executions
+      And a first code node whose body rewrites the bundled dspy stand-in on disk
+      When the executor runs that request and then a second request importing dspy
+      Then the second request sees the shipped stand-in, not the rewritten one
+
+    @unit
+    Scenario: each execution gets its own temporary directory, removed afterwards
+      Given a code node whose body writes a file next to the runner
+      When the executor runs the request twice
+      Then the second execution does not see the file the first one wrote
+      And no execution directory is left behind once the executor is done
+
   Rule: Container packages a stable Python toolchain for user code
 
     @integration

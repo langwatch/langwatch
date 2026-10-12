@@ -14,6 +14,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { signOut } from "~/utils/auth-client";
 import { useRouter } from "~/utils/compat/next-router";
+import { CONTACT_SALES_URL } from "../../ee/licensing/constants";
 import { TeamAccessWaiting } from "../features/auth/components/team-access-waiting";
 import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
 import { useOrganizationMfaGate } from "../features/mfa/hooks/useOrganizationMfaGate";
@@ -34,6 +35,7 @@ import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { JoinYourTeamTakeover } from "./JoinYourTeamTakeover";
 import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { SavedViewsBar } from "./SavedViewsBar";
+import { projectNavigation } from "./sidebar/projectKindNavigation";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
 import { PageErrorFallback } from "./ui/PageErrorFallback";
@@ -174,8 +176,13 @@ export const DashboardPageBody = ({
     organizationRole === OrganizationUserRole.ADMIN;
 
   // Analytics is the last surface on the v1 saved-views bar; the Trace
-  // Explorer carries its own view system.
-  const showSavedViews = router.pathname.startsWith("/[project]/analytics");
+  // Explorer carries its own view system. A project whose navigation has no
+  // Analytics (an aggregate, ADR-144) only shows the not-available notice
+  // there and takes no writes, so it gets no bar, no Edit menu and no
+  // saved-views read. Same rule as AggregateAnalyticsGate.
+  const showSavedViews =
+    router.pathname.startsWith("/[project]/analytics") &&
+    projectNavigation(project?.kind).analytics;
 
   return (
     <VStack width="full" gap={0} {...props}>
@@ -265,6 +272,56 @@ export const DashboardPageBody = ({
               </Alert.Content>
             </Alert.Root>
           )}
+        {usage.data?.seatLimitInfo?.status === "exceeded" && (
+          <Alert.Root
+            status="warning"
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor="yellow.300"
+            data-testid="seat-limit-banner"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              {usage.data.activePlan.type === "ENTERPRISE" ? (
+                <Text>
+                  {usage.data.seatLimitInfo.message}{" "}
+                  <Link
+                    href={CONTACT_SALES_URL}
+                    textDecoration="underline"
+                    _hover={{ textDecoration: "none" }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "seats_limit_exceeded",
+                      });
+                    }}
+                  >
+                    Contact sales
+                  </Link>{" "}
+                  to add seats.
+                </Text>
+              ) : (
+                <Text>
+                  {usage.data.seatLimitInfo.message}{" "}
+                  <Link
+                    href={planManagementUrl}
+                    textDecoration="underline"
+                    _hover={{ textDecoration: "none" }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "seats_limit_exceeded",
+                      });
+                    }}
+                  >
+                    Upgrade your plan
+                  </Link>{" "}
+                  to keep everyone.
+                </Text>
+              )}
+            </Alert.Content>
+          </Alert.Root>
+        )}
         {usage.data &&
           usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
             <Alert.Root

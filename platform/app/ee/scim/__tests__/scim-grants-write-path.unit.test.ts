@@ -24,10 +24,25 @@ import { ScimService } from "../scim.service";
  */
 import { resourceStore } from "./scim-user-resource.fixture";
 
+// A removal re-reads the organization's aggregate projects through the App;
+// none exist here, so the App answers with no reconciler.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
-  tryGetApp: () => ({ redis: null }),
+  tryGetApp: () => ({
+    redis: null,
+    projects: { aggregateReconciler: undefined },
+  }),
 }));
+
+// Delegates to the real reconciler; the spy only records what it was asked
+// to converge on, so a test can tell an empty desired set from an early exit.
+const reconcileScimGrantsSpy = vi.hoisted(() => vi.fn());
+vi.mock("../scim-grants.reconciler", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../scim-grants.reconciler")>();
+  reconcileScimGrantsSpy.mockImplementation(actual.reconcileScimGrants);
+  return { ...actual, reconcileScimGrants: reconcileScimGrantsSpy };
+});
 
 // The flag is validated once at module load, so `vi.stubEnv` would never
 // reach it. The env object itself is the seam — the same shape
@@ -730,6 +745,47 @@ describe("ScimService, with the grants flag off", () => {
     expect(prisma.organizationUser.deleteMany).toHaveBeenCalledWith({
       where: { userId: USER, organizationId: ORGANIZATION },
     });
+  });
+
+  /** @scenario Directory sync leaves a Developer alone */
+  it("asserts no organization grant for somebody on a Developer seat, and leaves the row as it is", async () => {
+    // A re-provision: the directory deleted them once, so a fresh create
+    // passes the "already exists" check and reaches the grant reconciliation.
+    await prisma.scimUserResource.upsert({
+      where: {
+        organizationId_userId: { organizationId: ORGANIZATION, userId: USER },
+      },
+      create: {
+        organizationId: ORGANIZATION,
+        userId: USER,
+        userName: "alice@acme.com",
+        name: null,
+        active: false,
+        deletedAt: new Date("2026-01-01T00:00:00Z"),
+      },
+      update: {},
+    });
+    prisma.organizationUser.findUnique = vi
+      .fn()
+      .mockResolvedValue({ userId: USER, role: "DEVELOPER" });
+
+    const result = await service.createUser({
+      organizationId: ORGANIZATION,
+      connectionId: CONNECTION,
+      request: {
+        schemas: ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        userName: "alice@acme.com",
+      },
+    });
+
+    expect(result).not.toHaveProperty("status");
+    expect(reconcileScimGrantsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ desired: [] }),
+    );
+    // No grant, and no rewrite of the row either: the service has no code
+    // path that changes an existing member's role on a sync, which is what
+    // "leaves the row as it is" rests on.
+    expect(ledger.attachBindings).not.toHaveBeenCalled();
   });
 
   it("still asserts an unconditional MEMBER grant, as it did before", async () => {

@@ -111,6 +111,8 @@ vi.mock("~/server/app-layer/app", () => ({
 // Top-level `z` is safe to close over in a vi.mock factory — vitest hoists
 // vi.mock calls but allows factories to reference imports of OTHER modules.
 vi.mock("~/server/api/routers/traces.schemas", () => ({
+  publicTraceSearchPageSizeInput: z.number().optional(),
+  MAX_TRACE_LIST_PAGE_SIZE: 1000,
   getAllForProjectInput: z.object({
     projectId: z.string(),
     startDate: z.number(),

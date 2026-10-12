@@ -12,10 +12,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import {
   type LogRedactionService,
   prepareCanonicalLogRecords,
 } from "~/server/event-sourcing/pipelines/log-processing/canonicalLog";
+import { aggregateProof, ownProof } from "~/test-utils/authorizationProofs";
 import {
   startTestContainers,
   stopTestContainers,
@@ -36,6 +38,16 @@ const timeRange = {
 };
 
 const SESSION_ALPHA = `${tag}-sess-alpha`;
+/**
+ * An aggregate over two members that each hold a trace under the same id,
+ * in sessions of their own. The id alone cannot tell their previews apart.
+ */
+const TWIN_AGGREGATE = `${tag}-twin-aggregate`;
+const TWIN_MEMBER_X = `${tag}-twin-x`;
+const TWIN_MEMBER_Y = `${tag}-twin-y`;
+const TWIN_TRACE_ID = `${tag}-twin-trace`;
+const TWIN_SESSION_X = `${tag}-twin-sess-x`;
+const TWIN_SESSION_Y = `${tag}-twin-sess-y`;
 const SESSION_BETA = `${tag}-sess-beta`;
 
 function traceSummaryRow(overrides: Record<string, unknown> = {}) {
@@ -208,7 +220,7 @@ function query(
   overrides: Partial<SessionGroupsQuery> = {},
 ): SessionGroupsQuery {
   return {
-    tenantId,
+    authorization: ownProof({ projectId: tenantId }),
     timeRange,
     sort: { column: "lastActivity", direction: "desc" },
     limit: 50,
@@ -219,7 +231,9 @@ function query(
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repository = new SessionGroupsClickHouseRepository(async () => ch);
+  repository = new SessionGroupsClickHouseRepository(
+    new AuthorizedClickHouse({ resolveClient: async () => ch }),
+  );
 
   await insertTraceSummaries([
     // Session alpha: three traces whose rollup the small-page read must
@@ -284,6 +298,31 @@ beforeAll(async () => {
       OccurredAt: new Date(baseMs - 10_000),
       TotalCost: 100,
     }),
+    // The twin members: one trace id in two tenants, each in its own session.
+    {
+      ...sessionTrace({
+        sessionId: TWIN_SESSION_X,
+        traceId: TWIN_TRACE_ID,
+        occurredAtMs: baseMs - 20_000,
+        cost: 1,
+        promptTokens: 10,
+        completionTokens: 5,
+        computedInput: "twin prompt of member x",
+      }),
+      TenantId: TWIN_MEMBER_X,
+    },
+    {
+      ...sessionTrace({
+        sessionId: TWIN_SESSION_Y,
+        traceId: TWIN_TRACE_ID,
+        occurredAtMs: baseMs - 10_000,
+        cost: 1,
+        promptTokens: 10,
+        completionTokens: 5,
+        computedInput: "twin prompt of member y",
+      }),
+      TenantId: TWIN_MEMBER_Y,
+    },
   ]);
 
   await insertSessionLog({
@@ -490,6 +529,103 @@ describe("SessionGroupsClickHouseRepository", () => {
       );
       expect(current.rows.map((row) => row.conversationId)).toContain(
         sessionId,
+      );
+    });
+  });
+
+  describe("given two members holding the same trace id in sessions of their own", () => {
+    it("keeps each session's own preview", async () => {
+      const page = await repository.findSessionGroups(
+        query({
+          authorization: aggregateProof({
+            projectId: TWIN_AGGREGATE,
+            members: [
+              { projectId: TWIN_MEMBER_X, from: 0 },
+              { projectId: TWIN_MEMBER_Y, from: 0 },
+            ],
+            now: baseMs,
+          }),
+        }),
+      );
+
+      const x = page.rows.find((row) => row.conversationId === TWIN_SESSION_X);
+      const y = page.rows.find((row) => row.conversationId === TWIN_SESSION_Y);
+      expect(x?.lastTraceId).toBe(TWIN_TRACE_ID);
+      expect(y?.lastTraceId).toBe(TWIN_TRACE_ID);
+      expect(x?.input).toBe("twin prompt of member x");
+      expect(y?.input).toBe("twin prompt of member y");
+    });
+  });
+
+  describe("given two members whose sessions share one conversation id", () => {
+    it("lists one session per member and pages through both", async () => {
+      const sharedConversation = `shared-conversation-${nanoid()}`;
+      const memberX = `${TWIN_MEMBER_X}-shared`;
+      const memberY = `${TWIN_MEMBER_Y}-shared`;
+      await insertTraceSummaries([
+        {
+          ...sessionTrace({
+            sessionId: sharedConversation,
+            traceId: `shared-x-${nanoid()}`,
+            occurredAtMs: baseMs + 5_000,
+            cost: 1,
+            promptTokens: 1,
+            completionTokens: 1,
+          }),
+          TenantId: memberX,
+        },
+        {
+          ...sessionTrace({
+            sessionId: sharedConversation,
+            traceId: `shared-y-${nanoid()}`,
+            occurredAtMs: baseMs + 5_000,
+            cost: 2,
+            promptTokens: 2,
+            completionTokens: 2,
+          }),
+          TenantId: memberY,
+        },
+      ]);
+      const authorization = aggregateProof({
+        projectId: TWIN_AGGREGATE,
+        members: [
+          { projectId: memberX, from: 0 },
+          { projectId: memberY, from: 0 },
+        ],
+        now: baseMs,
+      });
+
+      const page = await repository.findSessionGroups(query({ authorization }));
+      expect(
+        page.rows
+          .map((row) => ({ tenantId: row.tenantId, cost: row.totalCost }))
+          .sort((a, b) => a.cost - b.cost),
+      ).toEqual([
+        { tenantId: memberX, cost: 1 },
+        { tenantId: memberY, cost: 2 },
+      ]);
+      expect(page.totalHits).toBe(2);
+
+      // Walking one row per page on the tie: same sort value, same
+      // conversation id, so only the tenant tells the pages apart.
+      const first = await repository.findSessionGroups(
+        query({ authorization, limit: 1 }),
+      );
+      const firstRow = first.rows[0];
+      if (!firstRow) throw new Error("expected a first session");
+      const second = await repository.findSessionGroups(
+        query({
+          authorization,
+          limit: 1,
+          cursor: {
+            sortValue: firstRow.lastActivityMs,
+            conversationId: firstRow.conversationId,
+            tenantId: firstRow.tenantId,
+          },
+        }),
+      );
+      expect([firstRow.tenantId, second.rows[0]?.tenantId].sort()).toEqual(
+        [memberX, memberY].sort(),
       );
     });
   });

@@ -13,7 +13,10 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => mockLogger,
 }));
 
-import { getClickHouseMaxOpenConnections } from "../connectionPool";
+import {
+  getClickHouseMaxOpenConnections,
+  getClickHouseStatementLaneReserveShare,
+} from "../connectionPool";
 
 // Every knob the resolver reads: the process may really be running inside a
 // deployment that sets some of them (haven exports the server cap), and a
@@ -104,6 +107,73 @@ describe("getClickHouseMaxOpenConnections", () => {
 
       expect(getClickHouseMaxOpenConnections()).toBe(64);
       expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("getClickHouseStatementLaneReserveShare", () => {
+  const original = process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE;
+
+  beforeEach(() => {
+    delete process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE;
+    mockLogger.warn.mockClear();
+  });
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE;
+    } else {
+      process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE = original;
+    }
+  });
+
+  describe("given the env var is unset", () => {
+    it("returns the default of 0.25", () => {
+      expect(getClickHouseStatementLaneReserveShare()).toBe(0.25);
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the env var holds a share within (0, 0.5]", () => {
+    it("returns that share", () => {
+      process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE = "0.3";
+      expect(getClickHouseStatementLaneReserveShare()).toBe(0.3);
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it("accepts the upper bound of 0.5", () => {
+      process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE = "0.5";
+      expect(getClickHouseStatementLaneReserveShare()).toBe(0.5);
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe.each(["0", "0.6", "abc"])("given the env var is %j", (raw) => {
+    describe("when the share is resolved", () => {
+      it("falls back to the default and warns", () => {
+        process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE = raw;
+        expect(getClickHouseStatementLaneReserveShare()).toBe(0.25);
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          { raw, using: 0.25 },
+          "Invalid CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE; using default",
+        );
+      });
+    });
+  });
+
+  // A blank value is "unset", not a typo: it must take the default silently so
+  // a deployment that templates the var in but leaves it empty is not warned on
+  // every boot.
+  describe.each([
+    ["an empty string", ""],
+    ["whitespace", "   "],
+  ])("given the env var is %s", (_label, raw) => {
+    describe("when the share is resolved", () => {
+      it("takes the default without warning", () => {
+        process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE = raw;
+        expect(getClickHouseStatementLaneReserveShare()).toBe(0.25);
+        expect(mockLogger.warn).not.toHaveBeenCalled();
+      });
     });
   });
 });

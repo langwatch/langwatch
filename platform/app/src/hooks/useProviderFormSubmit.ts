@@ -74,7 +74,6 @@ export type UseProviderFormSubmitState = {
 
 export type UseProviderFormSubmitActions = {
   submit: () => Promise<void>;
-  setEnabled: (enabled: boolean) => Promise<void>;
   reset: () => void;
 };
 
@@ -132,35 +131,6 @@ export function useProviderFormSubmit({
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
-
-  const setEnabled = useCallback(
-    async (newEnabled: boolean) => {
-      const snapshot = getFormSnapshot();
-      try {
-        await updateMutation.mutateAsync({
-          id: snapshot.provider.id,
-          projectId: snapshot.projectId,
-          organizationId: snapshot.organizationId,
-          provider: snapshot.provider.provider,
-          enabled: newEnabled,
-          customKeys: snapshot.provider.customKeys as any,
-          customModels: snapshot.provider.customModels ?? [],
-          customEmbeddingsModels:
-            snapshot.provider.customEmbeddingsModels ?? [],
-        });
-        await invalidateModelProviderQueries(utils);
-        broadcastModelProvidersUpdated();
-        onSuccess?.();
-      } catch (err) {
-        onError?.(err);
-        showErrorToast({
-          error: err,
-          fallbackTitle: "Couldn't update the provider",
-        });
-      }
-    },
-    [getFormSnapshot, onSuccess, onError, updateMutation, utils],
-  );
 
   const submit = useCallback(async () => {
     setIsSaving(true);
@@ -516,7 +486,6 @@ export function useProviderFormSubmit({
     isSaving,
     errors,
     submit,
-    setEnabled,
     reset,
   };
 }

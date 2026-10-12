@@ -22,6 +22,7 @@ const samsRequest: PendingJoinRequest = {
   domain: "acme.com",
   requestedAt: new Date("2026-08-20T09:00:00Z"),
   expiresAt: new Date("2026-09-03T09:00:00Z"),
+  seat: "MEMBER",
 };
 
 const renderPanel = (
@@ -133,6 +134,35 @@ describe("given an organization with a pending request", () => {
 
       await userEvent.click(screen.getByRole("button", { name: "Reject" }));
       expect(onReject).toHaveBeenCalledWith("jreq_1");
+    });
+  });
+});
+
+describe("given one request from the terminal and one from the web", () => {
+  afterEach(() => cleanup());
+
+  describe("when an administrator opens the pending requests", () => {
+    /** @scenario The pending list shows the seat each request will land as */
+    it("marks each with the seat it will land as, and offers nothing to change it", () => {
+      renderPanel([
+        {
+          ...samsRequest,
+          joinRequestId: "jreq_cli",
+          name: "Dana Kim",
+          seat: "DEVELOPER",
+        },
+        samsRequest,
+      ]);
+
+      const rows = screen.getAllByTestId("join-request-row");
+      expect(rows[0]?.textContent).toContain("Developer");
+      expect(rows[1]?.textContent).toContain("Member");
+      // The mark is read only. Approval carries no role choice, so there is
+      // no control on the row to move a seat with.
+      expect(screen.queryByRole("combobox")).toBeNull();
+      expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(
+        2,
+      );
     });
   });
 });

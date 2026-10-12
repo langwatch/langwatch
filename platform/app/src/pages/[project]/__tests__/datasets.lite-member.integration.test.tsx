@@ -4,7 +4,10 @@
  * Integration tests for the Datasets page permission-based UI visibility.
  *
  * Verifies that edit/delete menu items are gated behind
- * the `datasets:manage` permission for lite members.
+ * the `datasets:manage` permission for lite members, and that an aggregate
+ * project (ADR-144) offers no way to create one.
+ *
+ * @see specs/governance/aggregate-project.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -12,32 +15,38 @@ import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockIsLiteMemberRef, mockDatasetsList, mockDeleteMutate } = vi.hoisted(
-  () => {
-    return {
-      mockIsLiteMemberRef: {
-        current: false,
-      },
-      mockDatasetsList: {
-        current: [] as Array<{
-          id: string;
-          slug: string;
-          name: string;
-          schema: null;
-          columnTypes: Array<{ name: string }>;
-          createdAt: Date;
-          updatedAt: Date;
-          archivedAt: null;
-          projectId: string;
-          useS3?: boolean;
-          s3RecordCount?: number;
-          _count: { datasetRecords: number };
-        }>,
-      },
-      mockDeleteMutate: vi.fn(),
-    };
-  },
-);
+const {
+  mockIsLiteMemberRef,
+  mockDatasetsList,
+  mockDeleteMutate,
+  mockProjectRef,
+} = vi.hoisted(() => {
+  return {
+    mockIsLiteMemberRef: {
+      current: false,
+    },
+    mockProjectRef: {
+      current: { id: "proj-1", slug: "test-project", kind: "application" },
+    },
+    mockDatasetsList: {
+      current: [] as Array<{
+        id: string;
+        slug: string;
+        name: string;
+        schema: null;
+        columnTypes: Array<{ name: string }>;
+        createdAt: Date;
+        updatedAt: Date;
+        archivedAt: null;
+        projectId: string;
+        useS3?: boolean;
+        s3RecordCount?: number;
+        _count: { datasetRecords: number };
+      }>,
+    },
+    mockDeleteMutate: vi.fn(),
+  };
+});
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -51,7 +60,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     organization: { id: "org-1" },
     organizations: [{ id: "org-1", name: "Test Org" }],
-    project: { id: "proj-1", slug: "test-project" },
+    project: mockProjectRef.current,
     hasOrgPermission: () => false,
     hasAnyPermission: () => false,
   }),
@@ -208,6 +217,11 @@ describe("Datasets page permission visibility", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsLiteMemberRef.current = false;
+    mockProjectRef.current = {
+      id: "proj-1",
+      slug: "test-project",
+      kind: "application",
+    };
     mockDatasetsList.current = [
       {
         id: "ds-1",
@@ -234,6 +248,27 @@ describe("Datasets page permission visibility", () => {
 
       expect(screen.getByText("Edit dataset")).toBeTruthy();
       expect(screen.getByText("Delete dataset")).toBeTruthy();
+    });
+  });
+
+  describe("when the open project is an aggregate", () => {
+    beforeEach(() => {
+      mockProjectRef.current = {
+        id: "proj-aggregate",
+        slug: "company-traces",
+        kind: "aggregate",
+      };
+    });
+
+    /** @scenario "The app marks the aggregate and offers no way to add data to it" */
+    it("says data can't be added and offers no way to create a dataset", () => {
+      renderPage();
+
+      expect(
+        screen.getByText("Data can't be added to this project"),
+      ).toBeTruthy();
+      expect(screen.queryByTestId("upload-or-create-dataset")).toBeNull();
+      expect(screen.queryByTestId("no-data-info-block")).toBeNull();
     });
   });
 

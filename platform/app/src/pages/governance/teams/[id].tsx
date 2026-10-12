@@ -15,6 +15,7 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { HandledErrorAlert } from "~/features/errors";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { landingProjectOf } from "~/server/app-layer/projects/project-kinds";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { getHexColorForString } from "~/utils/rotatingColors";
@@ -62,17 +63,19 @@ function GovernanceTeamDetailPage() {
     });
   const orgId = organization?.id ?? "";
   const canReadActivity = hasAnyPermission("activityMonitor:view");
-  // Resolve the team's first project slug for the bird's-eye drill-in
-  // link. Teams typically have a primary project (or a small set);
-  // navigating to /[projectSlug]/traces lands the admin on the team's
-  // workspace via the existing project-shell. No "viewing as admin" banner
-  // comes with it: that banner keys off a PERSONAL workspace owned by
-  // somebody else (see DashboardPageBody), and an org team is not one, so a
-  // team drill-through is silent and unlogged.
-  const teamProjectSlug =
+  // Resolve the team's landing project slug for the bird's-eye drill-in
+  // link: its first project that is not an aggregate, the same rule the app
+  // lands on (ADR-144 block F), since an aggregate reads other projects and
+  // is opened on purpose. Navigating to /[projectSlug]/traces lands the admin
+  // on the team's workspace via the existing project-shell. No "viewing as
+  // admin" banner comes with it: that banner keys off a PERSONAL workspace
+  // owned by somebody else (see DashboardPageBody), and an org team is not
+  // one, so a team drill-through is silent and unlogged.
+  const teamProjects =
     organizations
       ?.flatMap((org) => org.teams ?? [])
-      .find((t) => t.id === teamId)?.projects?.[0]?.slug ?? null;
+      .find((t) => t.id === teamId)?.projects ?? [];
+  const teamProjectSlug = landingProjectOf(teamProjects)?.slug ?? null;
 
   const teamsQuery = api.activityMonitor.spendByTeam.useQuery(
     { organizationId: orgId, windowDays: 30, limit: 500 },

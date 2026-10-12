@@ -75,12 +75,10 @@ export function queryWithoutFacet({
  */
 export function createFacetFilterCompiler({
   queryText,
-  tenantId,
   timeRange,
   evalRuns,
 }: {
   queryText: string;
-  tenantId: string;
   timeRange: { from: number; to: number };
   /** The Instant Eval runs registered for the query's `eval` chips. */
   evalRuns?: readonly ResolvedInstantEvalRun[];
@@ -88,7 +86,6 @@ export function createFacetFilterCompiler({
   const compile = (text: string) =>
     translateFilterWithEvalRuns({
       queryText: text,
-      tenantId,
       timeRange,
       ...(evalRuns ? { evalRuns } : {}),
     }) ?? undefined;

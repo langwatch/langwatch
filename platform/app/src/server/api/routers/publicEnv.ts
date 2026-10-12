@@ -65,6 +65,10 @@ export const publicEnvRouter = publicProcedure
       // so a passkey-only admin can still set the password break-glass needs. A
       // browser that keyed off NEXTAUTH_PROVIDER alone hid that door.
       EMAIL_PASSWORD_ENABLED: isEmailPasswordEnabled(env),
+      // `invite_only` hides the "create an account" links. The server refuses
+      // an uninvited sign-up either way; this only stops offering a door most
+      // visitors cannot use.
+      SIGN_UP_MODE: env.SIGN_UP_MODE,
       // The federated providers this deployment actually offers — mounted AND
       // licensed — as the sign-in method policy's own answer, so the
       // linked-accounts offer and the sign-in rail can never disagree. Ids

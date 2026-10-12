@@ -45,6 +45,11 @@ import {
 export interface ErrorPresentation {
   title: string;
   /**
+   * A headline for one variant of the code, when a single code covers
+   * failures with different fixes. Returning nothing keeps `title`.
+   */
+  titleFor?: (error: HandledErrorShape) => string | undefined;
+  /**
    * Optional body copy. Receives the error so it can use `meta` — but only
    * where this registry knows the shape of that meta, which is the whole
    * point: `meta` is a contract per code, not a bag to rummage through.
@@ -173,6 +178,13 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
   membersLite: "Lite Member seats",
 };
 
+/** Creation caps the cloud Free plan sets, named as the pricing page does. */
+const CREATION_LIMIT_LABELS: Record<string, string> = {
+  scenarios: "scenarios",
+  scenarioSets: "simulations",
+  evaluators: "custom evaluators",
+};
+
 /**
  * Registered migration names, in the operator's words rather than the
  * column's. Stable identifiers (renaming one orphans its state rows), so
@@ -234,14 +246,61 @@ const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * What a provider slot is missing when the gateway answers
+ * `provider_config_invalid`, as `meta.problem` (ConfigProblem in
+ * services/aigateway/domain/errors.go). A closed set: the sentence is picked
+ * by matching it, and a value outside it reads as the remainder.
+ */
+export const PROVIDER_CONFIG_PROBLEMS: ReadonlySet<string> = new Set([
+  "api_key_missing",
+  "endpoint_missing",
+  "deployment_missing",
+  "operation_unsupported",
+  "model_not_served",
+]);
+
+/**
  * The upstream-HTTP-status fallback reasons (llmproxy.go's
  * upstreamReasonCodes), used when the provider's own body carried no
  * discriminant of its own. Grouped the same way PROVIDER_ALLOWANCE_REASONS
  * is: one remediation, one sentence.
  */
-const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
+export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   "upstream_unauthorized",
   "upstream_forbidden",
+  // The providers' own codes for the same two statuses, which the proxy files
+  // instead of the status when the body carries one: Bedrock through the
+  // gateway ("access_denied" / "permission_denied_error"), Anthropic
+  // ("authentication_error" / "permission_error"), OpenAI ("invalid_api_key"),
+  // and the AWS SDK exception name.
+  "access_denied",
+  "permission_denied_error",
+  "authentication_error",
+  "permission_error",
+  "invalid_api_key",
+  "AccessDeniedException",
+  // A wrong AWS secret, an unknown or expired AWS access key.
+  "InvalidSignatureException",
+  "UnrecognizedClientException",
+  "ExpiredTokenException",
+  "InvalidClientTokenId",
+  "SignatureDoesNotMatch",
+  // Google's statuses for the same two refusals.
+  "UNAUTHENTICATED",
+  "PERMISSION_DENIED",
+]);
+
+/**
+ * The provider does not serve the model to this key: a 404 status, or the
+ * provider's own code for it (OpenAI "model_not_found", Anthropic
+ * "not_found_error", the AWS SDK exception name). Deterministic, like a
+ * refused credential: the fix is the model, not a retry.
+ */
+export const PROVIDER_MODEL_MISSING_REASONS: ReadonlySet<string> = new Set([
+  "upstream_not_found",
+  "model_not_found",
+  "not_found_error",
+  "ResourceNotFoundException",
 ]);
 
 /**
@@ -262,6 +321,20 @@ const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
   "upstream_unavailable",
   "upstream_timeout",
+  // The gateway's own codes for a provider it could not get an answer from.
+  "provider_timeout",
+  "provider_connection_failed",
+]);
+
+/**
+ * The provider refused the request itself as malformed: Bedrock's
+ * "ValidationException", or a 422 status. Deterministic, so the fix is another
+ * model, not a retry. The broad "invalid_request_error" and bare 400 are left
+ * out: Anthropic files a spent balance under them, and that one can pass.
+ */
+export const PROVIDER_INVALID_REQUEST_REASONS: ReadonlySet<string> = new Set([
+  "upstream_unprocessable_entity",
+  "ValidationException",
 ]);
 
 /**
@@ -297,6 +370,10 @@ const label = (
 
 const presentations = {
   // ---- traces & spans ----
+  annotation_not_found: {
+    title: "Annotation not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
+  },
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
@@ -496,12 +573,19 @@ const presentations = {
   instant_eval_not_enabled: {
     title: "Instant Evals aren't available yet",
     describe: () =>
-      "This project can't run Instant Evals. Ask us to turn them on for your workspace.",
+      "Instant Evals are off for this organization. Ask an organization admin how to switch them on, or contact us.",
   },
   instant_eval_not_found: {
     title: "That run doesn't exist",
     describe: () =>
       "The run may have been deleted, or the id may belong to another project.",
+  },
+  instant_eval_opt_in_not_offered: {
+    title: "Ask us to switch Instant Evals on",
+    describe: (error) =>
+      error.meta.deployment === "self_hosted"
+        ? "A self-hosted install gets Instant Evals from its license, or from whoever runs it when it has its own judge key, never from this switch. Contact us to add them to your license."
+        : "LangWatch switches Instant Evals on for an enterprise plan. Contact us to get them.",
   },
   instant_eval_query_invalid: {
     title: "That query can't run as a job",
@@ -903,6 +987,11 @@ const presentations = {
     title: "This evaluation needs an evaluator",
     describe: () =>
       "Pick an existing evaluator or create one first, then attach it to the evaluation.",
+  },
+  monitor_parameters_unused: {
+    title: "These settings belong to the evaluator",
+    describe: () =>
+      "This evaluation runs with its evaluator's settings. Change them on the evaluator instead.",
   },
   evaluator_not_found: { title: "Evaluator not found" },
   evaluator_config_error: {
@@ -1374,6 +1463,39 @@ const presentations = {
   },
 
   // ---- access, org & limits ----
+  aggregate_project_admin_only: {
+    // Reached from the new-project flow or the rule editor by someone whose
+    // role lets them manage projects but who is not an organisation admin.
+    // Nothing was written, so the copy says who can do it.
+    title: "Only organization admins can do this",
+    describe: () =>
+      "This project reads traces from every member project, including personal ones, so only an organization admin can create it or change what it reads.",
+  },
+  aggregate_project_has_no_credential: {
+    // Reached by an SDK or exporter pointed at the aggregate, so the answer is
+    // where the traces should go instead. The key is not the problem.
+    title: "This project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and accepts no API key of its own. Send traces to one of its member projects instead.",
+  },
+  aggregate_project_is_read_only: {
+    // Reached from any save, create or edit aimed at an aggregate, often a
+    // form opened before the project was switched, so the copy says where
+    // the change belongs rather than what went wrong. Renaming, archiving
+    // and editing its rule still work, so the title names data, not the
+    // project.
+    title: "Data can't be added to this project",
+    describe: () =>
+      "It reads traces from other projects and keeps nothing of its own. Open the project the data belongs to and make the change there.",
+  },
+  aggregate_rule_outside_organization: {
+    // Raised before anything is written, so the form is still open with the
+    // rule in it: the copy says what to change there. One answer for a
+    // foreign id and a missing one, on purpose.
+    title: "That rule names something outside this organization",
+    describe: () =>
+      "An aggregate project can only read projects and departments of this organization. Remove the project or department that isn't listed here, then create it again.",
+  },
   project_not_found: {
     title: "Project not found",
     describe: () =>
@@ -1999,6 +2121,16 @@ const presentations = {
         : "It only takes effect at organization scope. Bind it there instead.";
     },
   },
+  auth_sign_up_restricted: {
+    title: "Sign-up on this installation is by invitation",
+    describe: () =>
+      "Ask an administrator to invite your email address, then use the link in the invitation to create your account.",
+  },
+  organization_creation_restricted: {
+    title: "Organizations here are created by an administrator",
+    describe: () =>
+      "Ask an administrator to invite you to an existing organization, or to create a new one for you.",
+  },
   organization_slug_taken: {
     title: "That organization slug is already in use",
     describe: () =>
@@ -2166,7 +2298,14 @@ const presentations = {
     // avoid. Most seat refusals arrive as the upgrade modal rather than a toast,
     // and it says the same thing.
     describe: (error) => {
-      const label = SEAT_LIMIT_LABELS[str(error, "limitType", "")];
+      const limitType = str(error, "limitType", "");
+      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      if (creationLabel) {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
+        return `Your plan includes ${included}. Upgrade to create more. Everything you already have keeps working.`;
+      }
+      const label = SEAT_LIMIT_LABELS[limitType];
       if (!label) return "Upgrade your plan to raise it.";
       return `Your plan's ${label} are all in use. Upgrade to raise the allowance, or disable a membership from the members page to free one, which is reversible.`;
     },
@@ -2857,6 +2996,18 @@ const presentations = {
     describe: () =>
       "For OpenID Connect we need the issuer address, the client id and the client secret. For SAML we need the sign-in address, and either your identity provider's metadata or its entity id and signing certificate.",
   },
+  sso_issuer_mismatch: {
+    // Names both addresses: they are public, and the fix is to make them
+    // equal, which nobody can do without seeing both.
+    title: "The identity provider names a different issuer",
+    describe: (error) =>
+      `This connection expects ${str(error, "expected", "its issuer")}, and the identity provider sent ${str(error, "received", "a different one")}. Use the issuer the identity provider names. For Microsoft Entra ID that is https://login.microsoftonline.com/<tenant id>/v2.0 with the tenant id of the app registration, not a user's home tenant and not common or organizations.`,
+  },
+  sso_issuer_multi_tenant: {
+    title: "Use your tenant's own issuer",
+    describe: (error) =>
+      `${str(error, "issuer", "That address")} is a Microsoft Entra ID multi-tenant endpoint, and no sign-in token carries it as the issuer. Use https://login.microsoftonline.com/<tenant id>/v2.0 with the tenant id of the app registration.`,
+  },
   sso_issuer_unreachable: {
     // Says the address did not answer and nothing about our side of the call.
     // A timeout, a refused connection and a 404 are one thing to the person
@@ -2881,7 +3032,7 @@ const presentations = {
     // and an internals leak on a screen an administrator opens.
     title: "Single sign-on needs an active license",
     describe: () =>
-      "Activate an enterprise license on this installation, then restart it, and you can set single sign-on up here.",
+      "Activate an enterprise license on this installation, and you can set single sign-on up here. A license activated a moment ago reaches every server within a minute.",
   },
   sso_domain_claim_pending: {
     // Reached by one claim only now: one on a domain somebody else already
@@ -3002,7 +3153,7 @@ const presentations = {
   sso_domain_not_verified: {
     title: "That address isn't on a verified domain",
     describe: () =>
-      "Your organization hasn't verified the domain of the address your identity provider sent. Ask whoever manages single sign-on to verify it.",
+      "Your organization hasn't verified the domain of the address your identity provider sent. If you are setting up single sign-on, verify the domain in Settings > Authentication > Identity provider and try again. Otherwise, ask whoever manages single sign-on to verify it.",
   },
   sso_domain_proof_lapsed: {
     // Says why a colleague can sign in and this reader cannot, because that
@@ -3014,7 +3165,7 @@ const presentations = {
   sso_existing_account_unconfirmed: {
     title: "An account with this address already exists",
     describe: () =>
-      "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain and your identity provider marks the address as verified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
+      "Its address was never confirmed, so single sign-on can be added only once your organization has verified the domain, and not while your identity provider reports the address as unverified. Sign in the way you did before, or ask whoever manages single sign-on to check both.",
   },
   identity_link_proposal_not_found: {
     title: "That waiting sign-in is no longer there",
@@ -3169,6 +3320,23 @@ const presentations = {
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
+  },
+  developer_seat_no_shared_access: {
+    // Not a field to correct: the seat sets the ceiling. The scope can be a
+    // team, a project or the organization, so the copy names the seat.
+    title: "A Developer seat has no shared access",
+    describe: (error) => {
+      const scopeName = str(error, "scopeName", "");
+      const scope = scopeName ? ` on "${scopeName}"` : "";
+      return `A Developer seat works in its own project only, so no role can be given${scope}. Move them to a Member seat to give them shared access.`;
+    },
+  },
+  developer_seat_restricted: {
+    // A Developer seat reaches its own project only (ADR-143). No admin can
+    // grant a role here, so the copy names the seat rather than a permission.
+    title: "This is outside your Developer seat",
+    describe: () =>
+      "A Developer seat works in your own project only. Ask an admin for a Member seat if you need shared projects.",
   },
   dataset_column_type_change_unsupported: {
     // Customer fault in the ADR-045 sense: they asked for something the format
@@ -3521,6 +3689,13 @@ const presentations = {
         ? `This project has sent as many as a minute allows. Try again in ${seconds} second${seconds === 1 ? "" : "s"}.`
         : "This project has sent as many as a minute allows. Try again now.";
     },
+  },
+
+  trigger_graph_immutable: {
+    title: "This alert stays on its graph",
+    describe: () =>
+      "An alert keeps the graph it was created on. Create an alert on the " +
+      "graph you want and delete this one.",
   },
 
   trigger_kind_immutable: {
@@ -4242,8 +4417,37 @@ const presentations = {
   },
   provider_config_invalid: {
     title: "This provider is not set up to serve that model",
+    // The body names the gap, so the headline has to name the same one.
+    titleFor: (error) => {
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This provider has no API key saved";
+        case "endpoint_missing":
+          return "This provider has no endpoint URL saved";
+        case "deployment_missing":
+          return "This provider has no deployment for that model";
+        case "operation_unsupported":
+          return "This provider does not support this kind of request";
+      }
+      return undefined;
+    },
     describe: (error) => {
       const model = str(error, "model", "");
+      // One code, several different things to change. Telling a customer whose
+      // provider was saved with no API key to "add the model" sends them to the
+      // wrong field, so the gateway names the gap and each gets its sentence.
+      switch (str(error, "problem", "")) {
+        case "api_key_missing":
+          return "This model provider is enabled with no API key saved, so the request never reached it. Add the API key in Settings → Model Providers.";
+        case "endpoint_missing":
+          return "This model provider has no endpoint URL saved, so there was nowhere to send the request. Add the endpoint in Settings → Model Providers.";
+        case "deployment_missing":
+          return model
+            ? `This model provider has no deployment mapped for ${model}. Add the deployment mapping in Settings → Model Providers.`
+            : "This model provider has no deployment mapped for that model. Add the deployment mapping in Settings → Model Providers.";
+        case "operation_unsupported":
+          return "This model provider does not support this kind of request. Pick a model from a provider that does.";
+      }
       if (model) {
         return `No provider on this project is configured for ${model}. Add it to one in Settings → Model Providers.`;
       }
@@ -4442,6 +4646,13 @@ const presentations = {
         : "Pick the project where its traces and costs land. Without one they go to a hidden governance project, and every budget on the project you had in mind counts nothing.";
     },
   },
+  gateway_trace_project_not_a_destination: {
+    // The form is still open with the aggregate picked, so the copy says
+    // what to pick instead.
+    title: "That project doesn't receive traces",
+    describe: () =>
+      "It reads traces from other projects and has none of its own. Pick one of the projects it reads as this key's destination.",
+  },
   gateway_trace_project_unknown: {
     // Says the destination is the problem, not the key, because the form
     // shows a picker and the natural reading of a refusal there is that the
@@ -4629,18 +4840,29 @@ const presentations = {
     // cannot name is exactly the ADR-045 "unknown" scenario, and a trace id serves
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
+    // A refused key has one fix, so the headline names it like the body does.
+    titleFor: (error) =>
+      hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
+        ? "This provider rejected the API key"
+        : undefined,
     describe: (error) => {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
-        return "The model provider refused this key or its permissions. Check the credential configured for this model.";
+        return "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_MODEL_MISSING_REASONS)) {
+        return "The model provider does not serve this model to this key. Check the model name, or pick a different model.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_RATE_LIMIT_REASONS)) {
         return "The model provider is rate-limiting this model right now. Wait a minute and send your message again, or pick a model with more room.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_OUTAGE_REASONS)) {
         return "The model provider is temporarily unavailable. Try again shortly, or pick a different model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_INVALID_REQUEST_REASONS)) {
+        return "The model provider refused the request as invalid, and it refuses the same request every time. Pick a different model, or share the trace with support.";
       }
       return "Try again, or pick a different model.";
     },
@@ -5074,7 +5296,7 @@ export function explainHandledError(
   }
 
   return {
-    title: presentation.title,
+    title: presentation.titleFor?.(error) ?? presentation.title,
     description: presentation.describe?.(error) ?? "",
     isRegistered: true,
   };

@@ -33,7 +33,7 @@ Expected:
 
 This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it.
 
-The default ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
+The chart Ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. To reach `/healthz` from outside, add your own route to the gateway Service for it, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## 3. The gateway reaches the control plane
 
@@ -114,14 +114,14 @@ Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_
 
 ## 8. The control plane knows the public URL
 
-The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `gateway.ingress.host`.
+The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `ingress.gateway.host` when the app Ingress is enabled.
 
 ```bash
 kubectl -n langwatch get deploy langwatch-app \
   -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LW_GATEWAY_PUBLIC_URL")].value}'
 ```
 
-Expected: `https://gateway.acme.com`. An empty result means the ingress host is still the chart placeholder; set `gateway.ingress.host` or `gateway.publicUrl` and upgrade.
+Expected: `https://gateway.acme.com`. An empty result means the install has neither `ingress.gateway.host` nor `gateway.publicUrl`. Set one and upgrade.
 
 Members can then sign in from the CLI and get a [personal key](/ai-gateway/governance/personal-keys) bound to this gateway.
 

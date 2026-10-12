@@ -826,6 +826,21 @@ func (e GetApiAnnotationsTraceIdParamsAnchor) Valid() bool {
 	}
 }
 
+// Defines values for DeleteApiAnnotationsId404JSONResponseBodyError.
+const (
+	AnnotationNotFound DeleteApiAnnotationsId404JSONResponseBodyError = "annotation_not_found"
+)
+
+// Valid indicates whether the value is a known member of the DeleteApiAnnotationsId404JSONResponseBodyError enum.
+func (e DeleteApiAnnotationsId404JSONResponseBodyError) Valid() bool {
+	switch e {
+	case AnnotationNotFound:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateApiKeyJSONBodyBindingsRole.
 const (
 	CreateApiKeyJSONBodyBindingsRoleADMIN  CreateApiKeyJSONBodyBindingsRole = "ADMIN"
@@ -5595,15 +5610,18 @@ func (e UpdateOrganization200JSONResponseBodyPrimaryIntent) Valid() bool {
 
 // Defines values for ListOrganizationInvites200JSONResponseBodyInvitesRole.
 const (
-	ListOrganizationInvites200JSONResponseBodyInvitesRoleADMIN    ListOrganizationInvites200JSONResponseBodyInvitesRole = "ADMIN"
-	ListOrganizationInvites200JSONResponseBodyInvitesRoleEXTERNAL ListOrganizationInvites200JSONResponseBodyInvitesRole = "EXTERNAL"
-	ListOrganizationInvites200JSONResponseBodyInvitesRoleMEMBER   ListOrganizationInvites200JSONResponseBodyInvitesRole = "MEMBER"
+	ListOrganizationInvites200JSONResponseBodyInvitesRoleADMIN     ListOrganizationInvites200JSONResponseBodyInvitesRole = "ADMIN"
+	ListOrganizationInvites200JSONResponseBodyInvitesRoleDEVELOPER ListOrganizationInvites200JSONResponseBodyInvitesRole = "DEVELOPER"
+	ListOrganizationInvites200JSONResponseBodyInvitesRoleEXTERNAL  ListOrganizationInvites200JSONResponseBodyInvitesRole = "EXTERNAL"
+	ListOrganizationInvites200JSONResponseBodyInvitesRoleMEMBER    ListOrganizationInvites200JSONResponseBodyInvitesRole = "MEMBER"
 )
 
 // Valid indicates whether the value is a known member of the ListOrganizationInvites200JSONResponseBodyInvitesRole enum.
 func (e ListOrganizationInvites200JSONResponseBodyInvitesRole) Valid() bool {
 	switch e {
 	case ListOrganizationInvites200JSONResponseBodyInvitesRoleADMIN:
+		return true
+	case ListOrganizationInvites200JSONResponseBodyInvitesRoleDEVELOPER:
 		return true
 	case ListOrganizationInvites200JSONResponseBodyInvitesRoleEXTERNAL:
 		return true
@@ -5616,15 +5634,18 @@ func (e ListOrganizationInvites200JSONResponseBodyInvitesRole) Valid() bool {
 
 // Defines values for CreateOrganizationInvitesJSONBodyInvitesRole.
 const (
-	CreateOrganizationInvitesJSONBodyInvitesRoleADMIN    CreateOrganizationInvitesJSONBodyInvitesRole = "ADMIN"
-	CreateOrganizationInvitesJSONBodyInvitesRoleEXTERNAL CreateOrganizationInvitesJSONBodyInvitesRole = "EXTERNAL"
-	CreateOrganizationInvitesJSONBodyInvitesRoleMEMBER   CreateOrganizationInvitesJSONBodyInvitesRole = "MEMBER"
+	CreateOrganizationInvitesJSONBodyInvitesRoleADMIN     CreateOrganizationInvitesJSONBodyInvitesRole = "ADMIN"
+	CreateOrganizationInvitesJSONBodyInvitesRoleDEVELOPER CreateOrganizationInvitesJSONBodyInvitesRole = "DEVELOPER"
+	CreateOrganizationInvitesJSONBodyInvitesRoleEXTERNAL  CreateOrganizationInvitesJSONBodyInvitesRole = "EXTERNAL"
+	CreateOrganizationInvitesJSONBodyInvitesRoleMEMBER    CreateOrganizationInvitesJSONBodyInvitesRole = "MEMBER"
 )
 
 // Valid indicates whether the value is a known member of the CreateOrganizationInvitesJSONBodyInvitesRole enum.
 func (e CreateOrganizationInvitesJSONBodyInvitesRole) Valid() bool {
 	switch e {
 	case CreateOrganizationInvitesJSONBodyInvitesRoleADMIN:
+		return true
+	case CreateOrganizationInvitesJSONBodyInvitesRoleDEVELOPER:
 		return true
 	case CreateOrganizationInvitesJSONBodyInvitesRoleEXTERNAL:
 		return true
@@ -5661,15 +5682,18 @@ func (e CreateOrganizationInvitesJSONBodyInvitesTeamsRole) Valid() bool {
 
 // Defines values for CreateOrganizationInvites201JSONResponseBodyInvitesRole.
 const (
-	CreateOrganizationInvites201JSONResponseBodyInvitesRoleADMIN    CreateOrganizationInvites201JSONResponseBodyInvitesRole = "ADMIN"
-	CreateOrganizationInvites201JSONResponseBodyInvitesRoleEXTERNAL CreateOrganizationInvites201JSONResponseBodyInvitesRole = "EXTERNAL"
-	CreateOrganizationInvites201JSONResponseBodyInvitesRoleMEMBER   CreateOrganizationInvites201JSONResponseBodyInvitesRole = "MEMBER"
+	CreateOrganizationInvites201JSONResponseBodyInvitesRoleADMIN     CreateOrganizationInvites201JSONResponseBodyInvitesRole = "ADMIN"
+	CreateOrganizationInvites201JSONResponseBodyInvitesRoleDEVELOPER CreateOrganizationInvites201JSONResponseBodyInvitesRole = "DEVELOPER"
+	CreateOrganizationInvites201JSONResponseBodyInvitesRoleEXTERNAL  CreateOrganizationInvites201JSONResponseBodyInvitesRole = "EXTERNAL"
+	CreateOrganizationInvites201JSONResponseBodyInvitesRoleMEMBER    CreateOrganizationInvites201JSONResponseBodyInvitesRole = "MEMBER"
 )
 
 // Valid indicates whether the value is a known member of the CreateOrganizationInvites201JSONResponseBodyInvitesRole enum.
 func (e CreateOrganizationInvites201JSONResponseBodyInvitesRole) Valid() bool {
 	switch e {
 	case CreateOrganizationInvites201JSONResponseBodyInvitesRoleADMIN:
+		return true
+	case CreateOrganizationInvites201JSONResponseBodyInvitesRoleDEVELOPER:
 		return true
 	case CreateOrganizationInvites201JSONResponseBodyInvitesRoleEXTERNAL:
 		return true
@@ -5715,15 +5739,18 @@ func (e ListOrganizationMembersParamsIncludeDisabled) Valid() bool {
 
 // Defines values for ListOrganizationMembers200JSONResponseBodyMembersRole.
 const (
-	ListOrganizationMembers200JSONResponseBodyMembersRoleADMIN    ListOrganizationMembers200JSONResponseBodyMembersRole = "ADMIN"
-	ListOrganizationMembers200JSONResponseBodyMembersRoleEXTERNAL ListOrganizationMembers200JSONResponseBodyMembersRole = "EXTERNAL"
-	ListOrganizationMembers200JSONResponseBodyMembersRoleMEMBER   ListOrganizationMembers200JSONResponseBodyMembersRole = "MEMBER"
+	ListOrganizationMembers200JSONResponseBodyMembersRoleADMIN     ListOrganizationMembers200JSONResponseBodyMembersRole = "ADMIN"
+	ListOrganizationMembers200JSONResponseBodyMembersRoleDEVELOPER ListOrganizationMembers200JSONResponseBodyMembersRole = "DEVELOPER"
+	ListOrganizationMembers200JSONResponseBodyMembersRoleEXTERNAL  ListOrganizationMembers200JSONResponseBodyMembersRole = "EXTERNAL"
+	ListOrganizationMembers200JSONResponseBodyMembersRoleMEMBER    ListOrganizationMembers200JSONResponseBodyMembersRole = "MEMBER"
 )
 
 // Valid indicates whether the value is a known member of the ListOrganizationMembers200JSONResponseBodyMembersRole enum.
 func (e ListOrganizationMembers200JSONResponseBodyMembersRole) Valid() bool {
 	switch e {
 	case ListOrganizationMembers200JSONResponseBodyMembersRoleADMIN:
+		return true
+	case ListOrganizationMembers200JSONResponseBodyMembersRoleDEVELOPER:
 		return true
 	case ListOrganizationMembers200JSONResponseBodyMembersRoleEXTERNAL:
 		return true
@@ -5751,15 +5778,18 @@ func (e RemoveOrganizationMember200JSONResponseBodySuccess) Valid() bool {
 
 // Defines values for GetOrganizationMember200JSONResponseBodyRole.
 const (
-	GetOrganizationMember200JSONResponseBodyRoleADMIN    GetOrganizationMember200JSONResponseBodyRole = "ADMIN"
-	GetOrganizationMember200JSONResponseBodyRoleEXTERNAL GetOrganizationMember200JSONResponseBodyRole = "EXTERNAL"
-	GetOrganizationMember200JSONResponseBodyRoleMEMBER   GetOrganizationMember200JSONResponseBodyRole = "MEMBER"
+	GetOrganizationMember200JSONResponseBodyRoleADMIN     GetOrganizationMember200JSONResponseBodyRole = "ADMIN"
+	GetOrganizationMember200JSONResponseBodyRoleDEVELOPER GetOrganizationMember200JSONResponseBodyRole = "DEVELOPER"
+	GetOrganizationMember200JSONResponseBodyRoleEXTERNAL  GetOrganizationMember200JSONResponseBodyRole = "EXTERNAL"
+	GetOrganizationMember200JSONResponseBodyRoleMEMBER    GetOrganizationMember200JSONResponseBodyRole = "MEMBER"
 )
 
 // Valid indicates whether the value is a known member of the GetOrganizationMember200JSONResponseBodyRole enum.
 func (e GetOrganizationMember200JSONResponseBodyRole) Valid() bool {
 	switch e {
 	case GetOrganizationMember200JSONResponseBodyRoleADMIN:
+		return true
+	case GetOrganizationMember200JSONResponseBodyRoleDEVELOPER:
 		return true
 	case GetOrganizationMember200JSONResponseBodyRoleEXTERNAL:
 		return true
@@ -5796,15 +5826,18 @@ func (e GetOrganizationMember200JSONResponseBodyTeamsRole) Valid() bool {
 
 // Defines values for UpdateOrganizationMemberJSONBodyRole.
 const (
-	UpdateOrganizationMemberJSONBodyRoleADMIN    UpdateOrganizationMemberJSONBodyRole = "ADMIN"
-	UpdateOrganizationMemberJSONBodyRoleEXTERNAL UpdateOrganizationMemberJSONBodyRole = "EXTERNAL"
-	UpdateOrganizationMemberJSONBodyRoleMEMBER   UpdateOrganizationMemberJSONBodyRole = "MEMBER"
+	UpdateOrganizationMemberJSONBodyRoleADMIN     UpdateOrganizationMemberJSONBodyRole = "ADMIN"
+	UpdateOrganizationMemberJSONBodyRoleDEVELOPER UpdateOrganizationMemberJSONBodyRole = "DEVELOPER"
+	UpdateOrganizationMemberJSONBodyRoleEXTERNAL  UpdateOrganizationMemberJSONBodyRole = "EXTERNAL"
+	UpdateOrganizationMemberJSONBodyRoleMEMBER    UpdateOrganizationMemberJSONBodyRole = "MEMBER"
 )
 
 // Valid indicates whether the value is a known member of the UpdateOrganizationMemberJSONBodyRole enum.
 func (e UpdateOrganizationMemberJSONBodyRole) Valid() bool {
 	switch e {
 	case UpdateOrganizationMemberJSONBodyRoleADMIN:
+		return true
+	case UpdateOrganizationMemberJSONBodyRoleDEVELOPER:
 		return true
 	case UpdateOrganizationMemberJSONBodyRoleEXTERNAL:
 		return true
@@ -5817,15 +5850,18 @@ func (e UpdateOrganizationMemberJSONBodyRole) Valid() bool {
 
 // Defines values for UpdateOrganizationMember200JSONResponseBodyRole.
 const (
-	UpdateOrganizationMember200JSONResponseBodyRoleADMIN    UpdateOrganizationMember200JSONResponseBodyRole = "ADMIN"
-	UpdateOrganizationMember200JSONResponseBodyRoleEXTERNAL UpdateOrganizationMember200JSONResponseBodyRole = "EXTERNAL"
-	UpdateOrganizationMember200JSONResponseBodyRoleMEMBER   UpdateOrganizationMember200JSONResponseBodyRole = "MEMBER"
+	UpdateOrganizationMember200JSONResponseBodyRoleADMIN     UpdateOrganizationMember200JSONResponseBodyRole = "ADMIN"
+	UpdateOrganizationMember200JSONResponseBodyRoleDEVELOPER UpdateOrganizationMember200JSONResponseBodyRole = "DEVELOPER"
+	UpdateOrganizationMember200JSONResponseBodyRoleEXTERNAL  UpdateOrganizationMember200JSONResponseBodyRole = "EXTERNAL"
+	UpdateOrganizationMember200JSONResponseBodyRoleMEMBER    UpdateOrganizationMember200JSONResponseBodyRole = "MEMBER"
 )
 
 // Valid indicates whether the value is a known member of the UpdateOrganizationMember200JSONResponseBodyRole enum.
 func (e UpdateOrganizationMember200JSONResponseBodyRole) Valid() bool {
 	switch e {
 	case UpdateOrganizationMember200JSONResponseBodyRoleADMIN:
+		return true
+	case UpdateOrganizationMember200JSONResponseBodyRoleDEVELOPER:
 		return true
 	case UpdateOrganizationMember200JSONResponseBodyRoleEXTERNAL:
 		return true
@@ -22409,6 +22445,9 @@ type PostApiAnnotationsTraceIdJSONBody struct {
 	IsThumbsUp bool    `json:"isThumbsUp"`
 }
 
+// DeleteApiAnnotationsId404JSONResponseBodyError defines parameters for DeleteApiAnnotationsId.
+type DeleteApiAnnotationsId404JSONResponseBodyError string
+
 // PatchApiAnnotationsIdJSONBody defines parameters for PatchApiAnnotationsId.
 type PatchApiAnnotationsIdJSONBody struct {
 	Comment    string  `json:"comment"`
@@ -30137,6 +30176,9 @@ type PatchApiTriggersByIdJSONBody struct {
 	ActionParams *PatchApiTriggersByIdJSONBody_ActionParams `json:"actionParams,omitempty"`
 	Active       *bool                                      `json:"active,omitempty"`
 	AlertType    *PatchApiTriggersByIdJSONBodyAlertType     `json:"alertType,omitempty"`
+
+	// CustomGraphId The graph this alert watches, which an update cannot change. Accepted so that writing the read response back works; a different graph is refused. Create an alert on the other graph and delete this one.
+	CustomGraphId *string `json:"customGraphId,omitempty"`
 
 	// FilterQuery The trace query this automation is about, in the syntax the traces view uses. When set it supersedes `filters`.
 	FilterQuery *string                                                               `json:"filterQuery,omitempty"`
@@ -103785,6 +103827,10 @@ type DeleteApiAnnotationsIdResponse struct {
 		Status  *string `json:"status,omitempty"`
 	}
 	JSON400 *Error
+	JSON404 *struct {
+		Error   DeleteApiAnnotationsId404JSONResponseBodyError `json:"error"`
+		Message string                                         `json:"message"`
+	}
 }
 
 // Status returns HTTPResponse.Status
@@ -128913,6 +128959,16 @@ func ParseDeleteApiAnnotationsIdResponse(rsp *http.Response) (*DeleteApiAnnotati
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest struct {
+			Error   DeleteApiAnnotationsId404JSONResponseBodyError `json:"error"`
+			Message string                                         `json:"message"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	}
 

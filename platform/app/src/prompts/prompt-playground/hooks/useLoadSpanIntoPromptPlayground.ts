@@ -21,9 +21,110 @@ import {
 const logger = createLogger("useLoadSpanIntoPromptPlayground");
 
 const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
+const QUERY_PARAM_PROMPT_PLAYGROUND_TRACE_ID = "promptPlaygroundTraceId";
+const QUERY_PARAM_PROMPT_PLAYGROUND_TENANT_ID = "promptPlaygroundTenantId";
+const QUERY_PARAM_PROMPT_PLAYGROUND_OCCURRED_AT_MS =
+  "promptPlaygroundOccurredAtMs";
 const QUERY_PARAM_ACTION = "action";
 
 export type PlaygroundAction = "open-existing" | "create-new";
+
+/**
+ * The trace a playground link's span belongs to. Named, the span is read
+ * through the trace's own proof, so a link opened under an aggregate loads
+ * the member's span (ADR-144 block F). `tenantId` is the member that holds
+ * the trace, set only under an aggregate; `occurredAtMs` narrows the read.
+ */
+export interface PlaygroundSpanTrace {
+  traceId: string;
+  tenantId?: string | null;
+  occurredAtMs?: number | null;
+}
+
+/** What a playground link asks the loader to open. */
+export interface PlaygroundSpanLink {
+  spanId: string;
+  action?: PlaygroundAction;
+  trace?: PlaygroundSpanTrace;
+}
+
+/**
+ * The URL that opens a span in the prompt playground of a project. Old links
+ * name only the span, and still open on a plain project.
+ */
+export function buildPlaygroundSpanUrl({
+  projectSlug,
+  origin,
+  spanId,
+  action,
+  trace,
+}: PlaygroundSpanLink & { projectSlug: string; origin: string }): URL {
+  const url = new URL(getRoutePath({ projectSlug, route: "prompts" }), origin);
+  url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID, spanId);
+  if (trace) {
+    url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_TRACE_ID, trace.traceId);
+    if (trace.tenantId) {
+      url.searchParams.set(
+        QUERY_PARAM_PROMPT_PLAYGROUND_TENANT_ID,
+        trace.tenantId,
+      );
+    }
+    if (trace.occurredAtMs != null) {
+      url.searchParams.set(
+        QUERY_PARAM_PROMPT_PLAYGROUND_OCCURRED_AT_MS,
+        String(trace.occurredAtMs),
+      );
+    }
+  }
+  if (action) {
+    url.searchParams.set(QUERY_PARAM_ACTION, action);
+  }
+  return url;
+}
+
+/**
+ * The span read a playground link asks for, from its query parameters: the
+ * span, and the trace that holds it when the link names one. A malformed
+ * time hint is dropped rather than sent, so the read falls back to an
+ * unhinted one.
+ */
+export function readPlaygroundSpanParams(
+  searchParams: { get: (name: string) => string | null } | null | undefined,
+): {
+  spanId: string | null;
+  action: PlaygroundAction | null;
+  trace: { traceId: string; tenantId?: string; occurredAtMs?: number } | null;
+} {
+  const spanId =
+    searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID) ?? null;
+  const rawAction = searchParams?.get(QUERY_PARAM_ACTION);
+  const action: PlaygroundAction | null =
+    rawAction === "open-existing" || rawAction === "create-new"
+      ? rawAction
+      : null;
+  const traceId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_TRACE_ID);
+  if (!traceId) return { spanId, action, trace: null };
+
+  const tenantId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_TENANT_ID);
+  const rawOccurredAtMs = searchParams?.get(
+    QUERY_PARAM_PROMPT_PLAYGROUND_OCCURRED_AT_MS,
+  );
+  const occurredAtMs =
+    rawOccurredAtMs != null && /^\d+$/.test(rawOccurredAtMs)
+      ? Number(rawOccurredAtMs)
+      : undefined;
+  return {
+    spanId,
+    action,
+    trace: {
+      traceId,
+      ...(tenantId ? { tenantId } : {}),
+      ...(occurredAtMs !== undefined && Number.isSafeInteger(occurredAtMs)
+        ? { occurredAtMs }
+        : {}),
+    },
+  };
+}
 
 /**
  * Hook for navigation to prompt playground with a span ID.
@@ -35,32 +136,27 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
   /**
    * buildUrl
    * Single Responsibility: Constructs URL to prompt playground page with span ID query parameter.
-   * @param spanId - The ID of the span to load into the prompt playground
-   * @param action - Optional action: "open-existing" to open the referenced prompt, "create-new" to always create a new tab
+   * @param link.spanId - The ID of the span to load into the prompt playground
+   * @param link.action - Optional action: "open-existing" to open the referenced prompt, "create-new" to always create a new tab
+   * @param link.trace - Optional trace that holds the span, so the span is read through the trace's own proof
    * @returns A URL object if the project slug is available, otherwise null
    */
-  const buildUrl = (spanId: string, action?: PlaygroundAction) => {
+  const buildUrl = (link: PlaygroundSpanLink) => {
     if (!project?.slug) {
       logger.warn("Cannot build URL: project slug is missing");
       return null;
     }
 
-    const url = new URL(
-      getRoutePath({ projectSlug: project.slug, route: "prompts" }),
-      window.location.origin,
-    );
-    url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID, spanId);
-    if (action) {
-      url.searchParams.set(QUERY_PARAM_ACTION, action);
-    }
-    return url;
+    return buildPlaygroundSpanUrl({
+      ...link,
+      projectSlug: project.slug,
+      origin: window.location.origin,
+    });
   };
 
   return {
     /**
-     * Build a URL to the prompt playground page with the given span ID.
-     * @param spanId - The ID of the span to load into the prompt playground.
-     * @param action - Optional action: "open-existing" or "create-new".
+     * Build a URL to the prompt playground page with the given span.
      * @returns A URL object if the project slug is available, otherwise null.
      */
     buildUrl,
@@ -68,27 +164,25 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
 }
 
 /**
- * Hook to read and clear URL query parameters for span ID and action.
- * Single Responsibility: Extract span ID and action from URL and clean up the URL.
- * @returns Object with spanId, action, and clearParamsFromUrl function
+ * Hook to read and clear URL query parameters for the span, its trace and action.
+ * Single Responsibility: Extract the span link from URL and clean up the URL.
+ * @returns Object with spanId, trace, action, and clearParamsFromUrl function
  */
 function useSpanIdFromUrl() {
   const searchParams = useSearchParams();
-  const spanId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID);
-  const rawAction = searchParams?.get(QUERY_PARAM_ACTION);
-  const action: PlaygroundAction | null =
-    rawAction === "open-existing" || rawAction === "create-new"
-      ? rawAction
-      : null;
+  const { spanId, action, trace } = readPlaygroundSpanParams(searchParams);
   const router = useRouter();
 
   /**
    * clearParamsFromUrl
-   * Single Responsibility: Removes span ID and action query parameters from URL without full page reload.
+   * Single Responsibility: Removes the span link query parameters from URL without full page reload.
    */
   const clearParamsFromUrl = () => {
     const {
       [QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID]: _spanId,
+      [QUERY_PARAM_PROMPT_PLAYGROUND_TRACE_ID]: _traceId,
+      [QUERY_PARAM_PROMPT_PLAYGROUND_TENANT_ID]: _tenantId,
+      [QUERY_PARAM_PROMPT_PLAYGROUND_OCCURRED_AT_MS]: _occurredAtMs,
       [QUERY_PARAM_ACTION]: _action,
       ...query
     } = router.query;
@@ -97,7 +191,7 @@ function useSpanIdFromUrl() {
     });
   };
 
-  return { spanId, action, clearParamsFromUrl };
+  return { spanId, action, trace, clearParamsFromUrl };
 }
 
 /**
@@ -341,7 +435,7 @@ function mergeTracedVariablesIntoInputs(
 export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);
   const { project } = useOrganizationTeamProject();
-  const { spanId, action, clearParamsFromUrl } = useSpanIdFromUrl();
+  const { spanId, action, trace, clearParamsFromUrl } = useSpanIdFromUrl();
   const trpc = api.useUtils();
   const { addTab, updateTabData, removeTab } = useDraggableTabsBrowserStore(
     ({ addTab, updateTabData, removeTab }) => ({
@@ -370,6 +464,7 @@ export function useLoadSpanIntoPromptPlayground() {
         const spanData = await trpc.spans.getForPromptStudio.fetch({
           projectId: project.id,
           spanId: spanId,
+          ...(trace ?? {}),
         });
 
         if (!spanData) {
@@ -466,6 +561,7 @@ export function useLoadSpanIntoPromptPlayground() {
   }, [
     spanId,
     action,
+    trace,
     project?.id,
     trpc.spans.getForPromptStudio,
     clearParamsFromUrl,

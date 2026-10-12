@@ -8,11 +8,16 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useConversationTurns } from "../../hooks/useConversationTurns";
 import { useDrawerStore } from "../../stores/drawerStore";
 import { useExplorerStore } from "../../stores/explorerStore";
 import type { LensConfig } from "../../stores/viewSlice";
 import { mapTraceListPayload } from "../../utils/mapTraceListPayload";
+import {
+  memberTenantOf,
+  traceDrawerParams,
+} from "../../utils/traceDrawerParams";
 import { buildConversationColumns } from "./columns";
 import type { ConversationGroup } from "./conversationGroups";
 import { conversationRegistry, RegistryRow } from "./registry";
@@ -183,22 +188,29 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
  */
 function useOpenLatestTrace(): (group: ConversationGroup) => void {
   const { openDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
 
   return useCallback(
     (group: ConversationGroup) => {
       const traceId = group.lastTraceId;
       if (!traceId) return;
       const occurredAtMs = group.latestTimestamp;
-      useDrawerStore.getState().openTrace(traceId, occurredAtMs);
-      openDrawer("traceV2Details", {
-        traceId,
-        // `t` (timestamp) is the partition-pruning hint the drawer's reads
-        // take, so opening on a conversation's last activity does not walk
-        // every weekly partition by id.
-        t: String(occurredAtMs),
+      // On an aggregate the session row names its member, and the drawer
+      // stays on it (ADR-144 block F).
+      const tenantId = memberTenantOf({
+        ownerProjectId: group.projectId,
+        projectId: project?.id,
       });
+      useDrawerStore.getState().openTrace(traceId, occurredAtMs, { tenantId });
+      // `t` (timestamp) is the partition-pruning hint the drawer's reads
+      // take, so opening on a conversation's last activity does not walk
+      // every weekly partition by id.
+      openDrawer(
+        "traceV2Details",
+        traceDrawerParams({ traceId, occurredAtMs, tenantId }),
+      );
     },
-    [openDrawer],
+    [openDrawer, project?.id],
   );
 }
 

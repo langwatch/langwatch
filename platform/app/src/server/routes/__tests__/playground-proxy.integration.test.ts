@@ -68,6 +68,10 @@ beforeAll(async () => {
       ...process.env,
       NLPGO_CHILD_BYPASS: "true",
       SERVER_ADDR: `:${NLPGO_PORT}`,
+      // This suite posts to /go/proxy/v1 directly, so a secret inherited from
+      // the developer's .env would make the engine 401 every request here
+      // while CI, which has none, stayed green.
+      LANGWATCH_NLP_INTERNAL_SECRET: "",
     },
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,

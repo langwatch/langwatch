@@ -1,5 +1,11 @@
-import { InvokeCommand } from "@aws-sdk/client-lambda";
+import { STATUS_CODES } from "node:http";
+import {
+  InvokeCommand,
+  type InvokeCommandOutput,
+  type LambdaClient,
+} from "@aws-sdk/client-lambda";
 import { createLogger } from "@langwatch/observability";
+import { type Dispatcher, fetch as undiciFetch } from "undici";
 import { env } from "../env.mjs";
 import { createLambdaClient } from "../optimization_studio/server/lambda";
 import {
@@ -8,6 +14,8 @@ import {
   type StagedObject,
   stagePayloadToS3,
 } from "../server/s3/stagePayload";
+import { LAMBDA_CLIENT_MAX_ATTEMPTS } from "./lambdaInvokeAttempts";
+import { readLWAResponsePayload } from "./lwaPrelude";
 
 const logger = createLogger("langwatch:lambdaFetch");
 
@@ -17,6 +25,29 @@ const logger = createLogger("langwatch:lambdaFetch");
 // (optimization_studio/server/lambda/index.ts STUDIO_INVOKE_STAGING_THRESHOLD_BYTES).
 const INVOKE_STAGING_THRESHOLD_BYTES_DEFAULT = 5 * 1024 * 1024;
 const INVOKE_STAGING_PREFIX = "nlpgo-staging";
+
+/**
+ * Status reported to the caller when AWS ran the function but the function
+ * itself failed, so nlpgo produced no HTTP response of its own. A gateway
+ * status describes it correctly: the hop succeeded, the engine behind it did
+ * not answer.
+ */
+const FUNCTION_ERROR_STATUS = 502;
+
+/**
+ * Total attempts for an invoke the Lambda control plane refused BEFORE the
+ * function started. The studio client's own allowance, which exists to ride
+ * out the concurrency burst a cold per-project image causes, so the two stay
+ * one number. Only the errors in {@link invokeNeverStarted} consume these
+ * attempts; see {@link sendInvokeAtMostOnce}.
+ */
+const INVOKE_MAX_ATTEMPTS = LAMBDA_CLIENT_MAX_ATTEMPTS;
+
+/** First backoff step between refused invokes; doubles per attempt. */
+const INVOKE_RETRY_BASE_DELAY_MS = 500;
+
+/** Ceiling on a single backoff step, so six attempts stay inside a turn. */
+const INVOKE_RETRY_MAX_DELAY_MS = 8_000;
 
 /**
  * Thrown when an invoke body exceeds EVAL_MAX_PAYLOAD_BYTES. Staging offloads
@@ -37,6 +68,29 @@ export class InvokePayloadTooLargeError extends Error {
   }
 }
 
+/**
+ * Thrown when a call ran past the `timeoutMs` its caller set, on either lane.
+ * Distinct from {@link LambdaFetchAbortedError} because the two mean different
+ * things to a caller classifying a failure. A deadline says the engine was
+ * still working; a cancellation says the answer is no longer wanted.
+ */
+export class LambdaFetchTimeoutError extends Error {
+  constructor(opts: { path: string; timeoutMs: number }) {
+    super(
+      `nlpgo call to ${opts.path} exceeded its ${opts.timeoutMs}ms deadline`,
+    );
+    this.name = "LambdaFetchTimeoutError";
+  }
+}
+
+/** Thrown when the caller's own `signal` aborted the call, on either lane. */
+export class LambdaFetchAbortedError extends Error {
+  constructor(opts: { path: string }) {
+    super(`nlpgo call to ${opts.path} was cancelled by its caller`);
+    this.name = "LambdaFetchAbortedError";
+  }
+}
+
 type LambdaFetchInit = {
   method?: string;
   headers?: Record<string, string>;
@@ -50,6 +104,37 @@ type LambdaFetchInit = {
    * "Request must be smaller than 6291456 bytes for the InvokeFunction operation".
    */
   projectId?: string;
+  /**
+   * Deadline for the whole call, honoured on BOTH lanes. Past it the call
+   * rejects with {@link LambdaFetchTimeoutError}. Omit it and no deadline is
+   * imposed, which is what every caller predating this option gets.
+   *
+   * On the HTTP lane this arms an abort, which does NOT raise undici's own
+   * `headersTimeout`/`bodyTimeout` (300s each by default), so a caller whose
+   * deadline is longer than that must also pass {@link LambdaFetchInit.dispatcher}.
+   */
+  timeoutMs?: number;
+  /**
+   * The caller's own cancellation, honoured on BOTH lanes. Past it the call
+   * rejects with {@link LambdaFetchAbortedError}. On the Lambda lane an
+   * already-aborted signal is refused before anything is staged or invoked.
+   */
+  signal?: AbortSignal;
+  /**
+   * HTTP lane only: an undici `Dispatcher` (see
+   * `server/nlpgo/timeouts.ts` `createNlpFetchDispatcher`) for a caller that
+   * must hold a socket open longer than undici's 300s `headersTimeout` /
+   * `bodyTimeout` defaults, which live on the dispatcher and cannot be raised
+   * by an abort signal.
+   *
+   * Passing it also selects the `fetch` from the same undici package. The two
+   * are only usable together: Node's global `fetch` is bound to the undici
+   * bundled with the runtime, and this package rejects that request handler
+   * up front with "InvalidArgumentError: invalid onRequestStart method".
+   * Pairing them here is deliberate, so no caller can mismatch them. See
+   * specs/scenarios/nlp-fetch-transport.feature for what that mismatch cost.
+   */
+  dispatcher?: Dispatcher;
 };
 
 type LambdaFetchResponse<T> = {
@@ -60,14 +145,220 @@ type LambdaFetchResponse<T> = {
   text: () => Promise<string>;
 };
 
+/**
+ * The reason phrase for a status, so the Lambda lane's `statusText` reads the
+ * way the HTTP lane's does. `STATUS_CODES` is the same table `fetch` answers
+ * from, which is what keeps the two lanes describing one engine answer with
+ * one string. A status outside it degrades to the number rather than claiming
+ * a phrase it does not have.
+ */
+function reasonPhrase(status: number): string {
+  return STATUS_CODES[status] ?? `HTTP ${status}`;
+}
+
+/**
+ * True only for invoke failures that PROVE the function never started, which is
+ * the sole condition under which re-invoking cannot re-run the user's code.
+ *
+ * Throttling is the Lambda control plane refusing the invoke outright, and a
+ * connection that was never established means the request never left this
+ * process. Everything else (a 5xx from the service, a reset mid-flight, a
+ * read timeout) is ambiguous about whether the function got the request, and
+ * an ambiguous retry is a second execution of someone's Python.
+ */
+const INVOKE_REFUSED_ERROR_NAMES = new Set([
+  "TooManyRequestsException",
+  "ThrottlingException",
+  "EC2ThrottledException",
+]);
+
+/**
+ * Socket errors raised while the connection was still being established, so
+ * no request bytes reached the service.
+ */
+const CONNECT_FAILED_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+]);
+
+function invokeNeverStarted(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name;
+  if (name !== undefined && INVOKE_REFUSED_ERROR_NAMES.has(name)) {
+    return true;
+  }
+  // The SDK's node handler rejects with the socket error itself, so `code` is
+  // on the error. A handler that wraps it instead leaves the socket error on
+  // `cause`, which is where undici and Node's own fetch put it, so both
+  // shapes are read.
+  const code = (error as { code?: string } | null)?.code;
+  if (code !== undefined && CONNECT_FAILED_ERROR_CODES.has(code)) {
+    return true;
+  }
+  const causeCode = (
+    (error as { cause?: { code?: string } } | null)?.cause ?? null
+  )?.code;
+  return causeCode !== undefined && CONNECT_FAILED_ERROR_CODES.has(causeCode);
+}
+
+function backoffDelayMs(attempt: number): number {
+  return Math.min(
+    INVOKE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
+    INVOKE_RETRY_MAX_DELAY_MS,
+  );
+}
+
+function sleep({
+  ms,
+  signal,
+}: {
+  ms: number;
+  signal?: AbortSignal;
+}): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    function onAbort() {
+      clearTimeout(timer);
+      reject(signal?.reason ?? new Error("aborted"));
+    }
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/**
+ * The deadline and cancellation for one call: a single signal to hand the
+ * transport, plus the two predicates that say which of them fired, so a
+ * failure is classified as a timeout or a cancellation rather than as a
+ * generic transport error.
+ */
+function armDeadline(init: LambdaFetchInit | undefined): {
+  signal: AbortSignal | undefined;
+  hasTimedOut: () => boolean;
+  isCancelled: () => boolean;
+} {
+  const timeoutSignal =
+    init?.timeoutMs === undefined
+      ? undefined
+      : AbortSignal.timeout(init.timeoutMs);
+  const signals = [init?.signal, timeoutSignal].filter(
+    (candidate): candidate is AbortSignal => candidate !== undefined,
+  );
+  return {
+    signal:
+      signals.length === 0
+        ? undefined
+        : signals.length === 1
+          ? signals[0]
+          : AbortSignal.any(signals),
+    hasTimedOut: () => timeoutSignal?.aborted ?? false,
+    isCancelled: () => init?.signal?.aborted ?? false,
+  };
+}
+
+/**
+ * Re-raises a transport failure as whichever of the caller's two deadlines
+ * actually fired, leaving anything else untouched.
+ */
+function classifyCallFailure({
+  error,
+  deadline,
+  path,
+  timeoutMs,
+}: {
+  error: unknown;
+  deadline: { hasTimedOut: () => boolean; isCancelled: () => boolean };
+  path: string;
+  timeoutMs: number | undefined;
+}): never {
+  if (deadline.isCancelled()) {
+    throw new LambdaFetchAbortedError({ path });
+  }
+  if (deadline.hasTimedOut() && timeoutMs !== undefined) {
+    throw new LambdaFetchTimeoutError({ path, timeoutMs });
+  }
+  throw error;
+}
+
+/**
+ * Runs one transport call, re-raising a deadline or a cancellation as the
+ * typed error for it. A wrapper rather than a bare try/catch so the classified
+ * failure can sit on a `return` path and the response stays typed.
+ */
+async function classifyingCallFailures<R>({
+  run,
+  deadline,
+  path,
+  timeoutMs,
+}: {
+  run: () => Promise<R>;
+  deadline: { hasTimedOut: () => boolean; isCancelled: () => boolean };
+  path: string;
+  timeoutMs: number | undefined;
+}): Promise<R> {
+  try {
+    return await run();
+  } catch (error) {
+    classifyCallFailure({ error, deadline, path, timeoutMs });
+  }
+}
+
+/**
+ * Sends the invoke, retrying ONLY while the error proves the function never
+ * started. The AWS client is built with `maxAttempts: 1` so the SDK's own
+ * retry policy, which happily re-invokes after a mid-flight failure, cannot
+ * re-run the user's code behind this decision.
+ */
+async function sendInvokeAtMostOnce({
+  lambda,
+  command,
+  signal,
+}: {
+  lambda: LambdaClient;
+  command: InvokeCommand;
+  signal: AbortSignal | undefined;
+}): Promise<InvokeCommandOutput> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await lambda.send(command, signal ? { abortSignal: signal } : {});
+    } catch (error) {
+      if (attempt >= INVOKE_MAX_ATTEMPTS || !invokeNeverStarted(error)) {
+        throw error;
+      }
+      logger.warn(
+        { attempt, error: (error as { name?: string })?.name },
+        "nlpgo invoke refused before the function started, retrying",
+      );
+      await sleep({ ms: backoffDelayMs(attempt), signal });
+    }
+  }
+}
+
 export const lambdaFetch = async <T>(
   urlOrArn: string,
   path: string,
   init?: LambdaFetchInit,
 ): Promise<LambdaFetchResponse<T>> => {
+  const deadline = armDeadline(init);
+
   // If it's a Lambda ARN
   if (urlOrArn.startsWith("arn:aws:lambda")) {
-    const lambda = createLambdaClient();
+    // Refused before anything is staged or invoked: a turn whose caller has
+    // already given up must not upload a payload or start user code.
+    if (init?.signal?.aborted) {
+      throw new LambdaFetchAbortedError({ path });
+    }
+
+    // maxAttempts 1: the SDK's own retry policy cannot tell a refused invoke
+    // from one that already reached the function, so the decision is made by
+    // sendInvokeAtMostOnce instead.
+    const lambda = createLambdaClient({ maxAttempts: 1 });
 
     const payload = {
       rawPath: path,
@@ -138,9 +429,18 @@ export const lambdaFetch = async <T>(
       Payload: invokeBody,
     });
 
-    let response;
+    let response: InvokeCommandOutput;
     try {
-      response = await lambda.send(command);
+      // The retry loop sits inside this try so a staged object outlives every
+      // attempt that may still fetch it, and is reaped exactly once after the
+      // last one.
+      response = await classifyingCallFailures({
+        run: () =>
+          sendInvokeAtMostOnce({ lambda, command, signal: deadline.signal }),
+        deadline,
+        path,
+        timeoutMs: init?.timeoutMs,
+      });
     } finally {
       // Best-effort delete: by the time lambda.send resolves the receiver has
       // already fetched the presigned URL, so the staged object is no longer
@@ -156,28 +456,58 @@ export const lambdaFetch = async <T>(
       }
     }
 
-    const responsePayload = response.Payload
-      ? Buffer.from(response.Payload).toString("utf-8")
-      : "";
+    const { status: engineStatus, body } = readLWAResponsePayload(
+      response.Payload,
+    );
+    const invocationStatus = response.StatusCode ?? 200;
+    const functionError = response.FunctionError;
 
-    const actualBody =
-      responsePayload.split("\u0000").filter(Boolean).pop() ?? "";
-
-    const statusCode = response.StatusCode ?? 200;
+    // Precedence, and why. A FunctionError means AWS ran the handler and the
+    // handler raised, so there is no nlpgo response to read a status from and
+    // the engine is simply down for this call. A non-2xx invocation status
+    // means AWS refused the invoke, likewise with no engine response. Only
+    // when the invocation itself succeeded does the prelude's status, which is
+    // nlpgo's own, describe the answer; the invocation status is the fallback for
+    // a payload that carries no prelude.
+    const status = functionError
+      ? FUNCTION_ERROR_STATUS
+      : invocationStatus >= 200 && invocationStatus < 300
+        ? (engineStatus ?? invocationStatus)
+        : invocationStatus;
 
     return {
-      ok: statusCode >= 200 && statusCode < 300,
-      status: statusCode,
-      statusText: response.FunctionError ?? "OK",
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: functionError ?? reasonPhrase(status),
       json: async () => {
-        return JSON.parse(actualBody);
+        return JSON.parse(body);
       },
-      text: async () => actualBody,
+      text: async () => body,
     };
   }
 
   // If it's a regular URL
-  const response = await fetch(urlOrArn + path, init);
+  const requestInit = {
+    method: init?.method,
+    headers: init?.headers,
+    body: init?.body,
+    signal: deadline.signal,
+  };
+  const response = await classifyingCallFailures({
+    // undici's own fetch for a dispatcher-carrying call, the global one
+    // otherwise. The two fetches and their dispatchers are not
+    // interchangeable, see LambdaFetchInit.dispatcher.
+    run: (): Promise<Response> =>
+      init?.dispatcher
+        ? (undiciFetch(urlOrArn + path, {
+            ...requestInit,
+            dispatcher: init.dispatcher,
+          }) as unknown as Promise<Response>)
+        : fetch(urlOrArn + path, requestInit),
+    deadline,
+    path,
+    timeoutMs: init?.timeoutMs,
+  });
   return {
     ok: response.ok,
     status: response.status,

@@ -7,6 +7,25 @@ import { createLogger } from "@langwatch/observability";
 const logger = createLogger("langwatch:clickhouse:connection-pool");
 
 /**
+ * The fraction of a process's statement slots each kind of work keeps in
+ * reserve for the OTHER kind (consumed by `./statementLimit.ts`).
+ *
+ * An async insert with `wait_for_async_insert=1` holds its connection until the
+ * server flushes the buffer, so it is slow by design, not by fault. With one
+ * bound shared by everything, ingest could occupy every slot and the UI's reads
+ * queued behind it until they timed out. Reserving a minimum per kind keeps a
+ * flood of either from starving the other, without the waste of a hard half:
+ * whichever kind is idle, the other borrows its slots. A quarter is the neutral
+ * starting point; tune it per deployment with
+ * `CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE`.
+ *
+ * It lives here, not in `./statementLimit.ts`, because this module owns pool
+ * configuration and the limiter consumes it — the other direction made pool
+ * config import the limiter's metric-gauge registration transitively.
+ */
+export const DEFAULT_LANE_RESERVE_SHARE = 0.25;
+
+/**
  * Resolve the ClickHouse client pool size for this process.
  *
  * The rules live in `@langwatch/clickhouse-client` so every construction site
@@ -58,4 +77,30 @@ export function getClickHouseMaxOpenConnections(): number {
   }
 
   return decision.size;
+}
+
+/**
+ * Resolve the fraction of this process's statement slots each kind of work
+ * keeps in reserve for the other (see `./statementLimit.ts`).
+ *
+ * Read from `CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE`. The valid range is the
+ * half-open interval (0, 0.5]: a reserve of nothing reintroduces the starvation
+ * the lanes exist to prevent, and a reserve above half the budget would hold
+ * back more for one kind than that kind may itself use. A value outside it is a
+ * typo, so it warns and falls back rather than silently misconfiguring the
+ * bound. A blank or whitespace value is "unset", not a mistake, so it takes the
+ * default quietly.
+ */
+export function getClickHouseStatementLaneReserveShare(): number {
+  const raw = process.env.CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE;
+  if (raw === undefined || raw.trim() === "") return DEFAULT_LANE_RESERVE_SHARE;
+
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed > 0 && parsed <= 0.5) return parsed;
+
+  logger.warn(
+    { raw, using: DEFAULT_LANE_RESERVE_SHARE },
+    "Invalid CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE; using default",
+  );
+  return DEFAULT_LANE_RESERVE_SHARE;
 }

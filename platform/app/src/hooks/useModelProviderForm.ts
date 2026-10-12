@@ -121,7 +121,6 @@ export type UseModelProviderFormState = {
 };
 
 export type UseModelProviderFormActions = {
-  setEnabled: (enabled: boolean) => Promise<void>;
   setName: (name: string) => void;
   setRoutingHandle: (routingHandle: string) => void;
   setScopes: (scopes: ScopeSelection[]) => void;
@@ -469,7 +468,6 @@ export function useModelProviderForm(
       isDirty,
     },
     {
-      setEnabled: formSubmitHook.setEnabled,
       setName,
       setRoutingHandle,
       setScopes,

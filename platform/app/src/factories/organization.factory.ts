@@ -1,7 +1,11 @@
 import { DEFAULT_DOMAIN_JOIN_SETTING } from "@langwatch/identity";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
-import { type Organization, PricingModel } from "~/generated/prisma/client";
+import {
+  type Organization,
+  OrganizationUserRole,
+  PricingModel,
+} from "~/generated/prisma/client";
 
 export const organizationFactory = Factory.define<
   Omit<Organization, "stripeCustomerId" | "currency" | "signupData">
@@ -37,12 +41,15 @@ export const organizationFactory = Factory.define<
   ssoDomain: null,
   ssoProvider: null,
   domainJoin: DEFAULT_DOMAIN_JOIN_SETTING,
+  joinerRole: OrganizationUserRole.MEMBER,
   joinDomains: [],
   license: null,
   licenseExpiresAt: null,
   licenseLastValidatedAt: null,
   selfHostedCustomer: false,
   connectServicesDisabled: [],
+  instantEvalsEnabledAt: null,
+  instantEvalsEnabledByUserId: null,
   connectLastSyncAt: null,
   connectLastSyncError: null,
   presenceEnabled: false,

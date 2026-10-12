@@ -244,6 +244,11 @@ const POLICIES: Record<string, LangyRecoveryPolicy> = {
   langy_insufficient_scope: terminal("langy_insufficient_scope"),
   langy_turn_in_progress: terminal("langy_turn_in_progress"),
 
+  // A turn on an aggregate project, which takes no writes. The identical turn
+  // is refused identically for as long as the project is an aggregate, so
+  // there is nothing to retry into; the card says where the change belongs.
+  aggregate_project_is_read_only: terminal("aggregate_project_is_read_only"),
+
   // Throttled by the per-user message limit. TERMINAL in the sense that matters
   // here: an automatic re-drive is the single worst response, because it spends
   // another request against the very limit that refused this one — the client

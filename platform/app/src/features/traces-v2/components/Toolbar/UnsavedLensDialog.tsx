@@ -12,8 +12,11 @@ import {
 interface UnsavedLensDialogProps {
   open: boolean;
   lensName: string;
-  /** Save the local changes as a brand-new lens (prompts for a name). */
-  onSaveAsNew: () => void;
+  /**
+   * Save the local changes as a brand-new lens (prompts for a name). Omitted
+   * where lenses cannot be saved, which drops the button.
+   */
+  onSaveAsNew?: () => void;
   /** Discard local changes — revert to the saved lens definition. */
   onDiscard: () => void;
   onCancel: () => void;
@@ -51,9 +54,11 @@ export const UnsavedLensDialog: React.FC<UnsavedLensDialogProps> = ({
           <Button variant="outline" size="sm" onClick={onDiscard}>
             Discard
           </Button>
-          <Button colorPalette="blue" size="sm" onClick={onSaveAsNew}>
-            Save as new lens…
-          </Button>
+          {onSaveAsNew && (
+            <Button colorPalette="blue" size="sm" onClick={onSaveAsNew}>
+              Save as new lens…
+            </Button>
+          )}
         </HStack>
       </DialogFooter>
     </DialogContent>

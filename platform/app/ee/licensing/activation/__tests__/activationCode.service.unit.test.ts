@@ -13,11 +13,12 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ENTERPRISE_TEMPLATE } from "../../planTemplates";
-import { activationCodeHash, normaliseActivationCode } from "../activationCode";
+import { activationCodeHash } from "../activationCode";
 import {
   ActivationCodeService,
   type LicenseMinterPort,
 } from "../activationCode.service";
+import { normaliseActivationCode } from "../activationCodeShape";
 import type { ActivationCodeRecord } from "../activationCodes";
 import { CODE, codeRecord, InMemoryActivationCodes } from "./activationFakes";
 

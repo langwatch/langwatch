@@ -61,6 +61,7 @@ import {
   expiryIncompleteReason,
   resolveExpiresAt,
 } from "./virtualKeyExpiration";
+import { virtualKeyProjectOptions } from "./virtualKeyProjectOptions";
 import {
   parseTagsCsv,
   TAGS_CSV_MAX_LENGTH,
@@ -112,14 +113,7 @@ export function VirtualKeyCreateDrawer({
     [organization?.teams],
   );
   const availableProjects = useMemo(
-    () =>
-      organization?.teams?.flatMap((t) =>
-        t.projects.map((p) => ({
-          id: p.id,
-          name: `${p.name} · ${t.name}`,
-          teamId: t.id,
-        })),
-      ) ?? [],
+    () => virtualKeyProjectOptions(organization?.teams),
     [organization?.teams],
   );
 
@@ -131,7 +125,12 @@ export function VirtualKeyCreateDrawer({
     if (!open) return;
     setOwnership((prev) => {
       if (prev.projectId ?? prev.teamId) return prev;
-      const seedProject = project?.id ?? availableProjects[0]?.id ?? null;
+      // The current project only when it is one a key may use: an
+      // aggregate (ADR-144) is not, so the first offered project stands in.
+      const seedProject =
+        availableProjects.find((option) => option.id === project?.id)?.id ??
+        availableProjects[0]?.id ??
+        null;
       const seedTeam =
         availableTeams.length === 1 ? (availableTeams[0]?.id ?? null) : null;
       // A no-op seed must keep the previous state's identity: a fresh

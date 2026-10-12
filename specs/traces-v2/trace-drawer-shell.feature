@@ -986,6 +986,13 @@ Rule: Deep links carry the partition hint
     And the span tree, events, signals, full spans and span detail reads wait for the hint
     And they run once the hint is known
 
+  @unit
+  Scenario: The evaluations read does not wait for the partition hint
+    Given the drawer opened from a link with no t
+    Then the evaluations read runs at once, naming the trace and its member
+    And it sends no hint, because the evaluations store is not partitioned by trace time
+    And the header's backfill of the hint neither re-keys nor refetches it
+
 # ─────────────────────────────────────────────────────────────────────────────
 # RESPONSIVE BEHAVIOR
 # ─────────────────────────────────────────────────────────────────────────────

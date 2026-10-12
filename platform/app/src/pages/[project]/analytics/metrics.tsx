@@ -1,4 +1,5 @@
 import { Box, HStack, SimpleGrid } from "@chakra-ui/react";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import { ChartCard } from "~/components/analytics/ChartCard";
 import {
   CustomGraph,
@@ -289,4 +290,6 @@ function MetricsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view")(MetricsContent);
+export default withPermissionGuard("analytics:view")(
+  withAggregateAnalyticsGate("LLM Metrics", MetricsContent),
+);

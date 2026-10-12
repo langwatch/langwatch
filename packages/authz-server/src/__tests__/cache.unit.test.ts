@@ -266,4 +266,134 @@ describe("AuthzService epoch cache", () => {
       expect(reader.findOrganizationMembership).not.toHaveBeenCalled();
     });
   });
+
+  describe("given checks asked by ids", () => {
+    const lineage = vi
+      .fn()
+      .mockResolvedValue({ teamId: "team-1", organizationId: ORG });
+
+    /** Every id-asked seam once, for the same principal and organization. */
+    async function askByIds(authz: AuthzService) {
+      return [
+        await authz.checkByIds({
+          principal: alice,
+          permission: "organization:view",
+          organizationId: ORG,
+        }),
+        await authz.canAnyByIds({
+          principal: alice,
+          permissions: ["project:view", "traces:view"],
+          projectId: "proj-1",
+        }),
+        await authz.canBatchPermissionsByIds({
+          principal: alice,
+          permissions: ["project:view", "traces:view"],
+          organizationId: ORG,
+          teams: [{ teamId: "team-1" }],
+          projects: [{ projectId: "proj-1", teamId: "team-1" }],
+        }),
+      ];
+    }
+
+    /** @scenario "Checks asked by ids read the same cached grants as a resolved-scope check" */
+    it("serves every id-asked seam from one collect, matching a fresh resolution", async () => {
+      const { reader, collects } = makeMemberReader();
+      reader.findProjectLineage = lineage;
+      const authz = makeService({ reader, epoch: () => Promise.resolve(4) });
+
+      await authz.can({
+        principal: alice,
+        permission: "organization:view",
+        scope: orgScope,
+      });
+      const cached = await askByIds(authz);
+      expect(collects()).toBe(1);
+
+      const fresh = makeMemberReader();
+      fresh.reader.findProjectLineage = lineage;
+      expect(cached).toEqual(await askByIds(makeUncachedService(fresh.reader)));
+    });
+
+    /** @scenario "A revocation reaches a check asked by ids on the caller's next request" */
+    it("denies an id-asked check once a revocation bumps the epoch", async () => {
+      let bindings: CollectedBinding[] = [
+        {
+          roleKey: "admin",
+          scopeType: "ORGANIZATION",
+          scopeId: ORG,
+          viaGroupId: null,
+        },
+      ];
+      const { reader, collects } = makeMemberReader(() => bindings);
+      let epoch = 4;
+      const authz = makeService({ reader, epoch: () => Promise.resolve(epoch) });
+      const ask = () =>
+        authz.checkByIds({
+          principal: alice,
+          permission: "organization:manage",
+          organizationId: ORG,
+        });
+
+      expect((await ask()).allowed).toBe(true);
+      bindings = [];
+      epoch = 5;
+
+      expect((await ask()).allowed).toBe(false);
+      expect(collects()).toBe(2);
+    });
+
+    /** @scenario "A revocation reaches a check asked by ids on the caller's next request" */
+    it("caps an api key's id-asked check at its owner's grants after a demotion", async () => {
+      let ownerBindings: CollectedBinding[] = [
+        {
+          roleKey: "admin",
+          scopeType: "ORGANIZATION",
+          scopeId: ORG,
+          viaGroupId: null,
+        },
+      ];
+      const { reader } = makeMemberReader(() => ownerBindings);
+      reader.findApiKeyOwner = vi.fn().mockResolvedValue({ userId: "dave" });
+      reader.findApiKeyBindings = vi.fn().mockResolvedValue([
+        {
+          roleKey: "admin",
+          scopeType: "ORGANIZATION",
+          scopeId: ORG,
+          viaGroupId: null,
+        },
+      ]);
+      let epoch = 4;
+      const authz = makeService({ reader, epoch: () => Promise.resolve(epoch) });
+      const ask = () =>
+        authz.canAnyByIds({
+          principal: { type: "apiKey", id: "key-1" },
+          permissions: ["organization:manage"],
+          projectId: "proj-1",
+        });
+      reader.findProjectLineage = lineage;
+
+      expect((await ask()).allowed).toBe(true);
+      ownerBindings = [];
+      epoch = 5;
+
+      expect((await ask()).allowed).toBe(false);
+    });
+
+    it("collects afresh for every id-asked check when the flag is off", async () => {
+      const { reader, collects } = makeMemberReader();
+      const epoch = vi.fn().mockResolvedValue(4);
+      const authz = makeService({ reader, epoch, cacheEnabled: false });
+
+      for (let ask = 0; ask < 2; ask += 1) {
+        await authz.checkByIds({
+          principal: alice,
+          permission: "organization:view",
+          organizationId: ORG,
+        });
+      }
+
+      expect(collects()).toBe(2);
+      expect(epoch).not.toHaveBeenCalled();
+    });
+  });
 });

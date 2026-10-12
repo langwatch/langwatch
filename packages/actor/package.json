@@ -2,7 +2,7 @@
   "name": "@langwatch/actor",
   "version": "0.1.0",
   "private": true,
-  "description": "The actor vocabulary: one closed answer to \"who caused this action\", minted at the boundary that authenticated it and carried to every durable record. No node imports and no dependencies, so any surface — frontend, backend, workers — names actors from the same vocabulary.",
+  "description": "The actor vocabulary: one closed answer to \"who caused this action\", minted at the boundary that authenticated it and carried to every durable record. No node imports and zod as the only dependency, so any surface \u2014 frontend, backend, workers \u2014 names actors from the same vocabulary.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -19,6 +19,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^26",

@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { normalizeIdentifierValue } from "@langwatch/identity";
+import { normalizeIdentifierValue, readJoinerRole } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
   Prisma,
   type PrismaClient,
 } from "~/generated/prisma/client";
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "~/server/app-layer/identity/admission-audit";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import type { PendingSsoAdmission } from "./sso-arrival.service";
+import type {
+  PendingSsoAdmission,
+  SsoMembershipWrite,
+} from "./sso-arrival.service";
 
 /**
  * The `OrganizationUser` rows the two single-sign-on sign-in decisions read
@@ -175,7 +182,14 @@ export class PrismaSsoMembershipRepository {
   }
 
   /**
-   * Makes somebody a MEMBER of an organization.
+   * Makes somebody a member of an organization, on the seat the organization
+   * hands to people who arrive without an invitation (`joinerRole`,
+   * ADR-143): a Full member by default, or a Developer.
+   *
+   * A Full member carries a pending organization-wide grant that the arrival
+   * service then attaches. A Developer holds their personal team and nothing
+   * shared, so no grant is pending for one: the membership row alone is the
+   * admission, and `findPendingAdmission` finds nothing to attach.
    *
    * P2002 (unique constraint) on THIS insert means another concurrent OAuth
    * callback or a retry already created this membership, so it is answered as
@@ -189,23 +203,61 @@ export class PrismaSsoMembershipRepository {
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<"created" | "already-present"> {
+  }): Promise<SsoMembershipWrite> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { joinerRole: true },
+    });
+    const seat = readJoinerRole(organization?.joinerRole);
     try {
-      await this.prisma.organizationUser.create({
-        data: {
-          userId,
-          organizationId,
-          role: "MEMBER",
-          pendingSsoGrantId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await tx.organizationUser.create({
+          data: {
+            userId,
+            organizationId,
+            role: seat,
+            pendingSsoGrantId:
+              seat === OrganizationUserRole.MEMBER
+                ? generate(KSUID_RESOURCES.ROLE_BINDING).toString()
+                : null,
+          },
+        });
+        // A Full member's admission audits through the grant attached next;
+        // a Developer gets none, so the row is audited here (ADR-143).
+        if (seat === OrganizationUserRole.DEVELOPER) {
+          await tx.auditLog.create({
+            data: {
+              action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+              userId,
+              organizationId,
+              metadata: {
+                seat,
+                via: "sso" satisfies DeveloperAdmissionVia,
+              },
+            },
+          });
+        }
       });
-      return "created";
+      return { outcome: "created", seat };
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
-        return "already-present";
+        // The row that is there decides, not the setting: a Full member's
+        // row created by a concurrent callback still has its grant to attach,
+        // whatever seat the organisation hands to newcomers today.
+        const existing = await this.prisma.organizationUser.findUnique({
+          where: { userId_organizationId: { userId, organizationId } },
+          select: { role: true },
+        });
+        return {
+          outcome: "already-present",
+          seat:
+            existing?.role === OrganizationUserRole.DEVELOPER
+              ? OrganizationUserRole.DEVELOPER
+              : OrganizationUserRole.MEMBER,
+        };
       }
       throw err;
     }

@@ -23,18 +23,18 @@ export type SsoDeployment = "hosted" | "self-hosted";
  * What the installation and the organization actually are, at the moment the
  * setup surface is opened.
  *
- * `licensed` is the licence gate ADR-027 froze AT STARTUP, not a live read.
- * That is the whole of why `licenseActivatedSinceStart` exists as a separate
- * fact: a licence activated while the installation is running is genuine and
- * still does not change what this process federates, so the honest answer is
- * "restart", not "yes".
+ * `licensed` is the licence gate ADR-027 memoizes per process, not a live read.
+ * That is why `licenseActivationPending` exists as a separate fact: a licence
+ * activated on another replica is genuine and reaches this process's gate
+ * within the gate's deny TTL, so the answer is "within a minute", not "no
+ * licence".
  */
 export interface SsoSelfServeContext {
   deployment: SsoDeployment;
-  /** Whether the installation held a genuine licence when it started. */
+  /** Whether the licence gate allows single sign-on in this process. */
   licensed: boolean;
   /** Whether a genuine licence has been activated since it started. */
-  licenseActivatedSinceStart: boolean;
+  licenseActivationPending: boolean;
   /** Hosted only: whether this organization is opted in to self-serve. */
   optedIn: boolean;
   /** Self-hosted only: whether the installation holds exactly one
@@ -48,7 +48,7 @@ export interface SsoSelfServeContext {
 /** Why setup is not available, in the vocabulary the error codes use. */
 export type SsoSelfServeRefusal =
   | "license_required"
-  | "license_restart_required"
+  | "license_activation_pending"
   | "not_opted_in";
 
 export type SsoSelfServeAvailability =
@@ -78,7 +78,7 @@ export type SsoSelfServeAvailability =
  *   self-hosted, licensed, one organization     → the licence proves it
  *   self-hosted, licensed, operator asking      → the licence proves it
  *   self-hosted, licensed, several organizations → published proof
- *   self-hosted, licensed since startup  → refuse, and say a restart is why
+ *   self-hosted, licence just activated → refuse, and say it arrives within a minute
  *   self-hosted, never licensed          → refuse, and say a licence is why
  *   hosted, opted in                     → published record decides it
  *   hosted, not opted in                 → refuse, and offer a conversation
@@ -107,8 +107,8 @@ export function ssoSelfServeAvailability(
     }
     return {
       available: false,
-      refusal: context.licenseActivatedSinceStart
-        ? "license_restart_required"
+      refusal: context.licenseActivationPending
+        ? "license_activation_pending"
         : "license_required",
     };
   }

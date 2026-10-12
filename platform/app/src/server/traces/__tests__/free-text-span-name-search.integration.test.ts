@@ -20,10 +20,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-
+import { tenantScope } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { getClickHouseClientForTenant } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
+import { expandStatementForProject } from "~/test-utils/authorizationProofs";
 import {
   startTestContainers,
   stopTestContainers,
@@ -153,7 +154,7 @@ vi.mock("~/server/db", () => ({
  * generated SQL against the seeded data and return the trace ids it selects.
  */
 async function searchViaCompiledFilter(query: string): Promise<string[]> {
-  const compiled = translateFilterToClickHouse(query, tenantId, {
+  const compiled = translateFilterToClickHouse(query, {
     from: now - 60_000,
     to: now + 60_000,
   });
@@ -161,16 +162,21 @@ async function searchViaCompiledFilter(query: string): Promise<string[]> {
   // a null compile here means the fixture query itself is wrong.
   if (!compiled) throw new Error(`query compiled to no filter: ${query}`);
 
-  const result = await ch.query({
+  const statement = expandStatementForProject({
     query: `
       SELECT DISTINCT TraceId
       FROM trace_summaries
-      WHERE TenantId = {tenantId:String}
+      WHERE ${tenantScope("OccurredAt")}
         AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
         AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})
         AND (${compiled.sql})
     `,
-    query_params: compiled.params,
+    queryParams: compiled.params,
+    projectId: tenantId,
+  });
+  const result = await ch.query({
+    query: statement.query,
+    query_params: statement.queryParams,
     format: "JSONEachRow",
   });
   const rows = await result.json<{ TraceId: string }>();

@@ -30,11 +30,23 @@ const pageOffsetInput = z
       "pageOffset is no longer supported — offset pagination was removed. Use the scrollId returned by the previous response to fetch the next page.",
   });
 
+/**
+ * Largest page a UI trace list read may ask for. A read buffers the whole page
+ * in backend memory and in ClickHouse, so an unbounded size is a memory lever
+ * any caller can pull. Same cap as tracesV2.list (#8479).
+ */
+export const MAX_TRACE_LIST_PAGE_SIZE = 1000;
+
 export const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: pageOffsetInput,
   // Non-negative integers only (#2163): a fractional or negative page size
   // reaches ClickHouse as a LIMIT and fails there instead of at the boundary.
-  pageSize: z.number().int().positive().optional(),
+  pageSize: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_TRACE_LIST_PAGE_SIZE)
+    .optional(),
 });
 
 export const getAllForProjectInput = tracesFilterInput.extend({
@@ -43,4 +55,30 @@ export const getAllForProjectInput = tracesFilterInput.extend({
   sortDirection: z.string().optional(),
   updatedAt: z.number().optional(),
   scrollId: z.string().optional().nullable(),
+});
+
+/**
+ * The public REST search routes clamp pageSize to 1000 instead of rejecting, so
+ * a larger value keeps working for existing API clients (#8479).
+ */
+export const publicTraceSearchPageSizeInput = z
+  .number()
+  .int()
+  .positive()
+  .optional();
+
+/**
+ * Downloads are a deliberate bulk read but still bounded (#8479). Matches the
+ * 10 000 default in traces.ts getAllForDownload.
+ */
+export const MAX_TRACE_DOWNLOAD_PAGE_SIZE = 10_000;
+
+export const getAllForDownloadInput = getAllForProjectInput.extend({
+  includeSpans: z.boolean(),
+  pageSize: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_TRACE_DOWNLOAD_PAGE_SIZE)
+    .optional(),
 });

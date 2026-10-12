@@ -28,8 +28,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
+import type { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
+import type { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   startTestContainers,
@@ -41,6 +41,9 @@ import {
   type TraceAnalyticsData,
   type TraceAnalyticsRow,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { traceAnalyticsRepositoryFor } from "~/test-utils/traceAnalyticsRepository";
+import { traceSummaryRepositoryFor } from "~/test-utils/traceSummaryRepository";
 
 let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;
@@ -111,8 +114,8 @@ async function flushAsyncInserts(): Promise<void> {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  analyticsRepo = new TraceAnalyticsClickHouseRepository(async () => ch);
-  summaryRepo = new TraceSummaryClickHouseRepository(async () => ch);
+  analyticsRepo = traceAnalyticsRepositoryFor(async () => ch);
+  summaryRepo = traceSummaryRepositoryFor(async () => ch);
 }, 120_000);
 
 afterAll(async () => {
@@ -404,7 +407,10 @@ describe("trace_analytics slim fold (integration)", () => {
 
     describe("when the same hoisted dimensions are read from both tables", () => {
       it("matches TotalCost, TimeToFirstTokenMs, Models, TopicId, Origin to the cent", async () => {
-        const summary = await summaryRepo.findByTraceId(tenantId, traceId);
+        const summary = await summaryRepo.findByTraceId({
+          authorization: ownProof({ projectId: tenantId }),
+          traceId,
+        });
         expect(summary).not.toBeNull();
 
         const slimResult = await ch.query({

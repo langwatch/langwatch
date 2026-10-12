@@ -20,7 +20,7 @@ import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "../../db";
 import { demoProjectId } from "./demo-project";
-import { bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
+import { authzEpochCacheEnabled, bumpAuthzEpoch, getAuthzEpoch } from "./epoch";
 import { grantsLedgerWriter } from "./ledger";
 import { LedgerAuthzGrantsRepository } from "./repositories/authz-grants.ledger.repository";
 import { GrantsAuthzReadRepository } from "./repositories/authz-read.grants.repository";
@@ -34,20 +34,10 @@ export const authzCollector = new AuthzCollectorService(
   new GrantsAuthzReadRepository(prisma),
 );
 
-/**
- * The internal rollout knob for the §12 L1 cache, read per check rather than
- * captured at module load so a test (or a restart-free rollout) can flip it.
- * Unset means off, which is always correct and only slower.
- */
-const epochCacheEnabled = (): boolean => {
-  const raw = process.env.AUTHZ_EPOCH_CACHE;
-  return raw === "1" || raw === "true";
-};
-
 /** The checking service - can / check / authorize / effectivePermissions. */
 export const authz = new AuthzService(authzCollector, {
   epochReader: getAuthzEpoch,
-  cacheEnabled: epochCacheEnabled,
+  cacheEnabled: authzEpochCacheEnabled,
   demoProjectId,
 });
 

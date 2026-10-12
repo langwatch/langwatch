@@ -9,6 +9,8 @@ import {
   organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
+  readJoinerRole,
+  seatForJoiner,
   resolveJoinLookup,
 } from "../join-matching";
 
@@ -471,6 +473,49 @@ describe("given the pure helpers the rules are built from", () => {
       expect(
         organizationAdmitsDomain({ organization: automatic, domain: "acme.com" }),
       ).toBe(true);
+    });
+  });
+});
+
+describe("readJoinerRole()", () => {
+  describe("when the stored seat is one a joiner may land on", () => {
+    it("returns it", () => {
+      expect(readJoinerRole("DEVELOPER")).toBe("DEVELOPER");
+      expect(readJoinerRole("MEMBER")).toBe("MEMBER");
+    });
+  });
+
+  describe("when the stored seat is missing or not a joiner seat", () => {
+    it("falls back to a Member seat", () => {
+      expect(readJoinerRole(null)).toBe("MEMBER");
+      expect(readJoinerRole(undefined)).toBe("MEMBER");
+      expect(readJoinerRole("ADMIN")).toBe("MEMBER");
+    });
+  });
+});
+
+describe("seatForJoiner()", () => {
+  describe("when the request was made from the terminal", () => {
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("lands a Developer whatever the joiner seat says", () => {
+      expect(seatForJoiner({ origin: "cli", joinerRole: "MEMBER" })).toBe(
+        "DEVELOPER",
+      );
+      expect(seatForJoiner({ origin: "cli", joinerRole: "DEVELOPER" })).toBe(
+        "DEVELOPER",
+      );
+    });
+  });
+
+  describe("when the request was made on the web", () => {
+    /** @scenario A request made on the web keeps the organisation's joiner seat */
+    it("lands the organisation's joiner seat, unchanged", () => {
+      expect(seatForJoiner({ origin: "web", joinerRole: "MEMBER" })).toBe(
+        "MEMBER",
+      );
+      expect(seatForJoiner({ origin: "web", joinerRole: "DEVELOPER" })).toBe(
+        "DEVELOPER",
+      );
     });
   });
 });

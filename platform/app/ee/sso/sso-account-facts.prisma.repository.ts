@@ -107,9 +107,11 @@ export class PrismaSsoAccountFactsRepository
   async findLatestForConnection({
     organizationId,
     connectionId,
+    issuer,
   }: {
     organizationId: string;
     connectionId: string;
+    issuer: string | null;
   }): Promise<SsoTestSignIn | null> {
     const connection = await this.#prisma.ssoConnection.findFirst({
       where: { id: connectionId, organizationId },
@@ -118,7 +120,12 @@ export class PrismaSsoAccountFactsRepository
     if (!connection) return null;
 
     const account = await this.#prisma.account.findFirst({
-      where: { provider: connectionId },
+      // An account the engine wrote through an issuer the connection no
+      // longer dials (its identity provider was edited) is not evidence.
+      where: {
+        provider: connectionId,
+        ...(issuer === null ? {} : { OR: [{ issuer }, { issuer: null }] }),
+      },
       select: { id: true, userId: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     });

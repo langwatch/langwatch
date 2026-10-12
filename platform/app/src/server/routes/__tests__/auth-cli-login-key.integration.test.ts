@@ -806,7 +806,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
           skipDuplicates: true,
         });
         await prisma.grant.createMany({
-          data: removedGrants,
+          data: removedGrants.map(({ condition: _condition, ...row }) => row),
           skipDuplicates: true,
         });
       }
@@ -897,7 +897,7 @@ describe("CLI login user-scoped key, given a device-session flow", () => {
           skipDuplicates: true,
         });
         await prisma.grant.createMany({
-          data: removedGrants,
+          data: removedGrants.map(({ condition: _condition, ...row }) => row),
           skipDuplicates: true,
         });
       }

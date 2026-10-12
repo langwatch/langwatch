@@ -251,14 +251,22 @@ const registry = {
   },
   instant_eval_not_enabled: {
     tips: [
-      "Instant Evals are behind a release flag; ask LangWatch to enable them for this project",
+      "Instant Evals are off for this organization; a self-serve organization on the hosted service is switched on by an organization admin from the search bar, and any other organization or install asks LangWatch to",
     ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_not_found: {
     tips: [
       "Read `meta.runId`; no run of the authenticated project carries that id",
       "List the project's runs to find the id you meant",
     ],
+  },
+  instant_eval_opt_in_not_offered: {
+    tips: [
+      "Read `meta.deployment`; an enterprise organization is switched on by LangWatch rather than from the search bar, and a self-hosted install gets Instant Evals from a license that names them, or from its operator's RELEASE_INSTANT_EVALS flag when it judges with its own JEV_API_KEY",
+      "Contact support@langwatch.ai to switch them on, or to add them to the license",
+    ],
+    docsPath: "/features/instant-evals/limits-and-cost",
   },
   instant_eval_query_invalid: {
     tips: [
@@ -723,6 +731,13 @@ const registry = {
     tips: [
       "Create an evaluator first: langwatch evaluator create <name> --type <type>, then pass its id via evaluatorId",
       "Or pick an existing one: langwatch evaluator list",
+    ],
+    docsPath: "/evaluations/evaluators/list",
+  },
+  monitor_parameters_unused: {
+    tips: [
+      "Change the settings on the evaluator named in meta.evaluatorId: PUT /api/evaluators/{evaluatorId}",
+      "Or send parameters as {}; the evaluator's settings are what run, and a move to another evaluator re-checks the stored parameters",
     ],
     docsPath: "/evaluations/evaluators/list",
   },

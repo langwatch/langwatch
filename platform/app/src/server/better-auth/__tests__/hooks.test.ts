@@ -376,6 +376,29 @@ describe("beforeAccountCreate", () => {
       ).resolves.toBeUndefined();
     });
 
+    /** @scenario "A connection reached through the broker refuses without bouncing" */
+    it("leaves a brokered connection to the legacy guard instead of bouncing", async () => {
+      // The grandfathered shape: the router names the connection but dials
+      // the broker for it, and the organization's legacy columns are set,
+      // because that is what a grandfathered connection was projected from.
+      const { hooks } = hooksOver({
+        user: userRow({ email: "sam@acme.com" }),
+        organization: legacyOrganization({ ssoProvider: "okta|acme" }),
+        governingConnectionId: "ssoc_acme",
+        governingMethodId: "auth0",
+        accountCount: 1,
+      });
+
+      // Not the bounce: the error route would dial `ssoc_acme`, the engine
+      // holds nothing under it, and the person would wait forever. The legacy
+      // guard's refusal is the one whose page says to type the address.
+      await expect(
+        hooks.beforeAccountCreate({ account: account() }),
+      ).rejects.toMatchObject({
+        body: { code: "SSO_PROVIDER_NOT_ALLOWED" },
+      });
+    });
+
     /** @scenario "An already-linked native account is refused on the sign-in path too" */
     it("refuses on the update seam, where no account row is created", async () => {
       const { hooks } = governedBy("ssoc_acme");

@@ -91,7 +91,7 @@ describe("given an issuer that answers inside a private network", () => {
         issuer: "https://idp.internal.example",
       });
 
-      expect(outcome).toEqual({ reachable: true });
+      expect(outcome).toMatchObject({ reachable: true });
       expect(calls).toEqual([
         "https://idp.internal.example/.well-known/openid-configuration",
       ]);

@@ -11,10 +11,12 @@ import { describe, expect, it } from "vitest";
 import {
   activationCodeHash,
   activationCodeHint,
-  isActivationCodeShape,
   mintActivationCode,
-  normaliseActivationCode,
 } from "../activationCode";
+import {
+  isActivationCodeShape,
+  normaliseActivationCode,
+} from "../activationCodeShape";
 
 describe("given a code as somebody typed it", () => {
   describe("when it is read back", () => {

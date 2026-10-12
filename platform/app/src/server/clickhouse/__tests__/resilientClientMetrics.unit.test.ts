@@ -153,11 +153,6 @@ describe("createResilientClickHouseClient()", () => {
           "Code: 202. DB::Exception: Too many simultaneous queries. Maximum: 100.",
       },
       {
-        label: "MEMORY_LIMIT_EXCEEDED (overload, message-only)",
-        message:
-          "Code: 241. DB::Exception: Memory limit (for query) exceeded: would use 3.5 GiB (MEMORY_LIMIT_EXCEEDED)",
-      },
-      {
         label: "QUERY_WAS_CANCELLED (CH replica graceful shutdown)",
         message:
           "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED)",

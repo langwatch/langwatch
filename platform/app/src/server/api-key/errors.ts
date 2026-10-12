@@ -208,3 +208,24 @@ export class ApiKeyScopeViolationError extends HandledError {
     this.name = "ApiKeyScopeViolationError";
   }
 }
+
+/**
+ * An API key was presented for an aggregate project (ADR-144 decision 7). An
+ * aggregate owns no traces and no credential: it reads its member projects
+ * through grants, so nothing is ever sent to it and no key acts on it. Its
+ * stored base key exists only because the column is required, and is never
+ * shown. HTTP 403 rather than 401, because the key may well be real; it is
+ * the project that accepts none.
+ */
+export class AggregateProjectHasNoCredentialError extends HandledError {
+  declare readonly code: "aggregate_project_has_no_credential";
+
+  constructor(options: { meta?: Record<string, unknown> } = {}) {
+    super(
+      "aggregate_project_has_no_credential",
+      "This project reads traces from other projects and accepts no API key. Send traces to one of its member projects instead.",
+      { httpStatus: 403, meta: options.meta },
+    );
+    this.name = "AggregateProjectHasNoCredentialError";
+  }
+}

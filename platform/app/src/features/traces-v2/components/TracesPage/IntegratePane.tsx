@@ -14,6 +14,7 @@ import { Code2, Compass } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
+import { AggregateReadOnlyNotice } from "~/components/projects/AggregateReadOnlyNotice";
 import { SetupWithAgentButton } from "~/components/SetupWithAgentButton";
 import {
   type ActiveProjectContextValue,
@@ -21,6 +22,7 @@ import {
 } from "~/features/onboarding/contexts/ActiveProjectContext";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { ApiKeyIntegrationInfoCard } from "../../onboarding/components/ApiKeyIntegrationInfoCard";
 import { SdkSetup } from "../../onboarding/components/SdkSetup";
 import { selfHostedEndpoint } from "../../onboarding/logic/selfHostedEndpoint";
@@ -48,6 +50,15 @@ export const IntegratePane: React.FC = () => {
   const endpoint = selfHostedEndpoint(publicEnv.data?.BASE_HOST);
 
   if (!project || !organization) return null;
+  // An aggregate (ADR-144) is never sent traces and owns no key, so there is
+  // nothing to instrument and no token to mint.
+  if (isAggregateProjectKind(project.kind)) {
+    return (
+      <Box padding={6}>
+        <AggregateReadOnlyNotice />
+      </Box>
+    );
+  }
 
   const activeProjectContext: ActiveProjectContextValue = {
     project: token ? { ...project, apiKey: token } : project,

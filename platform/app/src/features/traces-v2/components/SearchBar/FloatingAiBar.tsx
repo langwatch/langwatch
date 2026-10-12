@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useProjectAcceptsWrites } from "~/hooks/useProjectAcceptsWrites";
 import { useExplorerStore } from "../../stores/explorerStore";
 import { AiQueryComposer } from "./AiQueryComposer";
 import { AiShaderBackdrop } from "./AiShaderBackdrop";
@@ -18,22 +19,33 @@ interface FloatingAiBarProps {
   autoSubmit?: boolean;
 }
 
-const AI_TIPS = [
-  "Save the result as a lens with the + button next to your lenses.",
+const SAVE_AS_LENS_TIP =
+  "Save the result as a lens with the + button next to your lenses.";
+
+const GENERAL_TIPS = [
   "Press Enter to apply, Esc to cancel.",
   "Don't know the syntax? AI's got your back. Just describe what you want.",
 ];
 
+/** Tips for a project that can save lenses: the "+" tip leads. */
+const TIPS_WITH_LENS_SAVE = [SAVE_AS_LENS_TIP, ...GENERAL_TIPS];
+
+/**
+ * Cycles the composer tips. An aggregate project has no "+" to save a lens
+ * (ADR-144), so its tips leave out the one that points to it.
+ */
 const useCyclingTip = (active: boolean): string => {
+  const canSaveLenses = useProjectAcceptsWrites();
+  const tips = canSaveLenses ? TIPS_WITH_LENS_SAVE : GENERAL_TIPS;
   const [index, setIndex] = useState(0);
   useEffect(() => {
     if (!active) return;
     const id = setInterval(() => {
-      setIndex((i) => (i + 1) % AI_TIPS.length);
+      setIndex((i) => i + 1);
     }, 4200);
     return () => clearInterval(id);
   }, [active]);
-  return AI_TIPS[index] ?? AI_TIPS[0]!;
+  return tips[index % tips.length]!;
 };
 
 /**

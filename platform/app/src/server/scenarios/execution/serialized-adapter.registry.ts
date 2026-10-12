@@ -16,9 +16,12 @@ import {
   SerializedPromptConfigAdapter,
   SerializedWorkflowAgentAdapter,
 } from "./serialized-adapters";
+import type { ExecuteSyncTransport } from "./serialized-adapters/execute-sync-transport";
+import { childExecuteSyncTransport } from "./serialized-adapters/execute-sync-transport";
 import type {
   CodeAgentData,
   ConnectedAgentData,
+  ExecuteSyncRoute,
   HttpAgentData,
   LiteLLMParams,
   PromptConfigData,
@@ -40,6 +43,9 @@ type AdapterFactory = (params: {
   projectApiKey?: string;
   /** The values the run resolved, which every target reads as `params.NAME`. */
   parameters?: RunParameterValues;
+  /** How a code or workflow target reaches nlpgo. Already resolved, because
+   *  the caller knows whether it is the child or the control plane. */
+  executeSyncTransport?: ExecuteSyncTransport;
 }) => AgentAdapter;
 
 /**
@@ -63,24 +69,33 @@ export const SERIALIZED_ADAPTER_FACTORIES: Record<string, AdapterFactory> = {
       config: data as HttpAgentData,
       parameters,
     }),
-  code: ({ data, nlpServiceUrl, projectApiKey, parameters }) => {
-    if (!projectApiKey) {
-      throw new Error("Code adapter requires projectApiKey");
+  code: ({ data, projectApiKey, parameters, executeSyncTransport }) => {
+    // One guard, because a code turn needs both or it cannot run: the
+    // project's platform key, which reaches the engine inside the DSL, and a
+    // way to reach the engine at all. `createAdapter` derives the second from
+    // the first, so neither arrives without the other.
+    if (!projectApiKey || !executeSyncTransport) {
+      throw new Error(
+        "Code adapter requires projectApiKey and a transport to the engine",
+      );
     }
     return new SerializedCodeAgentAdapter({
       config: data as CodeAgentData,
-      nlpServiceUrl,
+      transport: executeSyncTransport,
       projectApiKey,
       parameters,
     });
   },
-  workflow: ({ data, nlpServiceUrl, projectApiKey, parameters }) => {
-    if (!projectApiKey) {
-      throw new Error("Workflow adapter requires projectApiKey");
+  workflow: ({ data, projectApiKey, parameters, executeSyncTransport }) => {
+    // See the code factory above: both or neither.
+    if (!projectApiKey || !executeSyncTransport) {
+      throw new Error(
+        "Workflow adapter requires projectApiKey and a transport to the engine",
+      );
     }
     return new SerializedWorkflowAgentAdapter({
       config: data as WorkflowAgentData,
-      nlpServiceUrl,
+      transport: executeSyncTransport,
       projectApiKey,
       parameters,
     });
@@ -118,12 +133,26 @@ export function createAdapter({
   nlpServiceUrl,
   projectApiKey,
   parameters,
+  executeSyncRoute,
+  executeSyncTransport,
 }: {
   adapterData: TargetAdapterData;
   modelParams?: LiteLLMParams;
   nlpServiceUrl: string;
   projectApiKey?: string;
   parameters?: RunParameterValues;
+  /**
+   * The route the parent chose for `execute_sync`. Used by a caller running
+   * in the scenario child, which builds its own HTTP transport from it.
+   */
+  executeSyncRoute?: ExecuteSyncRoute;
+  /**
+   * A transport the caller already has. A caller running inside the control
+   * plane passes `inProcessExecuteSyncTransport`, which reaches nlpgo the way
+   * the control plane always does rather than posting to the relay route the
+   * control plane itself serves.
+   */
+  executeSyncTransport?: ExecuteSyncTransport;
 }): AgentAdapter {
   const factory = SERIALIZED_ADAPTER_FACTORIES[adapterData.type];
 
@@ -137,5 +166,14 @@ export function createAdapter({
     nlpServiceUrl,
     projectApiKey,
     parameters,
+    executeSyncTransport:
+      executeSyncTransport ??
+      (projectApiKey === undefined
+        ? undefined
+        : childExecuteSyncTransport({
+            route: executeSyncRoute,
+            nlpServiceUrl,
+            projectApiKey,
+          })),
   });
 }

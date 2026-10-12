@@ -1,5 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repositories implement the interface as intentional no-ops.
 
+import type { Authorization } from "@langwatch/actor";
 import type { TraceSummaryData } from "../types";
 
 export interface FindByTraceIdOptions {
@@ -22,6 +23,23 @@ export interface FindByTraceIdOptions {
   window?: { fromMs: number; toMs: number };
 }
 
+/**
+ * A single-trace summary read. The proof fences the tenants the read may
+ * see (ADR-144 block C); the repository never names one of its own.
+ */
+export type FindByTraceIdParams = {
+  authorization: Authorization;
+  traceId: string;
+} & FindByTraceIdOptions;
+
+/**
+ * A summary as one read found it, with the tenant it was read from. A proof
+ * may span several tenants (an aggregate's members), and two of them may
+ * hold the same trace id, so the row says whose it is; the reads that follow
+ * it on a detail page are narrowed to that tenant (ADR-144 block F).
+ */
+export type TraceSummaryRead = TraceSummaryData & { tenantId: string };
+
 export interface TraceSummaryRepository {
   upsert(
     data: TraceSummaryData,
@@ -35,21 +53,31 @@ export interface TraceSummaryRepository {
       retentionDays?: number;
     }>,
   ): Promise<void>;
-  findByTraceId(
-    tenantId: string,
-    traceId: string,
-    options?: FindByTraceIdOptions,
-  ): Promise<TraceSummaryData | null>;
+  findByTraceId(params: FindByTraceIdParams): Promise<TraceSummaryRead | null>;
+  /**
+   * The tenant that holds a trace, of those the proof reads: the first by
+   * tenant id when several do, the same pick the heavy read makes. A light
+   * sort-key seek, for a caller that needs only whose trace it is.
+   */
+  findTenantIdByTraceId(params: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<string | null>;
 }
 
 export class NullTraceSummaryRepository implements TraceSummaryRepository {
   async upsert(_data: TraceSummaryData, _tenantId: string): Promise<void> {}
 
   async findByTraceId(
-    _tenantId: string,
-    _traceId: string,
-    _options?: FindByTraceIdOptions,
-  ): Promise<TraceSummaryData | null> {
+    _params: FindByTraceIdParams,
+  ): Promise<TraceSummaryRead | null> {
+    return null;
+  }
+
+  async findTenantIdByTraceId(_params: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<string | null> {
     return null;
   }
 }

@@ -11,6 +11,7 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
+import { projectKindsHiddenFrom } from "~/server/app-layer/projects/project-kinds";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   CreateTeamInput,
@@ -39,14 +40,16 @@ export class PrismaTeamRepository implements TeamRepository {
 
   async findProjectsInTeam({
     teamId,
+    callerOrganizationRole,
   }: {
     teamId: string;
+    callerOrganizationRole: string | null;
   }): Promise<TeamProjectListing[]> {
     return this.prisma.project.findMany({
       where: {
         teamId,
         archivedAt: null,
-        kind: { not: "internal_governance" },
+        kind: { notIn: projectKindsHiddenFrom(callerOrganizationRole) },
       },
       select: {
         id: true,

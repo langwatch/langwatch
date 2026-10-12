@@ -28,7 +28,7 @@ import { META_FIELD_DEFS } from "./meta-handlers";
 
 const FACET_BY_KEY = new Map(FACET_REGISTRY.map((d) => [d.key, d]));
 
-function expressionFacet(
+export function expressionFacet(
   key: string,
 ): ExpressionCategoricalDef | RangeFacetDef {
   const def = FACET_BY_KEY.get(key);

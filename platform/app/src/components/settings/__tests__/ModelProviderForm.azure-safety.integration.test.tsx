@@ -133,7 +133,6 @@ function buildActions(
   overrides: Partial<UseModelProviderFormActions> = {},
 ): UseModelProviderFormActions {
   return {
-    setEnabled: vi.fn(),
     setName: vi.fn(),
     setRoutingHandle: vi.fn(),
     setScopes: vi.fn(),

@@ -167,6 +167,33 @@ describe("guardOrganizationId — original three models preserved", () => {
     });
   });
 
+  describe("when asking whether one address holds a pending invitation", () => {
+    it("does NOT throw, because the read is bounded to one address", async () => {
+      await expect(
+        runGuard({
+          model: "OrganizationInvite",
+          action: "findFirst",
+          args: {
+            where: {
+              email: { equals: "sam@acme.com", mode: "insensitive" },
+              status: "PENDING",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it("still refuses listing every invitation for that address", async () => {
+      await expect(
+        runGuard({
+          model: "OrganizationInvite",
+          action: "findMany",
+          args: { where: { email: "sam@acme.com" } },
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
   describe("when querying Team by row id", () => {
     it("does NOT throw — id is the tenancy proof for a single-row lookup", async () => {
       await expect(

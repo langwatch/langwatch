@@ -71,6 +71,7 @@ function makeStopDeps() {
       } as unknown as LangyTurnServiceDeps["conversations"],
       credentials: {} as unknown as LangyTurnServiceDeps["credentials"],
       resolveModel: vi.fn(),
+      projectKinds: { kindOf: vi.fn(async () => "application") },
       // No worker is running the turn yet, which is the whole point: the cancel
       // reaches the manager and finds nothing to abort.
       worker: { cancel } as unknown as LangyTurnServiceDeps["worker"],

@@ -129,7 +129,10 @@ class SuitesFacade:
         Create a new suite.
 
         Args:
-            params: Dictionary of suite fields (name, slug, etc.).
+            params: Dictionary of suite fields (name, scenarioIds, targets,
+                and optionally kind, description, scope, repeatCount,
+                labels). A field the endpoint does not have is refused
+                with a 422 that names it; the slug is derived from the name.
 
         Returns:
             Dictionary containing the created suite data.

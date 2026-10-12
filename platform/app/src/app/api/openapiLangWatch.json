@@ -791,6 +791,31 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "No annotation with that ID exists in the project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "annotation_not_found"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "message"
+                  ]
+                }
+              }
+            }
           }
         }
       },
@@ -50164,7 +50189,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "disabled": {
@@ -50292,7 +50318,8 @@
                       "enum": [
                         "ADMIN",
                         "MEMBER",
-                        "EXTERNAL"
+                        "EXTERNAL",
+                        "DEVELOPER"
                       ]
                     },
                     "disabled": {
@@ -50432,7 +50459,8 @@
                       "enum": [
                         "ADMIN",
                         "MEMBER",
-                        "EXTERNAL"
+                        "EXTERNAL",
+                        "DEVELOPER"
                       ]
                     },
                     "disabled": {
@@ -50535,7 +50563,8 @@
                     "enum": [
                       "ADMIN",
                       "MEMBER",
-                      "EXTERNAL"
+                      "EXTERNAL",
+                      "DEVELOPER"
                     ]
                   },
                   "disabled": {
@@ -50838,7 +50867,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "status": {
@@ -50943,7 +50973,8 @@
                             "enum": [
                               "ADMIN",
                               "MEMBER",
-                              "EXTERNAL"
+                              "EXTERNAL",
+                              "DEVELOPER"
                             ]
                           },
                           "status": {
@@ -51042,7 +51073,8 @@
                           "enum": [
                             "ADMIN",
                             "MEMBER",
-                            "EXTERNAL"
+                            "EXTERNAL",
+                            "DEVELOPER"
                           ]
                         },
                         "teams": {
@@ -59037,7 +59069,8 @@
                     },
                     "description": "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value."
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -59498,7 +59531,8 @@
                     },
                     "description": "The value for each field the test suite declares, keyed by field identifier: text, a number or a boolean, in the field's own type. A field the suite does not declare answers 422 scenario_field_unknown; a value of the wrong type answers 422 scenario_field_type_invalid. An empty value clears the field. Send the full record; an empty record clears every value."
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -63304,7 +63338,8 @@
                 },
                 "required": [
                   "name"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -75309,7 +75344,7 @@
       },
       "patch": {
         "operationId": "patchApiTriggersById",
-        "description": "Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be changed.",
+        "description": "Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an alert's graph cannot be changed.",
         "responses": {
           "200": {
             "description": "Trigger updated",
@@ -75819,6 +75854,13 @@
                       "SEND_SLACK_MESSAGE",
                       "SEND_WEBHOOK"
                     ]
+                  },
+                  "customGraphId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The graph this alert watches, which an update cannot change. Accepted so that writing the read response back works; a different graph is refused. Create an alert on the other graph and delete this one."
                   },
                   "actionParams": {
                     "anyOf": [

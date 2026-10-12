@@ -5,6 +5,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { CLIENT_FLAG_STALE_TIME_MS } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { isAggregateProjectKind } from "~/server/app-layer/projects/project-kinds";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -149,6 +150,7 @@ export function useWorkspaceData(): Pick<
             orgSlug: org.slug,
             href: buildProjectHref(project.slug),
             label: project.name,
+            isAggregate: isAggregateProjectKind(project.kind),
           })),
         ),
       )

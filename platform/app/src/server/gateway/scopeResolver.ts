@@ -34,6 +34,11 @@ import type {
   Prisma,
   PrismaClient,
 } from "~/generated/prisma/client";
+import {
+  AGGREGATE_PROJECT_KIND,
+  INTERNAL_GOVERNANCE_PROJECT_KIND,
+  NON_DESTINATION_PROJECT_KINDS,
+} from "~/server/app-layer/projects/project-kinds";
 import { isDispatchableProvider } from "~/server/modelProviders/registry";
 import {
   MANAGED_MODELS,
@@ -406,7 +411,8 @@ export async function decideTraceDestination(
   const alternatives = await client.project.count({
     where: {
       team: { organizationId: input.organizationId },
-      kind: { not: "internal_governance" },
+      // An aggregate is no alternative either: it receives no traces.
+      kind: { notIn: [...NON_DESTINATION_PROJECT_KINDS] },
       archivedAt: null,
     },
   });
@@ -432,6 +438,9 @@ async function liveProjectInOrganization(
       id: args.projectId,
       team: { organizationId: args.organizationId },
       archivedAt: null,
+      // An aggregate owns no traces (ADR-144 decision 7), so it is never a
+      // destination; a key naming one is refused as naming nothing.
+      kind: { not: AGGREGATE_PROJECT_KIND },
     },
     select: TRACE_PROJECT_FIELDS,
   });
@@ -448,7 +457,7 @@ async function oldestGovernanceProject(
 ): Promise<TraceProject | null> {
   return await client.project.findFirst({
     where: {
-      kind: "internal_governance",
+      kind: INTERNAL_GOVERNANCE_PROJECT_KIND,
       team: { organizationId },
       archivedAt: null,
     },

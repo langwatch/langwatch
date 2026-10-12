@@ -73,7 +73,9 @@ const validPayload = () => ({
  * someone decides, explicitly, whether a share viewer should see it.
  */
 const INTENTIONALLY_NOT_SHARED: Record<string, string[]> = {
-  header: [],
+  // The project that owns the trace: a share viewer is told nothing about
+  // the project (ADR-057), and an aggregate's member is no exception.
+  header: ["projectId"],
   // The live delta poll's high-water mark. A share is a static snapshot —
   // `useSpanTree` disables the delta query in share mode — so this is internal
   // transport metadata with no consumer on the share page.

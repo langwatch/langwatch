@@ -1,4 +1,5 @@
 import { on } from "node:events";
+import { type Authorization, narrowAuthorization } from "@langwatch/actor";
 import { ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -67,6 +68,7 @@ import {
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   stripRolesFromChatArrayJson,
 } from "~/server/data-privacy/dropKeyCatalog";
+import { gateEvaluationContent } from "~/server/evaluations/evaluation-content-gate";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
@@ -102,6 +104,14 @@ import {
   RESERVED_INPUT_MEDIA_REFS,
   RESERVED_OUTPUT_MEDIA_REFS,
 } from "~/shared/traces/media-refs";
+import { requireRouteAuthorization } from "../authorization";
+import {
+  namedTenantAuthorization,
+  occurredAtFromInput,
+  spanReadHintShape,
+  traceDetailAuthorization,
+  traceTenantShape,
+} from "../trace-detail-authorization";
 import { getUserProtectionsForProject } from "../utils";
 import {
   gateHeaderCost,
@@ -126,31 +136,6 @@ import { spanTreeCursorSchema } from "./tracesV2.schemas";
 // ---------------------------------------------------------------------------
 // Shared input fragments
 // ---------------------------------------------------------------------------
-
-/**
- * Reusable Zod fields for span-read endpoints that accept the partition-
- * pruning hint. The drawer carries the trace's approximate timestamp in
- * the URL, so callers thread it through every span query that targets
- * `stored_spans`. Spread into a procedure's input shape with `...`.
- */
-const spanReadHintShape = {
-  /**
-   * Approximate trace timestamp (ms since epoch) used as a partition-
-   * pruning hint on `stored_spans`. Supplying it narrows the scan from
-   * every weekly partition (incl. cold S3) down to a ±2-day window.
-   * Optional — missing/invalid values fall back to the unconstrained
-   * scan path on the server.
-   */
-  occurredAtMs: z.number().int().optional(),
-} as const;
-
-function occurredAtFromInput(input: {
-  occurredAtMs?: number;
-}): { occurredAtMs: number } | Record<string, never> {
-  return input.occurredAtMs !== undefined
-    ? { occurredAtMs: input.occurredAtMs }
-    : {};
-}
 
 /**
  * The Instant Eval runs the Explorer registered for the query's `eval`
@@ -201,7 +186,6 @@ async function buildFilterWhere(input: {
   return (
     translateFilterWithEvalRuns({
       queryText: input.query ?? "",
-      tenantId: input.projectId,
       timeRange: input.timeRange,
       ...(evalRuns ? { evalRuns } : {}),
     }) ?? undefined
@@ -423,13 +407,13 @@ function hasOwnPromptAttrs(params: Record<string, unknown> | null): boolean {
  * caller can skip the assignment.
  */
 async function enrichLlmSpanWithAncestorPrompt({
-  tenantId,
+  authorization,
   traceId,
   targetSpanId,
   occurredAtMs,
   currentParams,
 }: {
-  tenantId: string;
+  authorization: Authorization;
   traceId: string;
   targetSpanId: string;
   occurredAtMs?: number;
@@ -437,7 +421,7 @@ async function enrichLlmSpanWithAncestorPrompt({
 }): Promise<Record<string, unknown> | null> {
   const app = getApp();
   const allSpans = await app.traces.spans.getSpansByTraceId({
-    tenantId,
+    authorization,
     traceId,
     occurredAtMs,
   });
@@ -985,12 +969,15 @@ const sortSchema = z.object({
 async function enrichSpanDetailFromCodingAgentLogs({
   app,
   span,
+  authorization,
   tenantId,
   traceId,
   occurredAtMs,
 }: {
   app: ReturnType<typeof getApp>;
   span: Span;
+  /** Fences the sibling span read; the log read still keys on the tenant. */
+  authorization: Authorization;
   tenantId: string;
   traceId: string;
   occurredAtMs?: number;
@@ -1003,7 +990,7 @@ async function enrichSpanDetailFromCodingAgentLogs({
       app.traces.logRecords.getLogsByTraceId(tenantId, traceId, occurredAtMs),
       needsSiblingRefs
         ? app.traces.spans.getSpanSummaryByTraceId({
-            tenantId,
+            authorization,
             traceId,
             occurredAtMs,
           })
@@ -1040,21 +1027,40 @@ async function loadProtectedSpansFull({
   input,
   ctx,
 }: {
-  input: { projectId: string; traceId: string; occurredAtMs?: number };
-  ctx: { session: unknown; prisma: unknown } & Record<string, unknown>;
+  input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number;
+    tenantId?: string;
+  };
+  ctx: {
+    session: unknown;
+    prisma: unknown;
+    authorization?: Authorization;
+  } & Record<string, unknown>;
 }): Promise<SpanDetail[]> {
+  const authorization = await traceDetailAuthorization({ ctx, input });
   const protections = await getUserProtectionsForProject(ctx as never, {
     projectId: input.projectId,
+    authorization,
   });
-  return loadSpansFullWithProtections({ ...input, protections });
+  return loadSpansFullWithProtections({
+    projectId: input.projectId,
+    traceId: input.traceId,
+    occurredAtMs: input.occurredAtMs,
+    authorization,
+    protections,
+  });
 }
 
 async function loadSpansFullWithProtections({
+  authorization,
   projectId,
   traceId,
   occurredAtMs,
   protections,
 }: {
+  authorization: Authorization;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
@@ -1063,7 +1069,7 @@ async function loadSpansFullWithProtections({
   const app = getApp();
   const input = { projectId, traceId, occurredAtMs };
   const storedSpans = await app.traces.spans.getSpansByTraceId({
-    tenantId: input.projectId,
+    authorization,
     traceId: input.traceId,
     visibilityCutoffMs: await getVisibilityCutoffMsForProject(input.projectId),
     ...occurredAtFromInput(input),
@@ -1156,17 +1162,20 @@ async function loadTraceLogsWithProtections({
  * passes as every sibling read.
  */
 export async function readCodingAgentTranscriptWithProtections({
+  authorization,
   projectId,
   traceId,
   occurredAtMs,
   protections,
 }: {
+  /** The proof the span read is fenced by; the caller's door mints it. */
+  authorization: Authorization;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
   protections: Protections;
 }): Promise<CodingAgentTranscript> {
-  const args = { projectId, traceId, occurredAtMs, protections };
+  const args = { authorization, projectId, traceId, occurredAtMs, protections };
   const [spans, logs] = await Promise.all([
     loadSpansFullWithProtections(args),
     loadTraceLogsWithProtections(args),
@@ -1194,6 +1203,9 @@ export const tracesV2Router = createTRPCRouter({
         cursor: z
           .object({
             sortValue: z.number().finite(),
+            // Absent on a cursor minted before the tenant was carried; the
+            // service reads such a cursor as the project's own tenant.
+            tenantId: z.string().min(1).optional(),
             traceId: z.string().min(1),
           })
           .optional(),
@@ -1208,7 +1220,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const page = await app.traces.list.getList({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         sort: input.sort,
         page: input.page,
@@ -1254,7 +1266,7 @@ export const tracesV2Router = createTRPCRouter({
         projectId: input.projectId,
       });
       const result = await app.traces.sessionGroups.getSessionGroups({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         sort: input.sort,
         pageSize: input.pageSize,
@@ -1287,7 +1299,10 @@ export const tracesV2Router = createTRPCRouter({
     }),
 
   /**
-   * Event rollups for the trace list's Events column, keyed by trace id.
+   * Event rollups for the trace list's Events column, keyed by the project
+   * that holds each trace and its id together (`listedTraceKey`): on an
+   * aggregate two members may hold the same trace id, and each row shows only
+   * its own member's events.
    *
    * Its own query rather than part of `list`: events live in `stored_spans`,
    * not on the summary fold, so bundling them would put a second table's read
@@ -1304,9 +1319,9 @@ export const tracesV2Router = createTRPCRouter({
     )
     .permission("traces:view")
     .query(
-      async ({ input }): Promise<Record<string, TraceEventRollup>> =>
+      async ({ input, ctx }): Promise<Record<string, TraceEventRollup>> =>
         getApp().traces.spans.getTraceEventRollupsByTraceIds({
-          tenantId: input.projectId,
+          authorization: requireRouteAuthorization(ctx),
           traceIds: input.traceIds,
           timeRange: input.timeRange,
         }),
@@ -1330,11 +1345,11 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       const evalRuns = await resolveEvalRuns(input);
       return app.traces.list.getFacets({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         query: input.query,
         hiddenOrigins: explorerHiddenOrigins(input.query),
@@ -1353,10 +1368,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       const count = await app.traces.list.getNewCount({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         since: input.since,
         filterWhere: await buildFilterWhere(input),
@@ -1379,10 +1394,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       const values = await app.traces.list.getSuggestions({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         field: input.field,
         prefix: input.prefix,
         limit: input.limit,
@@ -1400,13 +1415,23 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         conversationId: z.string().min(1),
+        /** The member whose conversation this is, on an aggregate. */
+        ...traceTenantShape,
       }),
     )
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
+      // Two members may share a conversation id; the member the drawer is
+      // on keeps its turns apart from the other's, and its policy applies.
+      const authorization = namedTenantAuthorization({
+        ctx,
+        tenantId: input.tenantId,
+        notFound: () => new TraceNotFoundError(input.conversationId),
+      });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       // Window: conversation membership is timeless; cap at 1y to keep
       // partition pruning effective.
@@ -1417,7 +1442,7 @@ export const tracesV2Router = createTRPCRouter({
         params: { threadConversationId: input.conversationId },
       };
       const page = await app.traces.list.getList({
-        tenantId: input.projectId,
+        authorization,
         timeRange,
         sort: { columnId: "time", direction: "asc" },
         page: 1,
@@ -1447,10 +1472,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       return app.traces.list.getDiscover({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
       });
     }),
@@ -1494,10 +1519,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
       return app.traces.list.getFacetValues({
-        tenantId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         timeRange: input.timeRange,
         facetKey: input.facetKey,
         prefix: input.prefix,
@@ -1515,9 +1540,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return generateTraceQueryFromPrompt({
         projectId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         prompt: input.prompt,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
       });
@@ -1536,9 +1562,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return generateTraceAction({
         projectId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         prompt: input.prompt,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
       });
@@ -1559,9 +1586,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       return routeSearch({
         projectId: input.projectId,
+        authorization: requireRouteAuthorization(ctx),
         text: input.text,
         timeRange: { from: input.timeRange.from, to: input.timeRange.to },
         activeQuery: input.activeQuery,
@@ -1601,30 +1629,41 @@ export const tracesV2Router = createTRPCRouter({
          * a stale client, never a caller in the current code.
          */
         full: z.boolean().default(true),
+        ...traceTenantShape,
       }),
     )
     .permission("traces:view")
     .query(async ({ input, ctx }): Promise<TraceHeader> => {
       const app = getApp();
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
+      // A named member narrows the read; with none, the summary read picks
+      // the member, and the header names it for the reads that follow.
+      const authorization = namedTenantAuthorization({
+        ctx,
+        tenantId: input.tenantId,
+        notFound: () => new TraceNotFoundError(input.traceId),
       });
-      const summary = await app.traces.summary.getByTraceId(
-        input.projectId,
-        input.traceId,
-        {
-          ...(input.occurredAtMs !== undefined
-            ? { occurredAtMs: input.occurredAtMs }
-            : {}),
-          visibilityCutoffMs: await getVisibilityCutoffMsForProject(
-            input.projectId,
-          ),
-          full: input.full,
-        },
-      );
+      const summary = await app.traces.summary.getByTraceId({
+        authorization,
+        traceId: input.traceId,
+        ...(input.occurredAtMs !== undefined
+          ? { occurredAtMs: input.occurredAtMs }
+          : {}),
+        visibilityCutoffMs: await getVisibilityCutoffMsForProject(
+          input.projectId,
+        ),
+        full: input.full,
+      });
       if (!summary) {
         throw new TraceNotFoundError(input.traceId);
       }
+      // The privacy policy follows the member the trace was found in, so a
+      // header opened without naming one is governed as the drawer will be.
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+        authorization:
+          narrowAuthorization({ authorization, projectId: summary.tenantId }) ??
+          authorization,
+      });
       const rawHeader = mapTraceSummaryToHeader(summary);
       // Cost is gated by the viewer's own `cost:view` (via `protections`), the
       // same rule the detail-pane spans apply through `applySpanProtections` —
@@ -1633,7 +1672,12 @@ export const tracesV2Router = createTRPCRouter({
         header: redactV2Content(rawHeader, protections),
         protections,
       });
-      header.privacy = await deriveTraceDropPrivacy(rawHeader, input.projectId);
+      // The dropped notice reads the same member's policy as the protections.
+      header.privacy = await deriveTraceDropPrivacy(
+        rawHeader,
+        summary.tenantId,
+      );
+      header.projectId = summary.tenantId;
 
       return header;
     }),
@@ -1712,11 +1756,13 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
+      const authorization = await traceDetailAuthorization({ ctx, input });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       const page = await app.traces.spans.getSpansPaginated({
-        tenantId: input.projectId,
+        authorization,
         traceId: input.traceId,
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
           input.projectId,
@@ -1750,11 +1796,13 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input, ctx }) => {
       const app = getApp();
+      const authorization = await traceDetailAuthorization({ ctx, input });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       const spans = await app.traces.spans.getSpansSince({
-        tenantId: input.projectId,
+        authorization,
         traceId: input.traceId,
         sinceStartTimeMs: input.sinceStartTimeMs,
         visibilityCutoffMs: await getVisibilityCutoffMsForProject(
@@ -1795,11 +1843,13 @@ export const tracesV2Router = createTRPCRouter({
         nextCursor: SpanTreeCursor | null;
       }> => {
         const app = getApp();
+        const authorization = await traceDetailAuthorization({ ctx, input });
         const protections = await getUserProtectionsForProject(ctx, {
           projectId: input.projectId,
+          authorization,
         });
         const page = await app.traces.spans.getSpanSummariesPage({
-          tenantId: input.projectId,
+          authorization,
           traceId: input.traceId,
           limit: input.limit,
           cursor: input.cursor,
@@ -1829,11 +1879,13 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
       const app = getApp();
+      const authorization = await traceDetailAuthorization({ ctx, input });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       const rows = await app.traces.spans.getSpanSummariesSince({
-        tenantId: input.projectId,
+        authorization,
         traceId: input.traceId,
         sinceUpdatedAtMs: input.sinceUpdatedAtMs,
         ...occurredAtFromInput(input),
@@ -1863,11 +1915,13 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input, ctx }): Promise<SpanTreeNode[]> => {
       const app = getApp();
+      const authorization = await traceDetailAuthorization({ ctx, input });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       const rows = await app.traces.spans.getSpanSummaryByTraceId({
-        tenantId: input.projectId,
+        authorization,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
@@ -1892,10 +1946,10 @@ export const tracesV2Router = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }): Promise<SpanLangwatchSignals[]> => {
+    .query(async ({ input, ctx }): Promise<SpanLangwatchSignals[]> => {
       const app = getApp();
       const rows = await app.traces.spans.getLangwatchSignalsByTraceId({
-        tenantId: input.projectId,
+        authorization: await traceDetailAuthorization({ ctx, input }),
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
@@ -1943,11 +1997,14 @@ export const tracesV2Router = createTRPCRouter({
     )
     .permission("traces:view")
     .query(async ({ input, ctx }): Promise<CodingAgentTranscript> => {
+      const authorization = await traceDetailAuthorization({ ctx, input });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       return readCodingAgentTranscriptWithProtections({
         ...input,
+        authorization,
         protections,
       });
     }),
@@ -1964,8 +2021,10 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input, ctx }): Promise<SpanDetail> => {
       const app = getApp();
+      const authorization = await traceDetailAuthorization({ ctx, input });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       const hint = occurredAtFromInput(input);
       // One narrow span fetch + one narrow events fetch in parallel —
@@ -1975,7 +2034,7 @@ export const tracesV2Router = createTRPCRouter({
       // whose result was never read.
       const [span, rawEvents] = await Promise.all([
         app.traces.spans.getSpanById({
-          tenantId: input.projectId,
+          authorization,
           traceId: input.traceId,
           spanId: input.spanId,
           visibilityCutoffMs: await getVisibilityCutoffMsForProject(
@@ -1984,7 +2043,7 @@ export const tracesV2Router = createTRPCRouter({
           ...hint,
         }),
         app.traces.spans.getSpanEvents({
-          tenantId: input.projectId,
+          authorization,
           traceId: input.traceId,
           spanId: input.spanId,
           ...hint,
@@ -2004,6 +2063,7 @@ export const tracesV2Router = createTRPCRouter({
         ? await enrichSpanDetailFromCodingAgentLogs({
             app,
             span,
+            authorization,
             tenantId: input.projectId,
             traceId: input.traceId,
             occurredAtMs: hint.occurredAtMs,
@@ -2053,7 +2113,7 @@ export const tracesV2Router = createTRPCRouter({
         !hasOwnPromptAttrs(detail.params as Record<string, unknown> | null)
       ) {
         const enriched = await enrichLlmSpanWithAncestorPrompt({
-          tenantId: input.projectId,
+          authorization,
           traceId: input.traceId,
           targetSpanId: input.spanId,
           occurredAtMs: hint.occurredAtMs,
@@ -2104,11 +2164,13 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input, ctx }): Promise<TraceResourceInfoDto> => {
       const app = getApp();
+      const authorization = await traceDetailAuthorization({ ctx, input });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       const rows = await app.traces.spans.getSpanResourcesByTraceId({
-        tenantId: input.projectId,
+        authorization,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
@@ -2159,11 +2221,13 @@ export const tracesV2Router = createTRPCRouter({
     .permission("traces:view")
     .query(async ({ input, ctx }): Promise<DerivedTraceEvent[]> => {
       const app = getApp();
+      const authorization = await traceDetailAuthorization({ ctx, input });
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
+        authorization,
       });
       const events = await app.traces.spans.getTraceEventsByTraceId({
-        tenantId: input.projectId,
+        authorization,
         traceId: input.traceId,
         ...occurredAtFromInput(input),
       });
@@ -2172,17 +2236,36 @@ export const tracesV2Router = createTRPCRouter({
       return applyDerivedTraceEventProtections(events, protections);
     }),
 
+  /**
+   * The evaluations already scored on one trace. Read through the detail
+   * proof, so on an aggregate an evaluation is matched to the member and the
+   * trace together (ADR-144 block F); the aggregate never runs one itself.
+   * Their inputs, details and error text follow the viewer's protections,
+   * resolved through the same proof, like the span reads beside it.
+   */
   evals: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceId: z.string(),
+        ...traceTenantShape,
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const app = getApp();
-      return app.evaluations.runs.findByTraceId(input.projectId, input.traceId);
+      const authorization = await traceDetailAuthorization({ ctx, input });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+        authorization,
+      });
+      const runs = await app.evaluations.runs.findByTraceId({
+        authorization,
+        traceId: input.traceId,
+      });
+      return runs.map((evaluation) =>
+        gateEvaluationContent({ evaluation, protections }),
+      );
     }),
 
   /**

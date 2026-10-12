@@ -12,6 +12,7 @@ import { SCOPE_TIERS, type ScopeTier } from "~/server/scopes/scope.types";
 import { isSafeRegex } from "~/utils/safeRegex";
 import { getModelLimits } from "../../../utils/modelLimits";
 import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
+import { requireRouteAuthorization } from "../authorization";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -229,7 +230,11 @@ export const llmModelCostsRouter = createTRPCRouter({
       }),
     )
     .permission("traces:view")
-    .query(async ({ input }) =>
-      previewCostRuleMatchingSpans({ spans: getApp().traces.spans, input }),
+    .query(async ({ input, ctx }) =>
+      previewCostRuleMatchingSpans({
+        spans: getApp().traces.spans,
+        authorization: requireRouteAuthorization(ctx),
+        input,
+      }),
     ),
 });

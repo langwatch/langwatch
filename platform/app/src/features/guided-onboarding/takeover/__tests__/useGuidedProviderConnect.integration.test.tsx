@@ -22,7 +22,6 @@ vi.mock("~/hooks/useModelProvidersSettings", () => ({
 }));
 
 const formParams: { current: Record<string, unknown> } = { current: {} };
-const setEnabled = vi.fn(async () => {});
 const setProjectDefaultModel = vi.fn();
 const setUseAsDefaultProvider = vi.fn();
 const setCustomModels = vi.fn();
@@ -39,7 +38,6 @@ vi.mock("~/hooks/useModelProviderForm", () => ({
         setProjectDefaultModel,
         setUseAsDefaultProvider,
         setCustomModels,
-        setEnabled,
         submit: async () => {
           await submit();
           (params.onSuccess as () => void)();
@@ -240,9 +238,6 @@ describe("useGuidedProviderConnect", () => {
 
       expect(validation.validate).toHaveBeenCalledTimes(1);
       expect(clearRefusal).toHaveBeenCalledTimes(1);
-      // The form's submit writes the row as enabled; a separate toggle would
-      // save (and fire the success path) before the key is on the row.
-      expect(setEnabled).not.toHaveBeenCalled();
       expect(submit).toHaveBeenCalledTimes(1);
       expect(setRoleAssignment).toHaveBeenCalledWith({
         scopeType: "ORGANIZATION",
@@ -279,7 +274,6 @@ describe("useGuidedProviderConnect", () => {
       });
 
       expect(recordRefusal).toHaveBeenCalledTimes(1);
-      expect(setEnabled).not.toHaveBeenCalled();
       expect(submit).not.toHaveBeenCalled();
       expect(setRoleAssignment).not.toHaveBeenCalled();
       expect(recordProvider).not.toHaveBeenCalled();

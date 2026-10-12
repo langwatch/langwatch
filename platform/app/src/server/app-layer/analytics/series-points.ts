@@ -13,6 +13,11 @@ import type { TimeseriesBucket } from "~/server/analytics/types";
  * compare against a threshold) and scheduled reports (which need every series
  * on a graph to draw a chart) read buckets this way, so the readers live here
  * rather than inside either caller.
+ *
+ * A single value per bucket is read from an UNGROUPED result. Per-group values
+ * cannot be added back into one: that sums averages, percentiles, minimums and
+ * maximums, and counts a row once per group for an array grouping. A reader
+ * that needs one value per bucket queries without `groupBy` instead.
  */
 
 export interface SeriesPoint {
@@ -21,60 +26,21 @@ export interface SeriesPoint {
 }
 
 /**
- * Sum one series' value across every group in a grouped bucket.
- *
- * Returns undefined when no group carries the metric, so the caller can tell
- * "this bucket has no data for the series" apart from "the series really was
- * zero here" and exclude it from aggregation rather than counting it as 0.
- */
-export function sumMetricAcrossGroups(
-  entry: TimeseriesBucket,
-  groupBy: string,
-  seriesKey: string,
-): number | undefined {
-  const groups = groupsOf(entry, groupBy);
-  if (!groups) return undefined;
-
-  let sum = 0;
-  let found = false;
-  for (const metrics of Object.values(groups)) {
-    const value = metrics[seriesKey];
-    if (typeof value === "number") {
-      found = true;
-      sum += value;
-    }
-  }
-  return found ? sum : undefined;
-}
-
-/**
- * Read one series' per-bucket values out of a timeseries period. Buckets
- * missing the key contribute 0, matching the cron's long-standing
+ * Read one series' per-bucket values out of an ungrouped timeseries period.
+ * Buckets missing the key contribute 0, matching the cron's long-standing
  * `calculateCurrentValue` behaviour.
  */
 export function extractSeriesPoints(
   dataPoints: TimeseriesBucket[],
   bucketKey: string,
-  groupBy?: string,
 ): SeriesPoint[] {
-  const points: SeriesPoint[] = [];
-  for (const entry of dataPoints) {
-    const timestamp = entry.date;
-    const direct = entry[bucketKey];
-    if (typeof direct === "number") {
-      points.push({ timestamp, value: direct });
-      continue;
-    }
-    if (groupBy) {
-      const grouped = sumMetricAcrossGroups(entry, groupBy, bucketKey);
-      if (typeof grouped === "number") {
-        points.push({ timestamp, value: grouped });
-        continue;
-      }
-    }
-    points.push({ timestamp, value: 0 });
-  }
-  return points;
+  return dataPoints.map((entry) => {
+    const value = entry[bucketKey];
+    return {
+      timestamp: entry.date,
+      value: typeof value === "number" ? value : 0,
+    };
+  });
 }
 
 /**

@@ -73,6 +73,7 @@ import {
   SerializedCodeAgentAdapter,
   SerializedCodeAgentAdapterError,
 } from "../code-agent.adapter";
+import { directExecuteSyncTransport } from "../execute-sync-transport";
 
 const mockInjectTraceContextHeaders = vi.mocked(injectTraceContextHeaders);
 
@@ -240,7 +241,7 @@ describe("SerializedCodeAgentAdapter", () => {
   it("has AGENT role", () => {
     const adapter = new SerializedCodeAgentAdapter({
       config: defaultConfig,
-      nlpServiceUrl: nlpServiceUrl,
+      transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
       projectApiKey: apiKey,
     });
     expect(adapter.role).toBe(AgentRole.AGENT);
@@ -249,7 +250,7 @@ describe("SerializedCodeAgentAdapter", () => {
   it("has correct name", () => {
     const adapter = new SerializedCodeAgentAdapter({
       config: defaultConfig,
-      nlpServiceUrl: nlpServiceUrl,
+      transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
       projectApiKey: apiKey,
     });
     expect(adapter.name).toBe("SerializedCodeAgentAdapter");
@@ -259,7 +260,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("sends an execute_flow event to /go/studio/execute_sync", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -289,7 +290,9 @@ describe("SerializedCodeAgentAdapter", () => {
               OTHER_SECRET: "value-2",
             },
           },
-          nlpServiceUrl: nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
 
@@ -306,7 +309,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("builds a workflow with entry, code, and end nodes", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -327,7 +330,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("returns the end node output as a response string", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -345,7 +348,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -361,7 +364,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -381,7 +384,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: configNoIO,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -402,7 +405,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       const result = await adapter.call(defaultInput);
@@ -415,7 +418,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       const result = await adapter.call(defaultInput);
@@ -437,7 +440,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(multiMessageInput);
@@ -462,7 +465,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: multiInputConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -480,7 +483,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("passes an abort signal for timeout protection", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -496,7 +499,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("passes a dispatcher whose headers timeout matches the adapter's own fetch timeout", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -512,7 +515,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("sets run_evaluations to false and do_not_trace to true", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -525,7 +528,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("generates a valid 32-char hex trace_id", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -552,7 +555,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("uses resolved mappings for input assignment in the input record", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: multiInputConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -567,7 +570,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("uses resolved mappings for workflow node input values", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: multiInputConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -593,7 +596,7 @@ describe("SerializedCodeAgentAdapter", () => {
       };
       const adapter = new SerializedCodeAgentAdapter({
         config: singleInputConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -619,7 +622,7 @@ describe("SerializedCodeAgentAdapter", () => {
       };
       const adapter = new SerializedCodeAgentAdapter({
         config: multiInputConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -648,7 +651,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: config,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       const result = await adapter.call(defaultInput);
@@ -668,7 +671,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: config,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       const result = await adapter.call(defaultInput);
@@ -685,7 +688,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: config,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -701,7 +704,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       const result = await adapter.call(defaultInput);
@@ -714,7 +717,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("includes a valid dataset on the entry node", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -733,7 +736,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("connects entry -> code_agent -> end with correct edge handles", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -776,7 +779,9 @@ describe("SerializedCodeAgentAdapter", () => {
       it("emits a CLIENT span tagged with the agent id and HTTP url", async () => {
         const adapter = new SerializedCodeAgentAdapter({
           config: defaultConfig,
-          nlpServiceUrl: nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
         await adapter.call(defaultInput);
@@ -793,7 +798,9 @@ describe("SerializedCodeAgentAdapter", () => {
       it("annotates the span with the response status code", async () => {
         const adapter = new SerializedCodeAgentAdapter({
           config: defaultConfig,
-          nlpServiceUrl: nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
         await adapter.call(defaultInput);
@@ -839,7 +846,9 @@ describe("SerializedCodeAgentAdapter", () => {
         try {
           const adapter = new SerializedCodeAgentAdapter({
             config: defaultConfig,
-            nlpServiceUrl: nlpServiceUrl,
+            transport: directExecuteSyncTransport({
+              nlpServiceUrl: nlpServiceUrl,
+            }),
             projectApiKey: apiKey,
           });
           const callPromise = adapter.call(defaultInput);
@@ -872,7 +881,9 @@ describe("SerializedCodeAgentAdapter", () => {
         try {
           const adapter = new SerializedCodeAgentAdapter({
             config: defaultConfig,
-            nlpServiceUrl: nlpServiceUrl,
+            transport: directExecuteSyncTransport({
+              nlpServiceUrl: nlpServiceUrl,
+            }),
             projectApiKey: apiKey,
           });
           const callPromise = adapter
@@ -897,7 +908,9 @@ describe("SerializedCodeAgentAdapter", () => {
 
         const adapter = new SerializedCodeAgentAdapter({
           config: defaultConfig,
-          nlpServiceUrl: nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
         await expect(adapter.call(defaultInput)).rejects.toBeInstanceOf(
@@ -924,7 +937,9 @@ describe("SerializedCodeAgentAdapter", () => {
 
         const adapter = new SerializedCodeAgentAdapter({
           config: defaultConfig,
-          nlpServiceUrl: nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
         await expect(adapter.call(defaultInput)).rejects.toBeInstanceOf(
@@ -951,7 +966,9 @@ describe("SerializedCodeAgentAdapter", () => {
 
         const adapter = new SerializedCodeAgentAdapter({
           config: defaultConfig,
-          nlpServiceUrl: nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
         let captured: SerializedCodeAgentAdapterError | undefined;
@@ -971,7 +988,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("carries them on the synthesized workflow DSL beside its secrets", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...defaultConfig, secrets: { API_KEY: "sk-test" } },
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
         parameters: { region: "eu-central" },
       });
@@ -989,7 +1006,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("keeps each value's native type", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
         parameters: { seats: 12, trial: false, region: "eu-central" },
       });
@@ -1007,7 +1024,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("sends an empty namespace when the run resolved none", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -1043,7 +1060,7 @@ describe("SerializedCodeAgentAdapter", () => {
       injectTraceContext({ traceId: TRACE_ID, traceparent: TRACEPARENT });
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
         parameters: { region: "eu-central" },
       });
@@ -1062,7 +1079,7 @@ describe("SerializedCodeAgentAdapter", () => {
       injectTraceContext({ traceId: TRACE_ID, traceparent: TRACEPARENT });
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
         parameters: { trace_id: "supplied", traceparent: "supplied" },
       });
@@ -1079,7 +1096,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("captures a fresh context on every turn", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -1116,7 +1133,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("sends it as the code node's timeout_ms parameter", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...defaultConfig, timeoutMs: 5000 },
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -1132,7 +1149,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("still sends the code parameter", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...defaultConfig, timeoutMs: 5000 },
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -1148,7 +1165,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("keeps its own fetch deadline above the requested code budget", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...defaultConfig, timeoutMs: 300_000 },
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -1163,7 +1180,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("clamps its own fetch deadline to the platform's maximum for one turn", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...defaultConfig, timeoutMs: Number.MAX_SAFE_INTEGER },
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -1180,7 +1197,7 @@ describe("SerializedCodeAgentAdapter", () => {
       const adapter = new SerializedCodeAgentAdapter({
         // 890s + the 30s headroom lands at 920s, above the 900s maximum.
         config: { ...defaultConfig, timeoutMs: 890_000 },
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -1193,7 +1210,7 @@ describe("SerializedCodeAgentAdapter", () => {
     it("omits timeout_ms when the config carries no timeout", async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
 
@@ -1216,7 +1233,7 @@ describe("SerializedCodeAgentAdapter", () => {
     const callWith = async (config: CodeAgentData) => {
       const adapter = new SerializedCodeAgentAdapter({
         config,
-        nlpServiceUrl: nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
@@ -1373,7 +1390,9 @@ describe("SerializedCodeAgentAdapter", () => {
           .mockResolvedValueOnce(replyWith({ output: "other" }));
         const adapter = new SerializedCodeAgentAdapter({
           config: sessionConfig,
-          nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
 
@@ -1401,7 +1420,9 @@ describe("SerializedCodeAgentAdapter", () => {
           .mockResolvedValueOnce(replyWith({ output: "three" }));
         const adapter = new SerializedCodeAgentAdapter({
           config: sessionConfig,
-          nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
 
@@ -1421,7 +1442,9 @@ describe("SerializedCodeAgentAdapter", () => {
         );
         const adapter = new SerializedCodeAgentAdapter({
           config: sessionConfig,
-          nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
 
@@ -1436,7 +1459,7 @@ describe("SerializedCodeAgentAdapter", () => {
     const captureFailure = async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       try {
@@ -1492,7 +1515,9 @@ describe("SerializedCodeAgentAdapter", () => {
 
         const adapter = new SerializedCodeAgentAdapter({
           config: defaultConfig,
-          nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
 
@@ -1723,7 +1748,9 @@ describe("SerializedCodeAgentAdapter", () => {
       const captureWithOutputField = async () => {
         const adapter = new SerializedCodeAgentAdapter({
           config: configDemandingOutputField,
-          nlpServiceUrl,
+          transport: directExecuteSyncTransport({
+            nlpServiceUrl: nlpServiceUrl,
+          }),
           projectApiKey: apiKey,
         });
         try {
@@ -1808,7 +1835,9 @@ describe("SerializedCodeAgentAdapter", () => {
         try {
           const adapter = new SerializedCodeAgentAdapter({
             config: configDemandingOutputField,
-            nlpServiceUrl,
+            transport: directExecuteSyncTransport({
+              nlpServiceUrl: nlpServiceUrl,
+            }),
             projectApiKey: apiKey,
           });
           const p = adapter
@@ -1845,7 +1874,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...defaultConfig, secrets: { OTHER: "shh-9f3a2b7c4e" } },
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: secretKey,
       });
       let captured: SerializedCodeAgentAdapterError | undefined;
@@ -1873,7 +1902,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
       const adapter = new SerializedCodeAgentAdapter({
         config: { ...defaultConfig, secrets: { TOKEN: projectSecret } },
-        nlpServiceUrl,
+        transport: directExecuteSyncTransport({ nlpServiceUrl: nlpServiceUrl }),
         projectApiKey: apiKey,
       });
       let captured: SerializedCodeAgentAdapterError | undefined;
@@ -1927,7 +1956,9 @@ describe("SerializedCodeAgentAdapter", () => {
         try {
           const adapter = new SerializedCodeAgentAdapter({
             config: defaultConfig,
-            nlpServiceUrl,
+            transport: directExecuteSyncTransport({
+              nlpServiceUrl: nlpServiceUrl,
+            }),
             projectApiKey: apiKey,
           });
           const callPromise = adapter
@@ -1975,7 +2006,9 @@ describe("SerializedCodeAgentAdapter", () => {
         try {
           const adapter = new SerializedCodeAgentAdapter({
             config: defaultConfig,
-            nlpServiceUrl,
+            transport: directExecuteSyncTransport({
+              nlpServiceUrl: nlpServiceUrl,
+            }),
             projectApiKey: apiKey,
           });
           const callPromise = adapter

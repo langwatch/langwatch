@@ -78,6 +78,8 @@ export type WorkspaceSwitcherEntry =
       href: string;
       label: string;
       subtitle?: string;
+      /** An aggregate project (ADR-144), marked wherever it is picked. */
+      isAggregate?: boolean;
     };
 
 export type WorkspaceSwitcherCurrent =

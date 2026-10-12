@@ -15,6 +15,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import { createInnerTRPCContext } from "../../trpc";
 import { sharedTraceRouter } from "../sharedTrace";
 import { SHARE_MAX_FULL_SPANS } from "../sharedTrace.schemas";
@@ -52,6 +53,12 @@ vi.mock("~/server/app-layer/app", () => ({
   // Consumers that degrade without Redis read through this one.
   tryGetApp: () => null,
   getApp: () => ({
+    // The route mints an own-only proof for the shared trace's project; the
+    // span reads below are fenced by it.
+    authorization: {
+      authorizeInternal: async ({ projectId }: { projectId: string }) =>
+        ownProof({ projectId }),
+    },
     share: { resolveForViewer: mockResolveForViewer },
     // No cache in unit tests: every call assembles, so the assertions below
     // observe the real assembly rather than a replayed payload.

@@ -62,6 +62,7 @@ describe("ProcessWakeWorker", () => {
       });
       expect(handleWake).toHaveBeenCalledWith({ wake: dueWake(), now: 123 });
       expect(notifyOutbox).toHaveBeenCalledTimes(1);
+      expect(notifyOutbox).toHaveBeenCalledWith("topicClustering");
       await worker.stop();
     });
 

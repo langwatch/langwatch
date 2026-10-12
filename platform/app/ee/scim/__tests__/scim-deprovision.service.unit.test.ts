@@ -13,12 +13,15 @@
  * `scim-offboard-postcondition.integration.test.ts`.
  */
 import { OffboardIncompleteError } from "@langwatch/authz-server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import {
   CannotDisableLastAdminError,
   CannotRemoveLastAdminError,
 } from "~/server/app-layer/organizations/errors";
+import type { AggregateReconciler } from "~/server/app-layer/projects/aggregate-reconciler.service";
 import { ScimDeprovisionService } from "../scim-deprovision.service";
+
+type Reconcile = AggregateReconciler["reconcileOrganizationOrLog"];
 
 const ORGANIZATION = "org_acme";
 const CONNECTION = "conn_okta_primary";
@@ -46,16 +49,23 @@ function createSyncLifecycle() {
 describe("ScimDeprovisionService", () => {
   let grants: ReturnType<typeof createGrants>;
   let syncLifecycle: ReturnType<typeof createSyncLifecycle>;
+  let aggregateMembers: { reconcileOrganizationOrLog: Mock<Reconcile> };
 
   beforeEach(() => {
     grants = createGrants();
     syncLifecycle = createSyncLifecycle();
+    aggregateMembers = {
+      reconcileOrganizationOrLog: vi
+        .fn<Reconcile>()
+        .mockResolvedValue(undefined),
+    };
   });
 
   function service() {
     return new ScimDeprovisionService({
       grants: grants as never,
       syncLifecycle: syncLifecycle as never,
+      aggregateMembers,
     });
   }
 
@@ -72,6 +82,20 @@ describe("ScimDeprovisionService", () => {
         actor: { type: "system", name: "scim" },
         userId: USER,
         organizationId: ORGANIZATION,
+      });
+    });
+
+    it("re-reads the organisation's aggregate projects once the removal stands", async () => {
+      await service().removeAccess({
+        userId: USER,
+        organizationId: ORGANIZATION,
+        connectionId: CONNECTION,
+        op: "delete_user",
+      });
+
+      expect(aggregateMembers.reconcileOrganizationOrLog).toHaveBeenCalledWith({
+        organizationId: ORGANIZATION,
+        trigger: "member-offboarded",
       });
     });
   });
@@ -117,6 +141,21 @@ describe("ScimDeprovisionService", () => {
         code: "offboard_incomplete",
         httpStatus: 500,
       });
+    });
+
+    it("leaves the aggregate projects alone when the removal is refused", async () => {
+      await service()
+        .removeAccess({
+          userId: USER,
+          organizationId: ORGANIZATION,
+          connectionId: CONNECTION,
+          op: "delete_user",
+        })
+        .catch(() => undefined);
+
+      expect(
+        aggregateMembers.reconcileOrganizationOrLog,
+      ).not.toHaveBeenCalled();
     });
 
     it("surfaces it as a dead letter naming the person and the operation", async () => {

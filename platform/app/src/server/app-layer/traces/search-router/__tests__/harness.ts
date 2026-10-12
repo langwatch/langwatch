@@ -14,11 +14,14 @@ import type {
   InstantEvalClassifyRequest,
   InstantEvalJudgement,
 } from "~/server/app-layer/instant-evals/classifier/classifier";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import type {
   RouteSearchInput,
   SearchRouteKind,
   SearchRouterDeps,
 } from "../contracts";
+/** The proof the route minted; every builder receives it alongside the project. */
+export const PROOF = ownProof({ projectId: "project-1" });
 
 export const RANGE = { from: 1_000_000, to: 1_000_000 + 24 * 3_600_000 };
 
@@ -26,6 +29,7 @@ export const input = (
   overrides: Partial<RouteSearchInput> = {},
 ): RouteSearchInput => ({
   projectId: "project-1",
+  authorization: PROOF,
   text: "annoyed users",
   timeRange: RANGE,
   activeQuery: "",

@@ -36,6 +36,11 @@ import { SsoConnectionGuards } from "@ee/sso/sso-connection-guards";
 import type { SsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.repository";
 import { PrismaSsoDomainProofNotificationPort } from "@ee/sso/sso-self-serve-adapters";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
+import {
+  type Authorization,
+  type AuthorizationPurpose,
+  internalActor,
+} from "@langwatch/actor";
 import type {
   IdentityHeadsRepository,
   IdentityReservationRepository,
@@ -86,6 +91,7 @@ import {
 } from "../../../ee/billing/services/instantEvalSpendQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
+import type { AuthorizationService } from "../app-layer/authz/authorization.service";
 import type { TriggerService } from "../app-layer/automations/trigger.service";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
@@ -100,6 +106,7 @@ import { offloadInputsIfOversized } from "../app-layer/evaluations/evaluation-in
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
+import { isEvaluatorSettingsRecoveryDisabled } from "../app-layer/evaluations/settings-recovery-flag";
 import { ssoBreakGlass, ssoDomainReproof } from "../app-layer/identity/runtime";
 import type { LangyTitleGenerator } from "../app-layer/langy/langy-title-generation.service";
 import {
@@ -495,6 +502,13 @@ export interface PipelineRepositories {
 
 export interface PipelineRegistryDeps {
   eventSourcing: EventSourcing;
+  /**
+   * Mints the proof a pipeline's span read is fenced by (ADR-144 block C).
+   * A command or subscriber names its tenant from the envelope it handles;
+   * the registry turns that into an own-only proof at the wiring seam, so
+   * the pure modules never hold a project id where the store wants a proof.
+   */
+  authorization: Pick<AuthorizationService, "authorizeInternal">;
   repositories: PipelineRepositories;
   redis: Redis | Cluster;
   broadcast: BroadcastService;
@@ -584,6 +598,29 @@ export class PipelineRegistry {
   constructor(private readonly deps: PipelineRegistryDeps) {}
 
   /**
+   * The own-only proof one pipeline read is fenced by: a span read, or a
+   * fold store's read-back of the summary or analytics row it wrote.
+   * `codePath` names the module reading, `purpose` what it reads for: the
+   * event it handles when it has one, else the entry point.
+   */
+  private authorizeTraceRead({
+    codePath,
+    projectId,
+    purpose,
+  }: {
+    codePath: string;
+    projectId: string;
+    purpose: AuthorizationPurpose;
+  }): Promise<Authorization> {
+    return this.deps.authorization.authorizeInternal({
+      actor: internalActor(codePath),
+      projectId,
+      permission: "traces:view",
+      purpose,
+    });
+  }
+
+  /**
    * ADR-051: the trace pipeline's projectMetadata subscriber bootstraps a
    * project's clustering schedule on its first real trace, but the topic
    * clustering pipeline (whose command it dispatches) registers later —
@@ -624,7 +661,15 @@ export class PipelineRegistry {
     // siblings migrated with the reactor retirement (ADR-098) and are
     // likewise implemented but unregistered, pending that same decision.
     const traceSummaryStore = this.cached<TraceSummaryData>(
-      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
+      new TraceSummaryStore({
+        repository: this.deps.repositories.traceSummaryFold,
+        authorize: (params) =>
+          this.authorizeTraceRead({
+            codePath:
+              "event-sourcing/pipelines/trace-processing/projections/traceSummary.store",
+            ...params,
+          }),
+      }),
       "trace_summaries",
     );
 
@@ -819,8 +864,16 @@ export class PipelineRegistry {
       codingAgentSubscribers: [
         createCodingAgentSpanFactsDispatchSubscriber({
           contributeSpanFacts: codingAgentCommands.contributeSpanFacts,
-          getNormalizedSpanById: (params) =>
-            this.deps.traces.spans.getNormalizedSpanById(params),
+          getNormalizedSpanById: async ({ tenantId, eventId, ...params }) =>
+            this.deps.traces.spans.getNormalizedSpanById({
+              authorization: await this.authorizeTraceRead({
+                codePath:
+                  "event-sourcing/pipelines/coding-agent-processing/subscribers/codingAgentSpanFactsDispatch.subscriber",
+                projectId: tenantId,
+                purpose: { kind: "event", eventId },
+              }),
+              ...params,
+            }),
         }),
       ],
     });
@@ -1408,6 +1461,56 @@ export class PipelineRegistry {
     );
   }
 
+  /**
+   * The span and event reads the evaluation command judges a trace from,
+   * each fenced by an own-only proof on the evaluated trace's project.
+   */
+  private executeEvaluationTraceReads(): Pick<
+    ConstructorParameters<typeof ExecuteEvaluationCommand>[0],
+    "spanStorage" | "traceEvents"
+  > {
+    const authorize = (projectId: string) =>
+      this.authorizeTraceRead({
+        codePath:
+          "event-sourcing/pipelines/evaluation-processing/commands/executeEvaluation.command",
+        projectId,
+        purpose: { kind: "operator", entry: "ExecuteEvaluationCommand.handle" },
+      });
+    return {
+      spanStorage: {
+        getSpansByTraceId: async ({ tenantId, ...params }) =>
+          this.deps.traces.spans.getSpansByTraceId({
+            authorization: await authorize(tenantId),
+            ...params,
+          }),
+      },
+      traceEvents: {
+        getEventsByTraceId: async ({ tenantId, ...params }) =>
+          this.deps.traces.spans.getEventsByTraceId({
+            authorization: await authorize(tenantId),
+            ...params,
+          }),
+      },
+    };
+  }
+
+  /**
+   * The evaluation fold's store. Its read-back is fenced by an own-only
+   * proof on the folded evaluation's project (ADR-144 block F).
+   */
+  private evaluationRunStore(): EvaluationRunStore {
+    return new EvaluationRunStore({
+      repository: this.deps.evaluations.runs.repository,
+      authorize: ({ projectId, purpose }) =>
+        this.authorizeTraceRead({
+          codePath:
+            "event-sourcing/pipelines/evaluation-processing/projections/evaluationRun.store",
+          projectId,
+          purpose,
+        }),
+    });
+  }
+
   private registerEvaluationPipeline({
     automations,
   }: {
@@ -1415,8 +1518,7 @@ export class PipelineRegistry {
   }) {
     const executeEvaluationCommand = new ExecuteEvaluationCommand({
       monitors: this.deps.monitors,
-      spanStorage: this.deps.traces.spans,
-      traceEvents: this.deps.traces.spans,
+      ...this.executeEvaluationTraceReads(),
       evaluationExecution: this.deps.evaluations.execution,
       costRecorder: this.deps.costRecorder,
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
@@ -1426,17 +1528,7 @@ export class PipelineRegistry {
       // switch as available while flipping it changed nothing. The command
       // catches a rejection here and stays on the shipped default (recovery
       // ACTIVE) — an unreadable kill switch must not fail evaluations.
-      isSettingsRecoveryDisabled: () =>
-        featureFlagService.isEnabled(
-          "ops_evaluator_settings_recovery_disabled",
-          {
-            distinctId: "evaluator-settings-recovery",
-            defaultValue: false,
-            // A pipeline-wide switch, flipped for the fleet and not per tenant.
-            projectId: NOT_TARGETED,
-            organizationId: NOT_TARGETED,
-          },
-        ),
+      isSettingsRecoveryDisabled: isEvaluatorSettingsRecoveryDisabled,
       // ADR-040: offload oversized evaluator inputs to durable object storage
       // before the event is built. ON by default (this bounds the fat-payload
       // class behind the 2026-07-10 outage); the SYSTEM flag
@@ -1490,9 +1582,7 @@ export class PipelineRegistry {
 
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
-        evalRunStore: new EvaluationRunStore(
-          this.deps.evaluations.runs.repository,
-        ),
+        evalRunStore: this.evaluationRunStore(),
         // Redis cache is the eval slim fold's warm read path; a miss now falls
         // through to the store's own ClickHouse read-back (ADR-066, migration
         // 00056) rather than re-folding the event log. Same wiring as
@@ -1653,7 +1743,15 @@ export class PipelineRegistry {
         // 00056) rather than re-folding the event log. The wrapper still earns
         // its keep — it keeps the steady state off ClickHouse entirely.
         traceAnalyticsStore: this.cached<TraceAnalyticsData>(
-          new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
+          new TraceAnalyticsStore({
+            repository: this.deps.repositories.traceAnalytics,
+            authorize: (params) =>
+              this.authorizeTraceRead({
+                codePath:
+                  "event-sourcing/pipelines/trace-processing/projections/traceAnalytics.store",
+                ...params,
+              }),
+          }),
           "trace_analytics",
         ),
         traceSummaryStore,
@@ -1837,8 +1935,19 @@ export class PipelineRegistry {
     const computeRunMetricsCommand = new ComputeRunMetricsCommand({
       traceSummaryStore,
       scheduleRetry: scheduleRetry.fn,
-      deriveScenarioRoleMetrics: (params) =>
-        traceReadDerivation.deriveScenarioRoleMetrics(params),
+      deriveScenarioRoleMetrics: async ({ tenantId, ...params }) =>
+        traceReadDerivation.deriveScenarioRoleMetrics({
+          authorization: await this.authorizeTraceRead({
+            codePath:
+              "event-sourcing/pipelines/simulation-processing/commands/computeRunMetrics.command",
+            projectId: tenantId,
+            purpose: {
+              kind: "operator",
+              entry: "ComputeRunMetricsCommand.handle",
+            },
+          }),
+          ...params,
+        }),
     });
 
     // ECST backfill: FinishRunCommand and RecordEvaluationsCommand load the
@@ -1919,7 +2028,20 @@ export class PipelineRegistry {
           };
         },
       },
-      spans: this.deps.traces.spans,
+      spans: {
+        getSpansByTraceId: async ({ tenantId, ...params }) =>
+          this.deps.traces.spans.getSpansByTraceId({
+            authorization: await this.authorizeTraceRead({
+              codePath: "scenarios/evaluations/runScenarioEvaluations",
+              projectId: tenantId,
+              purpose: {
+                kind: "operator",
+                entry: "runScenarioEvaluations.loadSpans",
+              },
+            }),
+            ...params,
+          }),
+      },
       runEvaluation: (params) =>
         runEvaluation({
           ...params,

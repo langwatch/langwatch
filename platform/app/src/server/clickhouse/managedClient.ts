@@ -4,9 +4,12 @@ import { createLogger } from "@langwatch/observability";
 import { detectColdScan } from "~/server/app-layer/clients/clickhouse/cold-scan-detector";
 import { translateClickHouseQueryError } from "~/server/app-layer/clients/clickhouse/translate-query-error";
 import { queryWindowed } from "~/server/app-layer/clients/clickhouse/windowed-read";
-import { CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
+import { CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS } from "~/server/event-sourcing/services/errorHandling";
 import { ClickHouseLogger } from "./clickhouseLogger";
-import { getClickHouseMaxOpenConnections } from "./connectionPool";
+import {
+  getClickHouseMaxOpenConnections,
+  getClickHouseStatementLaneReserveShare,
+} from "./connectionPool";
 import {
   incrementClickHouseQueryCount,
   observeClickHouseQueryDuration,
@@ -54,9 +57,10 @@ export const CLICKHOUSE_REQUEST_TIMEOUT_MS = 30_000;
  * error becomes a typed `HandledError` with remediation, which queries count as
  * cold scans (the table list is this schema's knowledge, pinned to the
  * migrations by `cold-scan-detector.coverage.unit.test.ts`), and the
- * transient-message list — still owned by
- * `event-sourcing/services/errorHandling.ts`, which keeps this layer and the
- * outer group-queue classifier reading the same list forever.
+ * statement-retry message list, owned by
+ * `event-sourcing/services/errorHandling.ts` next to the group-queue
+ * classifier's list it is derived from (minus MEMORY_LIMIT_EXCEEDED, which
+ * only the queue retries).
  */
 export function createResilientClickHouseClient({
   client,
@@ -80,7 +84,7 @@ export function createResilientClickHouseClient({
     maxRetries,
     baseDelayMs,
     maxDelayMs,
-    transientMessageFragments: CLICKHOUSE_TRANSIENT_MESSAGE_FRAGMENTS,
+    transientMessageFragments: CLICKHOUSE_STATEMENT_RETRY_MESSAGE_FRAGMENTS,
     // The package's ports take named arguments; these platform functions are
     // older and positional, and both have callers of their own. Adapting here
     // is this function's job — it is the seam between what the platform has and
@@ -192,10 +196,13 @@ export function createManagedClickHouseClient({
   return wrapWithDefaultSettings(
     withStatementLimit({
       client: createResilientClickHouseClient({ client: raw, cluster }),
-      // The pool size, so this bounds where the pool used to and capacity is
-      // unchanged. The difference is that the queue in front of it is finite,
-      // timed and counted.
+      // The pool size, never exceeded, so total capacity is unchanged. The
+      // difference is that the queues in front of it are finite, timed and
+      // counted, and each kind of work reserves a minimum the other cannot
+      // take — so slow inserts cannot occupy the slots reads need, while a lone
+      // kind still borrows all but the other's reserve.
       maxConcurrent: maxOpenConnections,
+      reserveShare: getClickHouseStatementLaneReserveShare(),
       instance,
     }),
   );

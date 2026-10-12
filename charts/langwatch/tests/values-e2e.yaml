@@ -26,10 +26,6 @@ gateway:
   replicaCount: 1
   autoscaling:
     enabled: false
-  # Kind cluster has no ingress controller; chart-default Ingress would
-  # reference a non-existent IngressClass.
-  ingress:
-    enabled: false
 
 # ── services that require private images — set to 0 replicas ─────────────────
 app:

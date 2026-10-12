@@ -25,7 +25,12 @@
  * @see specs/traces/trace-filter-api.feature
  */
 
+import type { Authorization } from "@langwatch/actor";
 import { RequestValidationError } from "~/server/api/validation";
+import {
+  expandFragment,
+  fenceFor,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import {
   FilterFieldUnknownError,
   FilterParseError,
@@ -73,24 +78,33 @@ const SPAN_SCOPED_TABLE = "stored_spans";
  */
 export function compileTraceFilter({
   filter,
-  tenantId,
+  authorization,
   timeRange,
   dateField,
 }: {
   filter: string | undefined;
-  tenantId: string;
+  /** The proof the fragment's tenant markers are expanded into. */
+  authorization: Authorization;
   timeRange: { from: number; to: number };
   dateField: "occurred" | "updated";
 }): { sql: string; params: Record<string, unknown> } | undefined {
   if (!filter || filter.trim().length === 0) return undefined;
+  let compiled: { sql: string; params: Record<string, unknown> } | undefined;
   try {
-    const compiled =
-      translateFilterToClickHouse(filter, tenantId, timeRange) ?? undefined;
+    compiled = translateFilterToClickHouse(filter, timeRange) ?? undefined;
     if (compiled) assertFilterFitsAxis({ compiled, dateField, filter });
-    return compiled;
   } catch (error) {
     throw asRequestValidationError({ error, filter });
   }
+  if (!compiled) return undefined;
+  // The legacy trace read assembles its own statement and names its own
+  // tenant, so the fragment's markers are expanded here, into the fence of the
+  // proof this route minted, before it is handed down.
+  return expandFragment({
+    fragment: compiled.sql,
+    queryParams: compiled.params,
+    fence: fenceFor({ authorization, reads: "traces" }),
+  });
 }
 
 function assertFilterFitsAxis({

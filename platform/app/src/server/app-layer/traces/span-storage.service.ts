@@ -1,4 +1,6 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
+import { singleTenantOf } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -6,6 +8,10 @@ import {
   mapNormalizedSpansToSpans,
   mapNormalizedSpanToSpan,
 } from "~/server/traces/mappers/span.mapper";
+import {
+  hasEventRefs,
+  parseSpanEventRefs,
+} from "~/server/traces/offloaded-eventref-parsing";
 import { resolveOffloadedTraces } from "~/server/traces/resolve-offloaded-traces";
 import type { BlobStore } from "./blob-store.service";
 import type {
@@ -19,6 +25,7 @@ import type {
   SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
+  StoredTraceSpan,
   TraceEventRollup,
   TraceEventRollupParams,
 } from "./repositories/span-storage.repository";
@@ -39,7 +46,16 @@ export interface SpanReadBlobResolutionDeps {
   ioExtractionService: TraceIOExtractionService;
 }
 
-type ByTraceId = { tenantId: string; traceId: string } & OccurredAtHint;
+/**
+ * Every read carries the sealed ADR-166 proof (ADR-144 block C). The
+ * repository fences the statement by it; where a store outside ClickHouse
+ * keys on a project id, the service reads it only for the one project the
+ * proof reads.
+ */
+type ByTraceId = {
+  authorization: Authorization;
+  traceId: string;
+} & OccurredAtHint;
 type BySpanId = ByTraceId & { spanId: string };
 type Paginated = ByTraceId & { limit: number; offset: number };
 /** Full-span delta: keyed on span start (see `findSpansSince`). */
@@ -72,6 +88,15 @@ const applyVisibilityGate = <T extends Span>(
       : span,
   );
 };
+
+/** A span with its reserved eventref pointers dropped and its previews kept. */
+const withoutEventRefs = (span: NormalizedSpan): NormalizedSpan =>
+  hasEventRefs(span.spanAttributes)
+    ? {
+        ...span,
+        spanAttributes: parseSpanEventRefs(span.spanAttributes).cleanedAttrs,
+      }
+    : span;
 
 export class SpanStorageService {
   private readonly blobResolutionDeps?: SpanReadBlobResolutionDeps;
@@ -114,12 +139,10 @@ export class SpanStorageService {
     // Fetch normalized spans so resolution can access raw spanAttributes.
     const normalizedSpans =
       await this.repository.getNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await resolveOffloadedTraces({
-      projectId: params.tenantId,
+    const resolvedSpans = await this.resolveOffloadedBodies({
+      authorization: params.authorization,
       normalizedSpans,
-      blobStore: this.blobResolutionDeps.blobStore,
-      ioExtractionService: this.blobResolutionDeps.ioExtractionService,
-      logger: this.logger,
+      deps: this.blobResolutionDeps,
     });
     return applyVisibilityGate(
       mapNormalizedSpansToSpans(resolvedSpans),
@@ -131,6 +154,16 @@ export class SpanStorageService {
     params: ByTraceId & { limit?: number },
   ): Promise<NormalizedSpan[]> {
     return this.repository.getNormalizedSpansByTraceId(params);
+  }
+
+  /**
+   * The spans of a trace with their attributes as stored, unparsed, for a
+   * reader that hands stored values on unchanged (the prompt playground).
+   */
+  async getStoredSpansByTraceId(
+    params: ByTraceId & { limit?: number },
+  ): Promise<StoredTraceSpan[]> {
+    return this.repository.getStoredSpansByTraceId(params);
   }
 
   /**
@@ -177,16 +210,45 @@ export class SpanStorageService {
     // Resolve the single span via the normalized+resolve path.
     const normalizedSpans =
       await this.repository.getNormalizedSpansByTraceId(params);
-    const { resolvedSpans } = await resolveOffloadedTraces({
-      projectId: params.tenantId,
+    const resolvedSpans = await this.resolveOffloadedBodies({
+      authorization: params.authorization,
       normalizedSpans,
-      blobStore: this.blobResolutionDeps.blobStore,
-      ioExtractionService: this.blobResolutionDeps.ioExtractionService,
-      logger: this.logger,
+      deps: this.blobResolutionDeps,
     });
     const resolved = resolvedSpans.find((s) => s.spanId === params.spanId);
     if (!resolved) return null;
     return gateOne(mapNormalizedSpanToSpan(resolved));
+  }
+
+  /**
+   * Restores the full bodies of a trace's offloaded spans (ADR-022). Bodies
+   * live outside ClickHouse under one project id, so they are read only when
+   * the proof reads exactly one project: the member a detail read was
+   * narrowed to, or the plain project itself. While the proof still spans
+   * several projects each span keeps its preview, as the trace header does,
+   * and its reserved pointers are dropped so they never reach the client.
+   */
+  private async resolveOffloadedBodies({
+    authorization,
+    normalizedSpans,
+    deps,
+  }: {
+    authorization: Authorization;
+    normalizedSpans: NormalizedSpan[];
+    deps: SpanReadBlobResolutionDeps;
+  }): Promise<NormalizedSpan[]> {
+    const projectId = singleTenantOf({ authorization, reads: "traces" });
+    if (projectId === undefined) {
+      return normalizedSpans.map(withoutEventRefs);
+    }
+    const { resolvedSpans } = await resolveOffloadedTraces({
+      projectId,
+      normalizedSpans,
+      blobStore: deps.blobStore,
+      ioExtractionService: deps.ioExtractionService,
+      logger: this.logger,
+    });
+    return resolvedSpans;
   }
 
   async getTraceEventsByTraceId(
@@ -260,7 +322,7 @@ export class SpanStorageService {
   }
 
   async getModelUsageStats(params: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]> {
@@ -268,7 +330,7 @@ export class SpanStorageService {
   }
 
   async getRecentSpansByModels(params: {
-    tenantId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;

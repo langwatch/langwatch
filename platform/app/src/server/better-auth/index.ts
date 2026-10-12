@@ -26,6 +26,7 @@ import {
   signInLockout,
   signUpConfirmationEndpoint,
   ssoAssertion,
+  ssoIssuerEndpointOrigins,
   ssoProvisionedUsers,
   ssoRegisteredIssuers,
   twoStepAccount,
@@ -38,6 +39,7 @@ import { plugins } from "./config/plugins";
 import { rateLimit } from "./config/rate-limit";
 import { requestHooks } from "./config/request-hooks";
 import { secondaryStorage } from "./config/secondary-storage";
+import { noteIdTokenIssuerRefusal } from "./id-token-issuer-mismatch";
 import { resolveTrustedOrigins } from "./trustedOrigins";
 
 /**
@@ -87,20 +89,24 @@ export const auth = betterAuth({
    */
   trustedOrigins: isBuildTime
     ? []
-    : async (request) =>
-        resolveTrustedOrigins({
+    : async (request) => {
+        // Scoped to the connection this request names, not every issuer we
+        // hold: the same list gates the Origin header and `callbackURL`, so
+        // the whole set made one tenant's registered origin a redirect target
+        // on the single sign-on endpoints for every other tenant.
+        const registeredIssuers =
+          await ssoRegisteredIssuers().issuersForRequest(request);
+        return resolveTrustedOrigins({
           nextAuthUrl: env.NEXTAUTH_URL,
           baseHost: env.BASE_HOST,
           trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
           idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
-          // Scoped to the connection this request names, not every issuer we
-          // hold: the same list gates the Origin header and `callbackURL`, so
-          // the whole set made one tenant's registered origin a redirect
-          // target on the single sign-on endpoints for every other tenant.
-          registeredIssuers:
-            await ssoRegisteredIssuers().issuersForRequest(request),
+          registeredIssuers,
+          issuerEndpointOrigins:
+            await ssoIssuerEndpointOrigins().originsFor(registeredIssuers),
           isProduction: env.NODE_ENV === "production",
-        }),
+        });
+      },
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   /**
    * The identity storage adapter (ADR-116 §1) — one `database:` entry,
@@ -208,6 +214,7 @@ export const auth = betterAuth({
   logger: {
     disabled: false,
     log: (level, message, ...args) => {
+      noteIdTokenIssuerRefusal([message, ...args]);
       (logger as any)[level]?.({ args }, message);
     },
   },

@@ -315,6 +315,19 @@ Feature: Customer.io nurturing integration
     Then the user session is established successfully
     And the Customer.io error is captured for observability
 
+  @unit
+  Scenario: Activity tracking fires an app_active event with the same debounce
+    Given a user refreshes their session multiple times within one hour
+    When the auth session callback fires each time
+    Then exactly one "app_active" event is tracked in Customer.io for that user
+
+  @unit
+  Scenario: A failed app_active event does not affect the last_active_at identify
+    Given the Customer.io track call fails
+    When the auth session callback fires
+    Then the user is still identified with last_active_at
+    And the error is captured without resetting the debounce
+
   # ===========================================================================
   # Iteration 2 — Journey Alignment (R10–R13)
   #

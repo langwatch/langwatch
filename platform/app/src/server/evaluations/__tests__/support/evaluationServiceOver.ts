@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { AuthorizedClickHouse } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { TraceEvaluationsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { EvaluationService } from "../../evaluation.service";
 
@@ -26,6 +27,9 @@ export function serviceOverUnavailable(error: Error): EvaluationService {
 
 function serviceOverResolver(): EvaluationService {
   return new EvaluationService({
-    repository: new TraceEvaluationsClickHouseRepository(resolveClient),
+    repository: new TraceEvaluationsClickHouseRepository({
+      resolveClient,
+      clickhouse: new AuthorizedClickHouse({ resolveClient }),
+    }),
   });
 }

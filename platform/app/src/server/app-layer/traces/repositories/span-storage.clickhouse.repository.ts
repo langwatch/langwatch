@@ -1,4 +1,11 @@
+import type { Authorization } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
+import {
+  type AuthorizedClickHouse,
+  type TenantScopedReader,
+  tenantScope,
+  tenantScopeKey,
+} from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   queryWindowed,
@@ -21,6 +28,7 @@ import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
+import { listedTraceKey } from "~/shared/traces/listedTraceKey";
 import type { SpanInsertData } from "../types";
 import type {
   LangwatchSignalBucket,
@@ -34,6 +42,7 @@ import type {
   SpanSummaryPage,
   SpanSummaryPageCursor,
   SpanSummaryRow,
+  StoredTraceSpan,
   TraceEventRollup,
   TraceEventRollupParams,
 } from "./span-storage.repository";
@@ -43,6 +52,7 @@ import {
   MAX_DERIVATION_SPANS,
   MAX_EVENT_NAMES_PER_TRACE,
   MAX_LIGHT_SPAN_READ_ROWS,
+  MAX_STORED_TRACE_SPAN_ROWS,
 } from "./span-storage.repository";
 
 const TABLE_NAME = "stored_spans" as const;
@@ -360,7 +370,7 @@ function dedupInTuple(extraInnerWhere: string): string {
   return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
     SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
     FROM ${TABLE_NAME}
-    WHERE TenantId = {tenantId:String}
+    WHERE ${tenantScope("StartTime")}
       AND TraceId = {traceId:String}
       ${extraInnerWhere}
     GROUP BY TenantId, TraceId, SpanId
@@ -376,7 +386,7 @@ function dedupInTupleForTraceIds(extraInnerWhere: string): string {
   return `(TenantId, TraceId, SpanId, UpdatedAt) IN (
     SELECT TenantId, TraceId, SpanId, max(UpdatedAt)
     FROM ${TABLE_NAME}
-    WHERE TenantId = {tenantId:String}
+    WHERE ${tenantScope("StartTime")}
       AND TraceId IN {traceIds:Array(String)}
       ${extraInnerWhere}
     GROUP BY TenantId, TraceId, SpanId
@@ -384,12 +394,16 @@ function dedupInTupleForTraceIds(extraInnerWhere: string): string {
 }
 
 /**
- * One row per (trace, event name) for a page of traces, ordered so the first
- * name a trace recorded comes first.
+ * One row per (tenant, trace, event name) for a page of traces, ordered so the
+ * first name a trace recorded comes first.
  *
  * Three stages, innermost out: elect each span's latest version and keep only
  * the ones carrying events, expand those spans' `Events.*` arrays, then
- * collapse to one row per (trace, event name).
+ * collapse to one row per (tenant, trace, event name).
+ *
+ * A trace is its tenant and id together: an aggregate's proof fences several
+ * tenants and two of them may hold the same trace id, so every grouping,
+ * window partition and trim runs per tenant as well as per trace.
  *
  * The window aggregates run over the whole per-trace partition and
  * `LIMIT ... BY` trims afterwards, so a trimmed trace still reports the totals
@@ -402,25 +416,28 @@ function traceEventRollupQuery(): string {
 
   return `
     SELECT
+      tenantId,
       traceId,
       name,
       nameCount,
       firstTimestamp,
-      sum(nameCount) OVER (PARTITION BY traceId) AS totalCount,
-      count() OVER (PARTITION BY traceId) AS distinctCount
+      sum(nameCount) OVER (PARTITION BY tenantId, traceId) AS totalCount,
+      count() OVER (PARTITION BY tenantId, traceId) AS distinctCount
     FROM (
       SELECT
+        TenantId AS tenantId,
         TraceId AS traceId,
         event_name AS name,
         count() AS nameCount,
         toUnixTimestamp64Milli(min(event_timestamp)) AS firstTimestamp
       FROM (
         SELECT
+          TenantId,
           TraceId,
           "Events.Timestamp" AS Events_Timestamp,
           "Events.Name" AS Events_Name
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND TraceId IN {traceIds:Array(String)}
           AND notEmpty("Events.Name")
           ${partitionAnd}
@@ -429,20 +446,28 @@ function traceEventRollupQuery(): string {
       ARRAY JOIN
         Events_Timestamp AS event_timestamp,
         Events_Name AS event_name
-      GROUP BY traceId, name
+      GROUP BY tenantId, traceId, name
     )
-    ORDER BY traceId ASC, firstTimestamp ASC, name ASC
-    LIMIT {maxNames:UInt32} BY traceId
+    ORDER BY tenantId ASC, traceId ASC, firstTimestamp ASC, name ASC
+    LIMIT {maxNames:UInt32} BY tenantId, traceId
   `;
 }
 
-/** Gather {@link traceEventRollupQuery}'s flat rows into one rollup per trace. */
+/**
+ * Gather {@link traceEventRollupQuery}'s flat rows into one rollup per trace,
+ * keyed by {@link listedTraceKey} so two tenants holding the same trace id
+ * each keep their own rollup.
+ */
 function toTraceEventRollups(
   rows: TraceEventRollupRow[],
 ): Record<string, TraceEventRollup> {
   const rollups: Record<string, TraceEventRollup> = {};
   for (const row of rows) {
-    const rollup = (rollups[row.traceId] ??= {
+    const key = listedTraceKey({
+      projectId: row.tenantId,
+      traceId: row.traceId,
+    });
+    const rollup = (rollups[key] ??= {
       names: [],
       totalCount: asNumber(row.totalCount),
       distinctCount: asNumber(row.distinctCount),
@@ -658,12 +683,18 @@ interface TraceEventRow {
 }
 
 interface TraceEventRollupRow {
+  tenantId: string;
   traceId: string;
   name: string;
   nameCount: string | number;
   firstTimestamp: string | number;
   totalCount: string | number;
   distinctCount: string | number;
+}
+
+/** The fence a read ran under, for a log line that used to name the tenant. */
+function scopeOf(authorization: Authorization): string {
+  return tenantScopeKey({ authorization, reads: "traces" });
 }
 
 /** JSONEachRow renders 64-bit integers as strings; narrow both back to number. */
@@ -945,6 +976,35 @@ export interface FullSpanRow {
   Links_Attributes: Record<string, unknown>[];
 }
 
+/** The columns {@link SpanStorageClickHouseRepository.getStoredSpansByTraceId} selects. */
+interface StoredSpanRow {
+  SpanId: string;
+  TraceId: string;
+  ParentSpanId: string | null;
+  SpanName: string;
+  SpanAttributes: Record<string, unknown>;
+  StartTimeMs: number;
+  EndTimeMs: number;
+  DurationMs: number;
+  StatusCode: number | null;
+  StatusMessage: string | null;
+}
+
+function storedTraceSpanOf(row: StoredSpanRow): StoredTraceSpan {
+  return {
+    spanId: row.SpanId,
+    traceId: row.TraceId,
+    parentSpanId: row.ParentSpanId,
+    name: row.SpanName,
+    spanAttributes: ensureStringRecord(row.SpanAttributes),
+    startTimeUnixMs: row.StartTimeMs,
+    endTimeUnixMs: row.EndTimeMs,
+    durationMs: row.DurationMs,
+    statusCode: row.StatusCode,
+    statusMessage: row.StatusMessage,
+  };
+}
+
 export function mapChRowToNormalized(row: FullSpanRow) {
   return {
     id: "",
@@ -997,7 +1057,21 @@ export function mapChRowToNormalized(row: FullSpanRow) {
 }
 
 export class SpanStorageClickHouseRepository implements SpanStorageRepository {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+  /**
+   * Writes resolve the tenant's own client by the span's tenant id, the way
+   * the projection hands it over. Reads never name a tenant: they go through
+   * the authorized client, which fences every statement by the proof.
+   */
+  constructor(
+    private readonly deps: {
+      resolveClient: ClickHouseClientResolver;
+      clickhouse: AuthorizedClickHouse;
+    },
+  ) {}
+
+  private reader(authorization: Authorization): TenantScopedReader {
+    return this.deps.clickhouse.as(authorization, { reads: "traces" });
+  }
 
   async insertSpan(span: SpanInsertData): Promise<void> {
     EventUtils.validateTenantId(
@@ -1006,7 +1080,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      const client = await this.resolveClient(span.tenantId);
+      const client = await this.deps.resolveClient(span.tenantId);
       const record = this.toClickHouseRecord(span);
       await client.insert({
         table: TABLE_NAME,
@@ -1055,7 +1129,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = await this.deps.resolveClient(tenantId);
       const records = spans.map((span) => this.toClickHouseRecord(span));
       await client.insert({
         table: TABLE_NAME,
@@ -1076,36 +1150,31 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async getSpansByTraceId({
-    tenantId,
+    authorization,
     traceId,
     limit,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     limit?: number;
   } & OccurredAtHint): Promise<Span[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getSpansByTraceId",
-    );
-
     // Hard ceiling, applied unconditionally: a leaked trace_id with a huge span
     // count can never load the pipeline through this path, regardless of caller.
     const effectiveLimit = clampSpanReadLimit(limit);
 
     try {
       return await this.readTraceSpans<Span[]>(
-        { tenantId, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
+          const client = this.reader(authorization);
           const result = await client.query({
             query: `
               SELECT ${FULL_SPAN_SELECT}
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("StartTime")}
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
@@ -1113,7 +1182,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT {limit:UInt32}
             `,
             query_params: {
-              tenantId,
               traceId,
               limit: effectiveLimit,
               ...partition.params,
@@ -1129,7 +1197,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     } catch (error) {
       logger.warn(
         {
-          tenantId,
+          scope: scopeOf(authorization),
           traceId,
           error: error instanceof Error ? error.message : String(error),
         },
@@ -1140,20 +1208,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async getNormalizedSpansByTraceId({
-    tenantId,
+    authorization,
     traceId,
     limit,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     limit?: number;
   } & OccurredAtHint): Promise<NormalizedSpan[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getNormalizedSpansByTraceId",
-    );
-
     // Hard ceiling so even a leaked trace_id can never load the pipeline.
     const effectiveLimit = clampSpanReadLimit(limit);
 
@@ -1162,16 +1225,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // trace duration, so a derivation read can't realistically split across it.
     try {
       return await this.readTraceSpans<NormalizedSpan[]>(
-        { tenantId, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
+          const client = this.reader(authorization);
           const result = await client.query({
             query: `
               SELECT ${FULL_SPAN_SELECT}
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("StartTime")}
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
@@ -1179,7 +1242,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT {limit:UInt32}
             `,
             query_params: {
-              tenantId,
               traceId,
               limit: effectiveLimit,
               ...partition.params,
@@ -1195,7 +1257,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     } catch (error) {
       logger.warn(
         {
-          tenantId,
+          scope: scopeOf(authorization),
           traceId,
           error: error instanceof Error ? error.message : String(error),
         },
@@ -1205,28 +1267,91 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
+  async getStoredSpansByTraceId({
+    authorization,
+    traceId,
+    limit,
+    occurredAtMs,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+    limit?: number;
+  } & OccurredAtHint): Promise<StoredTraceSpan[]> {
+    const effectiveLimit = clampSpanReadLimit(limit, {
+      max: MAX_STORED_TRACE_SPAN_ROWS,
+    });
+
+    try {
+      return await this.readTraceSpans<StoredTraceSpan[]>(
+        { authorization, traceId, occurredAtMs },
+        (rows) => rows.length === 0,
+        async (window) => {
+          const partition = partitionFragment(window);
+          const client = this.reader(authorization);
+          const result = await client.query({
+            query: `
+              SELECT
+                SpanId,
+                TraceId,
+                ParentSpanId,
+                SpanName,
+                SpanAttributes,
+                toUnixTimestamp64Milli(StartTime) AS StartTimeMs,
+                toUnixTimestamp64Milli(EndTime) AS EndTimeMs,
+                DurationMs,
+                StatusCode,
+                StatusMessage
+              FROM ${TABLE_NAME}
+              WHERE ${tenantScope("StartTime")}
+                AND TraceId = {traceId:String}
+                ${partition.sqlAnd}
+                AND ${dedupInTuple(partition.sqlAndInner)}
+              ORDER BY StartTimeMs ASC
+              LIMIT {limit:UInt32}
+            `,
+            query_params: {
+              traceId,
+              limit: effectiveLimit,
+              ...partition.params,
+            },
+            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as StoredSpanRow[];
+          return rows.map(storedTraceSpanOf);
+        },
+      );
+    } catch (error) {
+      logger.warn(
+        {
+          scope: scopeOf(authorization),
+          traceId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to get stored spans by trace ID from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async getSpanByIds({
-    tenantId,
+    authorization,
     traceId,
     spanId,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     spanId: string;
   } & OccurredAtHint): Promise<Span | null> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getSpanByIds",
-    );
-
     try {
       return await this.readTraceSpans<Span | null>(
-        { tenantId, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs },
         (span) => span === null,
         async (window) => {
           const row = await this.fetchNormalizedSpanRow({
-            tenantId,
+            authorization,
             traceId,
             spanId,
             window,
@@ -1239,7 +1364,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     } catch (error) {
       logger.warn(
         {
-          tenantId,
+          scope: scopeOf(authorization),
           traceId,
           spanId,
           error: error instanceof Error ? error.message : String(error),
@@ -1279,16 +1404,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * that returns one whole.
    */
   async findNormalizedSpanById({
-    tenantId,
+    authorization,
     traceId,
     spanId,
     occurredAtMs,
   }: NormalizedSpanByIdParams): Promise<NormalizedSpan | null> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findNormalizedSpanById",
-    );
-
     try {
       return await queryWindowed<NormalizedSpan | null>({
         table: TABLE_NAME,
@@ -1298,7 +1418,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         isEmpty: (row) => row === null,
         run: (window) =>
           this.fetchNormalizedSpanRow({
-            tenantId,
+            authorization,
             traceId,
             spanId,
             window,
@@ -1311,7 +1431,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     } catch (error) {
       logger.warn(
         {
-          tenantId,
+          scope: scopeOf(authorization),
           traceId,
           spanId,
           error: error instanceof Error ? error.message : String(error),
@@ -1346,32 +1466,32 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * resolving claim-checks through this read, not just the UI.
    */
   private async fetchNormalizedSpanRow({
-    tenantId,
+    authorization,
     traceId,
     spanId,
     window,
     select = FULL_SPAN_SELECT,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     spanId: string;
     window: WindowFragment | null;
     select?: string;
   }): Promise<NormalizedSpan | null> {
     const partition = partitionFragment(window);
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
     const result = await client.query({
       query: `
         SELECT ${select}
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND TraceId = {traceId:String}
           AND SpanId = {spanId:String}
           ${partition.sqlAnd}
         ORDER BY UpdatedAt DESC
         LIMIT 1
       `,
-      query_params: { tenantId, traceId, spanId, ...partition.params },
+      query_params: { traceId, spanId, ...partition.params },
       clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
       format: "JSONEachRow",
     });
@@ -1382,24 +1502,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async findSpanResourcesByTraceId({
-    tenantId,
+    authorization,
     traceId,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<SpanResourceInfo[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findSpanResourcesByTraceId",
-    );
-
     return this.readTraceSpans<SpanResourceInfo[]>(
-      { tenantId, traceId, occurredAtMs },
+      { authorization, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
-        const client = await this.resolveClient(tenantId);
+        const client = this.reader(authorization);
         // Light projection: only the resource/scope columns plus the bits
         // needed for ordering. SpanAttributes/Events/Links are heavy and
         // unrelated to OTel resource info, so don't read them.
@@ -1413,14 +1528,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ScopeName,
               ScopeVersion
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("StartTime")}
               AND TraceId = {traceId:String}
               ${partition.sqlAnd}
               AND ${dedupInTuple(partition.sqlAndInner)}
             ORDER BY StartTimeMs ASC
             LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
-          query_params: { tenantId, traceId, ...partition.params },
+          query_params: { traceId, ...partition.params },
           format: "JSONEachRow",
         });
 
@@ -1467,29 +1582,32 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    * local-disk partitions; a miss (old trace) pays the unbounded fallback
    * and stays correct.
    */
-  private async resolveTraceOccurredAtMs(
-    tenantId: string,
-    traceId: string,
-  ): Promise<number | undefined> {
+  private async resolveTraceOccurredAtMs({
+    authorization,
+    traceId,
+  }: {
+    authorization: Authorization;
+    traceId: string;
+  }): Promise<number | undefined> {
     const recent = await this.queryTraceOccurredAtMs({
-      tenantId,
+      authorization,
       traceId,
       sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
     });
     if (recent !== undefined) return recent;
-    return this.queryTraceOccurredAtMs({ tenantId, traceId });
+    return this.queryTraceOccurredAtMs({ authorization, traceId });
   }
 
   private async queryTraceOccurredAtMs({
-    tenantId,
+    authorization,
     traceId,
     sinceMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     sinceMs?: number;
   }): Promise<number | undefined> {
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
     const windowPredicate =
       sinceMs !== undefined
         ? "AND OccurredAt >= fromUnixTimestamp64Milli({sinceMs:Int64})"
@@ -1498,14 +1616,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       query: `
         SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
         FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("OccurredAt")}
           AND TraceId = {traceId:String}
           ${windowPredicate}
       `,
-      query_params:
-        sinceMs !== undefined
-          ? { tenantId, traceId, sinceMs }
-          : { tenantId, traceId },
+      query_params: sinceMs !== undefined ? { traceId, sinceMs } : { traceId },
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{
@@ -1535,14 +1650,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    */
   private async readTraceEvents<T>(
     {
-      tenantId,
+      authorization,
       traceId,
       occurredAtMs,
-    }: { tenantId: string; traceId: string } & OccurredAtHint,
+    }: { authorization: Authorization; traceId: string } & OccurredAtHint,
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
     const hintMs =
-      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+      occurredAtMs ??
+      (await this.resolveTraceOccurredAtMs({ authorization, traceId }));
     return queryWindowed<T>({
       table: TABLE_NAME,
       hintMs: hintMs ?? null,
@@ -1583,15 +1699,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    */
   private async readTraceSpans<T>(
     {
-      tenantId,
+      authorization,
       traceId,
       occurredAtMs,
-    }: { tenantId: string; traceId: string } & OccurredAtHint,
+    }: { authorization: Authorization; traceId: string } & OccurredAtHint,
     isEmpty: (result: T) => boolean,
     run: (window: WindowFragment | null) => Promise<T>,
   ): Promise<T> {
     const hintMs =
-      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+      occurredAtMs ??
+      (await this.resolveTraceOccurredAtMs({ authorization, traceId }));
     return queryWindowed<T>({
       table: TABLE_NAME,
       hintMs: hintMs ?? null,
@@ -1603,24 +1720,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async getTraceEventsByTraceId({
-    tenantId,
+    authorization,
     traceId,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<DerivedTraceEvent[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getTraceEventsByTraceId",
-    );
-
     try {
       return await this.readTraceEvents<DerivedTraceEvent[]>(
-        { tenantId, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs },
         async (window) => {
           const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
+          const client = this.reader(authorization);
           // Events-only ARRAY JOIN: reads just the `Events.*` columns, never
           // the heavy span attribute/link payload. Includes exception events
           // for parity with the trace-level list the fold used to carry.
@@ -1642,7 +1754,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                   "Events.Name" AS Events_Name,
                   "Events.Attributes" AS Events_Attributes
                 FROM ${TABLE_NAME}
-                WHERE TenantId = {tenantId:String}
+                WHERE ${tenantScope("StartTime")}
                   AND TraceId = {traceId:String}
                   ${partition.sqlAnd}
                   AND ${dedupInTuple(partition.sqlAndInner)}
@@ -1654,7 +1766,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ORDER BY event_timestamp ASC
               LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             `,
-            query_params: { tenantId, traceId, ...partition.params },
+            query_params: { traceId, ...partition.params },
             format: "JSONEachRow",
           });
 
@@ -1673,7 +1785,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     } catch (error) {
       logger.warn(
         {
-          tenantId,
+          scope: scopeOf(authorization),
           traceId,
           error: error instanceof Error ? error.message : String(error),
         },
@@ -1684,19 +1796,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async getTraceEventRollupsByTraceIds({
-    tenantId,
+    authorization,
     traceIds,
     timeRange,
   }: TraceEventRollupParams): Promise<Record<string, TraceEventRollup>> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getTraceEventRollupsByTraceIds",
-    );
-
     if (traceIds.length === 0) return {};
 
     try {
-      const client = await this.resolveClient(tenantId);
+      const client = this.reader(authorization);
       // The page's traces all occurred inside the list's range, and a span
       // starts no earlier than its trace does, so padding both ends by the
       // standard partition window covers every span of every trace on the
@@ -1708,7 +1815,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       const result = await client.query({
         query: traceEventRollupQuery(),
         query_params: {
-          tenantId,
           traceIds,
           fromMs,
           toMs,
@@ -1723,7 +1829,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     } catch (error) {
       logger.warn(
         {
-          tenantId,
+          scope: scopeOf(authorization),
           traceCount: traceIds.length,
           error: error instanceof Error ? error.message : String(error),
         },
@@ -1734,24 +1840,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async getEventsByTraceId({
-    tenantId,
+    authorization,
     traceId,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getEventsByTraceId",
-    );
-
     try {
       return await this.readTraceEvents<ElasticSearchEvent[]>(
-        { tenantId, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs },
         async (window) => {
           const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
+          const client = this.reader(authorization);
           // Same shape as `getTraceEventsByTraceId`: dedup at row level inside
           // the subquery, then ARRAY JOIN the Events.* arrays of the survivors,
           // and finally drop exception events (which is a per-event filter).
@@ -1771,7 +1872,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                   "Events.Name" AS Events_Name,
                   "Events.Attributes" AS Events_Attributes
                 FROM ${TABLE_NAME}
-                WHERE TenantId = {tenantId:String}
+                WHERE ${tenantScope("StartTime")}
                   AND TraceId = {traceId:String}
                   ${partition.sqlAnd}
                   AND ${dedupInTuple(partition.sqlAndInner)}
@@ -1783,7 +1884,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               WHERE event_name != 'exception'
               ORDER BY event_timestamp DESC
             `,
-            query_params: { tenantId, traceId, ...partition.params },
+            query_params: { traceId, ...partition.params },
             format: "JSONEachRow",
           });
 
@@ -1794,7 +1895,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     } catch (error) {
       logger.warn(
         {
-          tenantId,
+          scope: scopeOf(authorization),
           traceId,
           error: error instanceof Error ? error.message : String(error),
         },
@@ -1805,26 +1906,21 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async getSpanEvents({
-    tenantId,
+    authorization,
     traceId,
     spanId,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     spanId: string;
   } & OccurredAtHint): Promise<ElasticSearchEvent[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getSpanEvents",
-    );
-
     try {
       return await this.readTraceEvents<ElasticSearchEvent[]>(
-        { tenantId, traceId, occurredAtMs },
+        { authorization, traceId, occurredAtMs },
         async (window) => {
           const partition = partitionFragment(window);
-          const client = await this.resolveClient(tenantId);
+          const client = this.reader(authorization);
           const result = await client.query({
             query: `
               SELECT
@@ -1849,7 +1945,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                   "Events.Name" AS Events_Name,
                   "Events.Attributes" AS Events_Attributes
                 FROM ${TABLE_NAME}
-                WHERE TenantId = {tenantId:String}
+                WHERE ${tenantScope("StartTime")}
                   AND TraceId = {traceId:String}
                   AND SpanId = {spanId:String}
                   ${partition.sqlAnd}
@@ -1862,7 +1958,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 Events_Attributes AS event_attrs
               ORDER BY event_timestamp DESC
             `,
-            query_params: { tenantId, traceId, spanId, ...partition.params },
+            query_params: { traceId, spanId, ...partition.params },
             clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
             format: "JSONEachRow",
           });
@@ -1874,7 +1970,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     } catch (error) {
       logger.warn(
         {
-          tenantId,
+          scope: scopeOf(authorization),
           traceId,
           spanId,
           error: error instanceof Error ? error.message : String(error),
@@ -1886,36 +1982,31 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async getSpanSummaryByTraceId({
-    tenantId,
+    authorization,
     traceId,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<SpanSummaryRow[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.getSpanSummaryByTraceId",
-    );
-
     return this.readTraceSpans<SpanSummaryRow[]>(
-      { tenantId, traceId, occurredAtMs },
+      { authorization, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
-        const client = await this.resolveClient(tenantId);
+        const client = this.reader(authorization);
         const result = await client.query({
           query: `
             SELECT ${SUMMARY_SPAN_SELECT}
             FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
+            WHERE ${tenantScope("StartTime")}
               AND TraceId = {traceId:String}
               ${partition.sqlAnd}
               AND ${dedupInTuple(partition.sqlAndInner)}
             ORDER BY StartTimeMs ASC
             LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
           `,
-          query_params: { tenantId, traceId, ...partition.params },
+          query_params: { traceId, ...partition.params },
           format: "JSONEachRow",
         });
 
@@ -1926,24 +2017,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async findLangwatchSignalsByTraceId({
-    tenantId,
+    authorization,
     traceId,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
   } & OccurredAtHint): Promise<SpanLangwatchSignalsRow[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findLangwatchSignalsByTraceId",
-    );
-
     return this.readTraceSpans<SpanLangwatchSignalsRow[]>(
-      { tenantId, traceId, occurredAtMs },
+      { authorization, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
-        const client = await this.resolveClient(tenantId);
+        const client = this.reader(authorization);
         // Reads `mapKeys(SpanAttributes)` once per row into a CTE-style
         // alias (`keys`) so each bucket predicate doesn't re-materialize
         // the key array. Heavy attribute *values* are never read — only
@@ -1964,7 +2050,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 SpanId,
                 mapKeys(SpanAttributes) AS keys
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("StartTime")}
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
@@ -1978,7 +2064,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
             )
           `,
-          query_params: { tenantId, traceId, ...partition.params },
+          query_params: { traceId, ...partition.params },
           format: "JSONEachRow",
         });
 
@@ -2002,28 +2088,23 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async findSpansPaginated({
-    tenantId,
+    authorization,
     traceId,
     limit,
     offset,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     limit: number;
     offset: number;
   } & OccurredAtHint): Promise<{ spans: Span[]; total: number }> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findSpansPaginated",
-    );
-
     return this.readTraceSpans<{ spans: Span[]; total: number }>(
-      { tenantId, traceId, occurredAtMs },
+      { authorization, traceId, occurredAtMs },
       (result) => result.spans.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
-        const client = await this.resolveClient(tenantId);
+        const client = this.reader(authorization);
         // Two-step instead of one query with `count() OVER ()`:
         //   - Page query reads the heavy span columns for LIMIT rows only.
         //   - Count query touches just the dedup keys, no heavy payload.
@@ -2037,7 +2118,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             query: `
               SELECT ${FULL_SPAN_SELECT}
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("StartTime")}
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
                 AND ${dedupInTuple(partition.sqlAndInner)}
@@ -2046,7 +2127,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               OFFSET {offset:UInt32}
             `,
             query_params: {
-              tenantId,
               traceId,
               limit,
               offset,
@@ -2058,11 +2138,11 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             query: `
               SELECT count(DISTINCT SpanId) AS Total
               FROM ${TABLE_NAME}
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantScope("StartTime")}
                 AND TraceId = {traceId:String}
                 ${partition.sqlAnd}
             `,
-            query_params: { tenantId, traceId, ...partition.params },
+            query_params: { traceId, ...partition.params },
             format: "JSONEachRow",
           }),
         ]);
@@ -2082,19 +2162,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async findSpansSince({
-    tenantId,
+    authorization,
     traceId,
     sinceStartTimeMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     sinceStartTimeMs: number;
   } & OccurredAtHint): Promise<Span[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findSpansSince",
-    );
-
     // Poll reader: `StartTime > sinceStartTimeMs` is already a partition-pruning
     // lower bound, so this does NOT resolve or clamp to the trace's OccurredAt
     // window. A `StartTime <= OccurredAt + 2d` upper bound would silently hide
@@ -2102,19 +2177,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // trace_summaries.OccurredAt (the live delta view would just stop updating).
     const sinceFilter =
       "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
     const result = await client.query({
       query: `
         SELECT ${FULL_SPAN_SELECT}
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND TraceId = {traceId:String}
           ${sinceFilter}
           AND ${dedupInTuple(sinceFilter)}
         ORDER BY StartTime ASC
         LIMIT ${MAX_DERIVATION_SPANS}
       `,
-      query_params: { tenantId, traceId, sinceStartTimeMs },
+      query_params: { traceId, sinceStartTimeMs },
       format: "JSONEachRow",
     });
 
@@ -2123,22 +2198,17 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async findSpanSummariesPage({
-    tenantId,
+    authorization,
     traceId,
     limit,
     cursor,
     occurredAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     limit: number;
     cursor?: SpanSummaryPageCursor;
   } & OccurredAtHint): Promise<SpanSummaryPage> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findSpanSummariesPage",
-    );
-
     const effectiveLimit = clampSpanReadLimit(limit, {
       max: MAX_LIGHT_SPAN_READ_ROWS,
     });
@@ -2163,7 +2233,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const runPage = async (
       lowerBoundMs: number | undefined,
     ): Promise<SpanSummaryPage> => {
-      const client = await this.resolveClient(tenantId);
+      const client = this.reader(authorization);
       const pageLowerBound =
         lowerBoundMs !== undefined
           ? `AND StartTime >= fromUnixTimestamp64Milli({pageFromMs:Int64})`
@@ -2207,7 +2277,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         query: `
           SELECT ${SUMMARY_SPAN_SELECT}
           FROM ${TABLE_NAME}
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("StartTime")}
             AND TraceId = {traceId:String}
             ${pageLowerBound}
             ${cursorFilter}
@@ -2216,7 +2286,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           LIMIT {limit:UInt32}
         `,
         query_params: {
-          tenantId,
           traceId,
           limit: effectiveLimit + 1,
           ...(lowerBoundMs !== undefined ? { pageFromMs: lowerBoundMs } : {}),
@@ -2242,7 +2311,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     if (cursor) return runPage(undefined);
 
     const hintMs =
-      occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
+      occurredAtMs ??
+      (await this.resolveTraceOccurredAtMs({ authorization, traceId }));
     if (hintMs === undefined) return runPage(undefined);
     const bounded = await runPage(hintMs - DEFAULT_PARTITION_WINDOW_MS);
     if (bounded.rows.length > 0) return bounded;
@@ -2250,19 +2320,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async findSpanSummariesSince({
-    tenantId,
+    authorization,
     traceId,
     sinceUpdatedAtMs,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     traceId: string;
     sinceUpdatedAtMs: number;
   } & OccurredAtHint): Promise<SpanSummaryRow[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findSpanSummariesSince",
-    );
-
     // Keyed on the ROW VERSION, not the span start. A span updated in place —
     // end time, duration, status, cost, all re-projected as the span closes —
     // keeps its StartTime, so a `StartTime >` poll can only ever see brand-new
@@ -2279,19 +2344,19 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // bound would silently stop the live view on a long-running trace.
     const sinceFilter =
       "AND UpdatedAt > fromUnixTimestamp64Milli({sinceUpdatedAtMs:Int64})";
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
     const result = await client.query({
       query: `
         SELECT ${SUMMARY_SPAN_SELECT}
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND TraceId = {traceId:String}
           ${sinceFilter}
           AND ${dedupInTuple(sinceFilter)}
         ORDER BY StartTimeMs ASC
         LIMIT ${MAX_LIGHT_SPAN_READ_ROWS}
       `,
-      query_params: { tenantId, traceId, sinceUpdatedAtMs },
+      query_params: { traceId, sinceUpdatedAtMs },
       format: "JSONEachRow",
     });
 
@@ -2300,20 +2365,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async findModelUsageStats({
-    tenantId,
+    authorization,
     fromMs,
     limit,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     fromMs: number;
     limit: number;
   }): Promise<ModelUsageStatsRow[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findModelUsageStats",
-    );
-
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
     // Cross-trace scan bounded by the StartTime window (partition pruning)
     // and reading only two Map subscripts, no heavy attribute values.
     // `uniq` (approximate) instead of count() so ReplacingMergeTree row
@@ -2325,14 +2385,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           uniq(TraceId, SpanId) AS SpanCount,
           toUnixTimestamp64Milli(max(StartTime)) AS LastSeenMs
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND Model != ''
         GROUP BY Model
         ORDER BY SpanCount DESC, Model ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: { tenantId, fromMs, limit },
+      query_params: { fromMs, limit },
       format: "JSONEachRow",
     });
 
@@ -2349,25 +2409,21 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
   }
 
   async findRecentSpansByModels({
-    tenantId,
+    authorization,
     models,
     fromMs,
     perModelLimit,
     limit,
   }: {
-    tenantId: string;
+    authorization: Authorization;
     models: string[];
     fromMs: number;
     perModelLimit: number;
     limit: number;
   }): Promise<ModelSpanSampleRow[]> {
-    EventUtils.validateTenantId(
-      { tenantId },
-      "SpanStorageClickHouseRepository.findRecentSpansByModels",
-    );
     if (models.length === 0) return [];
 
-    const client = await this.resolveClient(tenantId);
+    const client = this.reader(authorization);
     // The `Model IN` filter is computed from the SpanAttributes map, so on its
     // own this read decodes that heavy map for every span in the window just to
     // evaluate the predicate. Instead, first narrow to the recent traces that
@@ -2389,7 +2445,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         WITH candidate_traces AS (
           SELECT TraceId
           FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
+          WHERE ${tenantScope("OccurredAt")}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND hasAny(Models, {models:Array(String)})
           GROUP BY TraceId
@@ -2412,7 +2468,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           (InputTokensRaw != '' OR PromptTokensRaw != ''
             OR OutputTokensRaw != '' OR CompletionTokensRaw != '') AS HasTokens
         FROM ${TABLE_NAME}
-        WHERE TenantId = {tenantId:String}
+        WHERE ${tenantScope("StartTime")}
           AND StartTime >= fromUnixTimestamp64Milli({fromMs:Int64})
           AND TraceId IN (SELECT TraceId FROM candidate_traces)
           AND Model IN {models:Array(String)}
@@ -2422,7 +2478,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         LIMIT {limit:UInt32}
       `,
       query_params: {
-        tenantId,
         models,
         fromMs,
         perModelLimit,

@@ -7,10 +7,11 @@ import {
 } from "../../stores/timeFormatStore";
 import type { TraceListItem } from "../../types/trace";
 import { addColumnColumnDef } from "./AddColumnHeader";
-import { getTraceColumnDef } from "./columns";
+import { getTraceColumnDef, memberProjectColumnDef } from "./columns";
 import { buildEvalColumnDef, evalColumnLabel } from "./evalColumns";
 import { type Registry, traceRegistry } from "./registry";
 import { makeEvalCellDef } from "./registry/cells/trace/EvalResultCell";
+import { ProjectCell } from "./registry/cells/trace/ProjectCell";
 import type { CellDef } from "./registry/types";
 import { traceSelectColumnDef } from "./selectColumn";
 
@@ -43,13 +44,19 @@ interface TraceLensColumns {
  * synthesised here (def + a registry cell), reading evaluator names from
  * `evaluatorNames` for their headers. See
  * dev/docs/adr/029-trace-table-per-evaluator-columns.md.
+ *
+ * `showMemberProject` puts the member project column first, after the select
+ * column: on an aggregate project (ADR-144) rows come from several members,
+ * and the reader has to tell them apart. No lens stores that column.
  */
 export function useTraceLensColumns({
   logicalColumnIds,
   evaluatorNames = EMPTY_NAMES,
+  showMemberProject = false,
 }: {
   logicalColumnIds: string[];
   evaluatorNames?: Map<string, string>;
+  showMemberProject?: boolean;
 }): TraceLensColumns {
   // The Time column's value format (relative ↔ ISO) is a personal display
   // preference, not a per-lens column width — so its sizing isn't baked
@@ -60,6 +67,7 @@ export function useTraceLensColumns({
   const columns = useMemo(() => {
     const defs: Array<ColumnDef<TraceListItem, unknown>> = [
       traceSelectColumnDef,
+      ...(showMemberProject ? [memberProjectColumnDef] : []),
     ];
     for (const id of logicalColumnIds) {
       const parsed = parseEvalColumnId(id);
@@ -90,7 +98,7 @@ export function useTraceLensColumns({
     // anchored where newly-added columns appear.
     defs.push(addColumnColumnDef);
     return defs;
-  }, [logicalColumnIds, evaluatorNames, timeFormat]);
+  }, [logicalColumnIds, evaluatorNames, timeFormat, showMemberProject]);
 
   // Cell renderers for the active eval columns, merged onto the static
   // trace registry. Keyed off the eval ids only (not the names — the
@@ -99,23 +107,24 @@ export function useTraceLensColumns({
   // `RegistryRow` memoises on `registry` identity, so an unstable object
   // here would re-render every row.
   const registry = useMemo<Registry<TraceListItem>>(() => {
-    const evalCells: Record<string, CellDef<TraceListItem>> = {};
+    const extraCells: Record<string, CellDef<TraceListItem>> = {};
     for (const id of logicalColumnIds) {
       const parsed = parseEvalColumnId(id);
       if (parsed) {
-        evalCells[id] = makeEvalCellDef({
+        extraCells[id] = makeEvalCellDef({
           id,
           evaluatorKey: parsed.evaluatorKey,
           field: parsed.field,
         });
       }
     }
-    if (Object.keys(evalCells).length === 0) return traceRegistry;
+    if (showMemberProject) extraCells[ProjectCell.id] = ProjectCell;
+    if (Object.keys(extraCells).length === 0) return traceRegistry;
     return {
       ...traceRegistry,
-      cells: { ...traceRegistry.cells, ...evalCells },
+      cells: { ...traceRegistry.cells, ...extraCells },
     };
-  }, [logicalColumnIds]);
+  }, [logicalColumnIds, showMemberProject]);
 
   const minWidth = useMemo(() => {
     /**

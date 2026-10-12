@@ -5,6 +5,7 @@
  * @see specs/traces-v2/sessions-lens.feature
  */
 import { describe, expect, it } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
 import type {
   SessionGroupRow,
   SessionGroupsQuery,
@@ -23,10 +24,12 @@ import { SessionGroupsService } from "../session-groups.service";
 import { teaserOf } from "../visibility-window.service";
 
 const TENANT = "project-1";
+const PROOF = ownProof({ projectId: TENANT });
 
 function makeRow(overrides: Partial<SessionGroupRow> = {}): SessionGroupRow {
   return {
     conversationId: "session-a",
+    tenantId: TENANT,
     traceCount: 3,
     totalCost: 1.25,
     totalTokens: 4200,
@@ -179,7 +182,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
       });
@@ -218,7 +221,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
       });
@@ -252,7 +255,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
       });
@@ -268,7 +271,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
       });
@@ -305,7 +308,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
       });
@@ -323,7 +326,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
       });
@@ -381,7 +384,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
       });
@@ -414,7 +417,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 2,
       });
@@ -427,6 +430,7 @@ describe("SessionGroupsService", () => {
       expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
         sortValue: 200,
         conversationId: "s-2",
+        tenantId: TENANT,
         ...CURSOR_SORT,
       });
     });
@@ -444,7 +448,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         sort: { columnId: "cost", direction: "desc" },
         pageSize: 2,
@@ -457,6 +461,7 @@ describe("SessionGroupsService", () => {
       expect(decodeSessionGroupsCursor(result.nextCursor!)).toEqual({
         sortValue: 5,
         conversationId: "s-2",
+        tenantId: TENANT,
         sortColumn: "cost",
         sortDirection: "desc",
       });
@@ -472,7 +477,7 @@ describe("SessionGroupsService", () => {
       });
 
       await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         sort: { columnId: "spans", direction: "asc" },
         pageSize: 10,
@@ -502,7 +507,7 @@ describe("SessionGroupsService", () => {
 
       await expect(
         service.getSessionGroups({
-          tenantId: TENANT,
+          authorization: PROOF,
           timeRange: { from: 0, to: 2_000_000_000_000 },
           sort: { columnId: "lastTurn", direction: "desc" },
           pageSize: 10,
@@ -528,7 +533,7 @@ describe("SessionGroupsService", () => {
       });
 
       await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         sort: { columnId: "cost", direction: "desc" },
         pageSize: 10,
@@ -555,7 +560,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
         visibilityCutoffMs: 2000,
@@ -586,7 +591,7 @@ describe("SessionGroupsService", () => {
       });
 
       const result = await service.getSessionGroups({
-        tenantId: TENANT,
+        authorization: PROOF,
         timeRange: { from: 0, to: 2_000_000_000_000 },
         pageSize: 10,
         visibilityCutoffMs: 2000,

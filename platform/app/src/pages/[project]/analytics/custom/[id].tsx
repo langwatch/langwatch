@@ -1,11 +1,12 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import AnalyticsCustomGraph, { type CustomGraphFormData } from "./index";
 
-export default function EditCustomAnalyticsPage() {
+function EditCustomAnalyticsPage() {
   const router = useRouter();
   const graphId = router.query.id as string;
 
@@ -58,3 +59,8 @@ export default function EditCustomAnalyticsPage() {
     />
   ) : null;
 }
+
+export default withAggregateAnalyticsGate(
+  "Custom Graph",
+  EditCustomAnalyticsPage,
+);

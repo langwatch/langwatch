@@ -461,12 +461,10 @@ export function compileInstantEvalShorthandFilter(
     paramCounter: 0,
     nodeCount: 0,
     params: {},
-    // Neither is read by any handler above, and neither has anything to say
-    // here: a statement is scoped by the row policy on the views rather than by
-    // a bound tenant, and its time window is written by the target's template.
-    // They are on the shared context because the trace-table dialect needs
-    // them for its own subqueries.
-    tenantId: "",
+    // Not read by any handler above, and with nothing to say here: a
+    // statement's time window is written by the target's template. It is on
+    // the shared context because the trace-table dialect needs it for its
+    // own subqueries.
     timeRange: { from: 0, to: 0 },
   };
 

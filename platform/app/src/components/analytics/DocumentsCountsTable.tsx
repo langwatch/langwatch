@@ -1,18 +1,33 @@
 import { Box, Table, Text, VStack } from "@chakra-ui/react";
-import { useFilterParams } from "../../hooks/useFilterParams";
-import { api } from "../../utils/api";
 import { Tooltip } from "../ui/tooltip";
+import { ChartErrorIndicator, ChartErrorState } from "./ChartErrorState";
 import { SummaryMetricValue } from "./SummaryMetric";
+import { useRetryFailedAnalytics } from "./useRetryFailedAnalytics";
+import {
+  type TopUsedDocumentsParams,
+  useTopUsedDocuments,
+} from "./useTopUsedDocuments";
 
-export const DocumentsCountsTable = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
+const DOCUMENTS_FALLBACK_TITLE = "Couldn't load documents";
+
+export const DocumentsCountsTable = ({
+  params,
+}: {
+  params?: TopUsedDocumentsParams;
+} = {}) => {
+  const documents = useTopUsedDocuments(params);
+  const retryFailedAnalytics = useRetryFailedAnalytics();
 
   if (documents.isLoading) return <Box>Loading...</Box>;
-  if (documents.error) return <Box>An error occurred</Box>;
+  if (documents.error && !documents.data) {
+    return (
+      <ChartErrorState
+        error={documents.error}
+        onRetry={retryFailedAnalytics}
+        fallbackTitle={DOCUMENTS_FALLBACK_TITLE}
+      />
+    );
+  }
 
   return (
     <VStack align="start" gap={4}>
@@ -62,12 +77,21 @@ export const DocumentsCountsTable = () => {
   );
 };
 
-export const DocumentsCountsSummary = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
+export const DocumentsCountsSummary = ({
+  params,
+}: {
+  params?: TopUsedDocumentsParams;
+} = {}) => {
+  const documents = useTopUsedDocuments(params);
+
+  if (documents.error && !documents.data) {
+    return (
+      <ChartErrorIndicator
+        error={documents.error}
+        fallbackTitle={DOCUMENTS_FALLBACK_TITLE}
+      />
+    );
+  }
 
   const count = documents.data?.totalUniqueDocuments;
 

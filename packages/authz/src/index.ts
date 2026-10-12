@@ -26,6 +26,7 @@ export type {
   AuthzScopeRef,
   BindingRoleKey,
   CollectedBinding,
+  SharedRoleKey,
   CollectedGrants,
   GrantAudience,
   ResourceGrant,
@@ -74,6 +75,8 @@ export type {
   TierOfScopeArg,
 } from "./declaration";
 export {
+  PROJECT_READER_PERMISSIONS,
+  PROJECT_READER_ROLE_KEY,
   builtinRoleGrants,
   builtinRolePermissions,
   roleKeyForTeamRole,

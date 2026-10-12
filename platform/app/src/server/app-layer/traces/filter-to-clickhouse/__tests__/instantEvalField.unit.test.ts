@@ -6,13 +6,13 @@
  */
 import { parse, type TagToken } from "liqe";
 import { describe, expect, it } from "vitest";
+import { tenantSet } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import { SEARCH_FIELDS } from "../../query-language/metadata";
 import { translateFilterWithEvalRuns } from "../ast";
 import { FIELD_DEFS } from "../build-handlers";
 import { UNSUPPORTED } from "../field-def";
 import type { ResolvedInstantEvalRun } from "../instant-eval-field";
 
-const TENANT = "project-1";
 const WINDOW = { from: 1_000, to: 2_000 };
 
 const run = (
@@ -29,7 +29,6 @@ const run = (
 const compile = (query: string, evalRuns?: ResolvedInstantEvalRun[]) =>
   translateFilterWithEvalRuns({
     queryText: query,
-    tenantId: TENANT,
     timeRange: WINDOW,
     ...(evalRuns ? { evalRuns } : {}),
   });
@@ -37,14 +36,13 @@ const compile = (query: string, evalRuns?: ResolvedInstantEvalRun[]) =>
 describe("given an eval chip with a registered run", () => {
   describe("when the filter is compiled for ClickHouse", () => {
     /** @scenario "An eval chip with a registered run compiles to a verdict subquery" */
-    it("keeps traces whose latest verdict for the run passed, TenantId first", () => {
+    it("keeps traces whose latest verdict for the run passed, tenant marker first", () => {
       const result = compile('eval:"the user is annoyed"', [run()]);
       expect(result).not.toBeNull();
       expect(result?.sql).toBe(
-        "TraceId IN (SELECT TraceId FROM instant_eval_judgments WHERE TenantId = {tenantId:String} AND RunId = {evalRun_0:String} AND CreatedAt >= fromUnixTimestamp64Milli({evalWrittenFrom_1:Int64}) AND CreatedAt <= fromUnixTimestamp64Milli({evalWrittenUntil_2:Int64}) GROUP BY TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1)",
+        `((TenantId, TraceId) IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${tenantSet()} AND RunId = {evalRun_0:String} AND CreatedAt >= fromUnixTimestamp64Milli({evalWrittenFrom_1:Int64}) AND CreatedAt <= fromUnixTimestamp64Milli({evalWrittenUntil_2:Int64}) GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1))`,
       );
       expect(result?.params).toMatchObject({
-        tenantId: TENANT,
         evalRun_0: "run-1",
         evalWrittenFrom_1: 5_000,
         evalWrittenUntil_2: 9_000,
@@ -57,7 +55,7 @@ describe("given an eval chip with a registered run", () => {
         run({ target: "threads", runId: "run-2" }),
       ]);
       expect(result?.sql).toContain(
-        "Attributes['gen_ai.conversation.id'] IN (SELECT argMax(ThreadId, UpdatedAt) AS MatchedThreadId FROM instant_eval_judgments WHERE TenantId = {tenantId:String} AND RunId = {evalRun_0:String}",
+        `((TenantId, Attributes['gen_ai.conversation.id']) IN (SELECT TenantId, argMax(ThreadId, UpdatedAt) AS MatchedThreadId FROM instant_eval_judgments WHERE ${tenantSet()} AND RunId = {evalRun_0:String}`,
       );
       expect(result?.sql).toContain(
         "HAVING argMax(Passed, UpdatedAt) = 1 AND MatchedThreadId != ''",
@@ -69,7 +67,7 @@ describe("given an eval chip with a registered run", () => {
     it("negates the verdict subquery under NOT", () => {
       const result = compile('NOT eval:"the user is annoyed"', [run()]);
       expect(result?.sql).toMatch(
-        /^NOT \(TraceId IN \(SELECT TraceId FROM instant_eval_judgments/,
+        /^NOT \(\(\(TenantId, TraceId\) IN \(SELECT TenantId, TraceId FROM instant_eval_judgments/,
       );
     });
 

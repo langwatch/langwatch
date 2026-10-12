@@ -1,3 +1,5 @@
+import type { Authorization } from "@langwatch/actor";
+import type { TenantScopeTimeColumn } from "~/server/app-layer/clients/clickhouse/authorized-reads";
 import type { TraceSummaryData } from "../types";
 
 export type TraceListSortColumn =
@@ -20,16 +22,26 @@ export interface TraceListSort {
 
 /**
  * Keyset cursor for the trace list. The sort value is normalized to a finite
- * number by the repository; TraceId is the unique tie-breaker that turns every
- * supported sort into a total order.
+ * number by the repository; the tenant and trace id together are the unique
+ * tie-breaker that turns every supported sort into a total order. The trace
+ * id alone is not one: an aggregate project reads several tenants, and two of
+ * them may hold the same trace id (ADR-144 v4.1).
  */
 export interface TraceListCursor {
   sortValue: number;
+  tenantId: string;
   traceId: string;
 }
 
+/** A listed trace with the tenant it was read from, which names it on an aggregate. */
+export type TraceListRow = TraceSummaryData & { tenantId: string };
+
+/** One trace, named by the tenant that holds it and its id. */
+export type TraceRef = { tenantId: string; traceId: string };
+
 export interface TraceListQuery {
-  tenantId: string;
+  /** The proof the read is fenced by; the reader applies its tenant set. */
+  authorization: Authorization;
   timeRange: { from: number; to: number; live?: boolean };
   sort: TraceListSort;
   limit: number;
@@ -41,7 +53,7 @@ export interface TraceListQuery {
 }
 
 export interface TraceListPage {
-  rows: TraceSummaryData[];
+  rows: TraceListRow[];
   totalHits: number;
 }
 
@@ -117,26 +129,29 @@ export interface TraceListRepository {
   findAll(query: TraceListQuery): Promise<TraceListPage>;
 
   findCount(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     since: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<number>;
 
   /**
-   * The ids of the traces a filter selects in the window, newest first, at
-   * most `limit` of them. What an Instant Eval run judges when its filter
-   * names a field only this repository's compiler can answer.
+   * The traces a filter selects in the window, newest first, at most
+   * `limit` of them, each named by its tenant and trace id together: on an
+   * aggregate two members may hold the same id (ADR-144 v4.1), and the id
+   * alone would not say which trace was meant. What an Instant Eval run
+   * judges when its filter names a field only this repository's compiler
+   * can answer.
    */
-  findTraceIds(params: {
-    tenantId: string;
+  findTraceRefs(params: {
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     filterWhere?: { sql: string; params: Record<string, unknown> };
     limit: number;
-  }): Promise<string[]>;
+  }): Promise<TraceRef[]>;
 
   findDistinctValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     column: string;
     prefix: string;
     limit: number;
@@ -148,10 +163,10 @@ export interface TraceListRepository {
    * applies after the version dedup. Absent for the unfiltered discover read.
    */
   findCategoricalFacet(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     facetExpression: string;
     limit: number;
     offset: number;
@@ -160,15 +175,15 @@ export interface TraceListRepository {
   }): Promise<CategoricalFacetResult>;
 
   findCategoricalFacetRaw(params: {
-    tenantId: string;
+    authorization: Authorization;
     query: { sql: string; params: Record<string, unknown> };
   }): Promise<CategoricalFacetResult>;
 
   findRangeStatsForTable(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     column: string;
     filterWhere?: { sql: string; params: Record<string, unknown> };
   }): Promise<{ min: number; max: number }>;
@@ -180,10 +195,10 @@ export interface TraceListRepository {
    * to the slider once the distinct values exceed its threshold.
    */
   findDiscreteValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     column: string;
     limit: number;
     filterWhere?: { sql: string; params: Record<string, unknown> };
@@ -195,10 +210,10 @@ export interface TraceListRepository {
    * Used by `discover` to collapse ~25 parallel queries into ~2 per table.
    */
   findBatchedFacets(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     table: FacetTableName;
-    timeColumn: string;
+    timeColumn: TenantScopeTimeColumn;
     categoricalSpecs: { key: string; expression: string }[];
     rangeSpecs: { key: string; expression: string }[];
     topN: number;
@@ -211,7 +226,7 @@ export interface TraceListRepository {
    * the repo trusts it.
    */
   findAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;
@@ -226,7 +241,7 @@ export interface TraceListRepository {
    * contract as {@link findAttributeValues}.
    */
   findEventAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;
@@ -240,7 +255,7 @@ export interface TraceListRepository {
    * injection-safety contract as {@link findAttributeValues}.
    */
   findSpanAttributeValues(params: {
-    tenantId: string;
+    authorization: Authorization;
     timeRange: { from: number; to: number; live?: boolean };
     attributeKey: string;
     prefix?: string;
@@ -256,7 +271,7 @@ export class NullTraceListRepository implements TraceListRepository {
   async findCount(): Promise<number> {
     return 0;
   }
-  async findTraceIds(): Promise<string[]> {
+  async findTraceRefs(): Promise<TraceRef[]> {
     return [];
   }
   async findDistinctValues(): Promise<string[]> {

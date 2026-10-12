@@ -71,6 +71,11 @@ vi.mock("~/utils/api", async () => {
   const setup = await import("./subscription-test-setup");
   return {
     api: {
+      limits: {
+        getUsage: {
+          useQuery: () => setup.mockGetUsage(),
+        },
+      },
       plan: {
         getActivePlan: {
           useQuery: () => setup.mockGetActivePlan(),
@@ -558,9 +563,9 @@ describe("<SubscriptionPage/>", () => {
     beforeEach(() => {
       mockGetPendingInvites.mockReturnValue({
         data: [
-          { role: "MEMBER", status: "PENDING" },
-          { role: "ADMIN", status: "PENDING" },
-          { role: "EXTERNAL", status: "PENDING" },
+          { role: "MEMBER", status: "PENDING", displayStatus: "PENDING" },
+          { role: "ADMIN", status: "PENDING", displayStatus: "PENDING" },
+          { role: "EXTERNAL", status: "PENDING", displayStatus: "PENDING" },
         ],
         isLoading: false,
       });
@@ -578,7 +583,9 @@ describe("<SubscriptionPage/>", () => {
 
     it("excludes EXTERNAL invites from N count", async () => {
       mockGetPendingInvites.mockReturnValue({
-        data: [{ role: "EXTERNAL", status: "PENDING" }],
+        data: [
+          { role: "EXTERNAL", status: "PENDING", displayStatus: "PENDING" },
+        ],
         isLoading: false,
       });
 

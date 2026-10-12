@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { TraceAnalyticsRepository } from "~/server/app-layer/traces/repositories/trace-analytics.repository";
 import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
+import { ownProofAuthorizer } from "~/test-utils/authorizationProofs";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
@@ -163,8 +164,9 @@ describe("traceAnalytics storage anchor", () => {
       it("writes the row, carrying the anchor the fold froze", async () => {
         const upsert = vi.fn().mockResolvedValue(undefined);
         const store = new TraceAnalyticsStore({
-          upsert,
-        } as unknown as TraceAnalyticsRepository);
+          repository: { upsert } as unknown as TraceAnalyticsRepository,
+          authorize: ownProofAuthorizer,
+        });
 
         await store.store(state, {
           aggregateId: TRACE_ID,

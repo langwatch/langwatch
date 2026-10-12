@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { translateFilterToClickHouse } from "../ast";
 
-const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 function translate(query: string) {
-  return translateFilterToClickHouse(query, TENANT, TIME_RANGE);
+  return translateFilterToClickHouse(query, TIME_RANGE);
 }
 
 describe("dynamic attribute prefix translation", () => {
@@ -50,7 +49,7 @@ describe("dynamic attribute prefix translation", () => {
       // Time predicate gets folded into the subquery's WHERE so the
       // partition-prune kicks in. Cheap proof: param names exist.
       expect(Object.keys(result!.params)).toEqual(
-        expect.arrayContaining(["timeFrom", "timeTo", "tenantId"]),
+        expect.arrayContaining(["timeFrom", "timeTo"]),
       );
     });
 

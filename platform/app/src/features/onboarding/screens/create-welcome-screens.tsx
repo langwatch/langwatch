@@ -14,7 +14,9 @@ import { useAnalytics } from "react-contextual-analytics";
 import { JoinYourTeamTakeover } from "~/components/JoinYourTeamTakeover";
 import { Link } from "~/components/ui/link";
 import { JoinInsteadNotice } from "~/features/auth";
+import { joinOriginOf } from "~/features/auth/logic/joinOrigin";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { LEGAL_LINKS } from "~/utils/legalLinks";
 import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
@@ -44,6 +46,13 @@ const OrganizationScreen: React.FC = () => {
   // for an unverified one — so no organization name reaches the browser
   // before the person has proved the domain they are being nudged about.
   const joinLookup = api.joinRequests.lookup.useQuery();
+  // Where a request made from here is coming from (ADR-143 v6): the device
+  // page `langwatch login` opens sends a new account here with itself as the
+  // continuation, and a request made on its behalf lands a Developer seat.
+  const { query } = useRouter();
+  const origin = joinOriginOf({
+    returnTo: typeof query.return_to === "string" ? query.return_to : null,
+  });
 
   return (
     <VStack gap={5} align="stretch" w="full" minW="0">
@@ -68,6 +77,7 @@ const OrganizationScreen: React.FC = () => {
         // not omission, so a pending request for ANY organization still
         // blocks workspace creation here.
         currentOrganizationId={null}
+        origin={origin}
       />
 
       {/* The soft notice stays for the case the screen above does not cover:

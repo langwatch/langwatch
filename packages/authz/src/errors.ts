@@ -29,7 +29,9 @@ export class PermissionDeniedError extends HandledError {
       "permission_denied",
       denialReason === "lite-member-restricted"
         ? "This feature is not available for your account"
-        : denialReason === "membership-disabled"
+        : denialReason === "developer-restricted"
+          ? "This is outside your Developer seat"
+          : denialReason === "membership-disabled"
           ? "Your access to this organization has been disabled"
           : `You do not have permission to access this ${scope.type}`,
       {

@@ -5,6 +5,7 @@ import {
   selectIsTraceEditDirty,
   useTraceEditStore,
 } from "../stores/traceEditStore";
+import { traceDrawerParams } from "../utils/traceDrawerParams";
 import { enterTraceEditMode, exitTraceEditMode } from "../utils/traceEditMode";
 
 /**
@@ -39,12 +40,25 @@ export function useTraceDrawerUrlHydrator(): void {
         ? occurredAtMs
         : null;
 
+    // The member that owns the trace, on an aggregate. A link that names none
+    // leaves the drawer on whichever member it is on, the one the header
+    // backfilled included.
+    const tenantId = params.tenantId || null;
+
     const store = useDrawerStore.getState();
 
     if (wantsOpen && traceId) {
       const alreadyOnTrace =
-        store.traceId === traceId && store.occurredAtMs === validTimestamp;
-      if (!alreadyOnTrace) store.openTrace(traceId, validTimestamp);
+        store.traceId === traceId &&
+        store.occurredAtMs === validTimestamp &&
+        (tenantId === null || store.tenantId === tenantId);
+      if (!alreadyOnTrace) {
+        store.openTrace(
+          traceId,
+          validTimestamp,
+          tenantId !== null ? { tenantId } : undefined,
+        );
+      }
       syncEditMode({
         traceId,
         editParam: params.edit,
@@ -58,7 +72,7 @@ export function useTraceDrawerUrlHydrator(): void {
       store.closeDrawer();
       exitTraceEditMode();
     }
-  }, [currentDrawer, params.traceId, params.t, params.edit]);
+  }, [currentDrawer, params.traceId, params.t, params.tenantId, params.edit]);
 }
 
 /**
@@ -88,8 +102,11 @@ function keepDrawerForUnsavedEdit({
 
   drawer.setIsEditing(true);
   openDrawer("traceV2Details", {
-    traceId: editingTraceId,
-    ...(drawer.occurredAtMs !== null ? { t: String(drawer.occurredAtMs) } : {}),
+    ...traceDrawerParams({
+      traceId: editingTraceId,
+      occurredAtMs: drawer.occurredAtMs,
+      tenantId: drawer.tenantId,
+    }),
     urlParams: { edit: "1" },
   });
   editStore.requestExit(() => {
@@ -143,8 +160,11 @@ function syncEditMode({
   const drawer = useDrawerStore.getState();
   drawer.setIsEditing(true);
   openDrawer("traceV2Details", {
-    traceId,
-    ...(drawer.occurredAtMs !== null ? { t: String(drawer.occurredAtMs) } : {}),
+    ...traceDrawerParams({
+      traceId,
+      occurredAtMs: drawer.occurredAtMs,
+      tenantId: drawer.tenantId,
+    }),
     urlParams: { edit: "1" },
   });
 }

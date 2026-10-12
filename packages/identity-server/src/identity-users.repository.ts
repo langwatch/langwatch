@@ -21,6 +21,12 @@ export interface IdentityUsersRepository {
   /** The user's current email, or null — including for a user that is gone. */
   findEmail(args: { userId: string }): Promise<string | null>;
   /**
+   * The user's email only where better-auth marked it verified, or null:
+   * the address a user not on identifiers yet has proven, which is what the
+   * join door and the invitation lookup read for such a user.
+   */
+  findVerifiedLegacyEmail(args: { userId: string }): Promise<string | null>;
+  /**
    * Who holds this address on the LEGACY branch — the half of the
    * cross-population uniqueness question the `Identifier` projection cannot
    * answer (ADR-116 §6).

@@ -4,6 +4,11 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+// Prisma's CLI sends a version check to checkpoint.prisma.io on every command.
+// LangWatch never uses it, in any environment. The CLI loads this file before
+// it runs the check, so setting the variable here covers every prisma command.
+process.env.CHECKPOINT_DISABLE = "1";
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {

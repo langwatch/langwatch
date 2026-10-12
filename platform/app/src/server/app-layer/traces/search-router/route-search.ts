@@ -130,6 +130,7 @@ async function routeWithModel(
   try {
     decision = await deps.routeWithModel({
       projectId: input.projectId,
+      authorization: input.authorization,
       text: context.sentence,
       timeRange: input.timeRange,
       target: context.target,
@@ -208,7 +209,7 @@ async function listKnownSignals({
 }): Promise<KnownProjectSignals> {
   try {
     return await deps.listKnownSignals({
-      projectId: input.projectId,
+      authorization: input.authorization,
       timeRange: input.timeRange,
     });
   } catch (error) {

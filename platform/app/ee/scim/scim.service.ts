@@ -155,7 +155,18 @@ export class ScimService {
       return;
     }
 
-    const role = await this.directoryAssertedRole({ userId, organizationId });
+    // ADR-143: a Developer seat holds no organization-wide grant. This path
+    // asserted an unconditional MEMBER grant for every synced person; a
+    // Developer keeps the seat the organization gave them and receives none,
+    // and the row's role is never rewritten by a sync on either path.
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true },
+    });
+    const role =
+      membership?.role === OrganizationUserRole.DEVELOPER
+        ? null
+        : await this.directoryAssertedRole({ userId, organizationId });
     await reconcileScimGrants({
       prisma: this.prisma,
       writer: this.writer,

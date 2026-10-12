@@ -5,14 +5,20 @@ import { z } from "zod";
  * Adding a new type here will cause compile errors in all switch statements
  * that use `assertNever`, ensuring exhaustive handling.
  *
- * Only the seat levers remain enforced: members and lite members. Workspace
- * structure (projects, teams) and all experimentation resources (workflows,
- * prompts, evaluators, scenarios, agents, experiments, online evaluations,
- * datasets, dashboards, custom graphs, automations) are OSS (Apache 2.0) and
- * have no creation cap on any plan — cloud monetizes via traces/messages
- * volume and seats, not by counting workspaces or experimentation artifacts.
+ * Seats (members, lite members) are enforced on every plan that sets them.
+ * Scenarios, simulations (distinct scenario sets) and custom evaluators are
+ * capped on the cloud Free plan only: the plan carries the cap, and every
+ * other plan, self-hosted included, leaves it unset and stays uncapped.
+ * Everything else (projects, teams, prompts, workflows, datasets, ...) has
+ * no creation cap on any plan.
  */
-export const limitTypes = ["members", "membersLite"] as const;
+export const limitTypes = [
+  "members",
+  "membersLite",
+  "scenarios",
+  "scenarioSets",
+  "evaluators",
+] as const;
 
 export type LimitType = (typeof limitTypes)[number];
 

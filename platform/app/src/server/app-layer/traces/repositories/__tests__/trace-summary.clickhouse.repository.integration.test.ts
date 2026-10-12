@@ -15,12 +15,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { traceSummaryRepositoryFor } from "~/test-utils/traceSummaryRepository";
 import { startTestContainers } from "../../../../event-sourcing/__tests__/integration/testContainers";
-import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
+import type { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
 
 const tenantId = `test-tsumm-resolve-${nanoid()}`;
 const presentTraceId = `trace-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
+const authorization = ownProof({ projectId: tenantId });
 
 let ch: ClickHouseClient;
 let repo: TraceSummaryClickHouseRepository;
@@ -68,7 +71,7 @@ function makeRow(traceId: string, occurredAtMs: number) {
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new TraceSummaryClickHouseRepository(async () => ch);
+  repo = traceSummaryRepositoryFor(async () => ch);
 
   await ch.insert({
     table: "trace_summaries",
@@ -107,14 +110,17 @@ function recordingRepo(): {
     },
   }) as ClickHouseClient;
   return {
-    repo: new TraceSummaryClickHouseRepository(async () => recordingClient),
+    repo: traceSummaryRepositoryFor(async () => recordingClient),
     queries,
   };
 }
 
 describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("returns the trace when no occurredAtMs hint is passed", async () => {
-    const result = await repo.findByTraceId(tenantId, presentTraceId);
+    const result = await repo.findByTraceId({
+      authorization,
+      traceId: presentTraceId,
+    });
 
     expect(result).not.toBeNull();
     expect(result?.traceId).toBe(presentTraceId);
@@ -123,7 +129,10 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("resolves OccurredAt and bounds the heavy read for a hint-less call", async () => {
     const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.findByTraceId(tenantId, presentTraceId);
+    const result = await rec.findByTraceId({
+      authorization,
+      traceId: presentTraceId,
+    });
 
     expect(result?.traceId).toBe(presentTraceId);
     // One cheap resolve (min(OccurredAt)) + the heavy read, and the heavy read
@@ -138,7 +147,10 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("skips the heavy read entirely for a trace that does not exist", async () => {
     const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.findByTraceId(tenantId, `missing-${nanoid()}`);
+    const result = await rec.findByTraceId({
+      authorization,
+      traceId: `missing-${nanoid()}`,
+    });
 
     expect(result).toBeNull();
     // The light resolve confirms absence; the heavy unbounded read is never

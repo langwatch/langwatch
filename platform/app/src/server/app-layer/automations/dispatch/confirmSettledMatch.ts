@@ -1,5 +1,5 @@
 import type { TriggerSummary } from "~/server/app-layer/automations/repositories/trigger.repository";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import {
   evaluateQueryInMemory,
   queryNeeds,
@@ -15,7 +15,12 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 
 export interface ConfirmSettledMatchDeps {
-  evaluationRuns: EvaluationRunService;
+  /** The trace's evaluations, read through a proof the wiring mints for the
+   *  match's project (ADR-144 block F). */
+  findEvaluations: (params: {
+    tenantId: string;
+    traceId: string;
+  }) => Promise<EvaluationRunData[]>;
   deriveEvents: (params: {
     tenantId: string;
     traceId: string;
@@ -47,7 +52,7 @@ export async function confirmSettledMatch({
   if (trigger.filterQuery != null) {
     const needs = queryNeeds(trigger.filterQuery);
     const evaluations = needs.has("evaluations")
-      ? await deps.evaluationRuns.findByTraceId(projectId, traceId)
+      ? await deps.findEvaluations({ tenantId: projectId, traceId })
       : null;
     const events = needs.has("events")
       ? await deps.deriveEvents({
@@ -88,10 +93,10 @@ export async function confirmSettledMatch({
   }
 
   if (hasEvaluationFilters) {
-    const allEvaluations = await deps.evaluationRuns.findByTraceId(
-      projectId,
+    const allEvaluations = await deps.findEvaluations({
+      tenantId: projectId,
       traceId,
-    );
+    });
     if (!matchesEvaluationFilters(allEvaluations, evaluationFilters)) {
       return false;
     }

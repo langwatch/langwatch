@@ -304,6 +304,7 @@ export const monitorsRouter = createTRPCRouter({
           evaluatorId: source.evaluatorId,
           sourceProjectId,
           targetProjectId: projectId,
+          shouldCheckEvaluatorCap: false,
         });
         newEvaluatorId = copiedEvaluator.id;
         newWorkflowId = copiedEvaluator.workflowId;

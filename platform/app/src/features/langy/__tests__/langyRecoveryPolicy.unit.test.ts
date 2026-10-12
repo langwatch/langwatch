@@ -203,6 +203,15 @@ describe("langyRecoveryPolicy", () => {
     });
   });
 
+  describe("when the turn was refused because the project is an aggregate", () => {
+    it("never retries, the same turn is refused the same way", () => {
+      const policy = langyRecoveryPolicy("aggregate_project_is_read_only");
+
+      expect(policy.disposition).toBe("terminal");
+      expect(policy.retry).toBe(false);
+    });
+  });
+
   describe("when Langy needs GitHub and the user has not connected it", () => {
     const policy = langyRecoveryPolicy("langy_github_not_connected");
 

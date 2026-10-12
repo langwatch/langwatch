@@ -5,7 +5,8 @@
  * Project login hands the CLI a project's API key, so the picker offers:
  *
  *   - the org's shared projects, grouped under their teams (the internal
- *     internal_governance tenancy project is never user-visible), and
+ *     internal_governance tenancy project is never user-visible, and an
+ *     aggregate project, which receives no traces, is never offered), and
  *   - the caller's OWN personal workspace project as a separate, explicit
  *     "Personal" entry. Explicit is the point: the historical hazard was a
  *     coding agent silently AUTO-selecting a personal project and routing a
@@ -27,6 +28,8 @@
  * projects at all, the personal project, so a fresh solo user is never
  * dead-ended on an empty picker.
  */
+
+import { NON_DESTINATION_PROJECT_KINDS } from "~/server/app-layer/projects/project-kinds";
 
 export interface CliAuthProjectOption {
   id: string;
@@ -75,7 +78,7 @@ function findOwnPersonalProject(
       (p) =>
         p.isPersonal &&
         p.ownerUserId === currentUserId &&
-        p.kind !== "internal_governance",
+        !NON_DESTINATION_PROJECT_KINDS.includes(p.kind ?? ""),
     );
     if (personal) {
       return {
@@ -129,7 +132,11 @@ export function resolveCliAuthProjects(args: {
 } {
   const projects = (args.teams ?? []).flatMap((team) =>
     (team.projects ?? [])
-      .filter((p) => !p.isPersonal && p.kind !== "internal_governance")
+      .filter(
+        (p) =>
+          !p.isPersonal &&
+          !NON_DESTINATION_PROJECT_KINDS.includes(p.kind ?? ""),
+      )
       .map((p) => ({
         id: p.id,
         name: p.name,

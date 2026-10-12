@@ -76,7 +76,7 @@ If a field doesn't resolve from the precedence list, the fold projection stores 
 
 ## What is still envelope-only, follow-up work
 
-- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli accepted via the shared parser). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
+- **gRPC.** Only OTLP/HTTP JSON + protobuf is implemented (gzip, deflate, brotli and zstd accepted via the shared parser; gzip and zstd bodies are recognised even without a correct Content-Encoding). OTLP/gRPC is not yet wired. Use the JSON or protobuf HTTP exporter on the upstream side.
 - **Span events, span links.** Not extracted into separate fold dimensions in this slice; the parent span's data is surfaced. Span events appear in the trace viewer's drill-down.
 
 ## Verify with CLI + web

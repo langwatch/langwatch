@@ -51,9 +51,15 @@ export interface IdentityProviderPreset {
   /** Where in the provider's console the app is created, in the console's
    *  own menu words. Null when we have no console to point at. */
   consolePath: string | null;
+  /** The console path for a SAML app, when the provider keeps those
+   *  somewhere else. */
+  samlConsolePath?: string;
   /** Protocol-specific examples in the provider's own address shapes, so a
    *  placeholder confirms the administrator is pasting the right thing. */
   issuerExample: string;
+  /** Where the provider's console shows the issuer, when it is not labelled
+   *  "issuer" there. */
+  issuerHint?: string;
   entryPointExample: string;
   /** Whether the protocol cards stay on screen after this tile is picked.
    *  A tile that IS a protocol has already answered that question. */
@@ -80,8 +86,11 @@ export const IDENTITY_PROVIDER_PRESETS: IdentityProviderPreset[] = [
     icon: FaMicrosoft,
     monogram: "En",
     defaultProtocol: "oidc",
-    consolePath: "Enterprise applications → New application",
+    consolePath: "App registrations → New registration",
+    samlConsolePath: "Enterprise applications → New application",
     issuerExample: "https://login.microsoftonline.com/<tenant-id>/v2.0",
+    issuerHint:
+      "In App registrations, open the app and select Endpoints. Copy the OpenID Connect metadata document address and remove /.well-known/openid-configuration from the end, with no trailing slash.",
     entryPointExample: "https://login.microsoftonline.com/<tenant-id>/saml2",
     protocolIsChosen: false,
   },

@@ -24,9 +24,14 @@ import { ScimService } from "../scim.service";
  */
 import { resourceStore } from "./scim-user-resource.fixture";
 
+// A removal re-reads the organization's aggregate projects through the App;
+// none exist here, so the App answers with no reconciler.
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
-  tryGetApp: () => ({ redis: null }),
+  tryGetApp: () => ({
+    redis: null,
+    projects: { aggregateReconciler: undefined },
+  }),
 }));
 
 vi.mock("~/env.mjs", async (importOriginal) => {

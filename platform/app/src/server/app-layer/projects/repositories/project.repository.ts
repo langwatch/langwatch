@@ -1,5 +1,6 @@
 import type { Project, Team } from "~/generated/prisma/client";
 import type { OnboardingVariant } from "~/server/schemas/sign-up-data.schema";
+import type { AggregateRule } from "../aggregate-rule";
 
 export type ProjectWithTeam = Project & { team: Team };
 
@@ -35,6 +36,10 @@ export interface CreateProjectInput {
   framework: string;
   teamId: string;
   apiKey: string;
+  /** Omitted means the column default, `"application"`. */
+  kind?: string;
+  /** ADR-144: set only on an aggregate project. */
+  aggregateRule?: AggregateRule;
 }
 
 export interface CreateTeamWithBindingInput {
@@ -139,6 +144,25 @@ export interface ProjectRepository {
     id: string;
     organizationId: string;
   }): Promise<Project | null>;
+  /**
+   * ADR-144 block E: replace a live aggregate's stored rule. Null when no live
+   * aggregate of this organisation has the id; the caller has validated the
+   * rule.
+   */
+  updateAggregateRule(params: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project | null>;
+  /**
+   * The slug of the project the app lands a member of an organisation on
+   * when they chose none: their oldest unarchived project in it whose kind
+   * is not in `NEVER_LANDED_ON_PROJECT_KINDS`. Null when they have none.
+   */
+  findLandingProjectSlug(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null>;
   findAllByOrganization(params: {
     organizationId: string;
     page: number;
@@ -149,6 +173,11 @@ export interface ProjectRepository {
      * `project:view` receives. An empty array lists nothing.
      */
     projectIds?: string[];
+    /**
+     * Leaves out the governance project always, and aggregate projects unless
+     * the caller is an organisation admin (ADR-144 decision 5).
+     */
+    callerOrganizationRole: string | null;
   }): Promise<PaginatedResult<Project>>;
   /**
    * Every project id of the organization, ordered by id ascending: archived
@@ -163,6 +192,15 @@ export interface ProjectRepository {
     slug: string;
     teamId: string;
   }): Promise<Project | null>;
+  /**
+   * The unarchived projects of one team of the organisation, with their
+   * kind: what archiving the team takes out of every aggregate (ADR-144
+   * block E). Empty for a team of another organisation.
+   */
+  findLiveKindsByTeam(params: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<Pick<Project, "id" | "kind">[]>;
   findActiveTeamInOrganization(params: {
     teamId: string;
     organizationId: string;
@@ -180,6 +218,13 @@ export interface ProjectRepository {
 
 export class NullProjectRepository implements ProjectRepository {
   async getById(_id: string): Promise<Project | null> {
+    return null;
+  }
+
+  async findLandingProjectSlug(_params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<string | null> {
     return null;
   }
 
@@ -242,11 +287,20 @@ export class NullProjectRepository implements ProjectRepository {
     return null;
   }
 
+  async updateAggregateRule(_params: {
+    id: string;
+    organizationId: string;
+    aggregateRule: AggregateRule;
+  }): Promise<Project | null> {
+    return null;
+  }
+
   async findAllByOrganization(_params: {
     organizationId: string;
     page: number;
     limit: number;
     projectIds?: string[];
+    callerOrganizationRole: string | null;
   }): Promise<PaginatedResult<Project>> {
     return { data: [], pagination: { page: 1, limit: 50, total: 0 } };
   }
@@ -254,6 +308,13 @@ export class NullProjectRepository implements ProjectRepository {
   async findAllIdsByOrganization(_params: {
     organizationId: string;
   }): Promise<string[]> {
+    return [];
+  }
+
+  async findLiveKindsByTeam(_params: {
+    teamId: string;
+    organizationId: string;
+  }): Promise<Pick<Project, "id" | "kind">[]> {
     return [];
   }
 

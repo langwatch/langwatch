@@ -68,6 +68,12 @@ function harness() {
       const row = db.user?.find((candidate) => candidate.id === userId);
       return typeof row?.email === "string" ? row.email : null;
     },
+    async findVerifiedLegacyEmail({ userId }) {
+      const row = db.user?.find((candidate) => candidate.id === userId);
+      return row?.emailVerified === true && typeof row.email === "string"
+        ? row.email
+        : null;
+    },
     async findUserIdByEmail({ normalizedValue }) {
       const row = db.user?.find(
         (candidate) =>

@@ -68,6 +68,45 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
     And the statement already running is left alone
     And the wait bound is shorter than the time one statement may spend on the wire
 
+  @unit
+  Scenario: a same-tick statement blocked only on the total is still bounded
+    Given the whole budget is taken within one tick
+    When a statement with lane room but no total slot arrives in the same tick
+    Then it is refused as overload rather than queueing indefinitely
+    And the wait bound is armed at the total, where it is full
+
+  # An insert holds its connection until the async insert flushes, so with one
+  # shared bound a burst of ingest could occupy every slot and starve UI reads.
+  # Each kind reserves a minimum of the shared budget for the other
+  # (configurable via CLICKHOUSE_STATEMENT_LANE_RESERVE_SHARE) but may borrow the
+  # rest when the other is idle, so neither can delay the other, a lone kind
+  # still uses the whole budget less the other kind's reserve, and together they never exceed it.
+  @unit
+  Scenario: a saturated insert lane does not delay reads
+    Given the insert lane has used every slot it may hold
+    When a read is issued
+    Then the read starts immediately
+    And the surplus inserts keep waiting
+
+  @unit
+  Scenario: a saturated read lane does not delay inserts
+    Given the read lane has used every slot it may hold
+    When an insert is issued
+    Then the insert starts immediately
+
+  @unit
+  Scenario: a lone kind of work borrows the idle lane's capacity
+    Given only reads are being issued and no inserts
+    When more reads are issued than a fixed half-budget would allow
+    Then they all start, up to the whole budget less the inserts' reserve
+    And the inserts' reserved slots stay free for an insert that may yet arrive
+
+  @unit
+  Scenario: both lanes together never exceed the connection budget
+    Given both lanes have more statements than they can run
+    When the statements are issued
+    Then no more statements run at once than the whole budget allows
+
   # Sizing the bound is where this went wrong in practice. The budget was read
   # as one server's allowance and then divided across the whole fleet, but the
   # cluster runs several nodes and the fleet's statements spread over all of

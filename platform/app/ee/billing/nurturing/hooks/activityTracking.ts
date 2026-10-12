@@ -14,6 +14,13 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 const lastActivitySentAt = new Map<string, number>();
 
 /**
+ * Last time the app_active event was sent for each user. Kept apart from the
+ * identify cache: a failed identify clears its own entry to retry, and that
+ * retry must not send a second event within the hour.
+ */
+const lastAppActiveSentAt = new Map<string, number>();
+
+/**
  * Timestamp of the last sweep pass. Sweeps run at most once per hour
  * to avoid O(n) iteration overhead on every call.
  */
@@ -25,16 +32,19 @@ let lastSweepAt = 0;
  */
 function sweepExpiredEntries({ now }: { now: number }): void {
   if (now - lastSweepAt < ONE_HOUR_MS) return;
-  for (const [cachedUserId, sentAt] of lastActivitySentAt) {
-    if (now - sentAt >= ONE_HOUR_MS) {
-      lastActivitySentAt.delete(cachedUserId);
+  for (const cache of [lastActivitySentAt, lastAppActiveSentAt]) {
+    for (const [cachedUserId, sentAt] of cache) {
+      if (now - sentAt >= ONE_HOUR_MS) {
+        cache.delete(cachedUserId);
+      }
     }
   }
   lastSweepAt = now;
 }
 
 /**
- * Pushes last_active_at to Customer.io for inactivity detection.
+ * Pushes last_active_at to Customer.io for inactivity detection, and tracks
+ * an app_active event for campaign conversion goals.
  *
  * Debounced to at most once per hour per user to avoid excessive API calls.
  * Fire-and-forget: never throws, never blocks the session callback.
@@ -53,6 +63,8 @@ export function fireActivityTrackingNurturing({
 
   const now = Date.now();
   sweepExpiredEntries({ now });
+  trackAppActive({ nurturing, userId, now });
+
   const lastSent = lastActivitySentAt.get(userId);
 
   if (lastSent !== undefined && now - lastSent < ONE_HOUR_MS) {
@@ -73,11 +85,35 @@ export function fireActivityTrackingNurturing({
 }
 
 /**
+ * Tracks app_active at most once per hour per user. A failed track is
+ * reported and not retried within the hour.
+ */
+function trackAppActive({
+  nurturing,
+  userId,
+  now,
+}: {
+  nurturing: NonNullable<ReturnType<typeof getApp>["nurturing"]>;
+  userId: string;
+  now: number;
+}): void {
+  const lastSent = lastAppActiveSentAt.get(userId);
+  if (lastSent !== undefined && now - lastSent < ONE_HOUR_MS) return;
+
+  lastAppActiveSentAt.set(userId, now);
+
+  void nurturing
+    .trackEvent({ userId, event: "app_active" })
+    .catch(captureException);
+}
+
+/**
  * Resets the debounce cache. Only exposed for testing.
  * @internal
  */
 export function resetActivityTrackingCache(): void {
   lastActivitySentAt.clear();
+  lastAppActiveSentAt.clear();
   lastSweepAt = 0;
 }
 
@@ -87,4 +123,12 @@ export function resetActivityTrackingCache(): void {
  */
 export function getActivityTrackingCacheSize(): number {
   return lastActivitySentAt.size;
+}
+
+/**
+ * Returns the size of the app_active debounce cache for testing.
+ * @internal
+ */
+export function getAppActiveCacheSize(): number {
+  return lastAppActiveSentAt.size;
 }

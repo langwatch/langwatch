@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { SpanStorageClickHouseRepository } from "~/server/app-layer/traces/repositories/span-storage.clickhouse.repository";
-import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { TraceSummaryService } from "~/server/app-layer/traces/trace-summary.service";
+import { ownProof } from "~/test-utils/authorizationProofs";
+import { spanStorageRepositoryFor } from "~/test-utils/spanStorageRepository";
+import { traceSummaryStoreFor } from "~/test-utils/traceSummaryRepository";
 import { getTestClickHouseClient } from "../../../__tests__/integration/testContainers";
 import {
   cleanupTestDataForTenant,
@@ -15,7 +15,7 @@ import { SpanStorageMapProjection } from "../projections/spanStorage.mapProjecti
 import { SpanAppendStore } from "../projections/spanStorage.store";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { TraceSummaryFoldProjection } from "../projections/traceSummary.foldProjection";
-import { TraceSummaryStore } from "../projections/traceSummary.store";
+import type { TraceSummaryStore } from "../projections/traceSummary.store";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -98,13 +98,9 @@ describe.skipIf(!hasTestcontainers)(
 
       tenantId = createTestTenantId();
       tenantIdString = getTenantIdString(tenantId);
-      traceSummaryStore = new TraceSummaryStore(
-        new TraceSummaryService(
-          new TraceSummaryClickHouseRepository(async () => clickHouseClient),
-        ).repository,
-      );
+      traceSummaryStore = traceSummaryStoreFor(async () => clickHouseClient);
       spanStorageService = new SpanStorageService(
-        new SpanStorageClickHouseRepository(async () => clickHouseClient),
+        spanStorageRepositoryFor(async () => clickHouseClient),
       );
     });
 
@@ -173,7 +169,7 @@ describe.skipIf(!hasTestcontainers)(
       );
 
       const storedSpans = await spanStorageService.getSpansByTraceId({
-        tenantId: currentTenantIdString,
+        authorization: ownProof({ projectId: currentTenantIdString }),
         traceId,
       });
 

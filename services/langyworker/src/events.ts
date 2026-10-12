@@ -88,6 +88,12 @@ export function settledToolOutput(result: unknown): string {
 
 export class TurnEventMapper {
   private readonly toolInputs = new Map<string, unknown>();
+  // A text block ended and no tool has started since. The next text delta
+  // opens a new block of the same paragraph run (GPT-5 on the Responses API
+  // sends a commentary message and a final one), so it gets a paragraph
+  // break instead of running into the previous sentence.
+  private textBlockEnded = false;
+  private textInBlock = false;
 
   constructor(private readonly turnId: string) {}
 
@@ -98,7 +104,15 @@ export class TurnEventMapper {
           | { type?: string; delta?: string }
           | undefined;
         if (delta?.type === "text_delta" && typeof delta.delta === "string" && delta.delta !== "") {
-          return [{ type: "delta", turnId: this.turnId, text: boundText({ text: delta.delta }) }];
+          const text = this.textBlockEnded ? `\n\n${delta.delta}` : delta.delta;
+          this.textBlockEnded = false;
+          this.textInBlock = true;
+          return [{ type: "delta", turnId: this.turnId, text: boundText({ text }) }];
+        }
+        if (delta?.type === "text_end") {
+          if (this.textInBlock) this.textBlockEnded = true;
+          this.textInBlock = false;
+          return [];
         }
         if (
           delta?.type === "thinking_delta" &&
@@ -110,6 +124,8 @@ export class TurnEventMapper {
         return [];
       }
       case "tool_execution_start": {
+        this.textBlockEnded = false;
+        this.textInBlock = false;
         const id = String(event.toolCallId ?? "");
         const name = String(event.toolName ?? "");
         this.toolInputs.set(id, event.args);

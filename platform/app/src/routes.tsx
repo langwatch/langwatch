@@ -85,6 +85,8 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/auth/verify-email")),
   },
   { path: "/auth/error", ...page(() => import("./pages/auth/error")) },
+  // Lands sign-ins whose destination better-auth's callbackURL check refuses.
+  { path: "/auth/resume", ...page(() => import("./pages/auth/resume")) },
   // Where a single sign-on test lands: the tester holds a session the
   // connection has not admitted, so the orgless bootstrap is the wrong answer.
   {

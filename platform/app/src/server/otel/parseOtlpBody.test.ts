@@ -15,9 +15,13 @@
  */
 
 import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";
-import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { describe, expect, it } from "vitest";
 
+import {
+  buildProtobufBody,
+  buildTraceRequest,
+  makeRequest,
+} from "./__tests__/fixtures/otlpTraceBody";
 import { OtlpBodyTooLargeError } from "./errors";
 import {
   OTLP_MAX_BODY_BYTES,
@@ -27,93 +31,11 @@ import {
   readOtlpBody,
 } from "./parseOtlpBody";
 
-const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
-  .ExportTraceServiceRequest;
-
-function buildTraceRequest(): {
-  resourceSpans: Array<Record<string, unknown>>;
-} {
-  const startNano = "1700000000000000000";
-  const endNano = "1700000000100000000";
-  return {
-    resourceSpans: [
-      {
-        resource: {
-          attributes: [
-            {
-              key: "service.name",
-              value: { stringValue: "shared-parser-test" },
-            },
-          ],
-        },
-        scopeSpans: [
-          {
-            scope: { name: "test-scope", version: "1.0.0" },
-            spans: [
-              {
-                traceId: "0123456789abcdef0123456789abcdef",
-                spanId: "0123456789abcdef",
-                parentSpanId: "",
-                name: "test-span",
-                kind: 1,
-                startTimeUnixNano: startNano,
-                endTimeUnixNano: endNano,
-                attributes: [
-                  {
-                    key: "gen_ai.usage.cost_usd",
-                    value: { doubleValue: 0.0123 },
-                  },
-                  {
-                    key: "gen_ai.usage.input_tokens",
-                    value: { intValue: 150 },
-                  },
-                  {
-                    key: "gen_ai.request.model",
-                    value: { stringValue: "claude-3-5-sonnet" },
-                  },
-                ],
-                events: [],
-                links: [],
-                status: { code: 1 },
-                droppedAttributesCount: 0,
-                droppedEventsCount: 0,
-                droppedLinksCount: 0,
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  };
-}
-
-function buildProtobufBody(
-  payload: ReturnType<typeof buildTraceRequest>,
-): ArrayBuffer {
-  const message = traceRequestType.create(payload);
-  const bytes = traceRequestType.encode(message).finish() as Uint8Array;
-  return bytes.buffer.slice(
-    bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength,
-  ) as ArrayBuffer;
-}
-
 function buildJsonBody(
   payload: ReturnType<typeof buildTraceRequest>,
 ): ArrayBuffer {
   return new TextEncoder().encode(JSON.stringify(payload))
     .buffer as ArrayBuffer;
-}
-
-function makeRequest(
-  body: ArrayBuffer | Buffer,
-  headers: Record<string, string>,
-): Request {
-  return new Request("http://localhost/test", {
-    method: "POST",
-    headers,
-    body: body instanceof Buffer ? new Uint8Array(body) : new Uint8Array(body),
-  });
 }
 
 function spanCountOf(parsed: {

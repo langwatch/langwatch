@@ -12,7 +12,7 @@ import {
   bindingScopeCanGrantPermission,
   permissionSatisfiedBy,
 } from "./registry";
-import { builtinRoleGrants } from "./roles";
+import { builtinRoleGrants, PROJECT_READER_ROLE_KEY } from "./roles";
 import { audienceMatches } from "./scope";
 import type {
   AuthzScopeRef,
@@ -26,7 +26,7 @@ export function bindingGrants({
   grants,
   permission,
 }: {
-  binding: Pick<CollectedBinding, "roleKey" | "scopeType">;
+  binding: Pick<CollectedBinding, "roleKey" | "scopeType" | "viaGroupId">;
   grants: CollectedGrants;
   permission: string;
 }): boolean {
@@ -41,6 +41,17 @@ export function bindingGrants({
     return false;
   }
 
+  // ADR-143: a Developer seat holds its personal team and nothing shared.
+  // The write paths keep it that way for direct rows; this is the cap for
+  // the two routes a row rule never sees. An ORGANIZATION-scoped binding
+  // reaches every project, and a group-delivered binding reaches whatever
+  // the group was mapped to, so neither grants a Developer anything. A
+  // direct TEAM or PROJECT row (their own personal team) grants normally.
+  if (grants.organizationRole === "DEVELOPER") {
+    if (binding.scopeType === "ORGANIZATION") return false;
+    if (binding.viaGroupId) return false;
+  }
+
   const { roleKey } = binding;
   // A custom key is authoritative, including grants imported beside a legacy
   // built-in role. Missing or empty role facts never restore that old role.
@@ -53,6 +64,17 @@ export function bindingGrants({
       granted: new Set(customPermissions),
       requested: permission,
     });
+  }
+
+  // ADR-144: a shared project-to-project read. The ledger places it on a
+  // PROJECT scope and nowhere else, and nothing widens or narrows it - not
+  // an organisation role, not the EXTERNAL cap - because the principal is a
+  // project, which has neither.
+  if (roleKey === PROJECT_READER_ROLE_KEY) {
+    return (
+      binding.scopeType === "PROJECT" &&
+      builtinRoleGrants({ role: PROJECT_READER_ROLE_KEY, permission })
+    );
   }
 
   if (roleKey !== "admin" && roleKey !== "member" && roleKey !== "viewer") {

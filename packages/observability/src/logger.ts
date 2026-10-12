@@ -3,8 +3,7 @@ import pino, {
   type LoggerOptions,
   type Logger as PinoLogger,
 } from "pino";
-import type SuperJSON from "superjson";
-import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants";
+import { DEFAULT_SERVICE_NAME, ERROR_SUMMARY, REQUEST_CAUSE_FIELD } from "./constants";
 
 type LogContextProvider = () => Record<string, string | null>;
 
@@ -12,17 +11,6 @@ const isNodeRuntime =
   typeof process !== "undefined" && typeof process.versions?.node === "string";
 
 let logContextProvider: LogContextProvider | undefined;
-let sharedSuperjson: typeof SuperJSON | undefined;
-
-function getSuperjson(): typeof SuperJSON {
-  if (!sharedSuperjson) {
-    const { createRequire } = process.getBuiltinModule("node:module");
-    const loadModule = createRequire(import.meta.url);
-    sharedSuperjson = loadModule("superjson") as typeof SuperJSON;
-  }
-
-  return sharedSuperjson;
-}
 
 /**
  * Registers the server context provider used by every logger mixin.
@@ -36,21 +24,92 @@ export function registerLogContextProvider(provider: LogContextProvider): void {
 }
 
 /**
- * Custom Error serializer using superjson.
- * Avoids expensive manual stack trace formatting while preserving metadata.
+ * Error serializer for every cause key. A branded error summary (see
+ * `ERROR_SUMMARY`, produced by request logging) passes through untouched, since
+ * pino's err serializer would relabel it `type: "Object"`. Every `Error` gets
+ * its full redacted pino serialization; anything else, including an unbranded
+ * plain object, goes to pino's err serializer.
  */
-const superjsonErrorSerializer = (error: unknown) => {
-  if (!(error instanceof Error)) {
-    return pino.stdSerializers.err(error as Error);
+const errorSerializer = (error: unknown) => {
+  if (error instanceof Error) {
+    return redactCommandCredentials(pino.stdSerializers.err(error));
   }
-
-  const serialized = getSuperjson().serialize(error);
-
-  return {
-    ...pino.stdSerializers.err(error),
-    _superjson: serialized.meta,
-  };
+  if (
+    error !== null &&
+    typeof error === "object" &&
+    (error as Record<symbol, unknown>)[ERROR_SUMMARY] === true
+  ) {
+    return error;
+  }
+  return pino.stdSerializers.err(error as Error);
 };
+
+/** Redis commands whose arguments carry a password. */
+const CREDENTIAL_COMMANDS = new Set(["auth", "hello"]);
+
+/**
+ * The password among a command's arguments: the last argument of
+ * `AUTH [username] password`, and the one after the username in
+ * `HELLO protover AUTH username password`. A username is not a secret, and
+ * masking a common one such as `default` would blank unrelated text.
+ */
+function credentialValues(name: string, args: unknown): string[] {
+  if (!Array.isArray(args)) return [];
+  let password: unknown;
+  if (name === "auth") {
+    password = args[args.length - 1];
+  } else {
+    const at = args.findIndex(
+      (a) => typeof a === "string" && a.toLowerCase() === "auth",
+    );
+    password = at < 0 ? undefined : args[at + 2];
+  }
+  return typeof password === "string" && password.length > 0 ? [password] : [];
+}
+
+/**
+ * A server that does not know the command echoes its first arguments, cut at
+ * about 128 bytes and with CR/LF replaced, so an exact match on the password
+ * can miss a truncated or rewritten copy. The whole echoed list goes.
+ */
+const ECHOED_ARGUMENTS = /(with args beginning with:)[^\n]*/g;
+
+/** Replaces the password, and any echoed argument list, in a text. */
+function maskValues(text: unknown, values: string[]): unknown {
+  if (typeof text !== "string") return text;
+  const masked = values.reduce(
+    (out, value) => out.split(value).join("[redacted]"),
+    text,
+  );
+  return masked.replace(ECHOED_ARGUMENTS, "$1 [redacted]");
+}
+
+/**
+ * ioredis attaches the failed command to a reply error as
+ * `command: { name, args }`, so a failed AUTH carries the password in `args`,
+ * and a server that renamed AUTH echoes it in the message too. Returns the
+ * serialized error with those values replaced; every other error passes
+ * through unchanged.
+ */
+export function redactCommandCredentials<T extends object>(serialized: T): T {
+  const command = (serialized as { command?: unknown }).command;
+  if (!command || typeof command !== "object") return serialized;
+  const { name, args } = command as { name?: unknown; args?: unknown };
+  if (typeof name !== "string" || !CREDENTIAL_COMMANDS.has(name.toLowerCase())) {
+    return serialized;
+  }
+  const values = credentialValues(name.toLowerCase(), args);
+  const { message, stack } = serialized as { message?: unknown; stack?: unknown };
+  return {
+    ...serialized,
+    message: maskValues(message, values),
+    stack: maskValues(stack, values),
+    command: {
+      ...command,
+      args: Array.isArray(args) ? args.map(() => "[redacted]") : "[redacted]",
+    },
+  };
+}
 
 /**
  * Every key a cause may be logged under, mapped to the same serializer.
@@ -62,11 +121,13 @@ const superjsonErrorSerializer = (error: unknown) => {
  * constant is what lets a test drive the real thing rather than a copy of it.
  *
  * `error` for records that ARE failures; {@link REQUEST_CAUSE_FIELD} for the
- * cause on records deliberately logged below error level.
+ * cause on records deliberately logged below error level; `reason` for the
+ * process-level unhandled-rejection record.
  */
 export const NODE_LOG_SERIALIZERS = {
-  error: superjsonErrorSerializer,
-  [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
+  error: errorSerializer,
+  [REQUEST_CAUSE_FIELD]: errorSerializer,
+  reason: errorSerializer,
 } as const;
 
 export interface CreateLoggerOptions {

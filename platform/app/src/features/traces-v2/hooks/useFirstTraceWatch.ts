@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { hasTracesToShow } from "~/server/app-layer/projects/project-kinds";
 import { api } from "~/utils/api";
 
 /** How often the first-trace flag is re-read while the project has none. */
@@ -32,7 +33,8 @@ export function useFirstTraceWatch(): void {
   const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
 
-  const waitingForFirstTrace = project?.firstMessage === false;
+  // An aggregate (ADR-144) is never sent a trace, so it is never waiting.
+  const waitingForFirstTrace = !!project && !hasTracesToShow(project);
   const firstTrace = api.project.getHasFirstMessage.useQuery(
     { projectId: project?.id ?? "" },
     {

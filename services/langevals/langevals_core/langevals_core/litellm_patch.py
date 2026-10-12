@@ -2,11 +2,14 @@ import os
 from tempfile import mkdtemp
 from typing import Optional
 import warnings
+
+import langevals_core.offline_defaults  # noqa: F401  (before litellm, see module)
 import litellm
 import litellm.cost_calculator
 from openai import OpenAI, AzureOpenAI
 import json
 
+from langevals_core.model_pricing import register_langwatch_model_pricing
 from langevals_core.request_env import current_request_env
 
 # Necessary for running DSPy on AWS lambdas
@@ -465,6 +468,7 @@ originals: dict = {}
 def patch_litellm():
     if originals:
         return
+    register_langwatch_model_pricing()
     originals["completion"] = litellm.completion
     originals["acompletion"] = litellm.acompletion
     originals["embedding"] = litellm.embedding

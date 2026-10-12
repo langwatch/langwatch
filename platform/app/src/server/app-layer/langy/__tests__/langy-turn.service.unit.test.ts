@@ -1,6 +1,7 @@
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildGuidedKickoffParts } from "~/features/guided-onboarding/kickoff";
+import { AggregateProjectIsReadOnlyError } from "~/server/app-layer/projects/errors";
 import { featureFlagService } from "~/server/featureFlag";
 import {
   LangyAgentUnavailableError,
@@ -100,6 +101,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
       conversations as unknown as LangyTurnServiceDeps["conversations"],
     credentials: credentials as unknown as LangyTurnServiceDeps["credentials"],
     resolveModel: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })),
+    projectKinds: { kindOf: vi.fn(async () => "application") },
     worker: { probe, dispatch },
     reservePermit,
     releasePermit,
@@ -570,6 +572,36 @@ describe("LangyTurnService.startConversationTurn", () => {
     ).rejects.toBeInstanceOf(LangyModelNotConfiguredError);
 
     expect(mocks.claim).not.toHaveBeenCalled();
+  });
+
+  describe("when the project is an aggregate", () => {
+    /** @scenario "Langy refuses to start on an aggregate with the read-only refusal" */
+    it("refuses as read only before resolving a model or a key, or writing a conversation", async () => {
+      // An aggregate has no Langy model or key, so either lookup would fail
+      // first and answer with a conflict; the kind check comes before both.
+      (deps.projectKinds.kindOf as ReturnType<typeof vi.fn>).mockResolvedValue(
+        "aggregate",
+      );
+      (deps.resolveModel as ReturnType<typeof vi.fn>).mockRejectedValue(
+        new Error("no model"),
+      );
+
+      const refusal = await LangyTurnService.create(deps)
+        .startConversationTurn(input())
+        .then(() => null)
+        .catch((error: unknown) => error);
+
+      expect(refusal).toBeInstanceOf(AggregateProjectIsReadOnlyError);
+      expect(refusal).toMatchObject({
+        code: "aggregate_project_is_read_only",
+        httpStatus: 403,
+      });
+      expect(deps.resolveModel).not.toHaveBeenCalled();
+      expect(deps.credentials.getOrProvision).not.toHaveBeenCalled();
+      expect(mocks.ensureConversation).not.toHaveBeenCalled();
+      expect(mocks.claim).not.toHaveBeenCalled();
+      expect(mocks.mintSessionKey).not.toHaveBeenCalled();
+    });
   });
 
   it("revokes the key, releases the permit, and aborts when acceptance fails", async () => {
@@ -1067,6 +1099,7 @@ describe("LangyTurnService.stopTurn", () => {
       } as unknown as LangyTurnServiceDeps["conversations"],
       credentials: {} as unknown as LangyTurnServiceDeps["credentials"],
       resolveModel: vi.fn(),
+      projectKinds: { kindOf: vi.fn(async () => "application") },
       worker: { cancel } as unknown as LangyTurnServiceDeps["worker"],
       tokenBuffer: over.noBuffer
         ? null

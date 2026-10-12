@@ -121,14 +121,19 @@ export function useInviteActions({
   };
 
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
-    const hasNewFullMembers = data.invites.some(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
+    // A Developer seat (ADR-143) sits in neither metered pool, so it neither
+    // trips the full-member check nor the lite one.
+    const isFullSeat = (role: OrganizationUserRole) =>
+      role === OrganizationUserRole.ADMIN ||
+      role === OrganizationUserRole.MEMBER;
+    const hasNewFullMembers = data.invites.some((invite) =>
+      isFullSeat(invite.orgRole),
     );
     const hasNewLiteMembers = data.invites.some(
       (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL,
     );
-    const newFullMemberInviteCount = data.invites.filter(
-      (invite) => invite.orgRole !== OrganizationUserRole.EXTERNAL,
+    const newFullMemberInviteCount = data.invites.filter((invite) =>
+      isFullSeat(invite.orgRole),
     ).length;
 
     const performMutation = performAdminInvite;

@@ -10,6 +10,7 @@ import {
   IdentityMatchSuggestionRepository,
 } from "@ee/governance/repositories/governanceIdentity.repository";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
+import { workspaceViewAggregateReadAudit } from "@ee/governance/services/aggregateReadAudit";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
 import { CostRollupComparatorService } from "@ee/governance/services/costRollupComparator.service";
 import { installGovernanceSuppressionSnapshot } from "@ee/governance/services/erasureSuppression.service";
@@ -43,6 +44,7 @@ import {
 } from "@ee/sso/sso-self-serve-adapters";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
+import { internalActor } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { RedisConnectionService } from "@langwatch/redis-client";
 import { env } from "~/env.mjs";
@@ -184,7 +186,9 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { createAnalyticsService } from "./analytics";
 import { LegacyAnalyticsBackendClickHouseRepository } from "./analytics/repositories/legacy-analytics-backend.clickhouse.repository";
 import { App, getApp, globalForApp, initializeApp } from "./app";
+import { authorizationServiceFor } from "./authz/checks";
 import { installAuthzEngineGateReporting } from "./authz/engine-gate-reporting";
+import { authzEpochCacheEnabled, getAuthzEpoch } from "./authz/epoch";
 import { GrantsLedgerWriter, grantsLedgerWriter } from "./authz/ledger";
 import { PrismaAuthzAuditTrailRepository } from "./authz/repositories/authz-audit-trail.prisma.repository";
 import { PrismaAuthzGrantsWriteRepository } from "./authz/repositories/authz-grants-write.prisma.repository";
@@ -205,6 +209,7 @@ import { TriggerService } from "./automations/trigger.service";
 import { testFireTrigger } from "./automations/trigger-template.service";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
+import { AuthorizedClickHouse } from "./clients/clickhouse/authorized-reads";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
 import { LangEvalsHttpClient } from "./clients/langevals/langevals.http.client";
 import { TiktokenClient } from "./clients/tokenizer/tiktoken.client";
@@ -347,11 +352,21 @@ import { getOpsSnapshotReader } from "./ops/snapshot/snapshot-reader";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
+import { projectKindReaderFor } from "./permissions/aggregate-admin-gate";
 import { permissionsServiceFor } from "./permissions/runtime";
 import { PresenceService } from "./presence/presence.service";
 import { InMemoryPresenceRepository } from "./presence/repositories/presence.memory.repository";
 import { RedisPresenceRepository } from "./presence/repositories/presence.redis.repository";
+import { NULL_AGGREGATE_READ_AUDIT } from "./projects/aggregate-read-audit";
+import {
+  AGGREGATE_RECONCILE_SWEEP,
+  AggregateReconciler,
+  aggregateReconcileSweepHandler,
+} from "./projects/aggregate-reconciler.service";
+import { AggregateRuleService } from "./projects/aggregate-rule.service";
 import { ProjectService } from "./projects/project.service";
+import { PrismaAggregateReconcileLock } from "./projects/repositories/aggregate-reconcile-lock.prisma.repository";
+import { PrismaAggregateRuleRepository } from "./projects/repositories/aggregate-rule.prisma.repository";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
 import { loadReportCharts } from "./reports/report-chart.service";
@@ -483,6 +498,15 @@ export function initializeDefaultApp(options?: {
       throw new Error(`ClickHouse not available for tenant ${tenantId}`);
     return client;
   };
+  // ADR-144 block C: the one client that fences a read by its proof. Every
+  // repository that reads the trace list goes through it, never the resolver.
+  const authorizedClickHouse = new AuthorizedClickHouse({
+    resolveClient: resolveClickHouseClient,
+  });
+  const authorizationService = authorizationServiceFor(prisma, {
+    epochReader: getAuthzEpoch,
+    cacheEnabled: authzEpochCacheEnabled,
+  });
 
   // ADR-137: one runs store and one judgements store, handed to the
   // pipeline's run port and to the App, so the run surface never resolves a
@@ -524,10 +548,25 @@ export function initializeDefaultApp(options?: {
   // One instance, shared with the governance cost screen's metered-lane scope
   // below, so both read projects through the same repository.
   const projectRepository = new PrismaProjectRepository(prisma);
+  const aggregateRuleRepository = new PrismaAggregateRuleRepository(prisma);
+  const aggregateRules = new AggregateRuleService(aggregateRuleRepository);
+  // ADR-144 block E: keeps every aggregate's shared reads in line with its
+  // rule. Its triggers reach it through the project service.
+  const aggregateReconciler = traced(
+    new AggregateReconciler({
+      aggregates: aggregateRuleRepository,
+      lock: new PrismaAggregateReconcileLock(prisma),
+      rules: aggregateRules,
+      ledger: grantsLedgerWriter,
+      schedule: new PrismaScheduledJobRepository(prisma),
+    }),
+    "AggregateReconciler",
+  );
   const projects = traced(
     new ProjectService(
       projectRepository,
       new LwqlKeyMapClickHouseRepository(resolveClickHouseClient),
+      { rules: aggregateRules, reconciler: aggregateReconciler },
     ),
     "ProjectService",
   );
@@ -552,7 +591,10 @@ export function initializeDefaultApp(options?: {
   });
   // Shared between SpanStorageService and TraceSummaryService's full read.
   const spanStorageRepository = clickhouseEnabled
-    ? new SpanStorageClickHouseRepository(resolveClickHouseClient)
+    ? new SpanStorageClickHouseRepository({
+        resolveClient: resolveClickHouseClient,
+        clickhouse: authorizedClickHouse,
+      })
     : new NullSpanStorageRepository();
 
   // Resolves the per-tenant retention cascade; shared by the DSPy CH repo
@@ -567,13 +609,20 @@ export function initializeDefaultApp(options?: {
     dataRetentionPolicyRepo,
   );
 
+  // One repository serves the drawer header and the fold's read-back: reads
+  // go through the authorized client, writes resolve the tenant's own.
+  const traceSummaryRepository = clickhouseEnabled
+    ? new TraceSummaryClickHouseRepository({
+        resolveClient: resolveClickHouseClient,
+        clickhouse: authorizedClickHouse,
+      })
+    : new NullTraceSummaryRepository();
   const traceSummary = traced(
-    new TraceSummaryService(
-      clickhouseEnabled
-        ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
-        : new NullTraceSummaryRepository(),
-      { spanStorageRepository, blobStore, ioExtractionService },
-    ),
+    new TraceSummaryService(traceSummaryRepository, {
+      spanStorageRepository,
+      blobStore,
+      ioExtractionService,
+    }),
     "TraceSummaryService",
   );
   const evaluationRuns = traced(
@@ -581,6 +630,7 @@ export function initializeDefaultApp(options?: {
       clickhouseEnabled
         ? new EvaluationRunClickHouseRepository({
             resolveClient: resolveClickHouseClient,
+            clickhouse: authorizedClickHouse,
             retentionResolver: retentionPolicyCache,
           })
         : new NullEvaluationRunRepository(),
@@ -594,7 +644,7 @@ export function initializeDefaultApp(options?: {
   const traceList = traced(
     new TraceListService(
       clickhouseEnabled
-        ? new TraceListClickHouseRepository(resolveClickHouseClient)
+        ? new TraceListClickHouseRepository(authorizedClickHouse)
         : new NullTraceListRepository(),
       evaluationRuns,
       topics,
@@ -722,9 +772,10 @@ export function initializeDefaultApp(options?: {
     // Unconditional on `clickhouseEnabled` for the same reason the analytics
     // service is: the resolver throws at query time when ClickHouse isn't
     // configured, and this repository already degrades that to an empty read.
-    traceEvaluations: new TraceEvaluationsClickHouseRepository(
-      resolveClickHouseClient,
-    ),
+    traceEvaluations: new TraceEvaluationsClickHouseRepository({
+      resolveClient: resolveClickHouseClient,
+      clickhouse: authorizedClickHouse,
+    }),
   };
 
   const planResolver = (organizationId: string) =>
@@ -738,6 +789,7 @@ export function initializeDefaultApp(options?: {
     eventUsageService,
     planResolver,
     orgRepo,
+    simulationReads,
   );
 
   const planProvider = config.isSaas
@@ -971,9 +1023,7 @@ export function initializeDefaultApp(options?: {
     experimentIdLookup: clickhouseEnabled
       ? new ExperimentIdLookupClickHouseRepository(resolveClickHouseClient)
       : new NullExperimentIdLookupRepository(),
-    traceSummaryFold: clickhouseEnabled
-      ? new TraceSummaryClickHouseRepository(resolveClickHouseClient)
-      : traceSummary.repository,
+    traceSummaryFold: traceSummaryRepository,
     canonicalLogStorage: clickhouseEnabled
       ? new CanonicalLogRecordClickHouseRepository(resolveClickHouseClient)
       : new NullCanonicalLogRecordRepository(),
@@ -1001,7 +1051,10 @@ export function initializeDefaultApp(options?: {
       ? new TraceAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
       : new NullTraceAnalyticsRollupRepository(),
     traceAnalytics: clickhouseEnabled
-      ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
+      ? new TraceAnalyticsClickHouseRepository({
+          resolveClient: resolveClickHouseClient,
+          clickhouse: authorizedClickHouse,
+        })
       : new NullTraceAnalyticsRepository(),
     evaluationAnalyticsRollup: clickhouseEnabled
       ? new EvaluationAnalyticsRollupClickHouseRepository(
@@ -1307,6 +1360,7 @@ export function initializeDefaultApp(options?: {
     traces: { spans: spanStorage },
     traceSummaryRepository: repositories.traceSummaryFold,
     resolveClickHouseClient,
+    authorization: authorizationService,
   });
 
   // ADR-044 Phase 1: the generic calendar scheduler. No cron infra. A
@@ -1383,16 +1437,27 @@ export function initializeDefaultApp(options?: {
               to,
               limit,
             }) => {
+              // A scheduled report acts on its own behalf: no request minted
+              // a proof, so the read is fenced to the report's project alone.
+              const authorization =
+                await authorizationService.authorizeInternal({
+                  actor: internalActor("app-layer/reports/report-dispatch"),
+                  projectId,
+                  permission: "traces:view",
+                  purpose: {
+                    kind: "operator",
+                    entry: "ReportDispatch.listReportTraces",
+                  },
+                });
               const page = await traceList.getList({
-                tenantId: projectId,
+                authorization,
                 timeRange: { from, to },
                 sort: { columnId: "time", direction: "desc" },
                 page: 1,
                 pageSize: limit,
                 visibilityCutoffMs: null,
                 filterWhere:
-                  translateFilterToClickHouse(query, projectId, { from, to }) ??
-                  undefined,
+                  translateFilterToClickHouse(query, { from, to }) ?? undefined,
               });
               const projectUrl = `${config.baseHost ?? env.BASE_HOST}/${projectSlug}`;
               return page.items.map((item) =>
@@ -1453,6 +1518,35 @@ export function initializeDefaultApp(options?: {
         }),
     });
 
+    // ADR-144 block E: the nightly sweep, one row per aggregate project,
+    // catches any member change a trigger missed.
+    schedulerRegistry.register({
+      targetType: AGGREGATE_RECONCILE_SWEEP.targetType,
+      handler: aggregateReconcileSweepHandler(aggregateReconciler),
+    });
+    // And its own boot self-heal, like the reports' below: a live aggregate
+    // with no sweep row (one from before block E, or a schedule write that
+    // failed) gets one. Fire-and-forget; a failure waits for the next boot.
+    const aggregateSweepLogger = createLogger(
+      "langwatch:projects:aggregate-reconciler",
+    );
+    void aggregateReconciler
+      .scheduleMissingSweeps()
+      .then(({ repaired }) => {
+        if (repaired > 0) {
+          aggregateSweepLogger.info(
+            { repaired },
+            "Scheduled the nightly sweep of aggregate projects missing one at boot",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        aggregateSweepLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Aggregate sweep self-heal failed at boot (will retry next boot)",
+        );
+      });
+
     // ADR-044 durable self-heal: the report upsert route writes the Trigger row
     // and its ScheduledJob in two non-atomic steps, so a crash between them can
     // leave an active report with no schedule. Repair any such gaps at boot
@@ -1497,6 +1591,7 @@ export function initializeDefaultApp(options?: {
 
   const registry = new PipelineRegistry({
     eventSourcing: es,
+    authorization: authorizationService,
     repositories,
     redis: redis!,
     broadcast,
@@ -1700,6 +1795,7 @@ export function initializeDefaultApp(options?: {
     // service forwards to the worker (ADR-065).
     resolveModel: ({ projectId }) =>
       getVercelAIModel({ projectId, featureKey: LANGY_CHAT_FEATURE_KEY }),
+    projectKinds: projectKindReaderFor(prisma),
     worker: langyAgentUrl && langyInternalSecret ? langyWorker : null,
     // The durable buffer backs a user Stop: reconstruct the partial answer and
     // end the live stream (ADR-078). Null without Redis, like the stores below.
@@ -1899,7 +1995,7 @@ export function initializeDefaultApp(options?: {
   const sessionGroups = traced(
     new SessionGroupsService({
       repository: clickhouseEnabled
-        ? new SessionGroupsClickHouseRepository(resolveClickHouseClient)
+        ? new SessionGroupsClickHouseRepository(authorizedClickHouse)
         : new NullSessionGroupsRepository(),
       codingAgentSessions,
       pullRequests: {
@@ -2186,6 +2282,13 @@ export function initializeDefaultApp(options?: {
     organizations,
     projects,
     permissions: permissionsServiceFor(prisma),
+    authorization: authorizationService,
+    aggregateReadAudit: workspaceViewAggregateReadAudit({
+      prisma,
+      ocsfRepository: governanceOcsfEventsRepository,
+      kinds: projectKindReaderFor(prisma),
+    }),
+    projectKinds: projectKindReaderFor(prisma),
     tokenizer,
     usage,
     planProvider,
@@ -2287,8 +2390,26 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     "OrganizationService",
   );
   const nullProjectRepository = new NullProjectRepository();
+  // Real rather than doubles: they are Postgres-only, the tRPC create checks
+  // an aggregate's rule through them, and the reconciler writes through the
+  // ledger the test App's event sourcing composes (none, unless supplied).
+  const testAggregateRuleRepository = new PrismaAggregateRuleRepository(
+    testPrisma,
+  );
+  const testAggregateRules = new AggregateRuleService(
+    testAggregateRuleRepository,
+  );
   const nullProjects = traced(
-    new ProjectService(nullProjectRepository, new NullLwqlKeyMapRepository()),
+    new ProjectService(nullProjectRepository, new NullLwqlKeyMapRepository(), {
+      rules: testAggregateRules,
+      reconciler: new AggregateReconciler({
+        aggregates: testAggregateRuleRepository,
+        lock: new PrismaAggregateReconcileLock(testPrisma),
+        rules: testAggregateRules,
+        ledger: () => new GrantsLedgerWriter(testPrisma),
+        schedule: new PrismaScheduledJobRepository(testPrisma),
+      }),
+    }),
     "ProjectService",
   );
 
@@ -2409,9 +2530,15 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       performance: new MonitorPerformanceService(
         new NullMonitorPerformanceRepository(),
       ),
-      traceEvaluations: new TraceEvaluationsClickHouseRepository(async () => {
-        throw new Error("ClickHouse is not available in the test app");
-      }),
+      traceEvaluations: (() => {
+        const resolveClient = async (): Promise<never> => {
+          throw new Error("ClickHouse is not available in the test app");
+        };
+        return new TraceEvaluationsClickHouseRepository({
+          resolveClient,
+          clickhouse: new AuthorizedClickHouse({ resolveClient }),
+        });
+      })(),
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     analytics: {
@@ -2585,6 +2712,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
         resolveModel: async () => {
           throw new Error("no model provider in test app");
         },
+        projectKinds: projectKindReaderFor(testPrisma),
         worker: null,
         tokenBuffer: null,
         reservePermit: async () => ({
@@ -2613,6 +2741,9 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     organizations: nullOrganizations,
     projects: nullProjects,
     permissions: permissionsServiceFor(testPrisma),
+    authorization: authorizationServiceFor(testPrisma),
+    aggregateReadAudit: NULL_AGGREGATE_READ_AUDIT,
+    projectKinds: projectKindReaderFor(testPrisma),
     tokenizer: new TokenizerService(new NullTokenizerClient()),
     usage: new UsageService(
       nullOrganizations,
@@ -2620,6 +2751,7 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       new EventUsageService(),
       async () => FREE_PLAN,
       null,
+      testSimulationReads,
     ),
     planProvider: PlanProviderService.create({
       getActivePlan: async () => FREE_PLAN,

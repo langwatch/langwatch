@@ -1,5 +1,6 @@
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { api } from "~/utils/api";
+import { useTraceQueryArgs } from "../../../hooks/useTraceQueryArgs";
 import { SessionView } from "./SessionView";
 
 interface SessionTabProps {
@@ -33,8 +34,14 @@ export function SessionTab({
   // sibling traces is a reasonable follow-up, not done here. Shares its
   // cache key with the Terminal tab's own read, so switching tabs on a
   // session already opened once costs nothing extra.
+  const { tenantId } = useTraceQueryArgs();
   const transcriptQuery = api.tracesV2.codingAgentTranscript.useQuery(
-    { projectId, traceId, occurredAtMs },
+    {
+      projectId,
+      traceId,
+      occurredAtMs,
+      ...(tenantId !== null ? { tenantId } : {}),
+    },
     { refetchOnWindowFocus: false, staleTime: 60_000, enabled: !!query.data },
   );
 

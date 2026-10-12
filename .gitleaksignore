@@ -19,3 +19,9 @@
 # credential; the fixture now reads `xoxb-bad-5678`, below the bar, so the tree
 # is clean and only this pull request's history still carries the literal.
 5575c828111cee9893e905201a240c26aa3d7437:platform/app/src/server/app-layer/automations/slack-integration/__tests__/slack-integration.service.unit.test.ts:generic-api-key:288
+
+# The SSO gate test set LANGWATCH_LICENSE_KEY to a made-up activation code
+# (LW- followed by sixteen characters), which clears the generic-api-key bar
+# beside a LICENSE_KEY name. It was never a credential; the test now mints a
+# code at runtime, so only this pull request's history carries the literal.
+ee724546d96949b22f8d04adc3a2ec5d8c79616a:platform/app/ee/sso/__tests__/sso-gate.test.ts:generic-api-key:248

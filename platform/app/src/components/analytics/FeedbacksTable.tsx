@@ -4,15 +4,25 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
 import { Tooltip } from "../ui/tooltip";
-import { SummaryMetricValue } from "./SummaryMetric";
+import { ChartErrorState } from "./ChartErrorState";
+import { useRetryFailedAnalytics } from "./useRetryFailedAnalytics";
 
 export const FeedbacksTable = () => {
   const { filterParams, queryOpts } = useFilterParams();
   const feedbacks = api.analytics.feedbacks.useQuery(filterParams, queryOpts);
   const { openDrawer } = useDrawer();
+  const retryFailedAnalytics = useRetryFailedAnalytics();
 
   if (feedbacks.isLoading) return <Box>Loading...</Box>;
-  if (feedbacks.error) return <Box>An error occurred</Box>;
+  if (feedbacks.error && !feedbacks.data) {
+    return (
+      <ChartErrorState
+        error={feedbacks.error}
+        onRetry={retryFailedAnalytics}
+        fallbackTitle="Couldn't load feedback"
+      />
+    );
+  }
 
   return (
     <VStack align="start" gap={4}>
@@ -102,16 +112,4 @@ export const FeedbacksTable = () => {
       </Table.Root>
     </VStack>
   );
-};
-
-export const DocumentsCountsSummary = () => {
-  const { filterParams, queryOpts } = useFilterParams();
-  const documents = api.analytics.topUsedDocuments.useQuery(
-    filterParams,
-    queryOpts,
-  );
-
-  const count = documents.data?.totalUniqueDocuments;
-
-  return <SummaryMetricValue current={count} />;
 };

@@ -670,9 +670,9 @@ export class CheckupService {
   ): Promise<CheckVerdict> {
     switch (id) {
       case "reach_connect_host":
-        return this.reach((await this.deps.connect()).licenseHost);
+        return this.reachLangWatch("licenseHost");
       case "reach_gateway_host":
-        return this.reach((await this.deps.connect()).gatewayHost);
+        return this.reachLangWatch("gatewayHost");
       case "gateway_control_plane":
         return this.gatewayControlPlane();
       case "storage_probe":
@@ -701,6 +701,25 @@ export class CheckupService {
       default:
         return notAskedFor();
     }
+  }
+
+  /**
+   * A LangWatch host is probed only while Connect is allowed: with
+   * LANGWATCH_CONNECT_DISABLED set the install opens no connection to
+   * LangWatch, and a reachability probe is a connection too.
+   */
+  private async reachLangWatch(
+    which: "licenseHost" | "gatewayHost",
+  ): Promise<CheckVerdict> {
+    const connect = await this.deps.connect();
+    if (connect.deployment === "off") {
+      return {
+        outcome: "unchecked",
+        detail:
+          "Not run. LANGWATCH_CONNECT_DISABLED is set, so this install opens no connection to LangWatch.",
+      };
+    }
+    return this.reach(connect[which]);
   }
 
   private async reach(host: string): Promise<CheckVerdict> {

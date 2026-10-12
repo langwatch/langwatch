@@ -95,6 +95,7 @@ type SocialProviderEnv = Pick<
   | "AZURE_AD_CLIENT_ID"
   | "AZURE_AD_CLIENT_SECRET"
   | "AZURE_AD_TENANT_ID"
+  | "NEXTAUTH_URL"
 >;
 
 /**
@@ -192,6 +193,7 @@ export const buildSocialProviders = (
       clientId: e.AZURE_AD_CLIENT_ID,
       clientSecret: e.AZURE_AD_CLIENT_SECRET,
       tenantId: e.AZURE_AD_TENANT_ID,
+      ...microsoftRedirect(e.NEXTAUTH_URL),
       mapProfileToUser: async (profile) => {
         await deps.onMicrosoftProfile?.(profile as Record<string, unknown>);
         return {
@@ -302,6 +304,29 @@ export const parseIssuerUrl = (issuer: string, envName: string): URL => {
     );
   }
 };
+
+/** The callback path segment Azure app registrations carry for the
+ *  Microsoft provider, from the NextAuth releases where it was `azure-ad`. */
+export const MICROSOFT_LEGACY_CALLBACK_ID = "azure-ad";
+
+/**
+ * better-auth mounts the Microsoft provider as `microsoft` and would send
+ * `/api/auth/callback/microsoft`. Every Azure app registration made for
+ * LangWatch before 3.17, and every one made from the self-hosting docs since,
+ * lists `/api/auth/callback/azure-ad`, so the redirect is pinned to that path
+ * and `legacy-callback-alias.ts` routes it back to the provider.
+ */
+function microsoftRedirect(baseUrl: string | undefined): {
+  redirectURI?: string;
+} {
+  if (!baseUrl) return {};
+  return {
+    redirectURI: legacyCallbackUrl({
+      baseUrl,
+      providerId: MICROSOFT_LEGACY_CALLBACK_ID,
+    }),
+  };
+}
 
 /**
  * The callback URL an operator registers with their identity provider. One

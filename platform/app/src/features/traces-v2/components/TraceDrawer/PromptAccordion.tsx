@@ -11,9 +11,9 @@ import { useMemo } from "react";
 import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
 import { usePromptByHandle } from "../../hooks/usePromptByHandle";
+import { useSpanPlaygroundHref } from "../../hooks/useSpanPlaygroundHref";
 import {
   extractPromptReference,
   hasPromptMetadata,
@@ -40,7 +40,8 @@ interface PromptAccordionProps {
 export function PromptAccordion({ span }: PromptAccordionProps) {
   const { openDrawer } = useDrawer();
   const ref = useMemo(() => extractPromptReference(span.params), [span]);
-  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+  const playgroundHrefFor = useSpanPlaygroundHref();
+  const playgroundHref = playgroundHrefFor(span.spanId);
   // SDK sometimes emits the opaque slug-id (`prompt_xxx`) instead of the
   // human handle (`pizza-prompt`) on `langwatch.prompt.id`. Resolve to the
   // friendlier handle for display while keeping the raw value for the
@@ -192,12 +193,8 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
               affordance the IOViewer header carries on llm spans —
               kept identical here so behavior is predictable
               wherever a prompt is surfaced. */}
-          {buildUrl(span.spanId) && (
-            <Link
-              href={buildUrl(span.spanId)?.toString() ?? ""}
-              isExternal
-              variant="plain"
-            >
+          {playgroundHref && (
+            <Link href={playgroundHref} isExternal variant="plain">
               <Button size="xs" variant="ghost" gap={1}>
                 <Icon as={LuExternalLink} boxSize={3} />
                 Open in Playground

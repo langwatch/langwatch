@@ -150,14 +150,23 @@ export class DashboardService {
 
   /**
    * Gets or creates the first dashboard for a project.
-   * Used to ensure every project has at least one dashboard.
+   * Used to ensure every project has at least one dashboard. A project that
+   * takes no writes (an aggregate, ADR-144) gets its first dashboard if it
+   * has one and `null` otherwise, never a new row.
    */
-  async getOrCreateFirst(projectId: string) {
+  async getOrCreateFirst({
+    projectId,
+    acceptsWrites,
+  }: {
+    projectId: string;
+    acceptsWrites: boolean;
+  }) {
     const existingDashboard = await this.repository.findFirst({ projectId });
 
     if (existingDashboard) {
       return existingDashboard;
     }
+    if (!acceptsWrites) return null;
 
     return await this.repository.create({
       id: nanoid(),

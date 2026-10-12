@@ -1,9 +1,14 @@
+import type { Authorization } from "@langwatch/actor";
 import { getLangWatchTracer } from "langwatch";
 import { getApp } from "~/server/app-layer/app";
 import { resolveInputsMarker } from "~/server/app-layer/evaluations/evaluation-inputs-offload";
 import type { TraceEvaluationsRepository } from "~/server/app-layer/evaluations/repositories/trace-evaluations.clickhouse.repository";
 import { createStoredObjectsService } from "~/server/stored-objects/stored-objects-factory";
 import type { Protections } from "~/server/traces/protections";
+import {
+  gateEvaluationContent,
+  gateEvaluationInputs,
+} from "./evaluation-content-gate";
 import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
@@ -69,33 +74,44 @@ export class EvaluationService {
     return new EvaluationService();
   }
 
+  /**
+   * One trace's evaluations, read through the proof (ADR-144 block F): on an
+   * aggregate the proof is narrowed to the member that holds the trace, so
+   * the drawer shows that member's evaluations. Their content follows the
+   * viewer's protections, resolved through the same proof.
+   */
   async getEvaluationsForTrace({
-    projectId,
+    authorization,
     traceId,
     protections,
   }: {
-    projectId: string;
+    authorization: Authorization;
     traceId: string;
-    protections?: Protections;
+    protections: Protections;
   }): Promise<TraceEvaluation[]> {
-    // Single-trace read is the multi-trace read with one id — keeps the
-    // query shape and the memory-limit fallback policy in one place.
-    const evaluationsByTrace = await this.getEvaluationsMultiple({
-      projectId,
-      traceIds: [traceId],
-      protections,
-    });
-    return evaluationsByTrace[traceId] ?? [];
+    return await this.tracer.withActiveSpan(
+      "EvaluationService.getEvaluationsForTrace",
+      { attributes: { "trace.id": traceId } },
+      async () => {
+        const evaluationsByTrace = await this.repository.findManyByTraceIds({
+          authorization,
+          traceIds: [traceId],
+        });
+        return (evaluationsByTrace[traceId] ?? []).map((evaluation) =>
+          gateEvaluationContent({ evaluation, protections }),
+        );
+      },
+    );
   }
 
   async getEvaluationsMultiple({
     projectId,
     traceIds,
-    protections: _protections,
+    protections,
   }: {
     projectId: string;
     traceIds: string[];
-    protections?: Protections;
+    protections: Protections;
   }): Promise<Record<string, TraceEvaluation[]>> {
     return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationsMultiple",
@@ -105,8 +121,20 @@ export class EvaluationService {
           "trace.count": traceIds.length,
         },
       },
-      () =>
-        this.repository.findManyByTraceIds({ tenantId: projectId, traceIds }),
+      async () => {
+        const byTrace = await this.repository.findManyByTraceIdsForTenant({
+          tenantId: projectId,
+          traceIds,
+        });
+        return Object.fromEntries(
+          Object.entries(byTrace).map(([traceId, evaluations]) => [
+            traceId,
+            evaluations.map((evaluation) =>
+              gateEvaluationContent({ evaluation, protections }),
+            ),
+          ]),
+        );
+      },
     );
   }
 
@@ -117,35 +145,41 @@ export class EvaluationService {
    * filter can't prune granules. This read is keyed by `EvaluationId` — the
    * table's second sort column — so ClickHouse prunes to the matching
    * granule(s) and the read stays bounded. Returns null when the evaluation
-   * recorded no inputs, ClickHouse is unavailable, or the (already-pruned)
-   * read still hits the ceiling.
+   * recorded no inputs, no project the proof reads holds it, or the
+   * (already-pruned) read still hits the ceiling.
    */
   async getEvaluationInputs({
-    projectId,
+    authorization,
     evaluationId,
+    protections,
   }: {
-    projectId: string;
+    authorization: Authorization;
     evaluationId: string;
-    protections?: Protections;
+    protections: Protections;
   }): Promise<Record<string, unknown> | null> {
     return await this.tracer.withActiveSpan(
       "EvaluationService.getEvaluationInputs",
-      {
-        attributes: {
-          "tenant.id": projectId,
-          "evaluation.id": evaluationId,
-        },
-      },
+      { attributes: { "evaluation.id": evaluationId } },
       async () => {
-        const inputs = await this.repository.findInputsByEvaluationId({
-          tenantId: projectId,
+        const read = await this.repository.findInputsByEvaluationId({
+          authorization,
           evaluationId,
         });
+        if (!read) return null;
         // ADR-040: when inputs were offloaded, `inputs` is a stored-object
         // marker. Resolve it to the full inputs here - the natural lazy seam
         // the UI already fetches through - so the caller cannot tell whether
-        // the inputs were inline or offloaded. Non-markers pass through.
-        return this.resolveInputsMarker({ projectId, inputs });
+        // the inputs were inline or offloaded. Non-markers pass through. The
+        // marker lives under the project the row was read from, which on an
+        // aggregate is the member, not the aggregate.
+        // Gated before the marker is resolved, so a viewer who may not read
+        // the content costs no object-storage read either.
+        const inputs = gateEvaluationInputs({
+          inputs: read.inputs,
+          protections,
+        });
+        if (inputs === null) return null;
+        return this.resolveInputsMarker({ projectId: read.tenantId, inputs });
       },
     );
   }

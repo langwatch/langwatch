@@ -21,9 +21,9 @@ import {
   activationCodeHash,
   activationCodeHint,
   mintActivationCode,
-  normaliseActivationCode,
 } from "../activationCode";
 import { PrismaActivationCodes } from "../activationCode.prisma";
+import { normaliseActivationCode } from "../activationCodeShape";
 
 const RUN = `act-${Date.now()}`;
 const NEXT_YEAR = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);

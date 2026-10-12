@@ -119,8 +119,8 @@ def sync_detailed(
     | PatchApiTriggersByIdResponse500
 ]:
     """Update an automation. Every field is optional and what is left out is left alone, except
-    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
-    changed.
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         id (str):
@@ -161,8 +161,8 @@ def sync(
     | None
 ):
     """Update an automation. Every field is optional and what is left out is left alone, except
-    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
-    changed.
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         id (str):
@@ -197,8 +197,8 @@ async def asyncio_detailed(
     | PatchApiTriggersByIdResponse500
 ]:
     """Update an automation. Every field is optional and what is left out is left alone, except
-    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
-    changed.
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         id (str):
@@ -237,8 +237,8 @@ async def asyncio(
     | None
 ):
     """Update an automation. Every field is optional and what is left out is left alone, except
-    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel cannot be
-    changed.
+    `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an
+    alert's graph cannot be changed.
 
     Args:
         id (str):

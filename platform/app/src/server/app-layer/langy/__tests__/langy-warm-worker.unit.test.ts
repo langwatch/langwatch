@@ -19,6 +19,18 @@ import {
 import { LangySessionKeyScopeError } from "../langyApiKey";
 import type { LangyWorkerPort } from "../langyWorker";
 
+const logger = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  child: vi.fn(),
+}));
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/observability")>()),
+  createLogger: () => logger,
+}));
+
 const SESSION = {
   user: { id: "user-1" },
 } as StartConversationTurnInput["session"];
@@ -61,6 +73,7 @@ function makeDeps(over: Partial<LangyTurnServiceDeps> = {}) {
     conversations,
     credentials,
     resolveModel: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })),
+    projectKinds: { kindOf: vi.fn(async () => "application") },
     worker: { probe, warm, dispatch, cancel },
     tokenBuffer: null,
     reservePermit: vi.fn(async () => ({
@@ -279,6 +292,36 @@ describe("LangyTurnService.warmConversationWorker", () => {
       expect(result).toEqual({ conversationId: null, warmed: false });
       expect(mocks.mintSessionKey).not.toHaveBeenCalled();
       expect(mocks.warm).not.toHaveBeenCalled();
+    });
+
+    it("skips the warm on an aggregate project and writes no conversation", async () => {
+      const { deps, mocks } = makeDeps({
+        projectKinds: { kindOf: vi.fn(async () => "aggregate") },
+      });
+      const service = LangyTurnService.create(deps);
+
+      const result = await service.warmConversationWorker(warmInput());
+
+      expect(result.warmed).toBe(false);
+      expect(mocks.ensureConversation).not.toHaveBeenCalled();
+      expect(mocks.warm).not.toHaveBeenCalled();
+    });
+
+    it("logs the aggregate refusal at debug, not as a warning", async () => {
+      logger.debug.mockClear();
+      logger.warn.mockClear();
+      const { deps } = makeDeps({
+        projectKinds: { kindOf: vi.fn(async () => "aggregate") },
+      });
+      const service = LangyTurnService.create(deps);
+
+      await service.warmConversationWorker(warmInput());
+
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(logger.debug).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "aggregate_project_is_read_only" }),
+        expect.any(String),
+      );
     });
 
     it("skips the warm when no model is configured", async () => {

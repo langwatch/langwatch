@@ -18,9 +18,17 @@ import {
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
+import {
+  DEVELOPER_ADMISSION_AUDIT_ACTION,
+  type DeveloperAdmissionVia,
+} from "~/server/app-layer/identity/admission-audit";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
+import {
+  holdsOrganizationBinding,
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "~/utils/memberRoleConstraints";
 import { isCustomRole } from "../api/enterprise";
 import { LimitExceededError } from "../license-enforcement/errors";
 import { RoleService } from "../role/role.service";
@@ -68,8 +76,12 @@ const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
 
 import { createLogger } from "@langwatch/observability";
 import { TeamUserRole } from "~/generated/prisma/client";
-import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
+import {
+  DeveloperSeatNoSharedAccessError,
+  LiteMemberViewerOnlyError,
+} from "~/server/app-layer/teams/team.service";
 import { getApp } from "../app-layer/app";
+import { NEVER_LANDED_ON_PROJECT_KINDS } from "../app-layer/projects/project-kinds";
 import type {
   PlanProvider,
   PlanProviderUser,
@@ -205,6 +217,9 @@ interface TeamAssignmentInput {
  * they are written, but invitations stored before the rule may still promise
  * more; the seat corrects them here, the same way a seat change corrects
  * stored access rows, rather than refusing the person who clicked the link.
+ *
+ * A Developer seat (ADR-143) grants no team at all: whatever the stored
+ * invitation promised, the person lands with their personal team only.
  */
 export function resolveInviteTeamMemberships({
   role,
@@ -215,6 +230,8 @@ export function resolveInviteTeamMemberships({
   teamIds: string;
   teamAssignments: unknown;
 }): Array<{ teamId: string; role: TeamUserRole; customRoleId?: string }> {
+  if (!holdsSharedAccess(role)) return [];
+
   let memberships: Array<{
     teamId: string;
     role: TeamUserRole;
@@ -259,37 +276,51 @@ export function resolveInviteTeamMemberships({
   );
 }
 
+type InviteSeat = "FullMember" | "LiteMember" | "Developer";
+
+/**
+ * The seat one invite lands on: an EXTERNAL invite that carries a custom
+ * team role with more than view permissions is a Full seat, since that is
+ * what the licence counts it as once accepted.
+ */
+function inviteSeat(
+  invite: {
+    role: OrganizationUserRole;
+    teams?: Array<{ customRoleId?: string }>;
+  },
+  customRoleMap: Map<string, string[]>,
+): InviteSeat {
+  if (
+    invite.role === OrganizationUserRole.ADMIN ||
+    invite.role === OrganizationUserRole.MEMBER
+  ) {
+    return "FullMember";
+  }
+  // Counted so the caller can see it; never compared to a limit (ADR-143).
+  if (invite.role === OrganizationUserRole.DEVELOPER) return "Developer";
+  const hasNonViewRole = invite.teams?.some((t) => {
+    if (!t.customRoleId) return false;
+    const permissions = customRoleMap.get(t.customRoleId);
+    return permissions && !isViewOnlyCustomRole(permissions);
+  });
+  return hasNonViewRole ? "FullMember" : "LiteMember";
+}
+
 export function classifyInvitesByMemberType(
   invites: Array<{
     role: OrganizationUserRole;
     teams?: Array<{ customRoleId?: string }>;
   }>,
   customRoleMap: Map<string, string[]>,
-): { fullMembers: number; liteMembers: number } {
-  let fullMembers = 0;
-  let liteMembers = 0;
-
+): { fullMembers: number; liteMembers: number; developers: number } {
+  const counts = { fullMembers: 0, liteMembers: 0, developers: 0 };
   for (const invite of invites) {
-    if (
-      invite.role === OrganizationUserRole.ADMIN ||
-      invite.role === OrganizationUserRole.MEMBER
-    ) {
-      fullMembers++;
-    } else if (invite.role === OrganizationUserRole.EXTERNAL) {
-      const hasNonViewRole = invite.teams?.some((t) => {
-        if (!t.customRoleId) return false;
-        const permissions = customRoleMap.get(t.customRoleId);
-        return permissions && !isViewOnlyCustomRole(permissions);
-      });
-      if (hasNonViewRole) {
-        fullMembers++;
-      } else {
-        liteMembers++;
-      }
-    }
+    const seat = inviteSeat(invite, customRoleMap);
+    if (seat === "FullMember") counts.fullMembers++;
+    else if (seat === "Developer") counts.developers++;
+    else counts.liteMembers++;
   }
-
-  return { fullMembers, liteMembers };
+  return counts;
 }
 
 /**
@@ -501,8 +532,15 @@ export class InviteService {
     const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
       classifyInvitesByMemberType(newInvites, customRoleMap);
 
+    // A pool is checked only when the batch adds to it. An organization
+    // already over one limit (a plan downgrade) can still invite into the
+    // other pools, and a batch of Developers, which no plan limit applies to
+    // (ADR-143), is never refused for the Full or Lite counts.
     if (!subscriptionLimits.overrideAddingLimitations) {
-      if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
+      if (
+        newFullMembers > 0 &&
+        currentFullMembers + newFullMembers > subscriptionLimits.maxMembers
+      ) {
         throw new LimitExceededError(
           "members",
           currentFullMembers,
@@ -510,8 +548,8 @@ export class InviteService {
         );
       }
       if (
-        currentMembersLite + newLiteMembers >
-        subscriptionLimits.maxMembersLite
+        newLiteMembers > 0 &&
+        currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite
       ) {
         throw new LimitExceededError(
           "membersLite",
@@ -536,6 +574,13 @@ export class InviteService {
     role: OrganizationUserRole;
     teamAssignments?: TeamAssignmentInput[];
   }): void {
+    // A Developer seat (ADR-143) cannot be invited onto any team.
+    if (!holdsSharedAccess(role)) {
+      if ((teamAssignments ?? []).length > 0) {
+        throw new DeveloperSeatNoSharedAccessError();
+      }
+      return;
+    }
     if (role !== OrganizationUserRole.EXTERNAL) return;
     for (const assignment of teamAssignments ?? []) {
       if (assignment.customRoleId || assignment.role !== TeamUserRole.VIEWER) {
@@ -856,6 +901,8 @@ export class InviteService {
     invite: CreateInvitesInviteInput;
     isStrict: boolean;
   }): Promise<ResolvedInviteTeams | null> {
+    const seatOnly = this.resolveInviteTeamsForSeat(invite);
+    if (seatOnly) return seatOnly;
     if (invite.teams && invite.teams.length > 0) {
       return this.resolveExplicitInviteTeams({
         organizationId,
@@ -875,6 +922,25 @@ export class InviteService {
       return { teamAssignments: [], teamIdsString: "" };
     }
     return null;
+  }
+
+  /**
+   * A Developer seat (ADR-143) is invited onto no team. An invite for one
+   * that names a team, in either request form, is refused here with the
+   * seat's own code, before the resolver would otherwise read the teams and
+   * before the record's seat assertion sees an already-empty list. One that
+   * names none resolves to an empty team list.
+   */
+  private resolveInviteTeamsForSeat(invite: {
+    role: OrganizationUserRole;
+    teams?: unknown[];
+    teamIds?: string;
+  }): ResolvedInviteTeams | null {
+    if (holdsSharedAccess(invite.role)) return null;
+    if ((invite.teams?.length ?? 0) > 0 || invite.teamIds?.trim()) {
+      throw new DeveloperSeatNoSharedAccessError();
+    }
+    return { teamAssignments: [], teamIdsString: "" };
   }
 
   /**
@@ -1064,6 +1130,68 @@ export class InviteService {
       return false;
     }
     return true;
+  }
+
+  /**
+   * The invitations waiting for an account, by the addresses it has PROVED
+   * (ADR-143 v6). What comes back includes the invitation code, which is the
+   * secret from the mail, so the caller hands in verified addresses only and
+   * this never falls back to anything softer. Lowercased the way an invite
+   * is stored. Nothing is asked when there is nothing to ask about.
+   *
+   * One `findFirst` per address rather than one `findMany` over them all:
+   * invitations span organizations by definition, and the tenancy guard
+   * admits a read bounded by subject only in the shape the sign-up policy
+   * already uses, a single address answered with at most one row. A
+   * `findMany` naming several addresses is refused outright, which this
+   * lookup learned the hard way: the refusal was invisible for as long as
+   * the address list arrived empty. The oldest pending invitation per
+   * address is the one offered.
+   */
+  async findPendingForAddresses({
+    addresses,
+  }: {
+    addresses: readonly string[];
+  }): Promise<
+    Array<{
+      inviteCode: string;
+      organizationName: string;
+      role: OrganizationUserRole;
+    }>
+  > {
+    const normalized = [
+      ...new Set(addresses.map((address) => address.trim().toLowerCase())),
+    ].filter(Boolean);
+    if (normalized.length === 0) return [];
+
+    const now = new Date();
+    // Invitations are stored as the administrator typed the address, so the
+    // match is case-insensitive like every other address lookup here.
+    const invites = await Promise.all(
+      normalized.map((address) =>
+        this.prisma.organizationInvite.findFirst({
+          where: {
+            email: { equals: address, mode: "insensitive" as const },
+            status: "PENDING",
+            OR: [{ expiration: null }, { expiration: { gt: now } }],
+          },
+          select: {
+            inviteCode: true,
+            role: true,
+            organization: { select: { name: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+      ),
+    );
+
+    return invites
+      .filter((invite) => invite !== null)
+      .map((invite) => ({
+        inviteCode: invite.inviteCode,
+        organizationName: invite.organization.name,
+        role: invite.role,
+      }));
   }
 
   /**
@@ -1367,7 +1495,8 @@ export class InviteService {
    * Finds the best project slug to redirect to after accepting an invite.
    * Tries the first assigned team first, then falls back to any non-archived
    * project in the org so the client can land directly in the app rather than
-   * hitting the onboarding flow.
+   * hitting the onboarding flow. Never an aggregate, opened on purpose
+   * (ADR-144 block F), nor the governance project, which no one sees.
    */
   async findLandingProjectSlug(
     invite: OrganizationInvite,
@@ -1388,7 +1517,11 @@ export class InviteService {
     const project =
       (invitedTeamIds.length > 0
         ? await this.prisma.project.findFirst({
-            where: { teamId: { in: invitedTeamIds }, archivedAt: null },
+            where: {
+              teamId: { in: invitedTeamIds },
+              archivedAt: null,
+              kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
+            },
             select: { slug: true },
           })
         : null) ??
@@ -1399,6 +1532,7 @@ export class InviteService {
             where: {
               team: { organizationId: invite.organizationId, archivedAt: null },
               archivedAt: null,
+              kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
             },
             select: { slug: true },
           })
@@ -1518,6 +1652,11 @@ export class InviteService {
         ],
         skipDuplicates: true,
       });
+      // Inside the claim, not in the grant tail: the tail re-runs on every
+      // retry of an accepted invite, and the admission happens once.
+      if (invite.role === OrganizationUserRole.DEVELOPER) {
+        await this.auditDeveloperAdmission({ tx, userId, invite });
+      }
       return true;
     });
 
@@ -1568,6 +1707,35 @@ export class InviteService {
   }
 
   /**
+   * A Developer admission has no grant to reach the audit page through
+   * (ADR-143), so the row itself is audited, as the join paths do. Written
+   * in the claim transaction so a retried acceptance never writes it twice.
+   */
+  private async auditDeveloperAdmission({
+    tx,
+    userId,
+    invite,
+  }: {
+    tx: Prisma.TransactionClient;
+    userId: string;
+    invite: OrganizationInvite;
+  }): Promise<void> {
+    await tx.auditLog.create({
+      data: {
+        action: DEVELOPER_ADMISSION_AUDIT_ACTION,
+        userId,
+        actorUserId: invite.requestedBy ?? null,
+        organizationId: invite.organizationId,
+        metadata: {
+          seat: OrganizationUserRole.DEVELOPER,
+          inviteId: invite.id,
+          via: "invite" satisfies DeveloperAdmissionVia,
+        },
+      },
+    });
+  }
+
+  /**
    * The grant tail of `applyInvite`: the ORGANIZATION-scoped grant (skipped
    * for EXTERNAL) and each team's grant. Idempotent (revoke-then-attach,
    * duplicates skipped), so both the fresh-accept caller and the retry-repair
@@ -1591,7 +1759,9 @@ export class InviteService {
       fallback: "inviteService",
     });
 
-    if (invite.role !== OrganizationUserRole.EXTERNAL) {
+    // No ORGANIZATION-scoped grant for a Lite Member (access comes from
+    // their teams) nor for a Developer (ADR-143: personal team only).
+    if (holdsOrganizationBinding(invite.role)) {
       await writer.revokeBindingsWhere({
         organizationId: invite.organizationId,
         where: {

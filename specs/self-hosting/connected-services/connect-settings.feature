@@ -206,6 +206,21 @@ Feature: Connect on a self-hosted install
     And the error names the cap and says an organization admin can raise it in Settings, Connect
 
   @unit
+  Scenario: A usage read that cannot reach LangWatch shows usage as unavailable
+    Given the hosted usage route is blocked, times out or fails
+    When an admin reads the Connect settings
+    Then the settings report usage as unavailable
+    And reading them does not fail and reports no refusal
+    And the services the license names keep their switches
+
+  @integration
+  Scenario: The page shows usage as unavailable when LangWatch cannot be reached
+    Given the usage read could not reach LangWatch
+    When an admin opens Settings, Connect
+    Then the spend section says usage is unavailable
+    And no error alert or toast is shown
+
+  @unit
   Scenario: An unregistered license surfaces as a named error
     Given the hosted service refuses the license as not registered
     When an admin reads the Connect settings

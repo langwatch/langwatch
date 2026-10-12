@@ -149,6 +149,8 @@ from .delete_api_agent_cache_by_name_response_500 import DeleteApiAgentCacheByNa
 from .delete_api_agent_cache_by_name_response_500_error import DeleteApiAgentCacheByNameResponse500Error
 from .delete_api_agent_cache_by_name_response_500_error_meta import DeleteApiAgentCacheByNameResponse500ErrorMeta
 from .delete_api_annotations_id_response_200 import DeleteApiAnnotationsIdResponse200
+from .delete_api_annotations_id_response_404 import DeleteApiAnnotationsIdResponse404
+from .delete_api_annotations_id_response_404_error import DeleteApiAnnotationsIdResponse404Error
 from .delete_api_dataset_by_slug_or_id_records_body import DeleteApiDatasetBySlugOrIdRecordsBody
 from .delete_api_evaluators_by_id_response_200 import DeleteApiEvaluatorsByIdResponse200
 from .delete_api_evaluators_by_id_response_400 import DeleteApiEvaluatorsByIdResponse400
@@ -7497,6 +7499,8 @@ __all__ = (
     "DeleteApiAgentCacheByNameResponse500Error",
     "DeleteApiAgentCacheByNameResponse500ErrorMeta",
     "DeleteApiAnnotationsIdResponse200",
+    "DeleteApiAnnotationsIdResponse404",
+    "DeleteApiAnnotationsIdResponse404Error",
     "DeleteApiDatasetBySlugOrIdRecordsBody",
     "DeleteApiEvaluatorsByIdResponse200",
     "DeleteApiEvaluatorsByIdResponse400",

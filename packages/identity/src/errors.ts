@@ -549,6 +549,53 @@ export class SsoIssuerUnreachableError extends SsoConnectionCommandRefusedError 
   }
 }
 
+/**
+ * The issuer an identity provider names is not the one the connection holds.
+ *
+ * At registration, the discovery document names a different issuer from the
+ * address typed. At sign-in, the ID token's `iss` is not the connection's
+ * issuer, the comparison being exact. Both addresses are public (they are in
+ * every token and every discovery document), so the refusal names them: the
+ * fix is to make one equal the other.
+ */
+export class SsoIssuerMismatchError extends SsoConnectionCommandRefusedError {
+  constructor({ expected, received }: { expected: string; received: string }) {
+    super("sso_issuer_mismatch", "sso_issuer_mismatch", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { expected, received },
+      reasons: [
+        new Error(
+          `the discovery document names issuer ${received}, the connection was registered with ${expected}`,
+        ),
+      ],
+    });
+    this.name = "SsoIssuerMismatchError";
+  }
+}
+
+/**
+ * A Microsoft Entra ID multi-tenant endpoint (`common`, `organizations`,
+ * `consumers`) offered as the issuer. Its discovery document names the
+ * issuer as a `{tenantid}` template that no token carries, so a connection
+ * registered on it refuses every sign-in. The tenant's own issuer is needed.
+ */
+export class SsoIssuerMultiTenantError extends SsoConnectionCommandRefusedError {
+  constructor({ issuer, segment }: { issuer: string; segment: string | null }) {
+    super("sso_issuer_multi_tenant", "sso_issuer_multi_tenant", {
+      httpStatus: 422,
+      fault: "customer",
+      meta: { issuer },
+      reasons: [
+        new Error(
+          `${issuer} is a multi-tenant endpoint${segment ? ` (${segment})` : ""}, not a tenant issuer`,
+        ),
+      ],
+    });
+    this.name = "SsoIssuerMultiTenantError";
+  }
+}
+
 /** What was pasted as identity provider metadata is not a SAML descriptor
  *  (D09). Refused before anything is written. */
 export class SsoSamlMetadataInvalidError extends SsoConnectionCommandRefusedError {

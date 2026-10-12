@@ -83,3 +83,80 @@ Feature: ClickHouse Query Memory Safety Regression Tests
     When trace_count and total_cost queries are executed
     Then trace_count returns the expected number of unique traces
     And total_cost returns the expected sum of costs
+
+  # ---------------------------------------------------------------------------
+  # Layer 3: Default dashboard on a high-volume project
+  #
+  # A 30-day dashboard on a project with millions of traces failed with
+  # "query memory exceeded" on about a dozen panels. Every panel read the
+  # newest version of each trace through an IN-tuple dedup, whose hash set
+  # holds one entry per trace in range and cannot spill to disk.
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Dashboard panels on a high-volume project answer under a memory cap
+    Given about a million traces over the current and previous 30 days, half of them with a second version
+    When the trace, user, error, latency and thread panels run with a 150 MB per-query cap
+    Then every panel answers without a memory exceeded error
+    And the trace, user and error counts match the seeded data
+
+  @integration
+  Scenario: The model-grouped chart answers under a memory cap
+    Given about a million traces with one LLM span each
+    When the LLM calls chart grouped by model runs with a 200 MB per-query cap
+    Then it answers without a memory exceeded error
+    And every current trace is counted under its model
+
+  @integration
+  Scenario: The documents panel reads only the RAG contexts attribute
+    Given about a million traces whose root spans carry RAG contexts and large message attributes
+    When the top documents panel runs with a 150 MB per-query cap
+    Then it answers in one query with the top 10 documents and the distinct document total
+
+  @unit
+  Scenario: Dashboard panels dedup traces with a collapse that can spill to disk
+    When a slim trace panel query is built
+    Then it collapses each trace to its newest version with argMax grouped by trace
+    And it carries only the columns the panel reads, never the whole attributes map
+
+  @unit
+  Scenario: Dashboard percentiles use a bounded-memory estimator
+    When a slim trace or evaluation panel asks for a median or p90
+    Then the query uses a t-digest quantile, not an exact one
+
+  @unit
+  Scenario: A panel that hides the previous period does not scan it
+    Given a chart that does not draw the previous period
+    When it loads its data
+    Then it asks to skip the previous period
+    And the previous window is empty and the query reads only the current window
+
+  @integration
+  Scenario: The documents section sends one request per window
+    When the documents summary and the documents table load on the analytics page
+    Then both query with the same window and filters, so they share one request
+
+  @unit
+  Scenario: A dashboard load runs a bounded number of panel queries at once
+    Given a project whose dashboard fires more panel queries than its concurrency limit
+    When the panels load
+    Then only the limit run at once in each app process and the rest wait their turn
+    And other projects' queries do not wait behind them
+
+  @unit
+  Scenario: A panel waiting too long for its tenant's turn fails as a transient overload
+    Given a project whose panel queries are all busy
+    When another panel query waits longer than the wait bound
+    Then it is refused as a transient overload without running
+    And the panel shows its retry state instead of hanging
+
+  @unit
+  Scenario: The evaluations summary reads the slim evaluation table
+    When the evaluations summary asks for evaluation runs grouped by pass or fail with an empty evaluator key
+    Then the query runs on the slim evaluation table instead of the full evaluation runs table
+
+  @unit
+  Scenario: A query over the memory limit is not retried in place
+    When ClickHouse refuses a query for exceeding the query or user memory limit
+    Then the client does not run the same statement again
+    And the caller gets a query memory exceeded error with the reasons preserved

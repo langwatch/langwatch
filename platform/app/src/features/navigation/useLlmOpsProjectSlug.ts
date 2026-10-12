@@ -7,11 +7,12 @@ import {
   userCanOpenTeam,
 } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { landingProjectOf } from "~/server/app-layer/projects/project-kinds";
 
 interface CandidateTeam {
   isPersonal?: boolean | null;
   members?: { userId: string }[];
-  projects: { slug: string }[];
+  projects: { slug: string; kind?: string | null }[];
 }
 
 /**
@@ -56,7 +57,10 @@ export function resolveLlmOpsProjectSlug({
   // The same preference the ambient context resolves with, so the product
   // opens where an organization-scoped page would have put the reader.
   const preferredTeam = selectAmbientTeam({ teams: openableTeams, userId });
-  return preferredTeam?.projects[0]?.slug ?? null;
+  // Never an aggregate by default (ADR-144 block F).
+  return preferredTeam
+    ? (landingProjectOf(preferredTeam.projects)?.slug ?? null)
+    : null;
 }
 
 /** `resolveLlmOpsProjectSlug` against the live workspace and this device. */

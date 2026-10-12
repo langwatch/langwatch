@@ -17,11 +17,17 @@ const hasOrganizationPermission = vi.fn();
 const auditLogMock = vi.fn(async () => undefined);
 const setJoiningMock = vi.fn();
 const verifiedEmailsOfMock = vi.fn();
+const provenAddressesMock = vi.fn();
 const findUserMock = vi.fn();
+const findUsersMock = vi.fn();
 const lookupMock = vi.fn();
+const requestMock = vi.fn();
+const admitMock = vi.fn();
+const pendingForOrganizationMock = vi.fn();
+const readJoiningMock = vi.fn();
 
 vi.mock("~/server/db", () => ({
-  prisma: { user: { findUnique: findUserMock } },
+  prisma: { user: { findUnique: findUserMock, findMany: findUsersMock } },
 }));
 
 vi.mock(
@@ -91,9 +97,14 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   sessionCallbackEvidence: () => ({}),
   mfaCeremonies: () => ({}),
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  provenAddresses: () => ({ addressesOf: provenAddressesMock }),
   joinRequestsService: () => ({
     setJoining: setJoiningMock,
     lookup: lookupMock,
+    request: requestMock,
+    joinAutomaticallyIfAdmitted: admitMock,
+    pendingForOrganization: pendingForOrganizationMock,
+    readJoining: readJoiningMock,
   }),
   // The second-factor gate runs after every permitted decision (D06). Nothing
   // here is about it, so it answers "satisfied" and gets out of the way.
@@ -128,35 +139,96 @@ beforeEach(() => {
     nextDomains: ["acme.com"],
   });
   verifiedEmailsOfMock.mockResolvedValue(null);
+  provenAddressesMock.mockResolvedValue([]);
   findUserMock.mockResolvedValue(null);
+  findUsersMock.mockResolvedValue([]);
   lookupMock.mockResolvedValue({ outcome: "none" });
+  requestMock.mockResolvedValue({ joinRequestId: "jreq_1", state: "PENDING" });
+  admitMock.mockResolvedValue(null);
+  pendingForOrganizationMock.mockResolvedValue([]);
+  readJoiningMock.mockResolvedValue({
+    domainJoin: "request",
+    joinDomains: [],
+    joinerRole: "MEMBER",
+  });
 });
 
-describe("given the caller's verified-address projection", () => {
-  describe("when it is present but empty", () => {
-    it("does not fall back to the legacy user email", async () => {
-      verifiedEmailsOfMock.mockResolvedValue([]);
-      findUserMock.mockResolvedValue({
-        email: "sam@acme.com",
-        emailVerified: true,
-      });
+describe("given a request made from the terminal", () => {
+  describe("when the welcome screen asks to join on the device page's behalf", () => {
+    /** @scenario A request made from the terminal lands as a Developer when approved */
+    it("hands the origin to the service", async () => {
+      provenAddressesMock.mockResolvedValue(["ana@acme.com"]);
 
-      await caller().lookup();
+      await caller().request({ organizationId: "org_acme", origin: "cli" });
 
-      expect(findUserMock).not.toHaveBeenCalled();
-      expect(lookupMock).toHaveBeenCalledWith({
-        userId: "user_ana",
-        verifiedEmail: null,
-      });
+      expect(requestMock).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org_acme", origin: "cli" }),
+      );
+    });
+
+    /** @scenario A request made on the web keeps the organisation's joiner seat */
+    it("reads an older client that names no origin as a web one", async () => {
+      provenAddressesMock.mockResolvedValue(["ana@acme.com"]);
+
+      await caller().request({ organizationId: "org_acme" });
+
+      expect(requestMock).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "web" }),
+      );
+    });
+
+    /** @scenario The welcome screen honours an automatic door */
+    it("hands the origin to the automatic door too", async () => {
+      provenAddressesMock.mockResolvedValue(["ana@acme.com"]);
+
+      await caller().admitAutomatically({ origin: "cli" });
+
+      expect(admitMock).toHaveBeenCalledWith(
+        expect.objectContaining({ origin: "cli" }),
+      );
     });
   });
 
-  describe("when the projection has not reached this legacy user", () => {
-    it("falls back only to a database-verified email", async () => {
-      findUserMock.mockResolvedValue({
-        email: "ana@acme.com",
-        emailVerified: true,
-      });
+  describe("when an administrator opens the pending list", () => {
+    /** @scenario The pending list shows the seat each request will land as */
+    it("shows a Developer seat for the terminal's request and the joiner seat for the web's", async () => {
+      hasOrganizationPermission.mockResolvedValue(true);
+      const waiting = {
+        domain: "acme.com",
+        createdAtMs: 1_700_000_000_000,
+        expiresAtMs: null,
+      };
+      pendingForOrganizationMock.mockResolvedValue([
+        {
+          ...waiting,
+          joinRequestId: "jreq_cli",
+          userId: "user_sam",
+          origin: "cli",
+        },
+        {
+          ...waiting,
+          joinRequestId: "jreq_web",
+          userId: "user_dana",
+          origin: "web",
+        },
+      ]);
+
+      const pending = await caller().pending({ organizationId: "org_acme" });
+
+      expect(
+        pending.map(({ joinRequestId, seat }) => ({ joinRequestId, seat })),
+      ).toEqual([
+        { joinRequestId: "jreq_cli", seat: "DEVELOPER" },
+        { joinRequestId: "jreq_web", seat: "MEMBER" },
+      ]);
+    });
+  });
+});
+
+describe("given the addresses the caller has proven", () => {
+  describe("when the list holds an address", () => {
+    it("hands the first one to the lookup as the verified address", async () => {
+      provenAddressesMock.mockResolvedValue(["ana@acme.com", "ana@other.com"]);
 
       await caller().lookup();
 
@@ -165,14 +237,19 @@ describe("given the caller's verified-address projection", () => {
         verifiedEmail: "ana@acme.com",
       });
     });
+  });
 
-    it("passes a null verified email when the database email is unverified", async () => {
+  describe("when the list is empty", () => {
+    it("passes a null verified address and reads the user row itself not at all", async () => {
+      provenAddressesMock.mockResolvedValue([]);
       findUserMock.mockResolvedValue({
         email: "ana@acme.com",
-        emailVerified: false,
+        emailVerified: true,
       });
 
       await expect(caller().lookup()).resolves.toEqual({ outcome: "none" });
+
+      expect(findUserMock).not.toHaveBeenCalled();
       expect(lookupMock).toHaveBeenCalledWith({
         userId: "user_ana",
         verifiedEmail: null,

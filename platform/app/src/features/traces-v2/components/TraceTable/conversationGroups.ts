@@ -27,6 +27,12 @@ export interface ConversationGroup {
    * rows leave it out entirely. A row without one expands on click instead.
    */
   lastTraceId?: string | null;
+  /**
+   * The project the session belongs to; on an aggregate, the member, which
+   * the drawer opened from this row reads (ADR-144 block F). Server rows
+   * carry it; page-local groups built client-side leave it out.
+   */
+  projectId?: string;
   latestTimestamp: number;
   earliestTimestamp: number;
   lastMessage: string;

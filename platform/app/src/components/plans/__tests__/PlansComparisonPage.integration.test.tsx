@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlansComparisonPage } from "../PlansComparisonPage";
@@ -125,6 +131,37 @@ describe("<PlansComparisonPage/>", () => {
       expect(
         within(growthColumn).getByRole("link", { name: "Add Members" }),
       ).toBeInTheDocument();
+    });
+
+    describe("when the currency is switched from EUR to USD", () => {
+      it("shows the custom retention price in the selected currency", () => {
+        render(
+          <PlansComparisonPage
+            activePlan={{ type: "GROWTH_SEAT_EUR_MONTHLY", free: false }}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        const growthColumn = screen.getByTestId("plan-column-growth");
+        expect(
+          within(growthColumn).getByText(
+            "30 days retention (+ custom at \u20AC3/GB)",
+          ),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId("currency-toggle"));
+
+        expect(
+          within(growthColumn).getByText(
+            "30 days retention (+ custom at $4/GB)",
+          ),
+        ).toBeInTheDocument();
+        expect(
+          within(growthColumn).queryByText(
+            "30 days retention (+ custom at \u20AC3/GB)",
+          ),
+        ).not.toBeInTheDocument();
+      });
     });
   });
 

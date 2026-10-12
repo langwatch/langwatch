@@ -12,6 +12,7 @@ import {
   localSignUpDecision,
   priorSession,
   signInRouter,
+  signUpPolicy,
   signUpVerification,
 } from "~/server/app-layer/identity/runtime";
 import {
@@ -72,6 +73,20 @@ function addressBudgetId(identifier: string): string {
     .digest("hex");
 }
 
+/**
+ * The sign-up policy, asked only when enrollment would open a NEW account: an
+ * address that already holds one is sent to log in, whatever the policy says.
+ */
+async function refuseRestrictedEnrollment<T extends { outcome: string }>(
+  email: string,
+  decision: T,
+): Promise<T> {
+  if (decision.outcome === "enroll") {
+    await signUpPolicy().assertSignUp({ email });
+  }
+  return decision;
+}
+
 export const authRouter = createTRPCRouter({
   signUpEnrollment: publicProcedure
     .input(
@@ -87,8 +102,15 @@ export const authRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       const verification = signUpVerification();
       const proof = { token: input.addressProof, email: input.email };
+      // A link minted before the installation closed sign-up is refused here,
+      // where the screen can still say why. Asked only once the proof checks
+      // out, so only the holder of the address learns the answer, and only
+      // for an address that would open a new account.
       if (await verification.validateAddressProof(proof)) {
-        return localSignUpDecision(input.email);
+        return refuseRestrictedEnrollment(
+          input.email,
+          await localSignUpDecision(input.email),
+        );
       }
 
       // An unconfirmed proof counts only while the installation still has no
@@ -98,7 +120,10 @@ export const authRouter = createTRPCRouter({
         isEmailUnconfigured() &&
         (await verification.validateUnconfirmedAddressProof(proof))
       ) {
-        const decision = await localSignUpDecision(input.email);
+        const decision = await refuseRestrictedEnrollment(
+          input.email,
+          await localSignUpDecision(input.email),
+        );
         return {
           ...decision,
           methodSet: decision.methodSet.filter(
@@ -223,7 +248,15 @@ export const authRouter = createTRPCRouter({
    * what strands somebody on an account they half-created.
    */
   requestSignUpVerification: publicProcedure
-    .input(z.object({ email: z.string().email() }))
+    .input(
+      z.object({
+        email: z.string().email(),
+        // Where the screen goes once through. Carried onto the emailed link
+        // so a sign-up finished in a fresh tab still lands there; the link
+        // builder keeps only a path on this site.
+        callbackUrl: z.string().max(2048).optional(),
+      }),
+    )
     .noPermission({
       reason:
         "starts a signed-out visitor's own sign-up; no tenant scope exists before an account does",
@@ -250,10 +283,16 @@ export const authRouter = createTRPCRouter({
       if (isOrganizationManagedDecision(decision)) {
         throw new DirectRegistrationUnavailableError();
       }
-
       const verification = signUpVerification();
       const withoutEmail = isEmailUnconfigured();
       const state = await verification.addressState({ email: input.email });
+      // Refused before a link goes out: an address the installation will not
+      // admit should not be mailed a sign-up it can never finish. An account
+      // already awaiting its confirmation was admitted when it was created,
+      // so asking for its link again is not a new sign-up.
+      if (state === "unknown") {
+        await signUpPolicy().assertSignUp({ email: input.email });
+      }
       // Without email there is no link to wait for, so an unconfirmed account
       // is not mid-sign-up: it is an account, and the way on is to log in.
       if (state === "confirmed" || (withoutEmail && state !== "unknown")) {
@@ -288,7 +327,10 @@ export const authRouter = createTRPCRouter({
         };
       }
 
-      await verification.requestVerification({ email: input.email });
+      await verification.requestVerification({
+        email: input.email,
+        callbackUrl: input.callbackUrl,
+      });
       return { sent: true as const };
     }),
 

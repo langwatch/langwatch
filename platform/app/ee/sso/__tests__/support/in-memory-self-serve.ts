@@ -27,18 +27,24 @@ import type {
  * has to avoid.
  */
 export class StubTestSignIns implements SsoTestSignInLookup {
-  private readonly held = new Map<string, SsoTestSignIn>();
+  private readonly held = new Map<
+    string,
+    { signIn: SsoTestSignIn; issuer: string | null }
+  >();
 
   record({
     organizationId,
     connectionId,
     signIn,
+    issuer = null,
   }: {
     organizationId: string;
     connectionId: string;
     signIn: SsoTestSignIn;
+    /** The issuer the sign-in came through; null matches any. */
+    issuer?: string | null;
   }): void {
-    this.held.set(`${organizationId}:${connectionId}`, signIn);
+    this.held.set(`${organizationId}:${connectionId}`, { signIn, issuer });
   }
 
   forget(): void {
@@ -48,11 +54,17 @@ export class StubTestSignIns implements SsoTestSignInLookup {
   async findLatestForConnection({
     organizationId,
     connectionId,
+    issuer,
   }: {
     organizationId: string;
     connectionId: string;
+    issuer: string | null;
   }): Promise<SsoTestSignIn | null> {
-    return this.held.get(`${organizationId}:${connectionId}`) ?? null;
+    const held = this.held.get(`${organizationId}:${connectionId}`);
+    if (!held) return null;
+    const isMatch =
+      issuer === null || held.issuer === null || held.issuer === issuer;
+    return isMatch ? held.signIn : null;
   }
 }
 

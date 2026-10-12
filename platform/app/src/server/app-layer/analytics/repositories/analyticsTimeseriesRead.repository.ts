@@ -25,6 +25,7 @@ import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/cli
 import type { SeriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { tenantAnalyticsLimiter } from "~/server/clickhouse/tenantStatementLimit";
 import { AnalyticsClientUnavailableError } from "../errors";
 import { buildEvalRollupTimeseriesQuery } from "../query-builders/eval-rollup-timeseries-query";
 import { buildEvalSlimTimeseriesQuery } from "../query-builders/eval-slim-timeseries-query";
@@ -114,20 +115,25 @@ class AnalyticsTimeseriesClickHouseReadRepository
     const { sql, params: queryParams } = this.builder(params.builderInput);
 
     try {
-      const result = await client.query({
-        query: sql,
-        query_params: queryParams,
-        format: "JSONEachRow",
-        clickhouse_settings: {
-          ...ANALYTICS_CLICKHOUSE_SETTINGS,
-          // Attributes this read in `clickhouse_result_rows` AND in
-          // `system.query_log`. `targetLabel` is one of four compile-time
-          // constants, so the label set stays closed.
-          log_comment: `analytics:timeseries:${this.targetLabel}`,
-          ...maxResultRowsSettings(params.maxResultRows),
+      const rows = await tenantAnalyticsLimiter.run({
+        tenantId: params.tenantId,
+        task: async () => {
+          const result = await client.query({
+            query: sql,
+            query_params: queryParams,
+            format: "JSONEachRow",
+            clickhouse_settings: {
+              ...ANALYTICS_CLICKHOUSE_SETTINGS,
+              // Attributes this read in `clickhouse_result_rows` AND in
+              // `system.query_log`. `targetLabel` is one of four compile-time
+              // constants, so the label set stays closed.
+              log_comment: `analytics:timeseries:${this.targetLabel}`,
+              ...maxResultRowsSettings(params.maxResultRows),
+            },
+          });
+          return (await result.json()) as AnalyticsTimeseriesRow[];
         },
       });
-      const rows = (await result.json()) as AnalyticsTimeseriesRow[];
       return parseTimeseriesRows({
         rows,
         series: params.series,

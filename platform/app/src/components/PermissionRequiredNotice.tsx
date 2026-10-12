@@ -1,7 +1,7 @@
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";
 import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { Lock } from "lucide-react";
-import { explainHandledError } from "~/features/errors";
+import { explainHandledError, readHandledError } from "~/features/errors";
 
 /**
  * One region of a page the viewer does not hold the permission for.
@@ -41,6 +41,65 @@ export function PermissionRequiredNotice({
   });
 
   return (
+    <NoticeBox
+      title={copy.title}
+      description={copy.description}
+      detail={detail}
+    />
+  );
+}
+
+/** The codes a server refusal for a missing grant arrives under. */
+const PERMISSION_REFUSAL_CODES: ReadonlySet<string> = new Set([
+  "permission_denied",
+  "project_permission_denied",
+  "insufficient_permissions",
+]);
+
+/** Whether a failed query was refused for a grant the viewer does not hold. */
+export function isPermissionRefusal(error: unknown): boolean {
+  const handled = readHandledError(error);
+  return handled !== null && PERMISSION_REFUSAL_CODES.has(handled.code);
+}
+
+/**
+ * The same notice, for a refusal the server sent. A query the client could not
+ * predict a refusal for (the server checks at a scope the client does not hold
+ * an answer for) lands here: the region reads as no access, in the registry's
+ * words for that refusal, instead of as a failed load with a retry.
+ *
+ * Renders nothing for any other error, so it can sit beside the error state.
+ */
+export function PermissionRefusedNotice({
+  error,
+  detail,
+}: {
+  error: unknown;
+  /** One extra line about what stays hidden without the grant. Optional. */
+  detail?: string;
+}) {
+  const handled = readHandledError(error);
+  if (!handled || !PERMISSION_REFUSAL_CODES.has(handled.code)) return null;
+  const copy = explainHandledError(handled);
+  return (
+    <NoticeBox
+      title={copy.title}
+      description={copy.description}
+      detail={detail}
+    />
+  );
+}
+
+function NoticeBox({
+  title,
+  description,
+  detail,
+}: {
+  title: string;
+  description?: string;
+  detail?: string;
+}) {
+  return (
     <Box
       role="note"
       borderWidth="1px"
@@ -56,11 +115,11 @@ export function PermissionRequiredNotice({
         </Box>
         <Stack gap={0.5} flex="1" minWidth={0}>
           <Text fontSize="sm" fontWeight="medium">
-            {copy.title}
+            {title}
           </Text>
-          {copy.description && (
+          {description && (
             <Text fontSize="xs" color="fg.muted">
-              {copy.description}
+              {description}
             </Text>
           )}
           {detail && (

@@ -19,6 +19,9 @@ const mocks = vi.hoisted(() => ({
   downloadCsv: vi.fn(),
   tableProps: null as Record<string, any> | null,
   annotationsByTraceIdsArgs: null as Record<string, unknown> | null,
+  nonEmptyFilters: {} as Record<string, unknown>,
+  walkFails: false,
+  walkOpts: [] as { enabled?: boolean }[],
 }));
 
 vi.mock("~/components/AnnotationsLayout", () => ({
@@ -48,8 +51,8 @@ vi.mock("~/components/PeriodSelector", () => ({
 vi.mock("~/hooks/useFilterParams", () => ({
   useFilterParams: () => ({
     filterParams: { projectId: "p1", filters: {} },
-    queryOpts: { enabled: false },
-    nonEmptyFilters: {},
+    queryOpts: { enabled: true },
+    nonEmptyFilters: mocks.nonEmptyFilters,
   }),
 }));
 vi.mock("~/hooks/useAnnotationsByTraceIds", () => ({
@@ -70,10 +73,24 @@ vi.mock("~/utils/downloadCsv", () => ({
 }));
 vi.mock("~/utils/api", () => ({
   api: {
+    // One settled page with no scrollId per descriptor, so the walk ends at once.
+    useQueries: (
+      build: (t: unknown) => unknown[],
+    ): { data: undefined; isLoading: false; isError: boolean }[] =>
+      build({
+        traces: {
+          getAllForProject: (_input: unknown, opts: { enabled?: boolean }) =>
+            opts,
+        },
+      }).map((opts) => {
+        mocks.walkOpts.push(opts as { enabled?: boolean });
+        return {
+          data: undefined,
+          isLoading: false,
+          isError: mocks.walkFails,
+        };
+      }),
     traces: {
-      getAllForProject: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
       getTracesWithSpans: {
         useQuery: () => ({ data: mocks.traces, isLoading: false }),
       },
@@ -114,6 +131,9 @@ beforeEach(() => {
   mocks.downloadCsv.mockReset();
   mocks.tableProps = null;
   mocks.annotationsByTraceIdsArgs = null;
+  mocks.nonEmptyFilters = {};
+  mocks.walkFails = false;
+  mocks.walkOpts = [];
   mocks.traces = [
     {
       trace_id: "trace-1",
@@ -189,6 +209,65 @@ describe("All annotations page", () => {
       expect(rows[0].date).toEqual(new Date("2026-07-20T10:00:00Z"));
       expect(mocks.tableProps?.dateColumnLabel).toBe("Date annotated");
       expect(mocks.tableProps?.showStatusFilter).toBe(false);
+    });
+  });
+
+  describe("given no filters are active", () => {
+    describe("when the page renders", () => {
+      it("does not walk the trace pages", () => {
+        renderPage();
+
+        expect(mocks.walkOpts.length).toBeGreaterThan(0);
+        expect(mocks.walkOpts.every((opts) => opts.enabled === false)).toBe(
+          true,
+        );
+      });
+    });
+  });
+
+  describe("given a filter is active", () => {
+    beforeEach(() => {
+      mocks.nonEmptyFilters = { "topics.topics": ["billing"] };
+    });
+
+    describe("when the page renders", () => {
+      it("walks the trace pages", () => {
+        renderPage();
+
+        expect(mocks.walkOpts.length).toBeGreaterThan(0);
+        expect(mocks.walkOpts.every((opts) => opts.enabled === true)).toBe(
+          true,
+        );
+      });
+    });
+
+    describe("when a trace page fails to load", () => {
+      beforeEach(() => {
+        mocks.walkFails = true;
+        renderPage();
+      });
+
+      it("shows the failure title", () => {
+        expect(mocks.tableProps?.noDataTitle).toBe(
+          "Couldn't load the annotations for these filters",
+        );
+      });
+
+      it("shows the reload hint", () => {
+        expect(mocks.tableProps?.noDataDescription).toContain(
+          "Reload the page",
+        );
+      });
+    });
+
+    describe("when every trace page loads", () => {
+      it("keeps the normal empty state", () => {
+        renderPage();
+
+        expect(mocks.tableProps?.noDataTitle).toMatch(
+          /^No recent annotations yet/,
+        );
+      });
     });
   });
 });

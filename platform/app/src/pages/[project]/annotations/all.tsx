@@ -13,6 +13,8 @@ import type { Annotation } from "~/generated/prisma/client";
 import { useAnnotationsByTraceIds } from "~/hooks/useAnnotationsByTraceIds";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTraceIdsAcrossPages } from "~/hooks/useTraceIdsAcrossPages";
+import { MAX_TRACE_LIST_PAGE_SIZE } from "~/server/api/routers/traces.schemas";
 import type { Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
@@ -25,37 +27,44 @@ type GroupedAnnotation = {
   annotations: AnnotationWithUser[];
 };
 
+// Keeps the old 10 000-trace ceiling while every request stays at the page cap (#8479).
+const MAX_ANNOTATION_TRACE_PAGES = 10;
+
 export default function Annotations() {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { filterParams, queryOpts, nonEmptyFilters } = useFilterParams();
 
   const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
-  const traceGroups = api.traces.getAllForProject.useQuery(
-    {
-      ...filterParams,
-      query: getSingleQueryParam(router.query.query),
-      groupBy: "none",
-      pageOffset: 0,
-      pageSize: 10000,
-      sortBy: getSingleQueryParam(router.query.sortBy),
-      sortDirection: getSingleQueryParam(router.query.orderBy),
+  const traceQueryInput = {
+    ...filterParams,
+    query: getSingleQueryParam(router.query.query),
+    groupBy: "none",
+    pageOffset: 0,
+    pageSize: MAX_TRACE_LIST_PAGE_SIZE,
+    sortBy: getSingleQueryParam(router.query.sortBy),
+    sortDirection: getSingleQueryParam(router.query.orderBy),
+  };
+  const {
+    traceIds: filteredTraceIds,
+    isLoading: tracePagesLoading,
+    isError: tracePagesFailed,
+  } = useTraceIdsAcrossPages({
+    input: traceQueryInput,
+    // Unfiltered mode reads allAnnotations, so walking trace pages there would
+    // be wasted reads (#8479).
+    queryOpts: {
+      ...queryOpts,
+      enabled: (queryOpts.enabled ?? true) && hasAnyFilters,
     },
-    queryOpts,
-  );
+    maxPages: MAX_ANNOTATION_TRACE_PAGES,
+  });
+  // A failed page leaves no ids, which would otherwise read as "no annotations".
+  const showTraceWalkError = hasAnyFilters && tracePagesFailed;
 
   const {
     period: { startDate, endDate },
   } = usePeriodSelector();
-
-  // Both queries are declared unconditionally (rules of hooks) and gated
-  // via `enabled` on the active mode. `getByTraceIds` is chunked so a
-  // fully-filtered project with thousands of matching traces doesn't blow
-  // past the GET URL ceiling tRPC batches into.
-  const filteredTraceIds =
-    traceGroups.data?.groups.flatMap((group) =>
-      group.map((trace) => trace.trace_id),
-    ) ?? [];
 
   // Everything said about these traces, anchored comments included: this page
   // lists the annotations themselves rather than answering a question about each
@@ -73,11 +82,11 @@ export default function Annotations() {
   );
 
   const annotations = hasAnyFilters ? filteredAnnotations : allAnnotations;
-  // In filtered mode the ids come from `traceGroups`, so its load must count
+  // In filtered mode the ids come from the trace pages, so their load must count
   // toward the table's loading state — otherwise the table flashes an empty
   // state before the ids (and then the annotations) arrive.
   const annotationsLoading = hasAnyFilters
-    ? traceGroups.isLoading || filteredAnnotations.isLoading
+    ? tracePagesLoading || filteredAnnotations.isLoading
     : allAnnotations.isLoading;
 
   const traceIds = annotations.data?.map((annotation) => annotation.traceId);
@@ -177,8 +186,16 @@ export default function Annotations() {
           rowTarget="trace"
           exportLabel="Export all"
           onExport={exportAll}
-          noDataTitle="No recent annotations yet, change the date range to see more or annotate your messages"
-          noDataDescription="Annotate your messages to add more context and improve your analysis."
+          noDataTitle={
+            showTraceWalkError
+              ? "Couldn't load the annotations for these filters"
+              : "No recent annotations yet, change the date range to see more or annotate your messages"
+          }
+          noDataDescription={
+            showTraceWalkError
+              ? "Something went wrong while loading matching traces. Reload the page to try again."
+              : "Annotate your messages to add more context and improve your analysis."
+          }
         />
       </Flex>
     </AnnotationsLayout>

@@ -34,7 +34,7 @@ import { OnboardingProgress } from "./OnboardingProgress";
 import { PendingJoinRequests } from "./PendingJoinRequests";
 import { RecentItemsSection } from "./RecentItemsSection";
 import { TracesOverview } from "./TracesOverview";
-import { useHomeComposition } from "./useHomeComposition";
+import { type HomeComposition, useHomeComposition } from "./useHomeComposition";
 import { useProjectReach } from "./useProjectReach";
 import { WelcomeHeader } from "./WelcomeHeader";
 
@@ -62,7 +62,7 @@ import { WelcomeHeader } from "./WelcomeHeader";
  * (HomeBriefingSection / QuietHeadline), and the classic traces overview
  */
 export function HomePage() {
-  const composition = useHomeComposition();
+  const view = useHomeComposition();
 
   return (
     <DashboardLayout>
@@ -85,7 +85,7 @@ export function HomePage() {
               {/* The Langy home greets from the centre of its own hero, where
                   the question is being asked. Rendering the greeting here as
                   well would put it on the page twice. */}
-              {composition === "langy" ? null : <WelcomeHeader />}
+              {view === "langy" ? null : <WelcomeHeader />}
               <Spacer />
               {/* The one sales-y ask: the friendly line, small and quiet, with
                   the demo link as a compact pill beside it. Shown to people who
@@ -103,51 +103,10 @@ export function HomePage() {
 
             {/* The Langy home carries the offer inside its hero, under the
                 ask field; the other homes carry it here, under the header. */}
-            {composition === "signal-focused" || composition === "classic" ? (
+            {view === "signal-focused" || view === "classic" ? (
               <GuidedOnboardingOffer space="project" />
             ) : null}
-            {composition === "undecided" ? (
-              <HomeCompositionSkeleton />
-            ) : composition === "signal-focused" ? (
-              <>
-                <HomeBriefingSection />
-                {/* The chrome grid: two equal-height columns whose interior
-                    splits OFFSET — the first card in each column sits at its
-                    natural height (they differ), and the second grows to fill
-                    the rest, so the middle seam staggers instead of running
-                    straight across. Content can always take more; nothing is
-                    ever squeezed into overlap. */}
-                <Grid
-                  templateColumns={{ base: "1fr", lg: "1fr 1fr" }}
-                  gap={4}
-                  width="full"
-                  alignItems="stretch"
-                >
-                  <VStack gap={4} align="stretch" minWidth={0}>
-                    <HomePageBanners />
-                    <Box flex="1" display="flex" minHeight="120px">
-                      <DocsGuides />
-                    </Box>
-                  </VStack>
-                  <VStack gap={4} align="stretch" minWidth={0}>
-                    <SetupHairline />
-                    <Box flex="1" display="flex" minHeight="100px">
-                      <HomeFortune />
-                    </Box>
-                  </VStack>
-                </Grid>
-                <RecentItemsSection />
-              </>
-            ) : composition === "langy" ? (
-              <LangyHome />
-            ) : (
-              <>
-                <HomePageBanners variant="legacy" />
-                <TracesOverview />
-                <RecentItemsSection />
-                <OnboardingProgress />
-              </>
-            )}
+            <HomeBody view={view} />
 
             {/* Dev-only chrome (the briefing mock switcher and the Langy
                 home's state switcher) belongs with the footer links, not next
@@ -164,6 +123,61 @@ export function HomePage() {
         </Container>
       </Box>
     </DashboardLayout>
+  );
+}
+
+/** The body of the home, one composition per view. */
+function HomeBody({ view }: { view: HomeComposition }) {
+  switch (view) {
+    case "undecided":
+      return <HomeCompositionSkeleton />;
+    case "signal-focused":
+      return <SignalFocusedHome />;
+    case "langy":
+      return <LangyHome />;
+    case "classic":
+      return (
+        <>
+          <HomePageBanners variant="legacy" />
+          <TracesOverview />
+          <RecentItemsSection />
+          <OnboardingProgress />
+        </>
+      );
+  }
+}
+
+function SignalFocusedHome() {
+  return (
+    <>
+      <HomeBriefingSection />
+      {/* The chrome grid: two equal-height columns whose interior
+          splits OFFSET — the first card in each column sits at its
+          natural height (they differ), and the second grows to fill
+          the rest, so the middle seam staggers instead of running
+          straight across. Content can always take more; nothing is
+          ever squeezed into overlap. */}
+      <Grid
+        templateColumns={{ base: "1fr", lg: "1fr 1fr" }}
+        gap={4}
+        width="full"
+        alignItems="stretch"
+      >
+        <VStack gap={4} align="stretch" minWidth={0}>
+          <HomePageBanners />
+          <Box flex="1" display="flex" minHeight="120px">
+            <DocsGuides />
+          </Box>
+        </VStack>
+        <VStack gap={4} align="stretch" minWidth={0}>
+          <SetupHairline />
+          <Box flex="1" display="flex" minHeight="100px">
+            <HomeFortune />
+          </Box>
+        </VStack>
+      </Grid>
+      <RecentItemsSection />
+    </>
   );
 }
 

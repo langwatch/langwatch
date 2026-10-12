@@ -77,7 +77,7 @@ function policyRestricting(args: {
 
 function mockPolicy(policy: ResolvedDataPrivacy) {
   vi.mocked(getDataPrivacyPolicyService).mockReturnValue({
-    getResolvedForProject: vi.fn().mockResolvedValue(policy),
+    getResolvedForProjects: vi.fn().mockResolvedValue(policy),
   } as unknown as ReturnType<typeof getDataPrivacyPolicyService>);
 }
 

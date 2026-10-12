@@ -125,6 +125,27 @@ export class DirectRegistrationUnavailableError extends HandledError {
 }
 
 /**
+ * The installation restricts who may create an account (`SIGN_UP_MODE`,
+ * `SIGN_UP_ALLOWED_DOMAINS`), and this address is not one of them.
+ *
+ * One code for both restrictions: what the person can do is the same either
+ * way, which is to ask an administrator for an invitation. Which rule refused
+ * goes to the log line, through the reason.
+ */
+export class SignUpRestrictedError extends HandledError {
+  declare readonly code: "auth_sign_up_restricted";
+
+  constructor(detail: string) {
+    super(
+      "auth_sign_up_restricted",
+      "Accounts on this installation are created by invitation.",
+      { httpStatus: 403, fault: "customer", reasons: [new Error(detail)] },
+    );
+    this.name = "SignUpRestrictedError";
+  }
+}
+
+/**
  * A signed-out sign-up request arrived from a web address other than the one
  * the installation is configured for (`NEXTAUTH_URL`).
  *

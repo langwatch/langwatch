@@ -721,15 +721,18 @@ export class MetricDataPointClickHouseRepository
     const result = await client.query({
       query: `
         WITH matched AS (
+          -- Columns go through the table alias: PointAttributesJson is also
+          -- a SELECT alias here, and unqualified it would put the aggregate
+          -- in WHERE.
           SELECT
-            SeriesId,
-            argMax(MetricName, LastSeenAt) AS MetricName,
-            argMax(PointAttributesJson, LastSeenAt) AS PointAttributesJson
-          FROM metric_series
-          WHERE TenantId = {tenantId:String}
-            AND has(PointAttributeKeys, {attributeKey:String})
-            AND JSONExtractString(PointAttributesJson, {attributeKey:String}) = {attributeValue:String}
-          GROUP BY SeriesId
+            s.SeriesId AS SeriesId,
+            argMax(s.MetricName, s.LastSeenAt) AS MetricName,
+            argMax(s.PointAttributesJson, s.LastSeenAt) AS PointAttributesJson
+          FROM metric_series AS s
+          WHERE s.TenantId = {tenantId:String}
+            AND has(s.PointAttributeKeys, {attributeKey:String})
+            AND JSONExtractString(s.PointAttributesJson, {attributeKey:String}) = {attributeValue:String}
+          GROUP BY s.SeriesId
         )
         SELECT
           matched.MetricName AS MetricName,

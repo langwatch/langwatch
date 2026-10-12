@@ -481,5 +481,45 @@ describe("the account's email addresses", () => {
 
       expect(screen.queryByTestId("resend-address-link")).toBeNull();
     });
+
+    /** @scenario "An installation that cannot send email does not offer to add an address" */
+    it("stands the add offer down and says an email provider is missing", () => {
+      confirmationRef.current = {
+        email: "sam@acme.test",
+        confirmed: true,
+        canSendConfirmation: false,
+      };
+      renderSection();
+
+      const offer = screen.getByTestId("add-address") as HTMLButtonElement;
+      expect(offer.disabled).toBe(true);
+      expect(offer.getAttribute("aria-label")).toMatch(
+        /set up an email provider/i,
+      );
+      expect(screen.getByTestId("add-address-unavailable")).toBeTruthy();
+
+      fireEvent.click(offer);
+      expect(screen.queryByTestId("new-address")).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /send confirmation/i }),
+      ).toBeNull();
+      expect(addMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an installation that can send email", () => {
+    /** @scenario "An installation that cannot send email does not offer to add an address" */
+    it("offers to add an address", () => {
+      confirmationRef.current = {
+        email: "sam@acme.test",
+        confirmed: true,
+        canSendConfirmation: true,
+      };
+      renderSection();
+
+      fireEvent.click(screen.getByTestId("add-address"));
+      expect(screen.getByTestId("new-address")).toBeTruthy();
+      expect(screen.queryByTestId("add-address-unavailable")).toBeNull();
+    });
   });
 });

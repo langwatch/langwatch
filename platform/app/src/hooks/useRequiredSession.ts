@@ -44,6 +44,9 @@ export const noOrgBouncerRoutes = [
   // BY DESIGN — bouncing them into the bootstrap is the exact outcome that
   // page exists to replace.
   "/auth/sso-test-complete",
+  // A new zero-org user landing here must reach the parked target, not be
+  // bounced to onboarding first.
+  "/auth/resume",
   "/onboarding/welcome",
   "/onboarding/[team]/project",
   "/onboarding/product",

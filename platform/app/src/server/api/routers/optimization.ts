@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
+import { enforceCreationLimit } from "../../license-enforcement";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const optimizationRouter = createTRPCRouter({
@@ -162,6 +163,23 @@ export const optimizationRouter = createTRPCRouter({
           throw new Error("Workflow not found");
         }
 
+        // Saving as an evaluator creates one when none is linked yet, so the
+        // plan's evaluator cap is checked before any flag changes.
+        const existingEvaluator = isEvaluator
+          ? await ctx.prisma.evaluator.findFirst({
+              where: { workflowId, projectId, archivedAt: null },
+              select: { id: true },
+            })
+          : null;
+        if (isEvaluator && !existingEvaluator) {
+          await enforceCreationLimit({
+            prisma: ctx.prisma,
+            projectId,
+            limitType: "evaluators",
+            user: ctx.session.user,
+          });
+        }
+
         // Update workflow flags
         await ctx.prisma.workflow.update({
           where: { id: workflowId, projectId: projectId },
@@ -169,15 +187,6 @@ export const optimizationRouter = createTRPCRouter({
         });
 
         if (isEvaluator) {
-          // Check if an evaluator already exists for this workflow
-          const existingEvaluator = await ctx.prisma.evaluator.findFirst({
-            where: {
-              workflowId: workflowId,
-              projectId: projectId,
-              archivedAt: null,
-            },
-          });
-
           if (existingEvaluator) {
             // Update existing evaluator's name to match workflow
             await ctx.prisma.evaluator.update({

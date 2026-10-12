@@ -25,6 +25,9 @@ export function inMemoryIdentityUsers({
     async findEmail({ userId }) {
       return rows.get(userId) ?? null;
     },
+    async findVerifiedLegacyEmail({ userId }) {
+      return rows.get(userId) ?? null;
+    },
     async findUserIdByEmail({ normalizedValue }) {
       for (const [userId, email] of rows) {
         if (email.toLowerCase() === normalizedValue.toLowerCase()) {

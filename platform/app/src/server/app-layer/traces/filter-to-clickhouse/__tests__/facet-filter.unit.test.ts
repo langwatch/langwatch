@@ -13,7 +13,6 @@ import {
 } from "../facet-filter";
 import { translateFilterToClickHouse } from "../index";
 
-const TENANT = "project-1";
 const WINDOW = { from: 1_700_000_000_000, to: 1_700_086_400_000 };
 
 describe("queryWithoutFacet", () => {
@@ -100,19 +99,10 @@ describe("createFacetFilterCompiler", () => {
   describe("given a query naming two fields", () => {
     const compiler = createFacetFilterCompiler({
       queryText: "status:error AND service:api",
-      tenantId: TENANT,
       timeRange: WINDOW,
     });
-    const serviceOnly = translateFilterToClickHouse(
-      "service:api",
-      TENANT,
-      WINDOW,
-    )!;
-    const statusOnly = translateFilterToClickHouse(
-      "status:error",
-      TENANT,
-      WINDOW,
-    )!;
+    const serviceOnly = translateFilterToClickHouse("service:api", WINDOW)!;
+    const statusOnly = translateFilterToClickHouse("status:error", WINDOW)!;
 
     /** @scenario "Facet counts show how many results another filter would yield" */
     it("compiles each named facet without its own field", () => {
@@ -124,7 +114,6 @@ describe("createFacetFilterCompiler", () => {
     it("compiles the whole query for a facet the query never names", () => {
       const whole = translateFilterToClickHouse(
         "status:error AND service:api",
-        TENANT,
         WINDOW,
       )!;
       expect(compiler.forFacet("model")?.sql).toBe(whole.sql);
@@ -142,7 +131,6 @@ describe("createFacetFilterCompiler", () => {
     it("answers no predicate for that facet and the query for the others", () => {
       const compiler = createFacetFilterCompiler({
         queryText: "status:error",
-        tenantId: TENANT,
         timeRange: WINDOW,
       });
       expect(compiler.forFacet("status")).toBeUndefined();
@@ -154,7 +142,6 @@ describe("createFacetFilterCompiler", () => {
     it("answers no predicate for every facet", () => {
       const compiler = createFacetFilterCompiler({
         queryText: "",
-        tenantId: TENANT,
         timeRange: WINDOW,
       });
       expect(compiler.forFacet("status")).toBeUndefined();

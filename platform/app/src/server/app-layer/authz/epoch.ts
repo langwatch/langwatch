@@ -4,9 +4,9 @@
  * processes share it; a missing/unavailable epoch disables caching (collect
  * fresh), never staleness.
  *
- * Whether the cache is consulted at all is the composition root's decision
- * (src/server/app-layer/authz/runtime.ts owns that env read); this module only answers
- * what the epoch IS.
+ * Whether the cache is consulted at all is the composition root's decision:
+ * runtime.ts wires the engine and presets.ts the door with the one rollout
+ * knob below, so the two caches turn on and off together.
  */
 import { createLogger } from "@langwatch/observability";
 import { tryGetApp } from "../app";
@@ -14,6 +14,16 @@ import { tryGetApp } from "../app";
 const logger = createLogger("langwatch:authz:epoch");
 
 const EPOCH_KEY_PREFIX = "authz:epoch:";
+
+/**
+ * The internal rollout knob for the §12 L1 cache, read per check rather than
+ * captured at module load so a test (or a restart-free rollout) can flip it.
+ * Unset means off, which is always correct and only slower.
+ */
+export const authzEpochCacheEnabled = (): boolean => {
+  const raw = process.env.AUTHZ_EPOCH_CACHE;
+  return raw === "1" || raw === "true";
+};
 
 /**
  * Current epoch for an organization, or null when there is no epoch to

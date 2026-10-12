@@ -14,6 +14,8 @@ import { getApp } from "~/server/app-layer/app";
 import {
   identityEmail,
   joinRequestsService,
+  provenAddresses,
+  signUpPolicy,
 } from "~/server/app-layer/identity/runtime";
 import type { Session } from "~/server/auth";
 import {
@@ -352,6 +354,60 @@ export const inviteRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
     }),
+
+  /**
+   * The oldest pending invitation on each address the signed-in user has
+   * proven, on any installation (ADR-143 v6). The welcome screen leads with
+   * one of these before it offers to ask to join, so an administrator who
+   * already invited somebody is not asked the question twice.
+   *
+   * VERIFIED addresses only, with no fall-back to an unproven session
+   * address: the answer carries the invitation code, which is the secret from
+   * the mail, and it is handed over only to somebody who has proved they hold
+   * the address it was sent to. A user not yet on identifiers is read from
+   * the legacy column, and only where it is marked verified: the same answer
+   * the join door reads for the same person, so an invitation can never stay
+   * hidden behind a door that opens on that very address.
+   */
+  pendingForMe: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason:
+        "answers for the session user's own VERIFIED addresses; the caller belongs to no organization yet, and nothing about anybody else's invitations is reachable",
+    })
+    .query(async ({ ctx }) =>
+      InviteService.create(ctx.prisma).findPendingForAddresses({
+        addresses: await provenAddresses().addressesOf({
+          userId: ctx.session.user.id,
+        }),
+      }),
+    ),
+
+  /**
+   * The invitation waiting for the signed-in user, on an installation where
+   * accounts are created by invitation. A member who signed up from the
+   * sign-in screen rather than the invitation link belongs to no organization
+   * yet, and this is where they are sent instead of the screen that creates
+   * one. Only addresses the account has proven count, the same ones
+   * `acceptInvite` accepts.
+   */
+  myPendingInvitation: protectedProcedure
+    .input(z.object({}))
+    .noPermission({
+      reason:
+        "answers for the session user's own proven addresses; the caller belongs to no organization yet, which is the condition being reported",
+    })
+    .query(({ ctx }) =>
+      signUpPolicy().pendingInvitationFor({
+        addresses: async () => {
+          const proven = await identityEmail().verifiedEmailsOf({
+            userId: ctx.session.user.id,
+          });
+          if (proven !== null) return proven.map(({ value }) => value);
+          return ctx.session.user.email ? [ctx.session.user.email] : [];
+        },
+      }),
+    ),
 
   acceptInvite: protectedProcedure
     .input(

@@ -1,5 +1,7 @@
+import type { Dispatcher } from "undici";
 import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 import { lambdaFetch } from "../../utils/lambdaFetch";
+import { nlpgoInternalHeaders } from "./internalSecret";
 
 /**
  * Origin tag for the X-LangWatch-Origin header. Set at the request
@@ -96,6 +98,25 @@ export interface NLPGOFetchOptions<TBody = unknown> {
     traceId: string;
     parentSpanId: string;
   };
+  /**
+   * Deadline for this call, honoured on the Lambda lane and the HTTP lane
+   * alike. Omit it and no deadline is imposed, which is what every caller
+   * that predates it gets.
+   */
+  timeoutMs?: number;
+  /**
+   * The caller's own cancellation. A caller that already bounds the call with
+   * its own timer passes the signal alone and keeps that timer as the single
+   * deadline, so a failure is classified by the caller rather than twice.
+   */
+  signal?: AbortSignal;
+  /**
+   * HTTP lane only: an undici dispatcher, for a caller that must hold the
+   * socket past undici's 300s `headersTimeout`/`bodyTimeout` defaults. Build
+   * it with `createNlpFetchDispatcher` in `./timeouts`. Without one a self
+   * hosted call is cut off at 300s however far out the deadline is armed.
+   */
+  dispatcher?: Dispatcher;
 }
 
 export interface NLPGOFetchResult<T> {
@@ -112,8 +133,9 @@ export interface NLPGOFetchResult<T> {
  * Send a request to the nlpgo service. nlpgo serves the Go engine under
  * the `/go` prefix, so the caller's `path` (e.g. "/studio/execute_sync")
  * is rewritten to "/go/studio/execute_sync" and tagged with
- * X-LangWatch-Origin. There is no auth on this hop: the TS app and nlpgo
- * share the Lambda function URL boundary.
+ * X-LangWatch-Origin. The hop carries the shared internal secret as
+ * X-LangWatch-NLP-Secret whenever LANGWATCH_NLP_INTERNAL_SECRET is set
+ * (see internalSecret.ts).
  *
  * Topic clustering runs on langevals, not nlpgo, so it MUST NOT call this
  * helper (see topicClustering.ts).
@@ -127,6 +149,7 @@ export async function nlpgoFetch<T = unknown>(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-LangWatch-Origin": opts.origin,
+    ...nlpgoInternalHeaders(),
   };
 
   // Causality depth: forwarded to nlpgo only when the caller is part of
@@ -161,6 +184,9 @@ export async function nlpgoFetch<T = unknown>(
     // sync-invoke Payload cap (per-project ARN path only; no-op for the
     // self-hosted HTTP URL path).
     projectId: opts.projectId,
+    timeoutMs: opts.timeoutMs,
+    signal: opts.signal,
+    dispatcher: opts.dispatcher,
   });
 
   return {

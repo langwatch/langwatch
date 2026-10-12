@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { SsoConnectionState } from "@langwatch/identity";
+import {
+  canonicalEntraIssuer,
+  type SsoConnectionState,
+} from "@langwatch/identity";
 import { withoutTrailingSlashes } from "@langwatch/identity-server";
 import type { SsoCredentialStore } from "./sso-credential-store";
 import {
@@ -171,7 +174,9 @@ async function oidcProviderFor({
   if (clientId === null || clientSecret === null) return null;
   return {
     ...base,
-    issuer,
+    // The engine compares the token's `iss` to this exactly, so an Entra ID
+    // issuer registered with a trailing slash refused every sign-in.
+    issuer: canonicalEntraIssuer(issuer),
     oidcConfig: providerConfig.seal(
       JSON.stringify({
         clientId,

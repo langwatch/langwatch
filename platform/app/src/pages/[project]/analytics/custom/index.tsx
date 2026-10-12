@@ -18,7 +18,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
-
 import {
   chakraComponents,
   Select as MultiSelect,
@@ -58,6 +57,7 @@ import {
 } from "react-hook-form";
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
+import { withAggregateAnalyticsGate } from "~/components/analytics/AggregateAnalyticsGate";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -65,6 +65,7 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
+import { showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
 import { useRouter } from "~/utils/compat/next-router";
@@ -742,6 +743,10 @@ function CustomGraphForm({
             : `/${project?.slug}/analytics/reports`;
           void router.push(dashboardUrl);
         },
+        // A refused save (an aggregate project is read only, a plan limit,
+        // a lost permission) leaves the editor open; say why.
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't save the graph" }),
       },
     );
   };
@@ -774,6 +779,8 @@ function CustomGraphForm({
             : `/${project?.slug}/analytics/reports`;
           void router.push(dashboardUrl);
         },
+        onError: (error) =>
+          showErrorToast({ error, fallbackTitle: "Couldn't save the graph" }),
       },
     );
   };
@@ -1650,4 +1657,7 @@ function GraphTypeField({
 }
 
 // No SSR in Vite — export directly (was wrapped in dynamic() for Next.js SSR avoidance)
-export default AnalyticsCustomGraphContent;
+export default withAggregateAnalyticsGate(
+  "Custom Graph",
+  AnalyticsCustomGraphContent,
+);

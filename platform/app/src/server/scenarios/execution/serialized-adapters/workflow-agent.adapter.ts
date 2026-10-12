@@ -22,16 +22,17 @@ import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentRole } from "@langwatch/scenario";
 import { randomBytes } from "crypto";
-import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
 import {
-  createNlpFetchDispatcher,
-  type FetchInitWithDispatcher,
   resolveFloorFetchTimeoutMs,
   resolveMaxFetchTimeoutMs,
 } from "../../../nlpgo/timeouts";
 import type { RunParameterValues } from "../../parameters";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { WorkflowAgentData } from "../types";
+import type {
+  ExecuteSyncResponse,
+  ExecuteSyncTransport,
+} from "./execute-sync-transport";
 import { SerializedAgentAdapter } from "./serialized-agent.adapter";
 
 /**
@@ -59,7 +60,13 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   role = AgentRole.AGENT;
 
   private readonly config: WorkflowAgentData;
-  private readonly nlpServiceUrl: string;
+  /**
+   * How one turn reaches nlpgo. Self-hosted that is the engine itself; on
+   * SaaS it is the control plane, which invokes this project's own engine
+   * with a credential the child must not hold. See
+   * `./execute-sync-transport.ts`.
+   */
+  private readonly transport: ExecuteSyncTransport;
   /**
    * The LangWatch platform API key (project.apiKey), sent as
    * workflow.api_key. nlpgo forwards it verbatim as the X-Auth-Token header
@@ -79,18 +86,18 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
 
   constructor({
     config,
-    nlpServiceUrl,
+    transport,
     projectApiKey,
     parameters,
   }: {
     config: WorkflowAgentData;
-    nlpServiceUrl: string;
+    transport: ExecuteSyncTransport;
     projectApiKey: string;
     parameters?: RunParameterValues;
   }) {
     super();
     this.config = config;
-    this.nlpServiceUrl = nlpServiceUrl;
+    this.transport = transport;
     this.projectApiKey = projectApiKey;
     this.parameters = parameters ?? {};
     this.name = "SerializedWorkflowAgentAdapter";
@@ -233,7 +240,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
 
     try {
       const response = await this.postExecuteSync({
-        body: JSON.stringify(event),
+        event,
         signal: controller.signal,
         timeoutMs,
       });
@@ -258,7 +265,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
         );
       }
 
-      const result = (await response.json()) as {
+      const result = JSON.parse(await response.text()) as {
         trace_id: string;
         status: string;
         result: Record<string, unknown> | null;
@@ -270,30 +277,16 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
   }
 
   private async postExecuteSync({
-    body,
+    event,
     signal,
     timeoutMs,
   }: {
-    body: string;
+    event: unknown;
     signal: AbortSignal;
     timeoutMs: number;
-  }): Promise<UndiciResponse> {
+  }): Promise<ExecuteSyncResponse> {
     try {
-      const fetchInit: FetchInitWithDispatcher = {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body,
-        signal,
-        dispatcher: createNlpFetchDispatcher({ timeoutMs }),
-      };
-      // undici's own fetch, not the global one: Node's global fetch is bound
-      // to the undici bundled with Node, which rejects a dispatcher built by
-      // this package with "invalid onRequestStart method" (see
-      // mailer/providers/resend.ts for the same fix).
-      return await undiciFetch(
-        `${this.nlpServiceUrl}/go/studio/execute_sync`,
-        fetchInit,
-      );
+      return await this.transport.post({ event, signal, timeoutMs });
     } catch (fetchError) {
       const cause =
         fetchError instanceof Error && "cause" in fetchError
@@ -302,7 +295,7 @@ export class SerializedWorkflowAgentAdapter extends SerializedAgentAdapter {
             )})`
           : "";
       throw new Error(
-        `Workflow execution failed: fetch to ${this.nlpServiceUrl}/go/studio/execute_sync failed - ${
+        `Workflow execution failed: fetch to ${this.transport.endpoint} failed - ${
           fetchError instanceof Error ? fetchError.message : String(fetchError)
         }${cause}`,
       );

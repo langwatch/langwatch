@@ -18,6 +18,16 @@ import { Dialog } from "../ui/dialog";
  */
 const SEAT_LIMIT_TYPES = new Set(["members", "membersLite"]);
 
+/**
+ * Creation caps on the cloud Free plan. Only creating one more is refused,
+ * so the modal says that what the organization has stays usable.
+ */
+const CREATION_LIMIT_TYPES = new Set([
+  "scenarios",
+  "scenarioSets",
+  "evaluators",
+]);
+
 function LimitContentBody({
   variant,
 }: {
@@ -40,6 +50,11 @@ function LimitContentBody({
           <Text>
             You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
             on your current plan.
+          </Text>
+        )}
+        {CREATION_LIMIT_TYPES.has(variant.limitType) && (
+          <Text color="gray.500">
+            Everything you already have keeps working and stays editable.
           </Text>
         )}
         {SEAT_LIMIT_TYPES.has(variant.limitType) && (

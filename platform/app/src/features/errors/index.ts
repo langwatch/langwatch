@@ -25,6 +25,10 @@ export {
   explainAnyError,
   explainHandledError,
   explainSerializedError,
+  PROVIDER_CONFIG_PROBLEMS,
+  PROVIDER_CREDENTIAL_REASONS,
+  PROVIDER_INVALID_REQUEST_REASONS,
+  PROVIDER_MODEL_MISSING_REASONS,
   UNKNOWN_ERROR_PRESENTATION,
 } from "./logic/presentation";
 export type { HandledErrorShape } from "./logic/readHandledError";
@@ -36,4 +40,7 @@ export { readHandledError } from "./logic/readHandledError";
 export type { ResolvedErrorCopy } from "./logic/resolveErrorCopy";
 export { describeError, resolveErrorCopy } from "./logic/resolveErrorCopy";
 export type { ShowErrorToastOptions } from "./logic/showErrorToast";
-export { showErrorToast } from "./logic/showErrorToast";
+export {
+  reloadingWriteOptions,
+  showErrorToast,
+} from "./logic/showErrorToast";

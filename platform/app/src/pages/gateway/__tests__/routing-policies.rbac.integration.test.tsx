@@ -22,6 +22,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
   permissions: [] as string[],
+  /** What the policy list answers with instead of rows, when set. */
+  listError: null as unknown,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
@@ -97,7 +99,15 @@ vi.mock("~/utils/api", () => {
           if (property === "useQuery") {
             const key = path.join(".");
             return () =>
-              queryResult(key === "routingPolicy.list" ? POLICIES : undefined);
+              key === "routingPolicy.list" && harness.listError
+                ? {
+                    ...queryResult(undefined),
+                    isError: true,
+                    error: harness.listError,
+                  }
+                : queryResult(
+                    key === "routingPolicy.list" ? POLICIES : undefined,
+                  );
           }
           if (property === "useMutation") return mutationResult;
           if (property === "invalidate") return vi.fn();
@@ -122,11 +132,45 @@ function renderPage() {
 
 beforeEach(() => {
   harness.permissions = [];
+  harness.listError = null;
 });
 
 afterEach(() => cleanup());
 
 describe("routing policies page access", () => {
+  describe("when the server refuses the policy list for a missing grant", () => {
+    /** @scenario "A refused policy list reads as no access, not as a failed load" */
+    it("names the grant and shows neither a load error nor the table", () => {
+      // The page guard passes; the refusal is the server's answer to the list.
+      harness.permissions = ["organization:view", "routingPolicies:view"];
+      harness.listError = {
+        data: {
+          code: "FORBIDDEN",
+          error: {
+            code: "permission_denied",
+            httpStatus: 403,
+            meta: { permission: "routingPolicies:view" },
+          },
+        },
+      };
+      renderPage();
+
+      expect(
+        screen.getByText("You don't have permission to do this"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/grant you "routingPolicies:view"/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Couldn't load routing policies"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("House default")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/You can read the policies/),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe("when the viewer holds routingPolicies:view only", () => {
     /** @scenario "Routing policies opens on the grant its router asks for" */
     it("opens the page, lists the policies, and offers no authoring controls", () => {

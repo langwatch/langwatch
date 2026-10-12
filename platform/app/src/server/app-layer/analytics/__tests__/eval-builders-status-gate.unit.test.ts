@@ -153,3 +153,20 @@ describe("buildEvalSlimTimeseriesQuery — status gate on verdict metrics", () =
     });
   });
 });
+
+describe("buildEvalSlimTimeseriesQuery percentiles", () => {
+  describe("when serving a percentile of evaluation_score", () => {
+    const { sql } = buildEvalSlimTimeseriesQuery({
+      projectId: "tenant-eval-slim",
+      ...baseDates,
+      series: [{ metric: "evaluations.evaluation_score", aggregation: "p90" }],
+      timeScale: 60,
+    });
+
+    /** @scenario Dashboard percentiles use a bounded-memory estimator */
+    it("uses the bounded-memory t-digest estimator", () => {
+      expect(sql).toContain("quantileTDigest(0.9)(");
+      expect(sql).not.toContain("quantileExact");
+    });
+  });
+});

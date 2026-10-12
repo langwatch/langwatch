@@ -89,8 +89,10 @@ function makeService({
         return addressIsConfirmed ? "confirmed" : "awaiting_confirmation";
       },
     },
-    buildVerificationUrl: ({ token }) =>
-      `https://app.test/auth/signup?verify=${token}`,
+    buildVerificationUrl: ({ token, callbackUrl }) =>
+      `https://app.test/auth/signup?verify=${token}${
+        callbackUrl ? `&callbackUrl=${encodeURIComponent(callbackUrl)}` : ""
+      }`,
     now: () => clock,
     mintToken: vi.fn(() => {
       mints += 1;
@@ -211,6 +213,18 @@ describe("given a sign-up address to confirm", () => {
       // send this one, and the password is chosen once, on the screen the
       // link lands on, where it is typed twice and held to a length.
       expect(harness.issued[0]?.identifier).toContain('"passwordHash":null');
+    });
+
+    /** @scenario The emailed confirmation link brings the terminal's continuation along */
+    it("carries the continuation the screen was started with, so a fresh tab lands where the first one was going", async () => {
+      await harness.service.requestVerification({
+        email: "sam@acme.com",
+        callbackUrl: "/cli/auth?user_code=ABCD-EFGH",
+      });
+
+      expect(harness.sent[0]?.verificationUrl).toContain(
+        `callbackUrl=${encodeURIComponent("/cli/auth?user_code=ABCD-EFGH")}`,
+      );
     });
 
     it("returns a proof for the account step that follows the link", async () => {

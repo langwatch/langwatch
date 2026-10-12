@@ -313,6 +313,29 @@ Feature: Saved Views on Analytics
     And delete buttons and hint text disappear
     And the views function normally for click-to-filter
 
+  @integration
+  Scenario Outline: A saved-view change the server refuses is rolled back
+    Given the bar shows the saved views from the server
+    When I <change> and the server refuses it
+    Then an error toast explains the refusal
+    And its title is the registered one for a known cause, such as "Data can't be added to this project", or "<title>" otherwise
+    And the bar reloads the views from the server, so it shows them as they were
+
+    Examples:
+      | change                         | title                       |
+      | save the current filters       | Couldn't save the view      |
+      | rename a view                  | Couldn't rename the view    |
+      | delete a view                  | Couldn't delete the view    |
+      | reorder the views              | Couldn't reorder the views  |
+
+  @integration
+  Scenario: A refused saved-view create leaves no temporary view selected
+    Given the bar shows the saved views from the server
+    And my current filters match none of them
+    When I save the current filters as a view and the server refuses it
+    Then the new view disappears from the bar without waiting for the reload
+    And no view is selected
+
   # ─── Step 5: View Matching and Edge Cases ───────────────────────────
 
   @unit @unimplemented

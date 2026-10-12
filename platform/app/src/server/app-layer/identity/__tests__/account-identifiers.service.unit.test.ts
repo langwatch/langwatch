@@ -273,4 +273,62 @@ describe("adding an address to an account", () => {
       });
     });
   });
+
+  describe("given the account's own address was confirmed on the account but never through its identifier", () => {
+    const heads = {
+      userId: USER_ID,
+      identifiers: {
+        own: head({
+          identifierId: "own",
+          value: "Sam@Acme.test",
+          state: "ATTACHED",
+          verifiedAtMs: null,
+        }),
+        other: head({
+          identifierId: "other",
+          value: "sam@other.test",
+          state: "ATTACHED",
+          verifiedAtMs: null,
+          attachedAtMs: 2,
+        }),
+      },
+    } as IdentityHeads;
+
+    describe("when the list is read with the account's own address confirmed", () => {
+      /** @scenario The account's own address confirmed outside the app shows as confirmed */
+      it("shows the own address as confirmed and offers no resend for it", async () => {
+        const { service } = build({ heads });
+
+        const list = await service.listIdentifiers({
+          userId: USER_ID,
+          accountAddress: { email: "sam@acme.test", confirmed: true },
+        });
+        const byId = Object.fromEntries(
+          list.map((row) => [row.identifierId, row]),
+        );
+
+        expect(byId.own?.confirmed).toBe(true);
+        expect(byId.own?.resendable).toBe(false);
+        // Only the account's own address follows the account's column.
+        expect(byId.other?.confirmed).toBe(false);
+        expect(byId.other?.resendable).toBe(true);
+      });
+    });
+
+    describe("when the account's own address is not confirmed either", () => {
+      /** @scenario The account's own address confirmed outside the app shows as confirmed */
+      it("keeps it as not confirmed yet", async () => {
+        const { service } = build({ heads });
+
+        const list = await service.listIdentifiers({
+          userId: USER_ID,
+          accountAddress: { email: "sam@acme.test", confirmed: false },
+        });
+
+        expect(list.find((row) => row.identifierId === "own")?.confirmed).toBe(
+          false,
+        );
+      });
+    });
+  });
 });

@@ -111,6 +111,12 @@ export function useLangyChatEngine({
     setMessagesRef.current(uiMessages as unknown as UIMessage[]);
   }, []);
 
+  const retryTurn = useRetryKeepingFailedReply({
+    messages,
+    regenerate,
+    setMessagesRef,
+  });
+
   const resetEngine = useCallback(
     ({ clearMessages }: { clearMessages: boolean }) => {
       void stop();
@@ -128,6 +134,13 @@ export function useLangyChatEngine({
     error,
     regenerate,
     /**
+     * Re-drive the last turn after it failed, keeping what the failed turn
+     * already did (its plan, its tool calls, its partial answer) on screen.
+     * The retried turn continues the same agent session, so that work is
+     * still the context it runs in.
+     */
+    retryTurn,
+    /**
      * Reattach to a turn this tab did not dispatch (the transport's
      * `getResumeTarget` names it). The stream then writes into a new
      * assistant message, or into the last message when it already is one.
@@ -142,4 +155,47 @@ export function useLangyChatEngine({
      */
     clearError,
   };
+}
+
+/**
+ * Re-drive the last turn and keep the failed reply on screen.
+ *
+ * `regenerate` drops the last assistant message and re-drives the turn
+ * against the user's message already on record. It reads the conversation
+ * synchronously before its first await, so the failed reply put back right
+ * after it stays on screen, and the retried turn's answer lands as a new
+ * message below it instead of replacing it.
+ */
+function useRetryKeepingFailedReply({
+  messages,
+  regenerate,
+  setMessagesRef,
+}: {
+  messages: UIMessage[];
+  regenerate: () => Promise<void>;
+  setMessagesRef: {
+    current: (update: (current: UIMessage[]) => UIMessage[]) => void;
+  };
+}): () => void {
+  // The messages as of the last render, read at call time so the callback is
+  // not re-created on every streamed token.
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  return useCallback(() => {
+    const failedReply = replyToKeepOnRetry(messagesRef.current);
+    void regenerate();
+    if (failedReply) {
+      setMessagesRef.current((current) => [...current, failedReply]);
+    }
+  }, [regenerate, setMessagesRef]);
+}
+
+/**
+ * The failed turn's reply, when it has something to show. `regenerate` would
+ * drop it, and with it the plan card and the tool calls the turn already ran.
+ */
+function replyToKeepOnRetry(messages: readonly UIMessage[]): UIMessage | null {
+  const last = messages.at(-1);
+  if (last?.role !== "assistant" || last.parts.length === 0) return null;
+  return last;
 }

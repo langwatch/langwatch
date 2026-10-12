@@ -1,0 +1,143 @@
+---
+title: Routing and ingress controllers
+description: "The hosts, paths, Services, timeouts and body sizes to expose for LangWatch on any ingress controller or Gateway API implementation"
+sidebarTitle: Routing
+---
+
+A Helm install creates no Ingress by default. Turn on the chart Ingress, which can carry the AI Gateway host too, or write your own routes with Envoy Gateway, another Gateway API implementation, Traefik or a cloud load balancer. This page lists what those routes must expose.
+
+## What to expose
+
+LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and coding agents reach the LangWatch AI Gateway.
+
+| Host | Path | Match | Backend Service | Port |
+|---|---|---|---|---|
+| App, for example `langwatch.acme.com` | `/` | Prefix | `<release>-app` | `5560` |
+| App | `/api/internal` | Prefix | Do not route. Block it. | |
+| Gateway, for example `gateway.acme.com` | `/v1` | Prefix | `<release>-gateway` | `80` |
+| Gateway | `/health` | Exact | `<release>-gateway` | `80` |
+
+`<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
+
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+
+`/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
+
+## Proxy settings
+
+| Setting | App | Gateway |
+|---|---|---|
+| Response buffering | Off, for Server-Sent Events under `/api/sse` and streamed runs | Off, for streamed completions |
+| Request buffering | Default | Off |
+| Idle or read timeout | Above 30 seconds. Streams send a keep-alive every 25 seconds and long polls wait up to 25 seconds. `120` is a good value. | At least 60 seconds. Non-streaming calls send a heartbeat every 45 seconds. The chart nginx default is `3600`. |
+| Total request timeout | Disabled, or longer than your longest stream | Disabled, or above 15 minutes. A provider call can run up to 14 minutes. |
+| Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
+| WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
+
+Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. On the gateway Ingress the chart sets both buffering annotations to off so a controller-wide setting cannot change them. The app Ingress keeps the controller defaults. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
+
+## Chart Ingress
+
+The chart renders an Ingress for the app when `ingress.enabled` is `true`. Set `ingress.gateway.host` and it renders a second Ingress, `<release>-gateway-ingress`, for the gateway host. The second Ingress uses the same `className`, `labels` and `annotations` as the app Ingress, minus the nginx `rewrite-target`, `use-regex` and `app-root` annotations, which would break the gateway paths.
+
+It is a separate object because ingress-nginx and similar controllers apply annotations to a whole Ingress, and the gateway needs streaming settings that the app routes do not.
+
+On ingress-nginx:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+  hosts:
+    - host: langwatch.acme.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.acme.com
+  gateway:
+    host: gateway.acme.com
+    tls:
+      secretName: gateway-tls
+```
+
+With `className: nginx` the chart adds these to the gateway Ingress only: `proxy-buffering: "off"`, `proxy-request-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` and `proxy-body-size: 32m`. They override the same keys from `ingress.annotations`. Keys in `ingress.gateway.annotations` override both.
+
+The chart matches on the value of `className`. If `className` is empty and the cluster default IngressClass is ingress-nginx, the gateway Ingress gets none of these settings. On ingress-nginx, set `className: nginx`.
+
+On another controller, set `className` to your IngressClass, or leave it empty for the cluster default. Put the gateway settings for that controller in `ingress.gateway.annotations`. Traefik works with `className: traefik` and no extra annotations for buffering. It can also serve the HTTPRoutes below through its Gateway API provider.
+
+## Gateway API (Envoy Gateway)
+
+Leave the chart Ingress off and attach HTTPRoutes to your Gateway. Set `gateway.publicUrl`, because the control plane cannot derive the gateway URL without `ingress.gateway.host`.
+
+```yaml
+# values.yaml
+ingress:
+  enabled: false
+gateway:
+  publicUrl: https://gateway.acme.com
+```
+
+These routes are for release `langwatch` in namespace `langwatch`, on a Gateway named `public` in namespace `envoy-gateway-system`:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: langwatch-app
+  namespace: langwatch
+spec:
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system
+  hostnames:
+    - langwatch.acme.com
+  rules:
+    # No backendRefs: requests to the private control plane get a 5xx.
+    - matches:
+        - path: { type: PathPrefix, value: /api/internal }
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: langwatch-app
+          port: 5560
+      timeouts:
+        request: 0s
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: langwatch-gateway
+  namespace: langwatch
+spec:
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system
+  hostnames:
+    - gateway.acme.com
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /v1 }
+        - path: { type: Exact, value: /health }
+      backendRefs:
+        - name: langwatch-gateway
+          port: 80
+      timeouts:
+        request: 0s
+```
+
+`request: 0s` turns off the total request timeout, so streams are not cut. You do not need to order the two app rules: Gateway API matches the longest prefix first, so `/api/internal` takes precedence over `/`. Check that your implementation answers that rule with a 5xx before you rely on it.
+
+If your Gateway is in a different namespace from the routes, set `allowedRoutes.namespaces` on its listener to admit the `langwatch` namespace. If you set idle timeouts in an Envoy Gateway `ClientTrafficPolicy` or `BackendTrafficPolicy`, keep them above the values in the table.
+
+## Network policies
+
+`gateway.networkPolicy.enabled` is off by default. When you turn it on, the default `gateway.networkPolicy.ingressFrom` admits only the `ingress-nginx` namespace and Prometheus. Change it to the namespace where your proxy pods run, for example `envoy-gateway-system`, or the gateway refuses that traffic.

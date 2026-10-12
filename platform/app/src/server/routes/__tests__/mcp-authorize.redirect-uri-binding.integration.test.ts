@@ -136,6 +136,17 @@ function resetMocks() {
   mockPrisma.organizationUser.findFirst
     .mockReset()
     .mockResolvedValue({ role: "MEMBER", disabledAt: null });
+  mockPrisma.project.findUnique
+    .mockReset()
+    .mockImplementation(({ select }: { select?: { team?: unknown } }) =>
+      select?.team
+        ? Promise.resolve({ team: { id: TEAM_ID, organizationId: ORG_ID } })
+        : Promise.resolve({
+            id: PROJECT_ID,
+            apiKey: "lw_test_key",
+            archivedAt: null as Date | null,
+          }),
+    );
 }
 
 describe("POST /api/mcp/authorize — redirect_uri binding", () => {
@@ -309,6 +320,53 @@ describe("POST /api/mcp/authorize — where failures are reported", () => {
       expect(res.status).toBe(400);
       expect(json.redirect).toBeUndefined();
       expect(json.error).toBe("Unknown or unregistered client_id");
+    });
+  });
+});
+
+/**
+ * ADR-144 decision 7: an aggregate accepts no credential, and an MCP
+ * authorization code carries the project's base key. So even an
+ * organisation admin, who may open the aggregate, is refused a code for it.
+ */
+describe("POST /api/mcp/authorize, given a project that holds no credential", () => {
+  beforeEach(resetMocks);
+
+  describe("when an organisation admin authorizes an aggregate project", () => {
+    it("is refused with the aggregate's code and never mints an authorization code", async () => {
+      mockRedis.get.mockResolvedValueOnce(registeredClient());
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: "ADMIN",
+        disabledAt: null,
+      });
+      mockPrisma.project.findUnique.mockImplementation(
+        ({ select }: { select?: { team?: unknown; kind?: unknown } }) =>
+          select?.team
+            ? Promise.resolve({
+                team: { id: TEAM_ID, organizationId: ORG_ID },
+              })
+            : Promise.resolve({
+                id: PROJECT_ID,
+                apiKey: "lw_test_key",
+                archivedAt: null as Date | null,
+                kind: "aggregate",
+              }),
+      );
+
+      const res = await authorize();
+      const json = (await res.json()) as {
+        error?: string;
+        code?: string;
+        redirect?: string;
+      };
+
+      expect(res.status).toBe(403);
+      expect(json.error).toBe("access_denied");
+      expect(json.code).toBe("aggregate_project_has_no_credential");
+      const redirect = new URL(json.redirect ?? "");
+      expect(redirect.searchParams.get("error")).toBe("access_denied");
+      expect(redirect.searchParams.get("code")).toBeNull();
+      expect(mockRedis.set).not.toHaveBeenCalled();
     });
   });
 });

@@ -3,6 +3,10 @@ import type { AuthzDenialReason, AuthzPermission } from "@langwatch/authz";
 import type { AuthzService } from "@langwatch/authz-server";
 import type { OrganizationUserRole } from "~/generated/prisma/client";
 import { isDemoProject } from "~/server/app-layer/authz/permission-adapters";
+import {
+  applyAggregateAdminGate,
+  type ProjectKindReader,
+} from "./aggregate-admin-gate";
 
 export type PermissionDecision = {
   permitted: boolean;
@@ -42,13 +46,22 @@ export class EnginePermissionDecisionRepository
   implements PermissionDecisionRepository
 {
   readonly #authz: AuthzService;
+  readonly #kinds: ProjectKindReader;
 
-  private constructor(authz: AuthzService) {
+  private constructor(authz: AuthzService, kinds: ProjectKindReader) {
     this.#authz = authz;
+    this.#kinds = kinds;
   }
 
-  static create(authz: AuthzService): EnginePermissionDecisionRepository {
-    return new EnginePermissionDecisionRepository(authz);
+  /**
+   * `kinds` lets every project decision apply the aggregate admin-only rule
+   * (ADR-144 decision 5) on top of the engine's answer.
+   */
+  static create(
+    authz: AuthzService,
+    kinds: ProjectKindReader,
+  ): EnginePermissionDecisionRepository {
+    return new EnginePermissionDecisionRepository(authz, kinds);
   }
 
   async findProjectDecision(input: {
@@ -59,7 +72,11 @@ export class EnginePermissionDecisionRepository
     if (isDemoProject(input.projectId, input.permission)) {
       return { permitted: true, organizationRole: null };
     }
-    return this.#check(input);
+    return applyAggregateAdminGate({
+      decision: await this.#check(input),
+      projectId: input.projectId,
+      kinds: this.#kinds,
+    });
   }
 
   async findProjectAnyDecision({
@@ -81,11 +98,15 @@ export class EnginePermissionDecisionRepository
       projectId,
       permissions,
     });
-    return {
-      permitted: decision.allowed,
-      organizationRole: decision.organizationRole,
-      denialReason: decision.denialReason,
-    };
+    return applyAggregateAdminGate({
+      decision: {
+        permitted: decision.allowed,
+        organizationRole: decision.organizationRole,
+        denialReason: decision.denialReason,
+      },
+      projectId,
+      kinds: this.#kinds,
+    });
   }
 
   findTeamDecision(input: {

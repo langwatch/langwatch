@@ -35,7 +35,6 @@ import {
   slackConnectionMissingDispatchError,
 } from "~/server/app-layer/automations/slack-integration/slack-destination-resolver";
 import type { TriggerService } from "~/server/app-layer/automations/trigger.service";
-import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
@@ -128,7 +127,6 @@ export interface TriggerSettlementDispatchDeps extends ConfirmSettledMatchDeps {
   /** Base host for deep links inside rendered customer templates (ADR-036). */
   baseHost: string;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-  evaluationRuns: EvaluationRunService;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   addToAnnotationQueue: (params: {
     traceIds: string[];

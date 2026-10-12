@@ -7,6 +7,7 @@
  * spans), so the service itself stays testable against a fake reader.
  */
 
+import { internalActor } from "@langwatch/actor";
 import { getApp } from "~/server/app-layer/app";
 import type { WholeCallAudioPorts } from "./whole-call-audio.service";
 
@@ -43,8 +44,20 @@ export function createWholeCallAudioPorts(): WholeCallAudioPorts {
      *  `voice.elevenlabs.conversation_id`), so the normalized spans' own
      *  attribute records are handed straight to the scan. */
     async readSpanAttributes({ projectId, traceId }) {
-      const spans = await getApp().traces.spans.getNormalizedSpansByTraceId({
-        tenantId: projectId,
+      const app = getApp();
+      // The run-audio route admitted the caller on the scenario; the span
+      // read is fenced to the run's own project (ADR-144 block C).
+      const authorization = await app.authorization.authorizeInternal({
+        actor: internalActor("scenarios/voice/whole-call-audio.ports"),
+        projectId,
+        permission: "traces:view",
+        purpose: {
+          kind: "operator",
+          entry: "WholeCallAudioPorts.readSpanAttributes",
+        },
+      });
+      const spans = await app.traces.spans.getNormalizedSpansByTraceId({
+        authorization,
         traceId,
       });
       return spans.map((span) => span.spanAttributes);

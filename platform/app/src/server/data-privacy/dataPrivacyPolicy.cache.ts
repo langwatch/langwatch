@@ -47,12 +47,37 @@ function reviveCached(
 
 export class DataPrivacyPolicyCache {
   private readonly cache: TtlCache<ResolvedDataPrivacy | null>;
+  /**
+   * Resolutions in flight in this process, so concurrent reads of one
+   * project share a single walk of the cascade. An aggregate's protections
+   * resolve every member at once, and without this an expiry fans out into
+   * one cascade walk per member per concurrent read.
+   */
+  private readonly inFlight = new Map<
+    string,
+    Promise<ResolvedDataPrivacy | null>
+  >();
 
   constructor(private readonly repository: DataPrivacyPolicyRepository) {
     this.cache = new TtlCache(60_000, "data-privacy-policy:");
   }
 
-  async resolve(projectId: string): Promise<ResolvedDataPrivacy | null> {
+  resolve(projectId: string): Promise<ResolvedDataPrivacy | null> {
+    const pending = this.inFlight.get(projectId);
+    if (pending) return pending;
+    const resolution = this.resolveUncoalesced(projectId).finally(() => {
+      // Only this resolution's own entry: an invalidate may have replaced it.
+      if (this.inFlight.get(projectId) === resolution) {
+        this.inFlight.delete(projectId);
+      }
+    });
+    this.inFlight.set(projectId, resolution);
+    return resolution;
+  }
+
+  private async resolveUncoalesced(
+    projectId: string,
+  ): Promise<ResolvedDataPrivacy | null> {
     const cached = await this.cache.get(projectId);
     if (cached !== undefined) {
       const revived = reviveCached(cached);
@@ -65,6 +90,9 @@ export class DataPrivacyPolicyCache {
   }
 
   invalidate(projectId: string): void {
+    // A read already in flight may have loaded the rules before the change,
+    // so the next read starts its own resolution rather than joining it.
+    this.inFlight.delete(projectId);
     // Best-effort: a failed cache delete is self-healing because every entry
     // expires on the 60s TTL anyway, so a stale resolution survives at most
     // one TTL window rather than indefinitely. Swallow to keep invalidate()

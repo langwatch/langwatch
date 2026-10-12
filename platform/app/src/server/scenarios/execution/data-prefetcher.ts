@@ -82,6 +82,7 @@ import {
 } from "../voice/caller-voice.config";
 import { voiceCallMaxSeconds } from "../voice/voice-limits";
 import { resolveTraceWaitTimeoutMs } from "./ingest-lag.service";
+import { resolveExecuteSyncRoute } from "./resolve-execute-sync-route";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
@@ -745,6 +746,7 @@ export async function prefetchScenarioData({
       simulatorModelParams: simulatorParamsResult.params,
       judgeModelParams: judgeParamsResult.params,
       nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
+      executeSyncRoute: resolveExecuteSyncRoute(),
       target,
       ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
       // The simulated caller's voice, carried to the child for a voice target

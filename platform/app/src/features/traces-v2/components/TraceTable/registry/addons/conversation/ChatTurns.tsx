@@ -219,7 +219,11 @@ const TurnDivider: React.FC<{
           {formatDuration(trace.durationMs)}
         </Text>
         <Box marginLeft={1}>
-          <TraceIdPeek traceId={trace.traceId} occurredAtMs={trace.timestamp} />
+          <TraceIdPeek
+            traceId={trace.traceId}
+            occurredAtMs={trace.timestamp}
+            ownerProjectId={trace.projectId}
+          />
         </Box>
       </HStack>
       <Box

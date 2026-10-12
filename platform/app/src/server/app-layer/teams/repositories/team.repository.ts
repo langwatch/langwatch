@@ -37,7 +37,14 @@ export interface TeamRepository {
    * (`src/server/__tests__/projectFilter.invariant.integration.test.ts`) can
    * drive this listing the way it drives every other one.
    */
-  findProjectsInTeam(params: { teamId: string }): Promise<TeamProjectListing[]>;
+  findProjectsInTeam(params: {
+    teamId: string;
+    /**
+     * Leaves out the governance project always, and aggregate projects unless
+     * the caller is an organisation admin (ADR-144 decision 5).
+     */
+    callerOrganizationRole: string | null;
+  }): Promise<TeamProjectListing[]>;
   listMembers(params: {
     organizationId: string;
     teamId: string;

@@ -2,14 +2,17 @@
  * Unit tests for currency-aware pricing strings in billing-plans.
  *
  * Verifies that getGrowthFeatures() and getGrowthPlanFeatures() produce
- * the correct per-100K events pricing line for each supported currency.
+ * the correct per-100K events and per-GB retention pricing lines for each
+ * supported currency.
  */
 
 import { describe, expect, it } from "vitest";
 import { Currency } from "~/generated/prisma/client";
+import { FREE_PLAN_CREATION_CAPS } from "../../../../ee/billing/planLimits";
 import {
   buildEnterprisePlanFeatures,
   ENTERPRISE_PLAN_FEATURES,
+  FREE_PLAN_FEATURES,
   getGrowthFeatures,
   getGrowthPlanFeatures,
   WEBHOOK_FEATURE_LABEL,
@@ -40,6 +43,12 @@ describe("getGrowthPlanFeatures()", () => {
 
       expect(features).toContain("\u20AC5 per additional 100,000 events");
     });
+
+    it("contains the EUR retention pricing string", () => {
+      const features = getGrowthPlanFeatures(Currency.EUR);
+
+      expect(features).toContain("30 days retention (+ custom at \u20AC3/GB)");
+    });
   });
 
   describe("when currency is USD", () => {
@@ -47,6 +56,12 @@ describe("getGrowthPlanFeatures()", () => {
       const features = getGrowthPlanFeatures(Currency.USD);
 
       expect(features).toContain("$6 per additional 100,000 events");
+    });
+
+    it("contains the USD retention pricing string", () => {
+      const features = getGrowthPlanFeatures(Currency.USD);
+
+      expect(features).toContain("30 days retention (+ custom at $4/GB)");
     });
   });
 });
@@ -79,6 +94,23 @@ describe("buildEnterprisePlanFeatures()", () => {
   describe("given a plan that says nothing about webhook endpoints", () => {
     it("lists everything, since silence is answered by the tier and not by us", () => {
       expect(buildEnterprisePlanFeatures({})).toEqual(ENTERPRISE_PLAN_FEATURES);
+    });
+  });
+});
+
+describe("FREE_PLAN_FEATURES", () => {
+  describe("when the Free plan card is shown", () => {
+    /** @scenario The Free plan card matches the pricing page */
+    it("lists the creation caps the plan enforces, as the pricing page does", () => {
+      const { maxScenarios, maxScenarioSets, maxEvaluators } =
+        FREE_PLAN_CREATION_CAPS;
+
+      expect(FREE_PLAN_FEATURES).toContain(
+        `${maxScenarios} scenarios, ${maxScenarioSets} simulations, ${maxEvaluators} custom evals`,
+      );
+      expect(FREE_PLAN_FEATURES).toContain(
+        "3 scenarios, 3 simulations, 3 custom evals",
+      );
     });
   });
 });

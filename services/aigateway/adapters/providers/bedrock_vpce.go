@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	brdocument "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/document"
 	brtypes "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
+	"github.com/aws/smithy-go"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 
 	"github.com/bytedance/sonic"
@@ -62,12 +64,8 @@ func credExtra(cred domain.Credential, keys ...string) string {
 // to the VPC endpoint, using the static AWS credentials carried on the
 // credential's Extra map.
 func newBedrockRuntimeClient(cred domain.Credential, endpoint string) *bedrockruntime.Client {
-	region := credExtra(cred, "region", "aws_region_name")
-	if region == "" {
-		region = "us-east-1"
-	}
 	cfg := aws.Config{
-		Region: region,
+		Region: bedrockRegion(cred),
 		Credentials: credentials.NewStaticCredentialsProvider(
 			credExtra(cred, "access_key", "aws_access_key_id"),
 			credExtra(cred, "secret_key", "aws_secret_access_key"),
@@ -131,6 +129,46 @@ func bedrockVPCEEndpoint(cred domain.Credential) (string, error) {
 	return endpoint, nil
 }
 
+// bedrockConverseEndpoint decides which Bedrock requests leave bifrost for
+// the SDK Converse lane, and the endpoint that lane dispatches through. A
+// credential carrying a runtime VPC endpoint always goes through it. Without
+// one, OpenAI models (gpt-5.x via the global.openai.* inference profiles,
+// gpt-oss) still take the Converse lane over the public regional runtime
+// host: bifrost sends every model id containing "gpt-" to the separate
+// bedrock-mantle endpoint, which needs the bedrock-mantle:CreateInference
+// permission, while a Bedrock credential is normally granted
+// bedrock:InvokeModel only. Converse serves the same models with that grant.
+// Returns "" to stay on bifrost.
+func bedrockConverseEndpoint(cred domain.Credential, model string) (string, error) {
+	endpoint, err := bedrockVPCEEndpoint(cred)
+	if err != nil || endpoint != "" {
+		return endpoint, err
+	}
+	if cred.ProviderID != domain.ProviderBedrock || !bedrockMantleModel(bedrockModelID(model, cred)) {
+		return "", nil
+	}
+	public := "https://bedrock-runtime." + bedrockRegion(cred) + ".amazonaws.com"
+	if err := validateBedrockEndpoint(public); err != nil {
+		return "", err
+	}
+	return public, nil
+}
+
+// bedrockMantleModel mirrors bifrost's isMantleModel: the model ids bifrost
+// routes to the bedrock-mantle endpoint instead of bedrock-runtime.
+func bedrockMantleModel(model string) bool {
+	return strings.Contains(model, "gpt-")
+}
+
+// bedrockRegion is the credential's AWS region, us-east-1 when unset (the
+// same default bifrost applies).
+func bedrockRegion(cred domain.Credential) string {
+	if region := credExtra(cred, "region", "aws_region_name"); region != "" {
+		return region
+	}
+	return "us-east-1"
+}
+
 // bedrockModelID resolves the public model id to the provider-specific
 // deployment / inference-profile id when the credential carries a mapping.
 func bedrockModelID(model string, cred domain.Credential) string {
@@ -188,13 +226,7 @@ func (r *BifrostRouter) dispatchBedrockVPCEStream(
 		return nil, err
 	}
 
-	streamInput := &bedrockruntime.ConverseStreamInput{
-		ModelId:         input.ModelId,
-		Messages:        input.Messages,
-		System:          input.System,
-		InferenceConfig: input.InferenceConfig,
-		ToolConfig:      input.ToolConfig,
-	}
+	streamInput := converseStreamInput(input)
 
 	client := newBedrockRuntimeClient(cred, endpoint)
 	out, err := client.ConverseStream(ctx, streamInput)
@@ -208,6 +240,20 @@ func (r *BifrostRouter) dispatchBedrockVPCEStream(
 		model:         model,
 		paramsDropped: dropped,
 	}, nil
+}
+
+// converseStreamInput carries a built Converse request onto the streaming
+// API, additional model fields included: they hold the thinking block and the
+// structured-output schema.
+func converseStreamInput(input *bedrockruntime.ConverseInput) *bedrockruntime.ConverseStreamInput {
+	return &bedrockruntime.ConverseStreamInput{
+		ModelId:                      input.ModelId,
+		Messages:                     input.Messages,
+		System:                       input.System,
+		InferenceConfig:              input.InferenceConfig,
+		ToolConfig:                   input.ToolConfig,
+		AdditionalModelRequestFields: input.AdditionalModelRequestFields,
+	}
 }
 
 // buildConverseInput reuses the gateway's existing OpenAI->Bifrost parser and
@@ -231,7 +277,10 @@ func (r *BifrostRouter) buildConverseInput(
 		return nil, nil, err
 	}
 
-	additional, err := mapBedrockAdditionalFields(ctx, bfReq.Params, model)
+	// The family checks read the id the request is dispatched as, the same
+	// one bedrockConverseEndpoint routed on, so a deployment alias of an
+	// OpenAI model maps like the model itself.
+	additional, err := mapBedrockAdditionalFields(ctx, bfReq.Params, bedrockModelID(model, cred))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -354,13 +403,27 @@ func (m bedrockFieldMapper) applyThinkingEffort(ctx context.Context) error {
 // applyResponseFormat writes the output_config block for a json_schema
 // request, refusing the families this endpoint cannot enforce it for.
 func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
-	schema, _, ok := jsonSchemaFromResponseFormat(m.params.ResponseFormat)
+	schema, name, ok := jsonSchemaFromResponseFormat(m.params.ResponseFormat)
 	if !ok {
+		return nil
+	}
+	if bedrockOpenAIStructuredOutputModel(m.model) {
+		// OpenAI models on Converse take the Responses API shape,
+		// text.format. The chat-completions response_format is ignored by
+		// gpt-5.5 and refused by gpt-6 as an unknown parameter.
+		if name == "" {
+			name = "response"
+		}
+		format := map[string]any{"type": "json_schema", "name": name, "schema": schema}
+		if strict, isBool := jsonSchemaStrict(m.params.ResponseFormat); isBool {
+			format["strict"] = strict
+		}
+		m.fields["text"] = map[string]any{"format": format}
 		return nil
 	}
 	if !bfschemas.IsAnthropicModel(m.model) {
 		return herr.New(ctx, domain.ErrUnsupportedParameter, herr.M{
-			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: the managed Bedrock endpoint enforces json_schema for Anthropic models only. Remove it, or use an Anthropic model", m.model),
+			"message": fmt.Sprintf("refusing to drop 'response_format' for bedrock/%s: this model does not enforce a json_schema on Bedrock (Anthropic models and OpenAI GPT-5 and later do; gpt-oss does not). Remove it, or use one of those models", m.model),
 			"fault":   "customer",
 		})
 	}
@@ -368,6 +431,23 @@ func (m bedrockFieldMapper) applyResponseFormat(ctx context.Context) error {
 	// so the schema name the caller sent has nowhere to go.
 	setOutputConfig(m.fields, "format", map[string]any{"type": "json_schema", "schema": schema})
 	return nil
+}
+
+// bedrockOpenAIStructuredOutputModel reports whether an OpenAI model on
+// Bedrock enforces a json_schema sent as text.format. gpt-oss answers it
+// with free text around the JSON, so it is not one of them.
+func bedrockOpenAIStructuredOutputModel(model string) bool {
+	return bedrockMantleModel(model) && !strings.Contains(model, "gpt-oss")
+}
+
+// jsonSchemaStrict reads json_schema.strict when the caller set it.
+func jsonSchemaStrict(rf *interface{}) (bool, bool) {
+	js, isMap := responseFormatJSONSchema(rf)
+	if !isMap {
+		return false, false
+	}
+	strict, isBool := js["strict"].(bool)
+	return strict, isBool
 }
 
 // anthropicMinimumThinkingBudget and bedrockDefaultCompletionMaxTokens
@@ -397,14 +477,7 @@ func setOutputConfig(fields map[string]any, key string, value any) {
 // absent response_format or other types (json_object never reaches this
 // mapper: the parameter policy refuses it on the bedrock lane).
 func jsonSchemaFromResponseFormat(rf *interface{}) (schema any, name string, ok bool) {
-	if rf == nil {
-		return nil, "", false
-	}
-	m, isMap := (*rf).(map[string]interface{})
-	if !isMap || m["type"] != "json_schema" {
-		return nil, "", false
-	}
-	js, isMap := m["json_schema"].(map[string]interface{})
+	js, isMap := responseFormatJSONSchema(rf)
 	if !isMap {
 		return nil, "", false
 	}
@@ -416,57 +489,81 @@ func jsonSchemaFromResponseFormat(rf *interface{}) (schema any, name string, ok 
 	return schema, name, true
 }
 
+// responseFormatJSONSchema returns the json_schema object of a json_schema
+// response format.
+func responseFormatJSONSchema(rf *interface{}) (map[string]interface{}, bool) {
+	if rf == nil {
+		return nil, false
+	}
+	m, isMap := (*rf).(map[string]interface{})
+	if !isMap || m["type"] != "json_schema" {
+		return nil, false
+	}
+	js, isMap := m["json_schema"].(map[string]interface{})
+	return js, isMap
+}
+
 // mapBedrockMessages splits the neutral Bifrost message list into Bedrock's
-// system prompt blocks and conversation messages. Bedrock Converse only allows
-// user/assistant roles, so a tool-role message is mapped to a user message
-// carrying a ToolResultBlock.
+// system prompt blocks and conversation messages.
+//
+// Converse only allows user and assistant roles, and it requires them to
+// alternate. A tool-role message becomes a ToolResultBlock on the user side,
+// and every block that lands on the same side as the message before it joins
+// that message: the results of parallel tool calls answer one assistant turn,
+// so they must sit in one user message (Converse rejects the turn otherwise,
+// "Expected toolResult blocks at messages.N.content"), and user text sent
+// right after them joins that message too. System and developer messages are
+// hoisted to the system prompt wherever they appear, and a message with no
+// content is dropped, which can leave two same-side messages adjacent; they
+// merge the same way.
 func mapBedrockMessages(in []bfschemas.ChatMessage) ([]brtypes.SystemContentBlock, []brtypes.Message, error) {
 	var system []brtypes.SystemContentBlock
 	var messages []brtypes.Message
 
 	for _, m := range in {
-		switch m.Role {
-		case bfschemas.ChatMessageRoleSystem, bfschemas.ChatMessageRoleDeveloper:
+		if m.Role == bfschemas.ChatMessageRoleSystem || m.Role == bfschemas.ChatMessageRoleDeveloper {
 			for _, text := range messageTexts(m) {
 				system = append(system, &brtypes.SystemContentBlockMemberText{Value: text})
 			}
-
-		case bfschemas.ChatMessageRoleTool:
-			blocks := toolResultBlocks(m)
-			if len(blocks) == 0 {
-				continue
-			}
-			messages = append(messages, brtypes.Message{
-				Role:    brtypes.ConversationRoleUser,
-				Content: blocks,
-			})
-
-		case bfschemas.ChatMessageRoleUser:
-			content := userContentBlocks(m)
-			if len(content) == 0 {
-				continue
-			}
-			messages = append(messages, brtypes.Message{
-				Role:    brtypes.ConversationRoleUser,
-				Content: content,
-			})
-
-		case bfschemas.ChatMessageRoleAssistant:
-			content := assistantContentBlocks(m)
-			if len(content) == 0 {
-				continue
-			}
-			messages = append(messages, brtypes.Message{
-				Role:    brtypes.ConversationRoleAssistant,
-				Content: content,
-			})
-
-		default:
-			return nil, nil, fmt.Errorf("unsupported chat message role %q", m.Role)
+			continue
 		}
+		role, content, err := converseTurn(m)
+		if err != nil {
+			return nil, nil, err
+		}
+		messages = appendConverseTurn(messages, role, content)
 	}
 
 	return system, messages, nil
+}
+
+// converseTurn maps one non-system message to the Converse side it lands on
+// and the content blocks it carries there.
+func converseTurn(m bfschemas.ChatMessage) (brtypes.ConversationRole, []brtypes.ContentBlock, error) {
+	switch m.Role {
+	case bfschemas.ChatMessageRoleTool:
+		return brtypes.ConversationRoleUser, toolResultBlocks(m), nil
+	case bfschemas.ChatMessageRoleUser:
+		return brtypes.ConversationRoleUser, userContentBlocks(m), nil
+	case bfschemas.ChatMessageRoleAssistant:
+		return brtypes.ConversationRoleAssistant, assistantContentBlocks(m), nil
+	default:
+		return "", nil, fmt.Errorf("unsupported chat message role %q", m.Role)
+	}
+}
+
+// appendConverseTurn adds content to the conversation, joining the last
+// message when it is on the same side so the roles keep alternating. Empty
+// content adds nothing.
+func appendConverseTurn(messages []brtypes.Message, role brtypes.ConversationRole, content []brtypes.ContentBlock) []brtypes.Message {
+	if len(content) == 0 {
+		return messages
+	}
+	if last := len(messages) - 1; last >= 0 && messages[last].Role == role {
+		messages[last].Content = append(messages[last].Content, content...)
+		return messages
+	}
+	return append(messages, brtypes.Message{Role: role, Content: content})
 }
 
 // messageTexts returns the plain-text fragments of a message content
@@ -540,6 +637,9 @@ func toolResultBlocks(m bfschemas.ChatMessage) []brtypes.ContentBlock {
 	}
 	if len(resultContent) == 0 && toolUseID == "" {
 		return nil
+	}
+	if len(resultContent) == 0 {
+		resultContent = []brtypes.ToolResultContentBlock{&brtypes.ToolResultContentBlockMemberText{Value: ""}}
 	}
 	return []brtypes.ContentBlock{
 		&brtypes.ContentBlockMemberToolResult{
@@ -771,19 +871,86 @@ func bedrockLLMUsage(usage *brtypes.TokenUsage) *bfschemas.BifrostLLMUsage {
 	}
 }
 
-// wrapBedrockError surfaces a Bedrock SDK error with the upstream HTTP status
-// when available so the gateway's error envelope mirrors the provider response.
+// wrapBedrockError turns a Bedrock SDK error into the error the gateway
+// surfaces. An error Bedrock answered is forwarded as an UpstreamError under
+// Bedrock's own status and exception name, so a terminal 400
+// (ValidationException) reaches the client as a 400 and is neither retried nor
+// failed over, while a 429 or 5xx stays retryable. A request the SDK refused
+// to send (a required field missing) is a deterministic bad request. Anything
+// else never got an answer and stays a retryable provider_error.
 func wrapBedrockError(ctx context.Context, err error) error {
 	var respErr *smithyhttp.ResponseError
-	if errors.As(err, &respErr) && respErr.Response != nil {
-		return herr.New(ctx, domain.ErrProviderError, herr.M{
-			"status":  respErr.Response.StatusCode,
+	if errors.As(err, &respErr) && respErr.Response != nil && respErr.Response.Response != nil &&
+		respErr.Response.StatusCode > 0 {
+		ue := &domain.UpstreamError{
+			StatusCode: respErr.Response.StatusCode,
+			Message:    err.Error(),
+			Provider:   string(domain.ProviderBedrock),
+			Headers:    forwardableUpstreamHeaders(bedrockResponseHeaders(respErr.Response.Header)),
+		}
+		var apiErr smithy.APIError
+		if errors.As(err, &apiErr) {
+			ue.ErrorType = apiErr.ErrorCode()
+			ue.ErrorCode = apiErr.ErrorCode()
+			if msg := apiErr.ErrorMessage(); msg != "" {
+				ue.Message = msg
+			}
+		}
+		return ue
+	}
+	var invalid *smithy.InvalidParamsError
+	if errors.As(err, &invalid) {
+		return herr.New(ctx, domain.ErrBadRequest, herr.M{
 			"message": err.Error(),
 		})
 	}
 	return herr.New(ctx, domain.ErrProviderError, herr.M{
 		"message": err.Error(),
 	})
+}
+
+// bedrockStreamError is the error a ConverseStream ends with mid-stream.
+// Bedrock reports these as typed exception events (ThrottlingException,
+// ValidationException, ModelStreamErrorException) on a stream already answered
+// 200. The exception name rides as the error type so the SSE error frame names
+// it, and the status Bedrock gives that exception on a plain call rides as the
+// status so the trace classifies it.
+func bedrockStreamError(err error) error {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) {
+		return fmt.Errorf("bedrock stream error: %w", err)
+	}
+	msg := apiErr.ErrorMessage()
+	if msg == "" {
+		msg = err.Error()
+	}
+	return &domain.UpstreamError{
+		StatusCode: bedrockExceptionStatus[apiErr.ErrorCode()],
+		Message:    msg,
+		ErrorType:  apiErr.ErrorCode(),
+		ErrorCode:  apiErr.ErrorCode(),
+		Provider:   string(domain.ProviderBedrock),
+	}
+}
+
+// bedrockExceptionStatus is the HTTP status Bedrock Runtime answers each
+// ConverseStream exception with when it is not inside a stream.
+var bedrockExceptionStatus = map[string]int{
+	"ValidationException":         http.StatusBadRequest,
+	"ThrottlingException":         http.StatusTooManyRequests,
+	"ServiceUnavailableException": http.StatusServiceUnavailable,
+	"ModelStreamErrorException":   http.StatusFailedDependency,
+	"InternalServerException":     http.StatusInternalServerError,
+}
+
+// bedrockResponseHeaders flattens the HTTP response headers of a Bedrock SDK
+// error for forwardableUpstreamHeaders.
+func bedrockResponseHeaders(header http.Header) map[string]string {
+	out := make(map[string]string, len(header))
+	for k := range header {
+		out[k] = header.Get(k)
+	}
+	return out
 }
 
 // --- stream iterator ---
@@ -842,7 +1009,7 @@ func (it *bedrockStreamIterator) nextTyped(ctx context.Context) (*bfschemas.Bifr
 		case event, ok := <-it.stream.Events():
 			if !ok {
 				if err := it.stream.Err(); err != nil {
-					it.err = fmt.Errorf("bedrock stream error: %w", err)
+					it.err = bedrockStreamError(err)
 				}
 				it.done = true
 				return nil, false

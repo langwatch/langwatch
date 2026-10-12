@@ -176,7 +176,8 @@ class ScenariosFacade:
 
         Args:
             scenario_id: The scenario ID to update.
-            params: Dictionary of fields to update.
+            params: Dictionary of fields to update. A field the endpoint
+                does not have is refused with a 422 that names it.
             test_suite_id: The test suite to file the scenario in. Left out,
                 the scenario keeps the test suite it is in. ``None`` files it
                 into the project's Default test suite.

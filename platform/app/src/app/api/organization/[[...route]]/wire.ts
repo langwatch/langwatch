@@ -25,7 +25,10 @@ import type { OrganizationMemberSummary } from "~/server/app-layer/organizations
 import type { InviteService } from "~/server/invites/invite.service";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import type { RoleBindingService } from "~/server/role-bindings/role-binding.service";
-import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
+import {
+  holdsSharedAccess,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "~/utils/memberRoleConstraints";
 
 /** The provider context every handler in this family receives. */
 export type OrganizationFamilyApp = BaseApp & {
@@ -164,19 +167,36 @@ export const inviteSchema = z.object({
 export const createInvitesSchema = z.object({
   invites: z
     .array(
-      z.object({
-        email: z.string().trim().min(1).email(),
-        role: z.nativeEnum(OrganizationUserRole),
-        teams: z
-          .array(
-            z.object({
-              teamId: z.string().min(1),
-              role: z.nativeEnum(TeamUserRole),
-              customRoleId: z.string().min(1).optional(),
-            }),
-          )
-          .min(1),
-      }),
+      z
+        .object({
+          email: z.string().trim().min(1).email(),
+          role: z.nativeEnum(OrganizationUserRole),
+          // Every seat but Developer is invited onto at least one team; a
+          // Developer (ADR-143) is invited onto none, and naming one is
+          // refused by the service with the seat's own code rather than as
+          // a shape error, because the shape is fine and the seat is not.
+          teams: z
+            .array(
+              z.object({
+                teamId: z.string().min(1),
+                role: z.nativeEnum(TeamUserRole),
+                customRoleId: z.string().min(1).optional(),
+              }),
+            )
+            .optional(),
+        })
+        .superRefine((invite, ctx) => {
+          if (holdsSharedAccess(invite.role) && !invite.teams?.length) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.too_small,
+              minimum: 1,
+              type: "array",
+              inclusive: true,
+              path: ["teams"],
+              message: "Array must contain at least 1 element(s)",
+            });
+          }
+        }),
     )
     .min(1)
     .max(50),
@@ -230,6 +250,8 @@ export const storedTeamAssignmentSchema = z.object({
  * comma-separated team ids that imply the organization role's default).
  */
 export const inviteTeams = (invite: OrganizationInvite) => {
+  // A Developer seat (ADR-143) is invited onto no team, whatever the row says.
+  if (!holdsSharedAccess(invite.role)) return [];
   if (Array.isArray(invite.teamAssignments)) {
     return z
       .array(storedTeamAssignmentSchema.nullable().catch(null))
