@@ -118,6 +118,7 @@ export interface TriggerActionDispatchDeps {
     datasetId: string;
     projectId: string;
     datasetRecords: DatasetRecordEntry[];
+    shouldSkipDuplicates?: boolean;
   }) => Promise<void>;
 }
 
@@ -308,6 +309,9 @@ async function addTraceToDataset({
     datasetId: params.datasetId,
     projectId: tenantId,
     datasetRecords: entries,
+    // Ids are deterministic per trigger+trace; a page retry can re-run a trace
+    // whose rows already landed (see throwIfPageShouldRetry).
+    shouldSkipDuplicates: true,
   });
 
   return true;
