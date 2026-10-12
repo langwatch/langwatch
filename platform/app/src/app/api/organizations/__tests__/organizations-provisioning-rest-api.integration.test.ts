@@ -9,6 +9,8 @@
  * taken slug deterministically, and is absent (404, not forbidden) when
  * the credential is not configured or the deployment is cloud.
  */
+
+import { auditLog } from "@ee/audit-log/auditLog";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -31,6 +33,10 @@ import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sour
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
 import { app } from "../[[...route]]/app";
+
+vi.mock("@ee/audit-log/auditLog", () => ({
+  auditLog: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe("Feature: Organization provisioning REST API for self-hosted deployments", () => {
   // Slugs are lowercase-and-hyphens by contract, and nanoid's alphabet is
@@ -88,6 +94,7 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
     // starts from the configured, self-hosted baseline.
     process.env.LANGWATCH_INSTANCE_ADMIN_API_KEY = instanceKey;
     installSelfHostedApp();
+    vi.mocked(auditLog).mockReset().mockResolvedValue(undefined);
   });
 
   afterAll(async () => {
@@ -142,6 +149,57 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
       const organization = await managed.json();
       expect(organization.id).toBe(body.organization.id);
       expect(organization.slug).toBe(`prov-acme-${ns}`);
+    });
+
+    /** @scenario The bootstrap credential is not returned before its audit record is durable */
+    it("waits for the provisioning audit before returning the bootstrap credential", async () => {
+      let releaseAudit!: () => void;
+      let auditStarted!: () => void;
+      const started = new Promise<void>((resolve) => {
+        auditStarted = resolve;
+      });
+      const pendingAudit = new Promise<void>((resolve) => {
+        releaseAudit = resolve;
+      });
+      vi.mocked(auditLog).mockImplementationOnce(async () => {
+        auditStarted();
+        await pendingAudit;
+      });
+
+      let responded = false;
+      const responsePromise = provision({
+        name: "Audited",
+        slug: `prov-audited-${ns}`,
+      }).then((response) => {
+        responded = true;
+        return response;
+      });
+
+      await started;
+      try {
+        // Give a fire-and-forget implementation a full turn to resolve. The
+        // response must remain blocked while the audit write is still pending.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(responded).toBe(false);
+      } finally {
+        releaseAudit();
+      }
+      const response = await responsePromise;
+      expect(response.status).toBe(201);
+      expect((await response.json()).adminApiKey.token).toContain("sk-lw-");
+    });
+
+    /** @scenario An unavailable audit store does not lose the one-time bootstrap credential */
+    it("returns the bootstrap credential when the audit write rejects", async () => {
+      vi.mocked(auditLog).mockRejectedValueOnce(new Error("audit unavailable"));
+
+      const response = await provision({
+        name: "Audit Failure",
+        slug: `prov-audit-failure-${ns}`,
+      });
+
+      expect(response.status).toBe(201);
+      expect((await response.json()).adminApiKey.token).toContain("sk-lw-");
     });
 
     /** @scenario A slug outside the documented shape is refused */
