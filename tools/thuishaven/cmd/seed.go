@@ -28,6 +28,7 @@ func seedSpec() commandSpec {
 		{long: "--shape", takesValue: true, value: "saas|sh-licensed|sh-free", summary: "deployment shape"},
 		{long: "--org", takesValue: true, value: "name=..,plan=free|licence,users=N[,persona=..][,owner=EMAIL][,admin=no]", summary: "create this org instead of the tier's (repeatable)"},
 		{long: "--into", takesValue: true, value: "<org-id>/<project-id>", summary: "send telemetry only, into an existing project"},
+		{long: "--resume", summary: "continue the last run of these flags on this stack, keeping its anchor and run id"},
 		{long: "--live", summary: "stream a gentle live load into the last seed's orgs"},
 		{long: "--dry-run", summary: "print the plan's counts, rows, bytes and duration; write nothing"},
 		{long: "--json", summary: "end with the logins and credentials as one JSON object"},
@@ -51,7 +52,7 @@ func runSeed(ctx context.Context, d deps, inv invocation) error {
 		}
 		return d.orch.SeedStatus(d.params)
 	}
-	err := d.orch.Seed(ctx, d.params, app.SeedRequest{Args: seedgenArgs(inv), Live: inv.has("--live"), JSON: inv.has("--json") || d.isAgent, Reveal: inv.has("--reveal")})
+	err := d.orch.Seed(ctx, d.params, app.SeedRequest{Args: seedgenArgs(inv), Live: inv.has("--live"), JSON: inv.has("--json") || d.isAgent, Reveal: inv.has("--reveal"), Resume: inv.has("--resume")})
 	if code := seedExitCode(err); code > 1 {
 		fmt.Fprintln(os.Stderr, "haven:", err)
 		os.Exit(code)
