@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sync"
+	"syscall"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -136,11 +138,13 @@ func (e *Exporter) send(ctx context.Context, payload []byte, encoding string) er
 
 	resp, err := e.client.Do(req)
 	if err != nil {
-		if ctx.Err() != nil {
-			return ctx.Err()
+		if cause := context.Cause(ctx); cause != nil {
+			return cause
 		}
-		// Connection-level failures (refused, reset, timeout) are transient.
-		return &retryableError{err: err}
+		if isTransientNetworkError(err) {
+			return &retryableError{err: err}
+		}
+		return err
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
@@ -169,6 +173,23 @@ func isRetryableStatus(code int) bool {
 	default:
 		return false
 	}
+}
+
+// isTransientNetworkError reports whether a failed request may succeed when
+// resent: what otlptracehttp retries (url.Error.Temporary, timeouts included)
+// plus a connection refused, reset or dropped mid-request. A bad URL, a TLS
+// verification failure or a refused redirect is permanent.
+func isTransientNetworkError(err error) bool {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && (urlErr.Temporary() || urlErr.Timeout()) {
+		return true
+	}
+	return errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.ECONNABORTED) ||
+		errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, io.EOF)
 }
 
 func httpStatusError(resp *http.Response, body []byte) error {
