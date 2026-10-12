@@ -106,7 +106,7 @@ import {
   lwqlPostgresEngineTableStatements,
   lwqlPostgresReaderConnectionLimit,
 } from "../provisioning/catalogStatements";
-import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../provisioning/clickhouseStatementRunner";
+import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../provisioning/clickhouseErrors";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   postgresReaderRoleStatements,

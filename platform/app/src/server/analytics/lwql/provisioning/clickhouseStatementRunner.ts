@@ -22,6 +22,8 @@
  * ({@link statementKind}), 1-based position, and a {@link clickHouseErrorSummary}
  * (numeric code and exception type, never the message) instead.
  *
+ * @see ./clickhouseErrors.ts — safe-to-log error classification
+ * @see ./statementTarget.ts — statement target/kind parsing
  * @see ./selfProvisionEntry.ts — the only caller with I/O
  * @see specs/lwql/api.feature
  */
@@ -30,265 +32,19 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 
 import type { LangWatchQLNames } from "./accessModel";
+import {
+  CLICKHOUSE_CONFIG_STORE_ERROR_CODE,
+  clickHouseErrorCode,
+  clickHouseErrorSummary,
+  NAMED_COLLECTION_CODES,
+} from "./clickhouseErrors";
+import {
+  assertPlainIdentifier,
+  statementKind,
+  statementTarget,
+} from "./statementTarget";
 
 const logger = createLogger("langwatch:analytics:lwql:clickhouseRunner");
-
-/**
- * ClickHouse error codes raised when a statement targets an LWQL entity the
- * server already owns in its read-only config store. Tolerated by
- * {@link runClickHouseStatements}: the entity belongs to another owner, so the
- * app skips it and provisions the rest.
- */
-export const CLICKHOUSE_CONFIG_STORE_ERROR_CODE = {
-  /** The user/profile/row-policy/grant target lives in `users_xml`. */
-  ACCESS_STORAGE_READONLY: 495,
-  /**
-   * A `DROP NAMED COLLECTION` of a config-XML-defined collection: the SQL store
-   * has no `<name>.sql` to remove, so the server reports it as non-existent even
-   * with `IF EXISTS`.
-   */
-  NAMED_COLLECTION_DOESNT_EXIST: 669,
-  /** A `CREATE NAMED COLLECTION` whose name is already defined in a config XML. */
-  NAMED_COLLECTION_ALREADY_EXISTS: 670,
-  /** An `ALTER`/`DROP NAMED COLLECTION` of a config-XML-owned, immutable collection. */
-  NAMED_COLLECTION_IS_IMMUTABLE: 671,
-} as const;
-
-/**
- * The named-collection codes are tolerated unconditionally: each is specific to
- * a `NAMED COLLECTION` statement whose collection is config-XML-defined, so the
- * failure itself proves the entity is config-owned. A 495 is not so specific —
- * it fires for any access entity in a read-only store — so it is tolerated only
- * against an inventoried entity (see {@link runClickHouseStatements}).
- */
-const NAMED_COLLECTION_CODES: ReadonlySet<number> = new Set([
-  CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
-  CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
-  CLICKHOUSE_CONFIG_STORE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
-]);
-
-// Whole-token identifier, optionally backticked, capturing the bare name.
-const IDENTIFIER = "`?([A-Za-z0-9_]+)`?";
-// Optional `OR REPLACE` / `IF [NOT] EXISTS` between the object keyword and name.
-const OPTIONAL_MODIFIERS =
-  "(?:OR\\s+REPLACE\\s+)?(?:IF\\s+(?:NOT\\s+)?EXISTS\\s+)?";
-
-// A row policy is keyed by short name AND its `ON <db>.<table>` target, so the
-// pattern captures all three: 1 = short name, 2 = database (optional), 3 =
-// table. Two tables can carry the same bare short name, so the ON target is
-// load-bearing, not decoration — see {@link toleratedConfigStoreSkipCode}.
-const ROW_POLICY_PATTERN = new RegExp(
-  `^\\s*(?:CREATE|ALTER|DROP)\\s+ROW\\s+POLICY\\s+${OPTIONAL_MODIFIERS}${IDENTIFIER}\\s+ON\\s+(?:${IDENTIFIER}\\.)?${IDENTIFIER}`,
-  "i",
-);
-
-const STATEMENT_TARGET_PATTERNS: ReadonlyArray<{
-  readonly kind: "user" | "settings_profile";
-  readonly pattern: RegExp;
-}> = [
-  {
-    kind: "settings_profile",
-    pattern: new RegExp(
-      `^\\s*(?:CREATE|ALTER|DROP)\\s+SETTINGS\\s+PROFILE\\s+${OPTIONAL_MODIFIERS}${IDENTIFIER}`,
-      "i",
-    ),
-  },
-  {
-    // `CREATE USER ... SETTINGS PROFILE <p>` still targets the user: the profile
-    // is a clause, and this pattern anchors on `USER`, not on `SETTINGS`.
-    kind: "user",
-    pattern: new RegExp(
-      `^\\s*(?:CREATE|ALTER|DROP)\\s+USER\\s+${OPTIONAL_MODIFIERS}${IDENTIFIER}`,
-      "i",
-    ),
-  },
-  // A grant/revoke targets the grantee — the user named after TO/FROM.
-  {
-    kind: "user",
-    pattern: new RegExp(`^\\s*GRANT\\b[\\s\\S]*?\\bTO\\s+${IDENTIFIER}`, "i"),
-  },
-  {
-    kind: "user",
-    pattern: new RegExp(
-      `^\\s*REVOKE\\b[\\s\\S]*?\\bFROM\\s+${IDENTIFIER}`,
-      "i",
-    ),
-  },
-];
-
-/**
- * The access entity a statement targets in its OWN right — the user it
- * creates/alters/drops or grants to, the settings profile, or the row policy by
- * its short name AND its `ON <db>.<table>` target — or `null` for a statement
- * that targets no config-store entity (a table, view, named collection,
- * function, or anything unrecognized).
- *
- * A 495 is excused only when this target matches an inventoried entity (see
- * {@link toleratedConfigStoreSkipCode}). A row-policy statement whose `TO <user>`
- * clause names the config-owned user is NOT excused by that user — the target is
- * the policy, not the grantee — and a policy short name is qualified by its ON
- * target, so the same short name on another table is a different policy. Keyword
- * matching is case-insensitive and whole-token; names may be backticked.
- */
-function statementTarget(statement: string): ConfigStoreLwqlEntity | null {
-  const policy = ROW_POLICY_PATTERN.exec(statement);
-  if (policy) {
-    // `noUncheckedIndexedAccess`: narrow the required groups. The short name and
-    // table are mandatory in the pattern, so a match always has them; database
-    // is the optional `(?:<db>\.)?` group and may be undefined.
-    const [, name, database, table] = policy;
-    if (name !== undefined && table !== undefined) {
-      return { kind: "row_policy", name, database, table };
-    }
-  }
-  for (const { kind, pattern } of STATEMENT_TARGET_PATTERNS) {
-    const name = pattern.exec(statement)?.[1];
-    if (name !== undefined) return { kind, name };
-  }
-  return null;
-}
-
-/** Throws unless `name` is a bare identifier safe to interpolate into a query. */
-function assertPlainIdentifier(name: string): string {
-  if (!/^[A-Za-z0-9_]+$/.test(name)) {
-    throw new Error(
-      `lwql provisioning: refusing to interpolate a non-identifier name into the config-store inventory query: ${JSON.stringify(name)}`,
-    );
-  }
-  return name;
-}
-
-/**
- * The numeric ClickHouse error code carried by a thrown error, or `null`.
- *
- * `@clickhouse/client` throws a `ClickHouseError` whose `code` is the number as
- * a string; a raw HTTP error carries it only in the `Code: NNN.` message
- * prefix, read as a fallback.
- */
-export function clickHouseErrorCode(error: unknown): number | null {
-  const code = (error as { code?: unknown } | null)?.code;
-  if (typeof code === "string" && /^\d+$/.test(code)) return Number(code);
-  if (typeof code === "number") return code;
-  const message = error instanceof Error ? error.message : String(error);
-  const match = /Code:\s*(\d+)/.exec(message);
-  return match ? Number(match[1]) : null;
-}
-
-/** The safe fields of a failed provisioning error — never its message. */
-export interface ClickHouseErrorSummary {
-  /** Numeric ClickHouse error code, or `null` for a non-ClickHouse error. */
-  readonly code: number | null;
-  /** The ClickHouse exception type name, else the error's constructor name. */
-  readonly type: string;
-  /** A non-ClickHouse system error's string code (e.g. `ECONNREFUSED`). */
-  readonly systemCode?: string;
-  /** A non-ClickHouse system error's numeric/string errno. */
-  readonly errno?: string | number;
-  /** A non-ClickHouse system error's syscall (e.g. `connect`). */
-  readonly syscall?: string;
-}
-
-/**
- * The safe-to-log shape of a provisioning error: its numeric ClickHouse code and
- * exception type, and for a non-ClickHouse error (a connection failure, a Prisma
- * error) only the primitive system fields — never the message. A ClickHouse
- * error's message echoes the failing statement, which carries the password; a
- * connection error's message carries the `CLICKHOUSE_URL`/`DATABASE_URL` with
- * credentials. Both are omitted; only `code`, `errno` and `syscall`, which
- * cannot contain either, are surfaced.
- */
-function errorTypeName(error: unknown): string {
-  const type = (error as { type?: unknown } | null)?.type;
-  if (typeof type === "string" && type.length > 0) return type;
-  if (error instanceof Error) return error.constructor.name;
-  return typeof error;
-}
-
-/**
- * The safe system primitives of a non-ClickHouse error — its string `.code`
- * (`ECONNREFUSED`, `P2010`), `errno` and `syscall` — none of which can carry SQL
- * or a connection URL. The message is deliberately never read.
- */
-function systemErrorFields(error: unknown): {
-  systemCode?: string;
-  errno?: string | number;
-  syscall?: string;
-} {
-  const err = error as {
-    code?: unknown;
-    errno?: unknown;
-    syscall?: unknown;
-  } | null;
-  const fields: {
-    systemCode?: string;
-    errno?: string | number;
-    syscall?: string;
-  } = {};
-  if (typeof err?.code === "string") fields.systemCode = err.code;
-  if (typeof err?.errno === "number" || typeof err?.errno === "string") {
-    fields.errno = err.errno;
-  }
-  if (typeof err?.syscall === "string") fields.syscall = err.syscall;
-  return fields;
-}
-
-export function clickHouseErrorSummary(error: unknown): ClickHouseErrorSummary {
-  const code = clickHouseErrorCode(error);
-  return {
-    code,
-    type: errorTypeName(error),
-    // A non-ClickHouse error carries no numeric ClickHouse code; surface only
-    // its safe system primitives, never the message.
-    ...(code === null ? systemErrorFields(error) : {}),
-  };
-}
-
-// Leading object keywords that qualify a DDL verb, so `CREATE USER lwql` logs as
-// `CREATE USER` — never the identifier. Consumed until the first non-keyword.
-const STATEMENT_OBJECT_KEYWORDS: ReadonlySet<string> = new Set([
-  "USER",
-  "ROLE",
-  "ROW",
-  "POLICY",
-  "SETTINGS",
-  "PROFILE",
-  "NAMED",
-  "COLLECTION",
-  "FUNCTION",
-  "TABLE",
-  "VIEW",
-  "MATERIALIZED",
-  "LIVE",
-  "DICTIONARY",
-  "DATABASE",
-  "QUOTA",
-  "INTO",
-]);
-
-/**
- * The leading DDL keywords of a statement — `CREATE USER`, `CREATE ROW POLICY`,
- * `CREATE NAMED COLLECTION`, `GRANT`, `DROP NAMED COLLECTION` — with no
- * identifier, quote or value, so it is always safe to log. The `OR REPLACE` and
- * `IF [NOT] EXISTS` modifiers are dropped as noise; `GRANT`/`REVOKE` reduce to
- * the verb alone. Returns `UNKNOWN` for a statement with no leading keyword.
- */
-export function statementKind(statement: string): string {
-  const tokens = statement
-    .replace(/\bOR\s+REPLACE\b/gi, " ")
-    .replace(/\bIF\s+(?:NOT\s+)?EXISTS\b/gi, " ")
-    .trim()
-    .split(/\s+/);
-  const verb = tokens[0]?.toUpperCase();
-  if (verb === undefined || !/^[A-Z]+$/.test(verb)) return "UNKNOWN";
-  if (verb === "GRANT" || verb === "REVOKE") return verb;
-  const objects: string[] = [];
-  for (const token of tokens.slice(1)) {
-    const upper = token.toUpperCase();
-    if (objects.length >= 3 || !STATEMENT_OBJECT_KEYWORDS.has(upper)) break;
-    objects.push(upper);
-  }
-  return [verb, ...objects].join(" ");
-}
 
 /** One statement skipped because its entity is owned by the config store. */
 export interface SkippedProvisioningStatement {

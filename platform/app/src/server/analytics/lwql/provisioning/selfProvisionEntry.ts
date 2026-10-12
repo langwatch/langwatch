@@ -35,8 +35,8 @@ import {
   type LwqlAccessModelOwner,
   probeLwqlAccessModelOwner,
 } from "./accessModelOwner";
+import { clickHouseErrorSummary } from "./clickhouseErrors";
 import {
-  clickHouseErrorSummary,
   inventoryConfigStoreLwqlEntities,
   runClickHouseStatements,
 } from "./clickhouseStatementRunner";

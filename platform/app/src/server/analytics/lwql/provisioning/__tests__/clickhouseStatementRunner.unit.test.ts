@@ -16,6 +16,7 @@
  * honest double (no `vi.mock`).
  *
  * @see ../clickhouseStatementRunner.ts
+ * @see ../clickhouseErrors.ts
  * @see specs/lwql/api.feature
  */
 
@@ -25,8 +26,8 @@ import { describe, expect, it, vi } from "vitest";
 import { CLICKHOUSE_ERROR_CODE } from "../../__tests__/lwqlClickHouseHarness";
 import { clickHouseLiteral } from "../../sqlText";
 import type { LangWatchQLNames } from "../accessModel";
+import { CLICKHOUSE_CONFIG_STORE_ERROR_CODE } from "../clickhouseErrors";
 import {
-  CLICKHOUSE_CONFIG_STORE_ERROR_CODE,
   type ConfigStoreLwqlEntity,
   inventoryConfigStoreLwqlEntities,
   runClickHouseStatements,

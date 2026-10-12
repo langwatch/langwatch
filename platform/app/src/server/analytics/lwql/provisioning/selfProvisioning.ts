@@ -57,7 +57,7 @@ import {
   lwqlViewSetupStatements,
   SHIPPED_LWQL_DEDUP,
 } from "./catalogStatements";
-import { clickHouseErrorSummary } from "./clickhouseStatementRunner";
+import { clickHouseErrorSummary } from "./clickhouseErrors";
 import {
   DEFAULT_POSTGRES_READER_LIMITS,
   postgresReaderRoleStatements,
