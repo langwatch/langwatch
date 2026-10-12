@@ -77,6 +77,16 @@ Feature: Ops shows an installation's release upgrades, read-only
     When the overview counts the held organizations
     Then it counts 1
 
+  # A step whose `migrated` is its steady state (Alex, 2026-10-12): the sign-in credential repair
+  # marks every user it repairs as migrated and never finalizes them, by design.
+  @integration
+  Scenario: A step that never finalizes by design keeps its users in step, not held
+    Given the sign-in credential repair step has repaired 3 users and parked 1
+    When an operator opens the Organizations tab
+    Then its count reads "3 kept in step", not held
+    And only the parked user is listed as needing attention
+    And the overview still reads "Up to date"
+
   @integration
   Scenario: On cloud, held organizations turn Up to date into needs attention linking to the Organizations tab
     Given an installation that is up to date on cloud

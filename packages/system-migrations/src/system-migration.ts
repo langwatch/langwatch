@@ -54,6 +54,12 @@ export interface SystemMigration {
   readonly enrolledAutomatically: boolean;
 
   /**
+   * True for a step that reports `migrated` on every pass by design and never finalizes, so its
+   * `migrated` tenants are kept in step, not held (Alex, 2026-10-12). Omitted means false.
+   */
+  readonly migratedIsSteady?: boolean;
+
+  /**
    * Safe to re-run every boot: idempotent and self-proving (`finalized`
    * only once verified without the legacy path). `migrated` is not
    * failed - proof disagreed, so it stays on the legacy path to retry.
