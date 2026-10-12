@@ -74,7 +74,7 @@ Feature: The local development process topology
   Scenario: Each lane is told the port that was derived for it
     Given a dev launcher deriving its ports from PORT
     When it starts the lanes
-    Then the API is given PORT + 1000, not the browser application's port
+    Then under --hmr the API is given PORT + 1000, not the browser application's port
     And the worker is given the metrics port the pre-flight reserved
     And the AI Gateway is given the port the launcher announced
 

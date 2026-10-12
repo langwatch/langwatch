@@ -1,3 +1,4 @@
+import { Link } from "@langwatch/browser-host/link";
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
@@ -21,7 +22,7 @@ function AggregateAnalyticsPage({ title, projectSlug }: { title: string; project
           title="Analytics across member projects is not available yet"
           action={
             <BannerAction asChild>
-              <a href={`/${projectSlug}/traces`}>Open Trace Explorer</a>
+              <Link href={`/${projectSlug}/traces`}>Open Trace Explorer</Link>
             </BannerAction>
           }
         >

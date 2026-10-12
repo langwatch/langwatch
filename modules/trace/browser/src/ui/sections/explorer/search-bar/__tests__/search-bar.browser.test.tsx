@@ -8,7 +8,6 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
-import "@testing-library/jest-dom/vitest";
 
 // The Instant Evals gate reads this flag; stub it enabled so nothing here
 // depends on the tRPC provider this suite doesn't mount.

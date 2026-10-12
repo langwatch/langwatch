@@ -71,9 +71,8 @@ function workspaceMembers(): Member[] {
 }
 
 /**
- * The packages that render React: a module's `browser` and `client` packages (typed hooks, tested
- * with `renderHook`), the browser application, the internal consoles (`apps/*-web`, ADR-160) and
- * the shared UI packages. Everything else is a contract, a process package or a tool.
+ * The packages that render React: module `browser` and `client` packages, apps/ui, the internal
+ * consoles (`apps/*-web`, ADR-160, and `apps/sims`) and the shared UI packages.
  */
 function isWebPackage(dir: string): boolean {
   const leaf = dir.slice(dir.lastIndexOf("/") + 1);
@@ -81,6 +80,7 @@ function isWebPackage(dir: string): boolean {
     leaf === "browser" ||
     /^(enterprise\/)?modules\/[^/]+\/client$/.test(dir) ||
     dir === "apps/ui" ||
+    dir === "apps/sims" ||
     (dir.startsWith("apps/") && dir.endsWith("-web")) ||
     dir.startsWith("packages/")
   );
@@ -143,7 +143,9 @@ describe("the real-browser test lane", () => {
         "modules/navigation/browser",
         "modules/organization/browser",
         "modules/project/browser",
+        "modules/prompt/browser",
         "modules/secret/browser",
+        "modules/trace/browser",
         "modules/user/browser",
         "packages/design-system",
       ]);
