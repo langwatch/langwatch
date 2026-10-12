@@ -1,0 +1,189 @@
+import { parseProcessConfig } from "@langwatch/config";
+import { EventSourcing } from "@langwatch/eventing";
+import {
+  createBlobMaintenancePipeline,
+  createProcessManagerMaintenancePipeline,
+  type BlobCleanupDeps,
+  type ProcessRetentionSweepDeps,
+} from "@langwatch/eventing/server";
+import { type BootedRuntime, createApp, processConfig } from "@langwatch/process";
+import {
+  aesEncryption,
+  memoryStores,
+  resolvedSecrets,
+  systemClock,
+} from "@langwatch/process-stores";
+import {
+  refuseDoubleClaims,
+  SecretsChain,
+  SecretsResolver,
+  type SecretHandle,
+} from "@langwatch/secrets";
+import { Task } from "@langwatch/task";
+import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The tasks process installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13).
+ * @vitest-environment node
+ * @see specs/platform/process-installation.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+
+import { processModules } from "../process-modules.generated.ts";
+
+const ROLE = "tasks";
+/** Every value is harmless and invented: nothing here is read from `.env`. */
+const SYNTHETIC_ENVIRONMENT: Readonly<Record<string, string>> = {
+  NODE_ENV: "test",
+  BASE_HOST: "http://langwatch.test",
+  // The API-key pepper chain refuses a boot where none of its secrets is set.
+  API_KEY_PEPPER: "synthetic-api-key-pepper",
+};
+
+function unreachable<Client extends object>(name: string): Client {
+  return createApiFixture<Client>({}, `${name} (no raw client over memory stores)`);
+}
+
+/**
+ * The supply chain over the whole installed list: its per-module type check does not close over
+ * thirty modules, so this names only the calls the harness makes.
+ */
+interface WholeListSupply {
+  withModules(modules: readonly unknown[]): WholeListSupply;
+  withConfig(config: unknown): WholeListSupply;
+  withStores(stores: ReturnType<typeof memoryStores>): WholeListSupply;
+  withMembers(members: Readonly<Record<string, unknown>>): WholeListSupply;
+  withEventing(eventing: EventSourcing): WholeListSupply;
+  boot(): Promise<BootedRuntime<Record<string, unknown>, unknown, unknown>>;
+}
+
+async function bootTasks() {
+  const owners = processConfig(processModules);
+  const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
+  const resolver = SecretsResolver.over(
+    SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
+  );
+  refuseDoubleClaims(owners);
+  const declared: readonly SecretHandle<unknown>[] = owners.flatMap((owner) =>
+    "secrets" in owner ? Object.values(owner.secrets ?? {}) : [],
+  );
+  await resolver.preflight(declared);
+
+  const stores = memoryStores();
+  const eventing = new EventSourcing({
+    enabled: false,
+    participation: "produce",
+    processStore: stores.processStore,
+    maintenance: () => [
+      createBlobMaintenancePipeline({ cleanup: unreachable<BlobCleanupDeps>("blob sweep") }),
+      createProcessManagerMaintenancePipeline({
+        retentionSweep: unreachable<ProcessRetentionSweepDeps>("process retention sweep"),
+      }),
+    ],
+  });
+  const supply: WholeListSupply = createApp({
+    role: ROLE,
+    secrets: (owner, handles) => resolver.scopeTo(owner, handles),
+  });
+  const runtime = await supply
+    .withModules(processModules)
+    .withConfig(config)
+    .withStores(stores)
+    .withMembers({
+      logger: createTestLogger().logger,
+      clock: systemClock(),
+      secrets: resolvedSecrets({}),
+      encryption: aesEncryption(new Uint8Array(32)),
+      telemetry: unreachable<object>("telemetry"),
+      prisma: unreachable<object>("prisma"),
+      clickhouse: unreachable<object>("clickhouse"),
+      objectStorage: unreachable<object>("objectStorage"),
+      cache: unreachable<object>("cache"),
+      idempotency: { claim: async () => true },
+      rateLimiter: { check: async () => ({ allowed: true }) },
+      // The memory answer for Redis is none: every Redis-backed member has a twin.
+      redis: null,
+      publicBaseUrl: config.process.baseHost,
+      serviceVersion: "test",
+      // No collector: rum answers not configured unless the test names one.
+      telemetryExporter: {
+        endpoint: void 0,
+        withHeaders: <Out>(build: (headers: Readonly<Record<string, string>>) => Out): Out =>
+          build({}),
+      },
+      nodeEnvironment: config.process.nodeEnvironment,
+      isSaas: config.process.isSaas ?? false,
+      nlpServiceUrl: config.process.nlpServiceUrl,
+      nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
+      nlpInternalSecret: void 0,
+      outboundProxy: config.process.outboundProxy,
+      processName: "langwatch-tasks",
+      storageResolver: void 0,
+      storage: void 0,
+      queue: void 0,
+      content: void 0,
+      connectJudge: null,
+      monitor: void 0,
+      langwatchQl: {
+        admin: { configured: false },
+        postgres: { configured: false },
+        database: () => unreachable<object>("langwatchQl database"),
+      },
+    })
+    .withEventing(eventing)
+    .boot();
+  return { runtime, eventing };
+}
+
+const isTask = (contribution: unknown): contribution is Task => contribution instanceof Task;
+
+describe("the tasks process installation", () => {
+  /** @scenario "Every installed module boots in the tasks role over memory stores" */
+  /** @scenario "The gateway offers its operator tasks to the tasks process" */
+  it("boots every installed module and lists every task the modules declared", async () => {
+    const { runtime } = await bootTasks();
+
+    try {
+      const names = runtime.tasks(isTask).map((task) => task.name);
+      expect(names).toEqual([
+        "backfill-annotations-to-clickhouse",
+        "clear-stale-pending-sso-setup",
+        "slack-alert",
+        "tiered-free-to-seat-event",
+        "stripe-prices-sync",
+        "demo-data",
+        "trace-destination-report",
+        "generate-license",
+        "model-registry-sync",
+        "model-provider-migrate-custom-models",
+        "process-manager-purge",
+        "credentials-reseal",
+        "grant-platform-operator",
+        "system-migrations-pass",
+        "request-system-migrations-pass",
+        "backfill-organization-presence-setting",
+        "backfill-project-created",
+        "backfill-project-presence-setting",
+        "backfill-project-department-assigned",
+        "topic-clustering-run",
+        "user-data-erase",
+        "webhook-signature-vectors",
+      ]);
+    } finally {
+      await runtime.stop();
+    }
+  });
+
+  /** @scenario "No module task runs a catch-up step's code" */
+  it("lists no task that runs the usage-billing or the spend catch-up step", async () => {
+    const { runtime } = await bootTasks();
+
+    try {
+      const names = runtime.tasks(isTask).map((task) => task.name);
+      expect(names).not.toContain("usage-billing-catch-up");
+      expect(names).not.toContain("instant-eval-judge-spend-catch-up");
+    } finally {
+      await runtime.stop();
+    }
+  });
+});

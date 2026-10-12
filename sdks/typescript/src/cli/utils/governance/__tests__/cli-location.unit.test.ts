@@ -1,7 +1,6 @@
 /**
- * The CLI recording where it runs from, for the plugin launcher that cannot
- * resolve it on PATH.
- *
+ * The CLI recording where it runs from, for the plugin launcher that
+ * cannot resolve it on PATH.
  * Spec: specs/ai-governance/agent-plugin/plugin-package.feature
  */
 

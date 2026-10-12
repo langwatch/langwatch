@@ -1,0 +1,222 @@
+# Governance create-and-edit journeys the first file leaves out: rename and archive a department,
+# edit a source's name from its page, rotate a source's secret. Labels and texts are the ones the
+# governance screens draw. Enterprise edition only, as governance.yaml. Unrun until a check.
+flows:
+  - id: cv2-governance-department-rename-reads-back
+    title: Rename a department from its row menu and find only the new name after a reload
+    steps:
+      - action: go
+        with:
+          path: "/governance/people?tab=departments&add=1"
+      - action: expect
+        with:
+          text: Department name
+          timeout: "15000"
+      - action: type
+        with:
+          placeholder: Engineering
+          text: "VD Rename {uid}"
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: expect
+        with:
+          text: Department created
+      - action: go
+        with:
+          path: "/governance/people?tab=departments"
+      - action: expect
+        with:
+          text: "VD Rename {uid}"
+          timeout: "15000"
+      - action: click
+        with:
+          label: "Actions for VD Rename {uid}"
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Rename
+      - action: expect
+        with:
+          text: Edit department
+      - action: fill
+        with:
+          selector: '[role="dialog"] input >> nth=0'
+          value: "VD Renamed {uid}"
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: expect
+        with:
+          text: Department renamed
+      - action: go
+        with:
+          path: "/governance/people?tab=departments"
+      - action: expect
+        with:
+          text: "VD Renamed {uid}"
+          timeout: "15000"
+      - action: expect
+        with:
+          text: "VD Rename {uid}"
+          equals: "0"
+
+  - id: cv2-governance-department-archive-removes-row
+    title: Archive a department behind its confirmation and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: "/governance/people?tab=departments&add=1"
+      - action: expect
+        with:
+          text: Department name
+          timeout: "15000"
+      - action: type
+        with:
+          placeholder: Engineering
+          text: "VD Archive Dept {uid}"
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: expect
+        with:
+          text: Department created
+      - action: go
+        with:
+          path: "/governance/people?tab=departments"
+      - action: expect
+        with:
+          text: "VD Archive Dept {uid}"
+          timeout: "15000"
+      - action: click
+        with:
+          label: "Actions for VD Archive Dept {uid}"
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Archive
+      - action: expect
+        with:
+          text: /Spend already attributed to this department/
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Archive\s*$/
+      - action: expect
+        with:
+          text: Department archived
+      - action: go
+        with:
+          path: "/governance/people?tab=departments"
+      - action: expect
+        with:
+          text: "VD Archive Dept {uid}"
+          equals: "0"
+
+  - id: cv2-governance-source-edit-name-reads-back
+    title: Rename an ingestion source from its page and find the new name in the list after a reload
+    steps:
+      - action: go
+        with:
+          path: "/governance/inventory?tab=sources"
+      - action: click
+        with:
+          text: /^\s*Add source\s*$/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Generic OpenTelemetry
+      - action: type
+        with:
+          placeholder: Display name for this source
+          text: "VD Edit Source {uid}"
+      - action: click
+        with:
+          text: /^\s*Create source\s*$/
+      - action: click
+        with:
+          text: /I.ve saved it/
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Edit Source {uid}")'
+          min: "1"
+      - action: click
+        with:
+          selector: 'a[href^="/governance/inventory/"]'
+          hasText: "VD Edit Source {uid}"
+      - action: expect
+        with:
+          url: /governance/inventory/
+      - action: click
+        with:
+          selector: 'button[title^="Edit this source"]'
+      - action: expect
+        with:
+          text: Edit Generic OpenTelemetry
+      - action: fill
+        with:
+          selector: '[role="dialog"] input >> nth=0'
+          value: "VD Edited Source {uid}"
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: expect
+        with:
+          text: Source updated
+      - action: go
+        with:
+          path: "/governance/inventory?tab=sources"
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Edited Source {uid}")'
+          min: "1"
+          timeout: "15000"
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Edit Source {uid}")'
+          equals: "0"
+
+  - id: cv2-governance-source-rotate-secret-shows-new-secret
+    title: Rotate a source's secret from its page and see the one-time secret dialog
+    steps:
+      - action: go
+        with:
+          path: "/governance/inventory?tab=sources"
+      - action: click
+        with:
+          text: /^\s*Add source\s*$/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Generic OpenTelemetry
+      - action: type
+        with:
+          placeholder: Display name for this source
+          text: "VD Rotate Source {uid}"
+      - action: click
+        with:
+          text: /^\s*Create source\s*$/
+      - action: click
+        with:
+          text: /I.ve saved it/
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Rotate Source {uid}")'
+          min: "1"
+      - action: click
+        with:
+          selector: 'a[href^="/governance/inventory/"]'
+          hasText: "VD Rotate Source {uid}"
+      - action: expect
+        with:
+          url: /governance/inventory/
+      - action: click
+        with:
+          selector: 'button[title^="Mint a new ingestSecret"]'
+      - action: expect
+        with:
+          text: New secret minted - old valid for 24h
+          timeout: "20000"
+      - action: expect
+        with:
+          text: /only time we.ll show this secret/

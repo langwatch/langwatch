@@ -7,11 +7,11 @@
 
 ## Scenarios Tested
 
-| # | Scenario | Result | Notes |
-|---|----------|--------|-------|
-| 1 | Delete a single scenario via row action menu | PASS | Row action menu shows "Delete", modal title "Delete scenario?", warning "This action cannot be undone.", scenario removed from list after confirm |
-| 2 | Batch delete multiple selected scenarios | PASS | Selecting 2 rows shows "2 selected" bar with "Delete" button, modal title "Delete 2 scenarios?", lists both names, both removed after confirm, empty state shown |
-| 3 | "I'll write it myself" hidden when no model provider | PASS | Verified before adding provider: modal shows warning with no skip button. After adding provider: modal shows full AI form with skip button |
+| #   | Scenario                                             | Result | Notes                                                                                                                                                            |
+| --- | ---------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Delete a single scenario via row action menu         | PASS   | Row action menu shows "Delete", modal title "Delete scenario?", warning "This action cannot be undone.", scenario removed from list after confirm                |
+| 2   | Batch delete multiple selected scenarios             | PASS   | Selecting 2 rows shows "2 selected" bar with "Delete" button, modal title "Delete 2 scenarios?", lists both names, both removed after confirm, empty state shown |
+| 3   | "I'll write it myself" hidden when no model provider | PASS   | Verified before adding provider: modal shows warning with no skip button. After adding provider: modal shows full AI form with skip button                       |
 
 ## Setup Notes
 

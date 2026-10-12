@@ -1,0 +1,44 @@
+# The `langwatch` CLI instance and SCIM management families: organizations admin (the
+# instance-admin key, self-hosted only, so deferred under SaaS) and scim-tokens (an organization
+# key, managementPath so `/latest`). Paths and bodies are the client's own
+# (client-sdk/services/organizations-admin, scim-tokens); assertions name the fields the
+# service types read. Written unrun.
+
+- id: "cli-organizations-admin-create-list-get"
+  endpoint: "POST /api/v1/organizations"
+  auth: "admin"
+  request:
+    path: "/api/v1/organizations"
+    body: {"name": "vd-{uid}", "slug": "vd-{uid}", "adminApiKeyName": "vd-key-{uid}"}
+  capture: {"newOrgId": "organization.id"}
+  expect:
+    status: 201
+    body:
+      organization: {"id": "<any>", "name": "vd-{uid}", "slug": "vd-{uid}"}
+      team: {"id": "<any>", "slug": "<any>", "name": "<any>"}
+      adminApiKey: {"id": "<any>", "token": "<any>"}
+  verify:
+    - request: "GET /api/v1/organizations"
+      auth: "admin"
+      expect: {"status": 200, "path": "organizations", "contains": ["vd-{uid}", "{newOrgId}", "createdAt"]}
+    - request: "GET /api/v1/organizations/{newOrgId}"
+      auth: "admin"
+      expect: {"status": 200, "body": {"organization": {"id": "{newOrgId}", "name": "vd-{uid}", "slug": "vd-{uid}", "createdAt": "<any>"}}}
+
+- id: "cli-organizations-admin-refuses-an-organization-key"
+  endpoint: "GET /api/v1/organizations"
+  auth: "org"
+  request: {"path": "/api/v1/organizations"}
+  expect: {"status": [401, 403, 404]}
+
+- id: "cli-scim-tokens-list-carries-its-fields"
+  endpoint: "GET /api/v1/scim-tokens/latest"
+  auth: "org"
+  request: {"path": "/api/v1/scim-tokens/latest"}
+  expect: {"status": 200}
+
+- id: "cli-scim-tokens-revoke-unknown-is-404"
+  endpoint: "DELETE /api/v1/scim-tokens/latest/{id}"
+  auth: "org"
+  request: {"path": "/api/v1/scim-tokens/latest/nope-{uid}"}
+  expect: {"status": [400, 404]}

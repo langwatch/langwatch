@@ -27,22 +27,15 @@ interface EndpointGroup {
   pathPrefixes: string[];
   overviewDescription: string;
   /**
-   * `METHOD /path` keys, in the order a reader should meet them.
-   *
-   * The default sort is CRUD-shaped (list, create, get, update, delete), which
-   * is right for a resource but wrong for a family that is a sequence of steps.
-   * A group whose overview describes a lifecycle sets this so the sidebar and
-   * the prose agree; anything the list omits falls in behind, still sorted the
-   * default way.
+   * `METHOD /path` keys, in the order a reader should meet them. CRUD is the
+   * default sort, wrong for a lifecycle sequence — a group can set this so
+   * sidebar and prose agree; anything omitted falls in behind, CRUD-sorted.
    */
   endpointOrder?: string[];
   /**
    * Hand-written pages that belong to this family but document no single
-   * operation, appended after the generated endpoint pages.
-   *
-   * They have to be declared here rather than edited into `docs.json`, because
-   * this generator replaces the whole API Reference anchor on every run: a page
-   * added to the nav by hand survives until the next run and then vanishes.
+   * operation, appended after the generated ones. Declared here, not
+   * `docs.json` — this generator replaces the whole anchor every run.
    */
   extraPages?: string[];
 }
@@ -60,9 +53,8 @@ const INTRO_GROUP = {
 const METHOD_ORDER = ["get", "post", "put", "patch", "delete"] as const;
 
 /**
- * Reasons per family, shared by the paths that belong to the same surface.
- * A reason states which kind of exclusion this is: a retired surface that is
- * intentionally undocumented, or a live surface that is not yet documented in
+ * Reasons per family, shared by paths on the same surface: a retired,
+ * intentionally undocumented surface, or a live one not yet documented in
  * the API reference.
  */
 const RETIRED_GATEWAY_PROVIDER_BINDINGS =
@@ -89,6 +81,21 @@ const UNDOCUMENTED_CHECKUP =
 const UNDOCUMENTED_DASHBOARD_WIDGETS =
   "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
 
+const RETIRED_LEGACY_AGENTS =
+  "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
+
+const UNDOCUMENTED_APP_INTERNAL =
+  "Not part of the public API: the LangWatch app, its operators or a vendor webhook call this route, not API key holders.";
+
+const UNDOCUMENTED_STORED_OBJECTS =
+  "Not yet documented in the API reference: the stored object upload routes back signed-URL attachments and have no reference pages yet.";
+
+const UNDOCUMENTED_CLI_AUTH =
+  "Not yet documented in the API reference: the langwatch CLI calls the device login routes and the routes behind its login session, and the CLI documentation covers that flow.";
+
+const UNDOCUMENTED_LANGY_CONVERSATIONS =
+  "Not yet documented in the API reference: the Langy conversation routes have no reference pages yet.";
+
 /**
  * Spec paths that deliberately get no reference page, each with the reason it
  * is excluded. Every other spec path has to be owned by an ENDPOINT_GROUPS
@@ -104,11 +111,13 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/checkup/run": UNDOCUMENTED_CHECKUP,
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
+  "/api/agents": RETIRED_LEGACY_AGENTS,
+  "/api/agents/{id}": RETIRED_LEGACY_AGENTS,
   "/api/governance/ingestion-templates": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/admin": UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/governance/ingestion-templates/clone": UNDOCUMENTED_INGESTION_TEMPLATES,
-  "/api/governance/ingestion-templates/{id}": UNDOCUMENTED_INGESTION_TEMPLATES,
-  "/api/governance/ingestion-templates/{id}/ottl-rules":
+  "/api/governance/ingestion-templates/{ingestionTemplateId}": UNDOCUMENTED_INGESTION_TEMPLATES,
+  "/api/governance/ingestion-templates/{ingestionTemplateId}/ottl-rules":
     UNDOCUMENTED_INGESTION_TEMPLATES,
   "/api/me/project": UNDOCUMENTED_CALLER_IDENTITY,
   "/api/me/usage": UNDOCUMENTED_CALLER_IDENTITY,
@@ -118,22 +127,74 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/langy/control/connect/poll": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/langy/control/connect/register": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
   "/api/v1/langy/control/requests": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/v1/langy/control/requests/{id}/approve":
-    UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/v1/langy/control/requests/{id}/cancel":
-    UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/v1/projects/{projectId}/analytics/charts":
-    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
-  "/api/v1/projects/{projectId}/analytics/charts/{chartId}":
-    UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+  "/api/v1/langy/control/requests/{requestId}/approve": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/control/requests/{requestId}/cancel": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/projects/{projectId}/analytics/charts": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
+  "/api/v1/projects/{projectId}/analytics/charts/{chartId}": UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
   "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement":
     UNDOCUMENTED_SAVED_WORKBENCH_CHARTS,
-  "/api/v1/projects/{projectId}/analytics/dashboard-widgets":
-    UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/v1/projects/{projectId}/analytics/dashboard-widgets": UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}":
     UNDOCUMENTED_DASHBOARD_WIDGETS,
   "/api/v1/projects/{projectId}/analytics/dashboard-widgets/{widgetId}/dashboard":
     UNDOCUMENTED_DASHBOARD_WIDGETS,
+  "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
+  "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
+  "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,
+  "/api/elevenlabs/webhook/{modelProviderId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/track_event": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/admin/impersonate": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/admin/{resource}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/bug-reports": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/ops/clickhouse/explain": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/platform-health": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/platform-health/{check}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/unsubscribe": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/auth/cli/approve": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/bootstrap": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/budget-overview": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/budget/status": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/deny": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/device-approval": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/device-code": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/exchange": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingest/sources": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingest/sources/{sourceId}/events": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingest/sources/{sourceId}/health": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingestion-key": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingestion-keys": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingestion-keys/{lookup_id}": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/ingestion-templates": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/governance/status": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/logout": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/lookup": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/personal-project": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/project-key": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/refresh": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/auth/cli/virtual-key": UNDOCUMENTED_CLI_AUTH,
+  "/api/v1/langy/conversations": UNDOCUMENTED_LANGY_CONVERSATIONS,
+  "/api/v1/langy/conversations/{conversationId}/messages": UNDOCUMENTED_LANGY_CONVERSATIONS,
+  "/api/v1/stored-objects/{storedObjectId}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/stored-objects/uploads": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/stored-objects/uploads/{storedObjectId}/confirmation": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/files/{storedObjectId}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/files/{projectId}/{storedObjectId}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/v1/files/{projectId}/{storedObjectId}/{filename}": UNDOCUMENTED_STORED_OBJECTS,
+  "/api/langy/local/calls": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/local/calls/{callId}": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/local/calls/{callId}/cancel": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/local/requests": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/local/workspace": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/langy/ui/actions": UNDOCUMENTED_APP_INTERNAL,
+  "/api/langy/waits": UNDOCUMENTED_APP_INTERNAL,
+  "/api/langy/waits/{waitId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/internal/langy/credentials/revoke": UNDOCUMENTED_APP_INTERNAL,
+  "/api/internal/langy/relay/frames": UNDOCUMENTED_APP_INTERNAL,
+  "/api/internal/langy/turn/{turnId}/result": UNDOCUMENTED_APP_INTERNAL,
+  "/api/rum/v1/traces": UNDOCUMENTED_APP_INTERNAL,
+  "/api/user-avatar/{projectId}/{userAvatarId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/webhooks/stripe": UNDOCUMENTED_APP_INTERNAL,
+  "/api/webhooks/auth0-scim": UNDOCUMENTED_APP_INTERNAL,
 };
 
 const ENDPOINT_GROUPS: EndpointGroup[] = [
@@ -170,10 +231,10 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     overviewDescription:
       "Run an evaluator over a single input and get its score back, or run it as a guardrail and gate on one boolean. List the built-in evaluators to see which ids you can address and what each one needs.",
     endpointOrder: [
-      "GET /api/evaluations/list",
-      "POST /api/evaluations/{evaluator}/evaluate",
-      "POST /api/evaluations/{evaluator}/{subpath}/evaluate",
-      "POST /api/guardrails/{evaluator}/evaluate",
+      "GET /api/v1/evaluations/list",
+      "POST /api/v1/evaluations/{evaluator}/evaluate",
+      "POST /api/v1/evaluations/{evaluator}/{subpath}/evaluate",
+      "POST /api/v1/guardrails/{evaluator}/evaluate",
     ],
   },
   {
@@ -188,13 +249,13 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     // The order the overview describes, so a reader going down the sidebar
     // meets the calls in the order they would make them.
     endpointOrder: [
-      "POST /api/experiment/init",
-      "GET /api/experiments",
-      "POST /api/experiments/{slug}/run",
-      "GET /api/experiments/runs",
-      "GET /api/experiments/runs/{runId}",
-      "GET /api/experiments/runs/{runId}/results",
-      "POST /api/dspy/log_steps",
+      "POST /api/v1/experiment/init",
+      "GET /api/v1/experiments",
+      "POST /api/v1/experiments/{slug}/run",
+      "GET /api/v1/experiments/runs",
+      "GET /api/v1/experiments/runs/{runId}",
+      "GET /api/v1/experiments/runs/{runId}/results",
+      "POST /api/v1/dspy/log_steps",
     ],
   },
   {
@@ -300,12 +361,10 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Events",
     dirName: "events",
-    // `/api/track_event` is the older spelling of the same call, still the one
-    // most SDK versions in the wild send.
-    pathPrefixes: ["/api/events", "/api/track_event"],
+    pathPrefixes: ["/api/events"],
     overviewDescription:
       "Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.",
-    endpointOrder: ["POST /api/events/track", "POST /api/track_event"],
+    endpointOrder: ["POST /api/v1/events/track"],
   },
   {
     name: "Workflows",
@@ -334,8 +393,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     name: "Analytics",
     dirName: "analytics",
     pathPrefixes: ["/api/analytics"],
-    overviewDescription:
-      "Query analytics timeseries data with metrics, aggregations, and filters.",
+    overviewDescription: "Query analytics timeseries data with metrics, aggregations, and filters.",
   },
   {
     name: "Query",
@@ -421,13 +479,20 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     // The catalog comes first because it is where the permission keys a role is
     // built from come from, and the overview walks a reader in that order.
     endpointOrder: [
-      "GET /api/roles/permissions",
-      "GET /api/roles",
-      "POST /api/roles",
-      "GET /api/roles/{id}",
-      "PATCH /api/roles/{id}",
-      "DELETE /api/roles/{id}",
+      "GET /api/v1/roles/permissions",
+      "GET /api/v1/roles",
+      "POST /api/v1/roles",
+      "GET /api/v1/roles/{id}",
+      "PATCH /api/v1/roles/{id}",
+      "DELETE /api/v1/roles/{id}",
     ],
+  },
+  {
+    name: "Grants",
+    dirName: "grants",
+    pathPrefixes: ["/api/grants"],
+    overviewDescription:
+      "Grant a built-in or custom role to a user, a group or an API key at the organization, a team or a project. Grants replace role bindings.",
   },
   {
     name: "Role Bindings",
@@ -534,11 +599,7 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
-function generateTitle(
-  method: string,
-  apiPath: string,
-  op: OpenAPIOperation,
-): string {
+function generateTitle(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) return op.summary;
 
   const desc = op.description ?? "";
@@ -561,9 +622,7 @@ function generateTitle(
 function getResourceName(apiPath: string): string {
   const parts = apiPath
     .split("/")
-    .filter(
-      (p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3",
-    )
+    .filter((p) => !p.startsWith("{") && p !== "api" && p !== "v1" && p !== "v3")
     .filter(Boolean);
   const last = parts[parts.length - 1] ?? "resource";
   return last
@@ -572,11 +631,7 @@ function getResourceName(apiPath: string): string {
     .join(" ");
 }
 
-function generateFileName(
-  method: string,
-  apiPath: string,
-  op: OpenAPIOperation,
-): string {
+function generateFileName(method: string, apiPath: string, op: OpenAPIOperation): string {
   if (op.summary) {
     const s = slugify(op.summary);
     return s.length > 40 ? s.substring(0, 40).replace(/-$/, "") : s;
@@ -610,20 +665,44 @@ function generateFileName(
 }
 
 /**
- * How much of `apiPath` this group's best prefix covers, or 0 when none match.
- * Ownership goes to the longest match, so `/api/gateway/v1/spend-events` beats
- * a shorter sibling prefix and a sub-path like `/spend-events/replay` lands in
- * the same group as its parent instead of nowhere.
+ * The `/api/{family}` twin of a spec path served at `/api/v1/{family}`, or
+ * null with no `/api/v1` segment to strip (Decision 20, 2026-09-04). Lookups
+ * fall back to this bare twin, except the four families only ever documented at v1.
+ */
+function bareTwinOf(apiPath: string): string | null {
+  if (apiPath === "/api/v1" || !apiPath.startsWith("/api/v1/")) return null;
+  return `/api${apiPath.slice("/api/v1".length)}`;
+}
+
+/** Skip reasons that retire only the bare path, never its live `/api/v1` successor. */
+const BARE_ONLY_SKIP_REASONS = new Set([RETIRED_LEGACY_AGENTS]);
+
+/** Whether `apiPath`, or its `/api/v1` bare twin, is named in SKIP_PATHS. */
+function isSkipped(apiPath: string): boolean {
+  if (Object.hasOwn(SKIP_PATHS, apiPath)) return true;
+  const bare = bareTwinOf(apiPath);
+  if (bare === null || !Object.hasOwn(SKIP_PATHS, bare)) return false;
+  return !BARE_ONLY_SKIP_REASONS.has(SKIP_PATHS[bare]!);
+}
+
+/**
+ * How much of `apiPath` this group's best prefix covers, or 0 when none
+ * match. Ownership goes to the longest match, checked against `apiPath` and
+ * its `/api/v1` bare twin (see {@link bareTwinOf}).
  */
 function matchStrength(apiPath: string, group: EndpointGroup): number {
+  const bare = bareTwinOf(apiPath);
+  const candidates = bare === null ? [apiPath] : [apiPath, bare];
   let best = 0;
   for (const prefix of group.pathPrefixes) {
-    if (
-      apiPath === prefix ||
-      apiPath.startsWith(prefix + "/") ||
-      apiPath.startsWith(prefix + "?")
-    ) {
-      best = Math.max(best, prefix.length);
+    for (const candidate of candidates) {
+      if (
+        candidate === prefix ||
+        candidate.startsWith(prefix + "/") ||
+        candidate.startsWith(prefix + "?")
+      ) {
+        best = Math.max(best, prefix.length);
+      }
     }
   }
   return best;
@@ -633,7 +712,7 @@ function matchStrength(apiPath: string, group: EndpointGroup): number {
 function resolveOwners(specPaths: string[]): Map<string, EndpointGroup> {
   const owners = new Map<string, EndpointGroup>();
   for (const apiPath of specPaths) {
-    if (Object.hasOwn(SKIP_PATHS, apiPath)) continue;
+    if (isSkipped(apiPath)) continue;
     let winner: EndpointGroup | undefined;
     let winningStrength = 0;
     for (const group of ENDPOINT_GROUPS) {
@@ -652,7 +731,7 @@ function findExistingMdxFiles(dirPath: string): Map<string, string> {
   const openapiToFile = new Map<string, string>();
   if (!fs.existsSync(dirPath)) return openapiToFile;
 
-  for (const file of fs.readdirSync(dirPath).sort()) {
+  for (const file of fs.readdirSync(dirPath).toSorted()) {
     if (!file.endsWith(".mdx")) continue;
     const content = fs.readFileSync(path.join(dirPath, file), "utf-8");
     const match = content.match(/^openapi:\s*['"]?(.+?)['"]?\s*$/m);
@@ -679,48 +758,52 @@ function sortScore(method: string, apiPath: string): number {
   return 6;
 }
 
-function main() {
-  const spec: OpenAPISpec = JSON.parse(fs.readFileSync(SPEC_PATH, "utf-8"));
-  const docsJson = JSON.parse(fs.readFileSync(DOCS_JSON_PATH, "utf-8"));
+type NavPage = string | { group: string; pages: string[] };
+type Tally = { created: number; existing: number };
+type GroupEndpoint = { method: string; path: string; op: OpenAPIOperation };
 
-  type NavPage = string | { group: string; pages: string[] };
-  const allNavGroups: Array<{ group: string; pages: NavPage[] }> = [];
-  let totalCreated = 0;
-  let totalExisting = 0;
-
-  const owners = resolveOwners(Object.keys(spec.paths));
-
-  // A hand-written page is named as a string, so a rename or a typo would drop
-  // it out of the sidebar silently: the same failure this generator exists to
-  // prevent. Check every one of them against the filesystem up front.
+/**
+ * A hand-written page is named as a string, so a rename or a typo would drop it
+ * out of the sidebar silently: the same failure this generator exists to
+ * prevent. Check every one of them against the filesystem up front.
+ */
+function checkDeclaredExtras(): void {
   const declaredExtras = [
     ...INTRO_GROUP.pages,
     ...ENDPOINT_GROUPS.flatMap((group) => group.extraPages ?? []),
   ];
   const missingExtras = declaredExtras.filter(
-    (page) => !fs.existsSync(path.join(DOCS_DIR, `${page}.mdx`))
+    (page) => !fs.existsSync(path.join(DOCS_DIR, `${page}.mdx`)),
   );
   if (missingExtras.length > 0) {
     const noun = missingExtras.length === 1 ? "page" : "pages";
     console.error(
-      `ERROR: ${missingExtras.length} hand-written nav ${noun} named in this generator has no .mdx file:`
+      `ERROR: ${missingExtras.length} hand-written nav ${noun} named in this generator has no .mdx file:`,
     );
-    for (const page of missingExtras.sort()) console.error(`  ${page}`);
+    for (const page of missingExtras.toSorted()) console.error(`  ${page}`);
     console.error(
-      "\nCreate the file, or drop it from INTRO_GROUP / the group's extraPages in docs/scripts/generate-api-reference-pages.ts."
+      "\nCreate the file, or drop it from INTRO_GROUP / the group's extraPages in docs/scripts/generate-api-reference-pages.ts.",
     );
     process.exit(1);
   }
+}
 
+function checkEveryPathOwned({
+  spec,
+  owners,
+}: {
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+}): void {
   const unowned = Object.keys(spec.paths).filter(
-    (apiPath) => !Object.hasOwn(SKIP_PATHS, apiPath) && !owners.has(apiPath),
+    (apiPath) => !isSkipped(apiPath) && !owners.has(apiPath),
   );
   if (unowned.length > 0) {
     const noun = unowned.length === 1 ? "spec path has" : "spec paths have";
     console.error(
       `ERROR: ${unowned.length} ${noun} no ENDPOINT_GROUPS entry and no SKIP_PATHS reason:`,
     );
-    for (const apiPath of unowned.sort()) console.error(`  ${apiPath}`);
+    for (const apiPath of unowned.toSorted()) console.error(`  ${apiPath}`);
     console.error(
       "\nEvery path above needs one of two resolutions in docs/scripts/generate-api-reference-pages.ts:",
     );
@@ -732,14 +815,21 @@ function main() {
     );
     process.exit(1);
   }
+}
 
-  // An `endpointOrder` key only sorts the group that declares it, so a key is
-  // invisible unless it names an operation THAT group owns: the sort silently
-  // falls back to the default for it. A drifted path parameter name, a casing
-  // slip, or a key naming a sibling group's path therefore reshuffles the
-  // sidebar with no diagnostic at all, which is exactly what a hand-written
-  // key list is prone to. The two failures get separate reports because their
-  // remedies differ: one is a typo, the other is a key in the wrong group.
+type OperationIndex = {
+  specOperations: Set<string>;
+  operationOwner: Map<string, EndpointGroup>;
+  groupOperations: Map<EndpointGroup, Set<string>>;
+};
+
+function indexSpecOperations({
+  spec,
+  owners,
+}: {
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+}): OperationIndex {
   const specOperations = new Set<string>();
   const operationOwner = new Map<string, EndpointGroup>();
   const groupOperations = new Map<EndpointGroup, Set<string>>(
@@ -757,7 +847,14 @@ function main() {
       }
     }
   }
+  return { specOperations, operationOwner, groupOperations };
+}
 
+/** Sorts every endpointOrder key the declaring group does not own by why it sorts nothing. */
+function strayOrderKeys({ specOperations, operationOwner, groupOperations }: OperationIndex): {
+  unknownOrder: string[];
+  misownedOrder: string[];
+} {
   const unknownOrder: string[] = [];
   const misownedOrder: string[] = [];
   for (const group of ENDPOINT_GROUPS) {
@@ -769,32 +866,40 @@ function main() {
       }
       const owner = operationOwner.get(key);
       misownedOrder.push(
-        `${group.name}: ${key} (${
-          owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"
-        })`,
+        `${group.name}: ${key} (${owner ? `owned by ${owner.name}` : "excluded by SKIP_PATHS"})`,
       );
     }
   }
+  return { unknownOrder, misownedOrder };
+}
 
+function checkEndpointOrder({
+  spec,
+  owners,
+}: {
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+}): void {
+  // An `endpointOrder` key only sorts the group that declares it — a key
+  // naming an operation another group owns silently falls back to the
+  // default sort, with no diagnostic. A drifted param name, a casing slip,
+  // or a sibling group's path key all reshuffle the sidebar silently. The
+  // two failures get separate reports since their remedies differ.
+  const { unknownOrder, misownedOrder } = strayOrderKeys(indexSpecOperations({ spec, owners }));
   if (unknownOrder.length > 0) {
     const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
-    console.error(
-      `ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`,
-    );
-    for (const entry of unknownOrder.sort()) console.error(`  ${entry}`);
+    console.error(`ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`);
+    for (const entry of unknownOrder.toSorted()) console.error(`  ${entry}`);
     console.error(
       "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts.",
     );
   }
   if (misownedOrder.length > 0) {
-    const noun =
-      misownedOrder.length === 1
-        ? "key names an operation"
-        : "keys name operations";
+    const noun = misownedOrder.length === 1 ? "key names an operation" : "keys name operations";
     console.error(
       `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts no entries:`,
     );
-    for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
+    for (const entry of misownedOrder.toSorted()) console.error(`  ${entry}`);
     console.error(
       "\nMove the key to the group that owns the path, widen that group's pathPrefixes, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts. A path excluded by SKIP_PATHS gets no page at all, so it can never be ordered.",
     );
@@ -802,111 +907,178 @@ function main() {
   if (unknownOrder.length > 0 || misownedOrder.length > 0) {
     process.exit(1);
   }
+}
+
+function sortGroupEndpoints({
+  group,
+  endpoints,
+}: {
+  group: EndpointGroup;
+  endpoints: GroupEndpoint[];
+}): void {
+  // A declared order wins; everything it does not name keeps the CRUD sort
+  // and follows behind, so adding a route never silently reshuffles the rest.
+  const declaredOrder = group.endpointOrder ?? [];
+  const declaredIndex = ({ method, apiPath }: { method: string; apiPath: string }): number => {
+    const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
+    return at === -1 ? Number.MAX_SAFE_INTEGER : at;
+  };
+
+  endpoints.sort((a, b) => {
+    const aDeclared = declaredIndex({ method: a.method, apiPath: a.path });
+    const bDeclared = declaredIndex({ method: b.method, apiPath: b.path });
+    if (aDeclared !== bDeclared) return aDeclared - bDeclared;
+    const aScore = sortScore(a.method, a.path);
+    const bScore = sortScore(b.method, b.path);
+    if (aScore !== bScore) return aScore - bScore;
+    return a.path.localeCompare(b.path);
+  });
+}
+
+function collectGroupEndpoints({
+  group,
+  spec,
+  owners,
+}: {
+  group: EndpointGroup;
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+}): GroupEndpoint[] {
+  const endpoints: {
+    method: string;
+    path: string;
+    op: OpenAPIOperation;
+  }[] = [];
+
+  for (const [apiPath, methods] of Object.entries(spec.paths)) {
+    if (owners.get(apiPath) !== group) continue;
+
+    for (const [method, op] of Object.entries(methods)) {
+      if (!METHOD_ORDER.includes(method)) continue;
+      endpoints.push({ method, path: apiPath, op });
+    }
+  }
+  return endpoints;
+}
+
+function writeOverviewPage({
+  group,
+  dirPath,
+  tally,
+}: {
+  group: EndpointGroup;
+  dirPath: string;
+  tally: Tally;
+}): void {
+  // Write overview page
+  const overviewPath = path.join(dirPath, "overview.mdx");
+  if (!fs.existsSync(overviewPath)) {
+    fs.writeFileSync(
+      overviewPath,
+      `---\ntitle: "Overview"\ndescription: "${group.overviewDescription}"\n---\n\n## Intro\n\n${group.overviewDescription}\n`,
+    );
+    tally.created++;
+  } else {
+    tally.existing++;
+  }
+}
+
+/** The page name for one endpoint, reusing an MDX file that already points at it. */
+function endpointPage({
+  ep,
+  dirPath,
+  existingMdx,
+  usedNames,
+  tally,
+}: {
+  ep: GroupEndpoint;
+  dirPath: string;
+  existingMdx: ReturnType<typeof findExistingMdxFiles>;
+  usedNames: Set<string>;
+  tally: Tally;
+}): string {
+  const openapiRef = `${ep.method.toUpperCase()} ${ep.path}`;
+
+  // Reuse existing MDX file if one already points to this endpoint
+  const existingName = existingMdx.get(openapiRef);
+  if (existingName && !usedNames.has(existingName)) {
+    usedNames.add(existingName);
+    tally.existing++;
+    return existingName;
+  }
+
+  let fileName = generateFileName(ep.method, ep.path, ep.op);
+  if (usedNames.has(fileName)) {
+    fileName = `${ep.method}-${fileName}`;
+  }
+  if (usedNames.has(fileName)) {
+    const suffix = ep.path.split("/").pop()?.replace(/[{}]/g, "") ?? "ep";
+    fileName = `${fileName}-${suffix}`;
+  }
+  usedNames.add(fileName);
+
+  const title = generateTitle(ep.method, ep.path, ep.op);
+  const mdxPath = path.join(dirPath, `${fileName}.mdx`);
+
+  if (!fs.existsSync(mdxPath)) {
+    fs.writeFileSync(mdxPath, `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`);
+    tally.created++;
+  } else {
+    tally.existing++;
+  }
+
+  return fileName;
+}
+
+/** Writes one group's pages; answers its nav pages, or none when it owns no endpoint. */
+function writeGroupPages({
+  group,
+  spec,
+  owners,
+  tally,
+}: {
+  group: EndpointGroup;
+  spec: OpenAPISpec;
+  owners: ReturnType<typeof resolveOwners>;
+  tally: Tally;
+}): string[] {
+  const dirPath = path.join(API_REF_DIR, group.dirName);
+  fs.mkdirSync(dirPath, { recursive: true });
+  const existingMdx = findExistingMdxFiles(dirPath);
+  const endpoints = collectGroupEndpoints({ group, spec, owners });
+  // A family whose routes are not in the spec yet still keeps its hand-written pages.
+  if (endpoints.length === 0) return [...(group.extraPages ?? [])];
+  sortGroupEndpoints({ group, endpoints });
+  writeOverviewPage({ group, dirPath, tally });
+
+  const pages: string[] = [`api-reference/${group.dirName}/overview`];
+  const usedNames = new Set<string>(["overview"]);
+  for (const ep of endpoints) {
+    const name = endpointPage({ ep, dirPath, existingMdx, usedNames, tally });
+    pages.push(`api-reference/${group.dirName}/${name}`);
+  }
+  pages.push(...(group.extraPages ?? []));
+  return pages;
+}
+
+function main() {
+  const spec: OpenAPISpec = JSON.parse(fs.readFileSync(SPEC_PATH, "utf-8"));
+  const docsJson = JSON.parse(fs.readFileSync(DOCS_JSON_PATH, "utf-8"));
+
+  const allNavGroups: { group: string; pages: NavPage[] }[] = [];
+  const tally: Tally = { created: 0, existing: 0 };
+
+  const owners = resolveOwners(Object.keys(spec.paths));
+
+  checkDeclaredExtras();
+  checkEveryPathOwned({ spec, owners });
+  checkEndpointOrder({ spec, owners });
 
   allNavGroups.push(INTRO_GROUP);
 
   for (const group of ENDPOINT_GROUPS) {
-    const dirPath = path.join(API_REF_DIR, group.dirName);
-    fs.mkdirSync(dirPath, { recursive: true });
-
-    const existingMdx = findExistingMdxFiles(dirPath);
-
-    const endpoints: Array<{
-      method: string;
-      path: string;
-      op: OpenAPIOperation;
-    }> = [];
-
-    for (const [apiPath, methods] of Object.entries(spec.paths)) {
-      if (owners.get(apiPath) !== group) continue;
-
-      for (const [method, op] of Object.entries(methods)) {
-        if (!METHOD_ORDER.includes(method)) continue;
-        endpoints.push({ method, path: apiPath, op });
-      }
-    }
-
-    if (endpoints.length === 0) continue;
-
-    // A declared order wins; everything it does not name keeps the CRUD sort
-    // and follows behind, so adding a route never silently reshuffles the rest.
-    const declaredOrder = group.endpointOrder ?? [];
-    const declaredIndex = ({
-      method,
-      apiPath,
-    }: {
-      method: string;
-      apiPath: string;
-    }): number => {
-      const at = declaredOrder.indexOf(`${method.toUpperCase()} ${apiPath}`);
-      return at === -1 ? Number.MAX_SAFE_INTEGER : at;
-    };
-
-    endpoints.sort((a, b) => {
-      const aDeclared = declaredIndex({ method: a.method, apiPath: a.path });
-      const bDeclared = declaredIndex({ method: b.method, apiPath: b.path });
-      if (aDeclared !== bDeclared) return aDeclared - bDeclared;
-      const aScore = sortScore(a.method, a.path);
-      const bScore = sortScore(b.method, b.path);
-      if (aScore !== bScore) return aScore - bScore;
-      return a.path.localeCompare(b.path);
-    });
-
-    // Write overview page
-    const overviewPath = path.join(dirPath, "overview.mdx");
-    if (!fs.existsSync(overviewPath)) {
-      fs.writeFileSync(
-        overviewPath,
-        `---\ntitle: "Overview"\ndescription: "${group.overviewDescription}"\n---\n\n## Intro\n\n${group.overviewDescription}\n`,
-      );
-      totalCreated++;
-    } else {
-      totalExisting++;
-    }
-
-    const pages: string[] = [`api-reference/${group.dirName}/overview`];
-    const usedNames = new Set<string>(["overview"]);
-
-    for (const ep of endpoints) {
-      const openapiRef = `${ep.method.toUpperCase()} ${ep.path}`;
-
-      // Reuse existing MDX file if one already points to this endpoint
-      const existingName = existingMdx.get(openapiRef);
-      if (existingName && !usedNames.has(existingName)) {
-        pages.push(`api-reference/${group.dirName}/${existingName}`);
-        usedNames.add(existingName);
-        totalExisting++;
-        continue;
-      }
-
-      let fileName = generateFileName(ep.method, ep.path, ep.op);
-      if (usedNames.has(fileName)) {
-        fileName = `${ep.method}-${fileName}`;
-      }
-      if (usedNames.has(fileName)) {
-        const suffix = ep.path.split("/").pop()?.replace(/[{}]/g, "") ?? "ep";
-        fileName = `${fileName}-${suffix}`;
-      }
-      usedNames.add(fileName);
-
-      const title = generateTitle(ep.method, ep.path, ep.op);
-      const mdxPath = path.join(dirPath, `${fileName}.mdx`);
-
-      if (!fs.existsSync(mdxPath)) {
-        fs.writeFileSync(
-          mdxPath,
-          `---\ntitle: "${title}"\nopenapi: "${openapiRef}"\n---\n`,
-        );
-        totalCreated++;
-      } else {
-        totalExisting++;
-      }
-
-      pages.push(`api-reference/${group.dirName}/${fileName}`);
-    }
-
-    pages.push(...(group.extraPages ?? []));
-
+    const pages = writeGroupPages({ group, spec, owners, tally });
+    if (pages.length === 0) continue;
     allNavGroups.push({ group: group.name, pages });
 
     // Insert Built-in Evaluators (categorized) right after the Evaluators config group
@@ -917,7 +1089,6 @@ function main() {
       });
     }
   }
-
   // Update docs.json navigation
   const apiRefAnchor = docsJson.navigation.anchors.find(
     (a: { anchor: string }) => a.anchor === "API Reference",
@@ -928,8 +1099,8 @@ function main() {
 
   fs.writeFileSync(DOCS_JSON_PATH, JSON.stringify(docsJson, null, 2) + "\n");
 
-  console.log(`Created ${totalCreated} new MDX pages`);
-  console.log(`Skipped ${totalExisting} existing pages`);
+  console.log(`Created ${tally.created} new MDX pages`);
+  console.log(`Skipped ${tally.existing} existing pages`);
   console.log(`Updated docs.json with ${allNavGroups.length} API groups`);
 }
 
@@ -978,18 +1149,11 @@ const BUILTIN_EVALUATOR_CATEGORIES: Record<string, string[]> = {
   ],
 };
 
-function buildBuiltInEvaluatorNav(): (
-  | string
-  | { group: string; pages: string[] }
-)[] {
+function buildBuiltInEvaluatorNav(): (string | { group: string; pages: string[] })[] {
   const p = (name: string) => `api-reference/evaluators/${name}`;
-  const pages: (string | { group: string; pages: string[] })[] = [
-    p("overview"),
-  ];
+  const pages: (string | { group: string; pages: string[] })[] = [p("overview")];
 
-  for (const [category, evaluators] of Object.entries(
-    BUILTIN_EVALUATOR_CATEGORIES,
-  )) {
+  for (const [category, evaluators] of Object.entries(BUILTIN_EVALUATOR_CATEGORIES)) {
     pages.push({
       group: category,
       pages: evaluators.map(p),

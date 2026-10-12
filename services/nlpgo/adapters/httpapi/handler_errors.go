@@ -9,6 +9,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
+	gatewaydomain "github.com/langwatch/langwatch/services/aigateway/domain"
 	"github.com/langwatch/langwatch/services/nlpgo/domain"
 )
 
@@ -23,7 +24,9 @@ func handlerFault(code herr.Code) (string, zapcore.Level) {
 	switch code {
 	case domain.ErrBadRequest, domain.ErrInvalidWorkflow, domain.ErrInvalidDataset,
 		domain.ErrUnsupportedNodeKind, domain.ErrUnauthorized, domain.ErrNotFound,
-		domain.ErrCodeBlockTimeout, domain.ErrSSRFBlocked:
+		domain.ErrCodeBlockTimeout, domain.ErrSSRFBlocked,
+		gatewaydomain.ErrRateLimited, gatewaydomain.ErrBudgetExceeded, gatewaydomain.ErrModelNotAllowed,
+		gatewaydomain.ErrProviderNotBound, gatewaydomain.ErrModelNotRecognized:
 		return "customer", zapcore.InfoLevel
 	default:
 		// internal_error, idle_timeout, gateway_unavailable, unknown.

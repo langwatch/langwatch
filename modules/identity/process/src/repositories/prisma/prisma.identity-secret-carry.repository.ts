@@ -1,0 +1,202 @@
+import { skipTenantCheck } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, type Instant, toDate } from "@langwatch/time";
+
+import type { IdentityAccountSecrets } from "../../rules/identity-storage.rules.ts";
+import type {
+  AccountSecretPair,
+  IdentitySecretCarryRepository,
+} from "../../services/identity-secret-carry.service.ts";
+
+interface LegacyAccountRow {
+  id: string;
+  userId: string;
+  provider: string;
+  password: string | null;
+  access_token: string | null;
+  refresh_token: string | null;
+  id_token: string | null;
+  expires_at: Date | null;
+  scope: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * The reads and writes behind both pass-time directions of the bridge healing back a secret that
+ * landed on the legacy branch afterwards.
+ * mirror (ADR-116 §4): carrying a latching user's secrets across, and
+ */
+export class PrismaIdentitySecretCarryRepository implements IdentitySecretCarryRepository {
+  static create(prisma: PrismaClient): PrismaIdentitySecretCarryRepository {
+    return new PrismaIdentitySecretCarryRepository(prisma);
+  }
+
+  constructor(private readonly prisma: PrismaClient) {}
+
+  /** A secret as its column stores it: an expiry instant is a `DateTime` column. */
+  static toColumnValue(value: string | Instant | null | undefined): string | Date | null {
+    if (value === null || value === undefined || typeof value === "string") return value ?? null;
+    return toDate(value);
+  }
+
+  /** A stored expiry as the identity branch holds it. */
+  static toInstant(value: Date | null | undefined): Instant | null {
+    return value ? fromDate(value) : null;
+  }
+
+  /** A secret patch as Prisma writes it, naming only the fields the patch names. */
+  static toCredentialColumns(
+    secrets: IdentityAccountSecrets,
+  ): Record<string, string | Date | null> {
+    return Object.fromEntries(
+      Object.entries(secrets).map(([field, value]) => [
+        field,
+        PrismaIdentitySecretCarryRepository.toColumnValue(value),
+      ]),
+    );
+  }
+
+  async findAccountSecretPairs({ userId }: { userId: string }): Promise<AccountSecretPair[]> {
+    const accounts = (await this.prisma.account.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        userId: true,
+        provider: true,
+        password: true,
+        access_token: true,
+        refresh_token: true,
+        id_token: true,
+        expires_at: true,
+        scope: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })) as LegacyAccountRow[];
+    if (accounts.length === 0) return [];
+
+    const credentials = await this.prisma.accountCredential.findMany({
+      where: { id: { in: accounts.map((account) => account.id) } },
+      select: { id: true, updatedAt: true },
+    });
+    const credentialUpdatedAt = new Map(
+      credentials.map((credential) => [credential.id, credential.updatedAt.getTime()]),
+    );
+
+    return accounts.map((account) => ({
+      accountId: account.id,
+      userId: account.userId,
+      // better-auth's own provider id, verbatim: `Identifier.provider` folds
+      // every generic OAuth IdP into `oidc`, so it cannot stand in here.
+      providerId: account.provider,
+      accountCreatedAtMs: account.createdAt.getTime(),
+      accountUpdatedAtMs: account.updatedAt.getTime(),
+      credentialUpdatedAtMs: credentialUpdatedAt.get(account.id) ?? null,
+      secrets: secretsOf(account),
+    }));
+  }
+
+  async findDriftedUserIdsAfter({
+    cursor,
+    limit,
+  }: {
+    cursor: string | null;
+    limit: number;
+  }): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ userId: string }[]>`
+      ${skipTenantCheck({
+        // The heal pass enumerates its cohort across users; each is a tenant.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT DISTINCT a."userId"
+      FROM "Account" a
+      LEFT JOIN "AccountCredential" c ON c."id" = a."id"
+      WHERE (c."id" IS NULL OR a."updatedAt" > c."updatedAt")
+        AND (${cursor}::text IS NULL OR a."userId" > ${cursor}::text)
+      ORDER BY a."userId"
+      LIMIT ${limit}
+    `;
+    return rows.map((row) => row.userId);
+  }
+
+  /**
+   * Idempotent by construction: keyed on the pinned account id, a row that already exists is left
+   * exactly as it is. Running the carry again inserts nothing, which is what makes it safe on every
+   * pass. The timestamps are the `Account` row's own, not `now()`.
+   */
+  async insertCredentialIfMissing({
+    accountId,
+    userId,
+    providerId,
+    secrets,
+    createdAtMs,
+    updatedAtMs,
+  }: {
+    accountId: string;
+    userId: string;
+    providerId: string;
+    secrets: IdentityAccountSecrets;
+    createdAtMs: number;
+    updatedAtMs: number;
+  }): Promise<boolean> {
+    const created = await this.prisma.accountCredential.createMany({
+      data: [
+        {
+          id: accountId,
+          userId,
+          provider: providerId,
+          ...PrismaIdentitySecretCarryRepository.toCredentialColumns(secrets),
+          createdAt: new Date(createdAtMs),
+          updatedAt: new Date(updatedAtMs),
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return created.count > 0;
+  }
+
+  async overwriteCredential({
+    accountId,
+    secrets,
+    updatedAtMs,
+  }: {
+    accountId: string;
+    secrets: IdentityAccountSecrets;
+    updatedAtMs: number;
+  }): Promise<void> {
+    await this.prisma.accountCredential.updateMany({
+      where: { id: accountId },
+      // The `Account` row's own `updatedAt` rides along, so the comparison
+      // settles at equal and the next pass writes nothing.
+      data: {
+        ...PrismaIdentitySecretCarryRepository.toCredentialColumns(secrets),
+        updatedAt: new Date(updatedAtMs),
+      },
+    });
+  }
+
+  async deleteCredentials({
+    userId,
+    accountIds,
+  }: {
+    userId: string;
+    accountIds: readonly string[];
+  }): Promise<number> {
+    const deleted = await this.prisma.accountCredential.deleteMany({
+      where: { userId, id: { in: [...accountIds] } },
+    });
+    return deleted.count;
+  }
+}
+
+function secretsOf(account: LegacyAccountRow): IdentityAccountSecrets {
+  return {
+    password: account.password,
+    accessToken: account.access_token,
+    refreshToken: account.refresh_token,
+    idToken: account.id_token,
+    accessTokenExpiresAt: PrismaIdentitySecretCarryRepository.toInstant(account.expires_at),
+    scope: account.scope,
+  };
+}

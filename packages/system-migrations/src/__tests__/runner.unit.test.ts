@@ -1,10 +1,20 @@
+import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { MigrationLeaseRepository } from "../lease.repository";
-import { SystemMigrationRunnerService } from "../runner.service";
-import type { SystemMigrationStateRepository } from "../state.repository";
-import type { SystemMigration } from "../system-migration";
-import type { TenantSource } from "../tenant-source";
-import type { TenantMigrationOutcome, TenantMigrationRecord } from "../types";
+
+import type { MigrationLeaseRepository } from "../lease.repository.ts";
+import { heldNoticeLevel, SystemMigrationRunnerService } from "../runner.service.ts";
+import {
+  SystemMigrationRecordNotFoundError,
+  type SystemMigrationStateRepository,
+} from "../state.repository.ts";
+import type { SystemMigration } from "../system-migration.ts";
+import type { TenantSource } from "../tenant-source.ts";
+import {
+  HELD_FAILED_AFTER,
+  isHeldTenantFailed,
+  type TenantMigrationOutcome,
+  type TenantMigrationRecord,
+} from "../types.ts";
 
 class FakeStateRepository implements SystemMigrationStateRepository {
   records = new Map<string, TenantMigrationRecord>();
@@ -13,35 +23,42 @@ class FakeStateRepository implements SystemMigrationStateRepository {
     return `${migrationName}::${tenantId}`;
   }
 
-  async hasFinalizedTenant({
-    migrationName,
-  }: {
-    migrationName: string;
-  }): Promise<boolean> {
+  async hasFinalizedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     return [...this.records.values()].some(
-      (record) =>
-        record.migrationName === migrationName &&
-        record.status === "finalized",
+      (record) => record.migrationName === migrationName && record.status === "finalized",
     );
   }
 
-  async findRecord({
+  async getRecord({
     migrationName,
     tenantId,
   }: {
     migrationName: string;
     tenantId: string;
-  }): Promise<TenantMigrationRecord | null> {
-    return this.records.get(this.key(migrationName, tenantId)) ?? null;
+  }): Promise<TenantMigrationRecord> {
+    const record = this.records.get(this.key(migrationName, tenantId));
+    if (!record) throw new SystemMigrationRecordNotFoundError({ migrationName, tenantId });
+    return record;
+  }
+
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    return tenantIds.flatMap((tenantId) => {
+      const record = this.records.get(this.key(migrationName, tenantId));
+      return record ? [record] : [];
+    });
   }
 
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     this.records.set(this.key(record.migrationName, record.tenantId), record);
   }
 
-  async upsertRecordUnlessRolledBack(
-    record: TenantMigrationRecord,
-  ): Promise<boolean> {
+  async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
     const key = this.key(record.migrationName, record.tenantId);
     if (this.records.get(key)?.status === "rolled_back") return false;
     this.records.set(key, record);
@@ -60,10 +77,7 @@ class FakeLeaseRepository implements MigrationLeaseRepository {
   /** Two repositories over one holder table: two processes, one Redis. */
   static shared(): [FakeLeaseRepository, FakeLeaseRepository] {
     const holders = new Map<string, symbol>();
-    return [
-      new FakeLeaseRepository(holders),
-      new FakeLeaseRepository(holders),
-    ];
+    return [new FakeLeaseRepository(holders), new FakeLeaseRepository(holders)];
   }
 
   async acquire({ name }: { name: string; ttlMs: number }): Promise<boolean> {
@@ -142,10 +156,12 @@ describe("SystemMigrationRunnerService", () => {
         migrations: [migration],
       };
       const runnerA = new SystemMigrationRunnerService({
+        now: nowInstant,
         ...deps,
         lease: leaseA,
       });
       const runnerB = new SystemMigrationRunnerService({
+        now: nowInstant,
         ...deps,
         lease: leaseB,
       });
@@ -153,9 +169,7 @@ describe("SystemMigrationRunnerService", () => {
       const [summaryA, summaryB] = await Promise.all([
         runnerA.runPass(),
         // Give runner A the first tick so the race is deterministic.
-        new Promise((resolve) => setTimeout(resolve, 5)).then(() =>
-          runnerB.runPass(),
-        ),
+        new Promise((resolve) => setTimeout(resolve, 5)).then(() => runnerB.runPass()),
       ]);
 
       expect(summaryA.finalized).toBe(1);
@@ -175,18 +189,14 @@ describe("SystemMigrationRunnerService", () => {
       const migration = migrationOf("m1", async ({ tenantId }) => {
         inFlight += 1;
         peak = Math.max(peak, inFlight);
-        await new Promise((resolve) =>
-          setTimeout(resolve, tenantId === "org-00" ? 40 : 5),
-        );
+        await new Promise((resolve) => setTimeout(resolve, tenantId === "org-00" ? 40 : 5));
         inFlight -= 1;
         completed.push(tenantId);
         return finalized;
       });
-      const ids = Array.from(
-        { length: 12 },
-        (_, i) => `org-${String(i).padStart(2, "0")}`,
-      );
+      const ids = Array.from({ length: 12 }, (_, i) => `org-${String(i).padStart(2, "0")}`);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(ids),
@@ -201,22 +211,21 @@ describe("SystemMigrationRunnerService", () => {
       // The LAST organization still finishes before the slow first one: a
       // pool keeps pulling past the straggler, where a chunked convoy would
       // hold the tail behind org-00's sleep.
-      expect(completed.indexOf("org-11")).toBeLessThan(
-        completed.indexOf("org-00"),
-      );
+      expect(completed.indexOf("org-11")).toBeLessThan(completed.indexOf("org-00"));
     });
   });
 
   describe("when reading one tenant's state throws", () => {
     it("parks that tenant in the summary and finishes the rest of the pass", async () => {
       const failingState = new FakeStateRepository();
-      const originalFindRecord = failingState.findRecord.bind(failingState);
-      failingState.findRecord = async (args) => {
+      const originalGetRecord = failingState.getRecord.bind(failingState);
+      failingState.getRecord = async (args) => {
         if (args.tenantId === "acme") throw new Error("postgres blinked");
-        return originalFindRecord(args);
+        return originalGetRecord(args);
       };
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state: failingState,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme", "globex", "initech"]),
@@ -232,7 +241,7 @@ describe("SystemMigrationRunnerService", () => {
       expect(summary.parked).toBe(1);
       expect(summary.finalized).toBe(2);
       expect(
-        await failingState.findRecord({
+        await failingState.getRecord({
           migrationName: "m1",
           tenantId: "globex",
         }),
@@ -245,6 +254,7 @@ describe("SystemMigrationRunnerService", () => {
     it("processes cohort tenants and records nothing for the rest", async () => {
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme", "globex"]),
@@ -255,13 +265,11 @@ describe("SystemMigrationRunnerService", () => {
       const summary = await runner.runPass();
 
       expect(migrate).toHaveBeenCalledTimes(1);
-      expect(migrate).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: "acme" }),
-      );
+      expect(migrate).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "acme" }));
       expect(summary?.skipped).toBe(1);
-      expect(
-        await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
-      ).toBeNull();
+      await expect(
+        state.getRecord({ migrationName: "m1", tenantId: "globex" }),
+      ).rejects.toBeInstanceOf(SystemMigrationRecordNotFoundError);
     });
   });
 
@@ -277,6 +285,7 @@ describe("SystemMigrationRunnerService", () => {
         return finalized;
       });
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme", "globex"]),
@@ -287,28 +296,29 @@ describe("SystemMigrationRunnerService", () => {
       const first = await runner.runPass();
       expect(first?.parked).toBe(1);
       expect(first?.finalized).toBe(1);
-      const parked = await state.findRecord({
+      const parked = await state.getRecord({
         migrationName: "m1",
         tenantId: "acme",
       });
-      expect(parked?.status).toBe("parked");
-      expect(parked?.report).toMatchObject({
+      expect(parked.status).toBe("parked");
+      expect(parked.report).toMatchObject({
         kind: "error",
         message: "storage unavailable",
       });
 
       const second = await runner.runPass();
       expect(second?.finalized).toBe(1);
-      const healed = await state.findRecord({
+      const healed = await state.getRecord({
         migrationName: "m1",
         tenantId: "acme",
       });
-      expect(healed?.status).toBe("finalized");
+      expect(healed.status).toBe("finalized");
     });
   });
 
   describe("when a tenant was finalized on an earlier pass", () => {
     /** @scenario "A finalized organization is never processed again" */
+    /** @scenario "A restart skips the tenants an earlier pass finalized" */
     it("skips it without calling the migration", async () => {
       await state.upsertRecord({
         migrationName: "m1",
@@ -318,6 +328,7 @@ describe("SystemMigrationRunnerService", () => {
       });
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -347,6 +358,7 @@ describe("SystemMigrationRunnerService", () => {
       });
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -361,10 +373,9 @@ describe("SystemMigrationRunnerService", () => {
       // migration whose proof still passes and undo the rollback.
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.alreadyRolledBack).toBe(1);
-      expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
-          ?.status,
-      ).toBe("rolled_back");
+      expect((await state.getRecord({ migrationName: "m1", tenantId: "acme" })).status).toBe(
+        "rolled_back",
+      );
     });
   });
 
@@ -385,6 +396,7 @@ describe("SystemMigrationRunnerService", () => {
       });
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -399,10 +411,9 @@ describe("SystemMigrationRunnerService", () => {
       // it came from.
       expect(migrate).not.toHaveBeenCalled();
       expect(summary?.alreadyRolledBack).toBe(1);
-      expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
-          ?.status,
-      ).toBe("rolled_back");
+      expect((await state.getRecord({ migrationName: "m1", tenantId: "acme" })).status).toBe(
+        "rolled_back",
+      );
     });
   });
 
@@ -427,6 +438,7 @@ describe("SystemMigrationRunnerService", () => {
         return finalized;
       });
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -436,12 +448,12 @@ describe("SystemMigrationRunnerService", () => {
 
       const summary = await runner.runPass();
 
-      const record = await state.findRecord({
+      const record = await state.getRecord({
         migrationName: "m1",
         tenantId: "acme",
       });
-      expect(record?.status).toBe("rolled_back");
-      expect(record?.report).toEqual({ rolledBack: { by: "user_alex" } });
+      expect(record.status).toBe("rolled_back");
+      expect(record.report).toEqual({ rolledBack: { by: "user_alex" } });
       // The pin won: nothing finalized, the tenant reads as skipped.
       expect(summary?.finalized).toBe(0);
       expect(summary?.skipped).toBe(1);
@@ -465,6 +477,7 @@ describe("SystemMigrationRunnerService", () => {
         throw new Error("storage gave out mid-pass");
       });
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -476,14 +489,14 @@ describe("SystemMigrationRunnerService", () => {
 
       // A `parked` row would be retried on the next pass and re-finalized -
       // the exact undo the pin exists to prevent.
-      expect(
-        (await state.findRecord({ migrationName: "m1", tenantId: "acme" }))
-          ?.status,
-      ).toBe("rolled_back");
+      expect((await state.getRecord({ migrationName: "m1", tenantId: "acme" })).status).toBe(
+        "rolled_back",
+      );
     });
   });
 
   describe("when the previous attempt for a tenant parked", () => {
+    /** @scenario "A background migration resumes from its persisted checkpoint" */
     it("hands the migration that record so it can finish stranded work", async () => {
       await state.upsertRecord({
         migrationName: "m1",
@@ -493,6 +506,7 @@ describe("SystemMigrationRunnerService", () => {
       });
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -515,13 +529,7 @@ describe("SystemMigrationRunnerService", () => {
     it("stops that tenant's remaining migrations and carries on with the rest", async () => {
       const lease = new FakeLeaseRepository();
       const touched: string[] = [];
-      const migrationBody = async ({
-        tenantId,
-        name,
-      }: {
-        tenantId: string;
-        name: string;
-      }) => {
+      const migrationBody = async ({ tenantId, name }: { tenantId: string; name: string }) => {
         touched.push(`${name}:${tenantId}`);
         // Outlive the renew interval, then lose the claim to another driver
         // mid-tenant - the case a between-migrations renewal cannot detect.
@@ -532,17 +540,14 @@ describe("SystemMigrationRunnerService", () => {
         return finalized;
       };
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease,
         tenants: tenantSourceOf(["acme", "globex"]),
         cohort: () => true,
         migrations: [
-          migrationOf("m1", ({ tenantId }) =>
-            migrationBody({ tenantId, name: "m1" }),
-          ),
-          migrationOf("m2", ({ tenantId }) =>
-            migrationBody({ tenantId, name: "m2" }),
-          ),
+          migrationOf("m1", ({ tenantId }) => migrationBody({ tenantId, name: "m1" })),
+          migrationOf("m2", ({ tenantId }) => migrationBody({ tenantId, name: "m2" })),
         ],
         leaseTtlMs: 50,
         leaseRenewIntervalMs: 5,
@@ -556,9 +561,9 @@ describe("SystemMigrationRunnerService", () => {
       expect(touched).toContain("m1:globex");
       expect(touched).toContain("m2:globex");
       expect(summary.tenantsSeen).toBe(2);
-      expect(
-        await state.findRecord({ migrationName: "m2", tenantId: "acme" }),
-      ).toBeNull();
+      await expect(
+        state.getRecord({ migrationName: "m2", tenantId: "acme" }),
+      ).rejects.toBeInstanceOf(SystemMigrationRecordNotFoundError);
     });
   });
 
@@ -576,6 +581,7 @@ describe("SystemMigrationRunnerService", () => {
         return outcome;
       });
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -585,12 +591,12 @@ describe("SystemMigrationRunnerService", () => {
 
       const first = await runner.runPass();
       expect(first?.held).toBe(1);
-      const held = await state.findRecord({
+      const held = await state.getRecord({
         migrationName: "m1",
         tenantId: "acme",
       });
-      expect(held?.status).toBe("migrated");
-      expect(held?.report).toMatchObject({ diffs: ["budgets:view at org"] });
+      expect(held.status).toBe("migrated");
+      expect(held.report).toMatchObject({ diffs: ["budgets:view at org"] });
 
       const second = await runner.runPass();
       expect(second?.finalized).toBe(1);
@@ -606,6 +612,7 @@ describe("SystemMigrationRunnerService", () => {
         return finalized;
       });
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease,
         tenants: tenantSourceOf(["acme", "globex"]),
@@ -619,9 +626,9 @@ describe("SystemMigrationRunnerService", () => {
       const summary = await runner.runPass({ signal: controller.signal });
 
       expect(summary?.tenantsSeen).toBe(1);
-      expect(
-        await state.findRecord({ migrationName: "m1", tenantId: "globex" }),
-      ).toBeNull();
+      await expect(
+        state.getRecord({ migrationName: "m1", tenantId: "globex" }),
+      ).rejects.toBeInstanceOf(SystemMigrationRecordNotFoundError);
       // Every claim released, aborted mid-pass or not.
       expect(lease.heldNames()).toEqual([]);
     });
@@ -629,12 +636,10 @@ describe("SystemMigrationRunnerService", () => {
 
   describe("when the tenant source pages", () => {
     it("walks every page with the last id as the cursor", async () => {
-      const ids = Array.from(
-        { length: 250 },
-        (_, i) => `org-${String(i).padStart(3, "0")}`,
-      );
+      const ids = Array.from({ length: 250 }, (_, i) => `org-${String(i).padStart(3, "0")}`);
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(ids),
@@ -660,6 +665,7 @@ describe("SystemMigrationRunnerService", () => {
         return outcomes.shift() ?? { status: "finalized" };
       });
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -680,6 +686,7 @@ describe("SystemMigrationRunnerService", () => {
         report: { outstanding: ["still disagreeing"] },
       }));
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -703,6 +710,7 @@ describe("SystemMigrationRunnerService", () => {
         throw new Error("still broken");
       });
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -725,6 +733,7 @@ describe("SystemMigrationRunnerService", () => {
       });
       const migrate = vi.fn(async () => finalized);
       const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
         state,
         lease: new FakeLeaseRepository(),
         tenants: tenantSourceOf(["acme"]),
@@ -740,5 +749,216 @@ describe("SystemMigrationRunnerService", () => {
       expect(summary.alreadyRolledBack).toBe(1);
       expect(summary.advanced).toBe(0);
     });
+  });
+});
+
+describe("SystemMigrationRunnerService held tenants", () => {
+  let state: FakeStateRepository;
+
+  beforeEach(() => {
+    state = new FakeStateRepository();
+  });
+
+  function runnerOver(
+    outcome: () => TenantMigrationOutcome,
+    now: () => Instant = nowInstant,
+  ): SystemMigrationRunnerService {
+    return new SystemMigrationRunnerService({
+      now,
+      state,
+      lease: new FakeLeaseRepository(),
+      tenants: tenantSourceOf(["org_acme"]),
+      cohort: () => true,
+      migrations: [migrationOf("m1", async () => outcome())],
+    });
+  }
+
+  function acme(): Promise<TenantMigrationRecord> {
+    return state.getRecord({ migrationName: "m1", tenantId: "org_acme" });
+  }
+
+  describe("when the migration's own proof disagrees", () => {
+    /** @scenario "A held tenant records why it is held" */
+    it("holds the tenant with reason proof", async () => {
+      await runnerOver(() => ({ status: "migrated", report: { outstanding: 1 } })).runPass();
+
+      expect(await acme()).toMatchObject({ status: "migrated", heldReason: "proof" });
+    });
+  });
+
+  describe("when the migration's queued work has not drained", () => {
+    /** @scenario "A tenant whose queued work has not drained is held as pending" */
+    it("holds the tenant with reason pending", async () => {
+      await runnerOver(() => ({
+        status: "migrated",
+        report: null,
+        heldReason: "pending",
+      })).runPass();
+
+      expect(await acme()).toMatchObject({ status: "migrated", heldReason: "pending" });
+    });
+  });
+
+  describe("when the hold is logged", () => {
+    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
+    it("logs a first hold at info, since the next pass re-proves it", () => {
+      expect(heldNoticeLevel({ existing: undefined })).toBe("info");
+    });
+
+    /** @scenario "A first hold is logged at info and a hold that persists at warn" */
+    it("logs a tenant still held from an earlier pass at warn", () => {
+      const held: TenantMigrationRecord = {
+        migrationName: "m1",
+        tenantId: "org_acme",
+        status: "migrated",
+        report: null,
+        heldReason: "proof",
+        heldSince: nowInstant(),
+      };
+
+      expect(heldNoticeLevel({ existing: held })).toBe("warn");
+    });
+  });
+
+  describe("when a held tenant is finalized", () => {
+    /** @scenario "A tenant that leaves held drops its reason" */
+    it("records no held reason", async () => {
+      let outcome: TenantMigrationOutcome = { status: "migrated", report: null };
+      const runner = runnerOver(() => outcome);
+      await runner.runPass();
+      outcome = finalized;
+      await runner.runPass();
+
+      const record = await acme();
+      expect(record.status).toBe("finalized");
+      expect(record).not.toHaveProperty("heldReason");
+      expect(record).not.toHaveProperty("heldSince");
+    });
+  });
+
+  describe("when a pass holds a tenant at a known moment", () => {
+    /** @scenario "A held tenant records the moment it became held" */
+    it("records that moment as heldSince", async () => {
+      const moment = Temporal.Instant.from("2026-10-09T10:00:00Z");
+      await runnerOver(
+        () => ({ status: "migrated", report: null }),
+        () => moment,
+      ).runPass();
+
+      expect((await acme()).heldSince?.equals(moment)).toBe(true);
+    });
+  });
+
+  describe("when a later pass re-proves a held tenant", () => {
+    /** @scenario "Re-proving a held tenant keeps the moment it was first held" */
+    it("keeps the moment it was first held", async () => {
+      const first = Temporal.Instant.from("2026-10-09T10:00:00Z");
+      let clock = first;
+      const runner = runnerOver(
+        () => ({ status: "migrated", report: null }),
+        () => clock,
+      );
+      await runner.runPass();
+      clock = first.add({ hours: 1 });
+      await runner.runPass();
+
+      expect((await acme()).heldSince?.equals(first)).toBe(true);
+    });
+  });
+});
+
+describe("isHeldTenantFailed", () => {
+  const heldSince = Temporal.Instant.from("2026-10-09T10:00:00Z");
+  const record: TenantMigrationRecord = {
+    migrationName: "m1",
+    tenantId: "org_acme",
+    status: "migrated",
+    report: null,
+    heldReason: "proof",
+    heldSince,
+  };
+
+  describe("when the tenant has been held past the threshold", () => {
+    /** @scenario "A tenant held past the threshold reads as failed" */
+    it("reads as failed", () => {
+      const now = heldSince.add(HELD_FAILED_AFTER).add({ minutes: 1 });
+
+      expect(isHeldTenantFailed({ record, now })).toBe(true);
+    });
+  });
+
+  describe("when the tenant was held moments ago", () => {
+    /** @scenario "A tenant held within the threshold does not read as failed" */
+    it("does not read as failed", () => {
+      const now = heldSince.add({ minutes: 1 });
+
+      expect(isHeldTenantFailed({ record, now })).toBe(false);
+    });
+  });
+});
+
+describe("SystemMigrationRunnerService over a finished fleet", () => {
+  const ids = Array.from({ length: 1000 }, (_, index) => `org-${String(index).padStart(4, "0")}`);
+
+  function finishedFleet() {
+    const state = new FakeStateRepository();
+    for (const tenantId of ids) {
+      for (const migrationName of ["m1", "m2"]) {
+        state.records.set(`${migrationName}::${tenantId}`, {
+          migrationName,
+          tenantId,
+          status: "finalized",
+        });
+      }
+    }
+    const pageReads = vi.spyOn(state, "findRecords");
+    const singleReads = vi.spyOn(state, "getRecord");
+    const lease = new FakeLeaseRepository();
+    const claims = vi.spyOn(lease, "acquire");
+    const migrate = vi.fn(async () => finalized);
+    const runner = new SystemMigrationRunnerService({
+      now: nowInstant,
+      state,
+      lease,
+      tenants: tenantSourceOf(ids),
+      cohort: () => true,
+      migrations: [migrationOf("m1", migrate), migrationOf("m2", migrate)],
+    });
+    return { runner, state, pageReads, singleReads, claims, migrate };
+  }
+
+  /** @scenario "A tenant whose every migration is finished takes no claim" */
+  it("reads state once per migration per page and claims no finished tenant", async () => {
+    const { runner, pageReads, singleReads, claims, migrate } = finishedFleet();
+
+    const summary = await runner.runPass();
+
+    expect(pageReads).toHaveBeenCalledTimes(2 * 10);
+    expect(singleReads).not.toHaveBeenCalled();
+    expect(claims).not.toHaveBeenCalled();
+    expect(migrate).not.toHaveBeenCalled();
+    expect(summary).toMatchObject({ tenantsSeen: 1000, alreadyFinalized: 2000, advanced: 0 });
+  });
+
+  /** @scenario "Asking whether a migration has unfinished tenants reads a page at a time" */
+  it("answers whether any tenant is unfinished in one state read per page", async () => {
+    const { runner, pageReads, singleReads } = finishedFleet();
+
+    expect(await runner.hasUnfinishedTenant({ migrationName: "m1" })).toBe(false);
+
+    expect(pageReads).toHaveBeenCalledTimes(10);
+    expect(singleReads).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A tenant whose every migration is finished takes no claim" */
+  it("still claims and drives a tenant with one migration left", async () => {
+    const { runner, state, claims, migrate } = finishedFleet();
+    state.records.delete("m2::org-0500");
+
+    const summary = await runner.runPass();
+
+    expect(claims).toHaveBeenCalledTimes(1);
+    expect(migrate).toHaveBeenCalledTimes(1);
+    expect(summary.finalized).toBe(1);
   });
 });

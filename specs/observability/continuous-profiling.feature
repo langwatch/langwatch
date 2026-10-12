@@ -67,6 +67,9 @@ Feature: Continuous profiling — where the CPU actually went
 
   Rule: The local stack serves profiles without extra setup
 
+    Both tiers run Pyroscope on the same loopback port: the container bundle's,
+    and on the native macOS tier a pinned release haven fetches itself.
+
     The shared LGTM stack already runs Pyroscope and already provisions a
     Pyroscope datasource. A developer should get flame graphs from the same
     "make haven up" that gives them traces, without learning a new address.

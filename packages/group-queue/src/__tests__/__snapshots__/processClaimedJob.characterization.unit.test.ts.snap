@@ -1,0 +1,856 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`given a claimed job > blocks the group when the handler fails for good 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "handler.process",
+    [
+      {
+        "__jobName": "job",
+        "groupId": "project_1/g1",
+        "id": "job-1",
+      },
+    ],
+  ],
+  [
+    "blob.encode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "jobData": {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-1",
+        },
+      },
+    ],
+  ],
+  [
+    "scripts.restageAndBlock",
+    [
+      {
+        "errorMessage": "never again",
+        "errorStack": "<stack>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job"}",
+        "newStagedJobId": "job-1",
+        "score": "<time>",
+      },
+    ],
+  ],
+  [
+    "blob.releaseLease",
+    [
+      {
+        "groupId": "project_1/g1",
+        "values": [
+          "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        ],
+      },
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job > completes a job whose handler succeeds 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "handler.process",
+    [
+      {
+        "__jobName": "job",
+        "groupId": "project_1/g1",
+        "id": "job-1",
+      },
+    ],
+  ],
+  [
+    "scripts.complete",
+    [
+      {
+        "groupId": "project_1/g1",
+        "jobName": "job",
+        "stagedJobId": "job-1",
+      },
+    ],
+  ],
+  [
+    "scripts.clearGroupFailures",
+    [
+      "project_1/g1",
+    ],
+  ],
+  [
+    "redis.del",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "blob.releaseLease",
+    [
+      {
+        "groupId": "project_1/g1",
+        "values": [
+          "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        ],
+      },
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job > drops a job whose value cannot be decoded 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "scripts.complete",
+    [
+      {
+        "dropped": true,
+        "groupId": "project_1/g1",
+        "stagedJobId": "job-1",
+      },
+    ],
+  ],
+  [
+    "blob.releaseLease",
+    [
+      {
+        "groupId": "project_1/g1",
+        "values": [
+          "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        ],
+      },
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job > parks the group when the payload is oversized 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "scripts.restageAndBlock",
+    [
+      {
+        "errorMessage": "Poison guard: Job payload is 99999999 bytes, over the 52428800-byte ceiling. The staged value was parked unparsed.",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "newStagedJobId": "job-1",
+        "score": "<time>",
+      },
+    ],
+  ],
+  [
+    "scripts.discardClaim",
+    [
+      "project_1/g1",
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job > quarantines a group past its failure streak 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "handler.process",
+    [
+      {
+        "__jobName": "job",
+        "groupId": "project_1/g1",
+        "id": "job-1",
+      },
+    ],
+  ],
+  [
+    "scripts.recordGroupFailure",
+    [
+      "project_1/g1",
+    ],
+  ],
+  [
+    "scripts.clearGroupFailures",
+    [
+      "project_1/g1",
+    ],
+  ],
+  [
+    "blob.encode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "jobData": {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-1",
+        },
+      },
+    ],
+  ],
+  [
+    "scripts.restageAndBlock",
+    [
+      {
+        "errorMessage": "Poison guard: group quarantined after 10000 consecutive failures (threshold 500) with no success. Last error: handler failed. Inspect the staged jobs, then unblock the group.",
+        "errorStack": "<stack>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job"}",
+        "newStagedJobId": "job-1",
+        "score": "<time>",
+      },
+    ],
+  ],
+  [
+    "blob.releaseLease",
+    [
+      {
+        "groupId": "project_1/g1",
+        "values": [
+          "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        ],
+      },
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job > re-stages a job whose handler fails retryably 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "handler.process",
+    [
+      {
+        "__jobName": "job",
+        "groupId": "project_1/g1",
+        "id": "job-1",
+      },
+    ],
+  ],
+  [
+    "scripts.recordGroupFailure",
+    [
+      "project_1/g1",
+    ],
+  ],
+  [
+    "blob.encode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "jobData": {
+          "__attempt": 2,
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-1",
+        },
+      },
+    ],
+  ],
+  [
+    "scripts.retryRestage",
+    [
+      {
+        "attempt": 2,
+        "attemptTtlSec": 1800,
+        "backoffMs": "<time>",
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":2}",
+        "newStagedJobId": "job-1",
+        "stagedJobId": "job-1",
+      },
+    ],
+  ],
+  [
+    "blob.transferLease",
+    [
+      {
+        "groupId": "project_1/g1",
+        "newValue": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":2}",
+        "oldValue": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job > retries a job whose body is transiently unreachable 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "scripts.retryRestage",
+    [
+      {
+        "attempt": 1,
+        "attemptTtlSec": 1800,
+        "backoffMs": "<time>",
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "newStagedJobId": "job-1",
+        "stagedJobId": "job-1",
+      },
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job that coalesces its siblings > bisects a batch that fails until the poison payload is alone 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "scripts.drainGroupReady",
+    [
+      {
+        "groupId": "project_1/g1",
+        "initialBytes": 71,
+        "maxBytes": 4194304,
+        "maxJobs": 2,
+        "nowMs": "<time>",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-4","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "handler.processBatch",
+    [
+      [
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-1",
+        },
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-2",
+        },
+        {
+          "__jobName": "other",
+          "groupId": "project_1/g1",
+          "id": "job-3",
+        },
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-4",
+        },
+      ],
+    ],
+  ],
+  [
+    "handler.processBatch",
+    [
+      [
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-1",
+        },
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-2",
+        },
+      ],
+    ],
+  ],
+  [
+    "handler.processBatch",
+    [
+      [
+        {
+          "__jobName": "other",
+          "groupId": "project_1/g1",
+          "id": "job-3",
+        },
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-4",
+        },
+      ],
+    ],
+  ],
+  [
+    "handler.processBatch",
+    [
+      [
+        {
+          "__jobName": "other",
+          "groupId": "project_1/g1",
+          "id": "job-3",
+        },
+      ],
+    ],
+  ],
+  [
+    "handler.processBatch",
+    [
+      [
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-4",
+        },
+      ],
+    ],
+  ],
+  [
+    "scripts.stage",
+    [
+      {
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "stagedJobId": "job-2",
+      },
+    ],
+  ],
+  [
+    "scripts.stage",
+    [
+      {
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+        "stagedJobId": "job-3",
+      },
+    ],
+  ],
+  [
+    "scripts.stage",
+    [
+      {
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-4","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "stagedJobId": "job-4",
+      },
+    ],
+  ],
+  [
+    "scripts.recordGroupFailure",
+    [
+      "project_1/g1",
+    ],
+  ],
+  [
+    "blob.encode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "jobData": {
+          "__attempt": 2,
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-1",
+        },
+      },
+    ],
+  ],
+  [
+    "scripts.retryRestage",
+    [
+      {
+        "attempt": 2,
+        "attemptTtlSec": 1800,
+        "backoffMs": "<time>",
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":2}",
+        "newStagedJobId": "job-1",
+        "stagedJobId": "job-1",
+      },
+    ],
+  ],
+  [
+    "blob.transferLease",
+    [
+      {
+        "groupId": "project_1/g1",
+        "newValue": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":2}",
+        "oldValue": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job that coalesces its siblings > processes the batch and restages a sibling of another job 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "scripts.drainGroupReady",
+    [
+      {
+        "groupId": "project_1/g1",
+        "initialBytes": 71,
+        "maxBytes": 4194304,
+        "maxJobs": 2,
+        "nowMs": "<time>",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-4","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "handler.processBatch",
+    [
+      [
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-1",
+        },
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-2",
+        },
+        {
+          "__jobName": "other",
+          "groupId": "project_1/g1",
+          "id": "job-3",
+        },
+        {
+          "__jobName": "job",
+          "groupId": "project_1/g1",
+          "id": "job-4",
+        },
+      ],
+    ],
+  ],
+  [
+    "scripts.complete",
+    [
+      {
+        "groupId": "project_1/g1",
+        "jobName": "job",
+        "stagedJobId": "job-1",
+      },
+    ],
+  ],
+  [
+    "scripts.clearGroupFailures",
+    [
+      "project_1/g1",
+    ],
+  ],
+  [
+    "redis.del",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "blob.releaseLease",
+    [
+      {
+        "groupId": "project_1/g1",
+        "values": [
+          "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+          "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+          "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+          "{"id":"job-4","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        ],
+      },
+    ],
+  ],
+]
+`;
+
+exports[`given a claimed job that coalesces its siblings > restages the siblings when a sibling body is transiently unreachable 1`] = `
+[
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "scripts.drainGroupReady",
+    [
+      {
+        "groupId": "project_1/g1",
+        "initialBytes": 71,
+        "maxBytes": 4194304,
+        "maxJobs": 2,
+        "nowMs": "<time>",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "blob.decode",
+    [
+      {
+        "groupId": "project_1/g1",
+        "value": "{"id":"job-4","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+      },
+    ],
+  ],
+  [
+    "scripts.stage",
+    [
+      {
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-2","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "stagedJobId": "job-2",
+      },
+    ],
+  ],
+  [
+    "scripts.stage",
+    [
+      {
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-3","groupId":"project_1/g1","__jobName":"other","__attempt":1}",
+        "stagedJobId": "job-3",
+      },
+    ],
+  ],
+  [
+    "scripts.stage",
+    [
+      {
+        "dedupId": "",
+        "dedupTtlMs": 0,
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-4","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "stagedJobId": "job-4",
+      },
+    ],
+  ],
+  [
+    "redis.get",
+    [
+      "{test/gq/characterize}:gq:group:project_1/g1:attempt",
+    ],
+  ],
+  [
+    "scripts.retryRestage",
+    [
+      {
+        "attempt": 1,
+        "attemptTtlSec": 1800,
+        "backoffMs": "<time>",
+        "dispatchAfterMs": "<time>",
+        "groupId": "project_1/g1",
+        "jobDataJson": "{"id":"job-1","groupId":"project_1/g1","__jobName":"job","__attempt":1}",
+        "newStagedJobId": "job-1",
+        "stagedJobId": "job-1",
+      },
+    ],
+  ],
+]
+`;

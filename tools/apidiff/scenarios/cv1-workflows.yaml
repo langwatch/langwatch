@@ -1,0 +1,36 @@
+# CV1 coverage sweep, workflows: the REST delete round trip. evaluations.yaml covers the refusals
+# and the reads; nothing there deletes a workflow the caller owns and reads the loss back.
+
+- id: cv1-workflows-delete-reads-back-gone
+  endpoint: DELETE /api/workflows/{id}
+  setup:
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows/{wfId}" }
+  expect: { status: 200 }
+  verify:
+    - request: GET /api/workflows/{wfId}
+      expect: { status: 404 }
+    - request: GET /api/workflows
+      expect: { status: 200, notContains: "wf-{uid}" }
+    - request: DELETE /api/workflows/{wfId}
+      expect: { status: 404 }
+
+- id: cv1-workflows-list-contains-created-then-not-after-delete
+  endpoint: GET /api/workflows
+  setup:
+    - request: POST /api/trpc/workflow.create
+      auth: session
+      body: { projectId: "{projectId}", commitMessage: "apidiff {uid}", dsl: { spec_version: "1.5", version: "1.0", name: "wf-{uid}", icon: "🧪", description: "seed-{uid}", nodes: [], edges: [], state: {} } }
+      capture: { wfId: "result.data.workflow.id" }
+      expect: { status: 200 }
+  request: { path: "/api/workflows" }
+  expect: { status: 200, contains: "wf-{uid}" }
+  verify:
+    - request: DELETE /api/workflows/{wfId}
+      expect: { status: 200 }
+    - request: GET /api/workflows
+      expect: { status: 200, notContains: "wf-{uid}" }

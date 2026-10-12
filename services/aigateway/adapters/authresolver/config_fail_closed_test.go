@@ -146,7 +146,7 @@ func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 	h := hashKey(domain.PresentedKey{Token: rawKey})
 	svc.storeL1(h, bundleWithCreds("vk_bg", time.Now().Add(5*time.Minute), "cred-old"), "")
 
-	svc.refreshBackground(domain.PresentedKey{Token: rawKey}, h)
+	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 
 	e, ok := svc.l1.Get(h)
 	if !ok {
@@ -158,7 +158,7 @@ func TestRefreshBackground_ConfigFetchFailure_KeepsExistingEntry(t *testing.T) {
 
 	// Control plane recovers: the next refresh replaces the entry for real.
 	fetcher.cfgErr = nil
-	svc.refreshBackground(domain.PresentedKey{Token: rawKey}, h)
+	refreshCurrent(svc, domain.PresentedKey{Token: rawKey}, h)
 	e, ok = svc.l1.Get(h)
 	if !ok {
 		t.Fatal("expected the refreshed entry in L1")

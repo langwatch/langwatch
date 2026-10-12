@@ -1,0 +1,22 @@
+
+  thuishaven: stack "visualdiff-20260929-185216-candidate"  (redis db 3)
+    app        https://app.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:51916
+    └ api      https://app.visualdiff-20260929-185216-candidate.langwatch.localhost/api  ->  127.0.0.1:51924
+    gateway    https://gateway.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:51917
+    nlp        https://nlp.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:51918
+    langyagent https://langyagent.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:0
+    idp        https://idp.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:51920
+    mail       https://mail.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:51921
+    design-system https://design-system.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:0
+    mail-room  https://mail-room.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:0
+    api        https://api.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:51924
+    clickhouse https://clickhouse.visualdiff-20260929-185216-candidate.langwatch.localhost  ->  127.0.0.1:50008
+    postgres   postgres.visualdiff-20260929-185216-candidate.langwatch.localhost:5432  ->  127.0.0.1:5432
+    redis      redis.visualdiff-20260929-185216-candidate.langwatch.localhost:6379  ->  127.0.0.1:6379
+    hub        https://hub.langwatch.localhost
+
+  services: ui · api · gateway · nlp · idp · mail   off: langy (haven up +langy) · design-system (haven up +design-system) · mail-room (haven up +mail-room)
+
+18:52:46.342  codegen    error  Wrote packages/installed-server-modules/src/server-modules.generated.ts (+7 lines, stack in haven logs codegen --raw)
+19:12:41.168  prepare    error  Debugger listening on ws://127.0.0.1:9229/92372538-28b5-4e5e-ad78-2f0ab087b547 (+1 lines, stack in haven logs prepare --raw)
+haven: migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: signal: killed

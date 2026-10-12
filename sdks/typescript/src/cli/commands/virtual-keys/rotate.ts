@@ -1,23 +1,19 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { virtualKeyDetailUrl } from "./_shared";
-import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns the rotated key rather than printing it: the output port renders it
- * in whatever format the caller asked for (utils/output.ts).
- *
- * `data` deliberately includes the new `secret`, for the same reason create
- * does: rotation is the only moment it exists, and the human output already
- * prints it in full. A rotate that withheld the new secret from a scripted
- * caller would break the very deployment it was rotating.
+ * Returns the rotated key rather than printing it — the output port renders it in whatever
+ * format the caller asked for. `data` deliberately includes the new `secret`, since rotation
+ * is its only moment to exist; withholding it would break the deployment being rotated.
  */
-export const rotateVirtualKeyCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const rotateVirtualKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new VirtualKeysApiService();
@@ -32,7 +28,11 @@ export const rotateVirtualKeyCommand = async (
       data: { virtual_key, secret },
       table: () => {
         console.log();
-        console.log(chalk.bold.yellow("⚠  New secret, save it NOW. The old secret keeps working for 24 hours."));
+        console.log(
+          chalk.bold.yellow(
+            "⚠  New secret, save it NOW. The old secret keeps working for 24 hours.",
+          ),
+        );
         console.log();
         console.log(`  ${chalk.green(secret)}`);
         console.log();

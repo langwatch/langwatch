@@ -1,0 +1,142 @@
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import { describe, expect, it } from "vitest";
+
+import { auditLogProcessModule } from "../../audit-log.module.ts";
+
+function process(role: "api" | "worker") {
+  return createApp({ role })
+    .withModules([auditLogProcessModule])
+    .withStores(memoryStores())
+    .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } });
+}
+
+const command = {
+  userId: "user-1",
+  projectId: "project-1",
+  action: "agents.create",
+  args: { id: "agent-1" },
+};
+
+describe("given a process that installed the audit log", () => {
+  describe("when a management write is recorded", () => {
+    /** @scenario "A recorded entry is readable as the entity's history" */
+    it.each(["api", "worker"] as const)("reads it back as history in the %s role", async (role) => {
+      const runtime = await process(role).boot();
+
+      try {
+        const app = runtime.service(AuditLogApi);
+        expect(runtime.module(auditLogProcessModule).provided).toBe(app);
+
+        await app.record(command);
+
+        await expect(
+          app.listEntityHistory({
+            projectId: "project-1",
+            actionPrefix: "agents.",
+            entityId: "agent-1",
+            argumentNames: ["id", "agentId", "newAgentId"],
+            limit: 10,
+          }),
+        ).resolves.toMatchObject([{ userId: "user-1", action: "agents.create" }]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "An installation with no Enterprise module still records management writes" */
+    it("records and reads back with the audit log module as the only installed module", async () => {
+      const runtime = await process("api").boot();
+
+      try {
+        const app = runtime.service(AuditLogApi);
+
+        await expect(app.record(command)).resolves.toMatchObject({ id: expect.any(String) });
+        await expect(
+          app.listEntityHistory({
+            projectId: "project-1",
+            actionPrefix: "agents.",
+            entityId: "agent-1",
+            argumentNames: ["id"],
+            limit: 10,
+          }),
+        ).resolves.toHaveLength(1);
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "Entity history stays inside the requested project and action family" */
+    it("answers nothing for another project or another action family", async () => {
+      const runtime = await process("api").boot();
+
+      try {
+        const app = runtime.service(AuditLogApi);
+        await app.record(command);
+
+        await expect(
+          app.listEntityHistory({
+            projectId: "other-project",
+            actionPrefix: "agents.",
+            entityId: "agent-1",
+            argumentNames: ["id"],
+            limit: 10,
+          }),
+        ).resolves.toEqual([]);
+
+        await expect(
+          app.listEntityHistory({
+            projectId: "project-1",
+            actionPrefix: "projects.",
+            entityId: "agent-1",
+            argumentNames: ["id"],
+            limit: 10,
+          }),
+        ).resolves.toEqual([]);
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("when operator acts are recorded in a memory process", () => {
+    /** @scenario "A memory process's trail lists what its own audit log recorded" */
+    it.each(["api", "worker"] as const)(
+      "lists them by target kind in the %s role",
+      async (role) => {
+        const runtime = await process(role).boot();
+
+        try {
+          const app = runtime.service(AuditLogApi);
+          for (const targetId of ["gateway_debits/project-1/a", "fleet"]) {
+            await app.record({
+              userId: "user-ops",
+              action: "process_wake_now",
+              targetKind: "process_instance",
+              targetId,
+              metadata: { moved: 1 },
+            });
+          }
+          await app.record({
+            userId: "user-ops",
+            action: "queue_drain_group",
+            targetKind: "queue",
+          });
+
+          await expect(
+            app.findByTargetKind({ targetKind: "process_instance", limit: 10 }),
+          ).resolves.toMatchObject([
+            { targetId: "fleet", userId: "user-ops", metadata: { moved: 1 } },
+            { targetId: "gateway_debits/project-1/a" },
+          ]);
+          await expect(
+            app.findByTargetKind({ targetKind: "scheduled_job", limit: 10 }),
+          ).resolves.toEqual([]);
+        } finally {
+          await runtime.stop();
+        }
+      },
+    );
+  });
+});

@@ -38,17 +38,15 @@ class PostApiTracesSearchBody:
         sort_direction (str | Unset):
         updated_at (float | Unset):
         scroll_id (None | str | Unset):
+        filter_ (str | Unset): A trace filter string in the same language the Trace Explorer's search bar speaks —
+            `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, a quoted phrase for free text.
+            Combined with `filters`/`query`/`traceIds` rather than replacing them, so every condition sent must hold. A
+            malformed filter, or one naming a field the language does not have, is a 422 that names the `filter` field.
         format_ (PostApiTracesSearchBodyFormat | Unset): Output format: 'digest' (AI-readable trace digest) or 'json'
             (full raw data)
         include_spans (bool | Unset): When true, fetches full span data for each trace. Useful for bulk export. Default
             false.
         llm_mode (bool | Unset):
-        filter_ (str | Unset): A trace filter string in the same language the Trace Explorer's search bar speaks —
-            `status:error AND model:gpt-*`, `trace.attribute.langwatch.user_id:alice`, `evaluatorVerdict:fail`, a quoted
-            phrase for free text. It is combined with `filters`, `query` and `traceIds` rather than replacing any of them,
-            so every condition you send must hold. `GET /api/v1/query/reference` lists every field and the syntax; `GET
-            /api/traces/facets` says what values a field actually holds. A malformed filter, or one naming a field the
-            language does not have, is a 422 that names the field.
         date_field (PostApiTracesSearchBodyDateField | Unset): Which timestamp the startDate/endDate window filters on.
             'occurred' (default) selects traces by when they happened. 'updated' selects traces by when they were last
             modified — use this for incremental ETL ('give me everything changed since my last pull'), since a trace can
@@ -77,10 +75,10 @@ class PostApiTracesSearchBody:
     sort_direction: str | Unset = UNSET
     updated_at: float | Unset = UNSET
     scroll_id: None | str | Unset = UNSET
+    filter_: str | Unset = UNSET
     format_: PostApiTracesSearchBodyFormat | Unset = UNSET
     include_spans: bool | Unset = UNSET
     llm_mode: bool | Unset = UNSET
-    filter_: str | Unset = UNSET
     date_field: PostApiTracesSearchBodyDateField | Unset = PostApiTracesSearchBodyDateField.OCCURRED
     from_: PostApiTracesSearchBodyFrom | Unset = PostApiTracesSearchBodyFrom.TRACES
     select: list[str] | Unset = UNSET
@@ -127,6 +125,8 @@ class PostApiTracesSearchBody:
         else:
             scroll_id = self.scroll_id
 
+        filter_ = self.filter_
+
         format_: str | Unset = UNSET
         if not isinstance(self.format_, Unset):
             format_ = self.format_.value
@@ -134,8 +134,6 @@ class PostApiTracesSearchBody:
         include_spans = self.include_spans
 
         llm_mode = self.llm_mode
-
-        filter_ = self.filter_
 
         date_field: str | Unset = UNSET
         if not isinstance(self.date_field, Unset):
@@ -181,14 +179,14 @@ class PostApiTracesSearchBody:
             field_dict["updatedAt"] = updated_at
         if scroll_id is not UNSET:
             field_dict["scrollId"] = scroll_id
+        if filter_ is not UNSET:
+            field_dict["filter"] = filter_
         if format_ is not UNSET:
             field_dict["format"] = format_
         if include_spans is not UNSET:
             field_dict["includeSpans"] = include_spans
         if llm_mode is not UNSET:
             field_dict["llmMode"] = llm_mode
-        if filter_ is not UNSET:
-            field_dict["filter"] = filter_
         if date_field is not UNSET:
             field_dict["dateField"] = date_field
         if from_ is not UNSET:
@@ -250,6 +248,8 @@ class PostApiTracesSearchBody:
 
         scroll_id = _parse_scroll_id(d.pop("scrollId", UNSET))
 
+        filter_ = d.pop("filter", UNSET)
+
         _format_ = d.pop("format", UNSET)
         format_: PostApiTracesSearchBodyFormat | Unset
         if isinstance(_format_, Unset):
@@ -260,8 +260,6 @@ class PostApiTracesSearchBody:
         include_spans = d.pop("includeSpans", UNSET)
 
         llm_mode = d.pop("llmMode", UNSET)
-
-        filter_ = d.pop("filter", UNSET)
 
         _date_field = d.pop("dateField", UNSET)
         date_field: PostApiTracesSearchBodyDateField | Unset
@@ -294,10 +292,10 @@ class PostApiTracesSearchBody:
             sort_direction=sort_direction,
             updated_at=updated_at,
             scroll_id=scroll_id,
+            filter_=filter_,
             format_=format_,
             include_spans=include_spans,
             llm_mode=llm_mode,
-            filter_=filter_,
             date_field=date_field,
             from_=from_,
             select=select,

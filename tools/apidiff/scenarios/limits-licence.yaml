@@ -1,0 +1,554 @@
+# Builder D: rate limits, licence and plan-gate behaviours. Written unrun (apidiff scenarios runs
+# single-sided once the engine allows it); nothing here lowers a global limit.
+# Limiters exercised are keyed to something a scenario owns: a shard project's key (files reads) or
+# an activation code the scenario invents. Not scripted, with the reason:
+#  - user-avatar reads (240/min): the branch counts per actor, not per key, and the actor a project
+#    key resolves to is not proven to be the key's own; exceeding it could starve avatars stack-wide.
+#  - dataset attachment uploads (30/min): multipart, and the engine sends JSON bodies only.
+#  - webhook test fires (webhookTestPerMinute): counted per organization, and only an entitled org
+#    reaches the counter, which on the shared stack is the org every lane uses.
+#  - the API's global limiter: raised on apidiff stacks and never ours to lower.
+#  - licence upload, replace, expiry and seat limits: org-wide state, or needs a licence minted in the
+#    backoffice; no public API mints one.
+# Gaps in the format: expect cannot read response headers, so Retry-After is unchecked.
+
+# rate limits: /api/files reads are 120 per minute per calling project key (main and branch alike)
+
+- id: lim-files-read-121st-is-429
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: none
+  shard: project
+  serial: true
+  setup:
+    # A project of its own, so the 120-per-minute window is this scenario's alone.
+    - request: "POST /api/projects"
+      auth: org
+      body: { name: "vd-limit-{uid}", language: python, framework: openai, teamId: "{teamId}" }
+      capture: { freshProjectId: id, freshProjectKey: serviceApiKey }
+      expect: { status: [200, 201] }
+    # Own-project misses: main counts foreign claims too, but the branch's door refuses a
+    # foreign projectId before any counter (runtime.ts countCall runs after the door).
+    - &fileRead
+      request: "GET /api/files/{freshProjectId}/vd-{uid}"
+      auth: none
+      headers: { X-Auth-Token: "{freshProjectKey}" }
+      expect: { status: 404 }
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+    - *fileRead
+  request:
+    path: "/api/files/{freshProjectId}/vd-{uid}"
+    headers: { X-Auth-Token: "{freshProjectKey}" }
+  expect:
+    status: 429
+    contains: rate_limited
+  verify:
+    - request: "GET /api/files/{freshProjectId}/vd-{uid}"
+      auth: project-b
+      expect: { status: [403, 404], notContains: rate_limited }
+    - request: "GET /api/files/{freshProjectId}/vd-{uid}"
+      auth: none
+      headers: { X-Auth-Token: "{freshProjectKey}" }
+      eventually: 75s
+      expect: { status: [404, 429], notContains: rate_limited }
+  teardown:
+    - request: "DELETE /api/projects/{freshProjectId}"
+      auth: org
+
+- id: lim-files-read-under-the-limit-is-not-limited
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: project
+  request:
+    path: "/api/files/{projectId}/vd-{uid}"
+  expect:
+    status: 404
+    notContains: rate_limited
+
+- id: lim-files-read-foreign-project-claim-refused
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: project-b
+  request:
+    path: "/api/files/{projectId}/vd-{uid}"
+  expect:
+    status: 403
+
+- id: lim-files-read-no-key
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  auth: none
+  request:
+    path: "/api/files/{projectId}/vd-{uid}"
+  expect:
+    status: 401
+
+# licence: the connect host's public activation door (an install redeems a code as its bearer)
+
+- id: lim-connect-activate-malformed-code
+  endpoint: POST /api/connect/v1/license/activate
+  auth: none
+  request:
+    path: /api/connect/v1/license/activate
+    headers: { Authorization: "Bearer not-a-code", X-LangWatch-Instance: "vd-{uid}" }
+    body: {}
+  expect:
+    status: 400
+    body: { code: activation_code_malformed }
+
+- id: lim-connect-activate-no-bearer
+  endpoint: POST /api/connect/v1/license/activate
+  auth: none
+  request:
+    path: /api/connect/v1/license/activate
+    headers: { X-LangWatch-Instance: "vd-{uid}" }
+    body: {}
+  expect:
+    status: 400
+    body: { code: activation_code_malformed }
+
+- id: lim-connect-activate-requires-instance
+  endpoint: POST /api/connect/v1/license/activate
+  auth: none
+  request:
+    path: /api/connect/v1/license/activate
+    headers: { Authorization: "Bearer LW{uidHex16}" }
+    body: {}
+  expect:
+    status: 400
+    body: { code: connect_instance_required }
+
+- id: lim-connect-activate-unknown-code
+  endpoint: POST /api/connect/v1/license/activate
+  auth: none
+  request:
+    path: /api/connect/v1/license/activate
+    headers: { Authorization: "Bearer LW{uidHex16}", X-LangWatch-Instance: "vd-{uid}" }
+    body: {}
+  expect:
+    status: 401
+    body: { code: activation_code_not_found }
+
+- id: lim-connect-activate-lowercase-dashed-code-is-normalised
+  endpoint: POST /api/connect/v1/license/activate
+  auth: none
+  request:
+    path: /api/connect/v1/license/activate
+    headers: { Authorization: "Bearer lw-{uidHex16}", X-LangWatch-Instance: "vd-{uid}" }
+    body: {}
+  expect:
+    status: 401
+    body: { code: activation_code_not_found }
+
+- id: lim-connect-activate-instance-id-must-be-plain
+  endpoint: POST /api/connect/v1/license/activate
+  auth: none
+  request:
+    path: /api/connect/v1/license/activate
+    headers: { Authorization: "Bearer LW{uidHex16}", X-LangWatch-Instance: "not a valid id!" }
+    body: {}
+  expect:
+    status: 400
+    body: { code: connect_instance_required }
+
+# ten guesses at one code are answered as unknown, the eleventh is refused; main's code for it is
+# rate_limited, the branch's is activation_rate_limited, so only the status and wording are held
+- id: lim-connect-activate-eleventh-guess-is-429
+  endpoint: POST /api/connect/v1/license/activate
+  auth: none
+  setup:
+    - &guess
+      request: { method: POST, path: /api/connect/v1/license/activate, headers: { Authorization: "Bearer LW{uidHex16}", X-LangWatch-Instance: "vd-{uid}" }, body: {} }
+      expect: { status: 401 }
+    - *guess
+    - *guess
+    - *guess
+    - *guess
+    - *guess
+    - *guess
+    - *guess
+    - *guess
+    - *guess
+  request:
+    path: /api/connect/v1/license/activate
+    headers: { Authorization: "Bearer LW{uidHex16}", X-LangWatch-Instance: "vd-{uid}" }
+    body: {}
+  expect:
+    status: 429
+    contains: many activation attempts
+  verify:
+    - request: { method: POST, path: /api/connect/v1/license/activate, headers: { Authorization: "Bearer LW{uidHex16}", X-LangWatch-Instance: "vd-{uid}" }, body: {} }
+      expect: { status: 429 }
+
+# licence: the sync door. The body is judged before the credential, the credential before the registry
+
+- id: lim-connect-sync-rejects-missing-seats
+  endpoint: POST /api/connect/v1/license/sync
+  auth: none
+  request:
+    path: /api/connect/v1/license/sync
+    headers: { Authorization: "Bearer lwl_{uidHex32}{uidHex32}", X-LangWatch-Instance: "vd-{uid}" }
+    body: { version: "1.0.0" }
+  expect:
+    status: 422
+    body: { code: validation_error }
+
+- id: lim-connect-sync-rejects-extra-fields
+  endpoint: POST /api/connect/v1/license/sync
+  auth: none
+  request:
+    path: /api/connect/v1/license/sync
+    headers: { Authorization: "Bearer lwl_{uidHex32}{uidHex32}", X-LangWatch-Instance: "vd-{uid}" }
+    body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 }, note: extra }
+  expect:
+    status: 422
+    body: { code: validation_error }
+
+- id: lim-connect-sync-rejects-negative-seats
+  endpoint: POST /api/connect/v1/license/sync
+  auth: none
+  request:
+    path: /api/connect/v1/license/sync
+    headers: { Authorization: "Bearer lwl_{uidHex32}{uidHex32}", X-LangWatch-Instance: "vd-{uid}" }
+    body: { version: "1.0.0", seats: { members: -1, liteMembers: 0 } }
+  expect:
+    status: 422
+    body: { code: validation_error }
+
+- id: lim-connect-sync-malformed-token
+  endpoint: POST /api/connect/v1/license/sync
+  auth: none
+  request:
+    path: /api/connect/v1/license/sync
+    headers: { Authorization: "Bearer garbage", X-LangWatch-Instance: "vd-{uid}" }
+    body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 } }
+  expect:
+    status: 401
+    body: { code: connect_license_token_malformed }
+
+- id: lim-connect-sync-no-bearer
+  endpoint: POST /api/connect/v1/license/sync
+  auth: none
+  request:
+    path: /api/connect/v1/license/sync
+    headers: { X-LangWatch-Instance: "vd-{uid}" }
+    body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 } }
+  expect:
+    status: 401
+    body: { code: connect_license_token_malformed }
+
+- id: lim-connect-sync-requires-instance
+  endpoint: POST /api/connect/v1/license/sync
+  auth: none
+  request:
+    path: /api/connect/v1/license/sync
+    headers: { Authorization: "Bearer lwl_{uidHex32}{uidHex32}" }
+    body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 } }
+  expect:
+    status: 400
+    body: { code: connect_instance_required }
+
+- id: lim-connect-sync-unregistered-licence
+  endpoint: POST /api/connect/v1/license/sync
+  auth: none
+  request:
+    path: /api/connect/v1/license/sync
+    headers: { Authorization: "Bearer lwl_{uidHex32}{uidHex32}", X-LangWatch-Instance: "vd-{uid}" }
+    body: { version: "1.0.0", seats: { members: 1, liteMembers: 0 } }
+  expect:
+    status: 401
+    body: { code: connect_license_not_registered }
+
+# plan gates: a freshly seeded organisation holds no licence, so features sold with one refuse it.
+# Main answers the webhook and spend gates 403 with the same sentence; the branch names a code.
+
+- id: lim-webhooks-list-refused-without-plan
+  endpoint: GET /api/webhooks/v1/endpoints
+  auth: org
+  shard: org
+  request:
+    path: /api/webhooks/v1/endpoints
+  expect:
+    status: 403
+    contains: enterprise feature
+
+- id: lim-webhooks-create-refused-without-plan
+  endpoint: POST /api/webhooks/v1/endpoints
+  auth: org
+  shard: org
+  request:
+    path: /api/webhooks/v1/endpoints
+    body: { destination_kind: http, url: "https://example.com/vd-{uid}", enabled_events: ["gateway.request.completed"] }
+  expect:
+    status: 403
+    contains: enterprise feature
+
+- id: lim-webhooks-get-refused-without-plan
+  endpoint: GET /api/webhooks/v1/endpoints/{id}
+  auth: org
+  shard: org
+  request:
+    path: /api/webhooks/v1/endpoints/whe_vd{uid}
+  expect:
+    status: 403
+    contains: enterprise feature
+
+- id: lim-webhooks-test-fire-refused-without-plan
+  endpoint: POST /api/webhooks/v1/endpoints/{id}/test
+  auth: org
+  shard: org
+  request:
+    path: /api/webhooks/v1/endpoints/whe_vd{uid}/test
+    body: {}
+  expect:
+    status: 403
+    contains: enterprise feature
+
+- id: lim-webhooks-deliveries-refused-without-plan
+  endpoint: GET /api/webhooks/v1/endpoints/{id}/deliveries
+  auth: org
+  shard: org
+  request:
+    path: /api/webhooks/v1/endpoints/whe_vd{uid}/deliveries
+  expect:
+    status: 403
+    contains: enterprise feature
+
+- id: lim-webhooks-event-types-refused-without-plan
+  endpoint: GET /api/webhooks/v1/event-types
+  auth: org
+  shard: org
+  request:
+    path: /api/webhooks/v1/event-types
+  expect:
+    status: 403
+    contains: enterprise feature
+
+- id: lim-webhooks-events-refused-without-plan
+  endpoint: GET /api/webhooks/v1/events
+  auth: org
+  shard: org
+  request:
+    path: /api/webhooks/v1/events
+    query: { from: 1700000000000, to: 4102444800000 }
+  expect:
+    status: 403
+    contains: enterprise feature
+
+- id: lim-spend-events-refused-without-plan
+  endpoint: GET /api/gateway/v1/spend-events
+  auth: org
+  shard: org
+  request:
+    path: /api/gateway/v1/spend-events
+    query: { from: 1700000000000, to: 4102444800000 }
+  expect:
+    status: 403
+    contains: billing events API is an enterprise feature
+
+- id: lim-spend-summaries-refused-without-plan
+  endpoint: GET /api/gateway/v1/spend-summaries
+  auth: org
+  shard: org
+  request:
+    path: /api/gateway/v1/spend-summaries
+    query: { from: 1700000000000, to: 4102444800000, group_by: virtual_key }
+  expect:
+    status: 403
+    contains: billing events API is an enterprise feature
+
+- id: lim-spend-end-user-refused-without-plan
+  endpoint: GET /api/gateway/v1/end-users/{id}/spend
+  auth: org
+  shard: org
+  request:
+    path: /api/gateway/v1/end-users/user-{uid}/spend
+  expect:
+    status: 403
+    contains: billing events API is an enterprise feature
+
+- id: lim-spend-replay-refused-without-plan
+  endpoint: POST /api/gateway/v1/spend-events/replay
+  auth: org
+  shard: org
+  request:
+    path: /api/gateway/v1/spend-events/replay
+    body: { from: 1700000000000, to: 1700003600000, endpoint_id: "whe_vd{uid}" }
+  expect:
+    status: 403
+    contains: billing events API is an enterprise feature
+
+- id: lim-groups-list-refused-without-plan
+  endpoint: GET /api/groups
+  auth: org
+  shard: org
+  request:
+    path: /api/groups
+  expect:
+    status: 402
+    body: { code: enterprise_plan_required }
+
+- id: lim-groups-create-refused-without-plan
+  endpoint: POST /api/groups
+  auth: org
+  shard: org
+  request:
+    path: /api/groups
+    body: { name: "vd-{uid}" }
+  expect:
+    status: 402
+    body: { code: enterprise_plan_required }
+
+- id: lim-organization-read-refused-without-plan
+  endpoint: GET /api/organization
+  auth: org
+  shard: org
+  request:
+    path: /api/organization
+  expect:
+    status: 402
+    body: { code: enterprise_plan_required }
+
+- id: lim-organization-update-refused-without-plan
+  endpoint: PATCH /api/organization
+  auth: org
+  shard: org
+  request:
+    path: /api/organization
+    body: { name: "vd-{uid}" }
+  expect:
+    status: 402
+    body: { code: enterprise_plan_required }
+
+- id: lim-organization-invites-list-refused-without-plan
+  endpoint: GET /api/organization/invites
+  auth: org
+  shard: org
+  request:
+    path: /api/organization/invites
+  expect:
+    status: 402
+    body: { code: enterprise_plan_required }
+
+- id: lim-organization-members-list-refused-without-plan
+  endpoint: GET /api/organization/members
+  auth: org
+  shard: org
+  request:
+    path: /api/organization/members
+  expect:
+    status: 402
+    body: { code: enterprise_plan_required }

@@ -1,0 +1,130 @@
+# Model providers and defaults: set, read back, replace, remove. The model-defaults scenarios are
+# serial like the CLI ones, since the cascade is one per project. Keys are never echoed.
+
+- id: cv2-model-provider-key-replace-never-echoed
+  endpoint: PUT /api/model-providers/{provider}
+  shard: project
+  request:
+    method: PUT
+    path: /api/model-providers/openai
+    body: { enabled: true, customKeys: { OPENAI_API_KEY: "sk-cv2-first-{uid}" } }
+  expect:
+    status: 200
+    body: { openai: { enabled: true, provider: openai } }
+    notContains: "sk-cv2-first-{uid}"
+  verify:
+    - request:
+        method: PUT
+        path: /api/model-providers/openai
+        body: { enabled: true, customKeys: { OPENAI_API_KEY: "sk-cv2-second-{uid}" } }
+      expect: { status: 200, notContains: ["sk-cv2-first-{uid}", "sk-cv2-second-{uid}"] }
+    - request: GET /api/model-providers
+      expect:
+        status: 200
+        body: { openai: { enabled: true } }
+        notContains: ["sk-cv2-first-{uid}", "sk-cv2-second-{uid}"]
+
+- id: cv2-model-provider-embeddings-model-reads-back
+  endpoint: PUT /api/model-providers/{provider}
+  shard: project
+  request:
+    method: PUT
+    path: /api/model-providers/openai
+    body:
+      enabled: true
+      customKeys: { OPENAI_API_KEY: "sk-cv2-emb-{uid}" }
+      customEmbeddingsModels:
+        - { modelId: "cv2-embed-{uid}", displayName: "CV2 Embed {uid}", mode: embedding }
+  expect:
+    status: 200
+    contains: "cv2-embed-{uid}"
+    notContains: "sk-cv2-emb-{uid}"
+  verify:
+    - request: GET /api/model-providers
+      expect: { status: 200, contains: ["cv2-embed-{uid}", "CV2 Embed {uid}"], notContains: "sk-cv2-emb-{uid}" }
+
+- id: cv2-model-provider-disable-keeps-provider-listed
+  endpoint: PUT /api/model-providers/{provider}
+  shard: project
+  setup:
+    - request:
+        method: PUT
+        path: /api/model-providers/cerebras
+        body: { enabled: true, customKeys: { CEREBRAS_API_KEY: "sk-cv2-off-{uid}" } }
+      expect: { status: 200 }
+  request:
+    method: PUT
+    path: /api/model-providers/cerebras
+    body: { enabled: false }
+  expect:
+    status: 200
+    body: { cerebras: { enabled: false } }
+  verify:
+    - request: GET /api/model-providers
+      expect: { status: 200, body: { cerebras: { enabled: false } }, notContains: "sk-cv2-off-{uid}" }
+
+- id: cv2-model-provider-refuses-no-key
+  endpoint: PUT /api/model-providers/{provider}
+  auth: none
+  request:
+    method: PUT
+    path: /api/model-providers/openai
+    body: { enabled: true }
+  expect:
+    status: 401
+
+- id: cv2-model-defaults-embeddings-role-round-trip
+  endpoint: POST /api/v1/model-defaults
+  auth: org
+  shard: project
+  serial: true
+  request:
+    path: /api/v1/model-defaults
+    headers: { "X-Project-Id": "{projectId}" }
+    body:
+      config: { EMBEDDINGS: "openai/text-embedding-3-small" }
+      scopes: [{ scopeType: PROJECT, scopeId: "{projectId}" }]
+  capture: { configId: id }
+  expect:
+    status: [200, 201]
+    body: { id: "<any>" }
+  verify:
+    - request: GET /api/v1/model-defaults
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      expect:
+        status: 200
+        body: { effective: { EMBEDDINGS: { model: "openai/text-embedding-3-small", source: "<any>" } } }
+        contains: "{configId}"
+    - request: PUT /api/v1/model-defaults/{configId}
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      body: { config: { EMBEDDINGS: "openai/text-embedding-3-large" } }
+      expect: { status: 204 }
+    - request: GET /api/v1/model-defaults
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      expect: { status: 200, contains: ["{configId}", "openai/text-embedding-3-large"] }
+    - request: DELETE /api/v1/model-defaults/{configId}
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      expect: { status: 204 }
+    - request: GET /api/v1/model-defaults
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+      expect: { status: 200, notContains: "{configId}" }
+  teardown:
+    - request: DELETE /api/v1/model-defaults/{configId}
+      auth: org
+      headers: { "X-Project-Id": "{projectId}" }
+
+- id: cv2-model-defaults-create-refuses-no-scopes
+  endpoint: POST /api/v1/model-defaults
+  auth: org
+  shard: project
+  request:
+    path: /api/v1/model-defaults
+    headers: { "X-Project-Id": "{projectId}" }
+    body: { config: { DEFAULT: "openai/gpt-5-mini" } }
+  expect:
+    status: [400, 422]

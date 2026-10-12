@@ -1,0 +1,132 @@
+# CV3: online evaluations seeded through the API (the exact-match evaluator body the API scenarios
+# prove), so the flows start at the list instead of the evaluator setup drawer and do not depend on it.
+flows:
+  - id: cv3-online-eval-seeded-row-pause-and-delete
+    title: A monitor made over the API shows Active, pauses from its row menu, then deletes and stays gone after a reload
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-cv3ev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-cv3mon-{uid}
+          checkType: langevals/exact_match
+          evaluatorId: "{evaluatorId}"
+          parameters: {}
+        as:
+          monitorId: id
+          monitorName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: Active
+          role: row
+          name: "{monitorName}"
+          timeout: "20000"
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Enable|Disable)\s*$/
+      - action: expect
+        with:
+          text: Paused
+          role: row
+          name: "{monitorName}"
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: enabled
+          equals: "false"
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: /^Delete$/
+      - action: expect
+        with:
+          count: 'tr:has-text("{monitorName}")'
+          equals: "0"
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          status: "404"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          count: 'tr:has-text("{monitorName}")'
+          equals: "0"
+
+  - id: cv3-online-eval-seeded-edit-name-and-read-back
+    title: Rename a monitor made over the API from its edit drawer and read the new name back from the API
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-cv3ev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-cv3edit-{uid}
+          checkType: lingua/language_detection
+          evaluatorId: "{evaluatorId}"
+          parameters: {}
+          mappings:
+            mapping:
+              output:
+                source: output
+            expansions: []
+        as:
+          monitorId: id
+          monitorName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          testId: online-evaluation-name-input
+          timeout: "30000"
+      - action: fill
+        with:
+          testId: online-evaluation-name-input
+          value: vd-cv3edit-{uid}-renamed
+      - action: click
+        with:
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
+      - action: expect
+        with:
+          text: vd-cv3edit-{uid}-renamed
+          role: row
+          name: vd-cv3edit-{uid}-renamed
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: name
+          equals: vd-cv3edit-{uid}-renamed

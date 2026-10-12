@@ -1,0 +1,97 @@
+# Files and media: what an uploaded object serves back under each of its read addresses, that two
+# objects in one project keep their own bytes, and the refusals around them. The upload half has no
+# route on main, so like stored-objects.yaml these are branch-only; the read half is main's.
+
+- id: cv2-files-named-address-serves-the-bytes
+  endpoint: GET /api/files/{projectId}/{storedObjectId}/{filename}
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "cv2-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 10
+      capture: { objectId: objectId, uploadUrl: uploadUrl }
+    - request: "PUT {uploadUrl}"
+      bodyRaw: "cv2-named!"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+    - request: POST /api/stored-objects/uploads/{objectId}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [200, 201] }
+  request:
+    path: /api/files/{projectId}/{objectId}/cv2-{uid}.txt
+  expect:
+    status: 200
+    contains: cv2-named
+  verify:
+    - request: GET /api/files/{projectId}/{objectId}
+      expect: { status: 200, contains: cv2-named }
+
+- id: cv2-files-two-objects-keep-their-own-bytes
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  shard: project
+  setup:
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "cv2-a-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 8
+      capture: { objectA: objectId, uploadA: uploadUrl }
+    - request: "PUT {uploadA}"
+      bodyRaw: "cv2-aaaa"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+    - request: POST /api/stored-objects/uploads/{objectA}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [200, 201] }
+    - request: POST /api/stored-objects/uploads
+      body:
+        projectId: "{projectId}"
+        purpose: dataset_attachment
+        filename: "cv2-b-{uid}.txt"
+        mediaType: text/plain
+        byteLength: 8
+      capture: { objectB: objectId, uploadB: uploadUrl }
+    - request: "PUT {uploadB}"
+      bodyRaw: "cv2-bbbb"
+      contentType: text/plain
+      expect: { status: [200, 201, 204] }
+    - request: POST /api/stored-objects/uploads/{objectB}/confirmation
+      body: { projectId: "{projectId}" }
+      expect: { status: [200, 201] }
+  request:
+    path: /api/files/{projectId}/{objectA}
+  expect:
+    status: 200
+    contains: cv2-aaaa
+    notContains: cv2-bbbb
+  verify:
+    - request: GET /api/files/{projectId}/{objectB}
+      expect: { status: 200, contains: cv2-bbbb, notContains: cv2-aaaa }
+
+- id: cv2-files-unknown-object-is-404
+  endpoint: GET /api/files/{projectId}/{storedObjectId}
+  shard: project
+  request:
+    path: /api/files/{projectId}/cv2-missing-{uid}
+  expect:
+    status: 404
+
+- id: cv2-files-upload-refuses-no-key
+  endpoint: POST /api/stored-objects/uploads
+  auth: none
+  request:
+    path: /api/stored-objects/uploads
+    body:
+      projectId: "{projectId}"
+      purpose: dataset_attachment
+      filename: "cv2-{uid}.txt"
+      mediaType: text/plain
+      byteLength: 4
+  expect:
+    status: 401

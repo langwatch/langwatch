@@ -1,0 +1,411 @@
+# Agents beyond the HTTP agent in simulations.yaml: code, workflow, connect-from-code
+# and deleting one. Voice agents ride release_voice_agents_enabled, forced on by haven
+# (tools/visualdiff/haven.go), so the type selector carries the voice card.
+flows:
+  - id: agent-create-code
+    title: Create a code agent with the default template and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-code
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-code-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-code-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          text: vd-code-agent-{uid}
+
+  - id: agent-create-workflow
+    title: Create a workflow agent, land in its studio and find the agent after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-workflow
+      - action: expect
+        with:
+          testId: agent-name-input
+          timeout: "30000"
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-wf-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          url: /studio/
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-wf-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          text: vd-wf-agent-{uid}
+
+  - id: agent-connect-from-code-drawer
+    title: Open the connect-from-code drawer and see its snippet and listening state
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-connected
+      - action: expect
+        with:
+          testId: connect-from-code-drawer
+      - action: expect
+        with:
+          testIdPrefix: connect-code-
+          min: "1"
+      - action: expect
+        with:
+          testId: connect-agent-listening
+
+  - id: agent-delete
+    title: Delete an agent behind its typed confirmation and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-del-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-del-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-del-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          label: Actions for vd-agent-del-{uid}
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: fill
+        with:
+          testId: cascade-archive-confirm-input
+          value: delete
+      - action: click
+        with:
+          testId: cascade-archive-confirm-button
+      - action: expect
+        with:
+          text: vd-agent-del-{uid}
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          text: New Agent
+      - action: expect
+        with:
+          text: vd-agent-del-{uid}
+          equals: "0"
+
+  # Appended by the coverage builder. Handles are main's own: the New Agent button by its
+  # text and cards by their name, since agents-new-agent and agent-card-name-* are branch-only.
+  - id: agent-create-voice
+    title: Create a voice agent from the type selector and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-voice
+      - action: fill
+        with:
+          testId: voice-agent-name-input
+          value: vd-voice-agent-{uid}
+      - action: fill
+        with:
+          testId: voice-agent-id-input
+          value: agent_vd{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-voice-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          text: vd-voice-agent-{uid}
+
+  - id: agent-setup-via-agent-menu
+    title: The connect-from-code drawer offers AI-assisted setup, a copied prompt and the guide
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-connected
+      - action: expect
+        with:
+          testId: connect-from-code-drawer
+      - action: click
+        with:
+          text: Setup via Agent
+      - action: expect
+        with:
+          text: Copy a prompt for your coding agent
+      - action: expect
+        with:
+          text: Read the connect your agent guide
+
+  - id: agent-history-records-create-and-update
+    title: An agent's history lists its creation and a later rename
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-hist-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-hist-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-hist-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: vd-agent-hist-{uid}
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-hist-{uid}-renamed
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-hist-{uid}-renamed
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          label: Actions for vd-agent-hist-{uid}-renamed
+      - action: click
+        with:
+          text: /^\s*View history\s*$/
+      - action: expect
+        with:
+          text: vd-agent-hist-{uid}-renamed history
+      - action: expect
+        with:
+          text: /^\s*Created\s*$/
+      - action: expect
+        with:
+          text: /^\s*Updated\s*$/
+
+  - id: agent-rename-code-agent
+    title: Reopen a saved code agent, rename it and find the new name after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-code
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-code-rename-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-code-rename-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: vd-code-rename-{uid}
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-code-rename-{uid}-done
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-code-rename-{uid}-done
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          text: vd-code-rename-{uid}-done
+
+  # States the prod comparison could not judge: the type chooser with all five kinds and the
+  # HTTP agent's own edit drawer. A connected agent's details drawer needs an SDK process
+  # registered over the connect websocket, which no flow step opens, so it is not covered here.
+  - id: agent-type-chooser-offers-every-connection-type
+    title: New Agent opens the connection type chooser with HTTP, Voice, Code, Workflow and Connect from code, and Cancel
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: expect
+        with:
+          text: Choose Agent Connection Type
+      - action: expect
+        with:
+          testId: agent-type-http
+          hasText: Connect to an external API endpoint to process requests
+      - action: expect
+        with:
+          testId: agent-type-voice
+          hasText: Voice Agent
+      - action: expect
+        with:
+          testId: agent-type-code
+          hasText: Code Agent
+      - action: expect
+        with:
+          testId: agent-type-workflow
+          hasText: Create a new workflow for custom agent logic
+      - action: expect
+        with:
+          testId: agent-type-connected
+      - action: expect
+        with:
+          text: /^\s*Cancel\s*$/
+
+  - id: agent-http-edit-drawer-tabs-and-test-agent
+    title: Open a saved HTTP agent and read its Body, Auth, Headers and Test tabs, with the Test agent panel
+    setup:
+      - post: /api/agents
+        body:
+          name: vd-httpdrawer-{uid}
+          type: http
+          config:
+            url: https://example.com/vd-httpdrawer-{uid}
+            method: POST
+        as:
+          agentId: id
+          agentName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: "{agentName}"
+      - action: expect
+        with:
+          testId: agent-name-input
+      - action: expect
+        with:
+          testId: url-input
+      - action: expect
+        with:
+          text: Request Body Template
+      - action: click
+        with:
+          text: /^Auth$/
+      - action: click
+        with:
+          text: /^Headers$/
+      - action: click
+        with:
+          text: /^Test$/
+      - action: expect
+        with:
+          testId: agent-test
+          hasText: Test agent
+          timeout: "15000"
+      - action: expect
+        with:
+          testId: agent-test-message
+      - action: expect
+        with:
+          testId: agent-test-run

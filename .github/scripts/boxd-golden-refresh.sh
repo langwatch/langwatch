@@ -85,7 +85,7 @@ else
 fi
 
 # Stop the previous dev stack by process group. Name patterns are not enough:
-# the API server runs as `tsx src/server.mts`, which matches none of the
+# the API server runs as `node ... src/main.ts`, which matches none of the
 # patterns below, so pattern-only kills left an old server alive holding the
 # app port. A stale server answering the health and collector gates would make
 # a refresh look verified while serving the previous commit — the gates check
@@ -125,7 +125,6 @@ pkill -9 -f "dev-superviso[r]" 2>/dev/null || true
 pkill -9 -f "bin/pnpm de[v]" 2>/dev/null || true
 pkill -9 -f "concurrentl[y]" 2>/dev/null || true
 pkill -9 -f "start:ap[p]" 2>/dev/null || true
-pkill -9 -f "tsx/dist/cli.mjs src/server.mt[s]" 2>/dev/null || true
 pkill -9 -f "loader.mjs src/server.mt[s]" 2>/dev/null || true
 # The Go services outlive their parents and hold ports of their own — an
 # nlpgo binary from an earlier stack was found still holding 5561 a day later.

@@ -1,0 +1,116 @@
+/**
+ * @vitest-environment node
+ * Namespace, door, dated version, addressing, paths, operation ids and the
+ * scope each permission is asked at, pinned. The operation ids become the
+ * Python SDK's function names, so a rename here renames somebody's method.
+ */
+import { describe, expect, it } from "vitest";
+
+import { projectRest, projectRestCaller } from "../project.rest.ts";
+
+const declaration = projectRest.router();
+
+describe("the projects REST declaration", () => {
+  describe("given the declaration a process mounts", () => {
+    it("keeps the family's namespace, door, dated version and addressing", () => {
+      expect(projectRest.namespace).toBe("projects");
+      expect(declaration.credential).toBe("organization");
+      expect(declaration.version).toBe("2026-08-07");
+      expect(declaration.addressing).toBe("dated");
+      // `/api/v1/projects` belongs to the LangWatch-QL family.
+      expect(declaration.v1Twin).toBe(false);
+    });
+
+    it("keeps every path, method, operation id and permission", () => {
+      expect(
+        declaration.routes.map((route) => [
+          route.method,
+          route.path,
+          route.operation,
+          route.permission ?? route.access?.kind,
+        ]),
+      ).toEqual([
+        ["get", "/:id", "getProject", "project:view"],
+        ["patch", "/:id", "updateProject", "project:update"],
+        ["delete", "/:id", "archiveProject", "project:delete"],
+        // Both base-key routes answer "authenticated" rather than a
+        // permission: they refuse every token, so no permission would grant
+        // them and none is asked for.
+        ["get", "/:id/api-key", "getProjectApiKey", "authenticated"],
+        ["post", "/:id/regenerate-api-key", "regenerateProjectApiKey", "authenticated"],
+      ]);
+    });
+
+    /**
+     * The by-id routes are reached with an ORGANIZATION credential, so a check
+     * resolved at the credential's own scope would let one organization-wide
+     * grant reach every project in it.
+     */
+    it("asks every by-id route's permission at the project its path names", () => {
+      const byId = declaration.routes.filter(
+        (route) => route.path.startsWith("/:id") && route.permission !== undefined,
+      );
+
+      expect(byId).toHaveLength(3);
+      for (const route of byId) {
+        expect([route.operation, route.permissionTarget]).toEqual([
+          route.operation,
+          { at: "route", param: "projectId", field: "id" },
+        ]);
+      }
+    });
+
+    /**
+     * A permission on either base-key route would promise some credential
+     * can pass it, and none can — a project administrator told "insufficient
+     * permissions" widening their token is the one thing that must not work here.
+     */
+    it("asks no permission on either base-key route, because none would grant it", () => {
+      const baseKeyRoutes = declaration.routes.filter((route) => route.path.endsWith("api-key"));
+
+      expect(baseKeyRoutes.map((route) => route.operation)).toEqual([
+        "getProjectApiKey",
+        "regenerateProjectApiKey",
+      ]);
+      for (const route of baseKeyRoutes) {
+        expect([route.operation, route.permission, route.access?.kind]).toEqual([
+          route.operation,
+          undefined,
+          "authenticated",
+        ]);
+      }
+    });
+
+    it("declares an answer and the default status for every route", () => {
+      for (const route of declaration.routes) {
+        expect([route.operation, route.output !== undefined]).toEqual([route.operation, true]);
+      }
+
+      expect(declaration.routes.map((route) => [route.operation, route.status])).toEqual([
+        ["getProject", undefined],
+        ["updateProject", undefined],
+        ["archiveProject", undefined],
+        ["getProjectApiKey", undefined],
+        ["regenerateProjectApiKey", undefined],
+      ]);
+    });
+
+    // Only the aggregate gate reads the key owner's role (ADR-177 decision 5).
+    it("binds only the caller on the project routes", () => {
+      const callerRoutes = ["getProject", "updateProject", "archiveProject"];
+      for (const route of declaration.routes) {
+        const expected = callerRoutes.includes(route.operation) ? [projectRestCaller] : [];
+        expect([route.operation, route.middleware ?? []]).toEqual([route.operation, expected]);
+      }
+    });
+
+    it("publishes a summary and at least one documented error for every operation", () => {
+      for (const route of declaration.routes) {
+        expect([route.operation, typeof route.docs?.summary]).toEqual([route.operation, "string"]);
+        const documentedAnswers =
+          Object.keys(route.docs?.responses ?? {}).length + (route.docs?.errors?.length ?? 0);
+        expect([route.operation, documentedAnswers > 0]).toEqual([route.operation, true]);
+      }
+    });
+  });
+});

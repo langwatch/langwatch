@@ -126,6 +126,36 @@ func (Hygiene) DiskUsage(ctx context.Context, path string) (int64, bool) {
 	return kb * 1024, true
 }
 
+// LastTouched is the worktree directory's own mtime — when anything was last
+// written directly in it. Deliberately not LastActivity's committer date: a
+// diff drive checks its worktree out at whatever ref it is comparing, so the
+// committer date can be months old one second after the directory is created,
+// and reclaiming on that clock would delete a comparison while it is running.
+func (Hygiene) LastTouched(worktreeDir string) (time.Time, bool) {
+	fi, err := os.Stat(worktreeDir)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return fi.ModTime(), true
+}
+
+// MergedIntoMain reports whether branch is an ancestor of origin/main — every
+// commit on it is already on main, so deleting the worktree loses nothing. It
+// asks git the question directly (`merge-base --is-ancestor`, exit 0 = yes)
+// rather than inferring it from the upstream's tracking state, so a branch
+// merged by squash-then-rebase and one merged by a merge commit both answer the
+// same. An empty branch (detached HEAD) is never merged; any error — no
+// origin/main in this checkout, an unknown ref — reads as not merged, because a
+// question git could not answer must never license a delete.
+func (Hygiene) MergedIntoMain(worktreeDir, branch string) bool {
+	if branch == "" {
+		return false
+	}
+	err := exec.Command("git", "-C", worktreeDir,
+		"merge-base", "--is-ancestor", "refs/heads/"+branch, "refs/remotes/origin/main").Run()
+	return err == nil
+}
+
 // UpstreamGone reports whether branch tracks an upstream whose remote-tracking
 // ref is gone (`git fetch --prune` removed it after the remote branch was
 // deleted). It reads the ref state with for-each-ref rather than `git status`, so

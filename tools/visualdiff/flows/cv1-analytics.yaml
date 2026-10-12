@@ -1,0 +1,62 @@
+# CV1 coverage sweep, analytics: the LLM metrics and online evaluations pages, which
+# analytics.yaml only reaches through the menu. Headings come from the module's screens.
+flows:
+  - id: cv1-analytics-metrics-page-cards
+    title: The LLM metrics page shows its usage, split, cost, token and latency cards
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/metrics
+      - action: expect
+        with:
+          text: LLM Usage
+      - action: expect
+        with:
+          text: LLM Split
+      - action: expect
+        with:
+          text: Average Completion Time
+      - action: expect
+        with:
+          text: Average Cost Per Message
+      - action: expect
+        with:
+          text: Average Tokens Per Message
+      - action: expect
+        with:
+          text: Latency Trend
+
+  - id: cv1-analytics-metrics-period-in-address
+    title: The LLM metrics page reads its period from the address and shows it on the picker
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/metrics
+      - action: expect
+        with:
+          text: Last 30 days
+      - action: go
+        with:
+          path: /{slug}/analytics/metrics?period=7d
+      - action: expect
+        with:
+          text: Last 7 days
+      - action: go
+        with:
+          path: /{slug}/analytics/metrics?period=90d
+      - action: expect
+        with:
+          text: Last 90 days
+
+  - id: cv1-analytics-evaluations-page
+    title: The online evaluations analytics page opens under its own heading with health and trend cards or its empty prompt
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/evaluations
+      - action: expect
+        with:
+          text: Online Evaluations
+      - action: expect
+        with:
+          url: /analytics/evaluations

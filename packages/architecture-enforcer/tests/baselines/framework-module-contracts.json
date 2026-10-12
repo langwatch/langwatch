@@ -1,0 +1,7 @@
+{
+  "record": "dev/docs/ARCHITECTURE.md §10.1, framework packages depend on no module contract (Alex, 2026-10-01). Shrink-only: remove an edge in the change that drops the dependency.",
+  "findings": {
+    "packages/browser-host -> @langwatch/feature-flag-contract": 1,
+    "packages/prisma-client -> @langwatch/api-key-contract": 1
+  }
+}

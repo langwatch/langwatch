@@ -1,0 +1,62 @@
+/**
+ * @vitest-environment jsdom
+ * The run dialog's footer offers "Call it myself" beside Run only for a
+ * voice-agent target, showing the lone Run action for every other (AC23, AC25).
+ * @see specs/features/agents/voice-agents-v1.feature
+ */
+
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { RunDialogFooter } from "../run-dialog-footer.tsx";
+import type { RunDialogController } from "../use-run-dialog-submit.ts";
+
+afterEach(cleanup);
+
+const controller: RunDialogController = {
+  run: vi.fn(),
+  isBusy: false,
+  hasAnyTarget: true,
+};
+
+function renderFooter(over: { onCallItMyself?: () => void } = {}) {
+  const ui: ReactNode = (
+    <Dialog.Root open onOpenChange={() => {}}>
+      <Dialog.Content>
+        <RunDialogFooter
+          controller={controller}
+          isRunBlocked={false}
+          blockedReason={null}
+          caseCount={1}
+          targetCount={1}
+          onClose={vi.fn()}
+          {...over}
+        />
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+  return renderWithDesignSystem(ui);
+}
+
+describe("RunDialog footer", () => {
+  describe("when the target is a voice agent", () => {
+    /** @scenario "Call it myself against a scenario and be scored on its criteria" */
+    it("shows both Run and Call it myself", () => {
+      renderFooter({ onCallItMyself: vi.fn() });
+      expect(screen.getByTestId("run-dialog-run")).toBeInTheDocument();
+      expect(screen.getByTestId("run-dialog-call-it-myself")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the target is not a voice agent", () => {
+    /** @scenario "Existing HTTP, Code and Workflow agent flows are unchanged" */
+    it("shows Run alone and no Call it myself", () => {
+      renderFooter();
+      expect(screen.getByTestId("run-dialog-run")).toBeInTheDocument();
+      expect(screen.queryByTestId("run-dialog-call-it-myself")).not.toBeInTheDocument();
+    });
+  });
+});

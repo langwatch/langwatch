@@ -1,7 +1,6 @@
 # LangWatch Evaluations Terminology
 
 > Purpose: Internal reference for consistent language across docs, marketing, support, and product.
->
 
 ## Core Terms
 
@@ -138,24 +137,24 @@
 
 ## Deprecated Terms
 
-| Don't Use | Use Instead |
-| --- | --- |
+| Don't Use            | Use Instead                                    |
+| -------------------- | ---------------------------------------------- |
 | Real-time evaluation | Online evaluation (docs) / Monitors (platform) |
-| Offline evaluation | Experiments |
-| Evaluation Wizard | Experiments Workbench |
-| Check | Evaluator |
-| Evaluations V3 | Experiments Workbench |
+| Offline evaluation   | Experiments                                    |
+| Evaluation Wizard    | Experiments Workbench                          |
+| Check                | Evaluator                                      |
+| Evaluations V3       | Experiments Workbench                          |
 
 ---
 
 ## Quick Reference: What Do They Mean?
 
-| When someone says... | They probably mean... | Clarify by asking... |
-| --- | --- | --- |
-| "I want to run evaluations" | Experiments or Monitors | "Do you want to test before deploying (experiment) or monitor production traffic?" |
-| "I created an evaluation" | An Evaluator config or an Experiment run | "Do you mean you configured an evaluator, or you ran an experiment?" |
-| "Evaluation results" | Scores | "From an experiment or from production traces?" |
-| "Real-time evaluation" | Monitor or Guardrail | "Do you need to measure (monitor) or block (guardrail)?" |
+| When someone says...        | They probably mean...                    | Clarify by asking...                                                               |
+| --------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| "I want to run evaluations" | Experiments or Monitors                  | "Do you want to test before deploying (experiment) or monitor production traffic?" |
+| "I created an evaluation"   | An Evaluator config or an Experiment run | "Do you mean you configured an evaluator, or you ran an experiment?"               |
+| "Evaluation results"        | Scores                                   | "From an experiment or from production traces?"                                    |
+| "Real-time evaluation"      | Monitor or Guardrail                     | "Do you need to measure (monitor) or block (guardrail)?"                           |
 
 ---
 
@@ -208,7 +207,7 @@ Testing & Quality
 ## Changelog
 
 - **2024-12-16**: Initial terminology guide created
-    - Adopted "Experiments" for batch testing (industry standard)
-    - Adopted "Online Evaluation" for docs, "Monitors" for platform
-    - Deprecated "Real-time evaluation", "Evaluation Wizard", "Check"
-    - Unified "Evaluator" to cover both built-in and custom configs
+  - Adopted "Experiments" for batch testing (industry standard)
+  - Adopted "Online Evaluation" for docs, "Monitors" for platform
+  - Deprecated "Real-time evaluation", "Evaluation Wizard", "Check"
+  - Unified "Evaluator" to cover both built-in and custom configs

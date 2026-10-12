@@ -28,11 +28,11 @@ func TestApplyInboundCausality_HeaderToBaggage_DepthPlusOne(t *testing.T) {
 		propagation.Baggage{},
 	))
 	r := httptest.NewRequest(http.MethodPost, "/", nil)
-	r.Header.Set(CausalityDepthHeader, "3")
+	r.Header.Set(otelsetup.CausalityDepthHeader, "3")
 
 	ctx := applyInboundCausality(context.Background(), r)
 
-	got := CurrentCausalityDepth(ctx)
+	got := otelsetup.CausalityDepth(ctx)
 	if got != 4 {
 		t.Fatalf("CurrentCausalityDepth = %d, want 4 (3 + 1)", got)
 	}
@@ -51,7 +51,7 @@ func TestApplyInboundCausality_MissingHeader_NoStamp(t *testing.T) {
 
 	ctx := applyInboundCausality(context.Background(), r)
 
-	got := CurrentCausalityDepth(ctx)
+	got := otelsetup.CausalityDepth(ctx)
 	if got != 0 {
 		t.Fatalf("CurrentCausalityDepth = %d, want 0 (missing header must NOT stamp)", got)
 	}
@@ -63,11 +63,11 @@ func TestApplyInboundCausality_NegativeHeader_TreatedAsZero(t *testing.T) {
 		propagation.Baggage{},
 	))
 	r := httptest.NewRequest(http.MethodPost, "/", nil)
-	r.Header.Set(CausalityDepthHeader, "-5")
+	r.Header.Set(otelsetup.CausalityDepthHeader, "-5")
 
 	ctx := applyInboundCausality(context.Background(), r)
 
-	got := CurrentCausalityDepth(ctx)
+	got := otelsetup.CausalityDepth(ctx)
 	if got != 1 {
 		t.Fatalf("CurrentCausalityDepth = %d, want 1 (negative coerced to 0 + 1)", got)
 	}
@@ -82,11 +82,11 @@ func TestApplyInboundCausality_HeaderZero_StampsOne(t *testing.T) {
 		propagation.Baggage{},
 	))
 	r := httptest.NewRequest(http.MethodPost, "/", nil)
-	r.Header.Set(CausalityDepthHeader, "0")
+	r.Header.Set(otelsetup.CausalityDepthHeader, "0")
 
 	ctx := applyInboundCausality(context.Background(), r)
 
-	got := CurrentCausalityDepth(ctx)
+	got := otelsetup.CausalityDepth(ctx)
 	if got != 1 {
 		t.Fatalf("CurrentCausalityDepth = %d, want 1 (header=0 → 0+1)", got)
 	}
@@ -212,7 +212,7 @@ func TestBaggageAttributeProcessor_NoBaggage_NoStamp(t *testing.T) {
 
 // CurrentCausalityDepth defaults to 0 when no baggage is present.
 func TestCurrentCausalityDepth_Default(t *testing.T) {
-	if got := CurrentCausalityDepth(context.Background()); got != 0 {
+	if got := otelsetup.CausalityDepth(context.Background()); got != 0 {
 		t.Errorf("CurrentCausalityDepth = %d, want 0", got)
 	}
 }
@@ -224,7 +224,7 @@ func TestCurrentCausalityDepth_ReadsBaggage(t *testing.T) {
 	bag, _ = bag.SetMember(m)
 	ctx := baggage.ContextWithBaggage(context.Background(), bag)
 
-	if got := CurrentCausalityDepth(ctx); got != 7 {
+	if got := otelsetup.CausalityDepth(ctx); got != 7 {
 		t.Errorf("CurrentCausalityDepth = %d, want 7", got)
 	}
 }
@@ -233,8 +233,8 @@ func TestCurrentCausalityDepth_ReadsBaggage(t *testing.T) {
 // dispatcher relies on. If anyone renames either, the integration breaks
 // silently. Pin them in a test so a rename forces a conversation.
 func TestCausalityWireContract_Pinned(t *testing.T) {
-	if CausalityDepthHeader != "X-LangWatch-Causality-Depth" {
-		t.Errorf("header = %q, want X-LangWatch-Causality-Depth", CausalityDepthHeader)
+	if otelsetup.CausalityDepthHeader != "X-LangWatch-Causality-Depth" {
+		t.Errorf("header = %q, want X-LangWatch-Causality-Depth", otelsetup.CausalityDepthHeader)
 	}
 	if otelsetup.BaggageKeyCausalityDepth != "langwatch.reserved.causality_depth" {
 		t.Errorf("baggage key = %q, want langwatch.reserved.causality_depth", otelsetup.BaggageKeyCausalityDepth)

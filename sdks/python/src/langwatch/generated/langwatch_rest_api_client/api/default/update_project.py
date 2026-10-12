@@ -5,15 +5,15 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.project import Project
 from ...models.update_project_body import UpdateProjectBody
-from ...types import Response, safe_http_status
+from ...models.update_project_response_200 import UpdateProjectResponse200
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     id: str,
     *,
-    body: UpdateProjectBody,
+    body: UpdateProjectBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -24,7 +24,8 @@ def _get_kwargs(
         ),
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -32,9 +33,11 @@ def _get_kwargs(
     return _kwargs
 
 
-def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Any | Project | None:
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Any | UpdateProjectResponse200 | None:
     if response.status_code == 200:
-        response_200 = Project.from_dict(response.json())
+        response_200 = UpdateProjectResponse200.from_dict(response.json())
 
         return response_200
 
@@ -56,7 +59,9 @@ def _parse_response(*, client: AuthenticatedClient | Client, response: httpx.Res
         return None
 
 
-def _build_response(*, client: AuthenticatedClient | Client, response: httpx.Response) -> Response[Any | Project]:
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[Any | UpdateProjectResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -72,22 +77,22 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateProjectBody,
-) -> Response[Any | Project]:
+    body: UpdateProjectBody | Unset = UNSET,
+) -> Response[Any | UpdateProjectResponse200]:
     """Update a project
 
      Update project fields. Only provided fields are changed. Requires project:update permission.
 
     Args:
         id (str):
-        body (UpdateProjectBody):
+        body (UpdateProjectBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | Project]
+        Response[Any | UpdateProjectResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -106,22 +111,22 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateProjectBody,
-) -> Any | Project | None:
+    body: UpdateProjectBody | Unset = UNSET,
+) -> Any | UpdateProjectResponse200 | None:
     """Update a project
 
      Update project fields. Only provided fields are changed. Requires project:update permission.
 
     Args:
         id (str):
-        body (UpdateProjectBody):
+        body (UpdateProjectBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | Project
+        Any | UpdateProjectResponse200
     """
 
     return sync_detailed(
@@ -135,22 +140,22 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateProjectBody,
-) -> Response[Any | Project]:
+    body: UpdateProjectBody | Unset = UNSET,
+) -> Response[Any | UpdateProjectResponse200]:
     """Update a project
 
      Update project fields. Only provided fields are changed. Requires project:update permission.
 
     Args:
         id (str):
-        body (UpdateProjectBody):
+        body (UpdateProjectBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | Project]
+        Response[Any | UpdateProjectResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -167,22 +172,22 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-    body: UpdateProjectBody,
-) -> Any | Project | None:
+    body: UpdateProjectBody | Unset = UNSET,
+) -> Any | UpdateProjectResponse200 | None:
     """Update a project
 
      Update project fields. Only provided fields are changed. Requires project:update permission.
 
     Args:
         id (str):
-        body (UpdateProjectBody):
+        body (UpdateProjectBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | Project
+        Any | UpdateProjectResponse200
     """
 
     return (

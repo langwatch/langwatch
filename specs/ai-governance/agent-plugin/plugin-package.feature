@@ -14,7 +14,7 @@
 # Related specs:
 #   specs/ai-governance/cli-wrappers/session-context-hook.feature , what the hook reports
 #   specs/ai-governance/cli-wrappers/session-context-declare.feature , the guidance the plugin injects
-#   specs/coding-agent/session-git-context.feature , what the pipeline does with the event
+#   modules/coding-agent/specs/session-git-context.feature, what the pipeline does with the event
 #
 # Motivation: `langwatch ingest install claude_code` wires the session context
 # hook into the user's own settings file, which works but shows up as an

@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.post_api_monitors_body_mappings_type_0_expansions_item import (
-    PostApiMonitorsBodyMappingsType0ExpansionsItem,
-)
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_monitors_body_mappings_type_0_mapping import PostApiMonitorsBodyMappingsType0Mapping
@@ -21,30 +19,30 @@ T = TypeVar("T", bound="PostApiMonitorsBodyMappingsType0")
 class PostApiMonitorsBodyMappingsType0:
     """
     Attributes:
-        mapping (PostApiMonitorsBodyMappingsType0Mapping):
-        expansions (list[PostApiMonitorsBodyMappingsType0ExpansionsItem]):
+        mapping (PostApiMonitorsBodyMappingsType0Mapping | Unset):
+        expansions (list[str] | Unset):
     """
 
-    mapping: PostApiMonitorsBodyMappingsType0Mapping
-    expansions: list[PostApiMonitorsBodyMappingsType0ExpansionsItem]
+    mapping: PostApiMonitorsBodyMappingsType0Mapping | Unset = UNSET
+    expansions: list[str] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        mapping = self.mapping.to_dict()
+        mapping: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.mapping, Unset):
+            mapping = self.mapping.to_dict()
 
-        expansions = []
-        for expansions_item_data in self.expansions:
-            expansions_item = expansions_item_data.value
-            expansions.append(expansions_item)
+        expansions: list[str] | Unset = UNSET
+        if not isinstance(self.expansions, Unset):
+            expansions = self.expansions
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "mapping": mapping,
-                "expansions": expansions,
-            }
-        )
+        field_dict.update({})
+        if mapping is not UNSET:
+            field_dict["mapping"] = mapping
+        if expansions is not UNSET:
+            field_dict["expansions"] = expansions
 
         return field_dict
 
@@ -53,14 +51,14 @@ class PostApiMonitorsBodyMappingsType0:
         from ..models.post_api_monitors_body_mappings_type_0_mapping import PostApiMonitorsBodyMappingsType0Mapping
 
         d = dict(src_dict)
-        mapping = PostApiMonitorsBodyMappingsType0Mapping.from_dict(d.pop("mapping"))
+        _mapping = d.pop("mapping", UNSET)
+        mapping: PostApiMonitorsBodyMappingsType0Mapping | Unset
+        if isinstance(_mapping, Unset):
+            mapping = UNSET
+        else:
+            mapping = PostApiMonitorsBodyMappingsType0Mapping.from_dict(_mapping)
 
-        expansions = []
-        _expansions = d.pop("expansions")
-        for expansions_item_data in _expansions:
-            expansions_item = PostApiMonitorsBodyMappingsType0ExpansionsItem(expansions_item_data)
-
-            expansions.append(expansions_item)
+        expansions = cast(list[str], d.pop("expansions", UNSET))
 
         post_api_monitors_body_mappings_type_0 = cls(
             mapping=mapping,

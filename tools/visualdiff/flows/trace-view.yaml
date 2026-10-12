@@ -1,0 +1,414 @@
+# Trace drawer states the seeded traces cannot show: each flow posts its own trace in setup, waits
+# for it over the API (a trace takes seconds to arrive) and only then opens it, so a drawer that
+# reads "Trace not found" fails the flow instead of being photographed as if it were the screen.
+# Every trace id is fixed (a setup {uid} is not the flow's), and every span time is fixed too:
+# refresh them within 31 days of the run, or the collector drops the span as too old.
+# Steps use words both trees share (tab names, the Share trace label, dialog copy from main's
+# ShareTraceDialog, AddParticipants and the anchored-comment popover).
+flows:
+  - id: trace-drawer-summary-populated
+    title: A trace with a model call opens on Summary with its input, output and model
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-view-summary
+          metadata:
+            user_id: vd-view-user
+            labels: [vd-view]
+          spans:
+            - type: span
+              span_id: vd-view-summary-root
+              trace_id: vd-view-summary
+              name: vd_view_request
+              input: { type: text, value: vd view question }
+              output: { type: text, value: vd view answer }
+              timestamps: { started_at: 1790723307541, finished_at: 1790723309941 }
+            - type: llm
+              span_id: vd-view-summary-llm
+              parent_id: vd-view-summary-root
+              trace_id: vd-view-summary
+              name: vd_view_llm
+              model: gpt-5-mini
+              vendor: openai
+              input: { type: text, value: vd view question }
+              output: { type: text, value: vd view answer }
+              metrics: { prompt_tokens: 12, completion_tokens: 34, cost: 0.0012 }
+              timestamps: { started_at: 1790723307741, finished_at: 1790723309741 }
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-view-summary
+          contains: vd view answer
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-view-summary
+      - action: expect
+        with:
+          text: vd view question
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd view answer
+      - action: expect
+        with:
+          text: gpt-5-mini
+      - action: expect
+        with:
+          text: Trace not found
+          equals: "0"
+
+  - id: trace-drawer-waterfall-populated
+    title: The Trace tab draws one waterfall row per span, with the model, retrieval and tool calls
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-view-waterfall
+          spans:
+            - type: span
+              span_id: vd-view-waterfall-root
+              trace_id: vd-view-waterfall
+              name: vd_wf_request
+              input: { type: text, value: vd wf question }
+              output: { type: text, value: vd wf answer }
+              timestamps: { started_at: 1790723307541, finished_at: 1790723310041 }
+            - type: llm
+              span_id: vd-view-waterfall-llm
+              parent_id: vd-view-waterfall-root
+              trace_id: vd-view-waterfall
+              name: vd_wf_llm
+              model: gpt-5-mini
+              vendor: openai
+              metrics: { prompt_tokens: 20, completion_tokens: 40 }
+              timestamps: { started_at: 1790723307841, finished_at: 1790723309541 }
+            - type: rag
+              span_id: vd-view-waterfall-rag
+              parent_id: vd-view-waterfall-root
+              trace_id: vd-view-waterfall
+              name: vd_wf_retrieval
+              contexts:
+                - { document_id: vd-wf-doc, content: vd wf context }
+              timestamps: { started_at: 1790723307591, finished_at: 1790723307791 }
+            - type: tool
+              span_id: vd-view-waterfall-tool
+              parent_id: vd-view-waterfall-root
+              trace_id: vd-view-waterfall
+              name: vd_wf_tool
+              input: { type: json, value: { query: vd } }
+              output: { type: json, value: { hits: 1 } }
+              timestamps: { started_at: 1790723309591, finished_at: 1790723309941 }
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-view-waterfall
+          contains: vd_wf_tool
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-view-waterfall
+      - action: expect
+        with:
+          text: vd wf answer
+          timeout: "20000"
+      - action: click
+        with:
+          text: /^Trace(?![a-z])/
+      - action: expect
+        with:
+          testId: waterfall-row
+          min: "4"
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: vd_wf_request
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: vd_wf_llm
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: vd_wf_retrieval
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: vd_wf_tool
+
+  - id: trace-drawer-span-detail-populated
+    title: Picking the model span in the waterfall shows its input, output and model beside it
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-view-span
+          spans:
+            - type: span
+              span_id: vd-view-span-root
+              trace_id: vd-view-span
+              name: vd_span_request
+              timestamps: { started_at: 1790723307541, finished_at: 1790723309941 }
+            - type: llm
+              span_id: vd-view-span-llm
+              parent_id: vd-view-span-root
+              trace_id: vd-view-span
+              name: vd_span_llm
+              model: gpt-5-mini
+              vendor: openai
+              input: { type: text, value: vd span question }
+              output: { type: text, value: vd span answer }
+              metrics: { prompt_tokens: 12, completion_tokens: 34 }
+              timestamps: { started_at: 1790723307741, finished_at: 1790723309741 }
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-view-span
+          contains: vd span answer
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-view-span
+      - action: click
+        with:
+          text: /^Trace(?![a-z])/
+      - action: click
+        with:
+          testId: waterfall-row
+          hasText: vd_span_llm
+      - action: expect
+        with:
+          text: vd span question
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd span answer
+      - action: expect
+        with:
+          text: gpt-5-mini
+
+  - id: trace-drawer-conversation-populated
+    title: A trace in a thread opens in Conversation with both turns of the thread
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-view-conv-1
+          metadata: { thread_id: vd-view-thread, user_id: vd-view-user }
+          spans:
+            - type: span
+              span_id: vd-view-conv-1-root
+              trace_id: vd-view-conv-1
+              name: vd_conv_turn
+              input: { type: text, value: vd conv question one }
+              output: { type: text, value: vd conv answer one }
+              timestamps: { started_at: 1790723307541, finished_at: 1790723308541 }
+      - post: /api/collector
+        body:
+          trace_id: vd-view-conv-2
+          metadata: { thread_id: vd-view-thread, user_id: vd-view-user }
+          spans:
+            - type: span
+              span_id: vd-view-conv-2-root
+              trace_id: vd-view-conv-2
+              name: vd_conv_turn
+              input: { type: text, value: vd conv question two }
+              output: { type: text, value: vd conv answer two }
+              timestamps: { started_at: 1790723317541, finished_at: 1790723318541 }
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-view-conv-1
+          contains: vd conv answer one
+          timeout: "45000"
+      - action: expect
+        with:
+          api: /api/traces/vd-view-conv-2
+          contains: vd conv answer two
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-view-conv-1
+      - action: expect
+        with:
+          text: vd conv answer one
+          timeout: "20000"
+      - action: click
+        with:
+          text: /^Conversation/
+      - action: expect
+        with:
+          text: vd conv answer one
+          timeout: "30000"
+      - action: expect
+        with:
+          text: vd conv answer two
+          timeout: "30000"
+
+  # The SDK chip reads the resource's telemetry.sdk.* attributes, which only an OTLP trace carries.
+  - id: trace-drawer-sdk-tooltip
+    title: Hovering the SDK chip of an OTLP trace names the library, its version and its language
+    setup:
+      - post: /api/otel/v1/traces
+        body:
+          resourceSpans:
+            - resource:
+                attributes:
+                  - { key: service.name, value: { stringValue: vd-sdk-service } }
+                  - { key: telemetry.sdk.name, value: { stringValue: opentelemetry } }
+                  - { key: telemetry.sdk.language, value: { stringValue: python } }
+                  - { key: telemetry.sdk.version, value: { stringValue: "1.44.0" } }
+              scopeSpans:
+                - scope: { name: vd-sdk-scope, version: "1" }
+                  spans:
+                    - traceId: 5c0d1a6e0000000000000000000000b1
+                      spanId: 5c0d1a6e000000b1
+                      name: vd_sdk_root
+                      kind: 1
+                      startTimeUnixNano: "1790723307541000000"
+                      endTimeUnixNano: "1790723309941000000"
+                      attributes:
+                        - { key: langwatch.input, value: { stringValue: vd sdk question } }
+                        - { key: langwatch.output, value: { stringValue: vd sdk answer } }
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/5c0d1a6e0000000000000000000000b1
+          contains: vd_sdk_root
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/5c0d1a6e0000000000000000000000b1
+      - action: expect
+        with:
+          text: Python · 1.44.0
+          timeout: "20000"
+      - action: hover
+        with:
+          selector: text=Python · 1.44.0
+      - action: expect
+        with:
+          text: Python OpenTelemetry SDK 1.44.0
+      - action: expect
+        with:
+          text: /^Family$/
+
+  - id: trace-share-dialog-empty
+    title: The Share trace dialog offers access, expiry and one-time view, and lists no links yet
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-view-share
+          spans:
+            - type: span
+              span_id: vd-view-share-root
+              trace_id: vd-view-share
+              name: vd_share_request
+              input: { type: text, value: vd share question }
+              output: { type: text, value: vd share answer }
+              timestamps: { started_at: 1790723307541, finished_at: 1790723308541 }
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-view-share
+          contains: vd share answer
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-view-share
+      - action: expect
+        with:
+          text: vd share answer
+          timeout: "20000"
+      - action: click
+        with:
+          label: Share trace
+      - action: expect
+        with:
+          text: Who can access
+      - action: expect
+        with:
+          text: Anyone with the link
+      - action: expect
+        with:
+          text: One-time view
+      - action: expect
+        with:
+          text: No links yet
+      - action: expect
+        with:
+          count: 'button:text-is("Create link")'
+
+  - id: trace-add-annotation-popover
+    title: Comment on a trace from the drawer and see the Add annotation popover with its comment box
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-view-annot
+          spans:
+            - type: span
+              span_id: vd-view-annot-root
+              trace_id: vd-view-annot
+              name: vd_annot_request
+              input: { type: text, value: vd annot question }
+              output: { type: text, value: vd annot answer }
+              timestamps: { started_at: 1790723307541, finished_at: 1790723308541 }
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-view-annot
+          contains: vd annot answer
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-view-annot
+      - action: expect
+        with:
+          text: vd annot answer
+          timeout: "20000"
+      - action: click
+        with:
+          testId: anchor-comment-button
+      - action: expect
+        with:
+          text: Add annotation
+      - action: expect
+        with:
+          count: 'textarea[placeholder="Optional"]'
+      - action: expect
+        with:
+          count: 'button:text-is("Save")'
+      - action: expect
+        with:
+          count: 'button:text-is("Cancel")'
+
+  # A failed trace is the one row the search narrows a busy list to, so it is always on screen.
+  - id: trace-add-to-annotation-queue-dialog
+    title: Select a trace in the list and open the Add to annotation queue dialog with its participant list
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: type
+        with:
+          label: Search filters or type what you are looking for
+          text: status:error
+          submit: "true"
+      - action: expect
+        with:
+          count: tbody[data-trace-id="{errorTrace}"]
+          timeout: "20000"
+      - action: click
+        with:
+          label: Select trace {errorTrace}
+      - action: click
+        with:
+          text: Add to annotation queue
+      - action: expect
+        with:
+          text: Send the selected traces to people or queues for annotation
+      - action: expect
+        with:
+          text: /^Send to:/
+      - action: click
+        with:
+          text: Add Participants
+      - action: expect
+        with:
+          text: Add New Queue

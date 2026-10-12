@@ -1,0 +1,115 @@
+# Data retention settings (tRPC dataRetention.*, main's routers/dataRetention.ts).
+# Retention has no REST door on main; these drive the settings page's own procedures.
+# Serial: they write the shared project's retention rule and remove it again.
+
+- id: retention-rules-read-for-project
+  endpoint: GET /api/trpc/dataRetention.getRules
+  auth: session
+  request:
+    path: "/api/trpc/dataRetention.getRules?input=%7B%22projectId%22%3A%22{projectId}%22%7D"
+  expect:
+    status: 200
+    contains: "canConfigureRetention"
+
+- id: retention-rules-refuse-no-session
+  endpoint: GET /api/trpc/dataRetention.getRules
+  auth: none
+  request:
+    path: "/api/trpc/dataRetention.getRules?input=%7B%22projectId%22%3A%22{projectId}%22%7D"
+  expect:
+    status: 401
+
+- id: retention-set-project-two-months-reads-back
+  endpoint: POST /api/trpc/dataRetention.setForScope
+  auth: session
+  shard: serial
+  request:
+    path: /api/trpc/dataRetention.setForScope
+    body:
+      projectId: "{projectId}"
+      scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+      category: traces
+      retentionDays: 63
+  expect:
+    status: [200, 403]
+  verify:
+    - request: "GET /api/trpc/dataRetention.getRules?input=%7B%22projectId%22%3A%22{projectId}%22%7D"
+      auth: session
+      expect: { status: 200, contains: "63" }
+    - request: POST /api/trpc/dataRetention.removeForScope
+      auth: session
+      body:
+        projectId: "{projectId}"
+        scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+        category: traces
+      expect: { status: [200, 403] }
+  teardown:
+    - request: POST /api/trpc/dataRetention.removeForScope
+      auth: session
+      body:
+        projectId: "{projectId}"
+        scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+        category: traces
+
+- id: retention-set-off-menu-value-refused-on-paid-plan
+  endpoint: POST /api/trpc/dataRetention.setForScope
+  auth: session
+  shard: serial
+  request:
+    path: /api/trpc/dataRetention.setForScope
+    body:
+      projectId: "{projectId}"
+      scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+      category: traces
+      retentionDays: 364
+  expect:
+    status: [200, 400, 403]
+  teardown:
+    - request: POST /api/trpc/dataRetention.removeForScope
+      auth: session
+      body:
+        projectId: "{projectId}"
+        scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+        category: traces
+
+- id: retention-keep-forever-refused-for-non-operator
+  endpoint: POST /api/trpc/dataRetention.setForScope
+  auth: session
+  shard: serial
+  request:
+    path: /api/trpc/dataRetention.setForScope
+    body:
+      projectId: "{projectId}"
+      scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+      category: traces
+      retentionDays: 0
+  expect:
+    status: [200, 403]
+  teardown:
+    - request: POST /api/trpc/dataRetention.removeForScope
+      auth: session
+      body:
+        projectId: "{projectId}"
+        scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+        category: traces
+
+- id: retention-set-rejects-unknown-category
+  endpoint: POST /api/trpc/dataRetention.setForScope
+  auth: session
+  request:
+    path: /api/trpc/dataRetention.setForScope
+    body:
+      projectId: "{projectId}"
+      scope: { scopeType: PROJECT, scopeId: "{projectId}" }
+      category: nope
+      retentionDays: 63
+  expect:
+    status: 400
+
+- id: retention-mutation-progress-reads
+  endpoint: GET /api/trpc/dataRetention.getMutationProgress
+  auth: session
+  request:
+    path: "/api/trpc/dataRetention.getMutationProgress?input=%7B%22projectId%22%3A%22{projectId}%22%7D"
+  expect:
+    status: 200

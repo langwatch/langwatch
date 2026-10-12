@@ -13,8 +13,8 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     *,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
@@ -81,8 +81,8 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
 ) -> Response[ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403]:
     r"""List provisioned groups
@@ -93,8 +93,8 @@ def sync_detailed(
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
         excluded_attributes (str | Unset):
 
     Raises:
@@ -123,8 +123,8 @@ def sync(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
 ) -> ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403 | None:
     r"""List provisioned groups
@@ -135,8 +135,8 @@ def sync(
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
         excluded_attributes (str | Unset):
 
     Raises:
@@ -160,8 +160,8 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
 ) -> Response[ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403]:
     r"""List provisioned groups
@@ -172,8 +172,8 @@ async def asyncio_detailed(
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
         excluded_attributes (str | Unset):
 
     Raises:
@@ -200,8 +200,8 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
     excluded_attributes: str | Unset = UNSET,
 ) -> ScimListGroupsResponse200 | ScimListGroupsResponse401 | ScimListGroupsResponse403 | None:
     r"""List provisioned groups
@@ -212,8 +212,8 @@ async def asyncio(
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
         excluded_attributes (str | Unset):
 
     Raises:

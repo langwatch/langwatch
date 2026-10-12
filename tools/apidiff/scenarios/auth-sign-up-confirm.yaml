@@ -1,0 +1,28 @@
+# POST /api/auth/sign-up/confirm-address: spending the emailed sign-up link (a Better Auth
+# endpoint on main, sign-up-confirmation.ts). Only its refusals are here: the mailed link
+# cannot be captured in this grammar, so the confirmed round trip is the visualdiff flow
+# auth-signup-link-reopened (auth-sign-up.yaml). `session` auth is used only for the
+# browser Origin header the auth door's origin gate asks of every POST.
+- id: "auth-signup-confirm-refuses-unknown-token"
+  endpoint: "POST /api/auth/sign-up/confirm-address"
+  auth: "session"
+  request: {"path": "/api/auth/sign-up/confirm-address", "body": {"token": "vd-never-issued-{uid}"}}
+  expect: {"status": 410, "contains": "identity_verification_expired"}
+
+- id: "auth-signup-confirm-refuses-empty-token"
+  endpoint: "POST /api/auth/sign-up/confirm-address"
+  auth: "session"
+  request: {"path": "/api/auth/sign-up/confirm-address", "body": {"token": ""}}
+  expect: {"status": 400}
+
+- id: "auth-signup-confirm-refuses-missing-token"
+  endpoint: "POST /api/auth/sign-up/confirm-address"
+  auth: "session"
+  request: {"path": "/api/auth/sign-up/confirm-address", "body": {}}
+  expect: {"status": 400}
+
+- id: "auth-signup-confirm-refuses-foreign-origin"
+  endpoint: "POST /api/auth/sign-up/confirm-address"
+  auth: "none"
+  request: {"path": "/api/auth/sign-up/confirm-address", "body": {"token": "vd-{uid}"}}
+  expect: {"status": 403, "contains": "INVALID_ORIGIN"}

@@ -5,180 +5,31 @@ Feature: Instant Evals inside the Trace Explorer
   So that the traces the judge matched show in the same table, with the same counts, as any other filter
 
   The shape:
-  - An Instant Eval run is one chip, `eval:"<question>"`. The chip's value is the question as
-    the judge reads it. `eval:` judges what the lens shows (conversations on the Conversations
-    lens, traces everywhere else); `eval.trace:`, `eval.conversation:` and `eval.llm:` force
-    the unit judged, so a lens change cannot silently change what a saved chip means.
-  - The run behind a chip is keyed to its scope: the question, the unit judged, the other chips
-    of the query and the window. The client sends `evalRuns`, one entry per chip it holds a run
-    for, with every list, facet and new-count read, and the URL fragment carries `run=<key>:<runId>`
-    so a refresh or a shared link reuses the judgements instead of paying for them again.
+  - A sentence Enter routes to a judgement is handed to the Explorer as a question, the unit
+    judged, the explicit terms typed beside it and the phrase search to fall back to.
   - The run starts under a cost rule: an estimate first, then a start when the estimate is under
     half a dollar, and a confirm dialog otherwise.
   - Progress is visible on the table, matches appear as pages finish, and every refusal is a
     closable popover that leaves a phrase search behind, never an error state.
+
+  # The run service is the Instant Eval module's own. What is here is the search bar's half:
+  # the handover, how a chip is spelled and keyed, the four procedures the Explorer drives a
+  # run through, and the popover a refusal opens.
 
   Background:
     Given a project with traces in the window
     And the Instant Evals flag is on for the project
     And a classifier is configured
 
-  # ---------------------------------------------------------------------------
-  # The chip
-  # ---------------------------------------------------------------------------
-
-  Rule: An eval chip filters by a run's verdicts
-
-    @unit
-    Scenario: An eval chip with a registered run compiles to a verdict subquery
-      Given the query `eval:"the user is annoyed"`
-      And an evalRuns entry whose question is "the user is annoyed", target "traces" and run "run-1"
-      When the filter is compiled for ClickHouse
-      Then the condition keeps traces whose latest verdict for run "run-1" passed
-      And the subquery filters TenantId first, bounds the judgement's written time, and reads the latest version with argMax
-
-    @unit
-    Scenario: A conversation chip keeps every trace of a matched conversation
-      Given the query `eval.conversation:"the user is annoyed"`
-      And an evalRuns entry for that question with target "threads" and run "run-2"
-      When the filter is compiled for ClickHouse
-      Then the condition compares the trace's conversation id to the matched conversation ids of run "run-2"
-
-    @unit
-    Scenario: A target modifier only resolves a run of that target
-      Given the query `eval.llm:"the answer is wrong"`
-      And an evalRuns entry for that question with target "traces"
-      When the filter is compiled for ClickHouse
-      Then the condition matches no rows
-
-    @unit
-    Scenario: An eval chip with no registered run matches nothing
-      Given the query `eval.trace:"the user is annoyed"`
-      And no evalRuns entry
-      When the filter is compiled for ClickHouse
-      Then the condition matches no rows
-
-    @unit
-    Scenario: A bare eval chip with no registered run keeps its older meaning
-      Given the query `eval:faithfulness`
-      And no evalRuns entry
-      When the filter is compiled for ClickHouse
-      Then the condition is the evaluator-name lookup the field had before Instant Evals
-
-    @unit
-    Scenario: A negated eval chip keeps the traces the judge did not match
-      Given the query `NOT eval:"the user is annoyed"`
-      And an evalRuns entry for that question
-      When the filter is compiled for ClickHouse
-      Then the verdict subquery is negated
-
-    @unit
-    Scenario: The eval field cannot be evaluated in memory
-      Given a trigger evaluating `eval.trace:"the user is annoyed"` against a trace in memory
-      When the field is evaluated
-      Then it answers unsupported, so the whole query fails closed
-
-    @unit
-    Scenario: The eval field is in the query reference and the autocomplete
-      When the search field registry is read
-      Then it lists eval, eval.trace, eval.conversation and eval.llm under the eval group
+  Rule: A run starts under the cost rule
 
     @integration
-    Scenario: A run's verdicts filter the table and the sidebar agrees
-      Given a run "run-1" of the project with judgements on three traces, two of them passed
-      And the run is registered in evalRuns for the chip `eval:"the user is annoyed"`
-      When the list is read with that chip
-      Then it returns the two passed traces
-      And the facets read with the same chip counts the same two traces
-
-    @integration
-    Scenario: A run of another project is not a run of this one
-      Given a run id that belongs to another project
-      And the run is registered in evalRuns for an eval chip
-      When the list is read with that chip
-      Then it returns no traces
-
-  # ---------------------------------------------------------------------------
-  # The run key
-  # ---------------------------------------------------------------------------
-
-  Rule: A run is keyed to the scope it judged
-
-    @unit
-    Scenario: The same question over the same scope shares one key
-      Given a question, a target, the other chips of the query and an absolute window
-      When the run key is computed twice
-      Then the two keys are equal
-
-    @unit
-    Scenario: A change of range, target or other chips invalidates the key
-      Given a run key for a question over a scope
-      When the range, the target or one of the other chips changes
-      Then the key is a different key
-
-    @unit
-    Scenario: A rolling preset does not re-run every tick
-      Given a run key computed under the "Last 7 days" preset
-      When the preset's bounds roll forward
-      Then the key is the same key
-
-    @unit
-    Scenario: The run id rides in the URL fragment
-      Given a fragment carrying `run=<key>:<runId>` twice
-      When the fragment is parsed
-      Then both runs are read back keyed by their key
-      And building the fragment from that state writes the same two entries
-
-    @integration
-    Scenario: A registered run is sent with every read the Explorer makes
-      Given a chip `eval:"the user is annoyed"` and a run registered under its key
-      When the list, the facets and the new count are read
-      Then each read carries evalRuns with the question, the target and the run id
-
-    # A lens brings its own filter back, and a fragment naming only a lens
-    # carries no query and therefore no run keys. Dropping the runs there left
-    # an identical query offering "Judge these results", and taking it would
-    # have started a second run over rows the first one had already judged.
-    @integration
-    Scenario: A lens round trip keeps the run behind a restored chip
-      Given a lens whose filter carries an eval chip and a run held for its key
-      When the fragment names only that lens
-      Then the restored chip keeps its run, because the question, the target, the other chips and the window all still match its key
-      And a run held under any other key is not carried, so a changed scope is judged again
-
-    @unit
-    Scenario: A registered run resets the new-count baseline
-      Given the new count has settled for a query whose chip had no run
-      When a run registers behind that chip
-      Then the baseline is dropped, because the run changed what is counted
-      And the next count is a baseline rather than a transition to compare against
-
-    @unit
-    Scenario: An empty table under an unjudged chip says these results are not judged
-      Given a chip with no run for this window, lens and filter
-      When the table has no rows
-      Then the empty state says no Instant Eval has judged this question over this window, lens and filter
-      And it does not claim a previous run covered something else, because a chip can arrive with no run at all
-      And "Judge these results" submits the question through the search bar, with the other chips kept
-
-    @unit
-    Scenario: An eval chip is green, whatever its target
-      Given the search bar holds `eval:"the user is annoyed"`, `eval.trace:"a"`, `eval.conversation:"b"` and `eval.llm:"c"`
-      When the chips are drawn
-      Then each is drawn as an eval chip, apart from the blue filter chips
-
-    @integration
-    Scenario: An eval chip sweeps while its run is under way
-      Given an eval chip in the search bar
-      When its run is being estimated, started, queued, planned or judged
-      Then a band of light sweeps across the chip from left to right
-      And once the run has finished, stopped or failed the chip rests
-
-    @integration
-    Scenario: A chip with no registered run is pending
-      Given a chip `eval:"the user is annoyed"` and no run under its key
-      When the chips are resolved
-      Then the chip is reported as pending and no evalRuns entry is sent for it
+    Scenario: A new search supersedes a pending Instant Eval
+      Given an estimate for one sentence is still in flight
+      When the reader submits anything else, a filter, a phrase or a question for the assistant
+      Then the pending estimate is abandoned before the new search runs
+      And it cannot come back, start a run and put its chip over what is now on screen
+      And the dialog and the refusal popover close with it
 
     @integration
     Scenario: A chip typed by hand starts its run on Enter
@@ -204,72 +55,75 @@ Feature: Instant Evals inside the Trace Explorer
       And while the caret is inside the quotes no field list opens on a word of the question
       And Arrow Right, End or a click leaves the quotes, Enter searches from inside them, and a quote typed against the closing quote steps over it rather than opening a second pair
 
-  # ---------------------------------------------------------------------------
-  # Starting a run
-  # ---------------------------------------------------------------------------
-
-  Rule: A run starts under the cost rule
-
-    @integration
-    Scenario: An estimate under half a dollar starts the run
-      Given the router handed over a question for "annoyed users"
-      And the estimate is 0.20 USD
-      When the Explorer receives the payload
-      Then the run starts without a dialog
-      And the query becomes the other chips plus `eval:"<question>"`
-      And the run is registered under the chip's key
-
-    @integration
-    Scenario: An estimate of half a dollar or more asks first
-      Given the router handed over a question
-      And the estimate is 2.40 USD over 12,000 rows
-      When the Explorer receives the payload
-      Then a dialog shows the question as understood, the rows and the estimated cost
-      And "Run" starts the run
-      And "Search the words instead" applies the phrase search
-      And the criteria are shown as the classifier wrote them, one under Yes and one under No
-
-    @integration
-    Scenario: A target that differs from the lens default is written on the chip
-      Given the Conversations lens judges conversations
-      And the router handed over a question with target "traces"
-      When the run starts
-      Then the chip is `eval.trace:"<question>"`
-
-    @integration
-    Scenario: A second question judges the same rows as the first
-      Given the bar already carries an eval chip
-      When a second question starts a run
-      Then the run judges the query without either eval chip
-      And both chips stay in the bar, so a row must pass both
-      And a request that still carries one has it dropped before the run is written, because no run reference comes with it
-
-    @integration
-    Scenario: A run already registered for the scope is reused
-      Given a run registered under the key the payload would compute
-      When the Explorer receives the payload
-      Then no estimate is made and the chip is applied
-
-    @integration
-    Scenario: A new search supersedes a pending Instant Eval
-      Given an estimate for one sentence is still in flight
-      When the reader submits anything else, a filter, a phrase or a question for the assistant
-      Then the pending estimate is abandoned before the new search runs
-      And it cannot come back, start a run and put its chip over what is now on screen
-      And the dialog and the refusal popover close with it
-
-    @integration
-    Scenario: The start binds the exact window
-      Given the router handed over a question with a window
-      When the run starts
-      Then the start request carries the window's exact bounds, the other chips as the filter and one boolean question
-
     @unit
     Scenario: The bar names the step between Enter and the progress bar
       Given a sentence the router answered as an Instant Eval
       When the estimate is being made, and then the run is being started
       Then the search bar reads "Estimating the Instant Eval" and then "Starting the Instant Eval"
       And while the router decides it reads "Searching"
+
+  Rule: A run is keyed to the scope it judged
+
+    @unit
+    Scenario: The same question over the same scope shares one key
+      Given a question, a target, the other chips of the query and an absolute window
+      When the run key is computed twice
+      Then the two keys are equal
+
+    @unit
+    Scenario: A change of range, target or other chips invalidates the key
+      Given a run key for a question over a scope
+      When the range, the target or one of the other chips changes
+      Then the key is a different key
+
+    @unit
+    Scenario: A rolling preset does not re-run every tick
+      Given a run key computed under the "Last 7 days" preset
+      When the preset's bounds roll forward
+      Then the key is the same key
+
+    @unit
+    Scenario: A chip forcing a unit is spelled by that unit's field
+      Given a question whose target is not what the lens judges
+      When the chip is spelled
+      Then it carries the forcing field, quoted, and the bare field otherwise
+
+    @integration
+    Scenario: A registered run is sent with every read the Explorer makes
+      Given a chip `eval:"the user is annoyed"` and a run registered under its key
+      When the list, the facets and the new count are read
+      Then each read carries evalRuns with the question, the target and the run id
+
+    @unit
+    Scenario: An eval chip is green, whatever its target
+      Given the search bar holds `eval:"the user is annoyed"`, `eval.trace:"a"`, `eval.conversation:"b"` and `eval.llm:"c"`
+      When the chips are drawn
+      Then each is drawn as an eval chip, apart from the blue filter chips
+
+    @unit
+    Scenario: An eval question still being typed is green from its opening quote
+      Given the reader is typing `eval:"the assistant refused to help"` one character at a time
+      When the chips are drawn after each character from the opening quote on
+      Then each time one eval chip covers the field, the quote and the whole question so far
+
+    @integration
+    Scenario: The editor draws an eval question still being typed as one eval chip
+      Given the search bar editor holds `eval:"the assistant refused to` with the quote not closed
+      When the chips are drawn
+      Then the editor shows one eval chip holding the whole text
+
+    @integration
+    Scenario: An eval chip sweeps while its run is under way
+      Given an eval chip in the search bar
+      When its run is being estimated, started, queued, planned or judged
+      Then a band of light sweeps across the chip from left to right
+      And once the run has finished, stopped or failed the chip rests
+
+    @integration
+    Scenario: A chip with no registered run is pending
+      Given a chip `eval:"the user is annoyed"` and no run under its key
+      When the chips are resolved
+      Then the chip is reported as pending and no evalRuns entry is sent for it
 
   Rule: tRPC wraps the run service for the Explorer
 
@@ -291,12 +145,137 @@ Feature: Instant Evals inside the Trace Explorer
       Given the other chips name no origin
       When the request is turned into the run service's input
       Then the filter leaves out the Langy origin, as the table does
-      And the run's total is a count of rows the table can show
+      And an eval chip of the query is not part of what the run judges
       And a request whose chips name an origin is left as asked
 
-  # ---------------------------------------------------------------------------
-  # Progress
-  # ---------------------------------------------------------------------------
+    @unit
+    Scenario: Switching Instant Eval on is audited against the organization
+      Given an organization manager on a project
+      When they switch Instant Eval on through instantEval.enable
+      Then the audit row names the project's organization as its scope and its target
+
+  Rule: Instant Eval serves the Explorer's procedures under its own namespace
+
+    # Round 36 D4: the namespace moves with its owner; traces.instantEval.* is no longer served.
+
+    @unit
+    Scenario: The Explorer's seven procedures are served under instantEval
+      When the instant-eval tRPC contract is read
+      Then it declares estimate, start, cancel, get, access, enable and classifySearch under instantEval
+      And trace's tRPC contracts declare no instantEval procedure
+
+    @unit
+    Scenario: Spending on a run asks analytics:manage
+      Given a member without analytics:manage on the project
+      When they ask instantEval.estimate, instantEval.start or instantEval.cancel
+      Then each is refused as forbidden before the run service is asked
+
+    @unit
+    Scenario: Reading a run asks analytics:view
+      Given a member without analytics:view on the project
+      When they ask instantEval.get or instantEval.access
+      Then each is refused as forbidden before the run service is asked
+
+    @unit
+    Scenario: The opt-in switch asks organization:manage through the project
+      Given a member of the project without organization:manage on its organization
+      When they ask instantEval.enable
+      Then it is refused as forbidden and nothing is switched or audited
+
+  Rule: An eval chip filters by a run's verdicts
+
+    @unit
+    Scenario: An eval chip with a registered run compiles to a verdict subquery
+      Given a query with an eval chip and the run registered for it
+      When the filter is compiled
+      Then it keeps the traces whose latest verdict for that run passed
+      And the run and the window its judgements were written in are bound as parameters
+
+    @unit
+    Scenario: A conversation chip keeps every trace of a matched conversation
+      Given a chip whose run judged conversations
+      When the filter is compiled
+      Then it compares the conversation id rather than the trace id
+
+    @unit
+    Scenario: A negated eval chip keeps the traces the judge did not match
+      Given a query negating an eval chip with a registered run
+      When the filter is compiled
+      Then the verdict subquery is negated whole
+
+    @unit
+    Scenario: A target modifier only resolves a run of that target
+      Given a chip forcing a unit and a run of another unit
+      When the filter is compiled
+      Then it matches no rows
+
+    @unit
+    Scenario: An eval chip with no registered run matches nothing
+      Given a chip forcing a unit and no run registered for it
+      When the filter is compiled
+      Then it matches no rows, so the table is empty while the run starts
+
+    @unit
+    Scenario: A bare eval chip with no registered run keeps its older meaning
+      Given a bare eval chip and no run registered for it
+      When the filter is compiled
+      Then it reads the value as an evaluator name, as it did before Instant Evals
+
+    @unit
+    Scenario: The run id rides in the URL fragment
+      Given a fragment carrying `run=<key>:<runId>` twice
+      When the fragment is parsed
+      Then both runs are read back keyed by their key
+      And building the fragment from that state writes the same two entries
+
+    # A lens brings its own filter back, and a fragment naming only a lens
+    # carries no query and therefore no run keys. Dropping the runs there left
+    # an identical query offering "Judge these results", and taking it would
+    # have started a second run over rows the first one had already judged.
+    @integration
+    Scenario: A lens round trip keeps the run behind a restored chip
+      Given a lens whose filter carries an eval chip and a run held for its key
+      When the fragment names only that lens
+      Then the restored chip keeps its run, because the question, the target, the other chips and the window all still match its key
+      And a run held under any other key is not carried, so a changed scope is judged again
+
+    @unit
+    Scenario: Every explorer read checks the runs its chips claim
+      Given a table, sessions, facets or new-count read naming a run for its chip
+      When the read compiles its filter
+      Then the claimed run is checked against the project and dated before the compiler binds it
+      And a run the project does not own leaves its chip pending, selecting no rows
+
+    @unit
+    Scenario: A claimed run is dated from the run table instant-eval shares with trace
+      Given instant-eval recorded a run for the project, accepted at 10:00 and finished at 11:00
+      When an Explorer read checks the chip that claims it
+      Then trace reads the run from instant-eval's run table, shared with it for reading, without calling instant-eval
+      And the window opens an hour before acceptance and closes an hour after the finish, for the writers' clock skew
+      And the resolved run keeps the chip's own question and target
+
+    @unit
+    Scenario: A claimed run still judging is dated up to the read
+      Given a claimed run instant-eval has not finished
+      When an Explorer read checks the claim
+      Then the window closes an hour after the read
+
+    @unit
+    Scenario: A claimed run another project recorded is not dated
+      Given a chip claiming a run instant-eval recorded for another project
+      When an Explorer read checks the claim
+      Then no window is answered for it, so the chip stays pending
+
+    @unit
+    Scenario: The eval field cannot be evaluated in memory
+      Given a trigger evaluating a saved query with a forcing eval chip
+      When the field is evaluated against a trace in memory
+      Then it answers unsupported, so the query fails closed
+
+    @unit
+    Scenario: The eval field is in the query reference and the autocomplete
+      When the search field registry is read
+      Then eval and its three target spellings are published under the eval group
 
   Rule: Progress is visible while a run judges
 
@@ -306,14 +285,6 @@ Feature: Instant Evals inside the Trace Explorer
       When the progress bar renders
       Then it reads "Judging 3,200 / 10,000 · 412 matched" with a Stop button
       And the bar is at 32 percent
-
-    @unit
-    Scenario: An empty table during a run says matches are still coming
-      Given a run is judging and no row has matched yet
-      When the table has no rows to show
-      Then it says there are no matches yet and that the run is still judging
-      And it does not say that nothing matches the filters
-      And it does not offer "Clear filters" as the way out
 
     @integration
     Scenario: Matches appear as pages finish
@@ -381,7 +352,7 @@ Feature: Instant Evals inside the Trace Explorer
 
     # Instant Evals off for the organization: the popover offers the switch or a word
     # with us, depending on the plan. Both are specified in
-    # specs/instant-evals/instant-eval-opt-in.feature ("Instant Evals off for a
+    # modules/instant-eval/specs/instant-eval-opt-in.feature ("Instant Evals off for a
     # self-serve organization open the enable popover", "Instant Evals off for an
     # enterprise organization open the contact-us popover"). Either way no estimate
     # is requested, the typed query stays in the bar, and a chip typed alongside
@@ -401,3 +372,95 @@ Feature: Instant Evals inside the Trace Explorer
       When the Explorer receives an Instant Eval payload
       Then the phrase search is applied
       And the refusal's copy is shown from the presentation registry
+
+  # ---------------------------------------------------------------------------
+  # Routing a sentence: instant-eval classifies, trace routes
+  # ---------------------------------------------------------------------------
+
+  Rule: The browser asks Instant Eval to classify before trace routes the sentence
+
+    @unit
+    Scenario: A sentence classified as a judgement routes to Instant Eval
+      Given Instant Evals are released for the project
+      And Instant Eval's classifier answers "instant_eval" for "frustrated users"
+      When the user submits "frustrated users"
+      Then trace routes the search with that classification and Instant Evals available
+      And the route is an Instant Eval decided by the classifier
+      And trace does not ask Instant Eval anything itself
+
+    @unit
+    Scenario: A sentence routes to the plain search when Instant Evals are unavailable
+      Given Instant Evals are not released for the project
+      And Instant Eval's classifier answers "instant_eval" for "frustrated users"
+      When the user submits "frustrated users"
+      Then trace routes the search with Instant Evals unavailable
+      And the route is a filter or the phrase search, never an Instant Eval
+
+    @integration
+    Scenario: A missing classification falls back as it does today
+      Given Instant Eval's classifier skips, fails, or is not composed
+      When the user submits "frustrated users"
+      Then trace routes the search with no classification
+      And the model decides and builds the route, as when no classifier is configured
+      And Instant Evals count as unavailable unless the browser says otherwise
+
+  Rule: Instant Eval classifies a search sentence in the context trace routes it in
+
+    # Coordinator 2026-10-08 (T2 D3): instantEval.classifySearch takes instant-eval-owned plain
+    # fields, so the classifier keeps today's context and never answers langy without Langy.
+
+    @unit
+    Scenario: The classifier reads the sentence next to the search's context
+      Given Instant Evals are released for the project
+      And the project has evaluator "ragas/faithfulness" and event "thumbs_up_down" in the window
+      When the browser asks instantEval.classifySearch for "frustrated users status:error" in the conversations lens over 24 hours, after "model:gpt-5-mini"
+      Then the classifier reads the sentence, the lens, the window, the filters typed beside it, the search applied before it and the known evaluators and events
+      And the answer is the classifier's route with Instant Evals available
+
+    @unit
+    Scenario: Without Langy the classifier is never offered langy
+      Given the browser says Langy is not open to the user
+      When the browser asks instantEval.classifySearch for "why did costs rise this week"
+      Then the routing question offers filter, instant_eval and free_text, and not langy
+
+    @unit
+    Scenario: Instant Evals not released are neither offered nor reported available
+      Given Instant Evals are not released for the project, or the release cannot be read
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the routing question does not offer instant_eval
+      And the answer reports Instant Evals unavailable
+
+    @unit
+    Scenario: A classifier that has no route answers no classification
+      Given the classifier skips, fails, or answers a label that names no route
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the answer has no classification and reports the release as read
+
+    @unit
+    Scenario: Known signals that cannot be read leave the context without them
+      Given the project's evaluator and event names cannot be read
+      When the browser asks instantEval.classifySearch for "frustrated users"
+      Then the classifier is still asked, with no evaluators and no events in its context
+
+    @unit
+    Scenario: Text with no sentence asks the classifier nothing
+      When the browser asks instantEval.classifySearch for "status:error"
+      Then the classifier is not asked and the answer has no classification
+
+    @unit
+    Scenario: Classifying a search asks analytics:view
+      Given a member without analytics:view on the project
+      When they ask instantEval.classifySearch
+      Then it is refused as forbidden before the classifier is asked
+
+    @integration
+    Scenario: The search bar asks Instant Eval to classify, then trace to route
+      When the user submits "frustrated users"
+      Then the browser asks instantEval.classifySearch with the text, the window, the applied query, the lens and whether Langy is open
+      And hands traces.routeSearch the classification when it names a route, with Instant Evals' availability
+
+    @integration
+    Scenario: A classification the browser could not get still routes the sentence
+      Given instantEval.classifySearch fails
+      When the user submits "frustrated users"
+      Then traces.routeSearch is asked with no classification and no availability

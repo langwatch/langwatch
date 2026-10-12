@@ -126,6 +126,17 @@ test_readme_cover_art_passes() {
     .github/readme/cover.jpg .github/readme/backdrop.jpg
 }
 
+# @scenario "A file a visualdiff flow uploads passes"
+#
+# The upload flows need a real image to send; only that fixtures folder is
+# allowed, so another image under tools/ still fails.
+test_a_visualdiff_upload_fixture_passes() {
+  assert_gate_passes "an upload fixture under tools/visualdiff/fixtures exits 0" \
+    tools/visualdiff/fixtures/avatar.png
+  assert_gate_fails "an image elsewhere under tools/visualdiff exits non-zero" \
+    tools/visualdiff/screenshots/run.png
+}
+
 # @scenario "A screenshot committed to the app tree fails"
 test_a_screenshot_committed_to_the_app_tree_fails() {
   assert_gate_fails "a screenshot in the app tree exits non-zero" \
@@ -170,6 +181,7 @@ test_a_non_image_outside_every_allowed_location_passes() {
 test_a_pr_that_adds_no_images_passes
 test_a_docs_image_in_an_allowed_location_passes
 test_readme_cover_art_passes
+test_a_visualdiff_upload_fixture_passes
 test_a_screenshot_committed_to_the_app_tree_fails
 test_a_screenshot_dumped_into_a_docs_subfolder_fails
 test_an_image_at_the_repository_root_fails

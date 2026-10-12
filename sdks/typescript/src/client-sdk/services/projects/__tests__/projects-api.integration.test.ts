@@ -1,18 +1,10 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import {
-  ProjectsApiService,
-} from "../projects-api.service";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
+
 import { LangWatchHandledError } from "@/internal/api/errors";
+
+import { ProjectsApiService } from "../projects-api.service";
 
 const TEST_ENDPOINT = "http://localhost:5560";
 
@@ -164,9 +156,7 @@ describe("ProjectsApiService", () => {
       });
 
       it("returns the project's key", async () => {
-        await expect(service.getApiKey("proj_abc123")).resolves.toBe(
-          "sk-lw-project-key",
-        );
+        await expect(service.getApiKey("proj_abc123")).resolves.toBe("sk-lw-project-key");
       });
     });
 
@@ -174,10 +164,7 @@ describe("ProjectsApiService", () => {
       beforeEach(() => {
         server.use(
           http.get(`${TEST_ENDPOINT}/api/projects/proj_abc123/api-key`, () => {
-            return HttpResponse.json(
-              { error: "Forbidden", message: "Forbidden" },
-              { status: 403 },
-            );
+            return HttpResponse.json({ error: "Forbidden", message: "Forbidden" }, { status: 403 });
           }),
         );
       });
@@ -260,9 +247,7 @@ describe("ProjectsApiService", () => {
       beforeEach(() => {
         server.use(
           http.patch(`${TEST_ENDPOINT}/api/projects/proj_abc123`, () => {
-            return HttpResponse.json(
-              projectFixture({ name: "Updated Name" }),
-            );
+            return HttpResponse.json(projectFixture({ name: "Updated Name" }));
           }),
         );
       });
@@ -298,7 +283,7 @@ describe("ProjectsApiService", () => {
     });
   });
 
-  describe("auth header", () => {
+  describe("when setting the auth header", () => {
     it("sends Authorization Bearer header", async () => {
       let capturedAuth = "";
       server.use(

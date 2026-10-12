@@ -1,0 +1,45 @@
+{
+  "spec_version": "1.5",
+  "name": "Imported Workflow",
+  "icon": "🧩",
+  "description": "Uploaded from an exported JSON file",
+  "version": "1.0",
+  "template_adapter": "default",
+  "workflow_type": "workflow",
+  "enable_tracing": true,
+  "nodes": [
+    {
+      "id": "entry",
+      "type": "entry",
+      "position": { "x": 0, "y": 0 },
+      "deletable": false,
+      "data": {
+        "name": "Entry point",
+        "outputs": [{ "identifier": "input", "type": "str" }],
+        "entry_selection": "random",
+        "train_size": 0.8,
+        "test_size": 0.2,
+        "seed": 42,
+        "dataset": {
+          "name": "Draft Dataset",
+          "inline": {
+            "records": { "input": ["Hello world"] },
+            "columnTypes": [{ "name": "input", "type": "string" }]
+          }
+        }
+      }
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "position": { "x": 600, "y": 30 },
+      "deletable": false,
+      "data": {
+        "name": "End",
+        "inputs": [{ "identifier": "output", "type": "str" }]
+      }
+    }
+  ],
+  "edges": [],
+  "state": {}
+}

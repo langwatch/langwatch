@@ -1,0 +1,479 @@
+import { generate } from "@langwatch/ksuid";
+import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
+import {
+  EmailAlreadyRegisteredError,
+  createdUserSchema,
+  userAccountInfoSchema,
+  userFullProfileSchema,
+  userPasskeyNudgeStatusSchema,
+  userProfileSchema,
+  userTourPreferenceSchema,
+  UserNotFoundError,
+  USER_ACCOUNT_KSUID_RESOURCE,
+  USER_KSUID_RESOURCE,
+  type AdoptUnconfirmedAccountOutcome,
+  type CreateUserInput,
+  type CreatedUser,
+  type SetFirstUserPasswordResult,
+  type UserAccountInfo,
+  type UserFullProfile,
+  type UserPasskeyNudgeStatus,
+  type UserProfile,
+  type UserNotificationChoice,
+  type UserNotificationTopic,
+  type UserTourPreference,
+  type UserCodeAccessPreference,
+  type UserUsageCount,
+} from "@langwatch/user-contract";
+
+import type {
+  CreateCredentialUserRow,
+  CreatedCredentialUser,
+  CreatePasskeyUserRow,
+  SetFirstUserPasswordRow,
+  UserCreatedRow,
+  UserStandingRow,
+  UserDeactivationOutcome,
+  UserRepository,
+  StoredProfileChange,
+} from "../user.repository.ts";
+import { type MemoryUserDatabase, type MemoryUserRow } from "./memory.user.database.ts";
+
+/** better-auth's own provider name for an email-and-password sign-in method. */
+const CREDENTIAL_PROVIDER = "credential";
+
+/**
+ * The Prisma user repository's observable behaviour over a map: same
+ * profiles through the same contract schemas, same "already_set" refusal
+ * on a second first-password, same absence for a user nobody created.
+ */
+export class MemoryUserRepository implements UserRepository {
+  #database: MemoryUserDatabase;
+
+  private constructor(database: MemoryUserDatabase) {
+    this.#database = database;
+  }
+
+  static create(input: Readonly<{ database: MemoryUserDatabase }>): MemoryUserRepository {
+    return new MemoryUserRepository(input.database);
+  }
+
+  async countUsage(): Promise<UserUsageCount> {
+    return { emailDomains: domainCounts(this.#database.rows()) };
+  }
+
+  async countUsageAmong({ userIds }: { userIds: readonly string[] }): Promise<UserUsageCount> {
+    const among = new Set(userIds);
+    return { emailDomains: domainCounts(this.#database.rows().filter((row) => among.has(row.id))) };
+  }
+
+  async hasAccountOnDomain(domain: string): Promise<boolean> {
+    return this.#database
+      .rows()
+      .some((row) => row.email?.trim().toLowerCase().split("@")[1] === domain);
+  }
+
+  async hasAnyAccount(): Promise<boolean> {
+    return this.#database.rows().length > 0;
+  }
+
+  async findCreatedPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserCreatedRow[]> {
+    return this.#database
+      .rows()
+      .filter((row) => afterId === null || row.id > afterId)
+      .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
+      .slice(0, limit)
+      .map((row) => ({ id: row.id, createdAt: row.createdAt }));
+  }
+
+  async findStandingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserStandingRow[]> {
+    return this.#database
+      .rows()
+      .filter((row) => afterId === null || row.id > afterId)
+      .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
+      .slice(0, limit)
+      .map((row) => ({ id: row.id, deactivatedAt: row.deactivatedAt }));
+  }
+
+  async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
+    if (userIds.length === 0) return [];
+
+    return this.#database.usersById(userIds).map((row) => userFullProfileSchema.parse(fullOf(row)));
+  }
+
+  async findById(id: string): Promise<UserProfile | null> {
+    const [row] = this.#database.usersById([id]);
+
+    return row ? userProfileSchema.parse(profileOf(row)) : null;
+  }
+
+  async findByEmail(email: string): Promise<UserProfile[]> {
+    return this.#database
+      .usersWithEmail(email)
+      .map((row) => userProfileSchema.parse(profileOf(row)));
+  }
+
+  async create(input: CreateUserInput): Promise<UserProfile> {
+    // The store's email is unique as written, so only an exact twin collides.
+    if (this.#database.usersWithEmail(input.email).some((row) => row.email === input.email)) {
+      throw new EmailAlreadyRegisteredError();
+    }
+    const row = this.#insertUser({ name: input.name, email: input.email, emailVerified: false });
+    await this.#appendMintFacts({ row });
+
+    return userProfileSchema.parse(profileOf(row));
+  }
+
+  async createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser> {
+    const row = this.#insertUser({
+      name: input.name,
+      email: input.email,
+      emailVerified: input.emailVerified,
+    });
+    const accountId = this.#insertCredentialAccount({
+      userId: row.id,
+      issuer: input.issuer,
+      password: input.passwordHash,
+    });
+    const accountCreatedAtMs = nowInstant().epochMilliseconds;
+    await this.#appendMintFacts({
+      row,
+      ...(input.selfRegistered
+        ? { registration: { accountId, createdAtMs: accountCreatedAtMs, email: input.email } }
+        : {}),
+    });
+
+    return { ...createdUserSchema.parse({ id: row.id }), accountId, accountCreatedAtMs };
+  }
+
+  async createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser> {
+    const row = this.#insertUser({
+      name: null,
+      email: input.email,
+      emailVerified: input.emailVerified,
+    });
+    this.#insertCredentialAccount({ userId: row.id, issuer: input.issuer, password: null });
+    await this.#appendMintFacts({ row });
+
+    return createdUserSchema.parse({ id: row.id });
+  }
+
+  async hasPassword(id: string): Promise<boolean> {
+    const account = this.#credentialAccount(id);
+
+    return account ? account.password !== null : false;
+  }
+
+  async setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult> {
+    const account = this.#credentialAccount(input.id);
+    if (account?.password) return "already_set";
+
+    if (account) {
+      this.#database.writeAccount({ ...account, password: input.passwordHash });
+
+      return "set";
+    }
+
+    this.#insertCredentialAccount({
+      userId: input.id,
+      issuer: input.issuer,
+      password: input.passwordHash,
+    });
+
+    return "set";
+  }
+
+  async adoptUnconfirmed(input: { id: string }): Promise<AdoptUnconfirmedAccountOutcome> {
+    const row = this.#database.usersById([input.id])[0];
+    if (!row) return "no_account";
+    if (row.emailVerified) return "already_confirmed";
+    if (row.lastLoginAt) return "signed_in";
+
+    for (const account of this.#database.accountsOf(input.id)) {
+      this.#database.deleteAccount(account.id);
+    }
+    this.#database.deletePasskeysOf(input.id);
+    this.#database.writeUser({ ...row, emailVerified: true });
+
+    return "adopted";
+  }
+
+  async findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus> {
+    const [user] = this.#database.usersById([id]);
+    const dismissedAt = user?.passkeyNudgeDismissedAt ?? null;
+
+    return userPasskeyNudgeStatusSchema.parse({
+      hasPasskey: this.#database.passkeyCount(id) > 0,
+      twoStepEnabled: user?.twoFactorEnabled ?? false,
+      dismissedAt: dismissedAt ? toDate(dismissedAt) : null,
+      accountCreatedAt: toDate(user?.createdAt ?? Temporal.Instant.fromEpochMilliseconds(0)),
+    });
+  }
+
+  async setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({ ...row, passkeyNudgeDismissedAt: input.dismissedAt });
+  }
+
+  async findJoinOfferDismissedDomains(id: string): Promise<string[]> {
+    return [...(this.#database.usersById([id])[0]?.joinOfferDismissedDomains ?? [])];
+  }
+
+  async addJoinOfferDismissedDomain(input: { id: string; domain: string }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({
+      ...row,
+      joinOfferDismissedDomains: [...row.joinOfferDismissedDomains, input.domain],
+    });
+  }
+
+  async updateProfile(input: StoredProfileChange): Promise<UserProfile> {
+    const row = this.#require(input.id);
+    const updated: MemoryUserRow = {
+      ...row,
+      ...(input.name === undefined ? {} : { name: input.name }),
+      ...(input.email === undefined ? {} : { email: input.email }),
+      updatedAt: nowInstant(),
+    };
+    this.#database.writeUser(updated);
+
+    return userProfileSchema.parse(profileOf(updated));
+  }
+
+  async findAccountInfo(id: string): Promise<UserAccountInfo | null> {
+    const [row] = this.#database.usersById([id]);
+
+    return row ? userAccountInfoSchema.parse({ createdAt: toDate(row.createdAt) }) : null;
+  }
+
+  async getLangyCodeAccessPreference(id: string): Promise<UserCodeAccessPreference> {
+    const row = this.#require(id);
+
+    return { preference: row.langyCodeAccessPreference === "github" ? "github" : null };
+  }
+
+  async setLangyCodeAccessPreference(id: string, preference: "github" | null): Promise<void> {
+    const row = this.#require(id);
+    this.#database.writeUser({ ...row, langyCodeAccessPreference: preference });
+  }
+
+  async findTraceExplorerTourPreference(id: string): Promise<UserTourPreference> {
+    const row = this.#require(id);
+
+    return userTourPreferenceSchema.parse({
+      dismissed: row.tracesExplorerTourDismissedAt !== null,
+      dismissedAt: row.tracesExplorerTourDismissedAt
+        ? toDate(row.tracesExplorerTourDismissedAt)
+        : null,
+    });
+  }
+
+  async setTraceExplorerTourDismissedAt(input: {
+    id: string;
+    dismissedAt: Instant;
+  }): Promise<UserTourPreference> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({
+      ...row,
+      tracesExplorerTourDismissedAt: input.dismissedAt,
+    });
+
+    return userTourPreferenceSchema.parse({
+      dismissed: true,
+      dismissedAt: toDate(input.dismissedAt),
+    });
+  }
+
+  async findNotificationPreferences(id: string): Promise<Record<string, UserNotificationChoice>> {
+    return { ...this.#require(id).notificationPreferences };
+  }
+
+  async setNotificationPreference(input: {
+    id: string;
+    topic: UserNotificationTopic;
+    choice: UserNotificationChoice;
+  }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({
+      ...row,
+      notificationPreferences: { ...row.notificationPreferences, [input.topic]: input.choice },
+    });
+  }
+
+  async setLastLoginAt(input: { id: string; lastLoginAt: Instant }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({ ...row, lastLoginAt: input.lastLoginAt });
+  }
+
+  async findLastHomePath(id: string): Promise<string | null> {
+    return this.#database.usersById([id])[0]?.lastHomePath ?? null;
+  }
+
+  async setLastHomePath(input: { id: string; path: string | null }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({ ...row, lastHomePath: input.path });
+  }
+
+  async readClock(): Promise<Instant> {
+    return nowInstant();
+  }
+
+  async deactivateWhileOthersActive(input: {
+    id: string;
+    deactivatedAt: Instant;
+    others: readonly string[];
+  }): Promise<UserDeactivationOutcome> {
+    const active = this.#database.usersById(input.others).filter((row) => !row.deactivatedAt);
+    if (active.length === 0) return { outcome: "none_active" };
+
+    return {
+      outcome: "deactivated",
+      user: await this.setDeactivatedAt({ id: input.id, deactivatedAt: input.deactivatedAt }),
+    };
+  }
+
+  async setDeactivatedAt(input: {
+    id: string;
+    deactivatedAt: Instant | null;
+  }): Promise<UserProfile> {
+    const row = this.#require(input.id);
+    const updated: MemoryUserRow = {
+      ...row,
+      deactivatedAt: input.deactivatedAt,
+    };
+    this.#database.writeUser(updated);
+
+    return userProfileSchema.parse(profileOf(updated));
+  }
+
+  async setAvatar(input: { id: string; image: string | null }): Promise<void> {
+    const row = this.#require(input.id);
+    this.#database.writeUser({ ...row, image: input.image });
+  }
+
+  #require(id: string): MemoryUserRow {
+    const [row] = this.#database.usersById([id]);
+    if (!row) throw new UserNotFoundError(id);
+
+    return row;
+  }
+
+  #credentialAccount(userId: string) {
+    return this.#database
+      .accountsOf(userId)
+      .find((account) => account.provider === CREDENTIAL_PROVIDER);
+  }
+
+  /** As the Prisma twin's transaction: the created fact, and registered for a self-sign-up. */
+  async #appendMintFacts({
+    row,
+    registration,
+  }: {
+    row: MemoryUserRow;
+    registration?: { accountId: string; createdAtMs: number; email: string };
+  }): Promise<void> {
+    const fact = { tenantId: row.id, userId: row.id, occurredAt: row.createdAt.epochMilliseconds };
+    await this.#database.appendFacts({
+      userId: row.id,
+      intents: [
+        { type: "recordCreated", data: fact },
+        ...(registration
+          ? [{ type: "recordRegistered" as const, data: { ...fact, ...registration } }]
+          : []),
+      ],
+    });
+  }
+
+  #insertUser(input: {
+    name: string | null;
+    email: string;
+    emailVerified: boolean;
+  }): MemoryUserRow {
+    const stamp = nowInstant();
+    const row: MemoryUserRow = {
+      id: generate(USER_KSUID_RESOURCE).toString(),
+      name: input.name,
+      email: input.email,
+      emailVerified: input.emailVerified,
+      image: null,
+      pendingSsoSetup: false,
+      createdAt: stamp,
+      updatedAt: stamp,
+      lastLoginAt: null,
+      deactivatedAt: null,
+      lastHomePath: null,
+      tracesExplorerTourDismissedAt: null,
+      passkeyNudgeDismissedAt: null,
+      twoFactorEnabled: false,
+      joinOfferDismissedDomains: [],
+      notificationPreferences: {},
+    };
+    this.#database.writeUser(row);
+
+    return row;
+  }
+
+  #insertCredentialAccount(input: {
+    userId: string;
+    issuer: string;
+    password: string | null;
+  }): string {
+    const id = generate(USER_ACCOUNT_KSUID_RESOURCE).toString();
+    this.#database.writeAccount({
+      id,
+      userId: input.userId,
+      type: CREDENTIAL_PROVIDER,
+      provider: CREDENTIAL_PROVIDER,
+      issuer: input.issuer,
+      providerAccountId: input.userId,
+      password: input.password,
+    });
+    return id;
+  }
+}
+
+function profileOf(row: MemoryUserRow): UserProfile {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    emailVerified: row.emailVerified,
+    image: row.image,
+    pendingSsoSetup: row.pendingSsoSetup,
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
+    lastLoginAt: row.lastLoginAt ? toDate(row.lastLoginAt) : null,
+    deactivatedAt: row.deactivatedAt ? toDate(row.deactivatedAt) : null,
+  };
+}
+
+function fullOf(row: MemoryUserRow): UserFullProfile {
+  return {
+    ...profileOf(row),
+    lastHomePath: row.lastHomePath,
+    tracesExplorerTourDismissedAt: row.tracesExplorerTourDismissedAt
+      ? toDate(row.tracesExplorerTourDismissedAt)
+      : null,
+  };
+}
+
+function domainCounts(rows: readonly MemoryUserRow[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    const domain = row.email?.trim().toLowerCase().split("@")[1];
+    if (domain) counts[domain] = (counts[domain] ?? 0) + 1;
+  }
+  return counts;
+}
