@@ -10,9 +10,11 @@ Feature: One section rail for a workspace with many real sub-pages
   Background: the rail.
     The rail is kept only for a workspace with five or more real sub-pages; a short
     set of routes uses header tabs (PageLayout.Tabs) and a list nests in the sidebar.
-    The rail names its section in a 13px eyebrow, never a second 20px title.
-    Rows are 28px with 13px text; group labels are 12px medium sentence case.
-    It sits on the subtle ground with one full-height hairline against the content.
+    The rail names its section in a 13px eyebrow, never a second 20px title; a page whose
+    header above the rail already names the section leaves the eyebrow out.
+    Rows are 28px with 13px text, led by their icon when the page asks for icons; group
+    labels are 10px semibold uppercase. It sits on the page's own ground, with no fill of its own
+    and no rule against the content.
     Selection is the sidebar's pill: the active fill, foreground text, weight 500.
     There is no edge marker.
 

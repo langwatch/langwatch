@@ -1,5 +1,6 @@
 import { toaster } from "@langwatch/browser-host/toaster";
 import {
+  Alert,
   Button,
   createListCollection,
   HStack,
@@ -36,6 +37,7 @@ import {
 } from "../../../behavior/use-studio-connected.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";
+import { evaluationStartFailure } from "../../../model/evaluation-start-failure.ts";
 import { trainTestSplit } from "../../../model/studio-dataset.utils.ts";
 import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
 import { useEvaluationExecution } from "./use-evaluation-execution.ts";
@@ -272,6 +274,7 @@ export function EvaluateModalContent({
   }
 
   const needsACommitMessage = canSave && !commitMessage;
+  const startFailure = evaluationStartFailure({ hasStarted, evaluation: evaluationState });
 
   const isDatasetLoading = total === undefined && datasetQuery.isFetching;
 
@@ -311,6 +314,12 @@ export function EvaluateModalContent({
                 )}
               />
             </VStack>
+            {startFailure && (
+              <Alert.Root status="error">
+                <Alert.Indicator />
+                <Alert.Description>{startFailure}</Alert.Description>
+              </Alert.Root>
+            )}
           </VStack>
         </Dialog.Body>
         <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>

@@ -35,3 +35,14 @@ export const WithAction: Story = {
     ),
   },
 };
+
+export const WithSaveFooter: Story = {
+  args: {
+    children: "Fields go here.",
+    footer: (
+      <Button size="sm" colorPalette="accent">
+        Save changes
+      </Button>
+    ),
+  },
+};

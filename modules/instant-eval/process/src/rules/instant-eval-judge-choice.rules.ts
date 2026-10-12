@@ -42,6 +42,24 @@ export function instantEvalJudgeKind({
 }
 
 /**
+ * Whether the install judges through Connect, known before any key is read. An install LangWatch
+ * runs (Cloud, a development checkout) does only when its classifier setting names Connect.
+ */
+export function isInstantEvalJudgedThroughConnect({
+  classifier,
+  isLangWatchHost,
+  isProduction,
+}: {
+  classifier: InstantEvalServerConfig["classifier"];
+  isLangWatchHost: boolean;
+  isProduction: boolean;
+}): boolean {
+  if (classifier === "connect") return true;
+  if (isLangWatchHost) return false;
+  return instantEvalJudgeKind({ classifier, hasCloudKey: false, isProduction }) === "connect";
+}
+
+/**
  * Where the deployment's judge runs, as a refusal reads it (main #8416): `off`, `own_key`
  * (LangWatch Cloud's key, or the deterministic stand-in), through LangWatch, or a Connect judge
  * with Connect switched off for the deployment, which nothing can judge through.

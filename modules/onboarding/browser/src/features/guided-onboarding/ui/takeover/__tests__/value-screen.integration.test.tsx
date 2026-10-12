@@ -102,6 +102,16 @@ describe("ValueScreen", () => {
         "Control all AI subscriptions and usage across company departments",
       );
     });
+
+    it("sets Langy's question in regular-weight Sentient at 30px", () => {
+      renderValue();
+      const declarations = declarationsOf(screen.getByTestId("value-line"));
+      expect(declarations.get("font-family")).toBe("var(--chakra-fonts-display)");
+      expect(system.token("fonts.display")).toContain('"Sentient"');
+      expect(declarations.get("font-size")).toBe("30px");
+      expect(declarations.get("font-weight")).toBe("400");
+      expect(declarations.get("line-height")).toBe("1.25");
+    });
   });
 
   describe("when cards are picked", () => {
@@ -124,14 +134,13 @@ describe("ValueScreen", () => {
     });
 
     /** @scenario The pick order reads as white on a filled brand orange square */
-    it("writes the pick number in white on a solid orange square the theme defines", () => {
+    it("writes the pick number in white on a deep brand orange square the theme defines", () => {
       renderValue();
       fireEvent.click(card("Gateway"));
       const declarations = declarationsOf(order("gateway"));
-      const orange = system.token("colors.orange.solid");
-      expect(declarations.get("background")).toBe(orange);
-      expect(declarations.get("color")).toBe("var(--chakra-colors-white)");
-      expect(system.token("colors.white")).toBe("#FFFFFF");
+      expect(declarations.get("background")).toBe("var(--chakra-colors-takeover-badge)");
+      expect(system.tokens.getByName("colors.takeover.badge")?.originalValue).toBe("#c2510a");
+      expect(declarations.get("color")).toBe("var(--chakra-colors-fg-on-color)");
       expect(declarations.get("border-radius")).toBe("6px");
       expect(declarations.get("background")).not.toBe(
         declarationsOf(order("llmops")).get("background"),
@@ -145,7 +154,6 @@ describe("ValueScreen", () => {
             (match) => `orange.${match[1]}`,
           ),
         );
-      expect(named).toContain("orange.solid");
       for (const token of new Set(named)) {
         expect(system.tokens.getByName(`colors.${token}`), token).toBeDefined();
       }

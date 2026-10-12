@@ -94,8 +94,8 @@ export function TourSpotlight({
         width: spot.w,
         height: spot.h,
         boxShadow: handoff
-          ? "0 0 0 200vmax var(--chakra-colors-bg-scrim)"
-          : "0 0 0 200vmax var(--chakra-colors-bg-scrim)",
+          ? "0 0 0 200vmax var(--chakra-colors-takeover-tour-dim-lit)"
+          : "0 0 0 200vmax var(--chakra-colors-takeover-tour-dim)",
         opacity: handoff === "fading" ? 0 : 1,
         transition,
       }}
@@ -158,7 +158,7 @@ export function TourCursor({
         color="orange.contrast"
         boxShadow="md"
       >
-        (langy)
+        Langy
       </HStack>
       {step?.click && (
         <Box

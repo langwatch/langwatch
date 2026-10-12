@@ -1,7 +1,7 @@
 /**
  * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
- * It is the shared section rail, so its title, entries, current chip and glass match the
- * other sections; each entry is a link to its own address.
+ * It is the shared section rail, so its entries and current chip match the other sections;
+ * the page header above it names the section. Each entry is a link to its own address.
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
@@ -128,7 +128,6 @@ export function SuiteRail(props: SuiteRailProps) {
         label: set.setId,
         href: hrefOf(selection),
         icon: iconOf(FolderCode, "Runs from code"),
-        badge: iconOf(FolderCode, "Runs from code"),
         testId: `suite-rail-item-${set.setId}`,
       },
     };
@@ -157,6 +156,8 @@ export function SuiteRail(props: SuiteRailProps) {
     <Box data-testid="agent-testing-suite-rail" display="flex" flexShrink={0}>
       <SectionNavigationRail
         label="Agent testing"
+        showTitle={false}
+        showIcons
         groups={[
           {
             label: "Test suites",

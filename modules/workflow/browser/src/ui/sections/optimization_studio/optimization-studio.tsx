@@ -255,7 +255,8 @@ export default function OptimizationStudio() {
               <WorkflowDragPreview />
               <VStack width="full" height="full" gap={0}>
                 <PageLayout.Header size="sm" background="bg" borderColor="border.emphasized">
-                  <HStack width="full">
+                  {/* The header wraps its children; full-width thirds would each take a row. */}
+                  <HStack flex="1 1 0" minWidth={0}>
                     <Link href={`/${project?.slug}/workflows`}>
                       <LogoIcon height={24} forceColorMode="light" />
                     </Link>
@@ -264,11 +265,11 @@ export default function OptimizationStudio() {
                       <StudioWorkflowAutosave />
                     )}
                   </HStack>
-                  <HStack width="full" justify="center">
+                  <HStack flex="1 1 0" minWidth={0} justify="center">
                     <StudioWorkflowNamePopover />
                     <StudioConnectionStatus isConnected={socketStatus === "connected"} />
                   </HStack>
-                  <HStack width="full" justify="end">
+                  <HStack flex="1 1 0" minWidth={0} justify="end">
                     <StudioWorkflowUndoRedo />
                     <History />
                     <Box />

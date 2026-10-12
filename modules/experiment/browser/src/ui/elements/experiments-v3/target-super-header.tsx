@@ -24,17 +24,17 @@ export const TargetSuperHeader = React.memo(function TargetSuperHeader({
   isLoading,
 }: TargetSuperHeaderProps) {
   return (
-    <SuperHeader colSpan={colSpan} icon={<LLMIcon />}>
+    <SuperHeader colSpan={colSpan} colorPalette="green" icon={<LLMIcon />}>
       {isLoading ? (
         <>
           <Text textStyle="cardTitle" color="fg">
-            Prompts or agents
+            Prompts or Agents
           </Text>
           <Skeleton height="20px" width="150px" />
         </>
       ) : (
         <Text textStyle="cardTitle" color="fg">
-          Prompts or agents
+          Prompts or Agents
         </Text>
       )}
       {!isLoading && onAddClick && (

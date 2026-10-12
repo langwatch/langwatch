@@ -1,4 +1,7 @@
 /** The workbench table's column widths and header cells, resize handles included. */
+// TanStack mutates one table instance, so React Compiler caches would serve stale headers.
+"use no memo";
+
 import { Link } from "@langwatch/design-system/primitives";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
 

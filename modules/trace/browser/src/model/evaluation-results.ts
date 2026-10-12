@@ -109,16 +109,16 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
  * trace views and evaluator renderings.
  */
 export const EVALUATION_STATUS_COLORS = {
-  pending: "fg.subtle",
-  running: "blue.fg",
-  passed: "green.fg",
-  failed: "red.fg",
-  processed: "blue.fg", // Neutral color for score-only evaluators (no pass/fail)
-  error: "red.fg",
+  pending: "evaluation.pending",
+  running: "evaluation.running",
+  passed: "evaluation.passed",
+  failed: "evaluation.failed",
+  processed: "evaluation.processed", // Neutral color for score-only evaluators (no pass/fail)
+  error: "evaluation.error",
   // Skipped is a setup state, not a verdict — light grey (closer to
   // the muted bg than to fg) keeps it from competing for attention
   // next to real pass/fail rows.
-  skipped: "fg.subtle",
+  skipped: "evaluation.skipped",
 } as const;
 
 /**
@@ -132,7 +132,7 @@ export const EVALUATION_STATUS_TONES = {
   passed: { bg: "green.subtle", fg: "green.fg" },
   failed: { bg: "red.subtle", fg: "red.fg" },
   processed: { bg: "blue.subtle", fg: "blue.fg" },
-  error: { bg: "red.subtle", fg: "red.fg" },
+  error: { bg: "red.subtle", fg: "evaluation.error" },
   // Gray-on-gray skipped tone — neutral, low-attention.
   skipped: { bg: "bg.muted", fg: "fg.muted" },
 } as const;

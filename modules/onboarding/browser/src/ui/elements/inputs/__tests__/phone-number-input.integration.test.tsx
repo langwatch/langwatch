@@ -31,6 +31,25 @@ afterEach(() => {
 });
 
 describe("PhoneNumberInput", () => {
+  describe("when a country is selected", () => {
+    it("draws its flag and calling code above the select so they stay visible", async () => {
+      const { select } = renderInput({ defaultCountry: "NL" });
+      const display = screen.getByTestId("phone-country-display");
+      const selectLayer = select.closest(".chakra-native-select__root");
+      if (!(selectLayer instanceof HTMLElement)) throw new Error("select root missing");
+
+      expect(display).toHaveTextContent("+31");
+      expect(Number(getComputedStyle(display).zIndex)).toBeGreaterThan(
+        Number(getComputedStyle(selectLayer).zIndex),
+      );
+      expect(getComputedStyle(display).color).not.toBe("transparent");
+
+      await userEvent.selectOptions(select, "DE");
+
+      expect(display).toHaveTextContent("+49");
+    });
+  });
+
   describe("when given an E.164 value", () => {
     it("selects the value's country and shows it in national format", () => {
       const { select, input } = renderInput({ value: "+31612345678" });

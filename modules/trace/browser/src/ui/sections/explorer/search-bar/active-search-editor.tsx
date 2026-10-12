@@ -42,6 +42,8 @@ interface ActiveSearchEditorProps {
   onCursorAnchorChange?: (anchorX: number) => void;
   /** Mirrors the editor's focus state so the parent can gate chrome. */
   onFocusChange?: (focused: boolean) => void;
+  /** Whether the editor holds typed text Enter has not searched yet. */
+  onUnsubmittedTextChange?: (hasUnsubmittedText: boolean) => void;
   /**
    * Bumped by the parent's Clear button. Clear keeps the caret in the bar, and
    * text that was never submitted is not in the store, so neither focus nor
@@ -66,18 +68,27 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   onSuggestionOpenChange,
   onCursorAnchorChange,
   onFocusChange,
+  onUnsubmittedTextChange,
   clearNonce = 0,
 }) => {
-  const { editor, suggestion, acceptSuggestion, reset, cursorAnchorX, endAnchorX, isFocused } =
-    useFilterEditor({
-      queryText,
-      applyQueryText,
-      submitQueryText,
-      onHasContentChange,
-      valueResolver,
-      onTokenClick,
-      onAiShortcut,
-    });
+  const {
+    editor,
+    suggestion,
+    acceptSuggestion,
+    reset,
+    cursorAnchorX,
+    endAnchorX,
+    isFocused,
+    hasUnsubmittedText,
+  } = useFilterEditor({
+    queryText,
+    applyQueryText,
+    submitQueryText,
+    onHasContentChange,
+    valueResolver,
+    onTokenClick,
+    onAiShortcut,
+  });
 
   useGlobalSlashFocus(editor);
 
@@ -100,6 +111,10 @@ export const ActiveSearchEditor: React.FC<ActiveSearchEditorProps> = ({
   useEffect(() => {
     onFocusChange?.(isFocused);
   }, [isFocused, onFocusChange]);
+
+  useEffect(() => {
+    onUnsubmittedTextChange?.(hasUnsubmittedText);
+  }, [hasUnsubmittedText, onUnsubmittedTextChange]);
 
   // The mount value is the parent's starting count, not a clear.
   const lastClearNonceRef = useRef(clearNonce);

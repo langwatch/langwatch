@@ -87,7 +87,10 @@ export interface ListTableRowProps extends DataAttributes {
   ref?: Ref<HTMLTableRowElement>;
 }
 
-const HOVER = "var(--chakra-colors-bg-hover)";
+/** A light wash over the ground: muted grey at 60% in light, one zinc step up in dark. */
+const HOVER = "var(--list-table-row-hover)";
+const HOVER_LIGHT = "color-mix(in srgb, var(--chakra-colors-bg-muted) 60%, transparent)";
+const HOVER_DARK = "var(--chakra-colors-zinc-800)";
 const SELECTED = "var(--chakra-colors-bg-selected)";
 const EXPANDED = "var(--chakra-colors-bg-subtle)";
 const TONES = { warning: "bg.warning", danger: "bg.error" } as const;
@@ -141,7 +144,13 @@ export function Row({
         data-activatable={activatable ? "" : undefined}
         css={{
           "--list-table-row-ground": "transparent",
-          "&:hover": { "--list-table-row-ground": HOVER },
+          "--list-table-row-hover": HOVER_LIGHT,
+          _dark: { "--list-table-row-hover": HOVER_DARK },
+          // Pinned cells paint the tint as an image, which cannot fade: the row changes at once.
+          "&, & > td": { transition: "none" },
+          "&:hover": { bg: HOVER, "--list-table-row-ground": HOVER },
+          // An id chip shares the row's tint instead of standing out as a white patch.
+          "&:hover [data-id-cell] code": { bg: "transparent" },
           "&[data-expanded]": { bg: "bg.subtle", "--list-table-row-ground": EXPANDED },
           ...(tone
             ? { bg: TONES[tone], "&, &:hover": { "--list-table-row-ground": TONE_GROUND[tone] } }
@@ -253,7 +262,7 @@ export interface ListTableColumnHeaderProps extends DataAttributes {
   "aria-colindex"?: number;
 }
 
-/** A column header: 12px medium, muted, sentence case, set by the table. */
+/** A column header: 12px semibold, muted, uppercase, set by the table. */
 export function ColumnHeader({
   children,
   label,

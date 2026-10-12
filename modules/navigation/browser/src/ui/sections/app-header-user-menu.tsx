@@ -75,8 +75,8 @@ export function AppHeaderUserMenu() {
             name={user?.name ?? void 0}
             src={avatarSrc}
             size="xs"
-            backgroundColor="accent.solid"
-            color="fg"
+            backgroundColor="avatar.orange"
+            color="fg.onColor"
             width="28px"
             height="28px"
           />

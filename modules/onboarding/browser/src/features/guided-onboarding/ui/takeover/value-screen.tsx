@@ -62,13 +62,7 @@ export function ValueScreen({
 
   return (
     <TakeoverRow fading={fading} maxWidth={720}>
-      <Box
-        minH="84px"
-        fontFamily="display"
-        textStyle="pageTitle"
-        color="fg"
-        data-testid="value-line"
-      >
+      <Box minH="84px" textStyle="takeoverQuestion" color="fg" data-testid="value-line">
         <Typewriter segments={segments} speed={26} onDone={() => setTyped(true)} />
       </Box>
       <Grid
@@ -109,8 +103,7 @@ export function ValueScreen({
               transition="all 0.15s ease"
               _hover={{
                 transform: "translateY(-2px)",
-                boxShadow:
-                  "0 8px 28px color-mix(in srgb, var(--chakra-colors-bg-scrim) 10%, transparent)",
+                boxShadow: "0 8px 28px var(--chakra-colors-takeover-lift)",
                 borderColor: picked ? "orange.muted" : "fg",
               }}
             >
@@ -124,11 +117,10 @@ export function ValueScreen({
                 justify="center"
                 borderRadius="6px"
                 border="1px solid"
-                borderColor={picked ? "orange.solid" : "border.emphasized"}
-                bg={picked ? "orange.solid" : "bg.panel"}
-                color={picked ? "orange.contrast" : "transparent"}
-                textStyle="micro"
-                fontWeight="semibold"
+                borderColor={picked ? "takeover.badge" : "border.emphasized"}
+                bg={picked ? "takeover.badge" : "bg.panel"}
+                color={picked ? "fg.onColor" : "transparent"}
+                textStyle="takeoverBadge"
                 transition="all 0.15s ease"
                 data-testid={`pick-order-${id}`}
               >
@@ -147,10 +139,10 @@ export function ValueScreen({
                 <chakra.img src={PATH_ICONS[id]} alt="" w="28px" h="28px" objectFit="contain" />
               </Flex>
               <Box minW={0}>
-                <Text textStyle="cardTitle" color="fg">
+                <Text textStyle="takeoverCardTitle" color="fg">
                   {GUIDED_PATH_TITLES[id]}
                 </Text>
-                <Text mt={0.5} textStyle="caption" color="fg.muted">
+                <Text mt={0.5} textStyle="takeoverCardBody" color="fg.muted">
                   {GUIDED_PATH_DESCRIPTIONS[id]}
                 </Text>
               </Box>

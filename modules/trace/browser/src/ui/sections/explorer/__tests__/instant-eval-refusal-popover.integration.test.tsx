@@ -26,13 +26,14 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 afterEach(() => cleanup());
 
 describe("given the organization has spent its free Instant Evals budget", () => {
-  /** @scenario "A spent free budget opens the budget popover and the phrase search runs" */
+  /** @scenario "A spent free budget opens the budget popover and keeps the eval chip" */
   it("says in one line what Instant Evals find, and offers Upgrade and Skip", () => {
-    const onClose = vi.fn();
+    const onSkip = vi.fn();
     render(
       <InstantEvalRefusalPopover
         refusal={{ kind: "budget" }}
-        onClose={onClose}
+        onClose={vi.fn()}
+        onSkip={onSkip}
         onEnable={vi.fn()}
         isEnabling={false}
       >
@@ -44,7 +45,7 @@ describe("given the organization has spent its free Instant Evals budget", () =>
     expect(screen.getByText("Your free Instant Evals quota is used up")).toBeTruthy();
     expect(
       screen.getByText(
-        "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Upgrade to keep judging. The words are searched as a phrase in the meantime.",
+        "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Upgrade to keep judging. Skip searches your words without the eval.",
       ),
     ).toBeTruthy();
     expect(screen.getByRole("link", { name: "Compare plans" }).getAttribute("href")).toBe(
@@ -53,18 +54,18 @@ describe("given the organization has spent its free Instant Evals budget", () =>
 
     fireEvent.click(screen.getByRole("button", { name: "Skip" }));
 
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSkip).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("given the deployment has no classifier", () => {
-  /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
+  /** @scenario "A missing classifier opens the model popover and keeps the eval chip" */
   it("says Instant Evals can't run right now and offers a word with us, not the model settings", () => {
     const copy = instantEvalRefusalCopy({ kind: "model" });
 
     expect(copy.title).toBe("Instant Evals can't run right now");
     expect(copy.body).toBe(
-      "The words are searched as a phrase in the meantime. If it keeps happening, contact us.",
+      "Skip searches your words without the eval. If it keeps happening, contact us.",
     );
     expect(copy.action).toEqual({ label: "Contact us", href: CONTACT_US_HREF });
   });
@@ -74,10 +75,12 @@ describe("given the Instant Evals flag is off for the project", () => {
   /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
   it("says Instant Evals aren't enabled yet, offers Contact us, and dismisses on Not now", () => {
     const onClose = vi.fn();
+    const onSkip = vi.fn();
     render(
       <InstantEvalRefusalPopover
         refusal={{ kind: "unreleased" }}
         onClose={onClose}
+        onSkip={onSkip}
         onEnable={vi.fn()}
         isEnabling={false}
       >
@@ -99,6 +102,7 @@ describe("given the Instant Evals flag is off for the project", () => {
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSkip).not.toHaveBeenCalled();
   });
 
   it("renders nothing while there is no refusal", () => {
@@ -106,6 +110,7 @@ describe("given the Instant Evals flag is off for the project", () => {
       <InstantEvalRefusalPopover
         refusal={null}
         onClose={vi.fn()}
+        onSkip={vi.fn()}
         onEnable={vi.fn()}
         isEnabling={false}
       >
@@ -126,10 +131,12 @@ describe("given Instant Evals are off for a self-serve organization", () => {
   it("explains where the text goes, and Enable throws the switch", () => {
     const onEnable = vi.fn();
     const onClose = vi.fn();
+    const onSkip = vi.fn();
     render(
       <InstantEvalRefusalPopover
         refusal={{ kind: "opt_in" }}
         onClose={onClose}
+        onSkip={onSkip}
         onEnable={onEnable}
         isEnabling={false}
       >
@@ -153,6 +160,7 @@ describe("given Instant Evals are off for a self-serve organization", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Not now" }));
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSkip).not.toHaveBeenCalled();
   });
 });
 
@@ -163,6 +171,7 @@ describe("given a member who may not throw the organization's switch", () => {
       <InstantEvalRefusalPopover
         refusal={{ kind: "ask_admin" }}
         onClose={vi.fn()}
+        onSkip={vi.fn()}
         onEnable={vi.fn()}
         isEnabling={false}
       >
@@ -192,6 +201,7 @@ describe("given a self-hosted install that judges through LangWatch", () => {
         <InstantEvalRefusalPopover
           refusal={{ kind: "model" }}
           onClose={() => {}}
+          onSkip={() => {}}
           onEnable={() => {}}
           isEnabling={false}
           viaConnect
@@ -202,7 +212,7 @@ describe("given a self-hosted install that judges through LangWatch", () => {
       );
       expect(
         screen.getByText(
-          "The words are searched as a phrase in the meantime. This install judges through LangWatch, so check that it can reach connect.langwatch.ai and gateway.langwatch.ai. If it keeps happening, contact us.",
+          "This install judges through LangWatch, so check that it can reach connect.langwatch.ai and gateway.langwatch.ai. Skip searches your words without the eval. If it keeps happening, contact us.",
         ),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
@@ -221,6 +231,7 @@ describe("given an eval chip refused on a self-hosted install", () => {
       <InstantEvalRefusalPopover
         refusal={{ kind }}
         onClose={() => {}}
+        onSkip={() => {}}
         onEnable={() => {}}
         isEnabling={false}
       >

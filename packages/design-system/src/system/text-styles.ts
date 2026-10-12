@@ -3,9 +3,9 @@ import { defineTextStyles } from "@chakra-ui/react";
 const tabular = { fontVariantNumeric: "tabular-nums" } as const;
 
 /**
- * The product type scale: 11 to 20px, weights 400, 500, 600. Titles are 600, labels 500;
- * prose styles carry no weight, so a recipe's own weight survives. Mono is for ids, code and
- * durations only. px-to-style mapping: dev/docs/best_practices/type-scale.md.
+ * Type scale 11 to 20px, weights 400/500/600: titles 600 except the page header title (500),
+ * labels 500; prose styles carry no weight. Mono only for ids, code and durations.
+ * px-to-style mapping: dev/docs/best_practices/type-scale.md.
  */
 export const productTextStyles = defineTextStyles({
   pageTitle: {
@@ -14,7 +14,7 @@ export const productTextStyles = defineTextStyles({
   },
   pageTitleCompact: {
     description: "The page title in a compact (48px) header",
-    value: { fontSize: "16px", lineHeight: "24px", fontWeight: "600", letterSpacing: "-0.01em" },
+    value: { fontSize: "16px", lineHeight: "24px", fontWeight: "500", letterSpacing: "-0.01em" },
   },
   sectionTitle: {
     description: "A section heading inside a page or drawer",
@@ -69,6 +69,37 @@ export const productTextStyles = defineTextStyles({
   monoSm: {
     description: "Ids, code and durations in captions and table metadata",
     value: { fontFamily: "mono", fontSize: "12px", lineHeight: "16px", ...tabular },
+  },
+});
+
+/**
+ * The guided onboarding takeover: Langy's Sentient lines and the value cards, cut as the brand
+ * screens were. A documented exception to the product scale above, used nowhere else.
+ */
+export const takeoverTextStyles = defineTextStyles({
+  takeoverHello: {
+    description: "Langy's greeting on the takeover's first screen",
+    value: { fontFamily: "display", fontSize: "36px", lineHeight: "1.25", fontWeight: "400" },
+  },
+  takeoverQuestion: {
+    description: "Langy's question over the takeover's value cards",
+    value: { fontFamily: "display", fontSize: "30px", lineHeight: "1.25", fontWeight: "400" },
+  },
+  takeoverPrompt: {
+    description: "Langy's line over the takeover's provider connect",
+    value: { fontFamily: "display", fontSize: "24px", lineHeight: "1.375", fontWeight: "400" },
+  },
+  takeoverCardTitle: {
+    description: "A takeover value card's title",
+    value: { fontSize: "14.5px", fontWeight: "600" },
+  },
+  takeoverCardBody: {
+    description: "A takeover value card's description",
+    value: { fontSize: "12px", lineHeight: "1.6" },
+  },
+  takeoverBadge: {
+    description: "The pick-order digit on a takeover value card",
+    value: { fontSize: "10.5px", fontWeight: "600" },
   },
 });
 

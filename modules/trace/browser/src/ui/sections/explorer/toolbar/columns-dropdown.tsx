@@ -10,9 +10,12 @@ import { ColumnPickerContent } from "./column-picker-content.tsx";
 /**
  * Toolbar entry point to the column picker. The picker body (`ColumnPickerContent`) is
  * shared with the trailing "+" column header in the table, so both surfaces stay in
- * lockstep.
+ * lockstep. A wide toolbar spells "Columns" after the icon; a compact one drops the chevron.
  */
-export const ColumnsDropdown: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
+export const ColumnsDropdown: React.FC<{ compact?: boolean; showLabel?: boolean }> = ({
+  compact = false,
+  showLabel = false,
+}) => {
   return (
     <Popover.Root positioning={{ placement: "bottom-end" }}>
       <Tooltip content="Show or hide columns" positioning={{ placement: "bottom" }}>
@@ -26,6 +29,7 @@ export const ColumnsDropdown: React.FC<{ compact?: boolean }> = ({ compact = fal
               paddingX={2}
             >
               <Columns3 size={14} />
+              {showLabel && "Columns"}
               {!compact && <ChevronDown size={12} />}
             </Button>
           </Popover.Trigger>

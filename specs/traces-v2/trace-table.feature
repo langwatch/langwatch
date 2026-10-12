@@ -147,9 +147,15 @@ Rule: Toolbar strip
 
   @unimplemented
   Scenario: Toolbar renders the expected controls
-    Then the toolbar shows lens tabs flushed left
-    And the right side holds two clusters: filters, save view, time range picker, live indicator, grouping select, density toggle; then columns dropdown, export, tour button and a More menu (automate, keyboard shortcuts)
+    Then the toolbar shows lens tabs flushed left, led by the "Filters" button while the sidebar is closed
+    And the right side holds two clusters: save view, time range picker, live indicator, grouping select, density select; then columns dropdown, export, the Automate button, tour button and the keyboard shortcuts button
     And the toolbar row is 36px minimum height
+
+  @integration
+  Scenario: The Filters button leads the lens row
+    Given the filter sidebar is closed
+    Then the "Filters" button sits at the left of the lens tabs, before "All"
+    And it is not part of the right clusters, so it keeps its place as the clusters change
 
   @integration
   Scenario: Lens tabs take remaining horizontal space
@@ -587,6 +593,14 @@ Rule: Two-zone row format (compact density only)
     # that carries its own content (Labels, Evals, Prompt, Events).
     # The boundary follows the live column order, so it survives reorder.
 
+  @integration
+  Scenario: Comfortable preview labels read as bold coloured words in a fixed column
+    Given density is "comfortable"
+    And a trace has both `input` and `output` populated
+    Then the preview labels the input side "Input" in bold blue and the output side "Output" in bold green
+    And the labels carry no arrow icon
+    And the labels sit in a fixed-width column so both preview values start at the same x position
+
   @unimplemented
   Scenario: Non-LLM trace row shows header only
     Given a trace is missing either `input` or `output`
@@ -795,11 +809,19 @@ Rule: Density toggle
     And padding is generous
 
   @integration
-  Scenario: Density toggle shows both densities at once
-    Then the toolbar shows a "Compact" and a "Comfortable" segment, each with an icon and label
-    And hovering a segment explains what that density shows and that D switches it
-    And clicking a segment switches the table's density in one click
-    And the labels drop to icons only while the toolbar is too narrow
+  Scenario: Density select names the current density
+    Then the toolbar shows a "Density" select beside "Group by", reading the current density
+    And opening it offers "Compact" and "Comfortable", each explaining what that density shows
+    And choosing one switches the table's density
+    And the select drops to its icon alone while the toolbar is too narrow
+
+  @integration
+  Scenario: The toolbar keeps its actions in sight
+    Given the user may manage automations
+    Then the toolbar shows an "Automate" button that opens an automation from the current filter
+    And a keyboard shortcuts button sits beside it, with no overflow menu
+    And "Automate" drops to its icon while the toolbar is too narrow
+    And the columns button spells "Columns" after its icon while the toolbar is wide
 
   @unit
   Scenario: Density preference persists across sessions

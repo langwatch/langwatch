@@ -51,6 +51,12 @@ Feature: Workflow service boundary
     Then the first version is updated in place and the workflow still has one version
 
   @unit
+  Scenario: Repeated autosaves keep the autosaved version's number
+    Given a workflow whose autosaved version is numbered 1
+    When two more autosaves are written into it
+    Then the autosaved version is still numbered 1
+
+  @unit
   Scenario: Published version selection is tenant scoped
     Given a workflow with a published version in a project
     When the service resolves its published version

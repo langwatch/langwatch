@@ -296,3 +296,10 @@ Feature: tRPC framework boundary
     And a hook that fails fails the call, so a refusal is never answered unrecorded
     And a caller the door admits never reaches the hook
     And a hook on a procedure whose door refuses nobody is refused where it is written
+
+  @unit
+  Scenario: A strict page input accepts the direction an infinite query adds
+    Given a query declares a strict input schema for one page of a list
+    When the browser asks it for a page through an infinite query, which adds direction "forward" or "backward"
+    Then the door drops that direction before the schema parses the input
+    And any other unknown key is still refused

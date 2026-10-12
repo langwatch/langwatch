@@ -335,8 +335,8 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
 
   /** Palettes follow the studio node kinds in workflow-icons.tsx. */
   const getTargetPalette = (): StudioPalette => {
-    if (target.type === "prompt") return "blue";
-    if (target.type === "agent") return "pink";
+    if (target.type === "prompt") return "green";
+    if (target.type === "agent") return "cyan";
     if (target.type === "evaluator") return "green";
     return "gray";
   };

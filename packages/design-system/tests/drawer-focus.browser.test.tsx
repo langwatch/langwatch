@@ -404,3 +404,28 @@ describe("a drawer over a dialog, and a drawer built from parts", () => {
     await waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 });
+
+describe("the drawer's close button on open", () => {
+  const closeButton = () =>
+    within(screen.getByRole("dialog", { name: NAME })).getByRole("button", { name: "Close" });
+
+  /** @scenario "A drawer opened by a click shows no focus ring on its close button" */
+  it("draws no ring when the drawer was opened with the pointer", async () => {
+    renderWithDesignSystem(<Harness />);
+    await openDrawer();
+    if (document.activeElement !== closeButton()) closeButton().focus();
+
+    await waitFor(() => expect(closeButton().getAttribute("data-pointer-focus")).not.toBeNull());
+    expect(getComputedStyle(closeButton()).outlineStyle).toBe("none");
+  });
+
+  /** @scenario "A drawer opened by a click shows no focus ring on its close button" */
+  it("keeps the ring when the close button is reached with the keyboard", async () => {
+    renderWithDesignSystem(<Harness />);
+    await openDrawer();
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}{Tab}");
+    closeButton().focus();
+
+    await waitFor(() => expect(closeButton().getAttribute("data-pointer-focus")).toBeNull());
+  });
+});
