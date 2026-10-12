@@ -1608,6 +1608,8 @@ const processBatchEvaluation = async (
     experiment_type: ExperimentType.BATCH_EVALUATION_V2,
     experiment_name: param.name ?? undefined,
     workflowId: param.workflow_id ?? undefined,
+    dataset_id: param.dataset_id,
+    dataset_slug: param.dataset_slug,
   });
 
   const processedTargets = processTargets(param.targets);

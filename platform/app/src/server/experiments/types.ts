@@ -248,6 +248,14 @@ export const eSBatchEvaluationRESTParamsSchema = eSBatchEvaluationSchema
       experiment_slug: z.string().optional().nullable(),
       run_id: z.string().nullable(),
       workflow_id: z.string().optional().nullable(),
+      /**
+       * The LangWatch-managed dataset this run evaluated. Recorded on the
+       * experiment (issue #6411) so the experiments list can show it even
+       * when there is no Optimization Studio workflow to read it from.
+       * `dataset_id` wins when both are sent.
+       */
+      dataset_id: z.string().min(1).optional().nullable(),
+      dataset_slug: z.string().min(1).optional().nullable(),
       name: z.string().optional().nullable(),
       targets: z.array(eSBatchEvaluationTargetRESTSchema).optional().nullable(),
       timestamps: z
