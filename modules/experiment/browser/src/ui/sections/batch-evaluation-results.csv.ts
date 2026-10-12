@@ -112,7 +112,9 @@ const targetHeaders = (data: BatchEvaluationData, target: BatchTargetColumn): st
   const targetName = target.displayName ?? target.name;
   const outputFields = target.outputFields.length > 0 ? target.outputFields : ["output"];
   const evaluatorHeaders = [...targetEvaluatorIds(data, target.id)].flatMap((evalId) => {
-    const evalName = data.evaluatorNames[evalId] ?? evalId;
+    // Workbench runs key evaluator names per target; older runs key them by id alone.
+    const evalName =
+      data.evaluatorNames[`${target.id}:${evalId}`] ?? data.evaluatorNames[evalId] ?? evalId;
     return EVALUATOR_HEADER_SUFFIXES.map((suffix) => `${targetName}_${evalName}_${suffix}`);
   });
 
