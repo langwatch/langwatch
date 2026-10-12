@@ -76,6 +76,9 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		if err != nil {
 			return err
 		}
+		if domain.UnderRushGate(os.Getenv) {
+			return execUnderRush(args.argv, "")
+		}
 		reportGateOffIgnored(slotCheckEnv())
 		store := fileregistry.New(havenHome())
 		agentID, caller, overrideHonored := resolvePriorityState(store)
@@ -780,7 +783,8 @@ type qosEnv struct {
 }
 
 // agentBandArgv is agentQoSArgv for a band the capacity chose: behind a boot
-// someone waits on, `taskpolicy -b`; a waited-on boot's own run, no clamp.
+// someone waits on, `nice -n 10` (not `taskpolicy -b`, which pins the run to
+// Apple Silicon's efficiency cores); a waited-on boot's own run, no clamp.
 func agentBandArgv(env qosEnv, argv []string, band domain.RunBand) []string {
 	if band == domain.BandDefault || env.goos != "darwin" || (env.getenv("CLAUDECODE") == "" && env.getenv("HAVEN_AGENT_ID") == "") {
 		return argv
@@ -792,7 +796,7 @@ func agentBandArgv(env qosEnv, argv []string, band domain.RunBand) []string {
 		return argv
 	}
 	if band == domain.BandBackground {
-		return append([]string{"/usr/sbin/taskpolicy", "-b"}, argv...)
+		return append([]string{"/usr/bin/nice", "-n", "10"}, argv...)
 	}
 	return append([]string{"/usr/sbin/taskpolicy", "-c", "utility"}, argv...)
 }

@@ -244,6 +244,10 @@ var envHelpText = `Environment variables.
     HAVEN_COLIMA_CPUS            CPUs of a colima VM haven creates (never resizes one).
     HAVEN_COLIMA_MEMORY_GIB      Memory of a colima VM haven creates, in GiB.
     HAVEN_TEST_WORKERS=N         Machine-wide cap on unit test workers.
+    HAVEN_UI_MAX_RSS_MB=2048     Vite ui lane's memory ceiling; over it the lane is killed
+                                 and restarted. 0 disables.
+    HAVEN_API_MAX_RSS_MB=2560    api and worker ceilings; they share the --hmr api lane,
+    HAVEN_WORKER_MAX_RSS_MB=2560 capped at their sum. 0 on either disables.
     HAVEN_INSTANT_EVAL_MOCK_JUDGE=1  Judge Instant Evals with the app's deterministic
                                  memory judge (INSTANT_EVAL_CLASSIFIER=memory); modular
                                  checkouts only, from the next haven up. Default 0.

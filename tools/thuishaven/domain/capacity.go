@@ -158,7 +158,7 @@ func (c Capacity) RunUnits(class SlotClass, vitestMaxWorkers string) int {
 }
 
 // Background reports that a run admitted now goes to the background band
-// (`taskpolicy -b`) rather than utility: a check while a waited-on boot runs.
+// (`nice -n 10`) rather than utility: a check while a waited-on boot runs.
 func (c Capacity) Background() bool { return c.BootsAhead > 0 && !c.BootWork }
 
 // Describe says the capacity and why, in one clause: "quiet, load 1.2 on 10
@@ -285,7 +285,8 @@ const (
 	BandDefault RunBand = "default"
 	// BandUtility is `taskpolicy -c utility`, an agent's check normally.
 	BandUtility RunBand = "utility"
-	// BandBackground is `taskpolicy -b`, an agent's check behind a waited-on boot.
+	// BandBackground is `nice -n 10`, an agent's check behind a waited-on boot:
+	// lower priority on every core, where `taskpolicy -b` pinned it to the E-cores.
 	BandBackground RunBand = "background"
 )
 

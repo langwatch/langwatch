@@ -305,10 +305,15 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 		ObservabilityConsoleLevel:  obsConsoleLevel,
 		ShouldDisableGoogleDLP:     shouldDisableGoogleDLP(disableDLP, disableDLPSet),
 		ShouldMockInstantEvalJudge: devEnv(domain.InstantEvalMockJudgeEnv) == "1",
-		JobsRoot:                   jobsRoot(),
-		ClaudeHome:                 claudeHome(),
-		ClaudeTmp:                  claudeTmpRoot(),
-		OwnJobDirs:                 ownJobDirs(),
+		LaneMemory: domain.LaneMemoryCaps{
+			UIMB:     envInt(domain.UILaneMemoryEnv, domain.DefaultUILaneMemoryMB),
+			APIMB:    envInt(domain.APILaneMemoryEnv, domain.DefaultAPILaneMemoryMB),
+			WorkerMB: envInt(domain.WorkerLaneMemoryEnv, domain.DefaultWorkerLaneMemoryMB),
+		},
+		JobsRoot:   jobsRoot(),
+		ClaudeHome: claudeHome(),
+		ClaudeTmp:  claudeTmpRoot(),
+		OwnJobDirs: ownJobDirs(),
 	}
 
 	orch := app.New(app.Deps{

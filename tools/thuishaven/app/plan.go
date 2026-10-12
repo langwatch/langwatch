@@ -292,9 +292,6 @@ func (p *childPlan) nodeEnv(lane string) []string {
 	}
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
-		if p.opts.Selection.Refresh == domain.RefreshHMR {
-			env = append(env, "LANGWATCH_UI_BUNDLED=1")
-		}
 		if p.opts.Selection.Refresh == domain.RefreshWatch {
 			env = append(env, "LANGWATCH_UI_WATCH=1") // the api's port marks pages, which then reload once idle
 		}
@@ -316,8 +313,9 @@ func (p *childPlan) frontChild(mono monolithPlan, isBuiltUI bool) Child {
 	}
 	return Child{
 		Name: "ui", Dir: p.repoDir, Color: palette[1], LogPath: p.logPath("ui"),
-		Shell: "pnpm --silent --filter " + UIPackage + " dev",
-		Env:   p.nodeEnv("ui"),
+		Shell:       "pnpm --silent --filter " + UIPackage + " dev",
+		Env:         p.nodeEnv("ui"),
+		MaxRSSBytes: p.o.cfg.LaneMemory.UIBytes(),
 		// No readiness probe: the browser application holds the reader on its
 		// own waiting screen until the API answers, so serving it first is the
 		// boot the reader should see. specs/ui/api-boot-wait.feature.
@@ -483,8 +481,9 @@ func (p *childPlan) backendChild() Child {
 		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
 		// separately.
 		Name: APILane, Dir: p.repoDir, Color: palette[0], LogPath: p.logPath(APILane), SplitLog: true,
-		Shell: "pnpm --silent --filter " + BackendPackage + " dev",
-		Env:   p.nodeEnv(APILane),
+		Shell:       "pnpm --silent --filter " + BackendPackage + " dev",
+		Env:         p.nodeEnv(APILane),
+		MaxRSSBytes: p.o.cfg.LaneMemory.BackendBytes(),
 	}
 }
 

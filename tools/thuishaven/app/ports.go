@@ -192,6 +192,11 @@ type Child struct {
 	// SplitLog captures a Node host lane per application (ui, api, worker) beside
 	// LogPath instead of into it, so logs list what a developer thinks about.
 	SplitLog bool
+	// MaxRSSBytes, if set, kills the lane's process group once its RSS crosses
+	// it; the supervisor then restarts the lane as after any exit.
+	MaxRSSBytes int64
+	// OnReap hears each such kill, with its reason, so it lands in the reap record.
+	OnReap func(reason string) `json:"-"`
 }
 
 // ProcessSample is one live process as the tsgo governor's sampler sees it.
@@ -261,8 +266,8 @@ type System interface {
 	// LoadAverage is the 1-minute load average, -1 when unreadable; with
 	// MemStat it is the sample the capacity tier is read from.
 	LoadAverage() float64
-	// DemoteGroup moves a process group into the throttled background band, and
-	// RestoreGroup moves it back. The group, not the launcher: the policy is
+	// DemoteGroup lowers a process group's priority (nice 10), and
+	// RestoreGroup asks for it back. The group, not the launcher: the policy is
 	// inherited only by processes forked after it is set, so a tree that is
 	// already running has to be walked.
 	DemoteGroup(pid int)

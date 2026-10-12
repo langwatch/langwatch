@@ -54,23 +54,29 @@ func diffLanes(running, planned []Child) LaneChange {
 // is only how the terminal prints it.
 func sameLane(a, b *Child) bool {
 	return a.Name == b.Name && a.Dir == b.Dir && a.Shell == b.Shell && slices.Equal(a.Env, b.Env) &&
-		a.ReadyProbeURL == b.ReadyProbeURL && a.LogPath == b.LogPath && a.SplitLog == b.SplitLog
+		a.ReadyProbeURL == b.ReadyProbeURL && a.LogPath == b.LogPath && a.SplitLog == b.SplitLog &&
+		a.MaxRSSBytes == b.MaxRSSBytes
 }
 
 // liveLanes is a keeper's running lanes by name.
 type liveLanes struct {
-	ctx   context.Context
-	sup   Supervisor
-	lanes map[string]*liveLane
+	ctx    context.Context
+	sup    Supervisor
+	lanes  map[string]*liveLane
+	onReap func(lane, reason string) // a lane killed over its memory ceiling
 }
 
 func (l *liveLanes) start(c *Child) {
 	laneCtx, cancel := context.WithCancel(l.ctx)
 	lane := &liveLane{child: *c, cancel: cancel, done: make(chan struct{})}
 	l.lanes[c.Name] = lane
+	run := lane.child
+	if l.onReap != nil {
+		run.OnReap = func(reason string) { l.onReap(c.Name, reason) }
+	}
 	go func() {
 		defer close(lane.done)
-		l.sup.Supervise(laneCtx, []Child{lane.child})
+		l.sup.Supervise(laneCtx, []Child{run})
 	}()
 }
 
@@ -118,7 +124,9 @@ type keeperRun struct {
 // ends. On each replan signal it rereads the plan and applies diffLanes, so a
 // ±service starts or stops its own lanes and never restarts the stack.
 func (o *Orchestrator) superviseLive(ctx context.Context, run keeperRun) {
-	lanes := &liveLanes{ctx: ctx, sup: o.sup, lanes: map[string]*liveLane{}}
+	lanes := &liveLanes{ctx: ctx, sup: o.sup, lanes: map[string]*liveLane{}, onReap: func(lane, reason string) {
+		o.recordReap("lane", run.slug+"/"+lane, reason)
+	}}
 	lanes.apply(run.children)
 	for {
 		select {

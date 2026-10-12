@@ -78,11 +78,23 @@ var Limits = []Limit{
 		def: func(m LimitMachine) int { return DefaultBrowserMemoryMB(m.TotalRAMBytes) },
 		max: func(m LimitMachine) int { return m.ramMB() / 2 },
 	},
+	laneMemoryLimit(LimitUILaneMemory, UILaneMemoryEnv, DefaultUILaneMemoryMB),
+	laneMemoryLimit(LimitAPILaneMemory, APILaneMemoryEnv, DefaultAPILaneMemoryMB),
+	laneMemoryLimit(LimitWorkerLaneMemory, WorkerLaneMemoryEnv, DefaultWorkerLaneMemoryMB),
 	{
 		Name: LimitInstantEvalMockJudge, Env: InstantEvalMockJudgeEnv, Unit: "on", Min: 0,
 		def: func(LimitMachine) int { return 0 },
 		max: func(LimitMachine) int { return 1 },
 	},
+}
+
+// laneMemoryLimit is a stack lane's ceiling; 0 turns it off.
+func laneMemoryLimit(name, env string, def int) Limit {
+	return Limit{
+		Name: name, Env: env, Unit: "MB", Min: 512, AllowZero: true,
+		def: func(LimitMachine) int { return def },
+		max: LimitMachine.ramMB,
+	}
 }
 
 // InstantEvalMockJudgeEnv is the mock judge switch's knob; "1" turns it on.
@@ -195,6 +207,8 @@ func limitApplies(name, profile string, values map[string]int) string {
 		return "next `haven up`, which runs `config set maxmemory`"
 	case LimitBrowserMemory:
 		return "when the shared browser next starts (haven browser stop --all, or once its lanes close); haven's watchdog when the haven daemon restarts"
+	case LimitUILaneMemory, LimitAPILaneMemory, LimitWorkerLaneMemory:
+		return "next `haven up` or `haven restart`; a lane over it is killed and restarted (the api and worker share one --hmr lane, capped at their sum; the built-UI app lane is not capped)"
 	case LimitInstantEvalMockJudge:
 		return "when the stack is next brought up (haven down, then haven up), on a modular checkout only"
 	case LimitColimaCPUs, LimitColimaMemory:

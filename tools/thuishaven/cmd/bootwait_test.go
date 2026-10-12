@@ -19,7 +19,7 @@ func TestAgentBandArgvFollowsTheCapacity(t *testing.T) {
 		want []string
 	}{
 		{domain.BandUtility, []string{"/usr/sbin/taskpolicy", "-c", "utility", "sh"}},
-		{domain.BandBackground, []string{"/usr/sbin/taskpolicy", "-b", "sh"}},
+		{domain.BandBackground, []string{"/usr/bin/nice", "-n", "10", "sh"}},
 		{domain.BandDefault, []string{"sh"}},
 	}
 	for _, c := range cases {
