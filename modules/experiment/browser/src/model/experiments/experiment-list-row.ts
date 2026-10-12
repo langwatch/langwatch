@@ -13,7 +13,10 @@ export type ExperimentListRow = {
   createdAt: TimeInput;
   updatedAt: TimeInput;
   workflowId: string | null;
-  workbenchState?: { task?: keyof typeof LEGACY_EXPERIMENT_TASK_TYPES } | null;
+  workbenchState?: {
+    task?: keyof typeof LEGACY_EXPERIMENT_TASK_TYPES;
+    targets?: unknown[];
+  } | null;
   dataset?: { id?: string; name: string } | null;
   runsSummary: {
     count: number;
@@ -107,9 +110,26 @@ export function datasetOfRow(experiment: ExperimentListRow): ListDataset | undef
 
 export type RunStatus = "completed" | "stopped" | "running" | "none";
 
+export const RUN_STATUS_LABELS: Record<Exclude<RunStatus, "none">, string> = {
+  completed: "Finished",
+  stopped: "Stopped",
+  running: "Running",
+};
+
+const workbenchTargetsSchema = z.object({ targets: z.array(z.unknown()) });
+
+/** How many targets a workbench experiment is set up with; undefined for every other kind. */
+export function targetCountOfRow(experiment: ExperimentListRow): number | undefined {
+  const setup = workbenchTargetsSchema.safeParse(experiment.workbenchState);
+  return setup.success && setup.data.targets.length > 0 ? setup.data.targets.length : undefined;
+}
+
 const RUNNING_WINDOW_MS = 5 * 60 * 1000;
 
-/** What the latest run's timestamps say: unfinished and recently touched means running. */
+/**
+ * What the latest run's timestamps say: unfinished and recently touched means running; one
+ * untouched for five minutes was cut off, which the experiment page calls Stopped.
+ */
 export function runStatusOf({
   runsSummary,
   nowMs,
@@ -120,7 +140,27 @@ export function runStatusOf({
   const timestamps = runsSummary.latestRun?.timestamps;
   if (timestamps?.finishedAt) return "completed";
   if (timestamps?.stoppedAt) return "stopped";
-  const updatedAt = timestamps?.updatedAt;
-  if (updatedAt && nowMs - updatedAt < RUNNING_WINDOW_MS) return "running";
-  return runsSummary.count > 0 ? "completed" : "none";
+  if (runsSummary.count === 0) return "none";
+  const touchedAt = timestamps?.updatedAt;
+  if (!touchedAt) return "completed";
+  return nowMs - touchedAt < RUNNING_WINDOW_MS ? "running" : "stopped";
+}
+
+/** When the latest run started; the experiment's own update time for one that never ran. */
+export function lastRunStartedOf(experiment: ExperimentListRow): TimeInput {
+  return experiment.runsSummary.latestRun?.timestamps?.createdAt ?? experiment.updatedAt;
+}
+
+const dayWithoutYear = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+const dayWithYear = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+const yearOf = new Intl.DateTimeFormat("en-US", { year: "numeric" });
+
+/** "Sep 25", with the year once it is not the current one. */
+export function shortDay({ epochMs, nowMs }: { epochMs: number; nowMs: number }): string {
+  const thisYear = yearOf.format(epochMs) === yearOf.format(nowMs);
+  return (thisYear ? dayWithoutYear : dayWithYear).format(epochMs);
 }

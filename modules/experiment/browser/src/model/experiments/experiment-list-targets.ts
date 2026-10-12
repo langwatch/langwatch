@@ -49,7 +49,7 @@ function tallyEvaluators(
   return evaluators;
 }
 
-function summarizeTarget({
+function summariseTarget({
   target,
   label,
   rows,
@@ -90,7 +90,7 @@ export function targetResultsOf(run: ExperimentRunWithItems): TargetResult[] {
   return targets.map((target, index) => {
     const model = models[index];
     const shared = model !== undefined && models.filter((other) => other === model).length > 1;
-    return summarizeTarget({
+    return summariseTarget({
       target,
       label: (shared ? `${model} · ${target.name}` : model) ?? target.name,
       rows: run.dataset.filter((row) => forTarget(row.targetId, target.id)),
@@ -134,7 +134,7 @@ export const hasTooFewItems = ({
 
 /**
  * Two pass rates are tied when either side has too few decided items, or the gap sits inside the
- * 95% interval of the difference (two independent proportions over the distinct items). A 0.2 pt
+ * 95% interval of the difference (two independent proportions over the decided items). A 0.2 pt
  * lead on 1,000 items is noise; 5/5 against 0/5 is too little to call.
  */
 export function isTied({
@@ -150,7 +150,8 @@ export function isTied({
   const pa = (targetValue(a, metric) ?? 0) / 100;
   const pb = (targetValue(b, metric) ?? 0) / 100;
   const standardError = Math.sqrt(
-    (pa * (1 - pa)) / Math.max(a.items, 1) + (pb * (1 - pb)) / Math.max(b.items, 1),
+    (pa * (1 - pa)) / Math.max(decidedItems(a, metric), 1) +
+      (pb * (1 - pb)) / Math.max(decidedItems(b, metric), 1),
   );
   // Identical rates are tied, also at 0% and 100% where the standard error is zero. Differing
   // rates with a zero error over enough items (100% against 0%) are a real gap.
@@ -202,8 +203,11 @@ function rankOf({
   metric: ListMetric;
 }): number {
   const leader = scored[0];
-  if (leader && (entry === leader || isTied({ a: entry.target, b: leader.target, metric })))
-    return 1;
+  if (leader && entry === leader) return 1;
+  // A thin target is never crowned beside a leader that has enough items to stand on.
+  const thin = (target: TargetResult) => decidedItems(target, metric) < MIN_DECIDED_ITEMS_TO_CALL;
+  const crownable = leader && (!thin(entry.target) || thin(leader.target));
+  if (leader && crownable && isTied({ a: entry.target, b: leader.target, metric })) return 1;
   if (previous && previous.value === entry.value) return previous.rank;
   return index + 1;
 }
@@ -213,3 +217,42 @@ export const describeGap = (delta: number): string =>
   Math.abs(delta).toFixed(1) === "0.0"
     ? "tied"
     : `${Math.abs(delta).toFixed(1)} pt ${delta > 0 ? "ahead" : "behind"}`;
+
+/** The one line above the target table when the top is a tie, else undefined. */
+export function tieNoteOf({
+  ranked,
+  tooFew,
+}: {
+  ranked: RankedTarget[];
+  tooFew: boolean;
+}): { lead: string; rest: string } | undefined {
+  const leaders = ranked.filter((entry) => entry.rank === 1).length;
+  if (ranked.length < 2 || leaders < 2) return undefined;
+  if (tooFew) {
+    return {
+      lead: "Too few items to call a winner:",
+      rest: `a target needs at least ${MIN_DECIDED_ITEMS_TO_CALL} scored items.`,
+    };
+  }
+  const who = leaders === ranked.length ? `all ${leaders}` : `the top ${leaders}`;
+  return {
+    lead: "No clear winner:",
+    rest: `${who} within noise (gaps inside the 95% interval).`,
+  };
+}
+
+/** The gap chip between two targets: nothing inside the noise or with too few items. */
+export function gapOf({
+  a,
+  b,
+  metric,
+  delta,
+}: {
+  a: TargetResult;
+  b: TargetResult;
+  metric: ListMetric;
+  delta: number;
+}): { text: string; ahead: boolean } | undefined {
+  if (isTied({ a, b, metric })) return undefined;
+  return { text: describeGap(delta), ahead: delta > 0 };
+}

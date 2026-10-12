@@ -8,18 +8,23 @@ import {
   describeChange,
   formatMetricValue,
   formatScore,
+  cellProgressOf,
+  formatUsd,
   headlineFromList,
+  metricMenuLine,
+  sparklineOf,
   headlineOf,
   metricReason,
   noMetricNote,
   runsAreFresh,
+  listStampOf,
   DEFAULT_METRIC_RULE,
   leadMetric,
   metricsOfRuns,
   pooledValue,
   runCost,
   runsOldestFirst,
-  summarizeResult,
+  summariseResult,
 } from "../experiment-list-metrics.ts";
 
 const run = ({
@@ -27,16 +32,20 @@ const run = ({
   createdAt,
   evaluations,
   cost,
+  finishedAt,
+  updatedAt,
 }: {
   id: string;
   createdAt: number;
+  finishedAt?: number;
+  updatedAt?: number;
   evaluations: ExperimentRun["summary"]["evaluations"];
   cost?: { datasetCost?: number; evaluationsCost?: number };
 }): ExperimentRun => ({
   experimentId: "exp",
   runId: id,
   workflowVersion: null,
-  timestamps: { createdAt, updatedAt: createdAt },
+  timestamps: { createdAt, updatedAt: updatedAt ?? createdAt, finishedAt },
   summary: { evaluations, ...cost },
 });
 
@@ -54,21 +63,21 @@ describe("given the evaluators the runs of an experiment report", () => {
       const metrics = metricsOfRuns([
         run({ id: "a", createdAt: 1, evaluations: { q: quality(0.4), c: correct(0.9) } }),
       ]);
-      expect(defaultMetric(metrics)?.label).toBe("correct");
+      expect(defaultMetric({ metrics })?.label).toBe("correct");
     });
 
     it("skips measurements such as latency when no evaluator passes or fails", () => {
       const metrics = metricsOfRuns([
         run({ id: "a", createdAt: 1, evaluations: { l: latency(900), q: quality(0.4) } }),
       ]);
-      expect(defaultMetric(metrics)?.label).toBe("quality");
+      expect(defaultMetric({ metrics })?.label).toBe("quality");
     });
 
     it("falls back to the first evaluator when only measurements exist", () => {
       const metrics = metricsOfRuns([
         run({ id: "a", createdAt: 1, evaluations: { l: latency(900) } }),
       ]);
-      expect(defaultMetric(metrics)?.label).toBe("latency_ms");
+      expect(defaultMetric({ metrics })?.label).toBe("latency_ms");
     });
 
     /** @scenario A real score is not mistaken for a measurement */
@@ -81,13 +90,15 @@ describe("given the evaluators the runs of an experiment report", () => {
             evaluations: { a: { name: "cost", averageScore: 5 }, x: { name, averageScore: 0.4 } },
           }),
         ]);
-        expect(defaultMetric(metrics)?.label).toBe(name);
+        expect(defaultMetric({ metrics })?.label).toBe(name);
       }
     });
 
     it("has no metric when no evaluator ran", () => {
       expect(
-        defaultMetric(metricsOfRuns([run({ id: "a", createdAt: 1, evaluations: {} })])),
+        defaultMetric({
+          metrics: metricsOfRuns([run({ id: "a", createdAt: 1, evaluations: {} })]),
+        }),
       ).toBeUndefined();
     });
   });
@@ -114,11 +125,11 @@ describe("given the evaluators the runs of an experiment report", () => {
     ]);
 
     it("uses the pick", () => {
-      expect(leadMetric(metrics, "q")?.label).toBe("quality");
+      expect(leadMetric({ metrics, chosenKey: "q" })?.label).toBe("quality");
     });
 
     it("falls back to the default when the picked evaluator is gone", () => {
-      expect(leadMetric(metrics, "removed")?.label).toBe("correct");
+      expect(leadMetric({ metrics, chosenKey: "removed" })?.label).toBe("correct");
     });
   });
 });
@@ -166,48 +177,50 @@ describe("given a run's pooled values", () => {
 });
 
 describe("given a change between two values", () => {
-  /** @scenario A change reads as a sentence about an earlier run */
-  it("reads a pass rate, a score and no movement against run #2", () => {
-    expect(describeChange({ delta: 1.3, kind: "passRate", against: 2 }).text).toBe(
-      "1.3 pt better than run #2",
-    );
-    expect(describeChange({ delta: 0.12, kind: "score", against: 2 }).text).toBe(
-      "0.120 higher than run #2",
-    );
-    expect(describeChange({ delta: 0, kind: "score", against: 2 }).text).toBe(
-      "no change from run #2",
-    );
+  /** @scenario A change reads as a short chip about an earlier run */
+  it("reads a pass rate, a score and no movement as short chips naming the run", () => {
+    expect(describeChange({ delta: 1.3, kind: "passRate", against: 2 })).toMatchObject({
+      text: "1.3 pt better",
+      against: 2,
+    });
+    expect(describeChange({ delta: 0.12, kind: "score", against: 2 })).toMatchObject({
+      text: "up 0.120",
+      against: 2,
+    });
+    expect(describeChange({ delta: 0, kind: "score", against: 2 })).toMatchObject({
+      text: "no change",
+      against: 2,
+    });
   });
 
-  it("says a pass rate change in points, better or worse, than a run", () => {
+  it("says a pass rate change in points, better or worse", () => {
     expect(describeChange({ delta: 1.34, kind: "passRate", against: 2 })).toEqual({
-      text: "1.3 pt better than run #2",
+      text: "1.3 pt better",
       tone: "good",
+      against: 2,
     });
     expect(describeChange({ delta: -2, kind: "passRate", against: 1 })).toEqual({
-      text: "2.0 pt worse than run #1",
+      text: "2.0 pt worse",
       tone: "bad",
+      against: 1,
     });
   });
 
-  it("calls a move under half a point no change from the run", () => {
+  it("calls a move under half a point no change", () => {
     expect(describeChange({ delta: 0.4, kind: "passRate", against: 1 })).toEqual({
-      text: "no change from run #1",
+      text: "no change",
       tone: "flat",
+      against: 1,
     });
   });
 
-  it("never judges a score, only higher or lower, and says no change from the run", () => {
+  it("never judges a score, only up or down", () => {
     expect(describeChange({ delta: -0.12, kind: "score", against: 1 })).toEqual({
-      text: "0.120 lower than run #1",
+      text: "down 0.120",
       tone: "flat",
+      against: 1,
     });
-    expect(describeChange({ delta: 0.12, kind: "score", against: 3 }).text).toBe(
-      "0.120 higher than run #3",
-    );
-    expect(describeChange({ delta: 0, kind: "score", against: 1 }).text).toBe(
-      "no change from run #1",
-    );
+    expect(describeChange({ delta: 0.12, kind: "score", against: 3 }).text).toBe("up 0.120");
   });
 });
 
@@ -244,7 +257,7 @@ describe("given runs where the run before has no value", () => {
     const change = changeOfRun({ runs, index: 2, metric });
     expect(change?.againstRunNumber).toBe(1);
     expect(change?.delta).toBeCloseTo(20);
-    expect(summarizeResult({ runs, metric })?.change).toEqual(change);
+    expect(summariseResult({ runs, metric })?.change).toEqual(change);
   });
 
   it("has no change for a run without a value, or without an earlier one", () => {
@@ -265,7 +278,7 @@ describe("given the runs of one experiment", () => {
   ];
 
   it("heads with the newest scored run and its change from the scored run before", () => {
-    const result = summarizeResult({ runs, metric: pass })!;
+    const result = summariseResult({ runs, metric: pass })!;
     expect(result.value).toBe(90);
     expect(result.runNumber).toBe(2);
     expect(result.change?.againstRunNumber).toBe(1);
@@ -273,11 +286,11 @@ describe("given the runs of one experiment", () => {
   });
 
   it("names the newer run that has no score", () => {
-    expect(summarizeResult({ runs, metric: pass })?.newerRunNumber).toBe(3);
+    expect(summariseResult({ runs, metric: pass })?.newerRunNumber).toBe(3);
   });
 
   it("has no headline when no run scored the metric", () => {
-    expect(summarizeResult({ runs: [runs[2]!], metric: pass })).toBeUndefined();
+    expect(summariseResult({ runs: [runs[2]!], metric: pass })).toBeUndefined();
   });
 
   it("formats a pass rate with a percent sign and a score with its own precision", () => {
@@ -306,7 +319,7 @@ describe("given a measurement named with units or spaces", () => {
           },
         }),
       ]);
-      expect(defaultMetric(metrics)?.label).toBe("token_overlap");
+      expect(defaultMetric({ metrics })?.label).toBe("token_overlap");
     }
   });
 });
@@ -321,17 +334,25 @@ describe("given the list's own first evaluator", () => {
   ]);
 
   it("leads with it, matched by name and kind, so a closed and an open row agree", () => {
-    expect(defaultMetric(metrics, { name: "quality", averageScore: 0.4 })?.label).toBe("quality");
+    expect(
+      defaultMetric({ metrics, listPrimary: { name: "quality", averageScore: 0.4 } })?.label,
+    ).toBe("quality");
   });
 
   it("falls back to the rule when the runs do not carry it", () => {
-    expect(defaultMetric(metrics, { name: "gone", averageScore: 1 })?.label).toBe("correct");
+    expect(defaultMetric({ metrics, listPrimary: { name: "gone", averageScore: 1 } })?.label).toBe(
+      "correct",
+    );
   });
 
   it("still lets the person's pick win", () => {
-    expect(leadMetric(metrics, "q", { name: "latency_ms", averageScore: 900 })?.label).toBe(
-      "quality",
-    );
+    expect(
+      leadMetric({
+        metrics,
+        chosenKey: "q",
+        listPrimary: { name: "latency_ms", averageScore: 900 },
+      })?.label,
+    ).toBe("quality");
   });
 });
 
@@ -378,6 +399,28 @@ describe("given cached runs and what the list says", () => {
         runsSummary: { count: 2, latestRun: { timestamps: { createdAt: 9 } } },
       }),
     ).toBe(false);
+  });
+
+  /** @scenario A finished run replaces the partial numbers of a running one */
+  it("are stale once the list says the newest run finished and the cache saw it running", () => {
+    const running = [runs[0]!, run({ id: "b", createdAt: 2, updatedAt: 5, evaluations: {} })];
+    const listed = (timestamps: Record<string, number | null>) => ({
+      count: 2,
+      latestRun: { timestamps: { createdAt: 2, ...timestamps } },
+    });
+    expect(runsAreFresh({ runs: running, runsSummary: listed({ finishedAt: null }) })).toBe(true);
+    expect(runsAreFresh({ runs: running, runsSummary: listed({ finishedAt: 9 }) })).toBe(false);
+    expect(runsAreFresh({ runs: running, runsSummary: listed({ stoppedAt: 9 }) })).toBe(false);
+    expect(runsAreFresh({ runs: running, runsSummary: listed({ updatedAt: 9 }) })).toBe(false);
+    const finished = [runs[0]!, run({ id: "b", createdAt: 2, finishedAt: 9, evaluations: {} })];
+    expect(runsAreFresh({ runs: finished, runsSummary: listed({ finishedAt: 9 }) })).toBe(true);
+  });
+
+  it("changes the list stamp when the newest run finishes", () => {
+    const before = { count: 2, latestRun: { timestamps: { createdAt: 2, updatedAt: 5 } } };
+    const after = { count: 2, latestRun: { timestamps: { createdAt: 2, finishedAt: 9 } } };
+    expect(listStampOf(before)).not.toBe(listStampOf(after));
+    expect(listStampOf(before)).toBe(listStampOf({ ...before }));
   });
 
   it("are never fresh when empty", () => {
@@ -429,6 +472,98 @@ describe("given an average score of any size", () => {
       "3.50",
       "123.5",
       "1,235",
+    ]);
+  });
+});
+
+describe("given measurements among the evaluators", () => {
+  /** @scenario A real score is not mistaken for a measurement */
+  it("does not offer latency or tokens as an average score when anything else exists", () => {
+    const metrics = metricsOfRuns([
+      run({
+        id: "a",
+        createdAt: 1,
+        evaluations: {
+          l: latency(900),
+          t: { name: "tokens", averageScore: 4000 },
+          q: quality(0.4),
+        },
+      }),
+    ]);
+    expect(metrics.map((metric) => metric.label)).toEqual(["quality"]);
+  });
+
+  it("offers a measurement only when nothing else exists", () => {
+    const metrics = metricsOfRuns([
+      run({ id: "a", createdAt: 1, evaluations: { l: latency(900) } }),
+    ]);
+    expect(metrics.map((metric) => metric.label)).toEqual(["latency_ms"]);
+  });
+
+  it("keeps a pass rate named like a measurement", () => {
+    const metrics = metricsOfRuns([
+      run({
+        id: "a",
+        createdAt: 1,
+        evaluations: { l: { name: "latency_ok", averageScore: null, averagePassed: 0.9 } },
+      }),
+    ]);
+    expect(metrics.map((metric) => metric.kind)).toEqual(["passRate"]);
+  });
+
+  it("draws no headline from a list summary that leads with a measurement", () => {
+    expect(headlineFromList({ name: "latency_ms", averageScore: 900 })).toBeUndefined();
+  });
+});
+
+describe("given the menu of the primary metric", () => {
+  it("explains itself in one short line", () => {
+    expect(metricMenuLine({ only: false })).toBe("Pick the evaluator this row leads with.");
+    expect(metricMenuLine({ only: true })).toBe("The only evaluator in this experiment.");
+    expect(metricMenuLine({ only: false }).length).toBeLessThan(60);
+  });
+});
+
+describe("given a run history for the sparkline", () => {
+  const metric = { key: "c", evaluatorId: "c", label: "correct", kind: "passRate" } as const;
+  const runs = [0.5, 0.6, 0.7, 0.8].map((value, at) =>
+    run({ id: `r${at}`, createdAt: at + 1, evaluations: { c: correct(value) } }),
+  );
+
+  it("needs three values, and keeps them oldest first", () => {
+    expect(sparklineOf({ runs: runs.slice(0, 2), metric })).toEqual([]);
+    expect(sparklineOf({ runs, metric })).toEqual([50, 60, 70, 80]);
+  });
+
+  it("keeps only the latest twenty runs", () => {
+    const many = Array.from({ length: 30 }, (_, at) =>
+      run({ id: `m${at}`, createdAt: at + 1, evaluations: { c: correct(0.5) } }),
+    );
+    expect(sparklineOf({ runs: many, metric })).toHaveLength(20);
+  });
+});
+
+describe("given a run's progress", () => {
+  const running = {
+    ...run({ id: "a", createdAt: 1, evaluations: {} }),
+    progress: 1024,
+    total: 1600,
+  };
+
+  it("counts cells for a workbench run only", () => {
+    expect(cellProgressOf({ run: running, workbench: true })).toEqual({ done: 1024, total: 1600 });
+    expect(cellProgressOf({ run: running, workbench: false })).toBeUndefined();
+    expect(cellProgressOf({ run: undefined, workbench: true })).toBeUndefined();
+  });
+});
+
+describe("given a cost to scan", () => {
+  it("shows cents above ten, a thousandth below, whole dollars from a hundred", () => {
+    expect([formatUsd(9.284), formatUsd(0.019), formatUsd(128.4), formatUsd(undefined)]).toEqual([
+      "$9.28",
+      "$0.019",
+      "$128",
+      "–",
     ]);
   });
 });

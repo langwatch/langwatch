@@ -4,7 +4,11 @@ import { describe, expect, it } from "vitest";
 import {
   datasetOfRow,
   experimentPathOf,
+  lastRunStartedOf,
   runStatusOf,
+  targetCountOfRow,
+  RUN_STATUS_LABELS,
+  shortDay,
   type ExperimentListRow,
 } from "../experiment-list-row.ts";
 
@@ -89,9 +93,49 @@ describe("given an experiment row", () => {
       expect(status({ updatedAt: now - 1000 })).toBe("running");
     });
 
-    it("is completed when long idle with runs, and none with no runs", () => {
-      expect(status({ updatedAt: now - 3_600_000 })).toBe("completed");
-      expect(status(null, 0)).toBe("none");
+    /** @scenario An unfinished run left alone reads Stopped */
+    it("is stopped, not finished, when unfinished and untouched for over five minutes", () => {
+      expect(status({ updatedAt: now - 3_600_000 })).toBe("stopped");
+      expect(status({ updatedAt: now - 5 * 60 * 1000 - 1 })).toBe("stopped");
     });
+
+    it("is none with no runs, and finished when the list gives no times at all", () => {
+      expect(status(null, 0)).toBe("none");
+      expect(status(null)).toBe("completed");
+    });
+
+    it("starts the last run at the run's start, else at the experiment's update", () => {
+      const withRun = row({
+        updatedAt: 9_000,
+        runsSummary: { count: 1, latestRun: { timestamps: { createdAt: 4_000 } } },
+      });
+      expect(lastRunStartedOf(withRun)).toBe(4_000);
+      expect(lastRunStartedOf(row({ updatedAt: 9_000 }))).toBe(9_000);
+    });
+  });
+});
+
+describe("given the targets a workbench experiment is set up with", () => {
+  it("counts them, and has no count for anything else", () => {
+    const setup = (state: unknown) =>
+      row({ workbenchState: state as ExperimentListRow["workbenchState"] });
+    expect(targetCountOfRow(setup({ targets: [{}, {}, {}] }))).toBe(3);
+    expect(targetCountOfRow(setup({ targets: [] }))).toBeUndefined();
+    expect(targetCountOfRow(setup(null))).toBeUndefined();
+    expect(targetCountOfRow(row())).toBeUndefined();
+  });
+
+  it("says Finished, not Completed, for a run that ended", () => {
+    expect(RUN_STATUS_LABELS.completed).toBe("Finished");
+  });
+});
+
+describe("given the day a run started", () => {
+  /** @scenario A row shows its last run's day in short form */
+  it("reads month and day, with the year only when it is not this one", () => {
+    const sep25 = Date.UTC(2026, 8, 25, 12);
+    const now = Date.UTC(2026, 9, 12, 12);
+    expect(shortDay({ epochMs: sep25, nowMs: now })).toBe("Sep 25");
+    expect(shortDay({ epochMs: sep25, nowMs: Date.UTC(2027, 0, 5, 12) })).toBe("Sep 25, 2026");
   });
 });

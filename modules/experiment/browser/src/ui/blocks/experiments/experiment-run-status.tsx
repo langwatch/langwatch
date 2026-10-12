@@ -1,32 +1,55 @@
 import { EmptyValue } from "@langwatch/design-system/empty-value";
-import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
-import { LuCircleCheckBig, LuCircleX } from "react-icons/lu";
+import { MeterBar } from "@langwatch/design-system/meter-bar";
+import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 
-import type { RunStatus } from "../../../model/experiments/experiment-list-row.ts";
+import type { CellProgress } from "../../../model/experiments/experiment-list-metrics.ts";
+import {
+  RUN_STATUS_LABELS,
+  type RunStatus,
+} from "../../../model/experiments/experiment-list-row.ts";
 
-/** The latest run's state in words: Completed, Stopped, Running, or an empty mark if none ran. */
-export function ExperimentRunStatus({ status }: { status: RunStatus }) {
+const DOT = { completed: "green.solid", stopped: "orange.solid" } as const;
+
+/**
+ * The latest run's state: a coloured dot and Finished or Stopped, a spinner and Running. A running
+ * run says how many cells are done when the runs say so.
+ */
+export function ExperimentRunStatus({
+  status,
+  progress,
+}: {
+  status: RunStatus;
+  progress?: CellProgress;
+}) {
+  if (status === "none") return <EmptyValue label="Never run" />;
   return (
-    <HStack gap={1}>
-      {status === "completed" && (
+    <VStack align="start" gap={1} minWidth={0}>
+      <HStack gap={1.5}>
+        {status === "running" ? (
+          <Spinner size="xs" color="blue.fg" />
+        ) : (
+          <Box boxSize="8px" borderRadius="full" bg={DOT[status]} flexShrink={0} aria-hidden />
+        )}
+        <Text textStyle="bodySm" fontWeight="medium">
+          {RUN_STATUS_LABELS[status]}
+        </Text>
+      </HStack>
+      {progress && (
         <>
-          <LuCircleCheckBig size={14} color="var(--chakra-colors-green-fg)" />
-          <Text textStyle="bodySm">Completed</Text>
+          <Text textStyle="caption" color="fg.muted" fontVariantNumeric="tabular-nums">
+            {progress.done.toLocaleString("en-US")} of {progress.total.toLocaleString("en-US")}{" "}
+            cells
+          </Text>
+          {status === "running" && (
+            <MeterBar
+              fillRatio={progress.done / progress.total}
+              width="120px"
+              height="4px"
+              fillColor="blue.solid"
+            />
+          )}
         </>
       )}
-      {status === "stopped" && (
-        <>
-          <LuCircleX size={14} color="var(--chakra-colors-red-fg)" />
-          <Text textStyle="bodySm">Stopped</Text>
-        </>
-      )}
-      {status === "running" && (
-        <>
-          <Spinner size="xs" />
-          <Text textStyle="bodySm">Running</Text>
-        </>
-      )}
-      {status === "none" && <EmptyValue label="Never run" />}
-    </HStack>
+    </VStack>
   );
 }

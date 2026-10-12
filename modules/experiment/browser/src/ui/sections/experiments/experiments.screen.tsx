@@ -9,14 +9,23 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Pagination } from "@langwatch/design-system/pagination";
 import { Box, Table, Text, VStack } from "@langwatch/design-system/primitives";
-import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { keepPreviousData } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { LuSquareCheckBig } from "react-icons/lu";
 
 import { experimentApi } from "../../../behavior/experiment-api.ts";
+import {
+  createRunSlotQueue,
+  RUNS_IN_FLIGHT,
+} from "../../../behavior/experiments/run-slot-queue.ts";
 import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
+import {
+  EVERY_EXPERIMENT,
+  useExperimentListControls,
+  useVisibleExperiments,
+} from "../../../behavior/experiments/use-experiment-list-view.ts";
+import { kindOptions } from "../../../model/experiments/experiment-list-filter.ts";
 import { type ExperimentListRow } from "../../../model/experiments/experiment-list-row.ts";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { useWorkflowHost } from "../../../model/workflow/workflow-host.ts";
@@ -24,7 +33,13 @@ import { CopyExperimentDialog } from "../../../ui/elements/experiments/copy-expe
 import { CreateExperimentButton } from "../../../ui/elements/experiments/create-experiment-button.tsx";
 import { PAGE_SIZE_OPTIONS, useNavigationFooter } from "../../../ui/elements/navigation-footer.tsx";
 import { FullWidthListPageContent } from "../../../ui/elements/ui/layouts/full-width-list-page-content.tsx";
+import { ExperimentListToolbar } from "../../blocks/experiments/experiment-list-toolbar.tsx";
 import { ExperimentListRowSection, LIST_COLUMN_COUNT } from "./experiment-list-row.tsx";
+import {
+  ExperimentListBody,
+  ExperimentListHeader,
+  FilteredPagination,
+} from "./experiment-list-table.tsx";
 
 type ExperimentsListQuery = {
   data?: { experiments: ExperimentListRow[]; totalHits?: number };
@@ -55,24 +70,33 @@ export function ExperimentsPage() {
     experimentType: ExperimentType;
   } | null>(null);
   const [openIds, setOpenIds] = useState<string[]>([]);
+  const navigationFooter = useNavigationFooter();
+  const controls = useExperimentListControls({
+    pageSize: navigationFooter.pageSize,
+    onPageSizeChange: navigationFooter.changePageSize,
+  });
+  const runSlots = useMemo(() => createRunSlotQueue(RUNS_IN_FLIGHT), []);
+  const { narrowed } = controls;
   const [experimentToDelete, setExperimentToDelete] = useState<{
     id: string;
     name: string;
   } | null>(null);
 
-  const navigationFooter = useNavigationFooter();
   const { createNewExperiment, isCreating } = useCreateExperiment({
     projectId: project?.id,
     projectSlug: project?.slug,
   });
   const { copyExperimentTo, isCopying } = useCopyExperiment();
 
-  /** One page of the project's experiments; every field is one the table renders. */
+  /**
+   * One page of the project's experiments; every field is one the table renders. The endpoint has
+   * no search, so an active search or filter loads them all in one call and narrows them here.
+   */
   const experiments = experimentApi.experiments.getAllForEvaluationsList.useQuery(
     {
       projectId: project?.id ?? "",
-      pageOffset: navigationFooter.pageOffset,
-      pageSize: navigationFooter.pageSize,
+      pageOffset: narrowed ? 0 : navigationFooter.pageOffset,
+      pageSize: narrowed ? EVERY_EXPERIMENT : navigationFooter.pageSize,
     },
     {
       enabled: !!project && router.isReady,
@@ -83,6 +107,9 @@ export function ExperimentsPage() {
   ) as ExperimentsListQuery;
 
   navigationFooter.useUpdateTotalHits(experiments);
+
+  const loaded = experiments.data?.experiments;
+  const { matching, shown, groups, page } = useVisibleExperiments({ rows: loaded, controls });
 
   const deleteExperimentMutation = experimentApi.experiments.deleteExperiment.useMutation({
     onSuccess: () => {
@@ -102,6 +129,14 @@ export function ExperimentsPage() {
     },
   });
 
+  const permissions = {
+    canEdit: workflowHost.hasPermission("workflows:create"),
+    canReplicate: workflowHost.hasPermission("evaluations:manage"),
+    canDelete: workflowHost.hasPermission("workflows:delete"),
+  };
+  const toggleOpen = (id: string) =>
+    setOpenIds((ids) => (ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id]));
+
   const handleDeleteExperiment = (experimentId: string, experimentName: string) => {
     setExperimentToDelete({ id: experimentId, name: experimentName });
   };
@@ -120,9 +155,18 @@ export function ExperimentsPage() {
       <FullWidthListPageContent>
         <VStack width="full" gap={4} align="stretch">
           <Text color="fg.muted">
-            Compare prompts, models and agents against a dataset, and analyse the results.
+            Each row is an experiment&apos;s latest run: its score, cost and status. Open a row to
+            load every target&apos;s numbers.
           </Text>
-          {pageState === "loading" && <SkeletonRows rows={5} label="Loading experiments" />}
+          {pageState === "error" && narrowed && (
+            <ExperimentListToolbar
+              filters={controls.filters}
+              onFilters={controls.changeFilters}
+              kinds={kindOptions(loaded ?? [])}
+              grouping={controls.grouping}
+              onGrouping={controls.setGrouping}
+            />
+          )}
           {pageState === "error" && (
             <Banner
               status="error"
@@ -143,71 +187,79 @@ export function ExperimentsPage() {
               docsHref="https://langwatch.ai/docs/evaluations/experiments/overview"
             />
           )}
-          {pageState === "list" && (
+          {(pageState === "loading" || pageState === "list") && (
             <>
-              <ListTable width="full">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader width="4%" aria-label="Open or close the row" />
-                    <Table.ColumnHeader width="30%">Experiment</Table.ColumnHeader>
-                    <Table.ColumnHeader width="26%">Result, latest run</Table.ColumnHeader>
-                    <Table.ColumnHeader width="6%">Runs</Table.ColumnHeader>
-                    <Table.ColumnHeader width="12%">Status</Table.ColumnHeader>
-                    <Table.ColumnHeader width="14%">Last updated</Table.ColumnHeader>
-                    <ListTable.ActionHeader />
-                  </Table.Row>
-                </Table.Header>
+              <ExperimentListToolbar
+                filters={controls.filters}
+                onFilters={controls.changeFilters}
+                kinds={kindOptions(loaded ?? [])}
+                grouping={controls.grouping}
+                onGrouping={controls.setGrouping}
+              />
+              <ListTable width="full" loading={pageState === "loading"}>
+                <ExperimentListHeader />
                 <Table.Body>
                   {experiments.isFetching ? (
-                    <ListTable.LoadingRows rows={3} columns={LIST_COLUMN_COUNT} />
+                    <ListTable.LoadingRows rows={5} columns={LIST_COLUMN_COUNT} />
                   ) : (
-                    experiments.data?.experiments.map((experiment) => (
-                      <ExperimentListRowSection
-                        key={experiment.id}
-                        experiment={experiment}
-                        projectId={project.id}
-                        projectSlug={project.slug}
-                        permissions={{
-                          canEdit: workflowHost.hasPermission("workflows:create"),
-                          canReplicate: workflowHost.hasPermission("evaluations:manage"),
-                          canDelete: workflowHost.hasPermission("workflows:delete"),
-                        }}
-                        open={openIds.includes(experiment.id)}
-                        onToggle={() =>
-                          setOpenIds((ids) =>
-                            ids.includes(experiment.id)
-                              ? ids.filter((id) => id !== experiment.id)
-                              : [...ids, experiment.id],
-                          )
-                        }
-                        onOpen={(path) => void router.push(path)}
-                        onReplicate={() =>
-                          setCopyDialogState({
-                            open: true,
-                            experimentId: experiment.id,
-                            experimentName: experiment.name ?? experiment.slug,
-                            experimentType: experiment.type,
-                          })
-                        }
-                        onDelete={() =>
-                          handleDeleteExperiment(experiment.id, experiment.name ?? experiment.slug)
-                        }
-                      />
-                    ))
+                    <ExperimentListBody
+                      groups={groups}
+                      matching={matching}
+                      grouped={controls.grouping === "kind"}
+                      collapsed={controls.collapsed}
+                      onToggleGroup={controls.toggleGroup}
+                      renderRow={(experiment) => (
+                        <ExperimentListRowSection
+                          key={experiment.id}
+                          experiment={experiment}
+                          projectId={project.id}
+                          projectSlug={project.slug}
+                          runSlots={runSlots}
+                          permissions={permissions}
+                          open={openIds.includes(experiment.id)}
+                          onToggle={() => toggleOpen(experiment.id)}
+                          onOpen={(path) => void router.push(path)}
+                          onReplicate={() =>
+                            setCopyDialogState({
+                              open: true,
+                              experimentId: experiment.id,
+                              experimentName: experiment.name ?? experiment.slug,
+                              experimentType: experiment.type,
+                            })
+                          }
+                          onDelete={() =>
+                            handleDeleteExperiment(
+                              experiment.id,
+                              experiment.name ?? experiment.slug,
+                            )
+                          }
+                        />
+                      )}
+                    />
                   )}
                 </Table.Body>
               </ListTable>
-              <Pagination
-                page={Math.floor(navigationFooter.pageOffset / navigationFooter.pageSize) + 1}
-                pageSize={navigationFooter.pageSize}
-                totalCount={navigationFooter.totalHits}
-                visibleCount={experiments.data?.experiments.length}
-                unitLabel="experiments"
-                pageSizeOptions={PAGE_SIZE_OPTIONS}
-                isLoading={experiments.isFetching}
-                onPageChange={(page) => navigationFooter.goToPage(page)}
-                onPageSizeChange={navigationFooter.changePageSize}
-              />
+              {narrowed ? (
+                <FilteredPagination
+                  controls={controls}
+                  page={page}
+                  total={matching.length}
+                  visible={shown.length}
+                  isLoading={experiments.isFetching}
+                />
+              ) : (
+                <Pagination
+                  page={Math.floor(navigationFooter.pageOffset / navigationFooter.pageSize) + 1}
+                  pageSize={navigationFooter.pageSize}
+                  totalCount={navigationFooter.totalHits}
+                  visibleCount={experiments.data?.experiments.length}
+                  unitLabel="experiments"
+                  pageSizeOptions={PAGE_SIZE_OPTIONS}
+                  isLoading={experiments.isFetching}
+                  onPageChange={(page) => navigationFooter.goToPage(page)}
+                  onPageSizeChange={navigationFooter.changePageSize}
+                />
+              )}
             </>
           )}
         </VStack>

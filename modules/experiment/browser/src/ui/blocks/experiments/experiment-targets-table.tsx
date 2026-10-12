@@ -1,29 +1,30 @@
 import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
-import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
-import { Badge, Box, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { formatLatency } from "@langwatch/design-system/metric-value-formatters";
+import { Badge, Box, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderIcon } from "@langwatch/design-system/provider-icons";
 
 import {
   formatMetricValue,
+  formatUsd,
   metricNoun,
   type ListMetric,
 } from "../../../model/experiments/experiment-list-metrics.ts";
 import {
   decidedItems,
-  describeGap,
-  hasTooFewItems,
-  isTied,
+  gapOf,
   MIN_DECIDED_ITEMS_TO_CALL,
   rankTargets,
+  tieNoteOf,
   type RankedTarget,
   type TargetResult,
 } from "../../../model/experiments/experiment-list-targets.ts";
+import { PanelTable } from "./panel-table.tsx";
 
 /**
- * Every target of the latest run, best first: provider mark, a bar on the metric's own 0 to 100
- * scale, the gap to the best one in words, items, cost, p50 latency and failed answers. A tie with
- * the leader is said once above the table, never crowned.
+ * Every target of the latest run, best first: provider mark, the metric with a thin bar on its own
+ * 0 to 100 scale, the gap to the top target in words, items, cost, p50 latency and failed answers.
+ * A tie with the leader is said once above the table, never crowned.
  */
 export function ExperimentTargetsTable({
   targets,
@@ -37,49 +38,63 @@ export function ExperimentTargetsTable({
   const ranked = rankTargets({ targets, metric });
   const isRate = metric.kind === "passRate";
   const best = ranked[0];
-  const leaders = ranked.filter((entry) => entry.rank === 1).length;
-  const topTied = isRate && ranked.length > 1 && leaders > 1;
+  const second = ranked[1];
   const tooFew =
     isRate &&
     ranked.some((entry) => decidedItems(entry.target, metric) < MIN_DECIDED_ITEMS_TO_CALL);
+  const tieNote = isRate ? tieNoteOf({ ranked, tooFew }) : undefined;
   const unscored = targets.filter(
     (target) => !ranked.some((entry) => entry.target.id === target.id),
   );
+  const leaderGap =
+    isRate && best && second && !tieNote
+      ? gapOf({ a: best.target, b: second.target, metric, delta: best.value - second.value })
+      : undefined;
   return (
     <Box paddingY={2}>
-      <Text textStyle="label">
-        Every target, run #{runNumber}
-        <Text as="span" fontWeight="normal" color="fg.muted">
-          {" · "}
-          {metricNoun(metric)}
-          {!isRate && ", highest first. A score has no stored better direction, so none is marked"}
+      <Text textStyle="bodySm">
+        <Text as="span" fontWeight="medium">
+          Every target, run #{runNumber}
         </Text>
+        {!isRate && (
+          <Text as="span" color="fg.muted">
+            {" · "}
+            {metricNoun(metric)}, highest first. No winner is marked: LangWatch stores no better
+            direction for a score.
+          </Text>
+        )}
+        {leaderGap && best && second && (
+          <Text as="span" color="fg.muted">
+            {" · top "}
+            <Text as="span" fontWeight="medium" color="fg">
+              {best.target.label}
+            </Text>{" "}
+            {formatMetricValue(metric, best.value)}, {leaderGap.text} of {second.target.label}
+          </Text>
+        )}
       </Text>
-      {topTied && (
-        <Text textStyle="caption" color="fg.muted" marginTop={1}>
-          {tooFew
-            ? `Too few items to call a winner: a target needs at least ${MIN_DECIDED_ITEMS_TO_CALL} scored items.`
-            : null}
-          {!tooFew && (
-            <>
-              No clear winner: {leaders === ranked.length ? `all ${leaders}` : `the top ${leaders}`}{" "}
-              are within noise.
-            </>
-          )}
+      {tieNote && (
+        <Text textStyle="bodySm" color="fg.muted">
+          <Text as="span" fontWeight="medium" color="fg">
+            {tieNote.lead}
+          </Text>{" "}
+          {tieNote.rest}
         </Text>
       )}
-      <Table.Root size="sm" variant="line" marginTop={2}>
+      <PanelTable marginTop={1}>
         <Table.Header>
           <Table.Row>
-            <Table.ColumnHeader width="28%">Target</Table.ColumnHeader>
-            <Table.ColumnHeader width="22%">{metric.label}</Table.ColumnHeader>
-            <Table.ColumnHeader>
+            <Table.ColumnHeader width="22%">Target</Table.ColumnHeader>
+            <Table.ColumnHeader width="12%" textAlign="end">
+              {metric.label}
+            </Table.ColumnHeader>
+            <Table.ColumnHeader width="14%">
               {isRate && best ? `vs ${best.target.label}` : ""}
             </Table.ColumnHeader>
             <Table.ColumnHeader textAlign="end">Items</Table.ColumnHeader>
             <Table.ColumnHeader textAlign="end">Cost</Table.ColumnHeader>
             <Table.ColumnHeader textAlign="end">p50 latency</Table.ColumnHeader>
-            <Table.ColumnHeader>Errors</Table.ColumnHeader>
+            <Table.ColumnHeader width="26%">Errors</Table.ColumnHeader>
           </Table.Row>
         </Table.Header>
         <Table.Body>
@@ -92,12 +107,19 @@ export function ExperimentTargetsTable({
                 rank={rank}
                 metric={metric}
                 best={best}
-                leads={isRate && rank === 1 && !topTied && ranked.length > 1}
+                crowned={
+                  isRate &&
+                  rank === 1 &&
+                  !tieNote &&
+                  ranked.length > 1 &&
+                  decidedItems(target, metric) >= MIN_DECIDED_ITEMS_TO_CALL
+                }
+                allTop={ranked.length > 0 && ranked.every((entry) => entry.rank === 1)}
               />
             ),
           )}
         </Table.Body>
-      </Table.Root>
+      </PanelTable>
     </Box>
   );
 }
@@ -108,26 +130,32 @@ function TargetRow({
   rank,
   metric,
   best,
-  leads,
+  crowned,
+  allTop,
 }: {
   target: TargetResult;
   value: number | undefined;
   rank: number;
   metric: ListMetric;
   best: RankedTarget | undefined;
-  leads: boolean;
+  crowned: boolean;
+  allTop: boolean;
 }) {
   const isRate = metric.kind === "passRate";
-  const showGap = isRate && !!best && value !== undefined && best.target.id !== target.id;
+  const leading = rank === 1 && decidedItems(target, metric) >= MIN_DECIDED_ITEMS_TO_CALL;
+  const gap =
+    isRate && best && value !== undefined && best.target.id !== target.id
+      ? gapOf({ a: target, b: best.target, metric, delta: value - best.value })
+      : undefined;
   return (
     <Table.Row data-testid={`target-row-${target.id}`}>
       <Table.Cell>
-        <HStack gap={2}>
+        <HStack gap={2} minWidth={0}>
           {target.model && <ProviderIcon model={target.model} size="comfortable" />}
           <Text lineClamp={1} title={target.label}>
             {target.label}
           </Text>
-          {leads && (
+          {crowned && (
             <Badge size="sm" colorPalette="green" variant="subtle">
               best
             </Badge>
@@ -136,37 +164,56 @@ function TargetRow({
       </Table.Cell>
       <Table.Cell>
         {value === undefined ? (
-          <EmptyValue label="Not scored" />
+          <HStack justify="end">
+            <EmptyValue label="Not scored" />
+          </HStack>
         ) : (
-          <HStack gap={2}>
-            <Text fontWeight={rank === 1 ? "semibold" : "normal"} minWidth="52px">
+          <VStack align="end" gap={0.5}>
+            <Text
+              fontWeight={leading && !allTop ? "semibold" : "medium"}
+              fontVariantNumeric="tabular-nums"
+            >
               {formatMetricValue(metric, value)}
             </Text>
             {isRate && (
               <MeterBar
                 fillRatio={value / 100}
-                width="64px"
-                height="6px"
-                fillColor={rank === 1 ? "blue.solid" : "blue.muted"}
+                width="100%"
+                height="3px"
+                fillColor={leading ? "blue.solid" : "blue.muted"}
               />
             )}
-          </HStack>
+          </VStack>
         )}
       </Table.Cell>
       <Table.Cell>
-        {showGap && (
-          <Text textStyle="caption" color="fg.muted">
-            {gapText({ a: target, b: best.target, metric, delta: value - best.value })}
-          </Text>
+        {gap && (
+          <Badge size="sm" variant="subtle" colorPalette={gap.ahead ? "green" : "red"}>
+            {gap.text}
+          </Badge>
         )}
       </Table.Cell>
-      <Table.Cell textAlign="end">{target.items.toLocaleString("en-US")}</Table.Cell>
-      <Table.Cell textAlign="end">{formatCost(target.costUsd ?? null)}</Table.Cell>
-      <Table.Cell textAlign="end">{formatLatency(target.p50Ms ?? null)}</Table.Cell>
+      <Table.Cell textAlign="end" color="fg.muted" fontVariantNumeric="tabular-nums">
+        {target.items.toLocaleString("en-US")}
+      </Table.Cell>
+      <Table.Cell textAlign="end" color="fg.muted" fontVariantNumeric="tabular-nums">
+        {formatUsd(target.costUsd ?? null)}
+      </Table.Cell>
+      <Table.Cell textAlign="end" color="fg.muted" fontVariantNumeric="tabular-nums">
+        {formatLatency(target.p50Ms ?? null)}
+      </Table.Cell>
       <Table.Cell>
         {target.errors > 0 ? (
-          <Text color="orange.fg" lineClamp={1} title={target.firstError}>
-            {target.errors} {target.errors === 1 ? "error" : "errors"}
+          <Text lineClamp={1} title={target.firstError}>
+            <Text as="span" color="orange.fg">
+              {target.errors} {target.errors === 1 ? "error" : "errors"}
+            </Text>
+            {target.firstError && (
+              <Text as="span" color="fg.muted">
+                {" · “"}
+                {target.firstError}”
+              </Text>
+            )}
           </Text>
         ) : (
           <Text color="fg.muted">none</Text>
@@ -174,19 +221,4 @@ function TargetRow({
       </Table.Cell>
     </Table.Row>
   );
-}
-
-function gapText({
-  a,
-  b,
-  metric,
-  delta,
-}: {
-  a: TargetResult;
-  b: TargetResult;
-  metric: ListMetric;
-  delta: number;
-}): string {
-  if (hasTooFewItems({ a, b, metric })) return "too few items";
-  return isTied({ a, b, metric }) ? "tied" : describeGap(delta);
 }

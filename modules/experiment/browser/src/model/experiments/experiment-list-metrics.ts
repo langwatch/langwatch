@@ -70,7 +70,7 @@ export function metricsOfRuns(runs: ExperimentRun[]): ListMetric[] {
     }
   }
   const byName = (a: [string, string], b: [string, string]) => a[1].localeCompare(b[1]);
-  return [
+  const all = [
     ...[...passFail]
       .toSorted(byName)
       .map(([id, label]): ListMetric => ({ key: id, evaluatorId: id, label, kind: "passRate" })),
@@ -81,12 +81,20 @@ export function metricsOfRuns(runs: ExperimentRun[]): ListMetric[] {
       kind: "score",
     })),
   ];
+  // A measurement ("latency_ms") averaged over models is no score: offered only if nothing else is.
+  const quality = all.filter(
+    (metric) => metric.kind === "passRate" || !isMeasurementName(metric.label),
+  );
+  return quality.length > 0 ? quality : all;
 }
 
-export function defaultMetric(
-  metrics: ListMetric[],
-  listPrimary?: ListPrimaryMetric | null,
-): ListMetric | undefined {
+export function defaultMetric({
+  metrics,
+  listPrimary,
+}: {
+  metrics: ListMetric[];
+  listPrimary?: ListPrimaryMetric | null;
+}): ListMetric | undefined {
   const fromList = listPrimary && metricOfListPrimary(metrics, listPrimary);
   return (
     fromList ??
@@ -106,12 +114,18 @@ function metricOfListPrimary(
 }
 
 /** The person's pick when it still exists, else the default. */
-export function leadMetric(
-  metrics: ListMetric[],
-  chosenKey: string | undefined,
-  listPrimary?: ListPrimaryMetric | null,
-): ListMetric | undefined {
-  return metrics.find((metric) => metric.key === chosenKey) ?? defaultMetric(metrics, listPrimary);
+export function leadMetric({
+  metrics,
+  chosenKey,
+  listPrimary,
+}: {
+  metrics: ListMetric[];
+  chosenKey: string | undefined;
+  listPrimary?: ListPrimaryMetric | null;
+}): ListMetric | undefined {
+  return (
+    metrics.find((metric) => metric.key === chosenKey) ?? defaultMetric({ metrics, listPrimary })
+  );
 }
 
 /** What an opened row says when no evaluator has a number: nothing ran, or only categories. */
@@ -122,21 +136,54 @@ export function noMetricNote(runs: ExperimentRun[]): string {
     : "No scored runs yet.";
 }
 
-/** Whether the cached runs are the ones the list describes: same count, same newest run. */
+type ListedTimestamps = {
+  createdAt?: number | null;
+  finishedAt?: number | null;
+  stoppedAt?: number | null;
+  updatedAt?: number | null;
+};
+
+type ListedRuns = {
+  count: number;
+  latestRun?: { timestamps?: ListedTimestamps | null } | null;
+};
+
+/** What the list says about the newest run, as one string: it changes when the run does. */
+export function listStampOf(runsSummary: ListedRuns): string {
+  const listed = runsSummary.latestRun?.timestamps;
+  return [
+    runsSummary.count,
+    listed?.createdAt,
+    listed?.finishedAt,
+    listed?.stoppedAt,
+    listed?.updatedAt,
+  ]
+    .map((part) => part ?? "")
+    .join(":");
+}
+
+/**
+ * Whether the cached runs are the ones the list describes: same count, same newest run, and that
+ * run in the same state (finished or stopped when the list says so, not touched earlier than it).
+ */
 export function runsAreFresh({
   runs,
   runsSummary,
 }: {
   /** Oldest first. */
   runs: ExperimentRun[];
-  runsSummary: {
-    count: number;
-    latestRun?: { timestamps?: { createdAt?: number | null } | null } | null;
-  };
+  runsSummary: ListedRuns;
 }): boolean {
   if (runs.length === 0 || runs.length !== runsSummary.count) return false;
-  const listed = runsSummary.latestRun?.timestamps?.createdAt;
-  return listed == null || runs.at(-1)!.timestamps.createdAt === listed;
+  const newest = runs.at(-1)!.timestamps;
+  const listed = runsSummary.latestRun?.timestamps;
+  if (!listed) return true;
+  const same = (cached: number | null | undefined, now: number | null | undefined) =>
+    now === undefined || (cached ?? null) === now;
+  if (listed.createdAt != null && newest.createdAt !== listed.createdAt) return false;
+  if (!same(newest.finishedAt, listed.finishedAt)) return false;
+  if (!same(newest.stoppedAt, listed.stoppedAt)) return false;
+  return listed.updatedAt == null || (newest.updatedAt ?? 0) >= listed.updatedAt;
 }
 
 /** Pass rate in percent (one decimal), or the average score; undefined without a value. */
@@ -159,6 +206,14 @@ export function runCost(run: ExperimentRun): number | undefined {
     : (datasetCost ?? 0) + (evaluationsCost ?? 0);
 }
 
+/** A cost the way a scan reads it: "$9.28", "$0.019", "$128"; a dash without one. */
+export function formatUsd(value: number | undefined | null): string {
+  if (value === undefined || value === null) return "–";
+  if (value >= 100) return `$${value.toFixed(0)}`;
+  if (value >= 0.1) return `$${value.toFixed(2)}`;
+  return `$${value.toFixed(3)}`;
+}
+
 export const metricNoun = (metric: ListMetric) =>
   metric.kind === "passRate" ? "pass rate" : "average score";
 
@@ -174,11 +229,17 @@ export function formatScore(value: number): string {
 export const formatMetricValue = (metric: ListMetric, value: number) =>
   metric.kind === "passRate" ? `${value.toFixed(1)}%` : formatScore(value);
 
-export type ChangeInWords = { text: string; tone: "good" | "bad" | "flat" };
+export type ChangeInWords = {
+  /** The chip: "1.3 pt better", "up 0.120", "no change". */
+  text: string;
+  tone: "good" | "bad" | "flat";
+  /** The number of the run it is compared with: "than run #2" follows the chip. */
+  against: number;
+};
 
 /**
- * A change between two values of one metric against an earlier run, in words:
- * "1.3 pt better than run #2", "0.12 higher than run #2", "no change from run #2".
+ * A change between two values of one metric against an earlier run, in words: "1.3 pt better",
+ * "up 0.120", "no change". A score has no stored better direction, so it is only up or down.
  */
 export function describeChange({
   delta,
@@ -191,25 +252,28 @@ export function describeChange({
   against: number;
 }): ChangeInWords {
   const size = Math.abs(delta);
-  const flatText = `no change from run #${against}`;
   if (kind === "score") {
     const flat = Number(formatScore(size).replace(/,/g, "")) === 0;
     return {
-      text: flat
-        ? flatText
-        : `${formatScore(size)} ${delta > 0 ? "higher" : "lower"} than run #${against}`,
+      text: flat ? "no change" : `${delta > 0 ? "up" : "down"} ${formatScore(size)}`,
       tone: "flat",
+      against,
     };
   }
-  if (size < 0.5) return { text: flatText, tone: "flat" };
+  if (size < 0.5) return { text: "no change", tone: "flat", against };
   const better = delta > 0;
   return {
-    text: `${size.toFixed(1)} pt ${better ? "better" : "worse"} than run #${against}`,
+    text: `${size.toFixed(1)} pt ${better ? "better" : "worse"}`,
     tone: better ? "good" : "bad",
+    against,
   };
 }
 
-/** Why the row leads with this metric, for the picker's explanation. */
+/** The menu's one line: what picking does. The long reason lives in the (i) tip. */
+export const metricMenuLine = ({ only }: { only: boolean }): string =>
+  only ? "The only evaluator in this experiment." : "Pick the evaluator this row leads with.";
+
+/** Why the row leads with this metric, for the (i) tip beside the control. */
 export function metricReason({
   metric,
   fallback,
@@ -224,6 +288,12 @@ export function metricReason({
     return `You picked ${metric.label} for this experiment. Without a pick it shows ${fallback?.label}.`;
   return `Shown by default: ${DEFAULT_METRIC_RULE}. ${DEFAULT_METRIC_WHY}`;
 }
+
+export const METRIC_TIP_HOW =
+  "Open the metric button on the row and pick another evaluator. A pass/fail evaluator reads as a pass rate; a score has no stored better direction, so nothing is ranked on it. Latency, duration, token and cost measurements are not offered as scores unless nothing else exists.";
+
+export const METRIC_TIP_SAVED =
+  "Your pick is saved in this browser only, not shared with your team.";
 
 export type ResultSummary = {
   value: number;
@@ -257,7 +327,7 @@ export function changeOfRun({
 }
 
 /** The row's headline: the metric's value in the newest run that has one, and how it moved. */
-export function summarizeResult({
+export function summariseResult({
   runs,
   metric,
 }: {
@@ -293,7 +363,7 @@ export function headlineFromList(
       value: Math.round(primary.averagePassed * 1000) / 10,
     };
   }
-  if (primary.averageScore === null) return undefined;
+  if (primary.averageScore === null || isMeasurementName(primary.name)) return undefined;
   return { metric: { ...base, kind: "score" }, value: primary.averageScore };
 }
 
@@ -317,7 +387,7 @@ export function headlineOf({
   metric: ListMetric | undefined;
   listPrimary: ListPrimaryMetric | null | undefined;
 }): ResultHeadline | undefined {
-  const result = metric ? summarizeResult({ runs, metric }) : undefined;
+  const result = metric ? summariseResult({ runs, metric }) : undefined;
   if (!metric || !result) return headlineFromList(listPrimary);
   const { runNumber, newerRunNumber } = result;
   return {
@@ -328,4 +398,38 @@ export function headlineOf({
         ? undefined
         : `run #${runNumber}; #${newerRunNumber} has no ${metric.label} score`,
   };
+}
+
+/** Runs a sparkline needs before it says anything. */
+export const SPARKLINE_MIN_RUNS = 3;
+const SPARKLINE_MAX_RUNS = 20;
+
+/** The metric's pooled value over the latest runs, oldest first; empty under three values. */
+export function sparklineOf({
+  runs,
+  metric,
+}: {
+  /** Oldest first. */
+  runs: ExperimentRun[];
+  metric: ListMetric;
+}): number[] {
+  const values = runs
+    .slice(-SPARKLINE_MAX_RUNS)
+    .map((run) => pooledValue(run, metric))
+    .filter((value): value is number => value !== undefined);
+  return values.length >= SPARKLINE_MIN_RUNS ? values : [];
+}
+
+export type CellProgress = { done: number; total: number };
+
+/** Cells done of cells in total for a run: only the workbench counts cells, not the SDK. */
+export function cellProgressOf({
+  run,
+  workbench,
+}: {
+  run: ExperimentRun | undefined;
+  workbench: boolean;
+}): CellProgress | undefined {
+  if (!workbench || !run?.total) return undefined;
+  return { done: run.progress ?? 0, total: run.total };
 }

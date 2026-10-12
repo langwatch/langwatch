@@ -5,12 +5,14 @@ import { describe, expect, it } from "vitest";
 import type { ListMetric } from "../experiment-list-metrics.ts";
 import {
   describeGap,
+  gapOf,
   hasTooFewItems,
   isTied,
   median,
   rankTargets,
   targetResultsOf,
   targetValue,
+  tieNoteOf,
 } from "../experiment-list-targets.ts";
 
 const metric: ListMetric = { key: "c", evaluatorId: "c", label: "correct", kind: "passRate" };
@@ -162,6 +164,49 @@ describe("given two pass rates", () => {
   });
 });
 
+describe("given pass rates over fewer decided items than rows", () => {
+  /** 1,000 rows each, but only the first `decided` rows have a verdict. */
+  const decidedOf = ({ passed, decided }: { passed: number; decided: number }) => {
+    const [target] = targetResultsOf(runOf([{ id: "t1", n: 1000, passed: 1000 }]));
+    const full = runOf([{ id: "t1", n: 1000, passed: 0 }]);
+    return {
+      ...target!,
+      evaluators: { c: { passed, failed: decided - passed, scores: [] } },
+      items: full.dataset.length,
+    };
+  };
+
+  /** @scenario A gap is judged over the items that were decided */
+  it("sizes the interval by decided items, not by rows", () => {
+    // 30/40 against 22/40: a 20 pt gap that is noise at 40 decided items, real at 1,000
+    const a = decidedOf({ passed: 30, decided: 40 });
+    const b = decidedOf({ passed: 22, decided: 40 });
+    expect(isTied({ a, b, metric })).toBe(true);
+    const wide = (target: typeof a, passed: number) => ({
+      ...target,
+      evaluators: { c: { passed, failed: 1000 - passed, scores: [] } },
+    });
+    expect(isTied({ a: wide(a, 750), b: wide(b, 550), metric })).toBe(false);
+  });
+});
+
+describe("given a leader with enough items and a target with too few", () => {
+  /** @scenario Too few items are never crowned */
+  it("does not rank the thin target beside the leader", () => {
+    const targets = targetResultsOf(
+      runOf([
+        { id: "t1", n: 100, passed: 90 },
+        { id: "t2", n: 5, passed: 4 },
+      ]),
+    );
+    const ranked = rankTargets({ targets, metric });
+    expect(ranked.map((entry) => [entry.target.id, entry.rank])).toEqual([
+      ["t1", 1],
+      ["t2", 2],
+    ]);
+  });
+});
+
 describe("given a run with failed evaluations", () => {
   it("leaves status error out of the tallies", () => {
     const run = runOf([{ id: "t1", n: 4, passed: 2 }]);
@@ -212,5 +257,74 @@ describe("given several targets", () => {
 
   it("has no median of nothing", () => {
     expect(median([])).toBeUndefined();
+  });
+});
+
+describe("given three targets inside each other's interval", () => {
+  /** @scenario A tie is said once above the target table */
+  it("says no clear winner once, naming how many are within noise", () => {
+    const targets = targetResultsOf(
+      runOf([
+        { id: "t1", n: 1000, passed: 838 },
+        { id: "t2", n: 1000, passed: 836 },
+        { id: "t3", n: 1000, passed: 831 },
+      ]),
+    );
+    const ranked = rankTargets({ targets, metric });
+    expect(tieNoteOf({ ranked, tooFew: false })).toEqual({
+      lead: "No clear winner:",
+      rest: "all 3 within noise (gaps inside the 95% interval).",
+    });
+  });
+
+  it("names the top few when a lower target is clearly behind", () => {
+    const targets = targetResultsOf(
+      runOf([
+        { id: "t1", n: 1000, passed: 838 },
+        { id: "t2", n: 1000, passed: 836 },
+        { id: "t3", n: 1000, passed: 600 },
+      ]),
+    );
+    const note = tieNoteOf({ ranked: rankTargets({ targets, metric }), tooFew: false });
+    expect(note?.rest).toContain("the top 2");
+  });
+
+  it("says too few items instead when a target has under ten decided items", () => {
+    const targets = targetResultsOf(
+      runOf([
+        { id: "t1", n: 5, passed: 5 },
+        { id: "t2", n: 5, passed: 0 },
+      ]),
+    );
+    const note = tieNoteOf({ ranked: rankTargets({ targets, metric }), tooFew: true });
+    expect(note?.lead).toBe("Too few items to call a winner:");
+  });
+
+  it("says nothing with a single leader", () => {
+    const targets = targetResultsOf(
+      runOf([
+        { id: "t1", n: 100, passed: 90 },
+        { id: "t2", n: 100, passed: 50 },
+      ]),
+    );
+    expect(tieNoteOf({ ranked: rankTargets({ targets, metric }), tooFew: false })).toBeUndefined();
+  });
+});
+
+describe("given the gap between two targets", () => {
+  /** @scenario A target is compared with the top target in words */
+  it("reads points behind for a clear gap and nothing inside the noise", () => {
+    const [top, behind, near] = targetResultsOf(
+      runOf([
+        { id: "t1", n: 1000, passed: 838 },
+        { id: "t2", n: 1000, passed: 700 },
+        { id: "t3", n: 1000, passed: 836 },
+      ]),
+    );
+    expect(gapOf({ a: behind!, b: top!, metric, delta: -13.8 })).toEqual({
+      text: "13.8 pt behind",
+      ahead: false,
+    });
+    expect(gapOf({ a: near!, b: top!, metric, delta: -0.2 })).toBeUndefined();
   });
 });
