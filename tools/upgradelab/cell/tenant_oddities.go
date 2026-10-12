@@ -21,6 +21,8 @@ const (
 	oddPrompt        = "upgradelab-untagged-prompt"
 	oddHeldProvider  = "samlp|upgradelab-held"
 	actionNeededCard = "Action needed for updates"
+	// secretHealStep ends every drifted user "migrated" by design (never finalized), so it is no held organization.
+	secretHealStep = "identity-d01-secret-heal"
 )
 
 var oddDatasetMarkers = []string{"odd-row-alpha", "odd-row-bravo", "odd-row-charlie"}
@@ -235,7 +237,7 @@ func (cell *run) readOddFacts(ctx context.Context, onHead bool) oddFacts {
 		facts.ReadErr = errors.Join(errs...)
 		return facts
 	}
-	facts.OtherHeld, err = cell.legacyOrgStanding(ctx, `SELECT "migrationName" || ':' || "tenantId" || ':' || status FROM mydb."SystemMigrationTenantState" WHERE status IN ('migrated', 'parked') AND "tenantId" <> `+sqlQuote(odd.held.org)+` ORDER BY 1`)
+	facts.OtherHeld, err = cell.legacyOrgStanding(ctx, `SELECT "migrationName" || ':' || "tenantId" || ':' || status FROM mydb."SystemMigrationTenantState" WHERE "migrationName" <> '`+secretHealStep+`' AND status IN ('migrated', 'parked') AND "tenantId" <> `+sqlQuote(odd.held.org)+` ORDER BY 1`)
 	errs = append(errs, err)
 	facts.ProvidersRead, facts.ProvidersBody = cell.oddGet(ctx, "/api/model-providers", odd.keysAPIKey)
 	facts.DatasetRead, facts.DatasetBody = cell.oddGet(ctx, "/api/dataset/"+oddDataset, odd.keysAPIKey)

@@ -156,7 +156,7 @@ var invariantNames = map[string]string{
 	"E14": "SCIM: users and a group provisioned on main keep their membership on head through main's token, and a push on head lands",
 	"E11": "an organization on main's old per-organization SSO (legacy columns, no connection) is grandfathered onto a connection, its member signs in on head and Ops shows the migration inventory",
 	"E15": "the mixed legacy-SSO organization's administrator sees the hint to move its legacy domain in SSO settings",
-	"A1":  "tenant oddities: the held organization stays held alone, Ops > Upgrades > Organizations names it and Home shows Action needed for updates to an operator",
+	"A1":  "tenant oddities: the held organization stays held alone and Ops > Upgrades > Organizations names it (Home's Action needed card is for operator steps, not held organizations)",
 	"A2":  "tenant oddities: plaintext provider keys are sealed and still read through head",
 	"A3":  "tenant oddities: dataset rows main kept in Postgres are kept and read through head",
 	"A4":  "tenant oddities: an organization with prompts and no tags gets its tags and its prompt still opens",
