@@ -126,6 +126,8 @@ jobs:
       # The upgrade preflight and the api both refuse a missing api-key pepper; a fixed non-secret CI value.
       API_KEY_PEPPER: synthetic-api-key-pepper
       LW_BASE_URL: http://localhost:5560
+      # The hosted MCP endpoint refuses to boot without a public base URL.
+      BASE_HOST: "http://localhost:5560"
       # Provider creds — set as repo/org secrets, NOT committed.
       OPENAI_API_KEY: ${{ secrets.MATRIX_OPENAI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.MATRIX_ANTHROPIC_API_KEY }}
