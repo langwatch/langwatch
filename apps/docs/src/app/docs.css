@@ -758,23 +758,15 @@ body {
   height: 14px;
 }
 
-.docs-agent-start {
-  background: var(--chakra-colors-docs-paper);
-  border-color: var(--chakra-colors-border-emphasized);
-}
 .docs-agent-start [data-docs-agent] {
-  background: var(--chakra-colors-docs-paper);
+  background: transparent;
   color: var(--chakra-colors-fg);
   border-color: var(--chakra-colors-border);
-  gap: 8px;
-}
-.docs-agent-start [data-docs-agent]:hover {
-  background: var(--chakra-colors-bg-hover);
 }
 .docs-agent-start [data-docs-agent][aria-pressed="true"] {
-  background: var(--chakra-colors-accent-subtle);
-  border-color: var(--chakra-colors-accent-fg);
-  color: var(--chakra-colors-accent-fg);
+  background: var(--chakra-colors-blue-subtle);
+  color: var(--chakra-colors-blue-fg);
+  border-color: var(--chakra-colors-blue-fg);
 }
 .docs-agent-check {
   visibility: hidden;

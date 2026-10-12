@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { Box, Button, Flex, Link, Text } from "@langwatch/design-system/primitives";
 import { ArrowRight, Check, ChevronDown, Copy, FileText, Terminal } from "lucide-react";
 import { useState } from "react";
@@ -14,7 +15,7 @@ const AGENTS = [
 
 function PromptPreview({ prompt, action }: { prompt: string; action: ReactNode }) {
   return (
-    <Box borderWidth="1px" borderColor="border" borderRadius="xl" overflow="hidden" bg="bg.subtle">
+    <Card variant="nested" tone="neutral" padding="none">
       <Flex padding="4" gap="3" alignItems="center" justifyContent="space-between" wrap="wrap">
         <Flex gap="2" alignItems="center" color="fg" fontSize="14px" fontWeight="600">
           <FileText size={16} aria-hidden="true" /> Setup prompt
@@ -71,7 +72,7 @@ function PromptPreview({ prompt, action }: { prompt: string; action: ReactNode }
           {prompt}
         </Box>
       </Box>
-    </Box>
+    </Card>
   );
 }
 
@@ -79,107 +80,103 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
   const [agent, setAgent] = useState("Claude Code");
   const { state, copy, ready } = useCopy();
   return (
-    <Box
-      className="docs-agent-start"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      overflow="hidden"
-      marginY="6"
-    >
-      <Box padding={{ base: "5", md: "7" }}>
-        <Flex gap="3" alignItems="center" marginBottom="4">
-          <Terminal size={22} strokeWidth={1.7} aria-hidden="true" />
-          <Text as="div" fontSize="20px" lineHeight="28px" fontWeight="600" color="fg" margin="0">
-            Let your coding agent set it up
+    <Box className="docs-agent-start" marginY="6">
+      <Card variant="nested" tone="blue" padding="none">
+        <Box padding={{ base: "5", md: "7" }}>
+          <Flex gap="3" alignItems="center" marginBottom="4" color="blue.fg">
+            <Terminal size={22} strokeWidth={1.7} aria-hidden="true" />
+            <Text as="div" fontSize="20px" lineHeight="28px" fontWeight="600" color="fg" margin="0">
+              Let your coding agent set it up
+            </Text>
+          </Flex>
+          <Text as="div" fontSize="15px" lineHeight="25px" color="docs.lede" marginBottom="5">
+            Add tracing to the project you already have. Your agent can find the right SDK and
+            instrument your code.
           </Text>
-        </Flex>
-        <Text as="div" fontSize="15px" lineHeight="25px" color="docs.lede" marginBottom="5">
-          Add tracing to the project you already have. Your agent can find the right SDK and
-          instrument your code.
-        </Text>
-        <Flex as="fieldset" aria-label="Your coding agent" gap="2" wrap="wrap" marginBottom="5">
-          {AGENTS.map(({ name, logo }) => (
-            <Button
-              data-docs-agent={name}
-              key={name}
-              variant="outline"
-              colorPalette="gray"
-              size="sm"
-              flex={{ base: "1", md: "initial" }}
-              minHeight="40px"
-              disabled={!ready}
-              aria-pressed={agent === name}
-              onClick={() => setAgent(name)}
-              bg={agent === name ? "accent.subtle" : "transparent"}
-              color={agent === name ? "accent.fg" : "fg"}
-              borderColor={agent === name ? "accent.fg" : "border"}
-              _hover={{ bg: "bg.hover" }}
-            >
-              <img
-                src={sitePath({ path: `/images/logos/${logo}.svg` })}
-                width={20}
-                height={20}
-                alt=""
-                className="docs-agent-logo"
-              />
-              {name}
-              <Check size={14} className="docs-agent-check" aria-hidden="true" />
-            </Button>
-          ))}
-        </Flex>
-        <PromptPreview
-          prompt={prompt}
-          action={
-            <Button
-              size="sm"
-              minHeight="40px"
-              variant="outline"
-              colorPalette="gray"
-              disabled={!ready}
-              data-docs-prompt=""
-              onClick={() => copy({ text: prompt })}
-            >
-              {state === "copied" ? <Check size={16} /> : <Copy size={16} />}
-              {state === "copied" ? "Prompt copied" : "Copy setup prompt"}
-            </Button>
-          }
-        />
-        <Text as="div" fontSize="14px" lineHeight="24px" color="docs.body" marginTop="4">
-          Open your project in <span data-docs-agent-name="">{agent}</span>, then paste the prompt.
-        </Text>
-        <Text
-          as="output"
-          aria-live="polite"
-          fontSize="13px"
-          color={state === "failed" ? "red.fg" : "docs.lede"}
-          display="block"
-          marginTop="3"
-          minHeight="0"
-          marginBottom="0"
+          <Flex as="fieldset" aria-label="Your coding agent" gap="2" wrap="wrap" marginBottom="5">
+            {AGENTS.map(({ name, logo }) => (
+              <Button
+                data-docs-agent={name}
+                key={name}
+                variant="outline"
+                colorPalette="gray"
+                size="sm"
+                flex={{ base: "1", md: "initial" }}
+                minHeight="40px"
+                disabled={!ready}
+                aria-pressed={agent === name}
+                onClick={() => setAgent(name)}
+                bg={agent === name ? "blue.subtle" : "transparent"}
+                color={agent === name ? "blue.fg" : "fg"}
+                borderColor={agent === name ? "blue.fg" : "border"}
+                _hover={{ bg: "bg.hover" }}
+              >
+                <img
+                  src={sitePath({ path: `/images/logos/${logo}.svg` })}
+                  width={20}
+                  height={20}
+                  alt=""
+                  className="docs-agent-logo"
+                />
+                {name}
+                <Check size={14} className="docs-agent-check" aria-hidden="true" />
+              </Button>
+            ))}
+          </Flex>
+          <PromptPreview
+            prompt={prompt}
+            action={
+              <Button
+                size="sm"
+                minHeight="40px"
+                variant="subtle"
+                colorPalette="blue"
+                disabled={!ready}
+                data-docs-prompt=""
+                onClick={() => copy({ text: prompt })}
+              >
+                {state === "copied" ? <Check size={16} /> : <Copy size={16} />}
+                {state === "copied" ? "Prompt copied" : "Copy setup prompt"}
+              </Button>
+            }
+          />
+          <Text as="div" fontSize="14px" lineHeight="24px" color="docs.body" marginTop="4">
+            Open your project in <span data-docs-agent-name="">{agent}</span>, then paste the
+            prompt.
+          </Text>
+          <Text
+            as="output"
+            aria-live="polite"
+            fontSize="13px"
+            color={state === "failed" ? "red.fg" : "docs.lede"}
+            display="block"
+            marginTop="3"
+            minHeight="0"
+            marginBottom="0"
+          >
+            {state === "failed"
+              ? "Copy failed. Open the skills directory to select the full prompt."
+              : ""}
+          </Text>
+        </Box>
+        <Flex
+          borderTopWidth="1px"
+          borderColor="border"
+          paddingX={{ base: "5", md: "7" }}
+          paddingY="4"
+          gap="4"
+          justifyContent="space-between"
+          wrap="wrap"
+          fontSize="14px"
         >
-          {state === "failed"
-            ? "Copy failed. Open the skills directory to select the full prompt."
-            : ""}
-        </Text>
-      </Box>
-      <Flex
-        borderTopWidth="1px"
-        borderColor="border"
-        paddingX={{ base: "5", md: "7" }}
-        paddingY="4"
-        gap="4"
-        justifyContent="space-between"
-        wrap="wrap"
-        fontSize="14px"
-      >
-        <Link href={pagePath({ slug: "integration/quick-start" })} color="fg" gap="2">
-          Set up manually <ArrowRight size={14} />
-        </Link>
-        <Link href={pagePath({ slug: "skills/directory" })} color="fg" gap="2">
-          Explore all skills <ArrowRight size={14} />
-        </Link>
-      </Flex>
+          <Link href={pagePath({ slug: "integration/quick-start" })} color="fg" gap="2">
+            Set up manually <ArrowRight size={14} />
+          </Link>
+          <Link href={pagePath({ slug: "skills/directory" })} color="fg" gap="2">
+            Explore all skills <ArrowRight size={14} />
+          </Link>
+        </Flex>
+      </Card>
     </Box>
   );
 }
