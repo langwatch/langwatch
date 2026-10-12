@@ -200,11 +200,13 @@ catalogs:
 linkWorkspacePackages: false
 workspaceConcurrency: 2
 
-# OpenTelemetry's ESM loader shims must sit at the top of node_modules, or its
-# instrumentation cannot patch them. Moved from .npmrc, which pnpm 11+ reads for auth only.
+# OpenTelemetry's loader shims and its API sit at the top of node_modules: instrumentation
+# patches the shims, and the image resolves the SDK's @opentelemetry/api peer from there.
+# Moved from .npmrc, which pnpm 11+ reads for auth only.
 publicHoistPattern:
   - '*import-in-the-middle*'
   - '*require-in-the-middle*'
+  - '@opentelemetry/api'
 
 # pnpm 11+ installs before `pnpm run` when deps look stale; lanes share one checkout.
 verifyDepsBeforeRun: false
