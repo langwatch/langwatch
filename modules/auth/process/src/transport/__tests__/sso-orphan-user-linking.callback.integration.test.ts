@@ -125,6 +125,7 @@ function hooksRepositoryOver({ db }: { db: MemoryDb }): BetterAuthHooksRepositor
         deactivatedAt: null,
         pendingSsoSetup: false,
         signupConfirmationPending: false,
+        lastLoginAt: null,
         emailVerified: row.emailVerified === true,
       };
     },

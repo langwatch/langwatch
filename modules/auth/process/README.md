@@ -770,26 +770,14 @@ interface Output {
 // auth.browserSessions
 // Input: inline, ../contract/src/auth.trpc.ts:91
 type Input = Record<string, unknown>;
-// Output: inline, ../contract/src/auth.trpc.ts:92
-type Output = {
-  sessionId: string;
-  identifierId: string | null;
-  method: string;
-  secondFactorProven: boolean;
-  ipAddress: string | null;
-  userAgent: string | null;
-  signedInAt: string;
-  lastActiveAt: string;
-  expiresAt: string;
-  current: boolean;
-}[];
+// Output: browserSessionInventoryEntrySchema.array() (inline, ../contract/src/auth.trpc.ts:92)
 
 // auth.endBrowserSession
-// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:124
+// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:126
 interface Input {
   sessionId: string;
 }
-// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:134
+// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:136
 interface Output {
   ended: number;
 }

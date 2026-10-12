@@ -222,6 +222,7 @@ export const prismaModelFieldCatalogue = {
     "userAgent",
     "identifierId",
     "amr",
+    "startedBySignUp",
     "impersonating",
     "actorUserId",
     "subjectUserId",

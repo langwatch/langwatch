@@ -29,6 +29,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
         deactivatedAt: true,
         pendingSsoSetup: true,
         signupConfirmationPending: true,
+        lastLoginAt: true,
       },
     });
     if (user === null) throw new UserNotFoundError(userId);
@@ -36,6 +37,7 @@ export class PrismaBetterAuthHooksRepository extends BetterAuthHooksRepository {
     return {
       ...user,
       deactivatedAt: user.deactivatedAt === null ? null : fromDate(user.deactivatedAt),
+      lastLoginAt: user.lastLoginAt === null ? null : fromDate(user.lastLoginAt),
     };
   }
 

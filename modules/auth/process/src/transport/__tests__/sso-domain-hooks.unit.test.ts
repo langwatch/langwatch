@@ -135,6 +135,7 @@ function accountRepo({
       name: null,
       pendingSsoSetup: false,
       signupConfirmationPending: false,
+      lastLoginAt: null,
       emailVerified: true,
     }),
     findBySsoDomain: vi

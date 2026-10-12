@@ -41,9 +41,14 @@ test.describe("Passkeys", () => {
 
     const authenticator = await addVirtualAuthenticator(page);
     try {
-      // ── #5 (positive half): the nudge appears after a PASSWORD sign-in ──
+      // The account's first sign-in is the session its sign-up started, which
+      // the offer waits past; the next one, seconds later, is offered it.
       await whenISignInWithPassword(page, { email, password });
       await givenMyAccountHasAWorkspace(page);
+      await whenISignOut(page);
+
+      // ── #5 (positive half): the nudge appears after a PASSWORD sign-in ──
+      await whenISignInWithPassword(page, { email, password });
       await page.goto("/settings");
 
       // This account's address is confirmed and `@langwatch.ai`, so the shell

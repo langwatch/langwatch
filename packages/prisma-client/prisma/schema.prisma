@@ -115,6 +115,10 @@ model Session {
   /// factor reads this when a member reaches its data; it is never read at
   /// mint and never ends a session.
   amr                    String[]  @default([])
+  /// Minted while the account had never signed in: the session its sign-up
+  /// started, which skips the secure-account offer. False on every later one
+  /// and on every session that predates the column (specs/identity/passkeys.feature).
+  startedBySignUp        Boolean   @default(false)
   /// The legacy impersonation payload. NOTHING READS OR WRITES IT any more -
   /// the {actor, subject} columns below replaced it, and the migration beside
   /// them ended every session that still carried a value.

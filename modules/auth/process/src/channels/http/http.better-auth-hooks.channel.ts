@@ -852,14 +852,29 @@ export function createBeforeSessionCreateHook({
       });
     }
     const claims = await mintClaims({ userId: session.userId, path, context, sessionClaims });
-    if (claims.identifierId === null && claims.amr.length === 0) return undefined;
-    return {
-      data: {
-        ...session,
-        amr: [...claims.amr],
-        ...(claims.identifierId === null ? {} : { identifierId: claims.identifierId }),
-      },
-    };
+    // An account that never signed in is minting the session its sign-up started.
+    return mintedSession({ session, claims, startedBySignUp: user?.lastLoginAt === null });
+  };
+}
+
+/** What the hook writes on the session row; nothing when there is nothing to record. */
+function mintedSession<T extends object>({
+  session,
+  claims,
+  startedBySignUp,
+}: {
+  session: T;
+  claims: SessionClaims;
+  startedBySignUp: boolean;
+}) {
+  if (claims.identifierId === null && claims.amr.length === 0 && !startedBySignUp) return undefined;
+  return {
+    data: {
+      ...session,
+      amr: [...claims.amr],
+      ...(claims.identifierId === null ? {} : { identifierId: claims.identifierId }),
+      ...(startedBySignUp ? { startedBySignUp: true } : {}),
+    },
   };
 }
 

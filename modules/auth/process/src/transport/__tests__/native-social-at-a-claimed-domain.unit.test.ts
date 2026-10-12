@@ -57,6 +57,7 @@ function repoFor({
       deactivatedAt: null,
       pendingSsoSetup: false,
       signupConfirmationPending: false,
+      lastLoginAt: null,
       emailVerified: true,
     }),
     countAccountsForUser: async () => 1,

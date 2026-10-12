@@ -7,7 +7,7 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { fromDate, nowInstant, Temporal, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   AdoptUnconfirmedAccountOutcome,
   CreatePasskeyUserInput,
@@ -101,9 +101,6 @@ const logger = createLogger("langwatch:user-app");
  * on signup day is asked again once they have something worth protecting.
  */
 const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
-
-/** A session started this soon after the account was created is the sign-up's own. */
-const SIGN_UP_SESSION_WINDOW_MS = 60_000;
 
 /** Each upload writes bytes to object storage and updates the row. */
 const AVATAR_UPLOAD_BUDGET = { windowSeconds: 60, max: 10 } as const;
@@ -457,9 +454,8 @@ export class UserModule implements UserApi {
     const passkey = this.#facts.passkeysEnabled && !nudge.hasPasskey;
     const twoStep = this.#facts.mfaEnrollmentOpen && !nudge.twoStepEnabled;
     if (!passkey && !twoStep) return { offer: false, passkey, twoStep, signedInWith };
-    // A brand-new account is onboarding: the offer waits for its next sign-in.
-    const accountCreatedAt = fromDate(nudge.accountCreatedAt);
-    if (await this.#isSignUpSession({ ...input, accountCreatedAt })) {
+    // The session the sign-up started is onboarding: the offer waits for the next sign-in.
+    if (await this.#isSignUpSession(input)) {
       return { offer: false, passkey, twoStep, signedInWith };
     }
 
@@ -473,21 +469,14 @@ export class UserModule implements UserApi {
   async #isSignUpSession({
     id,
     sessionId,
-    accountCreatedAt,
-  }: UserIdInput & { sessionId: string | null; accountCreatedAt: Instant }): Promise<boolean> {
+  }: UserIdInput & { sessionId: string | null }): Promise<boolean> {
     if (!sessionId) return false;
     const sessions = await this.#authReads.listBrowserSessions({
       userId: id,
       currentSessionId: sessionId,
     });
-    const current = sessions.find((session) => session.sessionId === sessionId);
-    if (!current) return false;
 
-    const signedInAt = Temporal.Instant.from(current.signedInAt);
-
-    return (
-      signedInAt.epochMilliseconds - accountCreatedAt.epochMilliseconds < SIGN_UP_SESSION_WINDOW_MS
-    );
+    return sessions.some((session) => session.sessionId === sessionId && session.startedBySignUp);
   }
 
   /** "Not now" to the whole offer, dated rather than flagged: it comes back. */

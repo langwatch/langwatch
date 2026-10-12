@@ -2045,19 +2045,7 @@ type Output = z.infer<typeof cliSessionRevocationSchema>; // ../contract/src/fea
 // personalSessions.listWebSessions
 // Input: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:28
 type Input = Record<string, unknown>;
-// Output: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:29
-type Output = {
-  sessionId: string;
-  identifierId: string | null;
-  method: string;
-  secondFactorProven: boolean;
-  ipAddress: string | null;
-  userAgent: string | null;
-  signedInAt: string;
-  lastActiveAt: string;
-  expiresAt: string;
-  current: boolean;
-}[];
+// Output: browserSessionInventoryEntrySchema.array() (inline, ../contract/src/features/personal/personal-sessions.trpc.ts:29)
 
 // personalSessions.revokeWebSession
 // Input: inline, ../contract/src/features/personal/personal-sessions.trpc.ts:32

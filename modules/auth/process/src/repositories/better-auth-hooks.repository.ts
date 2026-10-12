@@ -12,6 +12,8 @@ export type BetterAuthHookUser = {
   pendingSsoSetup: boolean;
   /** A password sign-up still awaiting its emailed proof: no session until it lands. */
   signupConfirmationPending: boolean;
+  /** Null until the account's first session: the one its sign-up started. */
+  lastLoginAt: Instant | null;
 };
 
 /** One federated account row, with the id a retirement deletes it by. */
