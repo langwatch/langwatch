@@ -3,6 +3,7 @@ package aigateway
 // Binds specs/ai-gateway/voice-media-relay.feature.
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func TestMediaRelayOptions_CarryTheHopSettingsFromTheConfiguration(t *testing.T)
 	cfg.RelayHopAddr = "0.0.0.0:6000"
 	cfg.Voice.HopTimeoutSeconds = 5
 	cfg.Voice.MaxHopDials = 9
-	cfg.Voice.RelayIDKey = "k-0123456789-0123456789-0123456789"
+	cfg.Voice.RelayIDKey = strings.Repeat("k", 32)
 
 	opts := mediaRelayOptions(cfg, zap.NewNop(), nil)
 
