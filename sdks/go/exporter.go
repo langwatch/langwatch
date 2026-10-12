@@ -2,6 +2,7 @@ package langwatch
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +17,10 @@ const (
 	// TracesPath is the OTLP traces endpoint path.
 	TracesPath = "/api/otel/v1/traces"
 )
+
+// ErrNilTransportExporter is returned by NewExporter when a custom
+// ExporterTransport returns neither an exporter nor an error.
+var ErrNilTransportExporter = errors.New("langwatch: ExporterTransport returned a nil exporter")
 
 // LangWatchExporter exports spans to LangWatch with optional filtering.
 // It wraps an OTLP/HTTP trace exporter with auto-configuration and filter
@@ -181,6 +186,9 @@ func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporte
 	if cfg.transport != nil {
 		if transport, err = cfg.transport(ctx, endpointURL, headers); err != nil {
 			return nil, err
+		}
+		if transport == nil {
+			return nil, ErrNilTransportExporter
 		}
 	} else {
 		transport = otlpjson.New(otlpjson.Config{
