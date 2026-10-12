@@ -2287,6 +2287,9 @@ same ordered stream; every consumer registers drain-first on the server.
 There is one kind of event: an event an upgrade step records goes to every projection, subscriber
 and process manager like any other, whatever its data says (a `backfilled` field is data a consumer
 may read, never routing); the queue carries the volume (Alex, 2026-10-12).
+A request that needs its own write folded (a grant before a run key is issued) waits at most
+10 seconds for the projection, the same wait everywhere, then answers pending and the caller retries;
+no write jumps the queue and no projection is folded inline (Alex, 2026-10-12).
 The hand-off from an append to its projections, subscribers and process managers is durable: a
 lane that cannot be staged is recorded in the process store's outbox and re-driven, a fold or state
 projection by a rebuild job in the aggregate's own ordered lane, so it cannot race live folds, never
