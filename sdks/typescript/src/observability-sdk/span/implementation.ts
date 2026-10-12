@@ -7,7 +7,6 @@ import {
   type Link,
   type Exception,
 } from "@opentelemetry/api";
-import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 
 import { type Prompt } from "@/client-sdk/services/prompts";
 
@@ -15,6 +14,7 @@ import { type ChatMessage, type SpanInputOutput } from "../../internal/generated
 import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
 import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
 import * as intSemconv from "../semconv/attributes";
+import * as otelSemconv from "../semconv/otel";
 import { processSpanInputOutput } from "./input-output";
 import {
   type SimpleChatMessage,
@@ -109,11 +109,11 @@ class LangWatchSpanInternal implements LangWatchSpan {
   }
 
   setRequestModel(model: string): this {
-    return this.setAttribute(semconv.ATTR_GEN_AI_REQUEST_MODEL, model);
+    return this.setAttribute(otelSemconv.ATTR_GEN_AI_REQUEST_MODEL, model);
   }
 
   setResponseModel(model: string): this {
-    return this.setAttribute(semconv.ATTR_GEN_AI_RESPONSE_MODEL, model);
+    return this.setAttribute(otelSemconv.ATTR_GEN_AI_RESPONSE_MODEL, model);
   }
 
   setRAGContexts(ragContexts: LangWatchSpanRAGContext[]): this {

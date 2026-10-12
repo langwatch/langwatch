@@ -1,4 +1,4 @@
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import {
@@ -17,7 +17,7 @@ const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatc
 const DEFAULT_URL = `${DEFAULT_ENDPOINT}${TRACES_PATH}`;
 
 // Mock the OTLP exporter
-vi.mock("@opentelemetry/exporter-trace-otlp-http", () => {
+vi.mock("@opentelemetry/exporter-trace-otlp-proto", () => {
   const Ctor: any = vi.fn(function (this: any, config: any) {
     this.config = config;
     this.url = config.url;

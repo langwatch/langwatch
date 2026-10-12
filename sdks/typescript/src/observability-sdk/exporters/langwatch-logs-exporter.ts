@@ -1,4 +1,4 @@
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
 
 import {
   DEFAULT_ENDPOINT,

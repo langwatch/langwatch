@@ -45,6 +45,13 @@ export default defineConfig([
     clean: false,
     format: ["cjs", "esm"],
     dts: true,
+    // ESM keeps import.meta (every ESM loader has it) while the rest stays
+    // es2017; the Node setup resolves its optional peers from that URL.
+    esbuildOptions(options, { format }) {
+      const url = format === "esm" ? "import.meta.url" : "undefined";
+      options.define = { ...options.define, __ESM_MODULE_URL__: url };
+      if (format === "esm") options.supported = { ...options.supported, "import-meta": true };
+    },
     sourcemap: true,
     noExternal,
     define,
@@ -107,7 +114,9 @@ export default defineConfig([
     // `pnpm build`, and use the local dist/cli/bundle.js.map -- esbuild
     // output is deterministic, so it matches what shipped.
     sourcemap: true,
-    noExternal,
+    // `@opentelemetry/api` is a peer of the library, so tsup would leave it
+    // external; `npx langwatch` has no host app to supply it.
+    noExternal: [...noExternal, /^@opentelemetry\/api(\/|$)/],
     define,
     tsconfig,
     onSuccess: async () => {

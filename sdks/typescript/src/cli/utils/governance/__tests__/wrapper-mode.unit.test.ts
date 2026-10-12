@@ -418,7 +418,7 @@ describe("resolveWrapperMode", () => {
       expect(out.vars.OTEL_EXPORTER_OTLP_HEADERS).toContain(
         "Authorization=Bearer sk-lw-copilot-test-token",
       );
-      expect(out.vars.OTEL_EXPORTER_OTLP_PROTOCOL).toBe("http/json");
+      expect(out.vars.OTEL_EXPORTER_OTLP_PROTOCOL).toBe("http/protobuf");
       expect(out.vars.OTEL_RESOURCE_ATTRIBUTES).toBe("service.name=copilot-cli");
     });
 
