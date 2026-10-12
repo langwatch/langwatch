@@ -186,12 +186,17 @@ const licensePublicKeyEnv = "LANGWATCH_LICENSE_PUBLIC_KEY"
 // "". The haven path needs neither: haven inherits the shell, and
 // havenrun.CopyEnvFiles copies the root .env into both worktrees.
 func licensePublicKey(branchDir string) string {
-	if value := os.Getenv(licensePublicKeyEnv); value != "" {
+	return licenseEnvValue(branchDir, licensePublicKeyEnv)
+}
+
+// licenseEnvValue is name from the invoking shell, else the root .env, else "".
+func licenseEnvValue(branchDir, name string) string {
+	if value := os.Getenv(name); value != "" {
 		return value
 	}
 	values := map[string]string{}
 	domain.ReadEnvFile(filepath.Join(branchDir, ".env"), values)
-	return values[licensePublicKeyEnv]
+	return values[name]
 }
 
 // buildEntitlementActivator reads the licence the branch seed stored and
@@ -212,10 +217,13 @@ func (state *bootState) buildEntitlementActivator(ctx context.Context, booted *B
 		state.logf("entitled pass: deferred: no licence keys (%s and LANGWATCH_LICENSE_PRIVATE_KEY in the root .env), so neither side is entitled", licensePublicKeyEnv)
 		return nil
 	}
-	sql := activateEntitlementSQL(licenseKey)
+	statements := map[string]string{
+		booted.A.Name: activateEntitlementSQL(licenseKey),
+		booted.B.Name: activateEntitlementSQL(state.licenseForMain(licenseKey)),
+	}
 	activate := func(ctx context.Context) error {
 		for _, instance := range []*Instance{&booted.A, &booted.B} {
-			if _, err := state.sideSQL(ctx, *instance, sql); err != nil {
+			if _, err := state.sideSQL(ctx, *instance, statements[instance.Name]); err != nil {
 				return fmt.Errorf("activate entitlement %s: %w", instance.Name, err)
 			}
 		}
@@ -226,6 +234,21 @@ func (state *bootState) buildEntitlementActivator(ctx context.Context, booted *B
 		return nil
 	}
 	return activate
+}
+
+// licenseForMain is the branch license as main can verify it (main-license.go),
+// else the branch license unchanged. Logs the outcome, never a key or license.
+func (state *bootState) licenseForMain(licenseKey string) string {
+	branchDir := state.cfg.BranchDir
+	mainKey, err := licenseForMain(licenseKey, licenseEnvValue(branchDir, licensePrivateKeyEnv), licensePublicKey(branchDir))
+	if err != nil {
+		state.logf("entitled pass: main gets the branch license unchanged, so may read it as free (%v)", err)
+		return licenseKey
+	}
+	if mainKey != licenseKey {
+		state.logf("entitled pass: main gets the branch license re-signed with only the data keys it knows")
+	}
+	return mainKey
 }
 
 // sideSQL runs one statement on a side's database: the run's own server on

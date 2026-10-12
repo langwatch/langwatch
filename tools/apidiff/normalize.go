@@ -18,6 +18,7 @@ import (
 //	created, lastModified, modified      — SCIM's spelling of the same (RFC 7643 §3.1)
 //	token, secret, password, api_key, hash — credentials and digests
 //	url, uri, path, slug, platformUrl    — per-instance URLs and random slugs
+//	display_prefix                       — a virtual key's prefix, cut from its time-ordered id
 var volatileKeyPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`^id$|_id$|Id$`),
 	regexp.MustCompile(`_at$|At$`),
@@ -25,6 +26,7 @@ var volatileKeyPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)^(created|modified|last_?modified|updated)$`),
 	regexp.MustCompile(`(?i)(token|secret|password)`),
 	regexp.MustCompile(`(?i)^(url|uri|path|slug|platform_?url)$`),
+	regexp.MustCompile(`(?i)^display_?prefix$`),
 }
 
 // mintedIdentifier matches an id this deployment minted — a lowercase resource
