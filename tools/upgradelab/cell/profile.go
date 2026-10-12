@@ -53,9 +53,9 @@ var Profiles = map[string]Profile{
 // cloudBilling: main's SaaS runtime refuses to boot without a Stripe key; this one never reaches Stripe.
 var cloudBilling = map[string]string{"STRIPE_SECRET_KEY": "sk_test_upgradelab_never_sent"}
 
-// Tiers and shapes a cell accepts today; L and XL wait for the scale generator (lane L4).
+// Tiers and shapes a cell accepts today; L (the cloud long tail) runs from a produce snapshot only; XL waits for lane L4.
 var (
-	Tiers      = []string{"S", "M"}
+	Tiers      = []string{"S", "M", "L"}
 	DataShapes = []string{"typical", EmptyShape}
 )
 

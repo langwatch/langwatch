@@ -76,7 +76,7 @@ func TestHeavySeedsTelemetryAndEveryDoorKind(t *testing.T) {
 }
 
 func TestHeavyVolumesScaleByTier(t *testing.T) {
-	if HeavySpans("M") != 30_000 || HeavySpans("L") != 300_000 || HeavySpans("M")*10 != HeavySpans("L") {
+	if HeavySpans("M") != 30_000 || HeavySpans("L") != 30_000 || HeavySpans("XL") != 300_000 {
 		t.Fatalf("tier volumes: M %d, L %d", HeavySpans("M"), HeavySpans("L"))
 	}
 }

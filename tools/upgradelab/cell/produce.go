@@ -133,18 +133,18 @@ func Produce(ctx context.Context, options ProduceOptions) (string, error) {
 	return dir, writeErr
 }
 
-// tierHeavy is tier M: seedgen's medium, through main's doors (seed.Heavy).
-const tierHeavy = "M"
+// heavyTiers seed through main's doors (seed.Heavy): M is seedgen's medium, L the cloud long tail on seedgen's large.
+var heavyTiers = map[string]string{"M": "medium", "L": "large"}
 
 // seedTier seeds tier S as the cell does; tier M adds the heavy tenancy by SQL and then the product's
 // own doors at volume, against this cell's URL.
 func (cell *run) seedTier(ctx context.Context) error {
-	if cell.options.Tier != tierHeavy {
+	if heavyTiers[cell.options.Tier] == "" {
 		return cell.seed(ctx)
 	}
 	cell.anchor = time.Now().UTC().Truncate(24 * time.Hour)
 	shape := cell.profile.Shape
-	tenancy := seed.BuildTenancy(seed.TenancyInput{Shape: shape, Seed: cell.options.Seed, Anchor: cell.anchor, Cloud: shape == "saas" || shape == "hybrid", Volume: tierHeavy})
+	tenancy := seed.BuildTenancy(seed.TenancyInput{Shape: shape, Seed: cell.options.Seed, Anchor: cell.anchor, Cloud: shape == "saas" || shape == "hybrid", Volume: cell.options.Tier})
 	sum := sha256.Sum256([]byte(tenancy.SQL()))
 	cell.tenancy, cell.recipe = tenancy, snapshot.Recipe{Version: seed.RecipeVersion, Hash: hex.EncodeToString(sum[:])}
 	if err := psqlFile(ctx, cell.stores.psqlURL(), tenancy.SQL()); err != nil {
@@ -167,7 +167,7 @@ func (cell *run) seedTier(ctx context.Context) error {
 	pace := &seed.Pace{Depth: func(ctx context.Context) (int, error) { return QueueDepth(ctx, cell.stores.RedisPort) },
 		Above: cell.options.PaceAbove, Within: cell.options.DrainWithin}
 	result, err := seed.Heavy(ctx, seed.HeavyInput{App: cell.url(), Email: email, Password: password, Tenancy: tenancy, Seed: cell.options.Seed,
-		Anchor: cell.anchor, Spans: seed.HeavySpans(cell.options.Tier), Pace: pace, Log: cell.options.Stdout})
+		Anchor: cell.anchor, Spans: seed.HeavySpans(cell.options.Tier), Size: heavyTiers[cell.options.Tier], Pace: pace, Log: cell.options.Stdout})
 	cell.report.Notes = append(cell.report.Notes, fmt.Sprintf("heavy seed sent %v, refused %v", result.Sent, result.Refused))
 	cell.madeKeys = result.Made
 	if err != nil {
@@ -228,7 +228,7 @@ func (cell *run) drainQueue(ctx context.Context) error {
 // trickle sends Trickle spans of live telemetry (a different seed from the burst, so ids differ), so
 // the cut still catches a few hundred in-flight jobs. Tier S has no heavy seed and sends none.
 func (cell *run) trickle(ctx context.Context) error {
-	if cell.options.Tier != tierHeavy || cell.options.Trickle <= 0 {
+	if heavyTiers[cell.options.Tier] == "" || cell.options.Trickle <= 0 {
 		return nil
 	}
 	email, password := generate.SeedAccount(cell.options.Seed)

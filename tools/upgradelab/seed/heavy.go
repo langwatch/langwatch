@@ -22,19 +22,20 @@ type HeavyInput struct {
 	Tenancy              Tenancy // its projects' keys carry the telemetry
 	Seed                 int64
 	Anchor               time.Time
-	Spans                int  // 0 is seedgen's medium: about 300k
-	TelemetryOnly        bool // skip the product kinds: a trickle of live telemetry, not a second seed
-	Workers              int  // concurrent doors; default 8: requests carry up to 500 spans, so 32 timed out and starved the grants projection
+	Spans                int    // 0 is the size's own volume
+	Size                 string // seedgen's size: its organizations make the product kinds; default medium
+	TelemetryOnly        bool   // skip the product kinds: a trickle of live telemetry, not a second seed
+	Workers              int    // concurrent doors; default 8: requests carry up to 500 spans, so 32 timed out and starved the grants projection
 	Log                  io.Writer
 	Pace                 *Pace // nil sends the telemetry in one burst, as a trickle does
 }
 
 // HeavyVolumes is the spans a heavy seed sends per tier; metric points and logs follow the spans.
-// M is a tenth of seedgen's medium so one main worker drains it; L keeps the medium for bigger runs.
-var HeavyVolumes = map[string]int{"M": 30_000, "L": 300_000}
+// M is a tenth of seedgen's medium so one main worker drains it; L, the long tail, spreads as many over more organizations.
+var HeavyVolumes = map[string]int{"M": 30_000, "L": 30_000}
 
 // HeavySpans is the span volume of a tier; an unknown tier is seedgen's medium.
-func HeavySpans(tier string) int { return cmp.Or(HeavyVolumes[tier], HeavyVolumes["L"]) }
+func HeavySpans(tier string) int { return cmp.Or(HeavyVolumes[tier], 300_000) }
 
 // Pace sends telemetry in waves: after every WaveChunks requests the seed waits while Depth is above Above.
 type Pace struct {
@@ -144,7 +145,7 @@ func madeKeys(keys map[string]string, tenancy []Project) []string {
 }
 
 func heavyPlan(in HeavyInput) (*seedgen.Plan, error) {
-	args := []string{"--size", "medium", "--private", "0", "--seed", strconv.FormatInt(in.Seed, 10)}
+	args := []string{"--size", cmp.Or(in.Size, "medium"), "--private", "0", "--seed", strconv.FormatInt(in.Seed, 10)}
 	if in.Spans > 0 {
 		args = append(args, "--spans", strconv.Itoa(in.Spans))
 	}
