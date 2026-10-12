@@ -256,6 +256,40 @@ describe("SystemMigrationRunnerService", () => {
       expect(own.peak).toBeLessThanOrEqual(DEFAULT_PAUSE_WHILE_QUEUED_ABOVE + 100 * jobsPerTenant);
     });
 
+    /** @scenario "A migration can wait for queue room inside one organization" */
+    it("offers the migration a wait that holds at the pass's own limit between pages", async () => {
+      const rooms: number[] = [];
+      const list: PassQueueRun = {
+        waitForRoom: async ({ maxOutstanding }) => {
+          rooms.push(maxOutstanding);
+        },
+      };
+      const migration = migrationOf("m1", async ({ waitForRoom }) => {
+        await waitForRoom?.();
+        await waitForRoom?.();
+        return finalized;
+      });
+      const runner = new SystemMigrationRunnerService({
+        now: nowInstant,
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants: tenantSourceOf(["acme"]),
+        cohort: () => true,
+        migrations: [migration],
+        runListedWork: async ({ work }) => work(list),
+      });
+
+      const summary = await runner.runPass();
+
+      expect(summary.finalized).toBe(1);
+      // One wait before the page of organizations, then the two the migration asked for.
+      expect(rooms).toEqual([
+        DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+        DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+        DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+      ]);
+    });
+
     it("leaves a pass without a queue list unpaced, as on the tasks process", async () => {
       const queuedJobs = vi.fn(async () => 1_000_000);
       const runner = new SystemMigrationRunnerService({

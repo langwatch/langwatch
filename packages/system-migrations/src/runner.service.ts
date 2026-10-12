@@ -286,11 +286,13 @@ export class SystemMigrationRunnerService {
     summary,
     signal,
     heartbeat,
+    list,
   }: {
     page: string[];
     summary: MigrationPassSummary;
     signal?: AbortSignal;
     heartbeat?: () => void;
+    list?: PassQueueRun;
   }): Promise<boolean> {
     // A failed read only costs the shortcut: every tenant then takes its claim, as before.
     const finished = await this.readFinished({ page }).catch((error: unknown) => {
@@ -308,7 +310,7 @@ export class SystemMigrationRunnerService {
         const tenantId = pending.shift();
         if (tenantId === undefined) return;
         try {
-          await this.driveTenant({ tenantId, summary, signal, finished });
+          await this.driveTenant({ tenantId, summary, signal, finished, list });
         } catch (error) {
           // Contained here, not just around migrateTenant: a throw outside
           // that inner net (the state read, the cohort read) would reject
@@ -386,11 +388,13 @@ export class SystemMigrationRunnerService {
     summary,
     signal,
     finished,
+    list,
   }: {
     tenantId: string;
     summary: MigrationPassSummary;
     signal?: AbortSignal;
     finished: FinishedOnPage;
+    list?: PassQueueRun;
   }): Promise<void> {
     const { lease, cohort, migrations } = this.deps;
     summary.tenantsSeen += 1;
@@ -427,6 +431,7 @@ export class SystemMigrationRunnerService {
           tenantId,
           signal,
           summary,
+          list,
         });
       }
     } finally {
@@ -466,11 +471,13 @@ export class SystemMigrationRunnerService {
     tenantId,
     signal,
     summary,
+    list,
   }: {
     migration: SystemMigration;
     tenantId: string;
     signal?: AbortSignal;
     summary: MigrationPassSummary;
+    list?: PassQueueRun;
   }): Promise<void> {
     const { state } = this.deps;
     const existing = await state
@@ -493,6 +500,10 @@ export class SystemMigrationRunnerService {
         // A migration that writes before it records anything needs to know
         // its last attempt died, so it can finish work the crash stranded.
         previous: existing,
+        // The bound the pass holds between pages of tenants, offered between pages of commands.
+        waitForRoom: async () => {
+          await this.waitForQueueRoom({ signal, list });
+        },
       });
       // Compare-and-set, not a blind upsert: an operator may have pinned the
       // row `rolled_back` while `migrateTenant` ran, and that pin outranks

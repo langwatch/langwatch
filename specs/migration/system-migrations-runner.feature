@@ -58,6 +58,12 @@ Feature: Running system migrations across organizations
     And every organization is finalized
 
   @unit
+  Scenario: A migration can wait for queue room inside one organization
+    Given a migration that sends its commands in pages
+    When a worker's pass runs it on a queue list of its own
+    Then each wait it asks for between pages holds at the pass's own limit
+
+  @unit
   Scenario: An organization that fails mid-migration is parked and retried
     Given the migration throws for "org_acme"
     When the pass finishes

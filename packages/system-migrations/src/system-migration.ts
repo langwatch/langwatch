@@ -81,5 +81,10 @@ export interface SystemMigration {
      * rather than short-circuit on "nothing left to write".
      */
     previous?: TenantMigrationRecord | null;
+    /**
+     * Pacing inside one tenant: a migration that sends many commands awaits this between pages of
+     * them. It resolves once the pass is back under its bound, or as soon as the signal aborts.
+     */
+    waitForRoom?: () => Promise<void>;
   }): Promise<TenantMigrationOutcome>;
 }
