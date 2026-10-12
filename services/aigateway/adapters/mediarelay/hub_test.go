@@ -246,7 +246,9 @@ func TestJoinClosesTwilioWithACodeWhenTheRelayEndedMeanwhile(t *testing.T) {
 		t.Fatal("Twilio's upgrade never completed")
 	}
 	require.NoError(t, got.err)
-	code, _ := closeOf(got.conn, 3*time.Second)
+	// The worker vanished, so the relay ends as peer lost and Join passes that code on.
+	code, reason := closeOf(got.conn, 3*time.Second)
 
-	assert.NotEqual(t, websocket.StatusCode(-1), code, "Twilio's socket was dropped without a close frame")
+	assert.Equal(t, mediarelay.ClosePeerLost, code)
+	assert.Equal(t, "relay_ended", reason)
 }

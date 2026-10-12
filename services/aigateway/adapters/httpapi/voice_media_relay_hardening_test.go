@@ -1,8 +1,8 @@
 package httpapi
 
-// Review round 1 of the Twilio media relay: the drain started by a shutdown
-// signal, bodies on relay opens, organization id hygiene, the per-scope cap on
-// held relays, and a worker that speaks before Twilio joins.
+// Hardening of the Twilio media relay: the drain started by a shutdown signal,
+// bodies on relay opens, organization id hygiene, the per-scope cap on held
+// relays, and a worker that speaks before Twilio joins.
 //
 // Binds specs/ai-gateway/voice-media-relay.feature.
 
