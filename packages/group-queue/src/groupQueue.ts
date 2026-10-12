@@ -348,6 +348,7 @@ type ClaimedJob<Payload> = {
   stagedJobId: string;
   jobDataJson: string;
   originalScore: number;
+  claimToken: string;
   payload: Payload;
   contextMetadata: GroupQueueContextMetadata | undefined;
   attempt: number;
@@ -978,7 +979,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * the next claimant finds a provably dead owner (poison-group-park-guard.feature).
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
 
     // The beacon must exist before this worker owns a marker, or a peer would
     // read our live claim as an abandoned one.
@@ -1005,6 +1006,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           stagedJobId,
           jobDataJson,
           originalScore,
+          claimToken,
           reason: "claim_strikes",
           lastOwnerState,
           errorMessage: `Poison guard: ${deaths} confirmed worker deaths while this group was in flight (threshold ${deathThreshold}). Each was a worker that claimed this group and then stopped heartbeating without shutting down. Inspect the staged jobs, then unblock the group to retry.`,
@@ -1061,7 +1063,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const [job] = await this.claimedJobFrom({ dispatched, jobData });
     if (!job) return;
 
-    const { groupId, stagedJobId, jobDataJson, drainedSiblings, routingLabels } = job;
+    const { groupId, stagedJobId, jobDataJson, claimToken, drainedSiblings, routingLabels } = job;
     const jobStartTime = performance.now();
     // Idempotent so an outcome path can stop the beat at the moment it decides
     // (see the retry path) while the `finally` still guarantees it is stopped.
@@ -1069,6 +1071,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const heartbeat = this.startActiveKeyHeartbeat({
       groupId,
       stagedJobId,
+      claimToken,
       jobDataValues: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
       isCancelled: () => heartbeatStopped,
     });
@@ -1094,7 +1097,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
   /** The stored job data, or none when the value was retried, parked or dropped instead. */
   private async decodeClaimedJob(dispatched: DispatchResult): Promise<Record<string, unknown>[]> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
     // Parse the stored job data
     try {
       return [
@@ -1110,6 +1113,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           groupId,
           stagedJobId,
           jobDataJson,
+          claimToken,
           err,
         });
         return [];
@@ -1123,6 +1127,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           stagedJobId,
           jobDataJson,
           originalScore,
+          claimToken,
           reason: "oversized_payload",
           errorMessage: `Poison guard: ${err.message}. The staged value was parked unparsed.`,
         });
@@ -1135,6 +1140,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         jobDataJson,
+        claimToken,
         err,
         reason: dropReasonOf(err),
         message: "Failed to parse staged job data",
@@ -1151,7 +1157,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     dispatched: DispatchResult;
     jobData: Record<string, unknown>;
   }): Promise<ClaimedJob<Payload>[]> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
     const contextMetadata = jobData.__context as GroupQueueContextMetadata | undefined;
     const jobAttempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
     // A re-staged sibling carries no __attempt of its own, so fall back to the
@@ -1184,6 +1190,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       stagedJobId,
       jobDataJson,
       originalScore,
+      claimToken,
       payload,
       contextMetadata,
       attempt,
@@ -1214,7 +1221,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     payload: Payload;
     maxBatch: number;
   }): Promise<DrainedJob[]> {
-    const { groupId, jobDataJson } = dispatched;
+    const { groupId, jobDataJson, claimToken } = dispatched;
     let drainedSiblings: DrainedJob[] = [];
     const maxBytes = this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
     const initialBytes = readJobPayloadBytes(jobDataJson);
@@ -1225,6 +1232,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         maxJobs: maxBatch - 1,
         maxBytes,
         initialBytes,
+        claimToken,
       });
     } catch (err) {
       this.logger.warn(
@@ -1275,7 +1283,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     contextMetadata: GroupQueueContextMetadata | undefined;
     drained: DrainedJob[];
   }): Promise<CoalescedBatch<Payload>> {
-    const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
+    const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
     const drainedSiblings = drained;
     if (drainedSiblings.length === 0) {
       return { kind: "batch", batch: { batchPayloads: null, batchJobIds: [], drainedSiblings } };
@@ -1326,6 +1334,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           groupId,
           stagedJobId,
           jobDataJson,
+          claimToken,
           err,
         });
         return { kind: "handled" };
@@ -1342,6 +1351,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           stagedJobId,
           jobDataJson,
           originalScore,
+          claimToken,
           reason: "oversized_payload",
           errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed.`,
         });
@@ -1481,6 +1491,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       jobDataJson,
+      claimToken,
       payload,
       attempt,
       jobName,
@@ -1491,7 +1502,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Success — complete the group slot. Drained siblings were
     // removed from staging during the drain, so completing the
     // dispatched job is enough to free the group.
-    await this.scripts.complete({ groupId, stagedJobId, jobName });
+    const completed = await this.scripts.complete({ groupId, stagedJobId, jobName, claimToken });
+    if (!completed) {
+      // Another worker recovered this claim after our active key lapsed and runs the job
+      // now; its lease and the group's chain are that worker's (claimed-job-recovery.feature).
+      this.logger.warn(
+        { queueName: this.queueName, groupId, stagedJobId, attempt },
+        "Job finished after its claim was recovered by another worker; leaving the completion to that worker",
+      );
+      return;
+    }
 
     // PAST THE POINT OF NO RETURN: the slot is completed, so this needs its own
     // catch — the outer one treats a throw as a FAILED job and would re-stage the
@@ -1695,6 +1715,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
       stagedJobId,
       jobDataJson,
+      claimToken,
       payload,
       contextMetadata,
       attempt,
@@ -1751,6 +1772,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         stagedJobId,
         jobName,
         dropped: true,
+        claimToken,
       });
       // Kept alongside gq_jobs_dropped_total: this counter is the
       // specific "a retry-encode blip lost it" diagnostic, not a
@@ -1780,6 +1802,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       // would hand the next sibling-led claim a fresh budget.
       attempt: attempt + 1,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
+      claimToken,
     });
     // Only transfer once the replacement is staged: retryRestage returns false
     // when the active key is stale and nothing was written, so transferring
@@ -1847,7 +1870,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     since: number;
     stopHeartbeat: () => void;
   }): Promise<void> {
-    const { groupId, stagedJobId, jobDataJson, payload, contextMetadata, attempt, jobName } = job;
+    const { groupId, stagedJobId, jobDataJson, claimToken, payload, contextMetadata } = job;
+    const { attempt, jobName } = job;
     let handBackJobData: string;
     try {
       handBackJobData = await this.blobLifecycle.encode({
@@ -1870,7 +1894,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         bodyPreserved: false,
       });
       await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
-      await this.scripts.complete({ groupId, stagedJobId, jobName, dropped: true });
+      await this.scripts.complete({ groupId, stagedJobId, jobName, dropped: true, claimToken });
       return;
     }
     // Before the re-stage, as on the retry path: a heartbeat tick would overwrite its TTL.
@@ -1884,6 +1908,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       backoffMs: HAND_BACK_CONFIG.delayMs,
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
+      claimToken,
     });
     if (restaged) {
       await this.blobLifecycle.transferLease({
@@ -1978,6 +2003,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       stagedJobId: job.stagedJobId,
       payload: job.payload,
       originalScore: job.originalScore,
+      claimToken: job.claimToken,
       lastError,
       contextMetadata: job.contextMetadata,
       routingLabels: job.routingLabels,
@@ -2032,7 +2058,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         jobDataJson: freshValue,
       });
     }
-    await this.scripts.complete({ groupId, stagedJobId, jobName, dropped: true });
+    await this.scripts.complete({
+      groupId,
+      stagedJobId,
+      jobName,
+      dropped: true,
+      claimToken: job.claimToken,
+    });
     // The chain is over for this group: the next job starts with a fresh budget and streak.
     await this.scripts.clearGroupFailures(groupId).catch(() => {});
     await this.clearGroupAttempt(groupId);
@@ -2464,11 +2496,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   private startActiveKeyHeartbeat({
     groupId,
     stagedJobId,
+    claimToken,
     jobDataValues,
     isCancelled,
   }: {
     groupId: string;
     stagedJobId: string;
+    claimToken: string;
     jobDataValues: string[];
     /** True once the job's outcome is decided; see `stopHeartbeat`. */
     isCancelled: () => boolean;
@@ -2481,6 +2515,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           stagedJobId,
           activeTtlSec: GROUP_QUEUE_CONFIG.activeTtlSec,
           isCancelled,
+          claimToken,
         })
         .catch((err) => {
           this.logger.warn(
@@ -2508,6 +2543,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     stagedJobId,
     payload,
     originalScore,
+    claimToken,
     lastError,
     contextMetadata,
     routingLabels,
@@ -2516,6 +2552,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     stagedJobId: string;
     payload: Payload;
     originalScore: number;
+    claimToken: string;
     lastError: Error | undefined;
     contextMetadata: GroupQueueContextMetadata | undefined;
     routingLabels: Record<string, string>;
@@ -2544,14 +2581,22 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     const handlerError = lastError?.cause instanceof Error ? lastError.cause : lastError;
 
     // Atomically: block the group, re-stage the job, update ready score, store error
-    await this.scripts.restageAndBlock({
+    const blocked = await this.scripts.restageAndBlock({
       groupId,
       newStagedJobId,
       score,
       jobDataJson,
       errorMessage: lastError?.message,
       errorStack: handlerError?.stack,
+      claimToken,
     });
+    if (!blocked) {
+      this.logger.warn(
+        { queueName: this.queueName, groupId, stagedJobId, error: lastError },
+        "Job exhausted its retries after its claim was recovered by another worker; not blocking the group",
+      );
+      return;
+    }
 
     gqGroupsBlockedTotal.inc(routingLabels);
     gqJobsExhaustedTotal.inc(routingLabels);
@@ -2581,6 +2626,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId,
     stagedJobId,
     jobDataJson,
+    claimToken,
     err,
     reason,
     message,
@@ -2588,6 +2634,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId: string;
     stagedJobId: string;
     jobDataJson: string;
+    claimToken: string;
     err: unknown;
     /** Narrower than {@link DropReason}; other discard sites own no active slot. */
     reason: DecodeFailureReason | "transient_exhausted" | "unknown";
@@ -2607,7 +2654,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
     // `dropped: true` keeps the group advancing WITHOUT counting a thrown-away
     // job as a completion or clearing the group's stored error (#5538).
-    await this.scripts.complete({ groupId, stagedJobId, dropped: true });
+    await this.scripts.complete({ groupId, stagedJobId, dropped: true, claimToken });
     await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
   }
 
@@ -2688,6 +2735,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     stagedJobId,
     jobDataJson,
     originalScore,
+    claimToken,
     reason,
     errorMessage,
     lastOwnerState,
@@ -2696,6 +2744,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     stagedJobId: string;
     jobDataJson: string;
     originalScore: number;
+    claimToken: string;
     reason: "claim_strikes" | "oversized_payload";
     errorMessage: string;
     /**
@@ -2717,6 +2766,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       score,
       jobDataJson,
       errorMessage,
+      claimToken,
     });
     // Release the marker as the group is parked: leaving it would let the death
     // count survive, so an operator who unblocked inside the marker's TTL would
@@ -2754,11 +2804,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     groupId,
     stagedJobId,
     jobDataJson,
+    claimToken,
     err,
   }: {
     groupId: string;
     stagedJobId: string;
     jobDataJson: string;
+    claimToken: string;
     err: TransientBlobStoreError;
   }): Promise<void> {
     const attempt =
@@ -2773,6 +2825,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         groupId,
         stagedJobId,
         jobDataJson,
+        claimToken,
         err,
         reason: "transient_exhausted",
         message: `Blob store unreachable after ${attempt} attempts; discarding job (replay does not recover subscriber jobs)`,
@@ -2793,6 +2846,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       backoffMs,
       attempt,
       attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
+      claimToken,
     });
     // The script writes the chain in the same step, so a value whose machinery
     // does not live in the header still advances — that write is what keeps

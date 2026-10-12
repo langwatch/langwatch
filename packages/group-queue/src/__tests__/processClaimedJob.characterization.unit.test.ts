@@ -82,10 +82,10 @@ function recordingProcessor(scenario: Scenario): {
   });
 
   const scriptAnswers: [keyof GroupStagingScripts, () => unknown][] = [
-    ["complete", () => undefined],
+    ["complete", () => true],
     ["drainGroupReady", () => scenario.siblings ?? []],
     ["refreshActiveKey", () => undefined],
-    ["restageAndBlock", () => undefined],
+    ["restageAndBlock", () => true],
     ["retryRestage", () => true],
     ["recordGroupFailure", () => scenario.failStreak ?? 1],
     ["clearGroupFailures", () => undefined],
@@ -154,6 +154,7 @@ async function runClaimed(scenario: Scenario): Promise<unknown[]> {
     groupId: GROUP,
     jobDataJson: jobValue("job-1"),
     originalScore: 1000,
+    claimToken: "claim-1",
   });
   return calls;
 }
@@ -287,6 +288,7 @@ describe("given a coalesced batch that fails", () => {
         groupId: GROUP,
         jobDataJson: jobValue("job-1"),
         originalScore: 1000,
+        claimToken: "claim-1",
       });
 
       expect(named(calls, "handler.processBatch")).toHaveLength(1);
@@ -344,6 +346,7 @@ describe("given a claimed job this worker has no handler for", () => {
       groupId: GROUP,
       jobDataJson: handedBackJob(handedBackSince),
       originalScore: 1000,
+      claimToken: "claim-1",
     });
     return { calls, warn, error };
   };

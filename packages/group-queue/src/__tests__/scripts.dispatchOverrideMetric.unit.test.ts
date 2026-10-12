@@ -12,9 +12,9 @@ import { GroupStagingScripts } from "../scripts.ts";
 
 const QUEUE_NAME = "{pipeline/handler/spanStorage}";
 
-/** One dispatched job, in the flat 4-tuple layout the script emits. */
+/** One dispatched job in the script's flat 5-tuple layout; the last is its claim token. */
 function jobTuple(id: string): string[] {
-  return [id, `tenant-a/group-${id}`, JSON.stringify({ id }), "1000"];
+  return [id, `tenant-a/group-${id}`, JSON.stringify({ id }), "1000", `1000.${id}`];
 }
 
 function scriptsReturning(value: unknown): GroupStagingScripts {

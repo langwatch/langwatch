@@ -106,6 +106,12 @@ export const gqJobsDispatchedOverrideTotal = new Counter({
   labelNames: ["queue_name"] as const,
 });
 
+export const gqJobsRecoveredTotal = new Counter({
+  name: "gq_jobs_recovered_total",
+  help: "Claimed jobs put back at the front of their group because the worker running them died (specs/claimed-job-recovery.feature)",
+  labelNames: ["queue_name"] as const,
+});
+
 export const gqJobsCompletedTotal = new Counter({
   name: "gq_jobs_completed_total",
   help: "Total number of jobs completed successfully",
