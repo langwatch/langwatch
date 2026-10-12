@@ -431,3 +431,57 @@ func TestContentEncodings(t *testing.T) {
 	assert.Equal(t, []string{"gzip"}, contentEncodings("GZIP"))
 	assert.Equal(t, []string{"gzip", "zstd"}, contentEncodings("gzip, identity , zstd"))
 }
+
+// Every header extractToken accepts is a place a customer's virtual key can
+// arrive on. The gateway resolves that key itself and Bifrost injects the
+// real provider credential, so a carrier header that survives the passthrough
+// lane hands the virtual key to a vendor with no use for it, and the call
+// still succeeds on the injected credential, so nothing reports the leak.
+/** @scenario "the passthrough lane drops every virtual-key carrier header" */
+func TestRouter_GeminiPassthrough_DropsVirtualKeyCarrierHeaders(t *testing.T) {
+	for _, tc := range []struct{ carrier, value string }{
+		{carrier: "Authorization", value: "Bearer vk-lw-test"},
+		{carrier: "X-Api-Key", value: "vk-lw-test"},
+		{carrier: "X-Goog-Api-Key", value: "vk-lw-test"},
+		{carrier: "Xi-Api-Key", value: "vk-lw-test"},
+	} {
+		t.Run(tc.carrier, func(t *testing.T) {
+			auth := &mockAuth{
+				resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+					return geminiBundle(), nil
+				},
+			}
+			var got *domain.Request
+			provider := &mockProvider{
+				dispatchFn: func(_ context.Context, req *domain.Request, _ domain.Credential) (*domain.Response, error) {
+					got = req
+					return &domain.Response{
+						Body:       []byte(`{"candidates":[]}`),
+						StatusCode: 200,
+					}, nil
+				},
+			}
+			router := buildRouter(
+				app.WithAuth(auth),
+				app.WithProviders(provider),
+				app.WithLogger(zap.NewNop()),
+			)
+
+			payload := []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)
+			req := httptest.NewRequest(http.MethodPost,
+				"/v1beta/models/gemini-2.5-flash:generateContent", bytes.NewReader(payload))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Client-Trace", "keep-me")
+			req.Header.Set(tc.carrier, tc.value)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			require.NotNil(t, got, "provider was not dispatched")
+			assert.NotContains(t, got.Passthrough.Headers, http.CanonicalHeaderKey(tc.carrier),
+				"the client's virtual key must not travel on to the provider")
+			assert.Equal(t, "keep-me", got.Passthrough.Headers["X-Client-Trace"],
+				"headers that carry no credential still reach the provider")
+		})
+	}
+}
