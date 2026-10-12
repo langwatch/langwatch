@@ -723,6 +723,8 @@ func TestTwilioSocketIsRefusedBeforeTheUpgrade(t *testing.T) {
 			g := newMRGateway(t, withHub(func(o *mediarelay.Options) {
 				o.PodIP = ownPod
 				o.BootID = "a1b2c3d4"
+				// "owned by another pod" dials; keep an unanswered dial short.
+				o.HopTimeout = 200 * time.Millisecond
 			}))
 			id := prepare(t, g)
 

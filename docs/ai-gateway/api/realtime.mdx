@@ -261,6 +261,12 @@ An instance holds up to `LW_GATEWAY_VOICE_MAX_MEDIA_RELAYS` relays (default 500)
 
 A relay waits `LW_GATEWAY_VOICE_PENDING_TTL_SECONDS` (default 150) for Twilio to dial in, and a paired relay runs at most `LW_GATEWAY_VOICE_MAX_RELAY_SECONDS` (default 330). Relay ids name the pod that minted them through `GATEWAY_POD_IP` (set it to the pod's IP, for example with the Kubernetes downward API). Relays need `LW_GATEWAY_INTERNAL_SECRET`. Without it they are off, and the gateway logs a warning at boot.
 
+Twilio may land on a different pod from the one that opened the relay. That pod dials the owner on `GATEWAY_RELAY_HOP_ADDR` (default `:5564`), signed with the internal secret, and answers `403` if the owner refuses or does not reply within `LW_GATEWAY_VOICE_HOP_TIMEOUT_SECONDS` (default 3). Without `GATEWAY_POD_IP`, every id is local.
+
+Only the gateway's own pods may reach the hop port. Do not publish it in a Service. `LW_GATEWAY_VOICE_MAX_HOP_DIALS` (default 64) caps the dials in flight on one pod.
+
+`LW_GATEWAY_VOICE_RELAY_ID_KEY` (at least 32 bytes) keys the relay ids on its own. Unset, the internal secret keys them, and anything that holds it can mint an id. Set it when workers share the internal secret.
+
 ## WebSocket relay
 
 OpenAI's WebSocket transport needs the real API key on the socket, so a client on that transport cannot dial OpenAI with a virtual key. For it the gateway relays: the client opens the socket on the gateway with its virtual key, the gateway opens the vendor's socket with the provider key and passes frames both ways.

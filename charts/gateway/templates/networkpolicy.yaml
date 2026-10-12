@@ -5,10 +5,12 @@
 # Ingress (what can talk TO the gateway):
 #   - Anything on the LB / ingress-nginx namespace hitting :5563
 #     (the public customer surface).
+#   - The gateway's own pods hitting the relay hop port (relayHop.port).
 #   - Prometheus scraper hitting the metrics port (metrics.port, default
 #     9464) when metrics.enabled is true.
 #
 # Egress (what the gateway can talk to):
+#   - The gateway's own pods on the relay hop port.
 #   - DNS (kube-system:53 TCP+UDP).
 #   - Control plane (langwatch-app): resolve-key, config, changes,
 #     guardrail-check and codex-refresh all hit this one.
@@ -40,6 +42,13 @@ spec:
       ports:
         - protocol: TCP
           port: 5563
+    # Relay hop from the gateway's other pods, and from nobody else.
+    - from:
+        - podSelector:
+            matchLabels: {{- include "gateway.selectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.relayHop.port }}
     {{- if .Values.metrics.enabled }}
     # Prometheus scrapes the metrics listener, with the bearer key.
     - from:
@@ -49,6 +58,13 @@ spec:
           port: {{ .Values.metrics.port }}
     {{- end }}
   egress:
+    # Relay hop to the gateway's other pods.
+    - to:
+        - podSelector:
+            matchLabels: {{- include "gateway.selectorLabels" . | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.relayHop.port }}
     # DNS — must be allowed before anything else resolves.
     - to:
         - namespaceSelector:

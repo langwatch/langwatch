@@ -43,6 +43,9 @@ spec:
             - name: http
               containerPort: 5563
               protocol: TCP
+            - name: relay-hop
+              containerPort: {{ .Values.relayHop.port }}
+              protocol: TCP
             {{- if .Values.metrics.enabled }}
             - name: metrics
               containerPort: {{ .Values.metrics.port }}
@@ -52,6 +55,12 @@ spec:
             - configMapRef:
                 name: {{ include "gateway.fullname" . }}
           env:
+            # Names this pod in the Twilio relay ids it mints; the other pods
+            # dial it here. Never in the ConfigMap: each pod has its own.
+            - name: GATEWAY_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
             - name: LW_GATEWAY_INTERNAL_SECRET
               valueFrom:
                 secretKeyRef:

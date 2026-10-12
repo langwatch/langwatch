@@ -3,7 +3,8 @@ Feature: Twilio media relay on the AI Gateway
   I want a worker to dial out to the gateway and have Twilio dial the gateway
   So that Twilio media reaches the worker with no tunnel and no inbound port on the worker
 
-  # https://github.com/langwatch/langwatch/issues/8397, slice 1 (one gateway pod).
+  # https://github.com/langwatch/langwatch/issues/8397, slice 1 (one gateway pod),
+  # slice 2 (the cross-pod hop, last Rules of this file).
   # The worker opens GET /v1/voice/relay (or the signed GET /v1/voice/relay/{orgId}),
   # is told a relay id, and places the Twilio call with
   # <Stream url="wss://gateway/v1/voice/twilio/{id}">. Twilio then dials the
@@ -492,3 +493,364 @@ Feature: Twilio media relay on the AI Gateway
       And the pod address defaults to empty
       And each can be overridden from the environment
       And a negative value is refused
+
+  # ============================================================
+  # Slice 2. Twilio dials the gateway through an L4 load balancer, so its
+  # socket can land on a pod that does not hold the relay. Pods are named by
+  # the address sealed into the relay id. The pod Twilio landed on dials the
+  # owner's hop listener (GATEWAY_RELAY_HOP_ADDR, :5564), which is a second
+  # server that serves only GET /relay-hop/{id} behind the internal HMAC, and
+  # pumps Twilio's frames over that hop. The scenarios below run two gateway
+  # pods in one process, each with its own address (127.0.0.2 and 127.0.0.3)
+  # and its own hop listener on one shared port.
+
+  # ============================================================
+  Rule: A Twilio socket that lands on another pod is joined through the owner
+
+    @integration
+    Scenario: Two concurrent relays on two pods are each joined to the right Twilio socket
+      Given gateway pods A and B, each with its own pod address
+      And relay R1 opened on A and relay R2 opened on B
+      When Twilio T1 for R1 lands on B and Twilio T2 for R2 lands on A
+      And each of the four sockets sends 100 tagged text and binary frames
+      Then R1 receives exactly T1's frames, in order
+      And R2 receives exactly T2's frames, in order
+      And T1 receives exactly R1's frames, in order
+      And T2 receives exactly R2's frames, in order
+
+    @integration
+    Scenario: A hop is counted on both pods
+      When Twilio lands on pod B for a relay held by pod A and frames pass
+      Then pod B counts hop_joined and does not count paired
+      And pod A counts paired and does not count hop_joined
+
+    @integration
+    Scenario: Twilio closing the stream ends the hopped relay with 1000
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When Twilio closes the stream with 1000
+      Then the relay is closed with 1000
+
+    @integration
+    Scenario: The worker closing a hopped relay closes Twilio's socket with 1000
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When the worker closes the relay with 1000
+      Then Twilio's socket is closed with 1000
+
+    @integration
+    Scenario: Twilio dropping a hopped stream ends the relay with 4502
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When Twilio's TCP connection drops without a close frame
+      Then the relay is closed with 4502
+
+    @integration
+    Scenario: A hopped relay older than its maximum duration is closed with 4409
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When the maximum relay duration passes
+      Then the relay is closed with 4409
+      And Twilio's socket gets a close frame
+
+  # ============================================================
+  Rule: The owner decides whether a hop is joined
+
+    @integration
+    Scenario Outline: An owner that refuses the hop refuses Twilio
+      Given a relay held by pod A
+      When Twilio lands on pod B with <id>
+      Then Twilio gets HTTP 403 voice_relay_forbidden and no WebSocket
+      And the answer comes in under a second, not after the hop timeout
+
+      Examples:
+        | id                          |
+        | an id already joined once   |
+        | an id the owner never opened |
+        | an id whose relay has ended |
+
+    @integration
+    Scenario: A replayed id on another pod leaves the joined pair running
+      Given a relay on pod A joined by Twilio
+      When a second Twilio socket lands on pod B with the same id
+      Then it gets HTTP 403
+      And frames still pass between the first pair
+
+    @integration
+    Scenario Outline: A hop for a relay whose owner pod restarted is refused with 403
+      Given a pending relay on pod A and an id that names its owner address with another boot id
+      When <where> receives that id
+      Then Twilio gets HTTP 403 voice_relay_forbidden and no WebSocket
+
+      Examples:
+        | where                                   |
+        | pod B, which hops to A                  |
+        | pod A's hop port, with a valid signature |
+        | pod A's public Twilio route             |
+
+    @integration
+    Scenario: A refused stale id leaves the relay joinable with its real id
+      Given a pending relay on pod A
+      When Twilio lands on pod B with the id's boot id changed, and is refused
+      And Twilio then lands on pod B with the real id
+      Then the relay is joined and frames pass
+
+  # ============================================================
+  Rule: An owner that cannot be reached refuses Twilio at once
+
+    @integration
+    Scenario: A hop to an owner with a closed port refuses Twilio quickly
+      Given an id whose owner address has nothing listening on the hop port
+      When Twilio lands on pod B with that id
+      Then Twilio gets HTTP 403 voice_relay_forbidden and no WebSocket
+      And the answer comes in under a second
+      And the log carries "relay_owner_unreachable"
+      And gateway_voice_media_relay_total{outcome="refused_owner_unreachable"} rises by one
+      And the log does not hold the full relay id
+
+    @integration
+    Scenario: A hop to an owner that never answers refuses Twilio within the hop timeout
+      Given an owner that accepts TCP on the hop port and never answers
+      And a hop timeout of 400 milliseconds
+      When Twilio lands on pod B with an id naming that owner
+      Then Twilio gets HTTP 403 voice_relay_forbidden and no WebSocket
+      And the answer comes after the hop timeout and before two seconds
+      And the log carries "relay_owner_unreachable"
+      And gateway_voice_media_relay_total{outcome="refused_owner_unreachable"} rises by one
+      And the abandoned connection to the owner is closed
+
+    @integration
+    Scenario Outline: An owner address outside the private ranges is refused without a dial
+      Given an id sealed with a valid key whose owner address is <owner>
+      When Twilio lands on pod B with that id
+      Then Twilio gets HTTP 403 voice_relay_forbidden and no WebSocket
+      And gateway_voice_media_relay_total{outcome="refused_owner_invalid"} rises by one
+      And the log carries "relay_owner_invalid"
+      And no connection is made to the hop port
+
+      Examples:
+        | owner                     |
+        | 8.8.8.8                   |
+        | 169.254.169.254           |
+        | 100.64.0.1                |
+        | 0.0.0.0                   |
+        | ::                        |
+        | localhost                 |
+        | 127.0.0.2:80              |
+        | 127.0.0.2/x               |
+        | x@127.0.0.2               |
+        | 127.0.0.2 (trailing space) |
+        | ::ffff:8.8.8.8            |
+
+    @unit
+    Scenario: Only private addresses are dialed as owners
+      When an owner address is checked
+      Then 10/8, 172.16/12, 192.168/16, 127/8 and fc00::/7 literals are accepted
+      And every other IP literal is refused, at and beside each range edge
+      And a host name, a port, a path, a zone, a space, brackets, userinfo or a leading zero is refused
+      And an IPv4-mapped public address is refused
+
+    @integration
+    Scenario: The hop dial cap refuses further hops without a dial
+      Given a hop dial cap of 1 and an owner that never answers
+      And one hop dial is waiting on that owner
+      When Twilio lands on pod B with a second id
+      Then Twilio gets HTTP 403 voice_relay_forbidden at once
+      And the owner saw only one connection
+      And gateway_voice_media_relay_total{outcome="refused_hop_busy"} rises by one
+      And the dial that held the cap ends as an unreachable owner
+      And a later hop dials the owner again
+
+    @integration
+    Scenario: A pod without an address refuses an id that names an owner
+      Given a gateway pod with no pod address
+      When Twilio connects with an id that names an owner address
+      Then Twilio gets HTTP 403 voice_relay_forbidden and no WebSocket
+      And no connection is made to the hop port
+      And gateway_voice_media_relay_total{outcome="refused_unknown"} rises by one
+
+    @integration
+    Scenario: A pod without an address still serves its own ids
+      Given a gateway pod with no pod address
+      When a relay is opened and Twilio connects with its id
+      Then frames pass
+
+  # ============================================================
+  Rule: The hop listener is not the public listener
+
+    @integration
+    Scenario Outline: A hop request without a valid signature is refused with 401
+      Given a pending relay and the owner's hop listener
+      When the hop is dialed with <credential>
+      Then the response is 401 with error code <code>
+      And the relay is still waiting for Twilio
+
+      Examples:
+        | credential                         | code                    |
+        | no signature headers               | missing_signature       |
+        | a bad signature                    | invalid_signature       |
+        | a signature 301 seconds old        | timestamp_out_of_window |
+        | a signature over another path      | invalid_signature       |
+        | a signature over the public path   | invalid_signature       |
+        | only an lwl_ bearer token          | missing_signature       |
+
+    @integration
+    Scenario: A hop request that is not an upgrade, or carries a body, is refused with 400
+      Given a pending relay and the owner's hop listener
+      When a plain signed GET is sent to the hop route
+      And a signed upgrade with a body is sent to the hop route
+      Then both responses are 400
+      And the relay is still waiting for Twilio
+
+    @integration
+    Scenario Outline: The public router serves no relay-hop route
+      Given a pending relay
+      When a signed upgrade is sent to <path> on the public listener
+      Then the response is 404
+      And the relay is still waiting for Twilio
+
+      Examples:
+        | path                 |
+        | /relay-hop/{id}      |
+        | /v1/relay-hop/{id}   |
+
+    @integration
+    Scenario Outline: The hop listener serves only the hop route
+      Given a pending relay
+      When a signed upgrade with an lwl_ bearer is sent to <path> on the hop listener
+      Then the response is 404
+
+      Examples:
+        | path                         |
+        | /v1/voice/twilio/{id}        |
+        | /v1/voice/relay              |
+        | /v1/voice/relay/org-1        |
+        | /healthz                     |
+        | /metrics                     |
+        | /                            |
+
+    @integration
+    Scenario: The hop listener stops after the media relay hub and the public listener
+      Given the managed services of a gateway with a media relay and a hop listener
+      Then the hop listener is registered before the media relay hub and before the public listener
+      And so it stops after both, and serves through the whole voice drain
+
+    @integration
+    Scenario: A gateway without a hop listener registers none
+      Given the managed services of a gateway without a hop listener
+      Then no relay-hop service is registered
+
+    @integration
+    Scenario: A draining owner still accepts a hop for its pending relay
+      Given a pending relay on pod A
+      When pod A begins to drain
+      And Twilio lands on pod B with the relay id
+      Then the relay is joined through the hop and frames pass
+
+  # ============================================================
+  Rule: The relay id can be sealed with a key of its own
+
+    @integration
+    Scenario: A gateway-only key seals relay ids when it is set
+      Given gateway pods with a relay id key
+      When a relay is opened
+      Then its id opens with the key and names the pod address
+      And its id does not open with the internal secret
+
+    @integration
+    Scenario: Relay ids sealed with the gateway-only key hop between pods
+      Given gateway pods with a relay id key and one internal secret
+      When Twilio lands on pod B for a relay held by pod A
+      Then the relay is joined through the hop and frames pass
+
+    @integration
+    Scenario: An id sealed with the internal secret is refused when a gateway-only key is set
+      Given gateway pods with a relay id key
+      When Twilio connects with an id for a pending relay sealed with the internal secret
+      Then Twilio gets HTTP 403 voice_relay_forbidden
+
+  # ============================================================
+  Rule: The hop keeps ids and payloads out of telemetry
+
+    @integration
+    Scenario: The relay id never appears in full in hop logs
+      Given a hopped relay, a stale-boot probe, a hop with a bad signature and a replay
+      Then no log entry of either pod holds more than a short prefix of the relay id
+      And no log entry of either pod holds more than a short prefix of the refused id
+
+    @integration
+    Scenario: Frame payloads never appear in hop logs
+      Given a hopped relay
+      When a marker string passes in both directions
+      Then no log entry of either pod contains the marker
+
+    @integration
+    Scenario: Metric labels never carry a relay id
+      When a relay is hopped, closed and replayed
+      Then the only label on gateway_voice_media_relay_total is outcome
+      And its values are from the fixed outcome set, hop outcomes included
+
+    @unit
+    Scenario: The hop outcomes are documented
+      Then the counter's help text names hop_joined, refused_owner_unreachable, refused_owner_invalid and refused_hop_busy
+      And the observability page lists the same four outcomes
+
+  # ============================================================
+  Rule: Hop settings are configured from the environment
+
+    @unit
+    Scenario: Hop settings come from the environment
+      When the gateway loads its configuration
+      Then the hop address defaults to ":5564"
+      And the hop timeout defaults to 3 seconds
+      And the maximum hop dials default to 64
+      And the relay id key defaults to empty
+      And each can be overridden from the environment
+
+    @unit
+    Scenario: A negative hop setting is refused
+      When the hop timeout or the maximum hop dials is negative
+      Then the gateway refuses to start and names the variable
+
+    @unit
+    Scenario: The hop address must be a host and a port
+      When the hop address is "garbage", "5564", ":", ":0", ":notaport", ":70000" or "host:"
+      Then the gateway refuses to start and names GATEWAY_RELAY_HOP_ADDR
+
+    @unit
+    Scenario: The relay id key must be at least 32 bytes
+      When the relay id key is 31 bytes
+      Then the gateway refuses to start and names LW_GATEWAY_VOICE_RELAY_ID_KEY
+      And a key of 32 bytes is accepted
+      And the length is counted in bytes, not characters
+
+    @unit
+    Scenario: The relay id key is never echoed in a refusal
+      When a short relay id key is refused
+      Then the error text does not contain the key
+
+    @unit
+    Scenario: The hop port is read from the hop address
+      When the hop address is ":5564", "0.0.0.0:6000", "[::]:7000" or "127.0.0.1:5570"
+      Then the port is 5564, 6000, 7000 or 5570
+      And an empty address, a bare word, port 0, a non-number or a port above 65535 is refused
+
+  # ============================================================
+  Rule: The chart wires the hop
+
+    @unit
+    Scenario: The pod address and the hop port reach the container
+      When the gateway chart is rendered
+      Then the container env GATEWAY_POD_IP comes from the downward API field status.podIP
+      And the container has a port named relay-hop at 5564
+      And GATEWAY_RELAY_HOP_ADDR is ":5564" in the ConfigMap
+      And relayHop.port changes both the container port and the address
+
+    @unit
+    Scenario: The hop port is open only to the gateway's own pods
+      When the gateway chart is rendered with the network policy enabled
+      Then an ingress rule allows TCP 5564 from pods with the gateway's selector labels and nothing else
+      And an egress rule allows TCP 5564 to pods with the gateway's selector labels and nothing else
+      And no other ingress rule opens 5564
+
+    @unit
+    Scenario: The hop port is not published by a Service
+      When the gateway chart is rendered with the internal Service enabled
+      Then no Service has port 5564
+      And no Service targets the relay-hop port

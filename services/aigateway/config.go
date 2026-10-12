@@ -3,8 +3,10 @@ package aigateway
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,6 +42,9 @@ type Config struct {
 	// goes into Twilio relay ids so any pod can tell which pod owns one.
 	// Empty means a single-pod gateway.
 	PodIP string `env:"GATEWAY_POD_IP"`
+	// RelayHopAddr is where the owner side of a cross-pod relay hop listens
+	// (GATEWAY_RELAY_HOP_ADDR). Only the gateway's own pods may reach it.
+	RelayHopAddr string `env:"GATEWAY_RELAY_HOP_ADDR"`
 	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
 	// non-streaming response writes a keep-alive byte while dispatch is
 	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
@@ -109,6 +114,13 @@ type VoiceConfig struct {
 	// MaxRelaysPerScope caps all the relays one instance or organization
 	// holds, paired or not.
 	MaxRelaysPerScope int `env:"MAX_RELAYS_PER_SCOPE"`
+	// HopTimeoutSeconds bounds the dial to the pod that owns a relay.
+	HopTimeoutSeconds int64 `env:"HOP_TIMEOUT_SECONDS"`
+	// MaxHopDials caps the hop dials one process has in flight.
+	MaxHopDials int `env:"MAX_HOP_DIALS"`
+	// RelayIDKey keys the relay ids on its own, apart from the internal
+	// secret the workers share. Unset, the internal secret keys them.
+	RelayIDKey string `env:"RELAY_ID_KEY"`
 }
 
 // CORSConfig lets browser pages call the public /v1 routes directly.
@@ -255,6 +267,8 @@ func defaultConfig() Config {
 			MaxMediaRelays:           500,
 			MaxPendingRelaysPerScope: 20,
 			MaxRelaysPerScope:        50,
+			HopTimeoutSeconds:        3,
+			MaxHopDials:              64,
 		},
 		OTel: config.OTel{
 			// Left unset so an operator-supplied ratio is distinguishable from
@@ -291,6 +305,12 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	}
 	if err := validateMediaRelayLimits(cfg.Voice); err != nil {
 		return Config{}, err
+	}
+	if cfg.RelayHopAddr == "" {
+		cfg.RelayHopAddr = ":5564"
+	}
+	if _, err := relayHopPort(cfg.RelayHopAddr); err != nil {
+		return Config{}, fmt.Errorf("GATEWAY_RELAY_HOP_ADDR: %w", err)
 	}
 	if err := validateCodexAPIBase(cfg.CodexAPIBase); err != nil {
 		return Config{}, err
@@ -381,6 +401,21 @@ func validateSecondsFields(cfg Config) error {
 	return nil
 }
 
+const minRelayIDKeyBytes = 32
+
+// relayHopPort is the port of a listen address.
+func relayHopPort(addr string) (int, error) {
+	_, portText, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0, err
+	}
+	port, err := strconv.Atoi(portText)
+	if err != nil || port < 1 || port > 65535 {
+		return 0, fmt.Errorf("bad port %q", portText)
+	}
+	return port, nil
+}
+
 // validateMediaRelayLimits rejects a negative relay cap; zero takes the
 // relay hub's default, so only a negative is a mistake.
 func validateMediaRelayLimits(voice VoiceConfig) error {
@@ -389,6 +424,16 @@ func validateMediaRelayLimits(voice VoiceConfig) error {
 	}
 	if voice.MaxPendingRelaysPerScope < 0 {
 		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE is %d; it must be zero or positive", voice.MaxPendingRelaysPerScope)
+	}
+	if voice.HopTimeoutSeconds < 0 {
+		return fmt.Errorf("LW_GATEWAY_VOICE_HOP_TIMEOUT_SECONDS is %d; it must be zero or positive", voice.HopTimeoutSeconds)
+	}
+	if voice.MaxHopDials < 0 {
+		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_HOP_DIALS is %d; it must be zero or positive", voice.MaxHopDials)
+	}
+	// The key is not echoed: a short one is still a secret.
+	if voice.RelayIDKey != "" && len(voice.RelayIDKey) < minRelayIDKeyBytes {
+		return fmt.Errorf("LW_GATEWAY_VOICE_RELAY_ID_KEY is shorter than %d bytes", minRelayIDKeyBytes)
 	}
 	if voice.MaxRelaysPerScope < 0 {
 		return fmt.Errorf("LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE is %d; it must be zero or positive", voice.MaxRelaysPerScope)

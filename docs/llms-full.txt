@@ -3186,7 +3186,7 @@ Ignore fields you do not recognize. New ones are added over time and none of the
 | `realtime_registry_unavailable`  | 503  | The control plane could not record a realtime voice session, so the gateway did not mint a session.                                                        | Retry.                                                                                          |
 | `voice_broker_unavailable`       | 503  | The gateway instance is at its limit of supervised voice calls, or is shutting down. No call was created.                                                  | Retry after the `Retry-After` header.                                                           |
 | `voice_relay_license_required` | 403 | A Twilio media relay was opened with a virtual key. Only a license token, or a request signed by the control plane, may open one. | Open the relay with the install's `lwl_` token and `X-LangWatch-Instance`. |
-| `voice_relay_forbidden` | 403 | Twilio's socket was refused: the relay id is unknown, expired, already used, or belongs to another gateway pod. The answer is the same for every reason. | Open a new relay and place the call again. |
+| `voice_relay_forbidden` | 403 | Twilio's socket was refused: the relay id is unknown, expired, already used, or belongs to a gateway pod that cannot be reached. The answer is the same for every reason. | Open a new relay and place the call again. |
 | `voice_relay_unavailable` | 503 | The gateway instance is full, is shutting down, or the caller already has its maximum of relays, in total or waiting for Twilio. No relay was opened. | Retry after the `Retry-After` header. |
 | `internal_error`                 | 500  | An unclassified gateway failure.                                                                                                                           | Retry, and quote `trace_id` in a support ticket.                                                |
 
@@ -4413,6 +4413,12 @@ Twilio media relays have their own limits and do not count toward the 2000 super
 An instance holds up to `LW_GATEWAY_VOICE_MAX_MEDIA_RELAYS` relays (default 500). One self-hosted install or one organization holds up to `LW_GATEWAY_VOICE_MAX_RELAYS_PER_SCOPE` (default 50), of which `LW_GATEWAY_VOICE_MAX_PENDING_RELAYS_PER_SCOPE` (default 20) may still wait for Twilio. A relay past any cap answers `503 voice_relay_unavailable` with `Retry-After`.
 
 A relay waits `LW_GATEWAY_VOICE_PENDING_TTL_SECONDS` (default 150) for Twilio to dial in, and a paired relay runs at most `LW_GATEWAY_VOICE_MAX_RELAY_SECONDS` (default 330). Relay ids name the pod that minted them through `GATEWAY_POD_IP` (set it to the pod's IP, for example with the Kubernetes downward API). Relays need `LW_GATEWAY_INTERNAL_SECRET`. Without it they are off, and the gateway logs a warning at boot.
+
+Twilio may land on a different pod from the one that opened the relay. That pod dials the owner on `GATEWAY_RELAY_HOP_ADDR` (default `:5564`), signed with the internal secret, and answers `403` if the owner refuses or does not reply within `LW_GATEWAY_VOICE_HOP_TIMEOUT_SECONDS` (default 3). Without `GATEWAY_POD_IP`, every id is local.
+
+Only the gateway's own pods may reach the hop port. Do not publish it in a Service. `LW_GATEWAY_VOICE_MAX_HOP_DIALS` (default 64) caps the dials in flight on one pod.
+
+`LW_GATEWAY_VOICE_RELAY_ID_KEY` (at least 32 bytes) keys the relay ids on its own. Unset, the internal secret keys them, and anything that holds it can mint an id. Set it when workers share the internal secret.
 
 ## WebSocket relay
 
@@ -8425,7 +8431,7 @@ sum by (code) (rate(gateway_client_rejects_total{vk_id="<vk-id>"}[15m]))
 | `gateway_voice_sessions_supervised`           | gauge   | `kind`              | Brokered voice calls this pod meters from its own server-side socket, by `live` or `realtime`. Media does not pass through the pod |
 | `gateway_voice_sessions_ended_total`          | counter | `kind`, `reason`    | Supervised calls that ended. `reason` is `vendor_closed`, `budget_exceeded`, `key_revoked`, `sideband_lost`, `drain` or `session_closed`. Every reason but `vendor_closed` is the gateway ending the call |
 | `gateway_voice_usage_reports_total`           | counter | `outcome`           | Usage reports sent for supervised calls. `outcome` is `recorded`, `duplicate`, `closed`, `already_closed`, `error` or `dropped`. `error` is retried; `dropped` is usage lost because one call's retry queue was full |
-| `gateway_voice_media_relay_total`             | counter | `outcome`           | Twilio media relay outcomes. `outcome` is `opened`, `paired`, `refused_auth`, `refused_unknown`, `refused_expired`, `refused_replay`, `refused_unpaired`, `expired_unpaired`, `dropped` or `completed`. The relay id is never a label |
+| `gateway_voice_media_relay_total`             | counter | `outcome`           | Twilio media relay outcomes. `outcome` is `opened`, `paired`, `refused_auth`, `refused_unknown`, `refused_expired`, `refused_replay`, `refused_unpaired`, `expired_unpaired`, `dropped`, `completed`, or across pods `hop_joined`, `refused_owner_unreachable`, `refused_owner_invalid` and `refused_hop_busy`. A hop the owner pod refuses counts as `refused_unknown` on the pod Twilio reached. The relay id is never a label |
 
 ### Control plane
 

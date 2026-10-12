@@ -143,6 +143,12 @@ metrics:
     existingSecretName: ""
     secretKey: METRICS_API_KEY
 
+# Cross-pod Twilio relay hop (langwatch#8397). A pod Twilio reaches dials the
+# pod that opened the relay on this port. Only the gateway's own pods can reach
+# it (NetworkPolicy), and no Service publishes it.
+relayHop:
+  port: 5564
+
 logging:
   level: info # debug|info|warn|error
 

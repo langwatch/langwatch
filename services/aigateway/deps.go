@@ -212,9 +212,15 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 
 	var mediaRelay *mediarelay.Hub
 	if cfg.ControlPlane.InternalSecret != "" {
+		// LoadConfig validated the address; zero takes the hub's default.
+		hopPort, _ := relayHopPort(cfg.RelayHopAddr)
 		mediaRelay = mediarelay.NewHub(mediarelay.Options{
 			Secret:             cfg.ControlPlane.InternalSecret,
+			IDKey:              cfg.Voice.RelayIDKey,
 			PodIP:              cfg.PodIP,
+			HopPort:            hopPort,
+			HopTimeout:         time.Duration(cfg.Voice.HopTimeoutSeconds) * time.Second,
+			MaxHopDials:        cfg.Voice.MaxHopDials,
 			PendingTTL:         time.Duration(cfg.Voice.PendingTTLSeconds) * time.Second,
 			MaxRelayDuration:   time.Duration(cfg.Voice.MaxRelaySeconds) * time.Second,
 			DrainBudget:        time.Duration(cfg.Voice.DrainSeconds) * time.Second,

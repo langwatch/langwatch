@@ -1,6 +1,7 @@
 package mediarelay
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -29,6 +30,13 @@ const (
 	OutcomeExpiredUnpaired = "expired_unpaired"
 	OutcomeDropped         = "dropped"
 	OutcomeCompleted       = "completed"
+
+	// The cross-pod hop: joined through the owner, or turned away before
+	// Twilio's socket was accepted.
+	OutcomeHopJoined               = "hop_joined"
+	OutcomeRefusedOwnerUnreachable = "refused_owner_unreachable"
+	OutcomeRefusedOwnerInvalid     = "refused_owner_invalid"
+	OutcomeRefusedHopBusy          = "refused_hop_busy"
 )
 
 // Close codes a worker is told. 1000, 1009 and 1012 are the standard ones.
@@ -52,6 +60,9 @@ const (
 	defaultMaxRelays          = 500
 	defaultMaxPendingPerScope = 20
 	defaultMaxRelaysPerScope  = 50
+	defaultHopPort            = 5564
+	defaultHopTimeout         = 3 * time.Second
+	defaultMaxHopDials        = 64
 	// stopAllowance is what closing the remaining relays takes after the budget.
 	stopAllowance = 10 * time.Second
 )
@@ -67,12 +78,21 @@ func (discardMetrics) RecordVoiceMediaRelay(string) {}
 
 // Options configures a Hub. A zero field takes its default.
 type Options struct {
-	// Secret keys the relay ids (LW_GATEWAY_INTERNAL_SECRET).
+	// Secret signs the hop requests (LW_GATEWAY_INTERNAL_SECRET). It also keys
+	// the relay ids unless IDKey is set.
 	Secret string
+	// IDKey keys the relay ids alone (LW_GATEWAY_VOICE_RELAY_ID_KEY), so the
+	// workers, which hold Secret, cannot mint one.
+	IDKey string
 	// PodIP and BootID name this pod inside every id it mints. PodIP empty
 	// means a single-pod gateway; BootID empty draws a random one.
 	PodIP  string
 	BootID string
+	// HopPort is the owner's hop listener port; HopTimeout bounds one hop dial
+	// and MaxHopDials the dials in flight.
+	HopPort     int
+	HopTimeout  time.Duration
+	MaxHopDials int
 	// PendingTTL is how long an opened relay waits for Twilio.
 	PendingTTL time.Duration
 	// MaxRelayDuration caps a paired relay, from the join.
@@ -96,14 +116,17 @@ type Options struct {
 // ids, joins each to the Twilio socket that dials in with that id, and drains
 // on shutdown. A relay is held from its open to its end.
 type Hub struct {
-	codec   *IDCodec
-	podIP   string
-	bootID  string
-	logger  *zap.Logger
-	metrics Metrics
+	codec    *IDCodec
+	secret   string
+	podIP    string
+	bootID   string
+	hopPort  int
+	hopSlots chan struct{}
+	logger   *zap.Logger
+	metrics  Metrics
 
-	pendingTTL, maxDuration, pingInterval, drainBudget time.Duration
-	maxRelays, maxPending, maxRelaysPerScope           int
+	pendingTTL, maxDuration, pingInterval, drainBudget, hopTimeout time.Duration
+	maxRelays, maxPending, maxRelaysPerScope                       int
 
 	mu     sync.Mutex
 	relays map[[16]byte]*relay
@@ -122,9 +145,13 @@ type Hub struct {
 // NewHub builds a Hub.
 func NewHub(opts Options) *Hub {
 	h := &Hub{
-		codec:             NewIDCodec(opts.Secret),
+		codec:             NewIDCodec(cmp.Or(opts.IDKey, opts.Secret)),
+		secret:            opts.Secret,
 		podIP:             opts.PodIP,
 		bootID:            opts.BootID,
+		hopPort:           orInt(opts.HopPort, defaultHopPort),
+		hopTimeout:        orDuration(opts.HopTimeout, defaultHopTimeout),
+		hopSlots:          make(chan struct{}, orInt(opts.MaxHopDials, defaultMaxHopDials)),
 		logger:            opts.Logger,
 		metrics:           opts.Metrics,
 		pendingTTL:        orDuration(opts.PendingTTL, defaultPendingTTL),
@@ -247,30 +274,74 @@ func (h *Hub) Open(w http.ResponseWriter, r *http.Request, scope string) error {
 }
 
 // Join upgrades w into Twilio's socket for the relay the id names and hands
-// it to that relay. Every refusal is the same 403, whatever the reason.
+// it to that relay, here or through the pod that owns it. Every refusal is
+// the same 403, whatever the reason.
 func (h *Hub) Join(w http.ResponseWriter, r *http.Request, id string) error {
-	ctx := r.Context()
-	refuse := func(outcome, reason string) error {
-		h.metrics.RecordVoiceMediaRelay(outcome)
-		h.logger.Debug("voice_media_relay_refused", zap.String("reason", reason), zap.String("relay", idPrefix(id)))
-		return herr.New(ctx, domain.ErrVoiceRelayForbidden, herr.M{
-			"message": "this relay id cannot be joined", "fault": "customer",
-		})
+	claims, err := h.unsealOrRefuse(r.Context(), id)
+	if err != nil {
+		return err
 	}
+	if claims.OwnerPodIP != "" && claims.OwnerPodIP != h.podIP {
+		return h.joinViaHop(joining{w, r, id, claims})
+	}
+	return h.joinLocal(joining{w, r, id, claims})
+}
+
+// Hop is the owner's side of a hop: it runs the claim a local Twilio join
+// runs, for a socket another pod accepted. Only this pod's own ids are served.
+func (h *Hub) Hop(w http.ResponseWriter, r *http.Request, id string) error {
+	claims, err := h.unsealOrRefuse(r.Context(), id)
+	if err != nil {
+		return err
+	}
+	if claims.OwnerPodIP == "" || claims.OwnerPodIP != h.podIP {
+		return h.refuse(r.Context(), id, refusal{OutcomeRefusedUnknown, "not_owner"})
+	}
+	return h.joinLocal(joining{w, r, id, claims})
+}
+
+// refusal is why a join was turned away: the outcome to count and the reason
+// to log.
+type refusal struct{ outcome, reason string }
+
+// joining is one Twilio socket asking to be joined to the relay an id names.
+type joining struct {
+	w      http.ResponseWriter
+	r      *http.Request
+	id     string
+	claims IDClaims
+}
+
+func (h *Hub) refuse(ctx context.Context, id string, why refusal) error {
+	h.metrics.RecordVoiceMediaRelay(why.outcome)
+	h.logger.Debug("voice_media_relay_refused", zap.String("reason", why.reason), zap.String("relay", idPrefix(id)))
+	return herr.New(ctx, domain.ErrVoiceRelayForbidden, herr.M{
+		"message": "this relay id cannot be joined", "fault": "customer",
+	})
+}
+
+func (h *Hub) unsealOrRefuse(ctx context.Context, id string) (IDClaims, error) {
 	claims, err := h.codec.Unseal(id, time.Now())
 	switch {
 	case errors.Is(err, ErrIDExpired):
-		return refuse(OutcomeRefusedExpired, "expired")
+		return claims, h.refuse(ctx, id, refusal{OutcomeRefusedExpired, "expired"})
 	case err != nil:
-		return refuse(OutcomeRefusedUnknown, "invalid")
-	case claims.OwnerPodIP != "" && claims.OwnerPodIP != h.podIP:
-		// Slice 2 hops to the owner; until then the id is not joinable here.
-		h.logger.Info("relay_owner_remote", zap.String("relay", idPrefix(id)))
-		return refuse(OutcomeRefusedUnknown, "owner_remote")
+		return claims, h.refuse(ctx, id, refusal{OutcomeRefusedUnknown, "invalid"})
+	}
+	return claims, nil
+}
+
+// joinLocal pairs the socket with a relay this pod holds. An id minted by an
+// earlier run of a pod that kept its address names another boot: refused.
+func (h *Hub) joinLocal(j joining) error {
+	w, r, id, claims := j.w, j.r, j.id, j.claims
+	ctx := r.Context()
+	if claims.OwnerBootID != h.bootID {
+		return h.refuse(ctx, id, refusal{OutcomeRefusedUnknown, "boot"})
 	}
 	rl, outcome := h.claim(claims.Random)
 	if rl == nil {
-		return refuse(outcome, "not_pending")
+		return h.refuse(ctx, id, refusal{outcome, "not_pending"})
 	}
 	twilio, err := websocket.Accept(w, r, acceptOptions())
 	if err != nil {
