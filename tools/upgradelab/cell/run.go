@@ -2,7 +2,9 @@ package cell
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -96,8 +98,10 @@ type run struct {
 	anchor             time.Time
 	sso                ssoSeed
 	retention          retentionState
-	odd                oddSeed     // the tenant-oddities overlay
-	damage             damageState // the operator-damage overlay
+	odd                oddSeed        // the tenant-oddities overlay
+	damage             damageState    // the operator-damage overlay
+	queuedAtCut        queuedJobs     // the queued-jobs-v1 overlay: main's jobs when its worker paused
+	typesAtCut         map[string]int // the upcast-events overlay: event_log rows per stored type at the cut
 	legacy             legacySeed
 	legacyOrg          legacyOrgSeed
 	license            TestLicense
@@ -132,6 +136,17 @@ func (options Options) Name() string {
 	return strings.ToLower(strings.ReplaceAll(name, "-", "_"))
 }
 
+// StoreName is the cell's database name, upgradelab_<cell>; past Postgres's 63-byte identifier limit, the tail
+// becomes a hash of the whole name so many overlays still name one database of their own.
+func StoreName(cell string) string {
+	name := DedicatedPrefix + cell
+	if len(name) <= 63 {
+		return name
+	}
+	sum := sha256.Sum256([]byte(name))
+	return name[:63-17] + "_" + hex.EncodeToString(sum[:8])
+}
+
 // Run executes the cell and writes report.json and report.md into RunDir; the error is operational only.
 func Run(ctx context.Context, options Options) (*Report, error) {
 	if load := oneMinuteLoad(); options.MaxLoad > 0 && load > options.MaxLoad {
@@ -159,6 +174,15 @@ func Run(ctx context.Context, options Options) (*Report, error) {
 	}
 	if cell.overlay(OverlayTenantOddities) {
 		origin = append(origin, step{"oddities-plant", cell.plantOddities})
+	}
+	if cell.heldOnly() {
+		origin = append(origin, step{"held-plant", cell.plantHeldTenant})
+	}
+	if cell.overlay(OverlayQueuedJobs) {
+		cut = append(cut, step{"queued-jobs-cut", cell.noteQueuedAtCut})
+	}
+	if cell.overlay(OverlayUpcastEvents) {
+		cut = append(cut, step{"stored-types-cut", cell.noteStoredTypesAtCut})
 	}
 	if cell.overlay(OverlayOperatorDamage) {
 		origin = append(origin, step{"damage-plant", cell.plantDamage})
@@ -267,8 +291,8 @@ func prepare(options Options) (*run, error) {
 		if !contains(Overlays, overlay) {
 			return nil, fmt.Errorf("unknown overlay %q: want one of %v", overlay, Overlays)
 		}
-		if overlay == OverlayTenantOddities && !profile.SSO {
-			return nil, errors.New("the tenant-oddities overlay needs an SSO deployment (cloud-sso or cloud-legacy-sso)")
+		if (overlay == OverlayTenantOddities || overlay == OverlayHeldTenants) && !profile.SSO {
+			return nil, fmt.Errorf("the %s overlay needs an SSO deployment (cloud-sso or cloud-legacy-sso)", overlay)
 		}
 	}
 	for _, dir := range []string{options.FromDir, options.HeadDir, options.ViaDir} {
@@ -311,7 +335,7 @@ func (cell *run) freshStores(ctx context.Context) error {
 		return err
 	}
 	cell.stores = Stores{PostgresBase: cell.options.PostgresBase, ClickHouseBase: cell.options.ClickHouseBase,
-		Cluster: cell.options.ClickHouseCluster, Name: DedicatedPrefix + cell.options.Name(), RedisPort: itoa(redisPort)}
+		Cluster: cell.options.ClickHouseCluster, Name: StoreName(cell.options.Name()), RedisPort: itoa(redisPort)}
 	shape, err := seed.LoadShapeEnv(cell.profile.Shape)
 	if err != nil {
 		return err

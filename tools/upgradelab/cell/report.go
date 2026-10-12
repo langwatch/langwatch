@@ -160,6 +160,8 @@ var invariantNames = map[string]string{
 	"A2":  "tenant oddities: plaintext provider keys are sealed and still read through head",
 	"A3":  "tenant oddities: dataset rows main kept in Postgres are kept and read through head",
 	"A4":  "tenant oddities: an organization with prompts and no tags gets its tags and its prompt still opens",
+	"Q1":  "queued-jobs-v1: every job main queued before the switch, in main's format, ran on head's worker or was left safely (none still due in its group, none dead-lettered, none blocked)",
+	"V1":  "upcast-events: every stored type head reads through an upcast is settled in its ledger, main's rows under it are kept, and I7 refused none",
 	"F1":  "empty origin: every data step ends done over zero rows (or not-needed)",
 	"F3":  "empty origin: an organization made just after ready keeps its founder (membership and role bindings) after settle",
 	"R2":  "the oldest aged trace each organization keeps reads back through head's API",

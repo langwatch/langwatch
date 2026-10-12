@@ -223,13 +223,15 @@ func (cell *run) readOddFacts(ctx context.Context, onHead bool) oddFacts {
 	odd := cell.odd
 	var facts oddFacts
 	var errs []error
-	form, err := psql(ctx, cell.stores.psqlURL(), `SELECT jsonb_typeof("customKeys") FROM mydb."ModelProvider" WHERE id = `+sqlQuote(odd.providerID))
-	facts.KeysForm = strings.TrimSpace(form)
-	errs = append(errs, err)
-	facts.DatasetRows, err = cell.oddCount(ctx, `SELECT count(*) FROM mydb."DatasetRecord" r JOIN mydb."Dataset" d ON d.id = r."datasetId" WHERE d."projectId" = `+sqlQuote(odd.keys.project))
-	errs = append(errs, err)
-	facts.UntaggedTags, err = cell.oddCount(ctx, `SELECT count(*) FROM mydb."PromptTag" WHERE "organizationId" = `+sqlQuote(odd.untagged.org))
-	errs = append(errs, err)
+	if odd.keys.org != "" { // held-tenants plants the held organization alone
+		form, err := psql(ctx, cell.stores.psqlURL(), `SELECT jsonb_typeof("customKeys") FROM mydb."ModelProvider" WHERE id = `+sqlQuote(odd.providerID))
+		facts.KeysForm = strings.TrimSpace(form)
+		errs = append(errs, err)
+		facts.DatasetRows, err = cell.oddCount(ctx, `SELECT count(*) FROM mydb."DatasetRecord" r JOIN mydb."Dataset" d ON d.id = r."datasetId" WHERE d."projectId" = `+sqlQuote(odd.keys.project))
+		errs = append(errs, err)
+		facts.UntaggedTags, err = cell.oddCount(ctx, `SELECT count(*) FROM mydb."PromptTag" WHERE "organizationId" = `+sqlQuote(odd.untagged.org))
+		errs = append(errs, err)
+	}
 	held, err := cell.legacyOrgStanding(ctx, `SELECT status FROM mydb."SystemMigrationTenantState" WHERE "migrationName" = '`+grandfatherStep+`' AND "tenantId" = `+sqlQuote(odd.held.org))
 	facts.HeldStates = held
 	errs = append(errs, err)
@@ -239,9 +241,11 @@ func (cell *run) readOddFacts(ctx context.Context, onHead bool) oddFacts {
 	}
 	facts.OtherHeld, err = cell.legacyOrgStanding(ctx, `SELECT "migrationName" || ':' || "tenantId" || ':' || status FROM mydb."SystemMigrationTenantState" WHERE "migrationName" <> '`+secretHealStep+`' AND status IN ('migrated', 'parked') AND "tenantId" <> `+sqlQuote(odd.held.org)+` ORDER BY 1`)
 	errs = append(errs, err)
-	facts.ProvidersRead, facts.ProvidersBody = cell.oddGet(ctx, "/api/model-providers", odd.keysAPIKey)
-	facts.DatasetRead, facts.DatasetBody = cell.oddGet(ctx, "/api/dataset/"+oddDataset, odd.keysAPIKey)
-	facts.PromptRead, _ = cell.oddGet(ctx, "/api/prompts/"+oddPrompt, odd.tagsKey)
+	if odd.keys.org != "" {
+		facts.ProvidersRead, facts.ProvidersBody = cell.oddGet(ctx, "/api/model-providers", odd.keysAPIKey)
+		facts.DatasetRead, facts.DatasetBody = cell.oddGet(ctx, "/api/dataset/"+oddDataset, odd.keysAPIKey)
+		facts.PromptRead, _ = cell.oddGet(ctx, "/api/prompts/"+oddPrompt, odd.tagsKey)
+	}
 	facts.OpsText, facts.OpsErr = cell.opsPage(ctx, "ops-upgrades-organizations-held", "/ops/upgrades", "Organizations", odd.held.org)
 	facts.HomeText, facts.HomeErr = cell.opsPage(ctx, "home-action-needed-held", "/", "", "")
 	facts.ReadErr = errors.Join(errs...)
