@@ -2,6 +2,7 @@ package githubsim
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
@@ -69,7 +70,7 @@ func (s *Server) deliver(req deliverRequest) (delivery, error) {
 	if req.BadSignature {
 		secret += "-wrong"
 	}
-	httpReq, err := http.NewRequest(http.MethodPost, s.cfg.WebhookURL, bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(context.Background(), http.MethodPost, s.cfg.WebhookURL, bytes.NewReader(body))
 	if err != nil {
 		rec.Error = err.Error()
 		s.remember(rec)

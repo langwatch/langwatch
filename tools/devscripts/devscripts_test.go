@@ -10,21 +10,21 @@ import (
 	"github.com/langwatch/langwatch/tools/internal/collate"
 )
 
-func writeTree(t testing.TB, root string, tree map[string]string) {
-	t.Helper()
+func writeTree(tb testing.TB, root string, tree map[string]string) {
+	tb.Helper()
 	for path, content := range tree {
 		full := filepath.Join(root, path)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
+		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+			tb.Fatal(err)
 		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
+		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
+			tb.Fatal(err)
 		}
 	}
 }
 
-func run(t testing.TB, args ...string) (int, string, string) {
-	t.Helper()
+func run(tb testing.TB, args ...string) (int, string, string) {
+	tb.Helper()
 	var stdout, stderr bytes.Buffer
 	code := Run(args, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
@@ -95,7 +95,7 @@ func TestGenerateModulesDryRunWritesNothing(t *testing.T) {
 	if code != 0 || !strings.HasPrefix(stdout, "Would generate apps/api/src/process-modules.generated.ts (") {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
-	if exists(filepath.Join(root, "apps/api/src")) {
+	if exists(filepath.Join(root, "apps", "api", "src")) {
 		t.Error("dry run wrote a file")
 	}
 }
@@ -110,11 +110,11 @@ func BenchmarkGenerateModules(b *testing.B) {
 	}
 }
 
-func ensureRepoRoot(b testing.TB) string {
-	b.Helper()
+func ensureRepoRoot(tb testing.TB) string {
+	tb.Helper()
 	root, err := filepath.Abs("../..")
 	if err != nil || !exists(filepath.Join(root, "pnpm-workspace.yaml")) {
-		b.Skip("not inside the repository")
+		tb.Skip("not inside the repository")
 	}
 	return root
 }

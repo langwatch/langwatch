@@ -82,9 +82,9 @@ func (s *Server) api(fn apiFunc) http.HandlerFunc {
 				return
 			}
 		}
-		status, out := http.StatusOK, any(nil)
-		v, err := fn(r, p)
-		if err != nil {
+		status := http.StatusOK
+		var out any
+		if v, err := fn(r, p); err != nil {
 			e := asAPIError(err)
 			status, out = e.status, e.body()
 		} else {
@@ -432,12 +432,12 @@ func (s *Server) searchInvoices(_ *http.Request, p params) (any, error) {
 			if !prev(inv) {
 				return false
 			}
-			switch {
-			case field == "customer":
+			switch field {
+			case "customer":
 				return inv.Customer == want
-			case field == "subscription":
+			case "subscription":
 				return deref(inv.Subscription) == want
-			case field == "status":
+			case "status":
 				return deref(inv.Status) == want
 			}
 			return inv.Metadata[key] == want

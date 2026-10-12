@@ -22,8 +22,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, command+":", err)
 		return 1
 	}
-	switch command {
-	case "generate-modules":
+	if command == "generate-modules" {
 		return runGenerateModules(subcommand{root: root, args: rest, stdout: stdout, stderr: stderr})
 	}
 	fmt.Fprintf(stderr, "devscripts: unknown subcommand %q\n", command)

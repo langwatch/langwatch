@@ -211,9 +211,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	events, pending, held := s.hook.snapshot()
 	if typ := r.URL.Query().Get("type"); typ != "" {
 		kept := events[:0]
-		for _, e := range events {
-			if e.Event.Type == typ {
-				kept = append(kept, e)
+		for i := range events {
+			if events[i].Event.Type == typ {
+				kept = append(kept, events[i])
 			}
 		}
 		events = kept

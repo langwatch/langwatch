@@ -65,8 +65,8 @@ type hooks struct {
 	wake    chan struct{}
 }
 
-func newHooks(url, secret string, real func() time.Time) *hooks {
-	return &hooks{url: url, secret: secret, real: real, client: &http.Client{Timeout: 30 * time.Second}, wake: make(chan struct{}, 1)}
+func newHooks(url, secret string, clock func() time.Time) *hooks {
+	return &hooks{url: url, secret: secret, real: clock, client: &http.Client{Timeout: 30 * time.Second}, wake: make(chan struct{}, 1)}
 }
 
 // sign is Stripe's scheme: t=<unix>,v1=hex(HMAC-SHA256(secret, "<t>.<payload>")).

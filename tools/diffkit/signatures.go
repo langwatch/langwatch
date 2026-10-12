@@ -115,7 +115,7 @@ type signatureIndex struct {
 	order []string
 }
 
-// scanLog folds one log's levelled lines into the index under side.
+// scanLog folds one log's leveled lines into the index under side.
 func (index *signatureIndex) scanLog(path, side string) error {
 	file, err := os.Open(path) // #nosec G304 -- a log this run wrote.
 	if err != nil {

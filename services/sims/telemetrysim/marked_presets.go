@@ -8,7 +8,7 @@ var markedPresets = []Preset{
 	{Name: "seed-evals", Signal: SignalTraces, Service: "northwind-agents", Spans: []SpanShape{
 		{Name: "seed: evals", Kind: internal, DurationMs: 2200, Attrs: []Attr{
 			{"langwatch.span.type", "agent"}, {"langwatch.thread.id", "$session"}, {"langwatch.user.id", "$user"},
-			{"langwatch.input", "seed: evals - summarise ticket 9012."},
+			{"langwatch.input", "seed: evals - summarize ticket 9012."},
 			{"langwatch.output", "Checkout fails for EU cards since 09:12."},
 		}, Events: []EventShape{
 			{Name: "langwatch.evaluation.custom", OffsetMs: 2000, Attrs: []Attr{{"json_encoded_event", `{"name":"seed-faithfulness","type":"custom","status":"processed","passed":true,"score":0.92,"details":"grounded in the ticket"}`}}},

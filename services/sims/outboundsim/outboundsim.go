@@ -101,8 +101,9 @@ func newServer(cfg Config, bundle fs.FS) *Server {
 		console: newConsole(bundle),
 	}
 	if cfg.Seed {
-		for _, r := range seedRecords() {
-			s.records.add(r, s.now())
+		seeds := seedRecords()
+		for i := range seeds {
+			s.records.add(seeds[i], s.now())
 		}
 	}
 	s.mux = s.routes()

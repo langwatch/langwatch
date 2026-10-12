@@ -22,6 +22,7 @@ var (
 		"skills/_tests",
 		".github/scripts",
 		"dev/scripts/__tests__",
+		"dev/nx/__tests__",
 		"dev/scripts/upgrade-rehearsal/__tests__",
 	}
 	batsTestRoots = []string{
@@ -48,6 +49,7 @@ var (
 		"services/sims/telemetrysim",
 		"services/sims/lambdasim",
 		"services/sims/githubsim",
+		"services/scenariorunner",
 		"tools/workerrun",
 		"tools/seedgen",
 		"sdks/go",
@@ -85,7 +87,6 @@ var (
 		"modules/authz/specs/access-reviews.feature",
 		"modules/authz/specs/agent-principals.feature",
 		"modules/authz/specs/authz-passports.feature",
-		"modules/scenario/specs/simulation-run.feature",
 		"specs/agents/create-workflow-agent.feature",
 		"specs/agents/workflow-agent-editor.feature",
 		"specs/ai-gateway/budgets-principal-cascade.feature",
@@ -272,8 +273,6 @@ var (
 		"specs/monitors/monitor-execution-backend.feature",
 		"specs/monitors/monitor-trace-mappings.feature",
 		"specs/monitors/new-evaluation-menu.feature",
-		"specs/monitors/online-evaluation-drawer-flow.feature",
-		"specs/monitors/pending-mappings-validation.feature",
 		"specs/monitors/replicate-monitor-to-project.feature",
 		"specs/monitors/workflow-evaluator-checktype.feature",
 		"specs/monitors/workflow-evaluator-mappings.feature",
@@ -346,7 +345,6 @@ var (
 		"specs/traces-v2/editable-trace-name-alignment.feature",
 		"specs/traces-v2/facet-perspectives.feature",
 		"modules/trace/specs/flame-graph.feature",
-		"specs/traces-v2/grouping-engine.feature",
 		"specs/traces-v2/io-pretty-markdown.feature",
 		"specs/traces-v2/lens-preset-groups.feature",
 		"specs/traces-v2/light-mode-contrast.feature",
@@ -390,6 +388,7 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		"specs/traces-v2/grouping-engine.feature",
 		"specs/traces-v2/metrics.feature",
 		"specs/features/analytics-cli.feature",
 		"specs/traces-v2/trace-drawer-shell.feature",

@@ -2,9 +2,10 @@ package githubsim
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
-	"net/http/cgi"
+	"net/http/cgi" //nolint:gosec // G504: runs git http-backend; Httpoxy only hit Go before 1.6.3
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -67,7 +68,7 @@ func (s *Server) handleGit(w http.ResponseWriter, r *http.Request) {
 func (s *Server) gitRoot() (string, error) {
 	s.gitOnce.Do(func() {
 		if s.cfg.GitRoot != "" {
-			s.gitDir, s.gitErr = s.cfg.GitRoot, os.MkdirAll(s.cfg.GitRoot, 0o755)
+			s.gitDir, s.gitErr = s.cfg.GitRoot, os.MkdirAll(s.cfg.GitRoot, 0o750)
 			return
 		}
 		s.gitDir, s.gitErr = os.MkdirTemp("", "githubsim-git-")
@@ -123,7 +124,7 @@ func (s *Server) headMissing(fullName, branch string) bool {
 }
 
 func runGit(args []string, stdin string) (string, error) {
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(context.Background(), "git", args...)
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=githubsim", "GIT_AUTHOR_EMAIL=githubsim@example.com",
 		"GIT_COMMITTER_NAME=githubsim", "GIT_COMMITTER_EMAIL=githubsim@example.com",
