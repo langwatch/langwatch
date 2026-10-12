@@ -147,9 +147,15 @@ Rule: Toolbar strip
 
   @unimplemented
   Scenario: Toolbar renders the expected controls
-    Then the toolbar shows lens tabs flushed left
-    And the right side holds two clusters: filters, save view, time range picker, live indicator, grouping select, density toggle; then columns dropdown, export, tour button and a More menu (automate, keyboard shortcuts)
+    Then the toolbar shows lens tabs flushed left, led by the "Filters" button while the sidebar is closed
+    And the right side holds two clusters: save view, time range picker, live indicator, grouping select, density toggle; then columns dropdown, export, tour button and a More menu (automate, keyboard shortcuts)
     And the toolbar row is 36px minimum height
+
+  @integration
+  Scenario: The Filters button leads the lens row
+    Given the filter sidebar is closed
+    Then the "Filters" button sits at the left of the lens tabs, before "All"
+    And it is not part of the right clusters, so it keeps its place as the clusters change
 
   @integration
   Scenario: Lens tabs take remaining horizontal space

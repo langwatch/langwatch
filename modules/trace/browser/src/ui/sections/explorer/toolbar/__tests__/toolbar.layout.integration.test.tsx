@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
+import { useUIStore } from "../../../../../behavior/ui.store.ts";
 import { Toolbar, toolbarCompactness } from "../toolbar.tsx";
 
 vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
@@ -89,6 +90,36 @@ describe("the toolbar row", () => {
       expect(getByTestId("time-range").parentElement).toBe(timeCluster);
       expect(getByTestId("grouping").parentElement).toBe(timeCluster);
       expect(getByTestId("density").parentElement).toBe(timeCluster);
+    });
+  });
+});
+
+describe("the Filters button", () => {
+  describe("given the filters sidebar is closed", () => {
+    /** @scenario "The Filters button leads the lens row" */
+    it("sits before the lens tabs, outside the right clusters", () => {
+      useUIStore.getState().setSidebarCollapsed(true);
+      const { container, getByRole, getByTestId } = renderWithDesignSystem(<Toolbar />);
+
+      const filters = getByRole("button", { name: "Show filters sidebar" });
+      const tabs = container.querySelector('[data-scope="tabs"][data-part="root"]') as HTMLElement;
+      const tabsBox = tabs.parentElement as HTMLElement;
+      const row = tabsBox.parentElement as HTMLElement;
+
+      expect(row.contains(filters)).toBe(true);
+      expect(getByTestId("live").parentElement?.contains(filters)).toBe(false);
+      expect(filters.compareDocumentPosition(tabsBox) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    });
+  });
+
+  describe("given the filters sidebar is open", () => {
+    it("is not in the toolbar, since the sidebar carries its own close control", () => {
+      useUIStore.getState().setSidebarCollapsed(false);
+      const { queryByRole } = renderWithDesignSystem(<Toolbar />);
+
+      expect(queryByRole("button", { name: "Show filters sidebar" })).toBeNull();
     });
   });
 });

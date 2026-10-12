@@ -247,33 +247,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
           </Button>
         </Tooltip>
       )}
-      {/* Cluster 1: the lenses, which take every pixel the other two clusters leave. */}
+      {/* Cluster 1: the Filters button (only while the sidebar is closed) leads the lenses at
+          a fixed spot before "All"; the lenses take every pixel the other clusters leave. */}
+      {sidebarCollapsed && (
+        <Tooltip
+          content="Show filters sidebar"
+          shortcut={PAGE_SHORTCUTS.sidebar}
+          positioning={{ placement: "bottom" }}
+        >
+          <Button
+            aria-label="Show filters sidebar"
+            aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.sidebar)}
+            variant="outline"
+            size="xs"
+            fontWeight="medium"
+            gap={1.5}
+            color="fg.subtle"
+            onClick={toggleSidebar}
+            flexShrink={0}
+          >
+            <PanelLeftOpen size={14} />
+            Filters
+          </Button>
+        </Tooltip>
+      )}
       <LensTabs />
-      {/* Cluster 2: what the table holds and how its rows read: filters, saving them, the time
+      {/* Cluster 2: what the table holds and how its rows read: saving the view, the time
           window, freshness, grouping and density. */}
       <HStack gap={1} flexShrink={0}>
-        {sidebarCollapsed && (
-          <Tooltip
-            content="Show filters sidebar"
-            shortcut={PAGE_SHORTCUTS.sidebar}
-            positioning={{ placement: "bottom" }}
-          >
-            <Button
-              aria-label="Show filters sidebar"
-              aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.sidebar)}
-              variant="outline"
-              size="xs"
-              fontWeight="medium"
-              gap={1.5}
-              color="fg.subtle"
-              onClick={toggleSidebar}
-              flexShrink={0}
-            >
-              <PanelLeftOpen size={14} />
-              Filters
-            </Button>
-          </Tooltip>
-        )}
         {canSaveLenses && activeLensIsDraft && !hasParseError && (
           <LensNamePopover
             defaultName={`${activeLensName} (copy)`}
