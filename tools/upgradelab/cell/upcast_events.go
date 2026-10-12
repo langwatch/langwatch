@@ -18,7 +18,7 @@ const upcastStepPrefix = "upcast:"
 
 // storedTypeCounts reads event_log's rows per stored event type on the shared target.
 func (cell *run) storedTypeCounts(ctx context.Context) (map[string]int, error) {
-	out, err := clickhouseQuery(ctx, cell.stores.ClickHouseURL(""), "SELECT EventType, count() FROM event_log GROUP BY EventType FORMAT TSV")
+	out, err := clickhouseQuery(ctx, cell.stores.queryURL(""), "SELECT EventType, count() FROM event_log GROUP BY EventType FORMAT TSV")
 	if err != nil {
 		return nil, err
 	}
