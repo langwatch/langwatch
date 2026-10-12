@@ -98,9 +98,8 @@ For `Secret.load`, capabilities and entitlements, the `module-dependencies` skil
 - **Believing a section number is stable.** Search by heading; the record is
   edited often.
 - **Treating §16's left column as the tree.** It is the target; check the tree.
-- **Copying `app/<f>-composition.build.ts` into a new module.** The grammar
-  calls it the ported composition a converted module still carries; it only
-  shrinks, and §15 lists it as deleted (§5).
+- **Writing `app/<f>-composition.build.ts` or `*.members.ts` in a new module.** The grammar still
+  accepts the names, but §15 deletes both and no module carries one (§5).
 - **Citing a deleted ADR or skill reference.** Composition ADRs before 147/148
   are historical (§17).
 - **Skipping the specs.** If no scenario covers the task, write one first,
@@ -108,33 +107,28 @@ For `Secret.load`, capabilities and entitlements, the `module-dependencies` skil
 
 ## Known disagreements between the record and the tree
 
-Prefer the tree for names and the linter for rules; report, do not fix a record
-you do not own. Current list (brought current 2026-10-05, after Alex's evening answers):
+Prefer the tree for names and the linter for rules; report, do not fix a record you do not own.
+Enforcement status is read from the policy registry (`packages/architecture-enforcer/src/policies/index.ts`),
+not from this list: look for the policy, its implementation and any shrinking allowance before you
+call a rule unenforced. Current list (brought current 2026-10-12):
 
-- Members: removal is ruled now (Alex, 2026-10-05; §3.3 says where each kind goes), but the
-  deleted (§15) `ProcessContainer.withMember` still exists (only tests call it) and the grammar
-  still accepts the deleted (§15) `app/<f>.members.ts` and `-composition.build.ts` (8 and 10 files
-  left, from 36).
-- §7's "no mixing" is unenforced: a module's own `withMemoryRepositories` (deleted, §15) still wins
-  over the stores' tier. The fail-closed tier and the skipped surface (§4, §7) have landed.
-- §7 gives each module its own event store handle (Alex, 2026-10-05); ops still holds the
-  shared `EventSourcing` client.
-- §10.1's `UiFlags` host service is not in the tree: `useFeatureFlag` (kept, off §15's deleted list, Alex 2026-10-05) in
-  `packages/browser-host/src/feature-flag.ts` queries `featureFlag.isEnabled` itself.
-- `requestDelivery` (ADR-167, §9) is ruled to be built now on the outbox (Alex, 2026-10-05); no code
-  spells it yet.
-- §8/§17's guard rules that accept a justified disable are not built yet: `defineRule({ escape })` exists,
-  but no rule opts in, so today every `langwatch/*` disable is refused.
-- §5 expects no peer cycle; the `peer-cycles` policy stays red until the last is cut (ruled, not drift).
-- github declares its secret handles in the process half (`github.app.ts`); §6 and Alex (2026-10-05)
-  put them in the contract.
+- Members: no module has a `*.members.ts` or `*-composition.build.ts` file and `withMember` is gone from
+  the container, but the installation fixtures (api, worker, tasks) still build with
+  `createApp(...).withMembers(...)` and the grammar (`feature-layout-policy.mjs`) still accepts both
+  deleted filename shapes. The deleted-spellings policies hold the remaining counts down.
+- `requestDelivery` (ADR-167, §9) is ruled to be built on the outbox (Alex, 2026-10-05); no code spells
+  it yet.
+- Peer cycles: §5 expects none and the `peer-cycles` policy refuses them, bar the one ruled
+  organization and identity pair held in `PEER_CYCLE_EXCEPTIONS` (that file, Alex 2026-10-08).
+- §2 attributes `definePipeline` to `@langwatch/process`; it is exported by `@langwatch/eventing`.
+- §6 secret handles: `secrets.into({ … }, build)` is the record form; the tree nests single-handle
+  calls (§16 maps it). Github's handles are in its contract now (`githubSecrets`).
 - §10 has project lend `projectSwitcher` by token; it still sits in `withCapabilities` (ruled to move,
   Alex 2026-10-05).
-- §2 makes `@langwatch/module` a contract's only framework import; analytics and trace contracts import
-  `@langwatch/api/dates` and gateway's imports `@langwatch/api/hosting` until the helpers move and the
-  lint lands (Alex, 2026-10-05).
-- Open items are proposals, not rules: §16 "Open for Alex" (the E1 to E8 questions). Do not build or
-  teach them as ruled.
+- §2 lets a contract import the light `@langwatch/module` core and the sanctioned portable surfaces;
+  analytics and trace contracts import `@langwatch/api/dates` and gateway's imports
+  `@langwatch/api/hosting` until the helpers move.
+- Open items are proposals, not rules: §16 "Open for Alex". Do not build or teach them as ruled.
 
 ## Links
 

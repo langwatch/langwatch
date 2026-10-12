@@ -20,9 +20,11 @@ new image ─► worker boot ─► gate.admit (behind or first install)
                  │            held by a peer / failed run ─► wait, re-ask every 10 s, wait for Retry
                  │              ledger schema, lease, seed, plan
                  │              per release: schema (Prisma, goose programs) ─► blocking steps
+                 │              ─► blocking done: a serving worker is admitted here
                  │              ─► reconcilers (TTL, `pnpm task upgrade lwql-provision`, pass request)
+                 │                 finish beside it; a run-once worker waits for all of them
                  ▼
-             ledger current ─► takes jobs ─► background steps (per-step leases)
+             ledger current ─► takes jobs ─► background steps (per-step leases, own queue lists)
 
 new image ─► api boot (beside the worker, never after it) ─► never runs a step
    any blocking step outstanding       ─► UPGRADING: every route serves at once, not ready (NO-HOLDS)
@@ -34,14 +36,14 @@ new image ─► api boot (beside the worker, never after it) ─► never runs 
 Entry points (`specs/upgrade/entry-points.feature`, UPGRADE-IN-WORKER): the worker is the one
 runner of an image; every entry point reaches it. `pnpm task upgrade` is a run-once worker (Alex,
 2026-10-11): it starts `apps/worker` with `upgrade`, which runs the upgrade once in-process and
-exits 0, 1 or 3; `status`, `plan` and `steps` stay reads in the tasks app. Helm upgrade: new worker pods run it, new api
+exits 0, 1 or 3; `status`, `plan` and `steps` stay reads in the tasks app and write nothing. Helm upgrade: new worker pods run it, new api
 pods hold not ready, and the pre-roll Job renders only with `serializeUpgrades` (never a
 pre-install or pre-rollback hook). Helm with `workers.enabled: false`: each app pod carries the
 worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). Compose has no
 `migrate` service. The npx server has no migration phase (`doctor` prints `upgrade status` via
 `printUpgradeStatus`, `apps/server/src/cli.ts`). `pnpm dev` and haven run `start:prepare:db`
-(`pnpm task upgrade` alone, no system-migrations pass) once before the lanes. The root
-`prisma:migrate` and `clickhouse:migrate` scripts are aliases of the same command.
+(`pnpm task upgrade` alone) once before the lanes. The root `prisma:migrate` and
+`clickhouse:migrate` scripts are aliases of the same command, so they go through the ledger too.
 
 ## Where it lives
 
@@ -75,7 +77,8 @@ worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). 
 Its own Postgres schema, `<installation schema>_upgrade_ledger` (round 21), created before anything
 else so it exists before Prisma's first deploy. Tables (`LEDGER_TABLE`): `_langwatch_upgrade_run`,
 `_langwatch_upgrade_step`, `_langwatch_upgrade_target` (one row per ClickHouse target),
-`_langwatch_upgrade_lease`, `_langwatch_serving_roster`. A role without `CREATE` ends the run
+`_langwatch_upgrade_lease`, `_langwatch_serving_roster`, and `_langwatch_upgrade_tenant_state` (the
+framework's per-tenant state for tenant steps). A role without `CREATE` ends the run
 `schema_failed`. A first run on a populated database seeds the ledger from what is already applied
 (`ledger-seed.service.ts`, `seed-sources.ts`).
 
@@ -99,14 +102,24 @@ baseline; settled schema no manifest names is inferred there too (`runner/instal
 ## Declaring code steps
 
 `defineMigrationStep` in the owning module's `.withMigrations`, id `<module>:<kebab-name>`;
-recipe in `migration-data-step`. Tasks runs the blocking ones, the worker the background ones, the
-api builds none. Ordering:
+recipe in `migration-data-step`. The run-once worker (or a serving worker at boot) runs the blocking
+ones and the worker the background ones. Every role runs the migration binders (the api feeds tenant
+steps to Ops), but the api never executes a schema or blocking step. Ordering:
 
 - `after: [step]` (value, or a foreign id typed as `CodeStepId`): only background steps; the worker
   holds it `waiting` until each named step is `done` or `not-needed` (STEP-AFTER).
 - Unknown id: `step_after_unknown`; cycle: `step_after_cycle`, both refused when the upgrade plans.
 - Nothing is deleted automatically (Alex, 2026-10-11): a drop is an operator step confirmed in Ops once safe. The upgrade
-  registers operator steps pending and never runs them, nor any background step.
+  registers operator steps pending and never runs them, nor any background step. Ops today
+  offers reads, Retry (failed rows only) and tenant actions, not a generic "start this operator
+  step", and no operator step is declared yet: a new drop waits for that action; never bridge the
+  gap with SQL in a migration.
+- A re-run goes through the registered step (Retry on Ops > Upgrades, under the lease and the
+  writer gate), never a separate one-shot task that calls the same code (ARCHITECTURE.md §7).
+  Operator-started jobs outside the ledger (credential resealing, object-storage moves) stay
+  named tasks.
+- One pass per table: a step that walks a table records every event it needs in that pass, in pages
+  with `sendBatch`, rather than several steps walking the same rows.
 
 **After adding, renaming or removing a code step**, regenerate from the root:
 
@@ -115,9 +128,22 @@ node --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts
 node --experimental-transform-types packages/upgrade/scripts/image-code-steps.ts --check  # CI form
 ```
 
-It runs `pnpm task upgrade steps --json` and writes the committed step list plus
+It runs `pnpm task upgrade steps --json` and writes the committed step list
+(`packages/upgrade/releases/image/code-steps.json`) plus
 `packages/upgrade/src/step/code-step-ids.generated.ts` (the `CodeStepId` union). Commit both
 (`packages/upgrade/specs/image-code-steps.feature`).
+
+## Background work paces by its own queue work
+
+Each background run sends on a list of its own (a listed run). The worker's listed consumer runs
+that list, and the follow-on jobs its commands cause, ahead of any backlog; two listed runs take
+turns. A step is done only when its listed work has run, not when `run` returns. Before each
+checkpoint save the runner waits until few of the run's own jobs are outstanding, so save between
+bounded pages (a checkpoint after a whole large tenant defeats the pacing). The stall wait is five
+minutes (Alex, 2026-10-12): a list counts as stopped only after its work stands still that long.
+A run has a 15-minute attempt deadline; it aborts, keeps its checkpoint and goes back to pending.
+Specs: `specs/upgrade/background-steps.feature`. Tenant steps pace the same way (`system-migrations`
+skill); running the whole upgrade under traffic is the `upgradelab` skill.
 
 ## Serving while upgrading (no holds)
 
@@ -145,25 +171,26 @@ shipped at or below its release (`rollback.ts`). There is no down migration; the
 ## The Ops Upgrades console
 
 `/ops/upgrades`, platform operators. Reads ask `ops:view`; `retryStep` asks `ops:manage` and returns
-a `failed` background step to `pending` (refuses `upgrade_step_not_failed` otherwise). The page
+a failed step (background or schema) to `pending`; for a Prisma folder it also records consent to
+rerun it (refuses `upgrade_step_not_failed` otherwise). The page
 refreshes on the runner's read hint, never a timer. Seven installation states: Up to date,
 Finishing in background, Behind, Never upgraded, Upgrading, Rolled back, Needs attention. Specs: `modules/ops/specs/upgrades.feature`, `upgrade-alerts.feature`,
 `upgrades-checkup.feature`.
 
 ## Test it
 
-| What                             | How                                                                                                                               |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Plan, stepping, gate, reader     | unit and integration suites in `packages/upgrade` (`specs/upgrade/*.feature`, `packages/upgrade/specs/`)                          |
-| Code step list drift             | `image-code-steps.ts --check` (above)                                                                                             |
-| Whole upgrade on test stores     | `apps/api/src/__tests__/live-upgrade.fixture.ts` (`specs/upgrade/live-test-fixtures.feature`)                                     |
-| Old image on head's schema       | `.github/workflows/migration-compat.yml` (per PR, and the nightly `previous-release` job booting the newest manifest's image)     |
-| A real upgrade from an old image | `dev/scripts/upgrade-rehearsal/rehearse.sh` (`upgrade-rehearsal.yml`, manual dispatch; `specs/upgrade/upgrade-rehearsal.feature`) |
-| Snapshots of a seeded install    | `tools/upgradelab` (`cd tools && go run ../cmd/upgradelab snapshot capture                                                        | restore | fingerprint | verify`); harness phases not landed yet, see its README |
+| What                             | How                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Plan, stepping, gate, reader     | unit and integration suites in `packages/upgrade` (`specs/upgrade/*.feature`, `packages/upgrade/specs/`)                                                                                                                                                                                                                                         |
+| Code step list drift             | `image-code-steps.ts --check` (above)                                                                                                                                                                                                                                                                                                            |
+| Whole upgrade on test stores     | `apps/api/src/__tests__/live-upgrade.fixture.ts` (`specs/upgrade/live-test-fixtures.feature`)                                                                                                                                                                                                                                                    |
+| Old image on head's schema       | `.github/workflows/migration-compat.yml` (per PR, and the nightly `previous-release` job booting the newest manifest's image)                                                                                                                                                                                                                    |
+| A real upgrade from an old image | `dev/scripts/upgrade-rehearsal/rehearse.sh` (`upgrade-rehearsal.yml`, manual dispatch; `specs/upgrade/upgrade-rehearsal.feature`)                                                                                                                                                                                                                |
+| Matrix cells and drills          | `tools/upgradelab` (`cd tools && go run ../cmd/upgradelab generate, produce, cell, drill, snapshot ...`): old release seeded, then head's api and worker with traffic across the switch; exit 1 when an invariant fails. Details in `tools/upgradelab/README.md` (its "Not yet" list lags the code); heavy, so never start one on a busy machine |
 
 ## Never
 
-- Run a step from the api, add a `migrate` compose service or an npx migration phase, or wait without a deadline.
+- Run a step from the api (it declares them; the worker executes), add a `migrate` compose service or an npx migration phase, or wait without a deadline.
 - Hold a request while upgrading, or map a schema error per module: `promoteStoreFailure` is the one place.
 - Read a column a pending ClickHouse step adds without `ClickHouseColumns`.
 - Hand-edit a stamped manifest or a merged migration.

@@ -21,7 +21,7 @@ repositories, channels and the module class stay thin.
 ```
 process/src/
 ├── index.ts                    installer + transport declarations, nothing else
-├── monitor.module.ts           the installer
+├── monitor.module.ts           the installer, typed `PublishedProcessModule<...>`
 ├── app/monitor.app.ts          the module class (`MonitorModule`), where §3.2 puts it
 │                               (Alex, 2026-10-05)
 ├── services/*.service.ts       behaviour, one class per entity
@@ -44,7 +44,14 @@ are refused (§3.2).
 Past 30 source files in a folder, group into concerns:
 `process/src/features/<concern>/{services,rules,repositories,eventing}/`, one
 level, never `features/<a>/features/<b>/` (§3.4, ruled 2026-10-01). The grammar
-accepts it; no module has moved yet.
+accepts it and many modules already use it (for example
+`enterprise/modules/billing/process/src/features/connected-billing/services/`); a small module keeps
+the flat layout. Both are supported; recursive nesting is not.
+
+The installer is annotated `PublishedProcessModule<name, Api, Config>` (`@langwatch/process`;
+`modules/monitor/process/src/monitor.module.ts`) so the module class, repositories and generated
+database types never reach the emitted `.d.ts`. A test reads the module through its Api; boot still
+refuses a missing store by name.
 
 ## Rules that matter
 
@@ -68,11 +75,11 @@ accepts it; no module has moved yet.
    a named `<module>-rate-limit.repository.ts` with a memory fixed-window twin
    (record §3.3, coordinator members wave, 2026-10-05).
 5. **A channel is one interface per subject, a class per tier, a memory twin
-   and a registry.** Organization's invitation mail:
-   `channels/organization-invite-mail.channel.ts` (abstract class),
-   `channels/ses/ses.*.channel.ts`, `channels/memory/memory.*.channel.ts`,
-   `channels/organization-invite-mail-channels.registry.ts`
-   (`{ ses, memory }`). Tier folders: `http`, `memory`, `redis`, `s3`, `ses`,
+   and a registry.** Organization's: tier classes in `channels/http/http.organization.channels.ts`
+   and `channels/memory/memory.organization.channels.ts`, registered by
+   `channels/organization-channels.registry.ts` (`defineChannels({ live, memory })`). A tier may
+   bind another module's `*Api` with `static readonly binds` (received as `bound.key`); that is not a
+   peer (`module-dependencies`). Tier folders: `http`, `memory`, `redis`, `s3`, `ses`,
    `slack`, `smtp`, `sqs`, `eventing`. A filename's first qualifier equals its
    tier folder.
 6. **`rules/` is pure.** No clock, no I/O, no collaborator. Value types and
@@ -120,8 +127,9 @@ function with its own unit test.
   directly.** Peers arrive as narrow `Pick<PeerApi, ...>` slices handed in by
   the module class. How a peer is declared is the `module-dependencies`
   skill; do not invent a path.
-- **A re-parse.** `monitor.service.ts` still parses its inputs after the
-  transport has: the record says a service does not (§3.2). Do not copy it.
+- **A re-parse.** `monitor.service.ts` still parses some inputs after the
+  transport has: the record says a service does not (§3.2). Parse again only where the service
+  also receives untrusted input that did not come through a transport. Do not copy the monitor lines.
 - **Behaviour in a transport or repository.** Both are thin; move it to a
   service or rule.
 - **A new `*Api` operation, shim or chosen constant** is a design choice.
@@ -132,8 +140,9 @@ function with its own unit test.
   `<f>.server.ts` are gone (§15); write `defineProcessModule`, `*Module`,
   `.withApi` and `<f>.module.ts`. The other §15 spellings
   (`createProcess`, `withMemoryRepositories` in new code, `members:` options)
-  are deleted. Existing tests under `app/__tests__/` still use some; copy the
-  shape from §13, not those lines.
+  are deleted. Some installation tests still use the old builder (the monitor one builds with
+  `withStores(memoryStores())` and `.provide`); copy the whole-list shape from `backend`'s testing
+  section (`bootInstalledProcess` with `testPeer`), not those lines.
 
 ## Where next
 
