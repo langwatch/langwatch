@@ -15,6 +15,7 @@ import {
 } from "../model-catalog.ts";
 import type { LLMModelEntry } from "../model-catalog.types.ts";
 import { getStaticModelCostRates } from "../static-model-costs.ts";
+import { isVariablePriceRouterId } from "../variable-price-routers.ts";
 
 const getStaticModelCosts = getStaticModelCostRates;
 
@@ -27,8 +28,8 @@ const overlayModels = overlayModelCatalog.models;
 
 /**
  * Models the catalog prices at zero on purpose. Codex bills the user's ChatGPT plan. Every
- * `openrouter/` id is a router rather than a model: the price comes from whichever model it
- * picks.
+ * `openrouter/` id, and every entry whose rates are all negative, is a router rather than a
+ * model: the price comes from whichever model it picks.
  */
 const PRICED_ELSEWHERE = [/^openai_codex\//, /^openrouter\//];
 
@@ -43,16 +44,12 @@ const KNOWN_UNPRICED: Record<string, string> = {
     "Music generation billed per song at $0.08, same missing per-clip unit.",
   "inclusionai/ling-3.1-flash":
     "Upstream lists it at zero per token for input and output; no other source prices it yet.",
-  "nvidia/switchyard":
-    "A router, like openrouter/auto: upstream reports -1 per token and the price is the routed model's.",
   "stealth/space-bunny-alpha":
     "Anonymous preview model offered free of charge upstream, so zero per token is its real rate.",
-  "typesafe/jev-router":
-    "A router, like openrouter/auto: upstream reports -1 per token and the price is the routed model's.",
 };
 
 const isPricedElsewhere = (modelId: string) =>
-  PRICED_ELSEWHERE.some((pattern) => pattern.test(modelId));
+  PRICED_ELSEWHERE.some((pattern) => pattern.test(modelId)) || isVariablePriceRouterId(modelId);
 
 /** One unit of every quantity the cost path can price. */
 const ONE_OF_EVERYTHING = {

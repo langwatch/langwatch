@@ -1,6 +1,7 @@
 import type { ModelCostRate } from "../model-provider.ts";
 import { isCodexModel } from "./codex-restrictions.ts";
 import { llmModels } from "./model-catalog.ts";
+import { withoutNegativeRates } from "./variable-price-routers.ts";
 
 const ANTHROPIC_MODEL_ID = /^~?anthropic\//;
 const OPENAI_AUDIO_MODEL_ID = /^~?openai\/(gpt-audio|gpt-realtime)/;
@@ -53,7 +54,9 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
 
   const rates = Object.entries(llmModels.models)
     .flatMap(([modelId, model]): ModelCostRate[] => {
-      if (isCodexModel(modelId) || !hasPrice(model.pricing)) {
+      // A router's rates are all negative, so it is left with no price and gets no rule.
+      const pricing = withoutNegativeRates(model.pricing);
+      if (isCodexModel(modelId) || !hasPrice(pricing)) {
         return [];
       }
 
@@ -61,17 +64,17 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
         {
           model: modelId,
           regex: modelPattern(modelId),
-          inputCostPerToken: model.pricing.inputCostPerToken ?? 0,
-          outputCostPerToken: model.pricing.outputCostPerToken ?? 0,
-          cacheReadCostPerToken: model.pricing.inputCacheReadPerToken,
-          cacheCreationCostPerToken: model.pricing.inputCacheWritePerToken,
-          cacheCreation1hCostPerToken: deriveCacheWrite1hRate(modelId, model.pricing),
-          inputAudioCostPerToken: model.pricing.audioCostPerToken,
-          outputAudioCostPerToken: deriveAudioOutputRate(modelId, model.pricing),
-          inputImageCostPerToken: model.pricing.imageCostPerToken,
-          outputImageCostPerToken: model.pricing.imageOutputCostPerToken,
-          inputCostPerCharacter: model.pricing.inputCostPerCharacter,
-          inputCostPerSecond: model.pricing.inputCostPerSecond,
+          inputCostPerToken: pricing.inputCostPerToken ?? 0,
+          outputCostPerToken: pricing.outputCostPerToken ?? 0,
+          cacheReadCostPerToken: pricing.inputCacheReadPerToken,
+          cacheCreationCostPerToken: pricing.inputCacheWritePerToken,
+          cacheCreation1hCostPerToken: deriveCacheWrite1hRate(modelId, pricing),
+          inputAudioCostPerToken: pricing.audioCostPerToken,
+          outputAudioCostPerToken: deriveAudioOutputRate(modelId, pricing),
+          inputImageCostPerToken: pricing.imageCostPerToken,
+          outputImageCostPerToken: pricing.imageOutputCostPerToken,
+          inputCostPerCharacter: pricing.inputCostPerCharacter,
+          inputCostPerSecond: pricing.inputCostPerSecond,
         },
       ];
     })

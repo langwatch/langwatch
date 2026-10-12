@@ -1,5 +1,6 @@
 import safe from "safe-regex2";
 
+import { isVariablePriceRouterId } from "./catalog/variable-price-routers.ts";
 import {
   modelCostEstimateInputSchema,
   type ModelCostEstimateInput,
@@ -172,6 +173,12 @@ export const findMatchingModelCost = (
   model: string,
   costs: readonly ModelCostRate[],
 ): ModelCostRate[] => {
+  // A router has no price of its own, so no fallback may lend it another model's rule:
+  // `openrouter/pareto-code` would prefix-match `unbiased/pareto`. Only a rule naming it counts.
+  if (isVariablePriceRouterId(model)) {
+    const own = costs.find((cost) => buildSafeRegex(cost.regex)?.test(model));
+    return own ? [own] : [];
+  }
   const match =
     findCandidateModelCost({ candidate: model, costs }) ??
     findSubtypeStrippedModelCost({ model, costs }) ??

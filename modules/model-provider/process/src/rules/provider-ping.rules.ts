@@ -1,5 +1,7 @@
 import {
   getModelsForProvider,
+  withoutNegativeRates,
+  type LLMModelEntry,
   type ModelProvider,
   type ModelProviderUncheckedReason,
 } from "@langwatch/model-provider-contract";
@@ -14,6 +16,11 @@ export const UNPINGABLE_CREDENTIALS: readonly ModelProviderUncheckedReason[] = [
 ];
 
 type PingRefusal = "credit" | "usage_limit" | "auth" | "other";
+
+/** A router's negative rate is no price, so it sorts after every priced model. */
+function pingInputRate(model: LLMModelEntry): number {
+  return withoutNegativeRates(model.pricing).inputCostPerToken ?? Number.POSITIVE_INFINITY;
+}
 
 function bareModelId(id: string): string {
   return id.split("/").slice(1).join("/");
@@ -31,11 +38,7 @@ export function findPingModels(row: Pick<ModelProvider, "provider" | "customMode
       (model) =>
         named.length === 0 || named.includes(bareModelId(model.id)) || named.includes(model.id),
     )
-    .toSorted(
-      (a, b) =>
-        (a.pricing.inputCostPerToken ?? Number.POSITIVE_INFINITY) -
-        (b.pricing.inputCostPerToken ?? Number.POSITIVE_INFINITY),
-    );
+    .toSorted((a, b) => pingInputRate(a) - pingInputRate(b));
   const matched = new Set(catalogued.flatMap((model) => [model.id, bareModelId(model.id)]));
 
   return [
