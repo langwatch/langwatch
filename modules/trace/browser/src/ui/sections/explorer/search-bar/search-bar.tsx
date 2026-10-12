@@ -290,7 +290,7 @@ export const SearchBar: React.FC = () => {
   // Langy's explorer.runInstantEval reaches the same route, and so the same cost rule.
   const { onInstantEvalRoute } = instantEval;
   useEffect(() => registerInstantEvalRoute(onInstantEvalRoute), [onInstantEvalRoute]);
-  const { submitSearch, isRouting } = useSubmitSearch({
+  const { submitSearch, submitWithoutInstantEval, isRouting } = useSubmitSearch({
     isLangyAvailable: langyRoutesAsk,
     isInstantEvalAvailable,
     isSamplePreview,
@@ -365,6 +365,10 @@ export const SearchBar: React.FC = () => {
       <InstantEvalRefusalPopover
         refusal={instantEval.refusal}
         onClose={instantEval.dismissRefusal}
+        onSkip={() => {
+          const refused = instantEval.skipRefusal();
+          if (refused) submitWithoutInstantEval(refused);
+        }}
         onEnable={instantEval.enableInstantEvals}
         isEnabling={instantEval.isEnabling}
         viaConnect={instantEvalAccess.viaConnect}

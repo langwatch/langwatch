@@ -10,7 +10,8 @@ Feature: Instant Evals inside the Trace Explorer
   - The run starts under a cost rule: an estimate first, then a start when the estimate is under
     half a dollar, and a confirm dialog otherwise.
   - Progress is visible on the table, matches appear as pages finish, and every refusal is a
-    closable popover that leaves a phrase search behind, never an error state.
+    closable popover that keeps the eval chip in the bar, never an error state. Only Skip searches
+    the words another way, routed again with the eval option left out.
 
   # The run service is the Instant Eval module's own. What is here is the search bar's half:
   # the handover, how a chip is spelled and keyed, the four procedures the Explorer drives a
@@ -334,21 +335,30 @@ Feature: Instant Evals inside the Trace Explorer
   Rule: A refusal is a popover, never an error state
 
     @integration
-    Scenario: A spent free budget opens the budget popover and the phrase search runs
+    Scenario: A spent free budget opens the budget popover and keeps the eval chip
       Given the organization has spent its free Instant Evals budget
       When the Explorer receives an Instant Eval payload
       Then a closable popover anchored under the search bar says what an Instant Eval does, in two sentences
-      And the text the user typed stays visible above it
+      And the eval chip for the question stays in the bar above it, with no phrase search applied
       And it offers an Upgrade link, without the spend or budget figures
-      And "Skip" and closing both apply the phrase search
+      And closing it leaves the chip where it is
 
     @integration
-    Scenario: A missing classifier opens the model popover and the phrase search runs
+    Scenario: A missing classifier opens the model popover and keeps the eval chip
       Given the deployment has no classifier, or the server refuses the run as not enabled for a released project
       When the Explorer receives an Instant Eval payload
       Then a closable popover says Instant Evals can't run right now and offers to contact us
+      And the eval chip for the question stays in the bar, with no phrase search applied
       And it does not send the reader to the model settings, which cannot fix this
-      And closing it applies the phrase search
+      And the copy never says the words are searched in the meantime
+
+    @integration
+    Scenario: Skip routes the words again with the eval option left out
+      Given a refusal popover is open over an eval chip the router chose for a sentence
+      When the reader presses "Skip"
+      Then the popover closes
+      And the sentence and the terms typed beside it are routed again with Instant Evals unavailable
+      And the router's answer is applied: a filter, a phrase or a question for the assistant, never an eval chip
 
     # Instant Evals off for the organization: the popover offers the switch or a word
     # with us, depending on the plan. Both are specified in
