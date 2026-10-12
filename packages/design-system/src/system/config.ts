@@ -637,6 +637,17 @@ export const designSystemConfig = defineConfig({
           // The development badge: a dark pill over the top bar's glow, in both modes.
           devBadge: { value: "{colors.blackAlpha.600}" },
         },
+        // Avatar fills under `fg.onColor` initials: each step keeps white at 3:1 or more.
+        avatar: {
+          orange: { value: { _light: "{colors.orange.600}", _dark: "{colors.orange.700}" } },
+          blue: { value: { _light: "{colors.blue.400}", _dark: "{colors.blue.600}" } },
+          green: { value: { _light: "{colors.green.500}", _dark: "{colors.green.700}" } },
+          yellow: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.700}" } },
+          purple: { value: { _light: "{colors.purple.400}", _dark: "{colors.purple.700}" } },
+          teal: { value: { _light: "{colors.teal.500}", _dark: "{colors.teal.700}" } },
+          cyan: { value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.700}" } },
+          pink: { value: { _light: "{colors.pink.500}", _dark: "{colors.pink.700}" } },
+        },
 
         // Foreground semantic tokens - proper contrast in dark mode
         fg: {
@@ -903,9 +914,9 @@ export const designSystemConfig = defineConfig({
             outline: {
               item: {
                 _checked: {
-                  bg: "bg.selected",
-                  borderColor: "colorPalette.fg",
-                  boxShadowColor: "colorPalette.fg",
+                  bg: "colorPalette.muted/20",
+                  borderColor: "colorPalette.solid",
+                  boxShadowColor: "colorPalette.solid",
                 },
               },
             },

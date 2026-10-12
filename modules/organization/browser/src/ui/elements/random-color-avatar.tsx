@@ -5,7 +5,7 @@
  */
 
 import { type AvatarRootProps, UserAvatar } from "@langwatch/design-system/avatar";
-import { getColorForString } from "@langwatch/design-system/rotating-colors";
+import { getAvatarFillForString } from "@langwatch/design-system/rotating-colors";
 
 /**
  * Person avatar with a deterministic name-hashed background behind the initials
@@ -22,7 +22,7 @@ export function RandomColorAvatar({
       name={name}
       src={image}
       color="fg.onColor"
-      background={getColorForString("colors", name).color}
+      background={getAvatarFillForString(name)}
       {...props}
     />
   );

@@ -1,6 +1,6 @@
 import { Avatar } from "@langwatch/design-system/avatar";
 import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
-import { getColorForString } from "@langwatch/design-system/rotating-colors";
+import { getAvatarFillForString } from "@langwatch/design-system/rotating-colors";
 
 /** Project avatar: first grapheme on background color hashed from name. */
 export const ProjectAvatar = ({
@@ -15,7 +15,7 @@ export const ProjectAvatar = ({
     <Avatar.Root
       size={size}
       color="fg.onColor"
-      background={getColorForString("colors", initial).color}
+      background={getAvatarFillForString(initial)}
       width={size === "2xs" ? "20px" : undefined}
       height={size === "2xs" ? "20px" : undefined}
     >

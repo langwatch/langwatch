@@ -181,3 +181,14 @@ describe("terminal colour parity", () => {
     }
   });
 });
+
+describe("avatar fills under white initials", () => {
+  const palettes = ["orange", "blue", "green", "yellow", "purple", "teal", "cyan", "pink"];
+
+  it.each(palettes)("keeps white initials on avatar.%s at 3:1 or more in both modes", (palette) => {
+    for (const mode of ["_light", "_dark"] satisfies Mode[]) {
+      const ratio = contrast(resolve("fg.onColor", mode), resolve(`avatar.${palette}`, mode));
+      expect(ratio).toBeGreaterThanOrEqual(3);
+    }
+  });
+});

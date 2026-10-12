@@ -1,6 +1,6 @@
 import { Avatar } from "@langwatch/design-system/avatar";
 import { firstGrapheme } from "@langwatch/design-system/first-grapheme";
-import { getColorForString } from "@langwatch/design-system/rotating-colors";
+import { getAvatarFillForString } from "@langwatch/design-system/rotating-colors";
 
 /** A project's initial on a colour hashed from it, as main's switcher drew it. */
 export function ProjectAvatar({ name }: { name: string }) {
@@ -9,7 +9,7 @@ export function ProjectAvatar({ name }: { name: string }) {
     <Avatar.Root
       size="2xs"
       color="fg.onColor"
-      background={getColorForString("colors", initial).color}
+      background={getAvatarFillForString(initial)}
       width="20px"
       height="20px"
     >
