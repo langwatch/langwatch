@@ -286,12 +286,22 @@ describe("GroupQueue claimed-job recovery", () => {
       const q = freshQueue();
       const groupId = "proj1/agg";
       let recovered: DispatchResult | null = null;
+      const deadAudits: unknown[] = [];
       const processor = new GroupQueueProcessor<TestPayload & { value: string }>(
         {
           name: q.name,
           groupKey: (p) => p.groupId,
           identify: (p) => p.id,
           onExhausted: () => outcome,
+          auditAdapter: {
+            onEnqueue: async () => {},
+            onLeased: async () => {},
+            onDispatched: async () => {},
+            onFailed: async () => {},
+            onDead: async (event) => {
+              deadAudits.push(event);
+            },
+          },
           process: async () => {
             await redis.del(q.activeKey(groupId));
             recovered = await q.scripts.dispatch({ nowMs: Date.now() + 60_000, activeTtlSec: 60 });
@@ -331,16 +341,18 @@ describe("GroupQueue claimed-job recovery", () => {
       return {
         holderScore: await redis.zscore(leaseKey, lease!.holderId),
         blobTtl: await redis.ttl(blobKey),
+        deadAudits,
       };
     }
 
     /** @scenario "A former owner's failure keeps the payload lease the recovering worker relies on" */
     it.each(["block", "dead-letter"] as const)(
-      "keeps the recovered job's lease and the blob's lifetime when it would %s",
+      "keeps the recovered job's lease and the blob's lifetime and reports nothing dead when it would %s",
       async (outcome) => {
-        const { holderScore, blobTtl } = await failAfterRecovery(outcome);
+        const { holderScore, blobTtl, deadAudits } = await failAfterRecovery(outcome);
         expect(holderScore).not.toBeNull();
         expect(blobTtl).toBeGreaterThan(BLOB_RELEASE_GRACE_TTL_SECONDS);
+        expect(deadAudits).toEqual([]);
       },
     );
   });

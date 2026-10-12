@@ -2004,7 +2004,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     });
   }
 
-  /** Blocks the group with the job re-staged; every payload of the batch counts as dead. */
+  /**
+   * Blocks the group with the job re-staged; every payload of the batch counts as dead,
+   * unless the claim was lost.
+   */
   private async blockClaimedJob({
     job,
     lastError,
@@ -2022,7 +2025,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       contextMetadata: job.contextMetadata,
       routingLabels: job.routingLabels,
     });
-    return { deadPayloads: job.batchPayloads ?? [job.payload], claimLost: !blocked };
+    // A job whose claim was recovered did not die: the recovering worker runs it.
+    if (!blocked) return { deadPayloads: [], claimLost: true };
+    return { deadPayloads: job.batchPayloads ?? [job.payload], claimLost: false };
   }
 
   /**
