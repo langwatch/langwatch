@@ -124,6 +124,8 @@ export const scenarioConfig = Config.define((c) => ({
   publicBaseUrl,
   /** The worker's raw-socket door port (the shared leaf), which the quick tunnel points at. */
   rawSocketPort,
+  /** Where the Go scenario runner's binary is; unset, every run starts on the Node child. */
+  goRunnerPath: c.env("SCENARIO_GO_RUNNER_PATH", trimmedOptional),
   /** The nlpgo deadlines an agent-test turn answers inside; unusable values clamp to defaults. */
   nlpTimeouts: {
     maxTimeoutMs: nlpFetchMaxTimeoutMs,

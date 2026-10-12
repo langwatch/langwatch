@@ -1,22 +1,17 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { clearTimeout, setTimeout } from "node:timers";
 
 import { createLogger } from "@langwatch/observability";
 import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import {
-  CHILD_PROCESS,
   encodeScenarioEgressPolicy,
   encodeScenarioLogContext,
   isVoiceNonceRegisterMessage,
   SCENARIO_EGRESS_POLICY_ENV,
   SCENARIO_LOG_CONTEXT_ENV,
-  ScenarioAgentInstanceSchema,
   VOICE_PUBLIC_BASE_URL_UNAVAILABLE_REASON_ENV,
-  type ChildProcessJobData,
   type ScenarioEgressPolicy,
-  type ScenarioExecutionResult,
   type ScenarioLogContext,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
@@ -35,6 +30,7 @@ import type {
 import type { VoiceNonceRegistryService } from "../../voice/services/voice-nonce-registry.service.ts";
 import type { VoicePublicUrl } from "../../voice/services/voice-public-url.service.ts";
 import { ChildProcessSpawnService } from "./child-process-spawn.service.ts";
+import { ScenarioChildSupervisorService } from "./scenario-child-supervisor.service.ts";
 
 const logger = createLogger("langwatch:scenarios:child-process");
 
@@ -82,16 +78,8 @@ interface ScenarioChildTelemetry {
   apiKey: string;
 }
 
-type ScenarioChildProcessResult = {
-  success: boolean;
-  error?: string;
-  reasoning?: string;
-  agentInstance?: { hostname: string; label: string | null };
-  isCutAtLimit?: boolean;
-};
-
 export class NodeScenarioChildService implements ScenarioChildBootstrap {
-  static readonly parseResult = parseChildProcessResultValue;
+  static readonly parseResult = ScenarioChildSupervisorService.parseResult;
   static readonly buildEnvironment = buildChildEnvironmentValue;
   static readonly buildBaseEnvironment = buildBaseEnvironmentValue;
   static readonly buildOtelResourceAttributes = buildOtelResourceAttributesValue;
@@ -184,156 +172,14 @@ export class NodeScenarioChildService implements ScenarioChildBootstrap {
       spawnMs: nowInstant().epochMilliseconds - spawnStartedAt,
     });
 
-    this.options.pool.registerChild(input.jobData.scenarioRunId, child);
-    const completion = this.observeChild({ child, jobData: input.jobData, log });
-    return NodeScenarioChildExecutionSession.create({ child, completion, log });
-  };
-
-  private observeChild(input: {
-    child: ChildProcess;
-    jobData: ExecutionJobData;
-    log: (
-      level: "info" | "warn" | "error",
-      message: string,
-      extra?: Record<string, unknown>,
-    ) => void;
-  }): Promise<ScenarioExecutionResult> {
-    return new Promise((resolve) => {
-      const { child, log } = input;
-      let stderr = "";
-      let stdout = "";
-      let settled = false;
-
-      const timeout = setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        log("error", "Child process timed out", { timeoutMs: CHILD_PROCESS.TIMEOUT_MS });
-        child.kill();
-        resolve({ success: false, error: "Scenario execution timed out" });
-      }, CHILD_PROCESS.TIMEOUT_MS);
-
-      child.stdout?.on("data", (data: Buffer) => {
-        const chunk = data.toString();
-        stdout += chunk;
-        logChildChunk(chunk, "info", log);
-      });
-      child.stderr?.on("data", (data: Buffer) => {
-        const chunk = data.toString();
-        stderr += chunk;
-        logChildChunk(chunk, "warn", log);
-      });
-      child.on("close", (code) => {
-        clearTimeout(timeout);
-        this.options.pool.deregisterChild(input.jobData.scenarioRunId);
-        if (settled) return;
-        settled = true;
-
-        resolve(
-          childExitResult({
-            code,
-            stdout,
-            stderr,
-            log,
-            cancelled: this.options.pool.wasCancelled(input.jobData.scenarioRunId),
-          }),
-        );
-      });
-      child.on("error", (error) => {
-        clearTimeout(timeout);
-        this.options.pool.deregisterChild(input.jobData.scenarioRunId);
-        if (settled) return;
-        settled = true;
-        log("error", `Child process error: ${error.message}`);
-        resolve({ success: false, error: `Child process error: ${error.message}` });
-      });
-
-      child.stdin?.on("error", (error) => {
-        log("warn", "Child stdin error", { error: error.message });
-      });
+    return ScenarioChildSupervisorService.supervise({
+      child,
+      jobData: input.jobData,
+      pool: this.options.pool,
+      log,
     });
-  }
+  };
 }
-
-class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession {
-  static create(options: {
-    child: ChildProcess;
-    completion: Promise<ScenarioExecutionResult>;
-    log: (
-      level: "info" | "warn" | "error",
-      message: string,
-      extra?: Record<string, unknown>,
-    ) => void;
-  }): NodeScenarioChildExecutionSession {
-    return new NodeScenarioChildExecutionSession(options);
-  }
-
-  private started = false;
-
-  private constructor(
-    private readonly options: {
-      child: ChildProcess;
-      completion: Promise<ScenarioExecutionResult>;
-      log: (
-        level: "info" | "warn" | "error",
-        message: string,
-        extra?: Record<string, unknown>,
-      ) => void;
-    },
-  ) {}
-
-  execute(data: ChildProcessJobData): Promise<ScenarioExecutionResult> {
-    if (this.started) {
-      throw new Error("Scenario child execution has already started");
-    }
-    this.started = true;
-    try {
-      this.options.child.stdin?.write(JSON.stringify(data));
-      this.options.child.stdin?.end();
-    } catch (error) {
-      this.options.log("warn", "Child stdin write failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-    return this.options.completion;
-  }
-
-  async abort(): Promise<void> {
-    this.options.child.kill("SIGTERM");
-    await this.options.completion;
-  }
-}
-
-function parseChildProcessResultValue(stdout: string): ScenarioChildProcessResult | null {
-  for (const line of stdout.split("\n").reverse()) {
-    const result = parseResultLine(line);
-    if (result) return result;
-  }
-  return null;
-}
-
-function parseResultLine(line: string): ScenarioChildProcessResult | null {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
-
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
-    return scenarioChildProcessResultSchema.safeParse(parsed).data ?? null;
-  } catch {
-    return null;
-  }
-}
-
-import { z } from "zod";
-
-const scenarioChildProcessResultSchema = z.object({
-  success: z.boolean(),
-  error: z.string().optional(),
-  reasoning: z.string().optional(),
-  /** The connected agent instance that answered the run's turns, when one did. */
-  agentInstance: ScenarioAgentInstanceSchema.optional(),
-  /** LangWatch ended the voice call at the maximum call duration. */
-  isCutAtLimit: z.boolean().optional(),
-});
 
 function buildChildEnvironmentValue(input: {
   config: ScenarioChildProcessConfig;
@@ -436,62 +282,6 @@ function buildChildProcessEnvironment(
 export const parseChildProcessResult = NodeScenarioChildService.parseResult;
 export const buildChildEnvironment = NodeScenarioChildService.buildEnvironment;
 export const buildOtelResourceAttributes = NodeScenarioChildService.buildOtelResourceAttributes;
-
-type ChildLog = (
-  level: "info" | "warn" | "error",
-  message: string,
-  extra?: Record<string, unknown>,
-) => void;
-
-function logChildChunk(chunk: string, level: "info" | "warn", log: ChildLog): void {
-  for (const line of chunk.trim().split("\n")) {
-    if (line) {
-      log(level, line);
-    }
-  }
-}
-
-function childExitResult({
-  code,
-  stdout,
-  stderr,
-  log,
-  cancelled,
-}: {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-  log: ChildLog;
-  cancelled: boolean;
-}): ScenarioExecutionResult {
-  if (cancelled) {
-    log("info", "Job cancelled via cancel broadcast");
-    return { success: false, error: "Job was cancelled", cancelled: true };
-  }
-  if (code !== 0) {
-    const childResult = parseChildProcessResultValue(stdout);
-    const error = childResult?.error?.trim()
-      ? childResult.error
-      : `Child process exited with code ${code}: ${stderr}`;
-    log("error", `Child process exited with code ${code}`, {
-      exitCode: code,
-      stderr,
-    });
-    return { success: false, error };
-  }
-
-  log("info", "Scenario completed successfully", { exitCode: code });
-  // The last JSON line the child wrote is the only place the connected
-  // agent instance that answered the run is named; without reading it
-  // here a finished run records no instance at all.
-  const childResult = parseChildProcessResultValue(stdout);
-  return {
-    success: true,
-    ...(childResult?.reasoning ? { reasoning: childResult.reasoning } : {}),
-    ...(childResult?.agentInstance ? { agentInstance: childResult.agentInstance } : {}),
-    ...(childResult?.isCutAtLimit ? { isCutAtLimit: true } : {}),
-  };
-}
 
 /** The public origin a voice child dials back through, or the reason the phone run names. */
 function voicePublicUrlEnvironment(publicUrl: VoicePublicUrl | undefined): NodeJS.ProcessEnv {

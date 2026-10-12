@@ -2,6 +2,7 @@ import path from "node:path";
 
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -14,10 +15,12 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { CancellationPublisher, CancellationSubscriber } from "../app/scenario.app.ts";
+import { GoScenarioChildService } from "../features/child/services/go-scenario-child.service.ts";
 import {
   NodeScenarioChildService,
   type ScenarioChildProcessConfig,
 } from "../features/child/services/node-scenario-child.service.ts";
+import { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
@@ -43,6 +46,7 @@ type ScenarioExecutorPeers = Readonly<{
   modelProviders: ModelProviderApi;
   apiKeys: ApiKeyApi;
   gateway: GatewayApi;
+  featureFlags: FeatureFlagApi;
 }>;
 
 /** The repository root: this file sits five folders below it, in source and in dist alike. */
@@ -154,13 +158,26 @@ export class ScenarioExecutorService {
       execution,
       pool,
       cancellations: this.input.cancellationSubscriptions,
-      childProcesses: NodeScenarioChildService.create({
-        config: this.#childConfig(),
+      childProcesses: this.#childProcesses(pool),
+      metrics: ScenarioProcessorMetricsService.create(),
+    });
+  }
+
+  #childProcesses(pool: ScenarioExecutionPoolService): ScenarioChildChoiceService {
+    const config = this.#childConfig();
+    return ScenarioChildChoiceService.create({
+      node: NodeScenarioChildService.create({
+        config,
         voicePublicUrl: this.input.host.voicePublicUrl,
         pool,
         nonces: this.input.voiceNonces,
       }),
-      metrics: ScenarioProcessorMetricsService.create(),
+      go: GoScenarioChildService.create({
+        config,
+        binaryPath: this.input.config.goRunnerPath,
+        pool,
+      }),
+      featureFlags: this.input.peers.featureFlags,
     });
   }
 
