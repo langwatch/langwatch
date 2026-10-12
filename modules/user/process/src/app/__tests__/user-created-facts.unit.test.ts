@@ -85,14 +85,21 @@ function lifecycleLog() {
     recordUserDeactivated: append("deactivated"),
     recordUserReactivated: append("reactivated"),
   };
-  const eventStore: Pick<OwnEventStore, "read"> = {
-    read: async ({ aggregateId, accepts }) =>
-      facts
-        .filter(({ type, data }) => type !== "created" && data.userId === aggregateId)
-        .map(standingEventOf)
-        .flatMap((event) => (accepts(event) ? [event] : [])),
+  const reads: { aggregateIds: string[] }[] = [];
+  const eventStore: Pick<OwnEventStore, "findAggregates"> = {
+    findAggregates: async ({ aggregates, accepts }) => {
+      reads.push({ aggregateIds: aggregates.map(({ aggregateId }) => aggregateId) });
+      return aggregates.map(({ tenantId, aggregateId }) => ({
+        tenantId,
+        aggregateId,
+        events: facts
+          .filter(({ type, data }) => type !== "created" && data.userId === aggregateId)
+          .map(standingEventOf)
+          .flatMap((event) => (accepts(event) ? [event] : [])),
+      }));
+    },
   };
-  return { senders: logged, facts, batches, eventStore };
+  return { senders: logged, facts, batches, eventStore, reads };
 }
 
 /** An app over a memory store whose fact outbox the test reads, its bus optionally down. */
@@ -263,6 +270,7 @@ describe("user's created fact", () => {
         { type: "deactivated", userIds: [ids[1]] },
         { type: "reactivated", userIds: [ids[0]] },
       ]);
+      expect(log.reads).toEqual([{ aggregateIds: [ids[0], ids[2]] }]);
     });
 
     /** @scenario "The seed step catches up a missed deactivation" */

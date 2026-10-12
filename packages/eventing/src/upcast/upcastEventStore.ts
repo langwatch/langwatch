@@ -57,6 +57,12 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
     );
   }
 
+  findEventsOfAggregates(request: Parameters<EventStore<EventType>["findEventsOfAggregates"]>[0]) {
+    return this.#merged(request.aggregateType, (aggregateType) =>
+      this.store.findEventsOfAggregates({ ...request, aggregateType }),
+    );
+  }
+
   getEventsOccurredSince(request: Parameters<EventStore<EventType>["getEventsOccurredSince"]>[0]) {
     return this.#merged(request.aggregateType, (aggregateType) =>
       this.store.getEventsOccurredSince({ ...request, aggregateType }),

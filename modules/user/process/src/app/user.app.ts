@@ -531,7 +531,7 @@ export class UserModule implements UserApi {
   /** Keeps user_lifecycle's own event store as the process builds it; a listing keeps none. */
   keepLifecycleEventStore(input: {
     participation: EventingParticipation;
-    eventStore: Pick<OwnEventStore, "read"> | undefined;
+    eventStore: Pick<OwnEventStore, "findAggregates"> | undefined;
   }): void {
     this.#lifecycleLog.keep(input);
   }

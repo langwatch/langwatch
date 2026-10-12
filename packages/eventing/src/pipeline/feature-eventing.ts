@@ -41,6 +41,24 @@ export interface PriorEventsQuery<Event> {
 /** A command's read of its own aggregate's earlier events, oldest first (WP-5 ruling 2). */
 export type PriorEventsRead = <Event>(query: PriorEventsQuery<Event>) => Promise<readonly Event[]>;
 
+/** Many aggregates of the reading pipeline's own type; `accepts` keeps the events it declared. */
+export interface OwnAggregatesQuery<Event> {
+  readonly aggregates: readonly { readonly tenantId: string; readonly aggregateId: string }[];
+  readonly accepts: (event: unknown) => event is Event;
+}
+
+/** One asked aggregate's accepted events, oldest first; empty when it holds none. */
+export interface OwnAggregateEvents<Event> {
+  readonly tenantId: string;
+  readonly aggregateId: string;
+  readonly events: readonly Event[];
+}
+
+/** Every asked aggregate's events in one read, in the order asked, each aggregate once. */
+export type OwnAggregatesFind = <Event>(
+  query: OwnAggregatesQuery<Event>,
+) => Promise<readonly OwnAggregateEvents<Event>[]>;
+
 /** Events for one tenant, each of the appending pipeline's own aggregate type. */
 export interface OwnEventsAppend {
   readonly tenantId: string;
@@ -55,6 +73,7 @@ export interface OwnEventsAppend {
 export interface OwnEventStore {
   readonly append: (input: OwnEventsAppend) => Promise<void>;
   readonly read: PriorEventsRead;
+  readonly findAggregates: OwnAggregatesFind;
 }
 
 /**

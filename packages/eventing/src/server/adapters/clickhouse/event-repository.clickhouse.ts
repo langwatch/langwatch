@@ -260,6 +260,65 @@ export class EventingClickHouseEventRepository implements EventRepository {
     }
   }
 
+  async findEventRecordsOfAggregates({
+    aggregates,
+    aggregateType,
+  }: {
+    aggregates: readonly { tenantId: string; aggregateId: string }[];
+    aggregateType: string;
+  }): Promise<EventRecord[]> {
+    const tenantIds = [...new Set(aggregates.map(({ tenantId }) => tenantId))];
+    const aggregateIds = [...new Set(aggregates.map(({ aggregateId }) => String(aggregateId)))];
+    const [resolvingTenantId] = tenantIds;
+    if (resolvingTenantId === void 0) return [];
+    try {
+      const client = await this.getClient(resolvingTenantId);
+      const result = await client.query({
+        query: `
+          SELECT
+            TenantId,
+            AggregateId,
+            ${EVENT_LOG_SELECT_COLUMNS}
+          FROM event_log
+          WHERE TenantId IN {tenantIds:Array(String)}
+            AND AggregateType = {aggregateType:String}
+            AND AggregateId IN {aggregateIds:Array(String)}
+          ORDER BY TenantId ASC, AggregateId ASC, EventTimestamp ASC, EventId ASC
+        `,
+        query_params: { tenantIds, aggregateType, aggregateIds },
+        format: "JSONEachRow",
+        tenantIds,
+        // Unbounded, as in `getEventRecords`: each aggregate's whole history by its key.
+        SKIP_COLD_SCAN_CHECK: true,
+      });
+      const rows = await result.json<EventLogRow & { TenantId: string; AggregateId: string }>();
+      const asked = new Set(
+        aggregates.map(({ tenantId, aggregateId }) => `${tenantId}\n${aggregateId}`),
+      );
+      return rows
+        .filter((row) => asked.has(`${row.TenantId}\n${row.AggregateId}`))
+        .flatMap((row) =>
+          mapEventLogRows({
+            rows: [row],
+            tenantId: row.TenantId,
+            aggregateType,
+            aggregateId: row.AggregateId,
+          }),
+        );
+    } catch (error) {
+      this.logger.warn(
+        {
+          tenantCount: tenantIds.length,
+          aggregateType,
+          aggregateCount: aggregateIds.length,
+          error,
+        },
+        "Failed to get event records of many aggregates from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async getEventRecordsUpTo(request: {
     tenantId: string;
     aggregateType: string;

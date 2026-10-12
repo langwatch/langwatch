@@ -313,6 +313,7 @@ function eventingClickHouseResolver(
                 sql: request.query,
                 ...(request.query_params === undefined ? {} : { params: request.query_params }),
                 ...(request.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
+                ...(request.tenantIds === undefined ? {} : { tenantIds: request.tenantIds }),
               })
               .then((result) => result.rows),
         }),

@@ -7,6 +7,9 @@ export type {
   EventingParticipation,
   FeatureEventing,
   FeatureEventingSetup,
+  OwnAggregateEvents,
+  OwnAggregatesFind,
+  OwnAggregatesQuery,
   OwnEventsAppend,
   OwnEventStore,
   PriorEventsQuery,
@@ -150,6 +153,7 @@ export type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 // Stores
 export type {
   EventStore,
+  EventStoreAggregateKey,
   EventStoreEventReadInput,
   EventStoreReadContext,
 } from "./stores/eventStore.types.ts";

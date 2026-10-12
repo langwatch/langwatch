@@ -8,10 +8,8 @@ import type {
 import type { UserStandingFact } from "../../rules/user-standing.rules.ts";
 import type { UserStandingRepository } from "../user-standing.repository.ts";
 
-type UserLifecycleEventReads = Pick<OwnEventStore, "read">;
+type UserLifecycleEventReads = Pick<OwnEventStore, "findAggregates">;
 type UserStandingEvent = UserDeactivatedEvent | UserReactivatedEvent;
-
-const READ_CONCURRENCY = 50;
 
 const USER_STANDING_EVENT_TYPES: ReadonlySet<unknown> = new Set([
   USER_DEACTIVATED_EVENT_TYPE,
@@ -40,7 +38,7 @@ export class EventingUserStandingRepository implements UserStandingRepository {
     this.#eventStore = input.eventStore;
   }
 
-  /** Each account's deactivated and reactivated facts, oldest first, read a slice at a time. */
+  /** Each account's deactivated and reactivated facts, oldest first, in one read of the log. */
   async findStandingFactsOf({
     userIds,
   }: {
@@ -51,29 +49,18 @@ export class EventingUserStandingRepository implements UserStandingRepository {
       // A plain Error on purpose (error doctrine): the caller cannot act on an absent log.
       throw new Error("user's user_lifecycle pipeline cannot read: never built over a store");
     }
-    const found: { userId: string; facts: UserStandingFact[] }[] = [];
-    for (let start = 0; start < userIds.length; start += READ_CONCURRENCY) {
-      const slice = userIds.slice(start, start + READ_CONCURRENCY);
-      found.push(
-        ...(await Promise.all(
-          slice.map(async (userId) => {
-            const events = await eventStore.read({
-              tenantId: userId,
-              aggregateId: userId,
-              accepts: isUserStandingEvent,
-            });
-            return {
-              userId,
-              facts: events.map((event): UserStandingFact => ({
-                type: event.type === USER_DEACTIVATED_EVENT_TYPE ? "deactivated" : "reactivated",
-                occurredAt: event.data.occurredAt,
-              })),
-            };
-          }),
-        )),
-      );
-    }
-    return found;
+    if (userIds.length === 0) return [];
+    const found = await eventStore.findAggregates({
+      aggregates: userIds.map((userId) => ({ tenantId: userId, aggregateId: userId })),
+      accepts: isUserStandingEvent,
+    });
+    return found.map(({ aggregateId, events }) => ({
+      userId: aggregateId,
+      facts: events.map((event): UserStandingFact => ({
+        type: event.type === USER_DEACTIVATED_EVENT_TYPE ? "deactivated" : "reactivated",
+        occurredAt: event.data.occurredAt,
+      })),
+    }));
   }
 }
 

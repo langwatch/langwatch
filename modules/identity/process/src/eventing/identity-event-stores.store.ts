@@ -1,5 +1,6 @@
 import type {
   EventingParticipation,
+  OwnAggregatesQuery,
   OwnEventStore,
   OwnEventsAppend,
   PriorEventsQuery,
@@ -42,6 +43,8 @@ export class IdentityEventStores {
         this.#kept({ pipeline, operation: "append" }).append(appended),
       read: <Event>(query: PriorEventsQuery<Event>) =>
         this.#kept({ pipeline, operation: "read" }).read(query),
+      findAggregates: <Event>(query: OwnAggregatesQuery<Event>) =>
+        this.#kept({ pipeline, operation: "read" }).findAggregates(query),
     };
   }
 
