@@ -30,6 +30,21 @@ describe("SettingsSection", () => {
     });
   });
 
+  describe("given a footer", () => {
+    it("draws it after the body", () => {
+      renderWithDesignSystem(
+        <SettingsSection title="Organization" footer={<button type="submit">Save changes</button>}>
+          <p>Body</p>
+        </SettingsSection>,
+      );
+
+      const save = screen.getByRole("button", { name: "Save changes" });
+      const body = screen.getByText("Body");
+      expect(save.closest("[data-settings-footer]")).not.toBeNull();
+      expect(body.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+  });
+
   describe("given only a title", () => {
     it("renders no hint and no action", () => {
       renderWithDesignSystem(<SettingsSection icon={null} title="Sessions" />);

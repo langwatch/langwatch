@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Settings pages read at one measure, left-aligned under the title, forms and tables alike.
+ * Settings pages read in one centred column, title included, forms and tables alike.
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -48,8 +48,8 @@ describe("given a settings page", () => {
       "/settings/api-keys",
       "/settings/audit-log",
       "/settings/model-providers",
-    ])("frames %s at the one settings measure", (pathname) => {
-      expect(measureAt({ pathname })).toBe("960px");
+    ])("frames %s in the one centred settings column", (pathname) => {
+      expect(measureAt({ pathname })).toBe("1248px");
     });
   });
 
@@ -57,7 +57,7 @@ describe("given a settings page", () => {
     it.each(["/settings/authentication", "/settings/authentication/provider"])(
       "frames %s at the settings measure, its pages being header tabs now",
       (pathname) => {
-        expect(measureAt({ pathname })).toBe("960px");
+        expect(measureAt({ pathname })).toBe("1248px");
       },
     );
   });

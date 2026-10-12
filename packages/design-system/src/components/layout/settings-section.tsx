@@ -17,11 +17,13 @@ export interface SettingsSectionProps {
   hint?: ReactNode;
   /** A state the band is in, beside the title. */
   badge?: ReactNode;
-  /**
-   * The section's one action, aligned with the title: a form's Save goes here, disabled
-   * only while saving (ADR-018). A section of switches has none: a switch saves on change.
-   */
+  /** The section's one action aligned with the title, such as a link to manage it. */
   actions?: ReactNode;
+  /**
+   * Under the body, right-aligned: a form's Save goes here, disabled only while saving
+   * (ADR-018). A section of switches has none: a switch saves on change.
+   */
+  footer?: ReactNode;
   /** What a link elsewhere on the page scrolls to. */
   anchorId?: string;
   /** False drops the rule and band padding, for a section inside a card page. */
@@ -36,6 +38,7 @@ export function SettingsSection({
   hint,
   badge,
   actions,
+  footer,
   anchorId,
   divided = true,
   children,
@@ -79,6 +82,11 @@ export function SettingsSection({
           ) : null}
         </VStack>
         {children}
+        {footer ? (
+          <HStack width="full" justify="flex-end" gap={2} data-settings-footer>
+            {footer}
+          </HStack>
+        ) : null}
       </VStack>
     </Box>
   );

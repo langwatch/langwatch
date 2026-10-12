@@ -85,11 +85,11 @@ const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items
 
 /** Every page's header and body share this one edge; the design system reads it. */
 const PAGE_INSET = "var(--chakra-spacing-6)";
-/** Settings-style pages read at one width, left-aligned under the title. */
-const SETTINGS_MEASURE = "960px";
+/** Settings-style pages read in one centred column of this width, title included. */
+const SETTINGS_MEASURE = "1248px";
 
 /**
- * Settings, gateway, instance and Cloud admin pages read at the settings measure, under the title.
+ * Settings, gateway, instance and Cloud admin pages read in the centred settings column.
  * Ops tools other than instance and Cloud admin draw their own frame and get none here.
  */
 function PageMeasure({ pathname, children }: { pathname: string; children: ReactNode }) {
@@ -105,14 +105,15 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       minHeight={0}
       overflowY="auto"
       paddingBottom={16}
-      // The body starts at the header's inset and stops at the measure.
-      // Buttons are skipped: the assistant's floating launcher is a fixed sibling.
+      // Header and body share one centred column; the header's own inset is dropped so
+      // the title lines up with the body. The assistant's floating launcher is a fixed button.
       css={{
-        "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
-          width: `min(${SETTINGS_MEASURE}, calc(100% - 2 * var(--page-inset)))`,
-          marginInlineStart: "var(--page-inset)",
-          marginInlineEnd: "auto",
-        },
+        "& [data-page-header], & [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)":
+          {
+            width: `min(${SETTINGS_MEASURE}, calc(100% - 2 * var(--page-inset)))`,
+            marginInline: "auto",
+          },
+        "& [data-page-header]": { paddingInline: 0 },
         "& [data-page-container]": { paddingInline: 0 },
       }}
     >
