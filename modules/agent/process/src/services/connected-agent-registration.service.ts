@@ -23,13 +23,14 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
+import type { InstanceMeta } from "../repositories/connected-agent-state.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
 import {
   type NormalizedParameters,
   normalizeParameterSchema,
 } from "../rules/connected-agent-parameter-spec.rules.ts";
 import type { AgentService } from "./agent.service.ts";
-import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
+import type { ConnectedAgentRuntime } from "./connected-agent-runtime.service.ts";
 import type { SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:registration");

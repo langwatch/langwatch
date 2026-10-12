@@ -23,14 +23,8 @@ import {
  * Delivery is once only — a call is claimed under its own key before handout.
  */
 import { generate } from "@langwatch/ksuid";
-import { z } from "zod";
 
-import {
-  callDeliveredKey,
-  callKey,
-  httpSessionKey,
-  pendingKey,
-} from "../rules/connected-agent-keys.rules.ts";
+import type { StoredSession } from "../repositories/connected-agent-state.repository.ts";
 import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
 import { type AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
 
@@ -46,33 +40,6 @@ const GONE_CHECK_SLACK_MS = 5_000;
 
 /** The delivered marker outlives the longest call and its slack. */
 const DELIVERED_TTL_SECONDS = Math.ceil(MAX_CALL_TIMEOUT_MS / 1000) + CALL_KEY_SLACK_SECONDS;
-
-/** What the store keeps for one HTTP session, under its token. */
-const storedSessionSchema = z.object({
-  principalId: z.string(),
-  token: z.string(),
-  instanceId: z.string(),
-  projectId: z.string(),
-  projectSlug: z.string(),
-  agentIds: z.array(z.string()),
-  meta: z.object({
-    instanceId: z.string(),
-    projectId: z.string(),
-    hostname: z.string(),
-    username: z.string(),
-    pid: z.number(),
-    sdk: z.object({
-      name: z.string(),
-      version: z.string(),
-      language: z.string(),
-    }),
-    label: z.string().nullable(),
-    podId: z.string(),
-    connectedAt: z.number(),
-    maxConcurrency: z.number(),
-  }),
-});
-type StoredSession = z.infer<typeof storedSessionSchema>;
 
 /** What one pod keeps per instance it has served: the channel, and who waits on it. */
 interface LongPollTransportOptions {
@@ -173,11 +140,11 @@ export class LongPollTransportService {
       if (!call) {
         continue;
       }
-      await this.#core.runtime.store.setIfAbsent(
-        callDeliveredKey(session.projectId, callId),
-        "1",
-        DELIVERED_TTL_SECONDS,
-      );
+      await this.#core.runtime.state.claimCallDelivery({
+        projectId: session.projectId,
+        callId,
+        ttlSeconds: DELIVERED_TTL_SECONDS,
+      });
     }
 
     await this.#watchesOfInstances.ensureWatch(session);
@@ -317,21 +284,19 @@ export class LongPollTransportService {
 
     // Read under the credential's own project: a token minted in another
     // project names no session here, whatever instance it registered.
-    const raw = await this.#core.runtime.store.tryGet(httpSessionKey(resolved.project.id, token));
-    if (!raw) {
-      throw new AgentSessionUnknownError();
-    }
-
-    const parsed = storedSessionSchema.safeParse(JSON.parse(raw));
+    const lookup = await this.#core.runtime.state.readHttpSession({
+      projectId: resolved.project.id,
+      token,
+    });
     if (
-      !parsed.success ||
-      parsed.data.projectId !== resolved.project.id ||
-      parsed.data.principalId !== resolved.principalId
+      lookup.kind !== "hit" ||
+      lookup.value.projectId !== resolved.project.id ||
+      lookup.value.principalId !== resolved.principalId
     ) {
       throw new AgentSessionUnknownError();
     }
 
-    const stored = parsed.data;
+    const stored = lookup.value;
 
     return {
       stored,
@@ -347,11 +312,10 @@ export class LongPollTransportService {
   }
 
   async #saveSession(stored: StoredSession): Promise<void> {
-    await this.#core.runtime.store.set(
-      httpSessionKey(stored.projectId, stored.token),
-      JSON.stringify(stored),
-      HTTP_SESSION_TTL_SECONDS,
-    );
+    await this.#core.runtime.state.saveHttpSession({
+      session: stored,
+      ttlSeconds: HTTP_SESSION_TTL_SECONDS,
+    });
   }
 
   /** A poll is a heartbeat: the session and the presence both live on. */
@@ -371,12 +335,13 @@ export class LongPollTransportService {
     session: SessionInfo;
     inFlight: Set<string>;
   }): Promise<(CallFrame | CancelFrame)[]> {
-    const store = this.#core.runtime.store;
+    const state = this.#core.runtime.state;
     const frames: (CallFrame | CancelFrame)[] = [];
-    const pending = await store.zrangebyscore(
-      pendingKey(session.projectId, session.instanceId),
-      this.#core.now(),
-    );
+    const pending = await state.findPendingCallIds({
+      projectId: session.projectId,
+      instanceId: session.instanceId,
+      from: this.#core.now(),
+    });
     for (const callId of pending) {
       if (inFlight.has(callId)) {
         continue;
@@ -387,11 +352,11 @@ export class LongPollTransportService {
         continue;
       }
 
-      const claimed = await store.setIfAbsent(
-        callDeliveredKey(session.projectId, callId),
-        "1",
-        DELIVERED_TTL_SECONDS,
-      );
+      const claimed = await state.claimCallDelivery({
+        projectId: session.projectId,
+        callId,
+        ttlSeconds: DELIVERED_TTL_SECONDS,
+      });
       if (!claimed) {
         continue;
       }
@@ -400,7 +365,8 @@ export class LongPollTransportService {
     }
 
     for (const callId of inFlight) {
-      if (await store.tryGet(callKey(session.projectId, callId))) {
+      const envelope = await state.readCall({ projectId: session.projectId, callId });
+      if (envelope.kind !== "miss") {
         continue;
       }
 
@@ -417,11 +383,15 @@ export class LongPollTransportService {
   }
 
   async #deregister(stored: StoredSession, session: SessionInfo): Promise<void> {
-    const store = this.#core.runtime.store;
-    await store.del(httpSessionKey(stored.projectId, stored.token));
+    const state = this.#core.runtime.state;
+    await state.deleteHttpSession({ projectId: stored.projectId, token: stored.token });
     await this.#watchesOfInstances.drop(session);
 
-    const pending = await store.zrangebyscore(pendingKey(session.projectId, session.instanceId), 0);
+    const pending = await state.findPendingCallIds({
+      projectId: session.projectId,
+      instanceId: session.instanceId,
+      from: 0,
+    });
     await this.#core.retire(session, pending);
   }
 }

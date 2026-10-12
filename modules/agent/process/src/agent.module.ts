@@ -4,6 +4,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { AgentModule } from "#app/agent.app";
+import { agentChannels } from "#channels/agent-channels.registry";
 import { agentLifecycleEventing } from "#eventing/agent-lifecycle.pipeline";
 import { agentWorkflowFieldsEventing } from "#eventing/agent-workflow-fields.pipeline";
 import { agentRepositories } from "#repositories/agent-repositories.registry";
@@ -20,6 +21,7 @@ import { agentTrpcTransport } from "#transport/agent.trpc";
 export const agentProcessModule: PublishedProcessModule<"agent", AgentApi, AgentServerConfig> =
   defineProcessModule("agent")
     .withRepositories(agentRepositories)
+    .withChannels(agentChannels)
     .withApi(AgentModule)
     .withTransports(
       createAgentRest(),

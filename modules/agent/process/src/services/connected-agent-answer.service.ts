@@ -6,26 +6,25 @@ import {
   type CallEnvelope,
   type CallOutcome,
   STICKY_PIN_TTL_SECONDS,
+  type StoredResult,
   type StoredResultError,
-  storedResultSchema,
 } from "@langwatch/agent-contract";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
-import { resultKey, threadPinKey } from "../rules/connected-agent-keys.rules.ts";
+import type { ConnectedAgentStateRepository } from "../repositories/connected-agent-state.repository.ts";
 import { type LiveInstance } from "./connected-agent-runtime.service.ts";
 
-type AnswerOptions = { store: SessionStateStore };
+type AnswerOptions = { state: ConnectedAgentStateRepository };
 
 /** Reads a delivered call result and holds sticky threads on their instance. */
 export class ConnectedAgentAnswerService {
-  readonly #store: SessionStateStore;
+  readonly #state: ConnectedAgentStateRepository;
 
   static create(options: AnswerOptions): ConnectedAgentAnswerService {
     return new ConnectedAgentAnswerService(options);
   }
 
   private constructor(options: AnswerOptions) {
-    this.#store = options.store;
+    this.#state = options.state;
   }
 
   /** Reads a delivered result as the answer, a retry or a disconnect. */
@@ -61,7 +60,9 @@ export class ConnectedAgentAnswerService {
     }
     await this.pinThread({
       isSticky,
-      pinKey: threadPinKey(projectId, envelope.agentId, envelope.threadId),
+      projectId,
+      agentId: envelope.agentId,
+      threadId: envelope.threadId,
       instanceId: instance.instanceId,
     });
     return {
@@ -93,20 +94,28 @@ export class ConnectedAgentAnswerService {
   /** Holds a sticky thread on the instance that answers it. */
   async pinThread({
     isSticky,
-    pinKey,
-    instanceId,
+    ...thread
   }: {
     isSticky: boolean;
-    pinKey: string;
+    projectId: string;
+    agentId: string;
+    threadId: string;
     instanceId: string;
   }): Promise<void> {
     if (!isSticky) return;
-    await this.#store.set(pinKey, instanceId, STICKY_PIN_TTL_SECONDS);
+    await this.#state.pinThread({ ...thread, ttlSeconds: STICKY_PIN_TTL_SECONDS });
   }
 
-  async #readResult({ projectId, callId }: { projectId: string; callId: string }) {
-    const raw = await this.#store.tryGet(resultKey(projectId, callId));
-    return raw ? findParsedFrame(storedResultSchema, raw) : null;
+  /** The stored result; an absent or unreadable one reads as no result. */
+  async #readResult({
+    projectId,
+    callId,
+  }: {
+    projectId: string;
+    callId: string;
+  }): Promise<StoredResult | undefined> {
+    const lookup = await this.#state.readResult({ projectId, callId });
+    return lookup.kind === "hit" ? lookup.value : undefined;
   }
 }
 
@@ -124,16 +133,4 @@ function remoteError(error: StoredResultError): Error {
     remoteCode: error.code,
     remoteMessage: error.message,
   });
-}
-
-function findParsedFrame<T>(
-  schema: { safeParse: (raw: unknown) => { success: boolean; data?: T } },
-  raw: string,
-): T | null {
-  try {
-    const parsed = schema.safeParse(JSON.parse(raw));
-    return parsed.success ? (parsed.data as T) : null;
-  } catch {
-    return null;
-  }
 }

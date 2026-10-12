@@ -67,6 +67,7 @@ import { SecretApi } from "@langwatch/secret-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 
+import type { AgentChannels } from "../channels/agent.channels.ts";
 import {
   type AgentLifecyclePipeline,
   buildAgentLifecyclePipeline,
@@ -97,14 +98,15 @@ import { ConnectedAgentService } from "../services/connected-agent.service.ts";
 const THREAD_KSUID_RESOURCE = "thread";
 
 /**
- * The relay behind connected agents runs on the live tier's Redis session
- * state, so a deployment that named no Redis refuses at boot naming this
+ * The relay behind connected agents runs on the live tier's Redis state and
+ * pub/sub, so a deployment that named no Redis refuses at boot naming this
  * module rather than starting with the relay quietly switched off.
  */
 type AgentSetup = FeatureSetup<
   typeof AgentModule.dependencies,
   AgentServerConfig,
-  AgentRepositories
+  AgentRepositories,
+  AgentChannels
 >;
 
 export class AgentModule implements AgentApi {
@@ -135,7 +137,7 @@ export class AgentModule implements AgentApi {
   readonly #lifecycle = buildAgentLifecyclePipeline();
   #lifecycleCommands: EventingCommands<AgentLifecyclePipeline> | undefined;
 
-  private constructor({ repositories, dependencies, config, resources }: AgentSetup) {
+  private constructor({ repositories, channels, dependencies, config, resources }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
     this.#httpSecrets = AgentHttpSecretsService.create({
       secrets: dependencies.secrets,
@@ -157,7 +159,8 @@ export class AgentModule implements AgentApi {
 
     const connected = ConnectedAgentService.create({
       agents: this.#agents,
-      sessionState: repositories.sessionState,
+      state: repositories.connectedAgentState,
+      relay: channels.relay,
       config,
       publicBaseUrl: this.#publicBaseUrl,
     });
