@@ -16,8 +16,10 @@
  * @see dev/docs/adr/137-instant-eval-run-is-a-judgment-job.md
  */
 
+import type { InstantEvalRunInterruptionsRepository } from "~/server/app-layer/instant-evals/run/instant-eval-run-interruptions.repository";
 import { definePipeline } from "../../";
 import type { ProcessManagerApplier } from "../../pipeline/processBuilder";
+import type { CommandKillSwitchSkipObserver } from "../../pipeline/staticBuilder.types";
 import type { StateProjectionStore } from "../../projections/stateProjection.types";
 import {
   instantEvalPageDedupeId,
@@ -71,6 +73,7 @@ export interface InstantEvalProcessingPipelineDeps {
   /** The run's counters, on its own ClickHouse row. */
   instantEvalRunStore: StateProjectionStore<InstantEvalRunProjectionState>;
   dispatch: InstantEvalDispatchDeps;
+  interruptions: Pick<InstantEvalRunInterruptionsRepository, "record">;
 }
 
 /**
@@ -127,23 +130,55 @@ export function instantEvalPM(
 export function createInstantEvalProcessingPipeline(
   deps: InstantEvalProcessingPipelineDeps,
 ) {
+  const onKillSwitchSkip: CommandKillSwitchSkipObserver = async ({
+    payload,
+    tenantId,
+    aggregateId,
+    componentName,
+  }) => {
+    await deps.interruptions.record([
+      {
+        projectId: tenantId,
+        runId: aggregateId,
+        componentType: "command",
+        componentName,
+        operationKey:
+          typeof payload.page === "number"
+            ? `${componentName}:page:${payload.page}`
+            : componentName,
+        observedAtMs: Date.now(),
+      },
+    ]);
+  };
   return definePipeline<InstantEvalProcessingEvent>()
     .withName("instant_eval_processing")
     .withAggregateType(INSTANT_EVAL_AGGREGATE_TYPE)
     .withProjection(
       "instantEvalRun",
-      createInstantEvalRunStateProjection({ store: deps.instantEvalRunStore }),
+      createInstantEvalRunStateProjection({
+        store: deps.instantEvalRunStore,
+        interruptions: deps.interruptions,
+      }),
     )
-    .withCommand("requestRun", RequestInstantEvalRunCommand)
-    .withCommand("recordPlanned", RecordInstantEvalPlannedCommand)
+    .withCommand("requestRun", RequestInstantEvalRunCommand, {
+      onKillSwitchSkip,
+    })
+    .withCommand("recordPlanned", RecordInstantEvalPlannedCommand, {
+      onKillSwitchSkip,
+    })
     .withCommand("recordPageJudged", RecordInstantEvalPageJudgedCommand, {
+      onKillSwitchSkip,
       // Suppress a duplicate append for the same page at enqueue: a redelivered
       // page would otherwise write a second event the fold has to recognise.
       // TTL-bound and best-effort; the fold's own page guard is the backstop.
       deduplication: { makeId: instantEvalPageDedupeId, ttlMs: 60_000 },
     })
-    .withCommand("requestCancel", RequestInstantEvalCancelCommand)
-    .withCommand("recordFinished", RecordInstantEvalFinishedCommand)
+    .withCommand("requestCancel", RequestInstantEvalCancelCommand, {
+      onKillSwitchSkip,
+    })
+    .withCommand("recordFinished", RecordInstantEvalFinishedCommand, {
+      onKillSwitchSkip,
+    })
     .withProcessManager(INSTANT_EVAL_PROCESS_NAME, instantEvalPM(deps.dispatch))
     .build();
 }

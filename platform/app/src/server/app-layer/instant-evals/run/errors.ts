@@ -60,6 +60,23 @@ export class InstantEvalClassifierNotConfiguredError extends HandledError {
   }
 }
 
+/** An operator disabled admission; this does not change feature eligibility. */
+export class InstantEvalProcessingDisabledError extends HandledError {
+  declare readonly code: "instant_eval_processing_disabled";
+  constructor() {
+    super(
+      "instant_eval_processing_disabled",
+      "An Instant Eval processing step is disabled. Contact your administrator or support before starting a new run.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        ...remediation("instant_eval_processing_disabled"),
+      },
+    );
+    this.name = "InstantEvalProcessingDisabledError";
+  }
+}
+
 /** No run of this project has that id. */
 export class InstantEvalRunNotFoundError extends HandledError {
   declare readonly code: "instant_eval_not_found";

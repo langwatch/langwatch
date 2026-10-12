@@ -259,6 +259,14 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_RUNS_TTL_DAYS",
     hardcodedDefault: 49,
   },
+  // Keep refusal evidence as long as the run it explains, outside trace retention.
+  {
+    table: "instant_eval_run_interruptions",
+    ttlColumn: "ObservedAt",
+    retentionTTLColumn: "ObservedAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_INSTANT_EVAL_RUN_INTERRUPTIONS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
 ] as const;
 
 function parseNonNegativeInt(value: string, label: string): number {

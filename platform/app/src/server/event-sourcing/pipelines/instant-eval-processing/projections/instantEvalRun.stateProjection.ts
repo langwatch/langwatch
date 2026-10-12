@@ -22,6 +22,7 @@
  * @see ../../../../../../specs/instant-evals/instant-eval-pipeline.feature
  */
 
+import type { InstantEvalRunInterruptionsRepository } from "~/server/app-layer/instant-evals/run/instant-eval-run-interruptions.repository";
 import type {
   StateProjectionDefinition,
   StateProjectionStore,
@@ -181,6 +182,7 @@ function applyEvent(
  */
 export function createInstantEvalRunStateProjection(deps: {
   store: StateProjectionStore<InstantEvalRunProjectionState>;
+  interruptions: Pick<InstantEvalRunInterruptionsRepository, "record">;
 }): StateProjectionDefinition<
   InstantEvalRunProjectionState,
   InstantEvalProcessingEvent
@@ -192,6 +194,20 @@ export function createInstantEvalRunStateProjection(deps: {
     init: () => INITIAL_INSTANT_EVAL_RUN_STATE,
     apply: applyEvent,
     store: deps.store,
+    options: {
+      onKillSwitchSkip: async ({ events, componentName }) => {
+        await deps.interruptions.record(
+          events.map((event) => ({
+            projectId: String(event.tenantId),
+            runId: String(event.aggregateId),
+            componentType: "projection" as const,
+            componentName,
+            operationKey: event.id,
+            observedAtMs: Date.now(),
+          })),
+        );
+      },
+    },
     // The aggregate is the run, so the projection key is the run id and one
     // row is one run.
     key: (event) => String(event.aggregateId),

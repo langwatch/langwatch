@@ -295,6 +295,7 @@ import { createInstantEvalRunPortFromEnv } from "./instant-evals/run";
 import { ClickHouseInstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
 import { ClickHouseInstantEvalRunProjectionStore } from "./instant-evals/run/instant-eval-run.projection-store";
 import { ClickHouseInstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
+import { ClickHouseInstantEvalRunInterruptionsRepository } from "./instant-evals/run/instant-eval-run-interruptions.repository";
 import { createInstantEvalSpendRecorderFromEnv } from "./instant-evals/spend";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
@@ -512,6 +513,10 @@ export function initializeDefaultApp(options?: {
   // pipeline's run port and to the App, so the run surface never resolves a
   // client of its own. The spend recorder is the logging default until the
   // gateway spend pipeline binds its own.
+  const instantEvalInterruptions =
+    new ClickHouseInstantEvalRunInterruptionsRepository(
+      resolveClickHouseClient,
+    );
   const instantEvalRuns = new ClickHouseInstantEvalRunRepository({
     resolveClient: resolveClickHouseClient,
   });
@@ -1624,6 +1629,7 @@ export function initializeDefaultApp(options?: {
       },
     },
     instantEvals: {
+      interruptions: instantEvalInterruptions,
       runPort: createInstantEvalRunPortFromEnv({
         runs: instantEvalRuns,
         judgments: instantEvalJudgments,
@@ -2186,6 +2192,7 @@ export function initializeDefaultApp(options?: {
     },
     instantEvals: {
       runs: instantEvalRuns,
+      interruptions: instantEvalInterruptions,
       judgments: instantEvalJudgments,
       spend: instantEvalSpend,
     },
@@ -2603,6 +2610,11 @@ export function createTestApp(overrides?: TestAppOverrides): App {
     },
     filters: { options: new FilterService(null) },
     instantEvals: {
+      interruptions: new ClickHouseInstantEvalRunInterruptionsRepository(
+        async () => {
+          throw new Error("ClickHouse is not available in the test app");
+        },
+      ),
       runs: new ClickHouseInstantEvalRunRepository({
         resolveClient: async () => {
           throw new Error("ClickHouse is not available in the test app");

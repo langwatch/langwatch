@@ -1,0 +1,13 @@
+# Instant Eval processing interruptions
+
+Instant Eval admission checks the existing project-targeted `requestRun` switch before acceptance, budget reservation, row creation, or enqueue. This is an admission refusal, not a synchronous event-append acknowledgement: a switch can still change before a queued worker executes.
+
+The five Instant Eval commands and `instantEvalRun` state projection opt into awaited `onKillSwitchSkip` observers. At the actual disabled verdict, an independent ClickHouse repository records tenant/run, component, operation identity, and observation time before the job is acknowledged. A receipt write failure rejects that command/projection job through its normal retry path. It does not retry the paid page intent or invoke the classifier again. Other pipelines retain their existing skip contract.
+
+`instant_eval_run_interruptions` is append-only and contains no SQL, questions, parameters, judged text, or payloads. Repeated delivery is deduplicated by read-time grouping. Reads route to the tenant's configured ClickHouse and filter TenantId before RunId; a list performs one receipt lookup for its runs. Retention defaults to indefinite, matching runs, outside trace retention and the storage meter. The table is not exposed in LangWatchQL.
+
+The independent read view adds `processingBlock` without changing status, error, finishedAt, counters, paid intents, cancellation, or process-manager transitions. Receipt lookup failure fails the read rather than presenting healthy reporting. The interruption remains observable across flag restoration, reload, and later projection writes, including terminal writes. None of those proves complete recovery. Execution may still be running, and counters may be incomplete; this is reporting impairment, not a claim of cancellation or failure.
+
+Deploy additive migration 00101 before deploying writers/readers. Roll back code without dropping the receipt table, replaying skipped commands, or restarting paid work. This patch exposes observed refusals; it does not repair prior lost outcomes, accounting, or budget reservations. Persistent receipt-storage failure remains subject to existing queue retry/exhaustion handling.
+
+Focused verification lives in the command dispatcher suite, `instantEvalKillSwitch.unit.test.ts` (real dispatch and projection routing with fake external boundaries), admission/read-view tests, and the explicitly local-only ClickHouse integration test. The latter requires `LANGWATCH_INTERRUPTION_TEST_CLICKHOUSE_URL` pointing to loopback, creates a unique `langwatch8299_*` database, applies the two table migrations, and drops only that database after checking persistence and tenant isolation.

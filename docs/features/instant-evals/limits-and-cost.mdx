@@ -76,3 +76,11 @@ The judge is run by a third-party provider under a data processing agreement. It
 LangWatch sends judged text only after someone in your organization starts a run or a judged query. Judging is off for a self-serve organization until a member with organization management rights switches it on from the search bar; a member without those rights reads the same explanation there and is asked to turn to an organization admin. On an enterprise plan, ask us and we switch it on.
 
 A self-hosted install sends the text through [Connect](/self-hosting/connect) to LangWatch, which passes it on as above.
+
+## When processing is disabled
+
+An administrator can disable an Instant Eval processing step with an Ops kill switch. If starting runs is disabled, a new run is refused with `instant_eval_processing_disabled` before a run or free-budget hold is created. Ask your administrator or support before starting a new run.
+
+If a worker refuses a queued command or run-status event, Explorer shows **Progress reporting was interrupted**. Work may still be running, and the last counts may be incomplete. Contact your administrator or support with the run ID. This notice is independent of the execution outcome: even a run later marked finished can have incomplete reported progress.
+
+Run get and list responses expose optional `processingBlock` with `code`, `observedAtMs`, and affected `stages` (`componentType` and `componentName`). Each actual refusal is recorded separately from the run's status. Restoring a switch or refreshing Explorer does not remove that evidence, because it does not prove skipped work was repaired. There is no automatic rerun or recovery action; do not repeat paid work to repair a reporting gap.

@@ -17,6 +17,7 @@ export interface ActiveInstantEval {
   judged: number;
   total: number | null;
   matched: number;
+  hasReportedCounts?: boolean;
   /** Judging, asked to stop, or ended with its last verdicts still landing. */
   phase: Exclude<InstantEvalRunPhase, "settled">;
 }
@@ -51,12 +52,19 @@ function unsettledInstantEval({
   run,
   isStopRequested,
   isSettled,
+  isReadUnavailable,
 }: {
   run: InstantEvalExplorerRun;
   isStopRequested: boolean;
   isSettled: boolean;
+  isReadUnavailable: boolean;
 }): ActiveInstantEval | null {
-  const phase = instantEvalRunPhase({ run, isStopRequested, isSettled });
+  const phase = instantEvalRunPhase({
+    run,
+    isStopRequested,
+    isSettled,
+    isReadUnavailable,
+  });
   if (phase === "settled") return null;
   return {
     runId: run.id,
@@ -73,23 +81,41 @@ function firstUnsettledInstantEval({
   runs,
   stoppedByUser,
   settled,
+  readUnavailable,
 }: {
   chips: readonly { runId: string | null }[];
   runs: Readonly<Record<string, InstantEvalExplorerRun>>;
   stoppedByUser: Readonly<Record<string, true>>;
   settled: Readonly<Record<string, true>>;
+  readUnavailable: Readonly<Record<string, true>>;
 }): ActiveInstantEval | null {
+  let first: ActiveInstantEval | null = null;
+  let unavailable: ActiveInstantEval | null = null;
   for (const { runId } of chips) {
     const run = runId === null ? undefined : runs[runId];
-    if (!run) continue;
+    if (!run) {
+      if (runId && readUnavailable[runId])
+        unavailable ??= {
+          runId,
+          judged: 0,
+          total: null,
+          matched: 0,
+          phase: "unavailable",
+          hasReportedCounts: false,
+        };
+      continue;
+    }
     const unsettled = unsettledInstantEval({
       run,
       isStopRequested: stoppedByUser[run.id] === true,
       isSettled: settled[run.id] === true,
+      isReadUnavailable: readUnavailable[run.id] === true,
     });
-    if (unsettled) return unsettled;
+    if (unsettled?.phase === "interrupted") return unsettled;
+    if (unsettled?.phase === "unavailable") unavailable ??= unsettled;
+    first ??= unsettled;
   }
-  return null;
+  return unavailable ?? first;
 }
 
 /**
@@ -111,9 +137,17 @@ export function useExplorerCounts(): ExplorerCounts {
   const runs = useInstantEvalRunStore((s) => s.runs);
   const stoppedByUser = useInstantEvalRunStore((s) => s.stoppedByUser);
   const settled = useInstantEvalRunStore((s) => s.settled);
+  const readUnavailable = useInstantEvalRunStore((s) => s.readUnavailable);
   const instantEval = useMemo(
-    () => firstUnsettledInstantEval({ chips, runs, stoppedByUser, settled }),
-    [chips, runs, stoppedByUser, settled],
+    () =>
+      firstUnsettledInstantEval({
+        chips,
+        runs,
+        stoppedByUser,
+        settled,
+        readUnavailable,
+      }),
+    [chips, runs, stoppedByUser, settled, readUnavailable],
   );
 
   const counts = byConversation

@@ -12,6 +12,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+vi.hoisted(() => vi.resetModules());
+
 const snapshotQuery = vi.hoisted(() => vi.fn());
 
 vi.mock("~/utils/api", () => ({

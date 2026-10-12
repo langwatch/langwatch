@@ -13,7 +13,10 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useInstantEvalRuns } from "../../hooks/useInstantEvalRuns";
 import { useExplorerStore } from "../../stores/explorerStore";
-import { useInstantEvalRunStore } from "../../stores/instantEvalRunStore";
+import {
+  selectInstantEvalRunPhase,
+  useInstantEvalRunStore,
+} from "../../stores/instantEvalRunStore";
 import type { TimeRange } from "../../stores/querySlice";
 import { useSearchSubmitRequestStore } from "../../stores/searchSubmitRequestStore";
 import {
@@ -69,10 +72,24 @@ interface EmptyContent {
 function instantEvalEmptyContent({
   isJudging,
   hasUnjudgedEval,
+  reportingPhase,
 }: {
   isJudging: boolean;
   hasUnjudgedEval: boolean;
+  reportingPhase?: "interrupted" | "unavailable" | null;
 }): EmptyContent | null {
+  if (reportingPhase === "interrupted")
+    return {
+      title: "Progress reporting was interrupted",
+      description:
+        "Work may still be running and reported matches may be incomplete. Contact your administrator or support with the run ID shown above.",
+    };
+  if (reportingPhase === "unavailable")
+    return {
+      title: "Run status unavailable",
+      description:
+        "Last reported results may be outdated. Run status will be checked again.",
+    };
   if (hasUnjudgedEval) {
     return {
       title: "These results are not judged yet",
@@ -115,6 +132,7 @@ export function emptyContent({
   rangeHours,
   isJudging,
   hasUnjudgedEval = false,
+  reportingPhase,
 }: {
   activeLensId: string;
   hasFilters: boolean;
@@ -123,8 +141,13 @@ export function emptyContent({
   isJudging: boolean;
   /** An eval chip has no run for this window, lens and filter. */
   hasUnjudgedEval?: boolean;
+  reportingPhase?: "interrupted" | "unavailable" | null;
 }): EmptyContent {
-  const judging = instantEvalEmptyContent({ isJudging, hasUnjudgedEval });
+  const judging = instantEvalEmptyContent({
+    isJudging,
+    hasUnjudgedEval,
+    reportingPhase,
+  });
   if (judging) return judging;
   if (activeLensId === "errors") {
     return {
@@ -240,6 +263,7 @@ function emptyStateActions({
   selectLens,
   setTimeRange,
   judgeTheseResults,
+  isReportingImpaired,
 }: {
   activeLensId: string;
   hasFilters: boolean;
@@ -250,7 +274,9 @@ function emptyStateActions({
   selectLens: (lensId: string) => void;
   setTimeRange: (range: TimeRange) => void;
   judgeTheseResults: () => void;
+  isReportingImpaired: boolean;
 }): ActionButton[] {
+  if (isReportingImpaired) return [];
   const actions: ActionButton[] = [];
   // The query goes back through the search bar as it stands, so the chip's
   // run starts the way Enter on it does: the same estimate, cost rule and
@@ -291,8 +317,26 @@ export const EmptyFilterState: React.FC = () => {
   const selectLens = useExplorerStore((s) => s.selectLens);
 
   const isJudging = useInstantEvalRunStore((s) =>
-    Object.keys(s.runs).some((runId) => !s.settled[runId]),
+    Object.keys(s.runs).some((runId) => {
+      const phase = selectInstantEvalRunPhase(s, runId);
+      return (
+        phase === "judging" || phase === "stopping" || phase === "settling"
+      );
+    }),
   );
+  const reportingPhase = useInstantEvalRunStore((s) => {
+    const phases = [
+      ...new Set([
+        ...Object.keys(s.runs),
+        ...Object.keys(s.readUnavailable ?? {}),
+      ]),
+    ].map((id) => selectInstantEvalRunPhase(s, id));
+    return phases.includes("interrupted")
+      ? "interrupted"
+      : phases.includes("unavailable")
+        ? "unavailable"
+        : null;
+  });
   const { chips: evalChips } = useInstantEvalRuns();
   const unjudgedChip = evalChips.find((chip) => chip.runId === null);
   const requestSubmit = useSearchSubmitRequestStore((s) => s.requestSubmit);
@@ -305,6 +349,7 @@ export const EmptyFilterState: React.FC = () => {
     rangeHours,
     isJudging,
     hasUnjudgedEval: Boolean(unjudgedChip),
+    reportingPhase,
   });
 
   const actions = emptyStateActions({
@@ -313,6 +358,7 @@ export const EmptyFilterState: React.FC = () => {
     isJudging,
     rangeHours,
     unjudgedChip: unjudgedChip ?? null,
+    isReportingImpaired: reportingPhase !== null,
     clearAll,
     selectLens,
     setTimeRange,

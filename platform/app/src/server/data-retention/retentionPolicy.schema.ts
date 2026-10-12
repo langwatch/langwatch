@@ -369,6 +369,8 @@ export const INDEFINITE_DEFAULT_RETENTION_TABLES = [
   // a timer would orphan the judgements it explains, so it keeps the same
   // indefinite default. Migration 00098.
   "instant_eval_runs",
+  // Refusal evidence must outlive late status writes and stay with the run.
+  "instant_eval_run_interruptions",
 ] as const;
 
 export type IndefiniteDefaultRetentionTable =

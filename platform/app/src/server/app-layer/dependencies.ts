@@ -60,6 +60,7 @@ import type { GithubPullRequestsRepository } from "./github/repositories/github-
 import type { InstantEvalSpendRecorder } from "./instant-evals/instant-eval-spend.recorder";
 import type { InstantEvalJudgmentsRepository } from "./instant-evals/run/instant-eval-judgments.repository";
 import type { InstantEvalRunRepository } from "./instant-evals/run/instant-eval-run.repository";
+import type { InstantEvalRunInterruptionsRepository } from "./instant-evals/run/instant-eval-run-interruptions.repository";
 import type { LangyCredentialService } from "./langy/LangyCredentialService";
 import type { LangyConversationService } from "./langy/langy-conversation.service";
 import type { LangyFeedbackPromptService } from "./langy/langy-feedback-prompt.service";
@@ -219,6 +220,7 @@ export interface AppDependencies {
    */
   instantEvals: {
     runs: InstantEvalRunRepository;
+    interruptions: InstantEvalRunInterruptionsRepository;
     judgments: InstantEvalJudgmentsRepository;
     spend: InstantEvalSpendRecorder;
   };

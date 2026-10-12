@@ -1597,7 +1597,13 @@ export class ProjectionRouter<
           customKey: projection.options?.killSwitch?.customKey,
           logger: this.logger,
         });
-        if (disabled) return;
+        if (disabled) {
+          await projection.options?.onKillSwitchSkip?.({
+            events,
+            componentName: projectionName,
+          });
+          return;
+        }
 
         let toApply = events;
         if (this.replayMarkerChecker) {

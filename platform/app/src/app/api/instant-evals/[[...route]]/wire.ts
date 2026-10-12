@@ -19,7 +19,7 @@ import {
   INSTANT_EVAL_JUDGMENT_STATUSES,
   type InstantEvalJudgment,
 } from "~/server/app-layer/instant-evals/run";
-import type { InstantEvalRunRow } from "~/server/app-layer/instant-evals/run/instant-eval-run.repository";
+import type { InstantEvalRunView } from "~/server/app-layer/instant-evals/run/processing-block";
 import { readInstantEvalRunQuestions } from "~/server/app-layer/instant-evals/run/questions";
 import type { InstantEvalRunProjectedStatus } from "~/server/event-sourcing/pipelines/instant-eval-processing/projections/instantEvalRun.stateProjection";
 import { instantEvalStoredParametersSchema } from "./schemas";
@@ -57,6 +57,21 @@ const instantEvalRunQuestionSchema = z.object({
 
 export const instantEvalRunSchema = z.object({
   id: z.string().describe("The run id."),
+  processingBlock: z
+    .object({
+      code: z.literal("instant_eval_processing_disabled"),
+      observedAtMs: z.number(),
+      stages: z.array(
+        z.object({
+          componentType: z.enum(["command", "projection"]),
+          componentName: z.string(),
+        }),
+      ),
+    })
+    .optional()
+    .describe(
+      "A processing refusal was observed. Work may still be running and counters may be incomplete; this does not change the execution outcome.",
+    ),
   name: z.string().nullable().describe("What the run was called, if anything."),
   sql: z.string().describe("The statement, exactly as submitted."),
   parameters: instantEvalStoredParametersSchema.describe(
@@ -242,10 +257,18 @@ export function toInstantEvalJudgmentWire(
 
 /** One run, as a caller reads it. */
 export function toInstantEvalRunWire(
-  row: InstantEvalRunRow,
+  row: InstantEvalRunView,
 ): InstantEvalRunWire {
   return {
     id: row.id,
+    ...(row.processingBlock
+      ? {
+          processingBlock: {
+            ...row.processingBlock,
+            stages: row.processingBlock.stages.map((stage) => ({ ...stage })),
+          },
+        }
+      : {}),
     name: row.name,
     sql: row.sql,
     parameters: row.parameters as InstantEvalRunWire["parameters"],
