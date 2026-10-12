@@ -104,7 +104,8 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       flex={1}
       minHeight={0}
       overflowY="auto"
-      paddingBottom={16}
+      // Clears the floating assistant launcher, so the last action (Save) is never under it.
+      paddingBottom={28}
       // The header spans the full width like every page; the body below it reads in one
       // centred column. The assistant's floating launcher is a fixed button, so it is skipped.
       css={{
