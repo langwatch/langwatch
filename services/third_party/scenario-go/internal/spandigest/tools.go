@@ -40,6 +40,7 @@ func ExpandTrace(spans []sdktrace.ReadOnlySpan, spanIDs []string) string {
 	sorted := SortByStartTime(spans)
 	var out lines
 	var attrs []cleanAttribute
+	var c compiler
 	matched := 0
 	for _, s := range sorted {
 		id := s.SpanContext().SpanID().String()
@@ -54,7 +55,7 @@ func ExpandTrace(spans []sdktrace.ReadOnlySpan, spanIDs []string) string {
 			continue
 		}
 		matched++
-		attrs = renderFullSpan(&out, s, attrs)
+		attrs = renderFullSpan(&out, &c, s, attrs)
 		out.add("")
 	}
 	if matched == 0 {
@@ -71,22 +72,28 @@ func ExpandTrace(spans []sdktrace.ReadOnlySpan, spanIDs []string) string {
 	return truncateToCharBudget(string(bytes.TrimRight(out.buf, " \t\n\r")))
 }
 
-func renderFullSpan(out *lines, s sdktrace.ReadOnlySpan, attrs []cleanAttribute) []cleanAttribute {
-	n := &node{span: s}
-	r := renderer{}
-	out.buf = r.header(out.start(), n, "", false)
+func renderFullSpan(out *lines, c *compiler, s sdktrace.ReadOnlySpan, attrs []cleanAttribute) []cleanAttribute {
+	out.buf = appendHeader(out.start(), s, false)
 	attrs = cleanAttributes(attrs, s.Attributes())
 	for _, a := range attrs {
-		out.add("    " + a.key + ": " + FormatValue(a.value))
+		out.buf = appendAttr(out.start(), c, "    ", a)
 	}
 	for _, ev := range s.Events() {
 		out.add("    [event] " + ev.Name)
 		attrs = cleanAttributes(attrs, ev.Attributes)
 		for _, a := range attrs {
-			out.add("      " + a.key + ": " + FormatValue(a.value))
+			out.buf = appendAttr(out.start(), c, "      ", a)
 		}
 	}
 	return attrs
+}
+
+// appendAttr appends an indented "key: value" line, value as FormatValue.
+func appendAttr(b []byte, c *compiler, indent string, a cleanAttribute) []byte {
+	b = append(b, indent...)
+	b = append(b, a.key...)
+	b = append(b, ": "...)
+	return appendFormattedValue(b, c, a.value)
 }
 
 // grepMatcher finds the lines of a span's searchable text (its name, then
@@ -99,6 +106,7 @@ type grepMatcher struct {
 	ascii bool
 	buf   []byte
 	attrs []cleanAttribute
+	comp  compiler
 }
 
 func newGrepMatcher(pattern string) *grepMatcher {
@@ -177,7 +185,7 @@ func (m *grepMatcher) part(hits []string, part []byte) []string {
 func (m *grepMatcher) attributeParts(hits []string, kvs []attribute.KeyValue) []string {
 	m.attrs = cleanAttributes(m.attrs, kvs)
 	for _, a := range m.attrs {
-		m.buf = append(append(append(m.buf[:0], a.key...), ": "...), FormatValue(a.value)...)
+		m.buf = appendAttr(m.buf[:0], &m.comp, "", a)
 		hits = m.part(hits, m.buf)
 	}
 	return hits

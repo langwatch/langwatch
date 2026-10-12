@@ -1,22 +1,3 @@
-// Package evaluators runs LangWatch evaluators on scenario runs: the mapping
-// helpers a test author writes to say where an evaluator input reads from,
-// the inference of unmapped inputs, the LangWatch evaluations API client and
-// the scenario.EvaluatorRunner that gates the run on required evaluators.
-//
-// Register the runner once, then attach evaluators to scenarios:
-//
-//	scenario.Configure(scenario.WithEvaluatorRunner(evaluators.NewRunner()))
-//
-//	scenario.Run(ctx, scenario.ScenarioConfig{
-//		Fields: map[string]scenario.FieldValue{"golden_sql": "SELECT 1"},
-//		Evaluators: []scenario.ScenarioEvaluator{
-//			evaluators.Evaluator("ragas/sql_query_equivalence",
-//				evaluators.Map("output", evaluators.Trace.ToolCalls("run_sql").Last.Input),
-//				evaluators.Map("expected_output", evaluators.Field("golden_sql")),
-//			),
-//		},
-//		// …
-//	})
 package evaluators
 
 import (

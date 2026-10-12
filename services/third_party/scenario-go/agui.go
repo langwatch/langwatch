@@ -23,11 +23,15 @@ type aguiRow struct {
 	toolCalls   []ToolCall
 }
 
-// aguiRows converts a message to its AG-UI rows, mirroring the JS
+// aguiRows converts a message to its AG-UI rows. The Go model carries one
+// tool result per message, so it is always the one row of aguiRowOf.
+func aguiRows(m Message) []aguiRow { return []aguiRow{aguiRowOf(m)} }
+
+// aguiRowOf converts a message to its AG-UI row, mirroring the JS
 // convertModelMessagesToAguiMessages: trace_id first, then id, role, content
 // and toolCalls / toolCallId. Audio file parts become OpenAI input_audio parts
 // (raw PCM16 is wrapped in WAV) so the LangWatch ingest externalizes them.
-func aguiRows(m Message) []aguiRow {
+func aguiRowOf(m Message) aguiRow {
 	id := m.ID
 	if id == "" {
 		id = generateMessageID()
@@ -53,9 +57,9 @@ func aguiRows(m Message) []aguiRow {
 		b = append(b, `,"toolCallId":`...)
 		b = jsjson.AppendString(b, m.ToolCallID)
 		b = append(b, `,"content":`...)
-		value := appendToolOutputValue(nil, m.Text())
-		b = jsjson.AppendString(b, string(value))
-		row.text, row.textContent = string(value), true
+		value := string(appendToolOutputValue(nil, m.Text()))
+		b = jsjson.AppendString(b, value)
+		row.text, row.textContent = value, true
 	case m.Role == RoleSystem || m.isPlainText():
 		b = append(b, `,"content":`...)
 		text := m.Text()
@@ -85,7 +89,7 @@ func aguiRows(m Message) []aguiRow {
 		}
 	}
 	row.json = append(b, '}')
-	return []aguiRow{row}
+	return row
 }
 
 // toolArgumentsString is JSON.stringify(input) of the parsed arguments.

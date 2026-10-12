@@ -3,6 +3,7 @@ package scenario
 import (
 	"context"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,7 +16,7 @@ type Settings struct {
 	// config leaves the model unset.
 	DefaultModel ModelConfig
 	// Headless stops the SDK from opening the browser on the first run.
-	// Defaults to SCENARIO_HEADLESS being set.
+	// Defaults to SCENARIO_HEADLESS, unless it is empty, "false" or "0".
 	Headless bool
 	// FetchRemoteTraces is the project default of ScenarioConfig.FetchRemoteTraces.
 	FetchRemoteTraces bool
@@ -127,11 +128,21 @@ func CurrentSettings() Settings { return *currentSettings() }
 func currentSettings() *Settings {
 	settingsOnce.Do(func() {
 		settingsPtr.CompareAndSwap(nil, &Settings{
-			Headless:       os.Getenv("SCENARIO_HEADLESS") != "",
+			Headless:       headlessFromEnv(),
 			GranularEvents: envFlag("SCENARIO_SEND_GRANULAR_EVENTS"),
 		})
 	})
 	return settingsPtr.Load()
+}
+
+// headlessFromEnv reads SCENARIO_HEADLESS like the Python SDK: any value
+// but empty, "false" and "0" is headless (JS accepts only "true").
+func headlessFromEnv() bool {
+	switch lower(strings.TrimSpace(os.Getenv("SCENARIO_HEADLESS"))) {
+	case "", "false", "0":
+		return false
+	}
+	return true
 }
 
 // envFlag parses a boolean environment variable: true/1/yes/on enable it;

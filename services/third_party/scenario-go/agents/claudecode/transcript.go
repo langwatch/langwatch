@@ -21,6 +21,9 @@ import (
 // message's non-empty blocks on their own lines, messages separated by a
 // blank line.
 
+// literalTrue is the JSON of a set is_error flag.
+var literalTrue = []byte("true")
+
 // addMessage renders one inner message into the transcript.
 func (p *parser) addMessage(m *wireMessage) {
 	c := &m.Content
@@ -126,6 +129,7 @@ func (p *parser) addUserBlocks(blocks []wireBlock) {
 				ToolCallID: b.ToolUseID,
 				ToolName:   name,
 				Content:    value,
+				IsError:    bytes.Equal(b.IsError, literalTrue),
 			})
 		case "tool_use":
 			p.writeToolUse(b, jsonValue(b.Input))

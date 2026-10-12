@@ -180,11 +180,23 @@ func reopenInterval(o *Options) time.Duration {
 	return time.Duration(max(0, n)) * time.Second
 }
 
-func throttlePath() string { return filepath.Join(stateDir(), "scenario-tab-opens.json") }
+// throttlePath is the throttle record, or "" when there is no state
+// directory: the record must never land in the working directory.
+func throttlePath() string {
+	dir := stateDir()
+	if dir == "" {
+		return ""
+	}
+	return filepath.Join(dir, "scenario-tab-opens.json")
+}
 
 func readThrottle() map[string]float64 {
 	out := map[string]float64{}
-	b, err := os.ReadFile(throttlePath())
+	path := throttlePath()
+	if path == "" {
+		return out
+	}
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return out
 	}
@@ -210,6 +222,10 @@ func openedRecently(o *Options, setKey string, now float64) bool {
 }
 
 func recordOpen(o *Options, setKey string, now float64) {
+	target := throttlePath()
+	if target == "" {
+		return
+	}
 	entries := readThrottle()
 	entries[setKey] = now
 	horizon := max(reopenInterval(o).Seconds(), 1) * 10
@@ -218,7 +234,6 @@ func recordOpen(o *Options, setKey string, now float64) {
 			delete(entries, k)
 		}
 	}
-	target := throttlePath()
 	tmp := target + "." + strconv.Itoa(os.Getpid()) + ".tmp"
 	b, _ := json.Marshal(entries)
 	err := os.MkdirAll(filepath.Dir(target), 0o755)

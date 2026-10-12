@@ -28,7 +28,9 @@ const NoSpans = "No spans recorded."
 const DedupThreshold = 50
 
 type node struct {
-	span     sdktrace.ReadOnlySpan
+	span sdktrace.ReadOnlySpan
+	// index is the span's position in the sorted span list.
+	index    int
 	children []*node
 }
 
@@ -53,12 +55,7 @@ func (l *lines) add(s string) {
 // Format renders every span with its attributes and events, deduplicating
 // repeated long strings and truncating inline media.
 func Format(spans []sdktrace.ReadOnlySpan) string {
-	if len(spans) == 0 {
-		return NoSpans
-	}
-	d := &deduplicator{threshold: DedupThreshold}
-	r := renderer{dedup: d}
-	return r.render(spans, false)
+	return (*Cache)(nil).Format(spans)
 }
 
 // FormatStructureOnly renders the span tree without attributes or events,
@@ -68,41 +65,59 @@ func FormatStructureOnly(spans []sdktrace.ReadOnlySpan) string {
 		return NoSpans
 	}
 	r := renderer{}
-	return r.render(spans, true)
+	sorted := SortByStartTime(spans)
+	r.out.buf = make([]byte, 0, estimateSize(spans, true))
+	r.summary(sorted)
+	roots := buildHierarchy(sorted)
+	for i, n := range roots {
+		r.renderStructure(n, 0, i == len(roots)-1)
+	}
+	r.renderErrors(spans)
+	return r.result(r.out.buf)
 }
 
 type renderer struct {
-	dedup *deduplicator
-	out   lines
-	attrs []cleanAttribute
+	out lines
+	// seen holds the long strings the full digest showed so far.
+	seen map[uint64]struct{}
+	// indent is scratch for the attribute indent of the current node.
+	indent []byte
 }
 
-func (r *renderer) render(spans []sdktrace.ReadOnlySpan, structureOnly bool) string {
-	sorted := SortByStartTime(spans)
-	roots := buildHierarchy(sorted)
-
-	r.out.buf = make([]byte, 0, estimateSize(spans, structureOnly))
+func (r *renderer) summary(sorted []sdktrace.ReadOnlySpan) {
 	b := r.out.start()
 	b = append(b, "Spans: "...)
-	b = strconv.AppendInt(b, int64(len(spans)), 10)
+	b = strconv.AppendInt(b, int64(len(sorted)), 10)
 	b = append(b, " | Total Duration: "...)
 	b = appendDuration(b, totalDurationMs(sorted))
 	r.out.buf = b
 	r.out.add("")
+}
 
+// result turns a rendered buffer into the digest string. The buffer is
+// never touched again, so it can back the string.
+func (r *renderer) result(b []byte) string {
+	return unsafe.String(unsafe.SliceData(b), len(b))
+}
+
+// renderFullDigest renders spans in full from their compiled forms, into
+// the renderer's buffer, and returns it.
+func (r *renderer) renderFullDigest(spans []sdktrace.ReadOnlySpan, cache *Cache) []byte {
+	sorted := SortByStartTime(spans)
+	compiled := cache.compiled(sorted)
+	size := 64
+	for _, cs := range compiled {
+		size += len(cs.buf) + 16*cs.lines
+	}
+	r.out.buf = slices.Grow(r.out.buf[:0], size)
+	r.summary(sorted)
+	roots := buildHierarchy(sorted)
+	r.seen = make(map[uint64]struct{}, 2*len(spans))
 	for i, n := range roots {
-		if structureOnly {
-			r.renderStructure(n, 0, i == len(roots)-1)
-		} else {
-			r.renderFull(n, 0, i == len(roots)-1)
-		}
+		r.renderFull(n, compiled, 0, i == len(roots)-1)
 	}
 	r.renderErrors(spans)
-	if len(r.out.buf) == 0 {
-		return ""
-	}
-	// The buffer is never touched again, so it can back the string.
-	return unsafe.String(&r.out.buf[0], len(r.out.buf))
+	return r.out.buf
 }
 
 // estimateSize guesses the digest size from the span names and attribute
@@ -150,9 +165,8 @@ func (r *renderer) renderErrors(spans []sdktrace.ReadOnlySpan) {
 	}
 }
 
-func (r *renderer) header(b []byte, n *node, prefix string, withTokens bool) []byte {
-	s := n.span
-	b = append(b, prefix...)
+// appendHeader appends a span's header line, without its tree prefix.
+func appendHeader(b []byte, s sdktrace.ReadOnlySpan, withTokens bool) []byte {
 	b = append(b, '[')
 	b = AppendShortID(b, s.SpanContext().SpanID())
 	b = append(b, "] "...)
@@ -169,78 +183,65 @@ func (r *renderer) header(b []byte, n *node, prefix string, withTokens bool) []b
 }
 
 func (r *renderer) renderStructure(n *node, depth int, isLast bool) {
-	r.out.buf = r.header(r.out.start(), n, treePrefix(depth, isLast), true)
+	b := appendTreePrefix(r.out.start(), depth, isLast)
+	r.out.buf = appendHeader(b, n.span, true)
 	r.out.add("")
 	for i, c := range n.children {
 		r.renderStructure(c, depth+1, i == len(n.children)-1)
 	}
 }
 
-func (r *renderer) renderFull(n *node, depth int, isLast bool) {
-	r.out.buf = r.header(r.out.start(), n, treePrefix(depth, isLast), false)
-	indent := attrIndent(depth, isLast)
-	r.attrs = cleanAttributes(r.attrs, n.span.Attributes())
-	for _, a := range r.attrs {
-		r.attrLine(indent, "", a)
-	}
-	for _, ev := range n.span.Events() {
-		b := r.out.start()
-		b = append(b, indent...)
-		b = append(b, "[event] "...)
-		b = append(b, ev.Name...)
-		r.out.buf = b
-		r.attrs = cleanAttributes(r.attrs, ev.Attributes)
-		for _, a := range r.attrs {
-			r.attrLine(indent, "  ", a)
-		}
-	}
+// renderFull renders a node and its subtree; compiled is indexed like the
+// sorted spans the hierarchy was built from.
+func (r *renderer) renderFull(n *node, compiled []compiledSpan, depth int, isLast bool) {
+	cs := &compiled[n.index]
+	r.indent = appendAttrIndent(r.indent[:0], depth, isLast)
+	cs.appendTo(&r.out, appendTreePrefix(r.out.start(), depth, isLast), r.indent, r.seen)
 	r.out.add("")
 	for i, c := range n.children {
-		r.renderFull(c, depth+1, i == len(n.children)-1)
+		r.renderFull(c, compiled, depth+1, i == len(n.children)-1)
 	}
 }
 
-func (r *renderer) attrLine(indent, extra string, a cleanAttribute) {
-	b := r.out.start()
-	b = append(b, indent...)
-	b = append(b, extra...)
-	b = append(b, a.key...)
-	b = append(b, ": "...)
-	r.out.buf = r.dedup.appendValue(b, a.value)
-}
+const (
+	pipe        = "│   "
+	blank       = "    "
+	branch      = "├── "
+	lastBranch  = "└── "
+	attrPadding = "    "
+)
 
-// treePrefix returns the box-drawing connector of a node at depth.
-func treePrefix(depth int, isLast bool) string {
+// appendTreePrefix appends the box-drawing connector of a node at depth.
+func appendTreePrefix(b []byte, depth int, isLast bool) []byte {
 	if depth == 0 {
-		return ""
+		return b
 	}
-	connector := "├── "
+	b = appendPipes(b, depth-1)
 	if isLast {
-		connector = "└── "
+		return append(b, lastBranch...)
 	}
-	return repeatPipe(depth-1) + connector
+	return append(b, branch...)
 }
 
-func attrIndent(depth int, isLast bool) string {
+// appendAttrIndent appends the indent of a node's attribute lines.
+func appendAttrIndent(b []byte, depth int, isLast bool) []byte {
 	if depth == 0 {
-		return "    "
+		return append(b, attrPadding...)
 	}
-	continuation := "│   "
+	b = appendPipes(b, depth-1)
 	if isLast {
-		continuation = "    "
+		b = append(b, blank...)
+	} else {
+		b = append(b, pipe...)
 	}
-	return repeatPipe(depth-1) + continuation + "    "
+	return append(b, attrPadding...)
 }
 
-func repeatPipe(n int) string {
-	if n == 0 {
-		return ""
-	}
-	b := make([]byte, 0, n*len("│   "))
+func appendPipes(b []byte, n int) []byte {
 	for i := 0; i < n; i++ {
-		b = append(b, "│   "...)
+		b = append(b, pipe...)
 	}
-	return string(b)
+	return b
 }
 
 // SortByStartTime returns a copy of spans in stable start-time order.
@@ -254,22 +255,41 @@ func SortByStartTime(spans []sdktrace.ReadOnlySpan) []sdktrace.ReadOnlySpan {
 
 func buildHierarchy(sorted []sdktrace.ReadOnlySpan) []*node {
 	nodes := make([]node, len(sorted))
-	byID := make(map[trace.SpanID]*node, len(sorted))
+	byID := make(map[trace.SpanID]int, len(sorted))
 	for i, s := range sorted {
-		nodes[i].span = s
-		byID[s.SpanContext().SpanID()] = &nodes[i]
+		nodes[i].span, nodes[i].index = s, i
+		byID[s.SpanContext().SpanID()] = i
 	}
-	roots := make([]*node, 0, 4)
+	// parent[i] is the index of node i's parent, or -1 for a root. Children
+	// share one backing array, sized by a first counting pass.
+	parent := make([]int, len(nodes))
+	counts := make([]int, len(nodes))
+	roots := 0
 	for i := range nodes {
-		n := &nodes[i]
-		parentID := n.span.Parent().SpanID()
-		if parent, ok := byID[parentID]; ok && parentID.IsValid() && parent != n {
-			parent.children = append(parent.children, n)
+		parentID := nodes[i].span.Parent().SpanID()
+		if p, ok := byID[parentID]; ok && parentID.IsValid() && p != i {
+			parent[i] = p
+			counts[p]++
 		} else {
-			roots = append(roots, n)
+			parent[i] = -1
+			roots++
 		}
 	}
-	return roots
+	all := make([]*node, len(nodes))
+	next := roots
+	for i := range nodes {
+		nodes[i].children = all[next : next : next+counts[i]]
+		next += counts[i]
+	}
+	top := all[:0:roots]
+	for i := range nodes {
+		if p := parent[i]; p >= 0 {
+			nodes[p].children = append(nodes[p].children, &nodes[i])
+		} else {
+			top = append(top, &nodes[i])
+		}
+	}
+	return top
 }
 
 // AppendShortID appends the first 8 hex characters of a span id.

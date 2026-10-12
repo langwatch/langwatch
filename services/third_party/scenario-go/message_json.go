@@ -127,13 +127,28 @@ func appendToolResultPart(b []byte, m Message) []byte {
 	b = jsjson.AppendString(b, m.ToolName)
 	b = append(b, `,"output":`...)
 	if v, ok := toolOutputJSON(m.Text()); ok {
-		b = append(b, `{"type":"json","value":`...)
+		b = append(b, toolOutputType(m.IsError, "json")...)
 		b = jsjson.Append(b, v)
 	} else {
-		b = append(b, `{"type":"text","value":`...)
+		b = append(b, toolOutputType(m.IsError, "text")...)
 		b = jsjson.AppendString(b, m.Text())
 	}
 	return append(b, "}}"...)
+}
+
+// toolOutputType returns the opening of an AI SDK tool output of the kind
+// ("text" or "json"): {"type":"text","value": or, for a failed call,
+// {"type":"error-text","value":.
+func toolOutputType(isError bool, kind string) string {
+	switch {
+	case isError && kind == "json":
+		return `{"type":"error-json","value":`
+	case isError:
+		return `{"type":"error-text","value":`
+	case kind == "json":
+		return `{"type":"json","value":`
+	}
+	return `{"type":"text","value":`
 }
 
 // toolOutputJSON reports whether a tool result is a JSON object or array, the
@@ -165,6 +180,29 @@ func appendModelMessage(b []byte, m Message) []byte {
 	b = append(b, `,"content":`...)
 	b = appendModelContent(b, m, false)
 	return append(b, '}')
+}
+
+// encodeModelMessage returns appendModelMessage of m in a buffer sized up
+// front, so encoding takes one allocation instead of one per growth step.
+func encodeModelMessage(m Message) []byte {
+	return appendModelMessage(make([]byte, 0, modelMessageSizeHint(m)), m)
+}
+
+// modelMessageSizeHint estimates the model JSON size of m: the envelope,
+// the text, and per part and tool call their payload plus its keys. Escapes
+// and base64 make it an estimate; append grows the rare overflow.
+func modelMessageSizeHint(m Message) int {
+	n := 32 + len(m.Role) + len(m.Content)
+	if m.Role == RoleTool {
+		n += 96 + len(m.ToolCallID) + len(m.ToolName)
+	}
+	for _, p := range m.Parts {
+		n += 48 + len(p.Text) + len(p.MediaType) + len(p.URL) + len(p.Filename) + len(p.Raw) + base64.StdEncoding.EncodedLen(len(p.Data))
+	}
+	for _, tc := range m.ToolCalls {
+		n += 64 + len(tc.ID) + len(tc.Name) + len(tc.Arguments)
+	}
+	return n
 }
 
 // AppendMessageJSON appends the message as the JSON of an AI SDK
