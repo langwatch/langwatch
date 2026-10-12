@@ -1282,8 +1282,15 @@ export interface QuestionAsk {
     question: string;
     options?: Array<{ label: string; quiet?: boolean }>;
   }>;
-  answered: Array<{ question: string; selected: string[] }>;
+  answered: Array<{ question: string; selected: string[]; other?: string }>;
   turnId: string;
+  /**
+   * How many tool frames the watcher had read when the answer was sent. A
+   * frame at an earlier index was issued before the user's answer existed, so
+   * a call there did not wait for the card. Question cards are not tool
+   * frames, so this is the only place the card's position in the order lives.
+   */
+  toolEventsBeforeAnswer: number;
 }
 
 /** How the fixture answers permission cards, in the order it reads the rules. */
@@ -1297,7 +1304,8 @@ export interface PermissionPolicy {
 }
 
 /**
- * Picks the answer to one question card. Default: the first option.
+ * Picks the answer to one question card. Default: the first option. Returns
+ * the labels to pick, or `{ other }` to answer in typed words with no pick.
  *
  * It may read the world before it answers: the guided onboarding suite
  * checks that nothing was created yet while Langy's proposal is still open.
@@ -1305,7 +1313,7 @@ export interface PermissionPolicy {
 export type QuestionAnswerPicker = (question: {
   question: string;
   options?: Array<{ label: string; quiet?: boolean }>;
-}) => string[] | Promise<string[]>;
+}) => string[] | { other: string } | Promise<string[] | { other: string }>;
 
 /** One message in the shape the scenario judge reads. */
 export type JudgeMessage =
@@ -1718,7 +1726,10 @@ export function turnFailureMessage({
 /** The line that says what the developer answered on a question card. */
 export function questionAnswerNote(ask: QuestionAsk): string {
   const answers = ask.answered
-    .map((answer) => `"${answer.question}" -> ${answer.selected.join(", ")}`)
+    .map(
+      (answer) =>
+        `"${answer.question}" -> ${[...answer.selected, ...(answer.other ? [answer.other] : [])].join(", ")}`,
+    )
     .join("; ");
   return `[developer answered in the panel: ${answers}]`;
 }
@@ -1939,13 +1950,19 @@ export function watchLangyConversation({
     const asked = (
       Array.isArray(entry.questions) ? entry.questions : []
     ) as QuestionAsk["questions"];
-    const answers: Array<{ question: string; selected: string[] }> = [];
+    const answers: QuestionAsk["answered"] = [];
     for (const question of asked) {
+      const picked = await answerQuestion?.(question);
+      const other = picked && !Array.isArray(picked) ? picked.other : undefined;
+      const selected =
+        picked && !Array.isArray(picked)
+          ? []
+          : (picked ??
+            (question.options?.[0]?.label ? [question.options[0].label] : []));
       answers.push({
         question: question.question,
-        selected:
-          (await answerQuestion?.(question)) ??
-          (question.options?.[0]?.label ? [question.options[0].label] : []),
+        selected,
+        ...(other !== undefined ? { other } : {}),
       });
     }
     const ask: QuestionAsk = {
@@ -1953,6 +1970,7 @@ export function watchLangyConversation({
       questions: asked,
       answered: answers,
       turnId,
+      toolEventsBeforeAnswer: toolEvents.length,
     };
     questions.push(ask);
     answerNotes.push(questionAnswerNote(ask));

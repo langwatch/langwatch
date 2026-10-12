@@ -135,10 +135,29 @@ describe("questionAnswerNote", () => {
         ],
         answered: [{ question: "Which branch?", selected: ["main"] }],
         turnId: "langyturn_1",
+        toolEventsBeforeAnswer: 0,
       });
 
       expect(note).toBe(
         '[developer answered in the panel: "Which branch?" -> main]',
+      );
+    });
+  });
+
+  describe("when the developer answers in typed words", () => {
+    it("carries the question and the typed answer", () => {
+      const note = questionAnswerNote({
+        waitId: "wait_3",
+        questions: [{ question: "Delete it?" }],
+        answered: [
+          { question: "Delete it?", selected: [], other: "No, keep it." },
+        ],
+        turnId: "langyturn_1",
+        toolEventsBeforeAnswer: 0,
+      });
+
+      expect(note).toBe(
+        '[developer answered in the panel: "Delete it?" -> No, keep it.]',
       );
     });
   });
