@@ -40,7 +40,7 @@ type Config struct {
 	HTTPClient *http.Client
 	// DisableCompression sends the body uncompressed instead of gzipped.
 	DisableCompression bool
-	// Retry controls retries of throttled (429) and failed (5xx) exports.
+	// Retry controls retries of throttled (429) and unavailable (502/503/504) exports.
 	Retry RetryConfig
 }
 
@@ -160,11 +160,15 @@ func (e *Exporter) send(ctx context.Context, payload []byte, encoding string) er
 }
 
 // isRetryableStatus reports whether an export answered with code is worth
-// resending: throttling and server-side failures, but not 501, which will not
-// change on retry.
+// resending. It is the otlptracehttp set: throttling and the gateway errors.
 func isRetryableStatus(code int) bool {
-	return code == http.StatusTooManyRequests ||
-		(code >= 500 && code != http.StatusNotImplemented)
+	switch code {
+	case http.StatusTooManyRequests, http.StatusBadGateway,
+		http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 func httpStatusError(resp *http.Response, body []byte) error {

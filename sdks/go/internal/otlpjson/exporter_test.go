@@ -117,7 +117,7 @@ func TestExporter_UncompressedWhenDisabled(t *testing.T) {
 }
 
 func TestExporter_RetriesThrottlingAndServerErrors(t *testing.T) {
-	for _, status := range []int{http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
+	for _, status := range []int{http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			rec := &recorder{statuses: []int{status, status, http.StatusOK}}
 			exp := newTestExporter(t, rec, nil)
@@ -131,8 +131,8 @@ func TestExporter_RetriesThrottlingAndServerErrors(t *testing.T) {
 	}
 }
 
-func TestExporter_DoesNotRetryClientErrors(t *testing.T) {
-	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusNotImplemented} {
+func TestExporter_DoesNotRetryOtherStatuses(t *testing.T) {
+	for _, status := range []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusInternalServerError, http.StatusNotImplemented} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			rec := &recorder{statuses: []int{status}}
 			exp := newTestExporter(t, rec, nil)
