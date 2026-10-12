@@ -151,6 +151,11 @@ try {
         step = name;
         await page.goto(`${url}${path}`, { timeout: 30_000, waitUntil: "domcontentloaded" });
         await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
+        // Signed in, /auth/signin redirects through "/": let it land, or the next goto aborts it.
+        if (name === "signin")
+          await page
+            .waitForURL((at) => outsideAuth(at) && at.pathname !== "/", { timeout: 15_000 })
+            .catch(() => undefined);
         if (name === "traces") {
           step = "trace-drawer";
           await page
