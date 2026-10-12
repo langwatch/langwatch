@@ -322,7 +322,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     setRequestedProject(projectSelectorOf(actionCommand));
     const path = commandPath(actionCommand);
     setRunsOutsideProject(path in COMMANDS_WITHOUT_PROJECT || path in COMMANDS_ACROSS_PROJECTS);
-    const endpointFlag = (actionCommand.opts() as { endpoint?: unknown }).endpoint;
+    const endpointFlag: unknown = actionCommand.opts().endpoint;
     trustLocalDevCa({
       endpoint: resolveControlPlaneUrl({
         flag: typeof endpointFlag === "string" ? endpointFlag : null,

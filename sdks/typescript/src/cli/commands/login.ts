@@ -15,7 +15,7 @@ import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { mintProjectFullAccessKey, SessionApiError } from "@/cli/utils/governance/session-api";
 import { rememberProjectName } from "@/cli/utils/identityNotice";
-import { untrustedCertHint } from "@/cli/utils/localDevCa";
+import { trustLocalDevCa, untrustedCertHint } from "@/cli/utils/localDevCa";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
@@ -309,6 +309,8 @@ async function chooseEndpoint(): Promise<void> {
     saveConfig(cfg);
   }
   warnIfLocalEndpointTakesOverGlobalConfig(cfg.control_plane_url);
+  // The endpoint was picked after the command's preAction hook ran.
+  trustLocalDevCa({ endpoint: resolveControlPlaneEndpoint().url });
 }
 
 /**
