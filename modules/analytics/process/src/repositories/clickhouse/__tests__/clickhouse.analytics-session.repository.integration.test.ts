@@ -44,9 +44,12 @@ describe.skipIf(!enabled)("ClickHouseAnalyticsSessionRepository against ClickHou
     it("fails with query_memory_exceeded, status 422 and a customer fault", async () => {
       const session = await sessions.resolve("project-1");
 
+      // A tenant-scoped read the guard accepts; the table is empty, so the cap trips on the
+      // constant array ClickHouse folds before it reads a row.
       const read = session.query({
-        query: "SELECT groupArray(number) FROM numbers(20000000)",
-        query_params: {},
+        query:
+          "SELECT length(range(200000000)) AS n FROM stored_spans WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: "project-1" },
         format: "JSONEachRow",
         clickhouse_settings: { max_memory_usage: "10000000" },
       });
