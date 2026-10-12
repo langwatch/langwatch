@@ -1,6 +1,7 @@
 package otlpjson
 
 import (
+	"bytes"
 	"encoding/json"
 	"math"
 	"testing"
@@ -199,4 +200,14 @@ func TestMarshal_BytesTravelAsBase64String(t *testing.T) {
 	assert.Equal(t, "/wA=", v["stringValue"])
 	_, has := v["bytesValue"]
 	assert.False(t, has)
+}
+
+func TestEncode_WritesWhatMarshalReturns(t *testing.T) {
+	spans := []sdktrace.ReadOnlySpan{richSpan().Snapshot()}
+	want, err := Marshal(spans)
+	require.NoError(t, err)
+
+	var buf bytes.Buffer
+	require.NoError(t, Encode(&buf, spans))
+	assert.Equal(t, string(want)+"\n", buf.String())
 }

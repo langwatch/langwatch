@@ -108,15 +108,12 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpa
 	defer cancel(nil)
 	defer context.AfterFunc(e.stopped, func() { cancel(ErrShutdown) })()
 
-	payload, err := Marshal(spans)
+	payload, err := e.encode(spans)
 	if err != nil {
 		return fmt.Errorf("otlpjson: encoding spans: %w", err)
 	}
 	encoding := ""
 	if e.compression {
-		if payload, err = gzipBytes(payload); err != nil {
-			return fmt.Errorf("otlpjson: compressing spans: %w", err)
-		}
 		encoding = "gzip"
 	}
 
@@ -252,13 +249,25 @@ func reportPartialSuccess(body []byte) {
 
 var gzipPool = sync.Pool{New: func() any { return gzip.NewWriter(io.Discard) }}
 
-func gzipBytes(raw []byte) ([]byte, error) {
+// encode streams the OTLP/JSON request into one buffer, through a pooled gzip
+// writer when compression is on. The buffer is not pooled: the transport may
+// still read a request body after Do returns.
+func (e *Exporter) encode(spans []sdktrace.ReadOnlySpan) ([]byte, error) {
 	var buf bytes.Buffer
-	buf.Grow(len(raw) / 4)
+	if !e.compression {
+		if err := Encode(&buf, spans); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
+	}
+
 	zw := gzipPool.Get().(*gzip.Writer)
-	defer gzipPool.Put(zw)
+	defer func() {
+		zw.Reset(io.Discard) // drop the reference to buf before pooling
+		gzipPool.Put(zw)
+	}()
 	zw.Reset(&buf)
-	if _, err := zw.Write(raw); err != nil {
+	if err := Encode(zw, spans); err != nil {
 		return nil, err
 	}
 	if err := zw.Close(); err != nil {

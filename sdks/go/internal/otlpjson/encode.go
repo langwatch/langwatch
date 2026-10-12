@@ -9,6 +9,7 @@ package otlpjson
 import (
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"math"
 	"strconv"
 
@@ -37,6 +38,12 @@ const (
 // first appear; nil spans are skipped.
 func Marshal(spans []sdktrace.ReadOnlySpan) ([]byte, error) {
 	return json.Marshal(buildRequest(spans))
+}
+
+// Encode writes the request Marshal would return to w, followed by a newline,
+// without building the whole body as a separate []byte first.
+func Encode(w io.Writer, spans []sdktrace.ReadOnlySpan) error {
+	return json.NewEncoder(w).Encode(buildRequest(spans))
 }
 
 // buildRequest groups spans into resourceSpans/scopeSpans.
