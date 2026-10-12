@@ -50,7 +50,7 @@ export function createDashboardTestAnalytics(overrides: Partial<AnalyticsApi> = 
     }),
     isWorkbenchEnabled: async () => true,
     isDashboardsEnabled: async () => true,
-    assertCustomChartPlaygroundEnabled: async () => void 0,
+    assertDashboardWidgetsEnabled: async () => void 0,
     resolveProtections: async () => FULLY_PERMITTED,
     resolveRunCaller: async () => ({
       project: { id: "project-1", lwqlKey: "restricted-project-key" },

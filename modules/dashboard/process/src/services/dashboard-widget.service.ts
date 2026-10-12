@@ -35,7 +35,7 @@ type Viewed = Readonly<{ viewer?: DashboardViewer }>;
 const definitionUpdateSchema = dashboardWidgetDefinitionSchema.partial();
 
 /**
- * Every widget operation first asks analytics whether the project may use the playground. A
+ * Every widget operation first asks analytics whether the project may use widgets. A
  * widget on a board the viewer may not see reads and writes as not found, exactly like one that
  * does not exist; an Organization board's widgets are read, never written, from other projects.
  */
@@ -181,7 +181,7 @@ export class DashboardWidgetService {
   }
 
   #assertEnabled({ projectId }: { projectId: string }): Promise<void> {
-    return this.#analytics.assertCustomChartPlaygroundEnabled({ projectId });
+    return this.#analytics.assertDashboardWidgetsEnabled({ projectId });
   }
 
   /** Refuses before the write what `#present` would refuse after it, so no bad row is stored. */

@@ -7,7 +7,6 @@ import {
   analyticsServerConfig,
   type AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiToken,
-  CustomChartPlaygroundNotEnabledError,
   MAX_LWQL_LENGTH,
   type AnalyticsFeedbacksPageParams,
   type AnalyticsFeedbacksPageResult,
@@ -99,7 +98,7 @@ import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lw
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
-import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
+import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
@@ -471,7 +470,7 @@ export class AnalyticsModule
 
   #dependencies: AnalyticsAppDependencies;
   #publicBaseUrl: string | undefined;
-  #playgroundAccess: CustomChartPlaygroundAccessService;
+  #widgetAccess: DashboardWidgetAccessService;
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
   #protections: WorkbenchProtectionsService;
@@ -486,7 +485,7 @@ export class AnalyticsModule
       protections: this.#protections,
     });
     this.#publicBaseUrl = publicBaseUrl;
-    this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
+    this.#widgetAccess = DashboardWidgetAccessService.create(dependencies);
     this.#hydration = dependencies.hydration;
   }
 
@@ -952,9 +951,7 @@ export class AnalyticsModule
    * This must be implemented on the bound app so refusal returns the domain 403
    * instead of the feature-api proxy's “not callable” error.
    */
-  async assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void> {
-    const enabled = await this.#playgroundAccess.isEnabled(input);
-
-    if (!enabled) throw new CustomChartPlaygroundNotEnabledError();
+  assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void> {
+    return this.#widgetAccess.assertEnabled(input);
   }
 }

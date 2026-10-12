@@ -53,9 +53,9 @@ function ReportsContent() {
 
   const [isAddChartOpen, setIsAddChartOpen] = useState(false);
 
-  // Gates the new "Add chart" flow client-side to match server enforcement
-  // (enforceCustomChartPlaygroundEnabled): `enabled` defaults false while
-  // loading, so the button starts as the legacy link, never flashing open.
+  // Gates the "Add chart" widget drawer; the server admits widgets for this flag too
+  // (DashboardWidgetAccessService). `enabled` defaults false while loading, so the
+  // button starts as the legacy link, never flashing open.
   const { enabled: customChartPlaygroundEnabled } = useFeatureFlag(
     FrontendFlags.release_custom_chart_playground,
     {
@@ -232,12 +232,8 @@ function ReportsContent() {
         ),
       }}
     >
-      {/* The workbench builder's own save path is disabled while the
-          custom-chart-playground is enabled (see DashboardWidgetService /
-          saved_workbench_charts_disabled_for_playground) — a member landing
-          there would hit a Save button that always fails. This drawer is
-          the one "create a new chart" path that still works, and it lands
-          the new widget on this dashboard directly. */}
+      {/* The custom chart playground flag's one remaining job: this page's
+          widget drawer, which lands the new widget on this dashboard. */}
       {project && canAddChart && customChartPlaygroundEnabled && (
         <CreateDashboardWidgetDrawer
           open={isAddChartOpen}

@@ -192,12 +192,12 @@ updateGraphLayout(input: { projectId: string; graphId: string; layout: GraphLayo
 batchUpdateGraphLayouts(input: { projectId: string; layouts: { graphId: string; layout: GraphLayout }[]; viewer?: DashboardViewer; }): Promise<{ success: true }>;
 ```
 
-#### `assertCustomChartPlaygroundEnabled`
+#### `assertDashboardWidgetsEnabled`
 
 Custom chart widgets: a third kind of card on the same grid, whose definition analytics owns and whose placement this feature stores.
 
 ```typescript
-assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
+assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
 ```
 
 #### `listDashboardWidgets`

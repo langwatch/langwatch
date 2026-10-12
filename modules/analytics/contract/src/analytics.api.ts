@@ -96,8 +96,8 @@ export interface AnalyticsApi {
     readonly subkey?: string;
     readonly filters?: Record<string, unknown>;
   }): Promise<AnalyticsFilterOption[]>;
-  /** Refuses the dashboard-widget surface while its project rollout is disabled. */
-  assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
+  /** Refuses the dashboard-widget surface unless Dashboards and LangWatchQL are both on. */
+  assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void>;
   upsertEvaluationAnalyticsBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void>;
   findEvaluationAnalytics(input: AnalyticsEvaluationReadInput): Promise<{

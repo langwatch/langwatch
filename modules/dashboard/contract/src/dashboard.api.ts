@@ -187,7 +187,7 @@ export interface DashboardApi {
    * Custom chart widgets: a third kind of card on the same grid, whose
    * definition analytics owns and whose placement this feature stores.
    */
-  assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
+  assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
   /** The project's custom chart widgets, or one board's, the organization's boards included. */
   listDashboardWidgets(input: {
     projectId: string;

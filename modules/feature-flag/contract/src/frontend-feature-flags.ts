@@ -39,8 +39,8 @@ export const FRONTEND_FEATURE_FLAGS = [
   // purely additive: the current Simulations pages and menu group are
   // untouched while it is off, and the backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
-  // The custom-chart-playground page and its widget routes outside local
-  // development; the full registry documents the rollout story.
+  // The legacy Analytics reports page's custom chart widget drawer; the full
+  // registry documents the rollout story.
   "release_custom_chart_playground",
   // The Dashboards area, its sidebar entry and its saved-dashboards list.
   "release_dashboards",

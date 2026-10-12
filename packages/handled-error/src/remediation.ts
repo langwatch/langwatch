@@ -175,7 +175,7 @@ const registry = {
   },
   custom_chart_playground_not_enabled: {
     tips: [
-      "The custom-chart-playground feature is not enabled for this project; retrying will not help",
+      "Dashboard widgets need both Dashboards and LangWatchQL enabled for this project; retrying will not help",
       "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
     ],
   },

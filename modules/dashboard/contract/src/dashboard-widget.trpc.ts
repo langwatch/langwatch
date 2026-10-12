@@ -1,5 +1,5 @@
 /**
- * The dashboard widget procedures the custom-chart playground calls, at main's
+ * The dashboard widget procedures the widget editors call, at main's
  * `dashboardWidgets.*` path with main's inputs and outputs. The REST family is
  * `dashboard-widget-rest.schemas.ts`. Spec: custom-chart-playground-dashboard-placement.feature.
  */

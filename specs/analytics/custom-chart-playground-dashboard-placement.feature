@@ -6,17 +6,19 @@ Feature: Dashboard widgets placed on a dashboard
   precedent this mirrors). Placement was previously refused everywhere: the
   card-level procedures never admitted the kind, so a widget with a
   `dashboardId` still never appeared on the grid. This feature opens that
-  gate behind `release_custom_chart_playground`, the same flag that gates the
-  widget REST/CLI surface, gives the grid a renderer for the kind, and lets a
-  member edit the widget in place from the card's menu.
+  gate, gives the grid a renderer for the kind, and lets a member edit the
+  widget in place from the card's menu.
 
-  Unlike the mutual exclusion between `chart`/`graph` WRITES and
-  `dashboard-widget` WRITES (release_custom_chart_playground turns the
-  former off), placement is not mutually exclusive: a project can carry
-  `workbench_sql` rows placed before the playground shipped and
-  `dashboard_srcdoc` rows side by side, and both must keep rendering
-  regardless of which flags are on, because deleting neither is this
-  feature's job.
+  Dashboard widgets, their REST/CLI surface included, open with two flags:
+  `release_dashboards` and `release_lwql_workbench`. The custom chart
+  playground flag (`release_custom_chart_playground`) keeps one job: the
+  widget drawer on the legacy Analytics reports page, so it still opens the
+  widget surface on its own for that page.
+
+  Placement is not mutually exclusive: a project can carry `workbench_sql`
+  rows placed before widgets shipped and `dashboard_srcdoc` rows side by
+  side, and both must keep rendering regardless of which flags are on,
+  because deleting neither is this feature's job.
 
   Background:
     Given a dashboard grid
@@ -82,12 +84,32 @@ Feature: Dashboard widgets placed on a dashboard
 
   @unit
   Scenario: The create drawer places a new widget on the dashboard it names through dashboardWidgets.create
-    Given a dashboard in a project with the custom-chart playground on
+    Given a dashboard in a project with dashboard widgets open
     When a widget is created through dashboardWidgets.create naming that dashboard
     Then the widget is placed on that dashboard and answered in main's widget shape
 
   @unit
-  Scenario: Every dashboard widget procedure is refused while the custom-chart playground is off
-    Given a project with the custom-chart playground off
+  Scenario: Every dashboard widget procedure is refused while dashboard widgets are closed
+    Given a project with dashboard widgets closed
     When any dashboardWidgets procedure is called
-    Then it is refused with the playground's own error code
+    Then it is refused with the widget surface's own error code
+
+  @unit
+  Scenario: Dashboard widgets open with the Dashboards and LangWatchQL flags alone
+    Given a project with `release_dashboards` and `release_lwql_workbench` on
+    And `release_custom_chart_playground` off
+    When the widget surface asks whether the project may use it
+    Then the project is admitted
+
+  @unit
+  Scenario: Dashboard widgets stay closed while the Dashboards or the LangWatchQL flag is off
+    Given a project with `release_custom_chart_playground` off
+    And `release_dashboards` or `release_lwql_workbench` off
+    When the widget surface asks whether the project may use it
+    Then it is refused with the widget surface's own error code
+
+  @unit
+  Scenario: The custom chart playground still opens widgets for the legacy reports page
+    Given a project with only `release_custom_chart_playground` on
+    When the widget surface asks whether the project may use it
+    Then the project is admitted, so the legacy reports page's widget drawer keeps working
