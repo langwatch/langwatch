@@ -174,9 +174,17 @@ RUN if echo "$LANGWATCH_BUILD_COMMIT" | grep -Eq '^[0-9a-f]{7,40}$'; then \
 # The same preparation the CI build runs: generated files (modules, Prisma client,
 # langy skills) and the four dist-resolving packages (SDK, mcp-server, ksuid, mail)
 # before the declaration build, which reads their declarations. The root
-# `build:types` script goes through nx, whose workspace project is registered by
-# dev/nx plugins this stage does not copy, so run its tsc command directly.
-RUN pnpm start:prepare:files && pnpm ensure:built \
+# `start:prepare:files`, `ensure:built` and `build:types` scripts go through nx,
+# and this stage copies neither nx.json nor the dev/nx plugins (here nx stopped at
+# "Failed to process project graph"), so each step runs its package script directly.
+# Keep this list in step with those three root scripts.
+RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
+ && pnpm --filter @langwatch/prisma-client run prisma:generate \
+ && pnpm --filter @langwatch/evaluator-contract run generate:evaluators \
+ && pnpm --filter @langwatch/langy-browser run generate:langy-skills \
+ && pnpm --filter @langwatch/langy-browser run generate:feature-map \
+ && pnpm --filter @langwatch/langy-process run generate:setup-skill-bodies \
+ && pnpm --filter "langwatch..." --filter "@langwatch/mcp-server..." --filter "@langwatch/ksuid..." --filter "@langwatch/mail..." run build \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
