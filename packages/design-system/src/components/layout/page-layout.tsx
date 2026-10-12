@@ -30,7 +30,6 @@ import {
   type RefObject,
 } from "react";
 
-import { useProductAccent } from "../scope/use-product-accent.ts";
 import { PageTabMenu, PageTabs } from "./page-header-tabs.tsx";
 
 export type { PageTab } from "./page-header-tabs.tsx";
@@ -113,7 +112,7 @@ export interface LegacyHeaderProps extends ChakraStackProps {
   description?: ReactNode;
 }
 
-/** Whether the page has scrolled under the header, so its reserved hairline can show. */
+/** Whether the page has scrolled under the header, as `data-scrolled` for styles reading it. */
 function useContentScrolled({ headerRef }: { headerRef: RefObject<HTMLDivElement | null> }) {
   const [scrolled, setScrolled] = useState(false);
 
@@ -143,12 +142,6 @@ function useContentScrolled({ headerRef }: { headerRef: RefObject<HTMLDivElement
   return scrolled;
 }
 
-/** A bordered title row is nudged by the rule; a described header pads by the scale. */
-function headerPaddingTop({ described, withBorder }: { described: boolean; withBorder: boolean }) {
-  if (described) return 3;
-  return withBorder ? "1px" : 0;
-}
-
 function Header(props: PageHeaderProps): ReactNode;
 /** @deprecated Pass only `actions`, `children` and `data-testid`. */
 function Header(props: PropsWithChildren<LegacyHeaderProps>): ReactNode;
@@ -165,7 +158,6 @@ function Header({
   const size = useContext(PageHeaderAreaContext) ?? requestedSize;
   const headerRef = useRef<HTMLDivElement>(null);
   const scrolled = useContentScrolled({ headerRef });
-  const paddingTop = headerPaddingTop({ described, withBorder });
 
   return (
     <HeaderSizeContext.Provider value={size}>
@@ -179,9 +171,7 @@ function Header({
         width="full"
         borderBottomWidth={withBorder ? "1px" : 0}
         borderBottomStyle={withBorder ? "solid" : "none"}
-        borderBottomColor={withBorder && scrolled ? "border.card" : "transparent"}
-        transition="border-color 160ms ease"
-        _motionReduce={{ transition: "none" }}
+        borderBottomColor="border"
         gap={3}
         position="sticky"
         top={0}
@@ -194,13 +184,12 @@ function Header({
         minHeight={`pageHeader.${size}`}
         maxHeight="none"
         paddingX={PAGE_INSET}
-        paddingTop={paddingTop}
-        paddingBottom={described ? 3 : { base: 0, mdDown: 2 }}
+        paddingY={described ? 3 : { base: 0, mdDown: 2 }}
         flexWrap="wrap"
         rowGap={2}
         css={{
           "& h1": {
-            textStyle: size === "lg" ? "pageTitle" : "pageTitleCompact",
+            textStyle: "pageTitleCompact",
             lineHeight: "28px",
             height: described ? "28px" : { base: "28px", mdDown: "auto" },
             margin: 0,
@@ -212,8 +201,8 @@ function Header({
             overflowWrap: "break-word",
           },
           "& .chakra-button": {
-            height: size === "lg" ? "36px" : "28px",
-            minHeight: size === "lg" ? "36px" : "28px",
+            height: size === "lg" ? "32px" : "28px",
+            minHeight: size === "lg" ? "32px" : "28px",
           },
           ...props.css,
         }}
@@ -234,8 +223,6 @@ function Header({
           <HStack
             data-header-actions
             marginStart={{ base: 0, md: "auto" }}
-            marginTop={described && size === "lg" ? "-1" : 0}
-            marginBottom={described ? 0 : { base: 0, md: 1 }}
             minWidth={0}
             maxWidth="full"
             flexWrap="wrap"
@@ -260,11 +247,10 @@ function Heading(props: { children: ReactNode }): ReactNode;
 /** @deprecated Pass only `children`. */
 function Heading(props: PropsWithChildren<LegacyHeadingProps>): ReactNode;
 function Heading({ children, ...props }: PropsWithChildren<LegacyHeadingProps>): ReactNode {
-  const size = useContext(HeaderSizeContext);
   return (
     <ChakraHeading
       as="h1"
-      textStyle={size === "lg" ? "pageTitle" : "pageTitleCompact"}
+      textStyle="pageTitleCompact"
       lineHeight="28px"
       height={{ base: "28px", mdDown: "auto" }}
       flexShrink={0}
@@ -300,7 +286,7 @@ function Content({ children, ...props }: PropsWithChildren<CardRootProps>) {
 
 /** What every header button takes: appearance is the header's, so no style props. */
 interface HeaderButtonBase {
-  /** The page's one main act: solid in the product's accent. */
+  /** The page's one main act. Header buttons are all outlined; this only marks which one it is. */
   primary?: boolean;
   disabled?: boolean;
   loading?: boolean;
@@ -345,13 +331,12 @@ function HeaderButton({
   ...props
 }: PropsWithChildren<LegacyHeaderButtonProps>): ReactNode {
   const size = useContext(HeaderSizeContext);
-  const accent = useProductAccent();
   return (
     <Button
       variant="outline"
-      size={size === "lg" ? "md" : "xs"}
+      size={size === "lg" ? "sm" : "xs"}
       flexShrink={0}
-      {...(primary ? { variant: "solid", colorPalette: accent.colorPalette } : {})}
+      data-primary={primary ? "" : undefined}
       {...props}
     >
       {children}

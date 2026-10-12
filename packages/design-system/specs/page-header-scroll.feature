@@ -1,26 +1,29 @@
 Feature: Sticky glass page titles
-  Page titles share the content ground. Content scrolls beneath their glass;
-  a reserved hairline appears after scrolling, without shifting layout.
-  Reduced graphics removes blur and restores opacity. Reduced motion removes the fade.
+  Page titles share the content ground. Content scrolls beneath their glass.
+  A bordered header always draws its bottom rule, at the top of the page too,
+  so the title row reads as the page's header. The header still reports
+  whether the page has scrolled under it, for pages that react to it.
+  Reduced graphics removes blur and restores opacity.
 
   @integration
-  Scenario: The hairline appears only after content crosses the title boundary
+  Scenario: The bottom rule is drawn whether or not the page has scrolled
     Given a page title inside a nested scroll container
+    Then the bottom rule is visible at the top of the page
     When content scrolls beneath the title
-    Then the hairline is visible without changing the header height
+    Then the header reports that it is scrolled and the rule keeps its width
     When the content returns to the top
-    Then the hairline is transparent
+    Then the header reports that it is not scrolled
 
   @integration
-  Scenario: Restored scroll positions show the title separator immediately
+  Scenario: Restored scroll positions mark the header scrolled immediately
     Given the page opens at a saved scroll position
-    Then the title hairline is visible on mount
+    Then the header reports that it is scrolled on mount
 
   @integration
-  Scenario: Scrolling another pane does not decorate the page title
+  Scenario: Scrolling another pane does not mark the page title scrolled
     Given the page is at the top
     When an unrelated drawer scrolls
-    Then the page title hairline remains transparent
+    Then the header reports that it is not scrolled
 
   @integration
   Scenario: Explicit borderless headers remain borderless after scrolling
@@ -34,8 +37,8 @@ Feature: Sticky glass page titles
     When headers have no actions, one action, or several actions
     Then every header row is 48 pixels high
     And every title box starts 24 pixels from the left and 10 pixels from the top
-    And titles are 20 pixel semibold with a 28 pixel line box
-    And buttons are 36 pixels high
+    And titles are 16 pixel semibold with a 28 pixel line box
+    And buttons are outlined and 32 pixels high
     And a page cannot select compact sizing inside that area
 
   @integration @browser

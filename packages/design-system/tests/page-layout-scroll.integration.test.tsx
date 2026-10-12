@@ -40,29 +40,29 @@ function scrollPage(top: number) {
 }
 
 describe("sticky page header", () => {
-  /** @scenario The hairline appears only after content crosses the title boundary */
-  it("reveals the hairline when the page scrolls and clears it at the top without resizing", () => {
+  /** @scenario The bottom rule is drawn whether or not the page has scrolled */
+  it("draws the rule at the top and while scrolled, reporting the scroll", () => {
     fixture();
     const header = screen.getByTestId("header");
     const initialWidth = getComputedStyle(header).borderBottomWidth;
     expect(header.getAttribute("data-scrolled")).toBe("false");
     expect(initialWidth).toBe("1px");
-    expect(getComputedStyle(header).borderBottomColor).toBe("var(--chakra-colors-transparent)");
+    expect(getComputedStyle(header).borderBottomColor).toBe("var(--chakra-colors-border)");
     scrollPage(40);
     expect(header.getAttribute("data-scrolled")).toBe("true");
     expect(getComputedStyle(header).borderBottomWidth).toBe(initialWidth);
-    expect(getComputedStyle(header).borderBottomColor).toBe("var(--chakra-colors-border-card)");
+    expect(getComputedStyle(header).borderBottomColor).toBe("var(--chakra-colors-border)");
     scrollPage(0);
     expect(header.getAttribute("data-scrolled")).toBe("false");
   });
 
-  /** @scenario Restored scroll positions show the title separator immediately */
+  /** @scenario Restored scroll positions mark the header scrolled immediately */
   it("reads an already scrolled container on mount", () => {
     fixture({ restored: 80 });
     expect(screen.getByTestId("header").getAttribute("data-scrolled")).toBe("true");
   });
 
-  /** @scenario Scrolling another pane does not decorate the page title */
+  /** @scenario Scrolling another pane does not mark the page title scrolled */
   it("ignores a sibling drawer or pane", () => {
     fixture();
     const other = screen.getByTestId("other-scroll");
