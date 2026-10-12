@@ -49,7 +49,7 @@ func FreeDisk(path string) (int64, error) {
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return 0, err
 	}
-	return int64(stat.Bavail) * int64(stat.Bsize), nil
+	return int64(stat.Bavail) * int64(stat.Bsize), nil //nolint:unconvert // Bsize is int64 on Linux, uint32 on darwin
 }
 
 // ClickHouseCap reads max_server_memory_usage from CLICKHOUSE_URL; 0 when it cannot be read.
