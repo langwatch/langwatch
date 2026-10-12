@@ -151,6 +151,9 @@ class StubRepository implements ProjectRepository {
   findById = vi.fn(async () => applicationProject);
   findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(async () => "org");
   findWithTeam = vi.fn<(id: string) => Promise<ProjectWithTeam | null>>(async () => null);
+  findLiveWithTeamByIds = vi.fn<(ids: readonly string[]) => Promise<ProjectWithTeam[]>>(
+    async () => [],
+  );
   updateMetadata = vi.fn(async () => undefined);
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
@@ -440,6 +443,7 @@ const createService = (
       findWithOrgAdmin: async () => null,
       findIdsByOrganization: async () => [],
       findWithTeam: async () => null,
+      findLiveWithTeamByIds: async () => [],
     },
   }),
   granted: (permission: AuthzPermission) => boolean = () => true,
@@ -766,6 +770,7 @@ describe("ProjectService", () => {
           findWithOrgAdmin: async () => null,
           findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
+          findLiveWithTeamByIds: async () => [],
         },
       });
       created.connect({
@@ -802,6 +807,7 @@ describe("ProjectService", () => {
           findWithOrgAdmin: async () => null,
           findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
+          findLiveWithTeamByIds: async () => [],
         },
       });
       created.connect({
@@ -838,6 +844,7 @@ describe("ProjectService", () => {
           findWithOrgAdmin: async () => null,
           findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
+          findLiveWithTeamByIds: async () => [],
         },
       });
       created.connect({
@@ -1403,6 +1410,7 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
         findWithOrgAdmin: async () => null,
         findIdsByOrganization: async () => [],
         findWithTeam: async () => null,
+        findLiveWithTeamByIds: async () => [],
       },
     });
     created.connect({
@@ -1533,6 +1541,7 @@ describe("ProjectService department facts for data privacy's fold", () => {
         findWithOrgAdmin: async () => null,
         findIdsByOrganization: async () => [],
         findWithTeam: async () => projectWithTeam({ teamId: "team_alpha", departmentId: "risk" }),
+        findLiveWithTeamByIds: async () => [],
       },
     });
     created.connect({

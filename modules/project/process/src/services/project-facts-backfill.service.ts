@@ -13,6 +13,9 @@ type ProjectFactsBackfillPeers = Readonly<{
   preview?: (input: { organizationId: string }) => Promise<number>;
 }>;
 
+/** How many of a page's organizations record at once; the checkpoint still waits for the page. */
+const ORGANIZATION_WIDTH = 8;
+
 type ProjectFactsBackfillReport = {
   afterOrganizationId: string | null;
   organizations: number;
@@ -60,7 +63,7 @@ export class ProjectFactsBackfillService {
     return { afterOrganizationId: cursor ?? null, ...totals };
   }
 
-  /** One page's organizations; false when the signal stopped it part way. */
+  /** One page's organizations, a few at a time; false when the signal stopped it part way. */
   private async recordPage({
     ids,
     dryRun,
@@ -72,13 +75,21 @@ export class ProjectFactsBackfillService {
     signal: AbortSignal;
     totals: { organizations: number; projects: number };
   }): Promise<boolean> {
-    for (const organizationId of ids) {
-      if (signal.aborted) return false;
-      totals.projects += dryRun
-        ? ((await this.peers.preview?.({ organizationId })) ?? 0)
-        : await this.peers.record({ organizationId });
-      totals.organizations += 1;
-    }
-    return true;
+    const pending = [...ids];
+    let done = 0;
+    const lane = async (): Promise<void> => {
+      for (;;) {
+        if (signal.aborted) return;
+        const organizationId = pending.shift();
+        if (organizationId === undefined) return;
+        totals.projects += dryRun
+          ? ((await this.peers.preview?.({ organizationId })) ?? 0)
+          : await this.peers.record({ organizationId });
+        totals.organizations += 1;
+        done += 1;
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(ORGANIZATION_WIDTH, ids.length) }, lane));
+    return done === ids.length;
   }
 }

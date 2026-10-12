@@ -67,6 +67,9 @@ export const BACKGROUND_STEP_RETRY: BackgroundStepRetry = {
 /** A swept run past this aborts, keeps its checkpoint and is pending again (ARCHITECTURE.md §7). */
 export const BACKGROUND_STEP_DEADLINE_MS = 15 * 60_000;
 
+/** How many background steps one worker runs side by side; each still holds its own lease. */
+export const BACKGROUND_STEP_CONCURRENCY = 3;
+
 /** How often the worker looks for a background step to run. */
 export const BACKGROUND_SWEEP_EVERY_MS = 30_000;
 
@@ -92,6 +95,8 @@ export interface BackgroundStepsOptions {
   now?: () => number;
   /** Where a step's queue work runs ahead of any backlog and is waited for (Alex, 2026-10-11). */
   queue?: BackgroundStepsQueue;
+  /** How many steps run side by side; defaults to `BACKGROUND_STEP_CONCURRENCY`. */
+  concurrency?: number;
 }
 
 /** The job queue's listed runs: a run's jobs, and the jobs they cause, run ahead of any backlog. */
@@ -110,8 +115,9 @@ type StepOutcome = "done" | "failed" | "retrying" | "held" | "waiting" | "skippe
 
 /**
  * Runs the background steps the worker's modules declare (ADR-173 §1, round 14: the framework
- * runs). One step at a time under its own lease, only while the process serves, and a step that
- * needs old writers gone only once the serving roster says so. Spec: background-steps.feature.
+ * runs). A few steps side by side, each under its own lease, only while the process serves; a step
+ * that runs `after` others waits for them, and a step that needs old writers gone waits for the
+ * serving roster. Spec: background-steps.feature.
  */
 export class BackgroundStepsService {
   /** This worker's failed attempts per step, and when the next may start. */
@@ -123,7 +129,11 @@ export class BackgroundStepsService {
     return new BackgroundStepsService(options);
   }
 
-  /** One pass over the declared steps in declaration order; never throws for a step's failure. */
+  /**
+   * One pass over the declared steps, started in declaration order a few at a time; never throws
+   * for a step's failure. `after` is read from the pass's snapshot, so a step whose prerequisite
+   * finishes during this pass starts on the next one, never beside it.
+   */
   async sweep({ signal }: { signal: AbortSignal }): Promise<BackgroundSweep> {
     const sweep = { ran: [] as string[], failed: [] as string[], waiting: [] as string[] };
     const retrying: string[] = [];
@@ -133,14 +143,37 @@ export class BackgroundStepsService {
     );
     if (declared.length === 0) return { paused: false, ...sweep, retrying };
     const rows = new Map((await this.options.ledger.findSteps()).map((row) => [row.id, row]));
+    const outcomes = new Array<StepOutcome | undefined>(declared.length);
+    let next = 0;
+    let paused = false;
+    let thrown: { error: unknown } | undefined;
+    const lane = async (): Promise<void> => {
+      for (;;) {
+        if (signal.aborted || paused || thrown) return;
+        if (!this.options.serving()) {
+          paused = true;
+          return;
+        }
+        const index = next++;
+        const step = declared[index];
+        if (!step) return;
+        try {
+          outcomes[index] = await this.sweepOne({ step, row: rows.get(step.id), rows, signal });
+        } catch (error) {
+          // A ledger read or lease call that throws ends the pass, as it did one step at a time.
+          thrown ??= { error };
+        }
+      }
+    };
+    const width = Math.max(1, this.options.concurrency ?? BACKGROUND_STEP_CONCURRENCY);
+    await Promise.all(Array.from({ length: Math.min(width, declared.length) }, lane));
+    if (thrown) throw thrown.error;
     const by = { done: sweep.ran, failed: sweep.failed, waiting: sweep.waiting, retrying };
-    for (const step of declared) {
-      if (signal.aborted) break;
-      if (!this.options.serving()) return { paused: true, ...sweep, retrying };
-      const outcome = await this.sweepOne({ step, row: rows.get(step.id), rows, signal });
-      if (outcome !== "skipped" && outcome !== "held") by[outcome].push(step.id);
-    }
-    return { paused: false, ...sweep, retrying };
+    declared.forEach((step, index) => {
+      const outcome = outcomes[index];
+      if (outcome && outcome !== "skipped" && outcome !== "held") by[outcome].push(step.id);
+    });
+    return { paused, ...sweep, retrying };
   }
 
   private now(): number {

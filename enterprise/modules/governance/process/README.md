@@ -2193,16 +2193,22 @@ Declared at `src/eventing/pulled-usage.pipeline.ts:167`. Events: `pulledUsageObs
 
 ## Configuration
 
-| Kind   | Leaf                      | Environment variable                  | Declared at                               |
-| ------ | ------------------------- | ------------------------------------- | ----------------------------------------- |
-| secret | `–`                       | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:516`           |
-| config | `gatewayPublicUrl`        | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:35` |
-| config | `gatewayInternalUrl`      | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:36` |
-| config | `gatewayLegacyUrl`        | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:37` |
-| config | `blockLocalHttpCalls`     | `BLOCK_LOCAL_HTTP_CALLS`              | `../contract/src/governance.config.ts:39` |
-| config | `allowedProxyHosts`       | `ALLOWED_PROXY_HOSTS`                 | `../contract/src/governance.config.ts:40` |
-| config | `isSaas`                  | `IS_SAAS`                             | `../contract/src/governance.config.ts:42` |
-| config | `publicBaseUrl`           | `BASE_HOST`                           | `../contract/src/governance.config.ts:44` |
-| config | `ingestRateLimitDisabled` | `LW_INGEST_RATE_LIMIT_DISABLED`       | `../contract/src/governance.config.ts:46` |
+| Kind   | Leaf                       | Environment variable                  | Declared at                               |
+| ------ | -------------------------- | ------------------------------------- | ----------------------------------------- |
+| secret | `–`                        | `GOVERNANCE_ERASURE_PSEUDONYM_SECRET` | `src/app/governance.app.ts:517`           |
+| config | `gatewayPublicUrl`         | `LW_GATEWAY_PUBLIC_URL`               | `../contract/src/governance.config.ts:41` |
+| config | `gatewayInternalUrl`       | `LW_GATEWAY_INTERNAL_URL`             | `../contract/src/governance.config.ts:42` |
+| config | `gatewayLegacyUrl`         | `LW_GATEWAY_BASE_URL`                 | `../contract/src/governance.config.ts:43` |
+| config | `blockLocalHttpCalls`      | `BLOCK_LOCAL_HTTP_CALLS`              | `../contract/src/governance.config.ts:45` |
+| config | `allowedProxyHosts`        | `ALLOWED_PROXY_HOSTS`                 | `../contract/src/governance.config.ts:46` |
+| config | `openAiAdminApiBase`       | `OPENAI_ADMIN_API_BASE`               | `../contract/src/governance.config.ts:48` |
+| config | `anthropicAdminApiBase`    | `ANTHROPIC_ADMIN_API_BASE`            | `../contract/src/governance.config.ts:49` |
+| config | `microsoftLoginBase`       | `MICROSOFT_LOGIN_BASE`                | `../contract/src/governance.config.ts:50` |
+| config | `microsoftGraphApiBase`    | `MICROSOFT_GRAPH_API_BASE`            | `../contract/src/governance.config.ts:51` |
+| config | `databricksWorkspaceBase`  | `DATABRICKS_WORKSPACE_BASE`           | `../contract/src/governance.config.ts:53` |
+| config | `dataverseEnvironmentBase` | `DATAVERSE_ENVIRONMENT_BASE`          | `../contract/src/governance.config.ts:55` |
+| config | `isSaas`                   | `IS_SAAS`                             | `../contract/src/governance.config.ts:57` |
+| config | `publicBaseUrl`            | `BASE_HOST`                           | `../contract/src/governance.config.ts:59` |
+| config | `ingestRateLimitDisabled`  | `LW_INGEST_RATE_LIMIT_DISABLED`       | `../contract/src/governance.config.ts:61` |
 
 <!-- readme:generated:end -->

@@ -115,6 +115,9 @@ export function AuditLogEntry({
         data-testid="audit-log-entry"
         expanded={open !== "closed"}
         onActivate={onRowClick}
+        data-failed={log.error ? "" : void 0}
+        bg={log.error ? "red.subtle/40" : void 0}
+        _hover={log.error ? { bg: "red.subtle/70" } : void 0}
       >
         <ListTable.ExpandCell
           expanded={open !== "closed"}

@@ -29,15 +29,21 @@ const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
  *  large import from holding the rest of the fleet behind it. */
 const DEFAULT_TENANT_CONCURRENCY = 25;
 
+/** A page's terminal statuses: tenant id, then migration name. */
+type FinishedOnPage = Map<string, Map<string, TenantMigrationRecord["status"]>>;
+
 /**
  * Which (tenant, migration) pairs a pass may touch, read fresh each pass. A
  * pair outside the cohort gets no state record - "not started" and "not in
  * the cohort yet" are the same pending state, so a rollout can widen later.
  */
-export type MigrationCohort = (args: {
+export type MigrationCohort = ((args: {
   tenantId: string;
   migrationName: string;
-}) => boolean | Promise<boolean>;
+}) => boolean | Promise<boolean>) & {
+  /** Reads what a page of tenants needs in one go, before the page is asked per tenant. */
+  prepare?: (args: { tenantIds: readonly string[] }) => Promise<void>;
+};
 
 export type SystemMigrationRunnerDeps = {
   state: SystemMigrationStateRepository;
@@ -107,13 +113,17 @@ export class SystemMigrationRunnerService {
       const page = await this.deps.tenants.findTenantIdsAfter({ cursor, limit: TENANT_PAGE_SIZE });
       if (page.length === 0) return false;
       cursor = page[page.length - 1] ?? null;
+      await this.deps.cohort.prepare?.({ tenantIds: page });
+      const eligible: string[] = [];
       for (const tenantId of page) {
-        if (!(await this.deps.cohort({ tenantId, migrationName }))) continue;
-        const record = await this.deps.state
-          .getRecord({ migrationName, tenantId })
-          .catch(undefinedWhenNotFound);
-        if (!isTerminalTenantStatus(record?.status)) return true;
+        if (await this.deps.cohort({ tenantId, migrationName })) eligible.push(tenantId);
       }
+      if (eligible.length === 0) continue;
+      const records = await this.deps.state.findRecords({ migrationName, tenantIds: eligible });
+      const finished = new Set(
+        records.filter((record) => isTerminalTenantStatus(record.status)).map((r) => r.tenantId),
+      );
+      if (eligible.some((tenantId) => !finished.has(tenantId))) return true;
     }
   }
 
@@ -144,6 +154,11 @@ export class SystemMigrationRunnerService {
     summary: MigrationPassSummary;
     signal?: AbortSignal;
   }): Promise<boolean> {
+    // A failed read only costs the shortcut: every tenant then takes its claim, as before.
+    const finished = await this.readFinished({ page }).catch((error: unknown) => {
+      logger.warn({ error }, "could not read the page's finished tenants; claiming each one");
+      return new Map() as FinishedOnPage;
+    });
     const pending = [...page];
     const width = Math.min(
       Math.max(1, this.deps.tenantConcurrency ?? DEFAULT_TENANT_CONCURRENCY),
@@ -155,7 +170,7 @@ export class SystemMigrationRunnerService {
         const tenantId = pending.shift();
         if (tenantId === undefined) return;
         try {
-          await this.driveTenant({ tenantId, summary, signal });
+          await this.driveTenant({ tenantId, summary, signal, finished });
         } catch (error) {
           // Contained here, not just around migrateTenant: a throw outside
           // that inner net (the state read, the cohort read) would reject
@@ -175,6 +190,55 @@ export class SystemMigrationRunnerService {
   }
 
   /**
+   * The page's terminal rows, one read per migration: a tenant whose every migration is finished
+   * or out of the cohort is counted from these and takes no claim.
+   */
+  private async readFinished({ page }: { page: readonly string[] }): Promise<FinishedOnPage> {
+    await this.deps.cohort.prepare?.({ tenantIds: page });
+    const finished: FinishedOnPage = new Map();
+    for (const migration of this.deps.migrations) {
+      const records = await this.deps.state.findRecords({
+        migrationName: migration.name,
+        tenantIds: page,
+      });
+      for (const record of records) {
+        if (!isTerminalTenantStatus(record.status)) continue;
+        const statuses = finished.get(record.tenantId) ?? new Map();
+        statuses.set(migration.name, record.status);
+        finished.set(record.tenantId, statuses);
+      }
+    }
+    return finished;
+  }
+
+  /** Counts a tenant with nothing left to run without claiming it; false when it has work. */
+  private async countedAsFinished({
+    tenantId,
+    summary,
+    finished,
+  }: {
+    tenantId: string;
+    summary: MigrationPassSummary;
+    finished: FinishedOnPage;
+  }): Promise<boolean> {
+    const statuses = finished.get(tenantId);
+    if (!statuses) return false;
+    const counts = { skipped: 0, alreadyFinalized: 0, alreadyRolledBack: 0 };
+    for (const migration of this.deps.migrations) {
+      const status = statuses.get(migration.name);
+      if (status === "finalized") counts.alreadyFinalized += 1;
+      else if (status === "rolled_back") counts.alreadyRolledBack += 1;
+      else if (await this.deps.cohort({ tenantId, migrationName: migration.name }))
+        return false;
+      else counts.skipped += 1;
+    }
+    summary.skipped += counts.skipped;
+    summary.alreadyFinalized += counts.alreadyFinalized;
+    summary.alreadyRolledBack += counts.alreadyRolledBack;
+    return true;
+  }
+
+  /**
    * One tenant, under its own claim. A tenant claimed elsewhere is left to
    * that process; one this pass claims runs its migrations in registration
    * order, heartbeat-renewed for as long as they take.
@@ -183,13 +247,16 @@ export class SystemMigrationRunnerService {
     tenantId,
     summary,
     signal,
+    finished,
   }: {
     tenantId: string;
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    finished: FinishedOnPage;
   }): Promise<void> {
     const { lease, cohort, migrations } = this.deps;
     summary.tenantsSeen += 1;
+    if (await this.countedAsFinished({ tenantId, summary, finished })) return;
 
     const claimName = `${TENANT_CLAIM_PREFIX}${tenantId}`;
     const ttlMs = this.deps.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS;

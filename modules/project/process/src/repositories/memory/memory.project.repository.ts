@@ -200,6 +200,15 @@ export class MemoryProjectRepository implements ProjectRepository {
     return { ...project, team };
   }
 
+  async findLiveWithTeamByIds(ids: readonly string[]): Promise<ProjectWithTeam[]> {
+    const found: ProjectWithTeam[] = [];
+    for (const id of ids) {
+      const project = await this.findWithTeam(id);
+      if (project) found.push(project);
+    }
+    return found;
+  }
+
   async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
     const project = this.#database.findProject(id);
     if (!project) return;

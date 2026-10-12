@@ -16,10 +16,11 @@ Enterprise managed model providers: the policy for providers a deployment config
 
 ## What managed-provider owns
 
-| Kind            | Name                    | Declared at                                                     |
-| --------------- | ----------------------- | --------------------------------------------------------------- |
-| Stores required |                         | `process/src/channels/http/http.managed-provider.channels.ts:6` |
-| Secrets         | MANAGED_BEDROCK_CONFIGS | `process/src/app/managed-provider.app.ts:24`                    |
+| Kind            | Name                                 | Declared at                                                     |
+| --------------- | ------------------------------------ | --------------------------------------------------------------- |
+| Stores required |                                      | `process/src/channels/http/http.managed-provider.channels.ts:8` |
+| Secrets         | MANAGED_BEDROCK_CONFIGS              | `process/src/app/managed-provider.app.ts:27`                    |
+| Config          | `stsBase` (MANAGED_BEDROCK_STS_BASE) | `contract/src/managed-provider.config.ts:33`                    |
 
 Anything else managed-provider needs belongs to another module and is reached through its `*Api`.
 

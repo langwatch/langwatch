@@ -66,6 +66,7 @@ describe.skipIf(!DB_URL)(
           findWithOrgAdmin: async () => null,
           findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
+          findLiveWithTeamByIds: async () => [],
         },
       }),
       repository: PrismaProjectRepository.create({ prisma }),

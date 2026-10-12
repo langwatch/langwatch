@@ -1,4 +1,5 @@
 import type { EventingCommandSender } from "@langwatch/eventing";
+import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type {
@@ -47,8 +48,16 @@ type NoticeLogger = Readonly<{
 
 type NoticeDependencies = Readonly<{
   logger: NoticeLogger;
-  projects: Pick<ProjectRepository, "findWithOrgAdmin" | "findIdsByOrganization" | "findWithTeam">;
+  projects: Pick<
+    ProjectRepository,
+    "findWithOrgAdmin" | "findIdsByOrganization" | "findWithTeam" | "findLiveWithTeamByIds"
+  >;
 }>;
+
+/** How many projects a backfill reads in one query. */
+const BACKFILL_READ_PAGE = 100;
+/** How many of a backfill's commands are in flight at once. */
+const BACKFILL_SEND_WIDTH = 20;
 
 /**
  * Where a new project is recorded as project's event, with the organization's admin and its
@@ -108,23 +117,23 @@ export class ProjectCreatedNoticeService {
     input: Readonly<{ organizationId: string; isDryRun?: boolean }>,
   ): Promise<number> {
     const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
-    let recorded = 0;
+    // The admin is the organization's, so one project's read answers for all of them.
+    let admin: Awaited<ReturnType<ProjectRepository["findWithOrgAdmin"]>> = null;
     for (const projectId of projectIds) {
-      const found = await this.dependencies.projects.findWithOrgAdmin(projectId);
-      if (!found?.organizationId) continue;
-      if (input.isDryRun) {
-        recorded += 1;
-        continue;
-      }
-      await this.#send({
-        projectId,
-        organizationId: found.organizationId,
-        adminUserId: found.adminUserId,
-        backfilled: true,
-      });
-      recorded += 1;
+      admin = await this.dependencies.projects.findWithOrgAdmin(projectId);
+      if (admin?.organizationId) break;
     }
-    return recorded;
+    const organizationId = admin?.organizationId;
+    if (!organizationId) return 0;
+    if (input.isDryRun) return projectIds.length;
+    const adminUserId = admin?.adminUserId ?? null;
+    await inSlices({
+      items: projectIds,
+      width: BACKFILL_SEND_WIDTH,
+      each: (projectId) =>
+        this.#send({ projectId, organizationId, adminUserId, backfilled: true }),
+    });
+    return projectIds.length;
   }
 
   /** Best effort: the revocation has happened, so a failed record is logged, not raised. */
@@ -271,11 +280,20 @@ export class ProjectCreatedNoticeService {
   async recordExistingDepartmentAssignments(
     input: Readonly<{ organizationId: string }>,
   ): Promise<number> {
-    const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
+    const senders = this.#connected();
     let recorded = 0;
-    for (const projectId of projectIds) {
-      if (await this.#sendDepartmentAssigned({ projectId, backfilled: true })) recorded += 1;
-    }
+    await this.#eachLivePage({
+      organizationId: input.organizationId,
+      onPage: async ({ projects, occurredAt }) => {
+        await inSlices({
+          items: projects,
+          width: BACKFILL_SEND_WIDTH,
+          each: (project) =>
+            senders.recordProjectDepartmentAssigned.send(departmentFact({ project, occurredAt })),
+        });
+        recorded += projects.length;
+      },
+    });
     return recorded;
   }
 
@@ -283,20 +301,46 @@ export class ProjectCreatedNoticeService {
   async recordExistingPresenceSettings(
     input: Readonly<{ organizationId: string }>,
   ): Promise<number> {
-    const projectIds = await this.dependencies.projects.findIdsByOrganization(input.organizationId);
     let recorded = 0;
-    for (const projectId of projectIds) {
-      const project = await this.dependencies.projects.findWithTeam(projectId);
-      if (!project) continue;
-      await this.#sendPresenceSetting({
-        projectId,
-        organizationId: project.team.organizationId,
-        presenceEnabled: project.presenceEnabled,
-        backfilled: true,
-      });
-      recorded += 1;
-    }
+    await this.#eachLivePage({
+      organizationId: input.organizationId,
+      onPage: async ({ projects }) => {
+        await inSlices({
+          items: projects,
+          width: BACKFILL_SEND_WIDTH,
+          each: (project) =>
+            this.#sendPresenceSetting({
+              projectId: project.id,
+              organizationId: project.team.organizationId,
+              presenceEnabled: project.presenceEnabled,
+              backfilled: true,
+            }),
+        });
+        recorded += projects.length;
+      },
+    });
     return recorded;
+  }
+
+  /**
+   * An organization's live projects, one read per page. The moment is taken before each read, so
+   * a change saved meanwhile is the newer fact.
+   */
+  async #eachLivePage({
+    organizationId,
+    onPage,
+  }: {
+    organizationId: string;
+    onPage: (page: { projects: ProjectWithTeam[]; occurredAt: number }) => Promise<void>;
+  }): Promise<void> {
+    const projectIds = await this.dependencies.projects.findIdsByOrganization(organizationId);
+    for (let start = 0; start < projectIds.length; start += BACKFILL_READ_PAGE) {
+      const occurredAt = nowInstant().epochMilliseconds;
+      const projects = await this.dependencies.projects.findLiveWithTeamByIds(
+        projectIds.slice(start, start + BACKFILL_READ_PAGE),
+      );
+      if (projects.length > 0) await onPage({ projects, occurredAt });
+    }
   }
 
   #connected(): ProjectLifecycleSenders {
@@ -313,16 +357,9 @@ export class ProjectCreatedNoticeService {
     const occurredAt = nowInstant().epochMilliseconds;
     const project = await this.dependencies.projects.findWithTeam(input.projectId);
     if (!project) return false;
-    await senders.recordProjectDepartmentAssigned.send({
-      tenantId: input.projectId,
-      projectId: input.projectId,
-      organizationId: project.team.organizationId,
-      occurredAt,
-      departmentId: project.departmentId,
-      teamId: project.teamId,
-      isPersonal: project.isPersonal,
-      ...(input.backfilled ? { backfilled: true } : {}),
-    });
+    await senders.recordProjectDepartmentAssigned.send(
+      departmentFact({ project, occurredAt, backfilled: input.backfilled }),
+    );
     return true;
   }
 
@@ -362,5 +399,41 @@ export class ProjectCreatedNoticeService {
       occurredAt: nowInstant().epochMilliseconds,
       ...input,
     });
+  }
+}
+
+function departmentFact({
+  project,
+  occurredAt,
+  backfilled = true,
+}: {
+  project: ProjectWithTeam;
+  occurredAt: number;
+  backfilled?: boolean;
+}): RecordProjectDepartmentAssignedCommandData {
+  return {
+    tenantId: project.id,
+    projectId: project.id,
+    organizationId: project.team.organizationId,
+    occurredAt,
+    departmentId: project.departmentId,
+    teamId: project.teamId,
+    isPersonal: project.isPersonal,
+    ...(backfilled ? { backfilled: true } : {}),
+  };
+}
+
+/** Runs `each` over the items, at most `width` at a time, in order of the slices. */
+async function inSlices<Item>({
+  items,
+  width,
+  each,
+}: {
+  items: readonly Item[];
+  width: number;
+  each: (item: Item) => Promise<unknown>;
+}): Promise<void> {
+  for (let start = 0; start < items.length; start += width) {
+    await Promise.all(items.slice(start, start + width).map(each));
   }
 }

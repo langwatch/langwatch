@@ -77,6 +77,12 @@ class MemoryProjectTenantSourceRepository implements ProjectTenantSourceReposito
   async getOrganizationId(projectId: string): Promise<string> {
     throw new Error(`no project ${projectId} in the memory tier`);
   }
+
+  async findOrganizationIds(_input: {
+    projectIds: readonly string[];
+  }): Promise<{ projectId: string; organizationId: string }[]> {
+    return [];
+  }
 }
 
 /** The organization table is not ops' to hold, so this tier walks no organization. */

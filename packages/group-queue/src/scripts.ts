@@ -1660,28 +1660,39 @@ local candidatesKey = KEYS[2]
 local signalKey = KEYS[3]
 local blockedKey = KEYS[4]
 local baselineKey = KEYS[5]
+local registrationsKey = KEYS[6]
 local keyPrefix = ARGV[1]
 local ttlSec = tonumber(ARGV[2])
-for index = 3, #ARGV do
+local scoreBase = tonumber(ARGV[3])
+for index = 4, #ARGV do
   local groupId = ARGV[index]
   redis.call("SADD", targetKey, groupId)
   -- Registration puts a target ahead of the dispatch loop's wall-clock
   -- rotation scores. This also re-activates a target when an older worker
   -- stages it without knowing the preflight protocol.
-  redis.call("ZADD", candidatesKey, index - 2, groupId)
+  redis.call("ZADD", candidatesKey, scoreBase + index - 3, groupId)
   -- HSETNX: only the first registration may say what was already wedged here.
   redis.call("HSETNX", baselineKey, groupId, gqPreflightGroupState(keyPrefix, blockedKey, groupId))
 end
+-- Every registration, a repeat included, moves this on: a paged inspection
+-- that sees it move ran beside new work and is not taken as settled.
+redis.call("INCR", registrationsKey)
 redis.call("EXPIRE", targetKey, ttlSec)
 redis.call("EXPIRE", candidatesKey, ttlSec)
 redis.call("EXPIRE", baselineKey, ttlSec)
+redis.call("EXPIRE", registrationsKey, ttlSec)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
-return #ARGV - 2
+return #ARGV - 3
 `;
 const registerPreflightTargetsScript = new CachedLuaScript(REGISTER_PREFLIGHT_TARGETS_LUA);
 
-const INSPECT_PREFLIGHT_TARGETS_LUA =
+/**
+ * Inspects one slice of a preflight's target groups: the ids passed in ARGV, or, when none
+ * are, the whole set if it holds at most `maxGroups` (one atomic look, as small sets always
+ * had). A larger set returns `{-1}` untouched, so no call ever walks more than `maxGroups`.
+ */
+const INSPECT_PREFLIGHT_PAGE_LUA =
   PREFLIGHT_GROUP_STATE_LUA +
   `
 local targetKey = KEYS[1]
@@ -1689,7 +1700,14 @@ local blockedKey = KEYS[2]
 local baselineKey = KEYS[3]
 local keyPrefix = ARGV[1]
 local maxIds = tonumber(ARGV[2])
-local groups = redis.call("SMEMBERS", targetKey)
+local maxGroups = tonumber(ARGV[3])
+local groups = {}
+if #ARGV > 3 then
+  for index = 4, #ARGV do groups[#groups + 1] = ARGV[index] end
+else
+  if redis.call("SCARD", targetKey) > maxGroups then return {-1} end
+  groups = redis.call("SMEMBERS", targetKey)
+end
 local pending = 0
 local active = 0
 local failed = 0
@@ -1736,7 +1754,10 @@ for _, groupId in ipairs(groups) do
 end
 return {pending, active, failed, blocked, #groups, held, pendingGroups, failedIds, blockedIds, pendingIds, heldIds}
 `;
-const inspectPreflightTargetsScript = new CachedLuaScript(INSPECT_PREFLIGHT_TARGETS_LUA);
+const inspectPreflightPageScript = new CachedLuaScript(INSPECT_PREFLIGHT_PAGE_LUA);
+
+/** The most target groups one inspection or registration script call touches. */
+export const PREFLIGHT_GROUPS_PER_CALL = 500;
 
 /** How long a preflight's or a listed run's groups stay recorded after their last registration. */
 const LISTED_GROUPS_TTL_SEC = 3600;

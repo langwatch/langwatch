@@ -71,6 +71,7 @@ function noticeOver() {
   const sent: RecordProjectCreatedCommandData[] = [];
   const presence: RecordProjectPresenceSettingChangedCommandData[] = [];
   const departments: RecordProjectDepartmentAssignedCommandData[] = [];
+  const reads: number[] = [];
   const logger = { error: vi.fn() };
   const notice = ProjectCreatedNoticeService.create({
     logger,
@@ -79,6 +80,13 @@ function noticeOver() {
       findWithTeam: async (id) => {
         const found = admins[id];
         return found ? projectWithTeam({ id, ...found }) : null;
+      },
+      findLiveWithTeamByIds: async (ids) => {
+        reads.push(ids.length);
+        return ids.flatMap((id) => {
+          const found = admins[id];
+          return found ? [projectWithTeam({ id, ...found })] : [];
+        });
       },
       findWithOrgAdmin: async (id) => {
         const found = admins[id];
@@ -111,7 +119,7 @@ function noticeOver() {
     recordProjectAggregateRuleChanged: { send: async () => undefined },
     recordProjectRevived: { send: async () => undefined },
   });
-  return { notice, sent, presence, departments, logger };
+  return { notice, sent, presence, departments, reads, logger };
 }
 
 describe("ProjectCreatedNoticeService", () => {
@@ -237,5 +245,88 @@ describe("ProjectCreatedNoticeService", () => {
       })),
     );
     expect(departments.map(({ occurredAt: _at, ...rest }) => rest)).toEqual(firstRun);
+  });
+
+  describe("given an organization with a thousand projects", () => {
+    function largeOrganization() {
+      const ids = Array.from({ length: 1000 }, (_, index) => `big-${String(index).padStart(4, "0")}`);
+      const reads: number[] = [];
+      const adminReads: string[] = [];
+      const presence: RecordProjectPresenceSettingChangedCommandData[] = [];
+      const departments: RecordProjectDepartmentAssignedCommandData[] = [];
+      const sent: RecordProjectCreatedCommandData[] = [];
+      const notice = ProjectCreatedNoticeService.create({
+        logger: { error: vi.fn() },
+        projects: {
+          findIdsByOrganization: async () => ids,
+          findWithTeam: async () => {
+            throw new Error("a backfill reads a page of projects, never one at a time");
+          },
+          findLiveWithTeamByIds: async (page) => {
+            reads.push(page.length);
+            return page.map((id) => projectWithTeam({ id, organizationId: "org-big" }));
+          },
+          findWithOrgAdmin: async (id) => {
+            adminReads.push(id);
+            return {
+              organizationId: "org-big",
+              adminUserId: "admin-big",
+              firstMessage: false,
+              onboardingVariant: null,
+              organizationCreatedAt: null,
+            };
+          },
+        },
+      });
+      const quiet = { send: async () => undefined };
+      notice.connect({
+        recordProjectCreated: { send: async (payload) => void sent.push(payload) },
+        recordProjectLegacyKeyRevoked: quiet,
+        recordPresenceSettingChanged: { send: async (payload) => void presence.push(payload) },
+        recordProjectMoved: quiet,
+        recordProjectArchived: quiet,
+        recordProjectDepartmentAssigned: {
+          send: async (payload) => void departments.push(payload),
+        },
+        recordProjectTraceSharingDisabled: quiet,
+        recordProjectAggregateRuleChanged: quiet,
+        recordProjectRevived: quiet,
+      });
+      return { notice, reads, adminReads, presence, departments, sent };
+    }
+
+    /** @scenario "A project fact backfill reads an organization's projects a page at a time" */
+    it("reads presence settings in ten queries, not a thousand, and records every project", async () => {
+      const { notice, reads, presence } = largeOrganization();
+
+      expect(await notice.recordExistingPresenceSettings({ organizationId: "org-big" })).toBe(1000);
+
+      expect(reads).toEqual(Array.from({ length: 10 }, () => 100));
+      expect(new Set(presence.map((fact) => fact.projectId)).size).toBe(1000);
+    });
+
+    /** @scenario "A project fact backfill reads an organization's projects a page at a time" */
+    it("reads departments in ten queries, not a thousand, and records every project", async () => {
+      const { notice, reads, departments } = largeOrganization();
+
+      expect(
+        await notice.recordExistingDepartmentAssignments({ organizationId: "org-big" }),
+      ).toBe(1000);
+
+      expect(reads).toHaveLength(10);
+      expect(departments.every((fact) => fact.backfilled === true)).toBe(true);
+      expect(departments).toHaveLength(1000);
+    });
+
+    /** @scenario "A project fact backfill reads an organization's projects a page at a time" */
+    it("reads the organization's admin once for every created fact", async () => {
+      const { notice, adminReads, sent } = largeOrganization();
+
+      expect(await notice.recordExisting({ organizationId: "org-big" })).toBe(1000);
+
+      expect(adminReads).toHaveLength(1);
+      expect(sent).toHaveLength(1000);
+      expect(sent.every((fact) => fact.adminUserId === "admin-big")).toBe(true);
+    });
   });
 });

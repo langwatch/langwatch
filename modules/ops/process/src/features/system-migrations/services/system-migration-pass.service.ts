@@ -343,11 +343,7 @@ export class SystemMigrationPassService {
       this.options.tenantAxis === "project" ? this.options.repositories.projectTenants : null;
     const cohort: MigrationCohort =
       projectTenants && isSaaS
-        ? async ({ tenantId, migrationName }) =>
-            organizationCohort({
-              tenantId: await projectTenants.getOrganizationId(tenantId),
-              migrationName,
-            })
+        ? this.#cohorts.throughOwningOrganization({ organizationCohort })
         : organizationCohort;
     // Only the organizations with something left to do: one that has latched
     // every migration in this list will never move again, and enumerating it

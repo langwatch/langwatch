@@ -47,6 +47,24 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
     return recordOf({ migrationName, tenantId, row });
   }
 
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    if (tenantIds.length === 0) return [];
+    const table = await this.table();
+    const { rows } = await this.postgres.query<StateRow & { tenant_id: string }>(
+      `SELECT "tenant_id", "status", "report", "held_reason",
+        (extract(epoch FROM "held_since") * 1000)::bigint::text AS "held_since_ms"
+       FROM ${table} WHERE "step_id" = $1 AND "tenant_id" = ANY($2::text[])`,
+      [migrationName, [...tenantIds]],
+    );
+    return rows.map((row) => recordOf({ migrationName, tenantId: row.tenant_id, row }));
+  }
+
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     await this.write({ record, unlessRolledBack: false });
   }

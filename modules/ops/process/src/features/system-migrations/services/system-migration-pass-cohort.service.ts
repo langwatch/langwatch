@@ -42,9 +42,38 @@ export class SystemMigrationPassCohortService {
     if (axis === "user") return this.user({ isSaaS, enrollments, migrations });
     const organizationCohort = await this.organization({ isSaaS, enrollments, migrations });
     if (axis === "organization" || !isSaaS) return organizationCohort;
+    return this.throughOwningOrganization({ organizationCohort });
+  }
+
+  /**
+   * A project admitted through its organization. The owners are read a page at a time and kept
+   * for the pass: one read per page of projects, not one per project per migration.
+   */
+  throughOwningOrganization({
+    organizationCohort,
+  }: {
+    organizationCohort: (args: { tenantId: string; migrationName: string }) => boolean;
+  }): MigrationCohort {
     const projects = this.options.repositories.projectTenants;
-    return async ({ tenantId, migrationName }) =>
-      organizationCohort({ tenantId: await projects.getOrganizationId(tenantId), migrationName });
+    const owners = new Map<string, string>();
+    const prepare = async ({ tenantIds }: { tenantIds: readonly string[] }): Promise<void> => {
+      const unknown = tenantIds.filter((projectId) => !owners.has(projectId));
+      if (unknown.length === 0) return;
+      for (const { projectId, organizationId } of await projects.findOrganizationIds({
+        projectIds: unknown,
+      })) {
+        owners.set(projectId, organizationId);
+      }
+    };
+    const admits = async ({ tenantId, migrationName }: { tenantId: string; migrationName: string }) => {
+      let organizationId = owners.get(tenantId);
+      if (organizationId === undefined) {
+        organizationId = await projects.getOrganizationId(tenantId);
+        owners.set(tenantId, organizationId);
+      }
+      return organizationCohort({ tenantId: organizationId, migrationName });
+    };
+    return Object.assign(admits, { prepare });
   }
 
   /**
