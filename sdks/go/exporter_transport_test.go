@@ -183,6 +183,16 @@ func TestNewExporter_WithTransport(t *testing.T) {
 		assert.Equal(t, "llm.chat", mock.GetSpans()[0].Name())
 	})
 
+	t.Run("a transport returning no exporter and no error is refused", func(t *testing.T) {
+		exporter, err := NewExporter(context.Background(),
+			WithTransport(func(context.Context, string, map[string]string) (sdktrace.SpanExporter, error) {
+				return nil, nil
+			}),
+		)
+		require.ErrorIs(t, err, ErrNilTransportExporter)
+		assert.Nil(t, exporter)
+	})
+
 	t.Run("a transport error is returned", func(t *testing.T) {
 		boom := errors.New("boom")
 		exporter, err := NewExporter(context.Background(),
