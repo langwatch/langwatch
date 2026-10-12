@@ -454,15 +454,16 @@ interface CompactRowProps {
   direction: "input" | "output";
 }
 
+// Input reads blue, output green, in both densities. Light mode takes the saturated
+// `green.solid` the sidebar origin dots use; dark mode keeps `*.fg`, which reads on dark.
+const IO_ACCENT = {
+  input: { base: "blue.fg", _dark: "blue.fg" },
+  output: { base: "green.solid", _dark: "green.fg" },
+} as const;
+
 const CompactRow: React.FC<CompactRowProps> = ({ row, fontSize, direction }) => {
   const isInput = direction === "input";
-  // Vivid palette in light mode — `*.solid` matches the saturated tone
-  // the filter sidebar uses for the origin dots, so the table accents
-  // and the sidebar legend feel like the same palette. Dark mode keeps
-  // `*.fg` because against the dark canvas the solid step over-pops.
-  const accent = isInput
-    ? { base: "blue.fg", _dark: "blue.fg" }
-    : { base: "green.solid", _dark: "green.fg" };
+  const accent = IO_ACCENT[direction];
   const textColor = isInput ? "fg.muted" : "fg.subtle";
 
   return (
@@ -572,8 +573,8 @@ const ComfortableIOPreview: React.FC<
 };
 
 /**
- * "Input" / "Output" as a neutral label with the same up / down arrow the compact rows use,
- * so the two sides tell apart by word and shape in both themes, never by a palette colour.
+ * "Input" / "Output" in their accent colour with the same up / down arrow the compact rows
+ * use, so the two sides tell apart by colour, word and shape. A missing side stays muted.
  */
 const ComfortableLabel: React.FC<{ direction: "input" | "output"; muted?: boolean }> = ({
   direction,
@@ -584,13 +585,13 @@ const ComfortableLabel: React.FC<{ direction: "input" | "output"; muted?: boolea
     flexShrink={0}
     width={COMFORTABLE_LABEL_WIDTH}
     height="20px"
-    color={muted ? "fg.subtle" : "fg"}
+    color={muted ? "fg.subtle" : IO_ACCENT[direction]}
     data-testid={`io-preview-label-${direction}`}
   >
-    <Icon boxSize="12px" color={muted ? "fg.subtle" : "fg.muted"}>
-      {direction === "input" ? <ArrowUp /> : <ArrowDown />}
-    </Icon>
-    <Text textStyle="groupLabel">{direction === "input" ? "Input" : "Output"}</Text>
+    <Icon boxSize="12px">{direction === "input" ? <ArrowUp /> : <ArrowDown />}</Icon>
+    <Text textStyle="groupLabel" fontWeight="semibold">
+      {direction === "input" ? "Input" : "Output"}
+    </Text>
   </HStack>
 );
 
