@@ -144,10 +144,13 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>
+        {/* Above the select (zIndex 1), whose opaque field would otherwise paint over it. */}
         <Box
+          data-testid="phone-country-display"
           pointerEvents="none"
           position="absolute"
           inset="0"
+          zIndex={2}
           display="flex"
           alignItems="center"
           px="3"
