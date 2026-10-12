@@ -599,11 +599,11 @@ Contract `../contract/src/model-provider.trpc.ts:43`, router `src/transport/mode
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contract/src/model-provider.trpc-schemas.ts:332
+type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contract/src/model-provider.trpc-schemas.ts:334
 
 // modelProvider.getAllForProjectForFrontend
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
-type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contract/src/model-provider.trpc-schemas.ts:332
+type Output = z.infer<typeof modelProviderListEntryMapTrpcSchema>; // ../contract/src/model-provider.trpc-schemas.ts:334
 
 // modelProvider.listAllForProjectForFrontend
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
@@ -655,7 +655,7 @@ type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contra
 
 // modelProvider.codexSignInStart
 type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract/src/model-provider.trpc-schemas.ts:67
-// Output: modelProviderCodexSignInStartSchema, ../contract/src/model-provider.trpc-schemas.ts:347
+// Output: modelProviderCodexSignInStartSchema, ../contract/src/model-provider.trpc-schemas.ts:349
 interface Output {
   userCode: string;
   deviceAuthId: string;
@@ -664,7 +664,7 @@ interface Output {
 }
 
 // modelProvider.codexSignInPoll
-// Input: modelProviderCodexSignInPollTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:200
+// Input: modelProviderCodexSignInPollTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:202
 interface Input {
   projectId: string;
   deviceAuthId: string;
@@ -674,8 +674,9 @@ interface Input {
     scopeId: string;
   }[];
   setAsCodingDefaults?: boolean;
+  modelProviderId?: string;
 }
-// Output: modelProviderCodexSignInPollSchema, ../contract/src/model-provider.trpc-schemas.ts:368
+// Output: modelProviderCodexSignInPollSchema, ../contract/src/model-provider.trpc-schemas.ts:370
 type Output =
   | {
       status: "pending";
@@ -688,7 +689,7 @@ type Output =
     };
 
 // modelProvider.codexApplyCodingDefaults
-// Input: modelProviderCodexApplyCodingDefaultsTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:210
+// Input: modelProviderCodexApplyCodingDefaultsTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:212
 interface Input {
   projectId: string;
   scopes: {
@@ -696,7 +697,7 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: modelProviderCodexDefaultsAppliedSchema, ../contract/src/model-provider.trpc-schemas.ts:386
+// Output: modelProviderCodexDefaultsAppliedSchema, ../contract/src/model-provider.trpc-schemas.ts:388
 interface Output {
   applied: true;
 }
@@ -715,18 +716,18 @@ type Output =
     };
 
 // modelProvider.isManagedProvider
-// Input: modelProviderIsManagedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:220
+// Input: modelProviderIsManagedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:222
 interface Input {
   organizationId: string;
   provider: string;
 }
-// Output: modelProviderIsManagedSchema, ../contract/src/model-provider.trpc-schemas.ts:394
+// Output: modelProviderIsManagedSchema, ../contract/src/model-provider.trpc-schemas.ts:396
 interface Output {
   managed: boolean;
 }
 
 // modelProvider.validateKeyWithCustomUrl
-// Input: modelProviderValidateKeyWithCustomUrlTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:231
+// Input: modelProviderValidateKeyWithCustomUrlTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:233
 interface Input {
   projectId: string;
   provider: string;
@@ -735,7 +736,7 @@ interface Input {
 type Output = z.infer<typeof modelProviderCredentialVerdictSchema>; // ../contract/src/model-provider.ts:326
 
 // modelProvider.getResolvedDefault
-// Input: modelDefaultResolvedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:256
+// Input: modelDefaultResolvedTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:258
 interface Input {
   projectId: string;
   featureKey: string;
@@ -753,30 +754,30 @@ type Input = z.infer<typeof modelProviderProjectTrpcInputSchema>; // ../contract
 type Output = z.infer<typeof modelDefaultSnapshotSchema>; // ../contract/src/model-provider.ts:521
 
 // modelProvider.setRoleAssignmentForScope
-// Input: modelDefaultRoleAssignmentTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:268
+// Input: modelDefaultRoleAssignmentTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:270
 interface Input {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
   role: "DEFAULT" | "FAST" | "LANGY" | "EMBEDDINGS";
   model: string | null;
 }
-// Output: modelProviderOkAckSchema, ../contract/src/model-provider.trpc-schemas.ts:376
+// Output: modelProviderOkAckSchema, ../contract/src/model-provider.trpc-schemas.ts:378
 interface Output {
   ok: true;
 }
 
 // modelProvider.setFeatureOverrideForScope
-// Input: modelDefaultFeatureOverrideTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:280
+// Input: modelDefaultFeatureOverrideTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:282
 interface Input {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
   featureKey: string;
   model: string | null;
 }
-type Output = z.infer<typeof modelProviderOkAckSchema>; // ../contract/src/model-provider.trpc-schemas.ts:376
+type Output = z.infer<typeof modelProviderOkAckSchema>; // ../contract/src/model-provider.trpc-schemas.ts:378
 
 // modelProvider.saveDefaultModelsConfig
-// Input: modelDefaultConfigSaveTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:291
+// Input: modelDefaultConfigSaveTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:293
 interface Input {
   id?: string;
   config: Record<string, string>;
@@ -785,20 +786,20 @@ interface Input {
     scopeId: string;
   }[];
 }
-// Output: modelDefaultConfigSavedSchema, ../contract/src/model-provider.trpc-schemas.ts:402
+// Output: modelDefaultConfigSavedSchema, ../contract/src/model-provider.trpc-schemas.ts:404
 interface Output {
   id: string;
 }
 
 // modelProvider.deleteDefaultModelsConfig
-// Input: modelDefaultConfigDeleteTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:298
+// Input: modelDefaultConfigDeleteTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:300
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof modelProviderOkAckSchema>; // ../contract/src/model-provider.trpc-schemas.ts:376
+type Output = z.infer<typeof modelProviderOkAckSchema>; // ../contract/src/model-provider.trpc-schemas.ts:378
 
 // modelProvider.getInheritedValuesForScopes
-// Input: modelDefaultInheritedValuesTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:309
+// Input: modelDefaultInheritedValuesTrpcInputSchema, ../contract/src/model-provider.trpc-schemas.ts:311
 interface Input {
   projectId: string;
   scopes: {
@@ -850,20 +851,21 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                         | Environment variable                           | Declared at                                   |
 | ------ | -------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:248`           |
-| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:249`           |
-| config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:20` |
-| config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:21` |
-| config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:22` |
-| config | `nlpServiceUrl`                              | `LANGWATCH_NLP_SERVICE`                        | `../contract/src/model-provider.config.ts:23` |
-| config | `gatewayInternalUrl`                         | `LW_GATEWAY_INTERNAL_URL`                      | `../contract/src/model-provider.config.ts:24` |
-| config | `gatewayPublicUrl`                           | `LW_GATEWAY_PUBLIC_URL`                        | `../contract/src/model-provider.config.ts:25` |
-| config | `gatewayLegacyUrl`                           | `LW_GATEWAY_BASE_URL`                          | `../contract/src/model-provider.config.ts:26` |
-| config | `probeBaseUrls.gemini`                       | `GEMINI_BASE_URL`                              | `../contract/src/model-provider.config.ts:32` |
-| config | `probeBaseUrls.deepseek`                     | `DEEPSEEK_BASE_URL`                            | `../contract/src/model-provider.config.ts:33` |
-| config | `probeBaseUrls.xai`                          | `XAI_BASE_URL`                                 | `../contract/src/model-provider.config.ts:34` |
-| config | `probeBaseUrls.cerebras`                     | `CEREBRAS_BASE_URL`                            | `../contract/src/model-provider.config.ts:35` |
-| config | `probeBaseUrls.groq`                         | `GROQ_BASE_URL`                                | `../contract/src/model-provider.config.ts:36` |
-| config | `probeBaseUrls.elevenlabs`                   | `ELEVENLABS_BASE_URL`                          | `../contract/src/model-provider.config.ts:37` |
+| secret | `...ModelProviderModule.platformCredentials` | ≈ `...ModelProviderModule.platformCredentials` | `src/app/model-provider.app.ts:250`           |
+| secret | `...ModelProviderModule.operationalSecrets`  | ≈ `...ModelProviderModule.operationalSecrets`  | `src/app/model-provider.app.ts:251`           |
+| config | `blockLocalHttpCalls`                        | `BLOCK_LOCAL_HTTP_CALLS`                       | `../contract/src/model-provider.config.ts:26` |
+| config | `allowedProxyHosts`                          | `ALLOWED_PROXY_HOSTS`                          | `../contract/src/model-provider.config.ts:27` |
+| config | `defaultModel`                               | `LANGWATCH_DEFAULT_MODEL`                      | `../contract/src/model-provider.config.ts:28` |
+| config | `nlpServiceUrl`                              | `LANGWATCH_NLP_SERVICE`                        | `../contract/src/model-provider.config.ts:29` |
+| config | `gatewayInternalUrl`                         | `LW_GATEWAY_INTERNAL_URL`                      | `../contract/src/model-provider.config.ts:30` |
+| config | `gatewayPublicUrl`                           | `LW_GATEWAY_PUBLIC_URL`                        | `../contract/src/model-provider.config.ts:31` |
+| config | `gatewayLegacyUrl`                           | `LW_GATEWAY_BASE_URL`                          | `../contract/src/model-provider.config.ts:32` |
+| config | `probeBaseUrls.gemini`                       | `GEMINI_BASE_URL`                              | `../contract/src/model-provider.config.ts:38` |
+| config | `probeBaseUrls.deepseek`                     | `DEEPSEEK_BASE_URL`                            | `../contract/src/model-provider.config.ts:39` |
+| config | `probeBaseUrls.xai`                          | `XAI_BASE_URL`                                 | `../contract/src/model-provider.config.ts:40` |
+| config | `probeBaseUrls.cerebras`                     | `CEREBRAS_BASE_URL`                            | `../contract/src/model-provider.config.ts:41` |
+| config | `probeBaseUrls.groq`                         | `GROQ_BASE_URL`                                | `../contract/src/model-provider.config.ts:42` |
+| config | `probeBaseUrls.elevenlabs`                   | `ELEVENLABS_BASE_URL`                          | `../contract/src/model-provider.config.ts:43` |
+| config | `codexOAuthIssuer`                           | `CODEX_OAUTH_ISSUER`                           | `../contract/src/model-provider.config.ts:46` |
 
 <!-- readme:generated:end -->
