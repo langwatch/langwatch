@@ -9,22 +9,22 @@ module browser code sets `textStyle`, and `langwatch/no-raw-font-size` refuses a
 
 Sizes: 11, 12, 13, 14, 16, 18, 20 px. Weights: 400, 500, 600, nothing else.
 
-| `textStyle`        | Size / line | Weight | Use it for                                                       |
-| ------------------ | ----------- | ------ | ---------------------------------------------------------------- |
-| `pageTitle`        | 20 / 28     | 600    | The one title of a page (PageLayout sets it; never set it again) |
-| `pageTitleCompact` | 16 / 24     | 500    | Every page header title (48px header)                            |
-| `sectionTitle`     | 16 / 24     | 600    | A section heading in a page, drawer or dialog title              |
-| `cardTitle`        | 14 / 20     | 600    | A card's or panel's title                                        |
-| `metric`           | 18 / 24     | 600    | A headline number (tabular figures)                              |
-| `body`             | 14 / 20     | -      | Running text, paragraphs, default table cells                    |
-| `bodySm`           | 13 / 20     | -      | Dense UI text: list rows, menus, card descriptions, inputs       |
-| `label`            | 13 / 20     | 500    | A field label, a row's name, an emphasised dense line            |
-| `caption`          | 12 / 16     | -      | Metadata: timestamps, counts, hints under a line                 |
-| `groupLabel`       | 12 / 16     | 500    | Sentence-case label over a group (navigation, menus)             |
-| `eyebrow`          | 11 / 16     | 500    | Uppercase label over a group or value, tracked 0.05em            |
-| `micro`            | 11 / 16     | -      | Badges, counters, keyboard hints, chart ticks                    |
-| `mono`             | 13 / 20     | -      | Ids, code and durations inline with `bodySm` text                |
-| `monoSm`           | 12 / 16     | -      | Ids, code and durations in captions and table metadata           |
+| `textStyle`        | Size / line | Weight | Use it for                                                  |
+| ------------------ | ----------- | ------ | ----------------------------------------------------------- |
+| `pageTitle`        | 20 / 28     | 600    | A large display title outside PageLayout (a welcome header) |
+| `pageTitleCompact` | 16 / 24     | 500    | Every page title (PageLayout sets it; never set it again)   |
+| `sectionTitle`     | 16 / 24     | 600    | A section heading in a page, drawer or dialog title         |
+| `cardTitle`        | 14 / 20     | 600    | A card's or panel's title                                   |
+| `metric`           | 18 / 24     | 600    | A headline number (tabular figures)                         |
+| `body`             | 14 / 20     | -      | Running text, paragraphs, default table cells               |
+| `bodySm`           | 13 / 20     | -      | Dense UI text: list rows, menus, card descriptions, inputs  |
+| `label`            | 13 / 20     | 500    | A field label, a row's name, an emphasised dense line       |
+| `caption`          | 12 / 16     | -      | Metadata: timestamps, counts, hints under a line            |
+| `groupLabel`       | 12 / 16     | 500    | Sentence-case label over a group (navigation, menus)        |
+| `eyebrow`          | 11 / 16     | 500    | Uppercase label over a group or value, tracked 0.05em       |
+| `micro`            | 11 / 16     | -      | Badges, counters, keyboard hints, chart ticks               |
+| `mono`             | 13 / 20     | -      | Ids, code and durations inline with `bodySm` text           |
+| `monoSm`           | 12 / 16     | -      | Ids, code and durations in captions and table metadata      |
 
 "-" means the style sets no weight: the element's own weight (400, or a
 recipe's, such as a button's 600) survives. Add `fontWeight="medium"` or
