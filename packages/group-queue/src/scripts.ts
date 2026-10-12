@@ -554,6 +554,7 @@ local dataKey         = KEYS[5]
 local totalPendingKey = KEYS[6]
 local activeKey       = KEYS[7]
 local blockedKey      = KEYS[8]
+local claimedKey      = KEYS[9]
 
 local stagedJobId    = ARGV[1]
 local groupId        = ARGV[2]
@@ -571,6 +572,11 @@ local nowMs          = tonumber(ARGV[9])
 -- a tenant that stops enqueuing ages out of the window even while it drains, so
 -- a bursted-then-idle tenant cannot linger as a phantom claimant.
 local globalBudget   = tonumber(ARGV[10]) or 0
+-- A claim re-staging what it holds; a worker whose claim another worker recovered stages nothing.
+local claimToken     = ARGV[12] or ""
+if claimToken ~= "" and redis.call("HGET", claimedKey, "token") ~= claimToken then
+  return {-1, ""}
+end
 if globalBudget > 0 then
   redis.call("ZADD", parkKeyPrefixOf(readyKey) .. "demanding-tenants", nowMs, parkTenantOf(groupId))
 end
@@ -2022,6 +2028,7 @@ export class GroupStagingScripts {
     shouldExtend = true,
     shouldReplace = true,
     shouldSurviveDispatch = false,
+    claimToken = "",
   }: {
     stagedJobId: string;
     groupId: string;
@@ -2032,7 +2039,9 @@ export class GroupStagingScripts {
     shouldExtend?: boolean;
     shouldReplace?: boolean;
     shouldSurviveDispatch?: boolean;
-  }): Promise<{ isNew: boolean; orphanedValue: string }> {
+    /** A claim re-staging a job it holds; staged only while the claim is still this worker's. */
+    claimToken?: string;
+  }): Promise<{ isNew: boolean; orphanedValue: string; claimLost: boolean }> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
@@ -2043,10 +2052,11 @@ export class GroupStagingScripts {
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const blockedKey = `${this.keyPrefix}blocked`;
+    const claimedKey = `${this.keyPrefix}group:${groupId}:claimed`;
 
     const result = await stageScript.run(
       this.redis,
-      8,
+      9,
       groupJobsKey,
       readyKey,
       signalKey,
@@ -2055,6 +2065,7 @@ export class GroupStagingScripts {
       totalPendingKey,
       activeKey,
       blockedKey,
+      claimedKey,
       stagedJobId,
       groupId,
       String(dispatchAfterMs),
@@ -2067,6 +2078,7 @@ export class GroupStagingScripts {
       String(this.globalConcurrencyBudget),
       // ARGV[11] — appended after globalBudget so no existing index shifts.
       String(shouldSurviveDispatch ? 1 : 0),
+      claimToken,
     );
 
     // STAGE_LUA returns [code, orphanedValue]. Tolerate a bare
@@ -2077,6 +2089,7 @@ export class GroupStagingScripts {
       : [result as number, ""];
     return {
       isNew: Number(code) === 1,
+      claimLost: Number(code) === -1,
       orphanedValue:
         typeof orphanedValue === "string" || typeof orphanedValue === "number"
           ? String(orphanedValue)

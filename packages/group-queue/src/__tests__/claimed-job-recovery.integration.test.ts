@@ -206,6 +206,75 @@ describe("GroupQueue claimed-job recovery", () => {
     });
   });
 
+  describe("given a former owner that dead-letters and re-stages after its claim was recovered", () => {
+    /** @scenario "A former owner's dead-letter and re-stage leave the recovering worker's state alone" */
+    it("refuses both writes and leaves the new owner's claim, siblings and staged jobs as they were", async () => {
+      const q = freshQueue();
+      await q.scripts.stage(stageJob("j1", 100));
+      await q.scripts.stage(stageJob("j2", 200));
+      await q.scripts.stage(stageJob("j3", 300));
+
+      const slow = await q.scripts.dispatch({ nowMs: 1_000, activeTtlSec: 1 });
+      await q.scripts.drainGroupReady({
+        groupId: "g1",
+        nowMs: 1_000,
+        maxJobs: 1,
+        claimToken: slow!.claimToken,
+      });
+      await waitForExpiry(q.activeKey("g1"));
+      const current = await q.scripts.dispatch({ nowMs: 3_000, activeTtlSec: 60 });
+      await q.scripts.drainGroupReady({
+        groupId: "g1",
+        nowMs: 3_000,
+        maxJobs: 1,
+        claimToken: current!.claimToken,
+      });
+      const newOwnerRecord = await redis.hgetall(q.claimedKey("g1"));
+
+      const deadLetter = (jobId: string, jobDataJson: string) =>
+        deadLetterJob({
+          redis,
+          keyPrefix: q.keyPrefix,
+          groupId: "g1",
+          jobId,
+          score: 100,
+          jobDataJson,
+          errorMessage: "handler failed",
+          errorStack: "",
+          claimToken: slow!.claimToken,
+        });
+      expect(await deadLetter("j1", JSON.stringify({ stagedJobId: "j1" }))).toBe("claim-lost");
+      expect(await deadLetter("j3", "")).toBe("claim-lost");
+      expect(
+        await q.scripts.stage({ ...stageJob("j2", 200), claimToken: slow!.claimToken }),
+      ).toEqual({ isNew: false, orphanedValue: "", claimLost: true });
+
+      expect(newOwnerRecord).toEqual({
+        token: current!.claimToken,
+        "s:j1": "100",
+        "d:j1": JSON.stringify({ stagedJobId: "j1" }),
+        "s:j2": "200",
+        "d:j2": JSON.stringify({ stagedJobId: "j2" }),
+      });
+      expect(await redis.hgetall(q.claimedKey("g1"))).toEqual(newOwnerRecord);
+      expect(await redis.get(q.activeKey("g1"))).toBe("j1");
+      expect(await redis.zrange(`${q.keyPrefix}group:g1:jobs`, 0, -1)).toEqual(["j3"]);
+      expect(await redis.exists(`${q.keyPrefix}dlq:g1:jobs`)).toBe(0);
+      expect(await q.pending()).toBe(1);
+
+      expect(
+        await q.scripts.complete({
+          groupId: "g1",
+          stagedJobId: "j1",
+          claimToken: current!.claimToken,
+        }),
+      ).toBe(true);
+      expect((await q.scripts.dispatch({ nowMs: 4_000, activeTtlSec: 60 }))?.stagedJobId).toBe(
+        "j3",
+      );
+    });
+  });
+
   describe("given a worker whose active key lapsed before anyone recovered its claim", () => {
     /** @scenario "A worker that still owns its claim completes it after its active key lapsed" */
     it("completes the job and no later claim brings it back", async () => {
@@ -283,7 +352,7 @@ describe("GroupQueue claimed-job recovery", () => {
         errorMessage: "handler failed",
         errorStack: "",
       });
-      expect(moved).toBe(true);
+      expect(moved).toBe("moved");
       await waitForExpiry(q.activeKey("g1"));
 
       expect(await q.scripts.dispatch({ nowMs: 3_000, activeTtlSec: 60 })).toBeNull();

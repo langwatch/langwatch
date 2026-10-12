@@ -1268,7 +1268,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       }
       if (foreignSiblings.length > 0) {
         gqForeignSiblingsRestagedTotal.inc({ queue_name: this.queueName }, foreignSiblings.length);
-        await this.restageDrainedSiblings(groupId, foreignSiblings);
+        await this.restageDrainedSiblings({ groupId, siblings: foreignSiblings, claimToken });
       }
       drainedSiblings = matchingSiblings;
     }
@@ -1310,7 +1310,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         siblingPayloads.push(parsed.payload);
       }
       if (differentlyScoped.length > 0) {
-        await this.restageDrainedSiblings(groupId, differentlyScoped);
+        await this.restageDrainedSiblings({ groupId, siblings: differentlyScoped, claimToken });
       }
       if (siblingPayloads.length === 0) {
         return {
@@ -1333,7 +1333,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         // the siblings via the normal path and route the dispatched job
         // through the same handleTransientDecode as the direct decode
         // failure — the body is unreachable, not gone (ADR-029).
-        await this.restageDrainedSiblings(groupId, drainedSiblings);
+        await this.restageDrainedSiblings({ groupId, siblings: drainedSiblings, claimToken });
         await this.handleTransientDecode({
           groupId,
           stagedJobId,
@@ -1349,7 +1349,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         // path: park the group and re-stage the drained siblings first, preserving
         // them (and the oversized value) for inspection rather than losing them to
         // replay. The dispatched job's value carries the park.
-        await this.restageDrainedSiblings(groupId, drainedSiblings);
+        await this.restageDrainedSiblings({ groupId, siblings: drainedSiblings, claimToken });
         await this.parkPoisonGroup({
           groupId,
           stagedJobId,
@@ -1608,7 +1608,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Re-stage them so they are re-dispatched (and re-coalesced) on the
     // dispatched job's retry, rather than lost until an event replay.
     if (drainedSiblings.length > 0) {
-      await this.restageDrainedSiblings(groupId, drainedSiblings);
+      await this.restageDrainedSiblings({
+        groupId,
+        siblings: drainedSiblings,
+        claimToken: job.claimToken,
+      });
     }
 
     if (err instanceof HandBackGroupQueueError) {
@@ -2040,8 +2044,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       groupId,
     });
     const handlerError = lastError.cause instanceof Error ? lastError.cause : lastError;
+    const refusedJobIds: string[] = [];
     for (const jobId of deadJobIds) {
-      await deadLetterJob({
+      const outcome = await deadLetterJob({
         redis: this.redisConnection,
         keyPrefix: `${this.queueName}:gq:`,
         groupId,
@@ -2050,7 +2055,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         jobDataJson: jobId === stagedJobId ? freshValue : "",
         errorMessage: lastError.message,
         errorStack: handlerError.stack ?? "",
+        claimToken: job.claimToken,
       });
+      if (outcome === "claim-lost") refusedJobIds.push(jobId);
     }
     if (!deadJobIds.includes(stagedJobId)) {
       await this.scripts.stage({
@@ -2060,12 +2067,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         dedupId: "",
         dedupTtlMs: 0,
         jobDataJson: freshValue,
+        claimToken: job.claimToken,
       });
     }
     const payloads = job.batchPayloads ?? [payload];
-    const deadPayloads = payloads.filter((_, index) =>
-      deadJobIds.includes(batchJobIds[index] ?? stagedJobId),
-    );
+    // A job refused for a lost claim did not die: the recovering worker runs it.
+    const deadPayloads = payloads.filter((_, index) => {
+      const jobId = batchJobIds[index] ?? stagedJobId;
+      return deadJobIds.includes(jobId) && !refusedJobIds.includes(jobId);
+    });
     const completed = await this.scripts.complete({
       groupId,
       stagedJobId,
@@ -2076,8 +2086,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     if (!completed) {
       // The recovering worker now owns the group's chain, its failures and its attempt count.
       this.logger.warn(
-        { queueName: this.queueName, groupId, stagedJobId, deadJobIds, error: lastError },
-        "Job dead-lettered after its claim was recovered by another worker; leaving the group to that worker",
+        {
+          queueName: this.queueName,
+          groupId,
+          stagedJobId,
+          deadJobIds,
+          refusedJobIds,
+          error: lastError,
+        },
+        "Job exhausted after its claim was recovered by another worker; leaving the group to that worker",
       );
       return deadPayloads;
     }
@@ -2433,10 +2450,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     span.setAttribute("queue.batch_offending_job_id", entry.stagedJobId);
   }
 
-  private async restageDrainedSiblings(groupId: string, siblings: DrainedJob[]): Promise<void> {
+  private async restageDrainedSiblings({
+    groupId,
+    siblings,
+    claimToken,
+  }: {
+    groupId: string;
+    siblings: DrainedJob[];
+    claimToken: string;
+  }): Promise<void> {
     for (const sibling of siblings) {
       try {
-        await this.scripts.stage({
+        const { claimLost } = await this.scripts.stage({
           stagedJobId: sibling.stagedJobId,
           groupId,
           // Guarded like every other re-stage. An invalid persisted score such
@@ -2445,7 +2470,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
           dedupId: "",
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
+          claimToken,
         });
+        if (claimLost) {
+          // The recovering worker already put every sibling this claim held back on the group.
+          this.logger.warn(
+            { queueName: this.queueName, groupId, stagedJobId: sibling.stagedJobId },
+            "Drained siblings not re-staged: their claim was recovered by another worker",
+          );
+          return;
+        }
       } catch (err) {
         // The sibling never made it back into staging, so nothing will dispatch
         // it again — that is a discard, whatever the re-stage intended (#5538).

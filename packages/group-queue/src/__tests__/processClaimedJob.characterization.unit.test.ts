@@ -85,7 +85,7 @@ function recordingProcessor(scenario: Scenario): {
   });
   vi.spyOn(conn, "evalsha").mockImplementation(async () => {
     log("redis.evalsha", []);
-    return 1;
+    return scenario.claimLost ? -1 : 1;
   });
 
   const scriptAnswers: [keyof GroupStagingScripts, () => unknown][] = [
@@ -96,7 +96,7 @@ function recordingProcessor(scenario: Scenario): {
     ["retryRestage", () => true],
     ["recordGroupFailure", () => scenario.failStreak ?? 1],
     ["clearGroupFailures", () => undefined],
-    ["stage", () => undefined],
+    ["stage", () => ({ isNew: true, orphanedValue: "", claimLost: Boolean(scenario.claimLost) })],
     ["discardClaim", () => undefined],
     ["retireWorker", () => undefined],
     ["recordWorkerAlive", () => undefined],
@@ -263,6 +263,25 @@ describe("given a claimed job whose claim another worker recovered", () => {
     });
     expect(named(calls, "scripts.restageAndBlock")).toHaveLength(1);
     expect(named(calls, "scripts.discardClaim")).toHaveLength(0);
+  });
+
+  /** @scenario "A former owner's dead-letter and re-stage leave the recovering worker's state alone" */
+  it("stops re-staging its drained siblings at the first refusal", async () => {
+    const calls = await runClaimed({
+      claimLost: true,
+      siblings: [
+        { stagedJobId: "job-2", jobDataJson: jobValue("job-2"), originalScore: 1001 },
+        { stagedJobId: "job-3", jobDataJson: jobValue("job-3"), originalScore: 1002 },
+      ],
+      processBatch: async () => {},
+      decode: async (value) => {
+        if (value.includes("job-2")) {
+          throw new TransientBlobStoreError({ projectId: "project_1", hash: "h", cause: "down" });
+        }
+        return JSON.parse(value);
+      },
+    });
+    expect(named(calls, "scripts.stage")).toHaveLength(1);
   });
 });
 

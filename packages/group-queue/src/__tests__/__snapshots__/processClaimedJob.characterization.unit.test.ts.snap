@@ -539,6 +539,7 @@ exports[`given a claimed job that coalesces its siblings > bisects a batch that 
     "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
         "dedupId": "",
         "dedupTtlMs": 0,
         "dispatchAfterMs": "<time>",
@@ -552,6 +553,7 @@ exports[`given a claimed job that coalesces its siblings > bisects a batch that 
     "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
         "dedupId": "",
         "dedupTtlMs": 0,
         "dispatchAfterMs": "<time>",
@@ -565,6 +567,7 @@ exports[`given a claimed job that coalesces its siblings > bisects a batch that 
     "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
         "dedupId": "",
         "dedupTtlMs": 0,
         "dispatchAfterMs": "<time>",
@@ -808,6 +811,7 @@ exports[`given a claimed job that coalesces its siblings > restages the siblings
     "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
         "dedupId": "",
         "dedupTtlMs": 0,
         "dispatchAfterMs": "<time>",
@@ -821,6 +825,7 @@ exports[`given a claimed job that coalesces its siblings > restages the siblings
     "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
         "dedupId": "",
         "dedupTtlMs": 0,
         "dispatchAfterMs": "<time>",
@@ -834,6 +839,7 @@ exports[`given a claimed job that coalesces its siblings > restages the siblings
     "scripts.stage",
     [
       {
+        "claimToken": "claim-1",
         "dedupId": "",
         "dedupTtlMs": 0,
         "dispatchAfterMs": "<time>",

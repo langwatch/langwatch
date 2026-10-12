@@ -51,6 +51,14 @@ Feature: GroupQueue brings back a job whose worker died while running it
     And it releases no claim marker and counts no exhausted job or parked group
 
   @integration
+  Scenario: A former owner's dead-letter and re-stage leave the recovering worker's state alone
+    Given a worker whose claim, with a drained sibling, was recovered by a second worker
+    And the second worker has claimed the job again and drained the sibling into its batch
+    When the first worker dead-letters its job or a staged sibling, or re-stages its drained sibling
+    Then each write is refused as a lost claim and changes nothing
+    And the second worker's claimed record, active key and staged jobs are as they were
+
+  @integration
   Scenario: A worker that still owns its claim completes it after its active key lapsed
     Given a worker whose active key lapsed but whose job nobody has recovered yet
     When the worker finishes and completes
