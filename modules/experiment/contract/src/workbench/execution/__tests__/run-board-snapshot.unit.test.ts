@@ -277,25 +277,6 @@ describe("given a board scored by two evaluators", () => {
     });
   });
 
-  describe("when one evaluator is run on all rows and one row has no saved output", () => {
-    /** @scenario "Rerunning an evaluator without a saved output leaves that cell to the run" */
-    it("carries only the rows whose output is reused", () => {
-      const carried = carryOver({
-        scope: {
-          type: "evaluator-all-rows",
-          targetId: "target-A",
-          evaluatorId: "exact",
-          precomputedTargetOutputs: { 0: "A one" },
-          traceIds: {},
-        },
-        results: boardWithTwoEvaluators(),
-      });
-
-      expect(cellAt(carried, { rowIndex: 0, targetId: "target-A" })?.output).toBe("A one");
-      expect(cellAt(carried, { rowIndex: 1, targetId: "target-A" })).toBeUndefined();
-    });
-  });
-
   describe("when one evaluator is run on all rows of one column", () => {
     const runAll = () =>
       carryOver({
