@@ -175,10 +175,26 @@ describe("given the /api/v1/roles family", () => {
       const response = await send("/api/v1/roles");
 
       expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
+      expect(await response.json()).toEqual({
         roles: [
-          { id: "role-a", name: "Release Manager", permissions: ["project:view"], builtIn: false },
-          { id: "role-b", name: "Auditor", permissions: ["traces:view"], builtIn: false },
+          {
+            id: "role-a",
+            name: "Release Manager",
+            description: null,
+            permissions: ["project:view"],
+            builtIn: false,
+            createdAt: "1970-01-01T00:00:00.000Z",
+            updatedAt: "1970-01-01T00:00:00.000Z",
+          },
+          {
+            id: "role-b",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            builtIn: false,
+            createdAt: "1970-01-01T00:00:00.000Z",
+            updatedAt: "1970-01-01T00:00:00.000Z",
+          },
         ],
       });
     });
@@ -193,8 +209,23 @@ describe("given the /api/v1/roles family", () => {
       const bare = await send("/api/roles");
       const versioned = await send("/api/v1/roles");
 
+      const expected = {
+        roles: [
+          {
+            id: "role-a",
+            name: "Auditor",
+            description: null,
+            permissions: ["traces:view"],
+            builtIn: false,
+            createdAt: "1970-01-01T00:00:00.000Z",
+            updatedAt: "1970-01-01T00:00:00.000Z",
+          },
+        ],
+      };
       expect(bare.status).toBe(200);
-      expect(await bare.json()).toEqual(await versioned.json());
+      expect(await bare.json()).toEqual(expected);
+      expect(versioned.status).toBe(200);
+      expect(await versioned.json()).toEqual(expected);
     });
   });
 
