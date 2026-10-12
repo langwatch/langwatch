@@ -25,22 +25,22 @@ describe("formatRunStatusLabel()", () => {
 
     describe("when the run has no evaluation results", () => {
       /** @scenario "Run with no criteria results shows status without count" */
-      it("returns 'passed' without count", () => {
+      it("returns 'Not evaluated' without count", () => {
         const result = formatRunStatusLabel({
           status: ScenarioRunStatus.SUCCESS,
           results: undefined,
         });
-        expect(result).toBe("Passed");
+        expect(result).toBe("Not evaluated");
       });
     });
 
     describe("when the run has null results", () => {
-      it("returns 'Passed' without count", () => {
+      it("returns 'Not evaluated' without count", () => {
         const result = formatRunStatusLabel({
           status: ScenarioRunStatus.SUCCESS,
           results: null,
         });
-        expect(result).toBe("Passed");
+        expect(result).toBe("Not evaluated");
       });
     });
 
