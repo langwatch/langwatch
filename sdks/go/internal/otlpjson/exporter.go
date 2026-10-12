@@ -58,6 +58,9 @@ type Exporter struct {
 
 	mu       sync.RWMutex
 	shutdown bool
+	stop     context.CancelFunc // cancels stopped, ending in-flight exports
+	stopped  context.Context
+	inflight sync.WaitGroup
 }
 
 var _ sdktrace.SpanExporter = (*Exporter)(nil)
@@ -73,7 +76,10 @@ func New(cfg Config) *Exporter {
 	for k, v := range cfg.Headers {
 		headers[k] = v
 	}
+	stopped, stop := context.WithCancelCause(context.Background())
 	return &Exporter{
+		stopped:     stopped,
+		stop:        func() { stop(ErrShutdown) },
 		url:         cfg.URL,
 		headers:     headers,
 		client:      client,
@@ -87,14 +93,20 @@ func New(cfg Config) *Exporter {
 // attempts with backoff until the retry budget or ctx runs out.
 func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
 	e.mu.RLock()
-	closed := e.shutdown
-	e.mu.RUnlock()
-	if closed {
+	if e.shutdown {
+		e.mu.RUnlock()
 		return ErrShutdown
 	}
+	e.inflight.Add(1) // under the lock, so Shutdown's Wait sees it
+	e.mu.RUnlock()
+	defer e.inflight.Done()
 	if len(spans) == 0 {
 		return nil
 	}
+
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	defer context.AfterFunc(e.stopped, func() { cancel(ErrShutdown) })()
 
 	payload, err := Marshal(spans)
 	if err != nil {
@@ -113,16 +125,28 @@ func (e *Exporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpa
 	})
 }
 
-// Shutdown stops further exports. In-flight exports finish on their own
-// context. It is idempotent.
+// Shutdown refuses further exports, cancels in-flight ones (their retries
+// included) and waits for them to return, bounded by ctx. It is idempotent.
 func (e *Exporter) Shutdown(ctx context.Context) error {
 	e.mu.Lock()
 	e.shutdown = true
 	e.mu.Unlock()
+	e.stop()
+
+	done := make(chan struct{})
+	go func() {
+		e.inflight.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 	if e.ownsClient {
 		e.client.CloseIdleConnections()
 	}
-	return ctx.Err()
+	return nil
 }
 
 // send performs one HTTP attempt. A retryable failure is returned as a

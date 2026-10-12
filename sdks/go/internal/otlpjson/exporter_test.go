@@ -248,6 +248,50 @@ func TestExporter_RefusesAfterShutdown(t *testing.T) {
 	assert.EqualValues(t, 0, rec.calls.Load())
 }
 
+func TestExporter_ShutdownCancelsInFlightRetries(t *testing.T) {
+	rec := &recorder{statuses: []int{503, 503, 503}}
+	exp := newTestExporter(t, rec, func(c *Config) {
+		c.Retry = RetryConfig{InitialInterval: time.Minute, MaxElapsedTime: time.Hour}
+	})
+
+	exported := make(chan error, 1)
+	go func() { exported <- exp.ExportSpans(context.Background(), oneSpan()) }()
+	require.Eventually(t, func() bool { return rec.calls.Load() == 1 }, 5*time.Second, time.Millisecond)
+
+	start := time.Now()
+	require.NoError(t, exp.Shutdown(context.Background()))
+	assert.Less(t, time.Since(start), 5*time.Second, "shutdown does not sit out the backoff")
+	select {
+	case err := <-exported:
+		assert.ErrorIs(t, err, ErrShutdown, "Shutdown returned only once the export had")
+	default:
+		t.Fatal("Shutdown returned before the in-flight export did")
+	}
+}
+
+func TestExporter_ShutdownWaitIsBoundedByItsContext(t *testing.T) {
+	stuck := stubbornTransport{started: make(chan struct{}), release: make(chan struct{})}
+	t.Cleanup(func() { close(stuck.release) })
+	exp := New(Config{URL: "http://example.test", HTTPClient: &http.Client{Transport: stuck}})
+
+	go func() { _ = exp.ExportSpans(context.Background(), oneSpan()) }()
+	<-stuck.started
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	assert.ErrorIs(t, exp.Shutdown(ctx), context.DeadlineExceeded)
+}
+
+// stubbornTransport ignores request cancellation, standing in for an attempt
+// that is slow to unwind: it blocks until release closes.
+type stubbornTransport struct{ started, release chan struct{} }
+
+func (s stubbornTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	close(s.started)
+	<-s.release
+	return nil, errors.New("released")
+}
+
 // idleTracker records whether CloseIdleConnections reached the transport.
 type idleTracker struct {
 	http.RoundTripper
