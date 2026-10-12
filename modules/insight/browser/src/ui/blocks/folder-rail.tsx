@@ -45,7 +45,7 @@ export function FolderRail({
             borderRadius="lg"
             paddingX={2.5}
             paddingY="5px"
-            fontSize="13px"
+            textStyle="bodySm"
             fontWeight={isActive ? "medium" : "normal"}
             color={isActive ? "fg" : "fg.muted"}
             background={isActive ? "bg.emphasized" : "transparent"}
@@ -58,7 +58,7 @@ export function FolderRail({
               <Box
                 as="span"
                 marginLeft="auto"
-                fontSize="10.5px"
+                textStyle="micro"
                 fontVariantNumeric="tabular-nums"
                 {...(hot
                   ? {

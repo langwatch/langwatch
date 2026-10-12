@@ -31,9 +31,7 @@ function CopyBlock({
   return (
     <VStack align="stretch" gap={1.5}>
       <HStack>
-        <Text fontSize="12px" fontWeight="medium">
-          {label}
-        </Text>
+        <Text textStyle="groupLabel">{label}</Text>
         <Spacer />
         <CopyButton value={text} label={copied} aria-label={`Copy ${copied}`} size="xs" />
       </HStack>
@@ -46,8 +44,7 @@ function CopyBlock({
         borderRadius="lg"
         background="bg.subtle"
         padding={3}
-        fontFamily="mono"
-        fontSize="11.5px"
+        textStyle="monoSm"
         lineHeight="tall"
         color="fg.muted"
       >
@@ -69,7 +66,7 @@ export function WidgetApiPanel({
   if (!snippets) {
     return (
       <VStack align="stretch" gap={4}>
-        <VStack align="stretch" gap={1} fontSize="13px" color="fg.muted">
+        <VStack align="stretch" gap={1} textStyle="bodySm" color="fg.muted">
           <Text>Your own agent can build this widget from scratch, through our MCP server.</Text>
           <Text>Copy this prompt to your agent and say what the widget should show.</Text>
         </VStack>
@@ -80,7 +77,7 @@ export function WidgetApiPanel({
           href={WIDGET_AGENT_DOCS_URL}
           target="_blank"
           rel="noreferrer"
-          fontSize="13px"
+          textStyle="bodySm"
           alignSelf="start"
         >
           Read the docs
@@ -91,7 +88,7 @@ export function WidgetApiPanel({
   }
   return (
     <VStack align="stretch" gap={4}>
-      <Text fontSize="13px" color="fg.muted">
+      <Text textStyle="bodySm" color="fg.muted">
         Your own agent can edit this widget by its id, through the LangWatch API or our MCP server.
       </Text>
       <CopyBlock label="Widget id" copied="Widget id" text={snippets.widgetId} />

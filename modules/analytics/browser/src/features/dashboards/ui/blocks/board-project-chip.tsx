@@ -36,7 +36,7 @@ export function BoardProjectChip({
           paddingX={2.5}
           gap={1.5}
           borderRadius="lg"
-          fontSize="12.5px"
+          textStyle="bodySm"
           fontWeight="normal"
           aria-label={`${PROJECT_CHIP.name}: ${current.name}`}
         >
@@ -57,27 +57,21 @@ export function BoardProjectChip({
           }}
         >
           <Box paddingX={2} paddingTop={1} paddingBottom={1.5}>
-            <Text
-              fontSize="9.5px"
-              fontWeight="semibold"
-              letterSpacing="0.09em"
-              textTransform="uppercase"
-              color="fg.subtle"
-            >
+            <Text textStyle="eyebrow" color="fg.subtle">
               {PROJECT_CHIP.name}
             </Text>
-            <Text fontSize="11.5px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               {PROJECT_CHIP.menuHint}
             </Text>
           </Box>
           {projects.map((project) => (
             <Menu.RadioItem key={project.id} value={project.id} aria-label={project.name}>
               <HStack gap={2}>
-                <Text fontSize="12.5px" fontWeight="medium" truncate>
+                <Text textStyle="label" truncate>
                   {project.name}
                 </Text>
                 {project.id === ownerProject?.id && (
-                  <Text fontSize="11px" color="fg.subtle">
+                  <Text textStyle="micro" color="fg.subtle">
                     {PROJECT_CHIP.ownerTag}
                   </Text>
                 )}
@@ -86,7 +80,7 @@ export function BoardProjectChip({
           ))}
         </Menu.RadioItemGroup>
         {ownerProject && (
-          <Text paddingX={2} paddingTop={1.5} paddingBottom={1} fontSize="11px" color="fg.subtle">
+          <Text paddingX={2} paddingTop={1.5} paddingBottom={1} textStyle="micro" color="fg.subtle">
             {projectMenuNote({
               owner: ownerProject.name,
               isHere: ownerProject.id === current.id,

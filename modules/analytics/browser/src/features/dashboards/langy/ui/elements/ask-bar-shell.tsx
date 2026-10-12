@@ -58,8 +58,7 @@ const PILL = {
   paddingY: 0.5,
   background: "purple.subtle",
   color: INK,
-  fontSize: "11px",
-  lineHeight: "16px",
+  textStyle: "micro",
   fontWeight: "medium",
 } as const;
 

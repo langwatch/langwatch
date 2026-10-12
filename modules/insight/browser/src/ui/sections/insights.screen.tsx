@@ -76,10 +76,10 @@ export default function InsightsScreen() {
       </PageLayout.Header>
       <PageLayout.Container paddingTop={4}>
         <VStack align="start" gap={0.5} marginBottom={5}>
-          <Text fontSize="13px" color="fg.muted">
+          <Text textStyle="bodySm" color="fg.muted">
             {HINT}
           </Text>
-          <Text fontSize="12px" color="fg.subtle">
+          <Text textStyle="caption" color="fg.subtle">
             {ONLY_YOU}
           </Text>
         </VStack>
@@ -109,7 +109,7 @@ function InboxBody({
   if (reading.error) {
     return (
       <VStack align="start" gap={2} paddingY={6}>
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           The inbox didn't load.
         </Text>
         <Button size="xs" variant="outline" onClick={reading.retry}>
@@ -181,7 +181,7 @@ function FolderView({
       <FolderRail active={folder} counts={counts} onSelect={onSelectFolder} />
       <Box flex={1} minWidth={0}>
         {shown.length === 0 ? (
-          <Text paddingX={4} paddingY={14} textAlign="center" fontSize="12.5px" color="fg.subtle">
+          <Text paddingX={4} paddingY={14} textAlign="center" textStyle="bodySm" color="fg.subtle">
             {EMPTY_FOLDER_COPY[folder]}
           </Text>
         ) : (

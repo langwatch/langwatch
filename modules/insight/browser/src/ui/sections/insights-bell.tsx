@@ -55,7 +55,7 @@ export function InsightsBell(_props: InsightsBellProps) {
       </Popover.Trigger>
       <Popover.Content width="400px" padding={0}>
         <Box borderBottomWidth="1px" borderColor="border" paddingX={4} paddingY={2.5}>
-          <Text fontSize="12.5px" fontWeight="semibold">
+          <Text textStyle="cardTitle">
             Your inbox{" "}
             <Text as="span" fontWeight="normal" color="fg.subtle">
               · this project
@@ -69,10 +69,7 @@ export function InsightsBell(_props: InsightsBellProps) {
                 paddingX={4}
                 paddingTop={2}
                 paddingBottom={1}
-                fontSize="10px"
-                fontWeight="semibold"
-                letterSpacing="0.08em"
-                textTransform="uppercase"
+                textStyle="eyebrow"
                 color="fg.subtle"
               >
                 New insights
@@ -93,17 +90,23 @@ export function InsightsBell(_props: InsightsBellProps) {
                   _hover={{ background: "accent.subtle" }}
                 >
                   <ToneDot tone={entry.tone} />
-                  <Text as="span" flex={1} minWidth={0} truncate fontSize="12.5px">
+                  <Text as="span" flex={1} minWidth={0} truncate textStyle="bodySm">
                     {entry.title}
                   </Text>
-                  <Text as="span" flexShrink={0} fontSize="10px" color="fg.subtle">
+                  <Text as="span" flexShrink={0} textStyle="micro" color="fg.subtle">
                     {insightDay(entry)}
                   </Text>
                 </chakra.button>
               ))}
             </VStack>
           ) : (
-            <Text paddingX={4} paddingY={8} textAlign="center" fontSize="12px" color="fg.subtle">
+            <Text
+              paddingX={4}
+              paddingY={8}
+              textAlign="center"
+              textStyle="caption"
+              color="fg.subtle"
+            >
               All caught up.
             </Text>
           )}
@@ -116,7 +119,7 @@ export function InsightsBell(_props: InsightsBellProps) {
             paddingX={4}
             paddingY={2.5}
             textAlign="left"
-            fontSize="12px"
+            textStyle="caption"
             fontWeight="medium"
             color="accent.fg"
             cursor="pointer"

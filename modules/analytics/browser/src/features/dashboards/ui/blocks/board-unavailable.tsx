@@ -13,10 +13,10 @@ export function BoardUnavailable() {
   return (
     <VStack gap={3} paddingY={20} paddingX={6} textAlign="center" color="fg.muted">
       <Lock size={22} aria-hidden />
-      <Heading as="h1" fontSize="19px" fontWeight="semibold" color="fg">
+      <Heading as="h1" textStyle="pageTitle" color="fg">
         {BOARD_UNAVAILABLE.title}
       </Heading>
-      <Text fontSize="13px" maxWidth="md">
+      <Text textStyle="bodySm" maxWidth="md">
         {BOARD_UNAVAILABLE.body}
       </Text>
     </VStack>

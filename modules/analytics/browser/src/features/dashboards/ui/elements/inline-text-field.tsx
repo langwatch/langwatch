@@ -19,7 +19,7 @@ export function InlineTextField({
   placeholder?: string;
   onCommit: (value: string) => void;
   onCancel: () => void;
-} & Pick<InputProps, "fontSize" | "fontWeight" | "size" | "maxWidth">) {
+} & Pick<InputProps, "textStyle" | "fontWeight" | "size" | "maxWidth">) {
   const [draft, setDraft] = useState(value);
   // Enter settles the field and the blur that follows must not settle it twice.
   const settled = useRef(false);

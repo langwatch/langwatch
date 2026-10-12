@@ -80,7 +80,7 @@ function DailyInsightsControl({
           onCheckedChange={() => daily.turnOn(settings)}
           inputProps={{ "aria-label": "Turn on daily insights" }}
         >
-          <Text as="span" fontSize="12px" fontWeight="normal" color="fg.muted">
+          <Text as="span" textStyle="caption" fontWeight="normal" color="fg.muted">
             Daily insights
           </Text>
         </Switch>
@@ -174,7 +174,7 @@ function DailyInsightsDropdown({
           gap={1.5}
           borderRadius="lg"
           borderColor="border"
-          fontSize="12px"
+          textStyle="caption"
           fontWeight="normal"
           color="fg.muted"
           _hover={{ borderColor: "border.emphasized", color: "fg" }}
@@ -194,9 +194,7 @@ function DailyInsightsDropdown({
       <Popover.Content width="300px" padding={0}>
         <VStack align="stretch" gap={1.5} paddingX={4} paddingTop={3.5} paddingBottom={3}>
           <HStack justify="space-between" gap={3}>
-            <Text fontSize="13px" fontWeight="semibold">
-              Daily insights
-            </Text>
+            <Text textStyle="cardTitle">Daily insights</Text>
             <Switch
               size="sm"
               checked={isOn}
@@ -204,11 +202,11 @@ function DailyInsightsDropdown({
               inputProps={{ "aria-label": `Turn ${isOn ? "off" : "on"} daily insights` }}
             />
           </HStack>
-          <Text fontSize="11.5px" lineHeight="relaxed" color="fg.muted">
+          <Text textStyle="caption" color="fg.muted">
             {turnedOff ?? scheduleWords({ settings, hasWidgets: !isEmpty })}
           </Text>
           {/* A run that filed nothing says so, and why. */}
-          <Text fontSize="11.5px" lineHeight="relaxed" color="fg.muted">
+          <Text textStyle="caption" color="fg.muted">
             {lastRunWords({ lastRun, now, timezone: settings.timezone })}
           </Text>
         </VStack>
@@ -243,7 +241,7 @@ function Tag({ isNews = false, children }: { isNews?: boolean; children: ReactNo
       borderRadius="full"
       paddingX={1.5}
       paddingY="1px"
-      fontSize="10.5px"
+      textStyle="micro"
       {...(isNews
         ? { fontWeight: "semibold", color: "accent.fg", background: "accent.subtle" }
         : { color: "fg.muted", background: "bg.muted" })}
@@ -274,7 +272,7 @@ function MenuRow({
       paddingX={2}
       paddingY={1.5}
       textAlign="left"
-      fontSize="12.5px"
+      textStyle="bodySm"
       cursor="pointer"
       _hover={{ background: "bg.muted" }}
     >

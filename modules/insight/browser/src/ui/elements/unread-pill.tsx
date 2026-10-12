@@ -25,7 +25,7 @@ export function UnreadPill({
       height={size === "xs" ? "14px" : "16px"}
       paddingX={size === "xs" ? "3px" : "5px"}
       borderRadius="full"
-      fontSize={size === "xs" ? "8px" : "9.5px"}
+      textStyle="micro"
       fontWeight="bold"
       fontVariantNumeric="tabular-nums"
       color="white"

@@ -202,7 +202,7 @@ function SidebarRow({
         borderRadius="lg"
         paddingX={2}
         paddingY="3px"
-        fontSize="13px"
+        textStyle="bodySm"
         fontWeight={isActive ? "medium" : "normal"}
         color={isActive ? "fg" : "fg.subtle"}
         background={isActive ? "border" : "transparent"}
@@ -256,7 +256,7 @@ function SidebarRow({
 
 function MenuRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <HStack width="full" gap={2} fontSize="12.5px">
+    <HStack width="full" gap={2} textStyle="bodySm">
       <Box as="span" display="flex" flexShrink={0}>
         {icon}
       </Box>
@@ -274,7 +274,7 @@ function RenameField({ name, actions }: { name: string; actions: SavedDashboardR
         value={name}
         label="Dashboard name"
         size="xs"
-        fontSize="13px"
+        textStyle="bodySm"
         onCancel={actions.onRenameCancel}
         onCommit={(draft) => {
           const trimmed = draft.trim();

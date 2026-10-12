@@ -58,10 +58,7 @@ import { WidgetInfoTip } from "../blocks/widget-info-tip.tsx";
 import { ScopeMark } from "../elements/scope-mark.tsx";
 
 const GROUP_LABEL_STYLE = {
-  fontSize: "9px",
-  fontWeight: "semibold",
-  letterSpacing: "0.09em",
-  textTransform: "uppercase",
+  textStyle: "eyebrow",
   color: "fg.subtle",
 } as const;
 

@@ -3,8 +3,6 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   activeProjectsByScopesInputSchema,
-  internalProjectKindSchema,
-  internalProjectQuerySchema,
   projectPaginationSchema,
   liveProjectIdsByOrganizationInputSchema,
   projectIdsByOrganizationInputSchema,
@@ -47,6 +45,7 @@ import type { Instant } from "@langwatch/time";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
 import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
+import { InternalProjectService } from "./internal-project.service.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
@@ -64,23 +63,6 @@ export abstract class ProjectDiagnostics {
   abstract error(context: Record<string, unknown>, message: string): void;
   abstract capture(error: Error, context: Record<string, unknown>): void;
 }
-
-/** How each internal project kind is named when it is first created. */
-const INTERNAL_PROJECT_NAMING: Record<
-  InternalProjectKind,
-  { name: string; slugPrefix: string; framework: string }
-> = {
-  internal_governance: {
-    name: "Governance (internal)",
-    slugPrefix: "governance",
-    framework: "governance",
-  },
-  internal_checkup: {
-    name: "Checkup canary (internal)",
-    slugPrefix: "checkup",
-    framework: "checkup",
-  },
-};
 
 export class ProjectService {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
@@ -107,8 +89,8 @@ export class ProjectService {
 
   private readonly metadata: ProjectMetadataService;
   private readonly writes: ProjectWriteService;
+  private readonly internal: InternalProjectService;
   private readonly repository: ProjectRepository;
-  private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
   private readonly authorization: Pick<AuthzApi, "listUserBindings">;
   private readonly created: ProjectCreatedNoticeService;
@@ -116,24 +98,24 @@ export class ProjectService {
   private constructor({
     metadata,
     writes,
+    internal,
     repository,
-    credentials,
     organizations,
     authorization,
     created,
   }: {
     metadata: ProjectMetadataService;
     writes: ProjectWriteService;
+    internal: InternalProjectService;
     repository: ProjectRepository;
-    credentials: ProjectCredentials;
     organizations: OrganizationApi;
     authorization: Pick<AuthzApi, "listUserBindings">;
     created: ProjectCreatedNoticeService;
   }) {
     this.metadata = metadata;
     this.writes = writes;
+    this.internal = internal;
     this.repository = repository;
-    this.credentials = credentials;
     this.organizations = organizations;
     this.authorization = authorization;
     this.created = created;
@@ -154,8 +136,8 @@ export class ProjectService {
         ...(options.diagnostics ? { diagnostics: options.diagnostics } : {}),
       }),
       writes: ProjectWriteService.create(options),
+      internal: InternalProjectService.create(options),
       repository: options.repository,
-      credentials: options.credentials,
       organizations: options.organizations,
       authorization: options.authorization,
       created: options.created,
@@ -163,15 +145,11 @@ export class ProjectService {
   }
 
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
-    const parsed = internalProjectQuerySchema.parse(input);
-
-    return this.repository.findInternalByOrganization(parsed);
+    return this.internal.find(input);
   }
 
   findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]> {
-    return this.repository.findLiveInternalIds({
-      kind: internalProjectKindSchema.parse(input.kind),
-    });
+    return this.internal.findIds(input);
   }
 
   async resolveTraceDestination(input: TraceDestinationInput): Promise<TraceDestinationDecision> {
@@ -219,32 +197,8 @@ export class ProjectService {
     return this.repository.findTraceDestinations([...new Set(parsed)]);
   }
 
-  async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
-    const parsed = internalProjectQuerySchema.parse(input);
-    const existing = await this.repository.findInternalByOrganization(parsed);
-    if (existing) {
-      return existing;
-    }
-
-    const teamId = await this.organizations.getOldestTeamId({
-      organizationId: parsed.organizationId,
-    });
-    const naming = INTERNAL_PROJECT_NAMING[parsed.kind];
-    const slug = `${naming.slugPrefix}-${parsed.organizationId}`;
-    const bySlug = await this.repository.findInternalBySlug(slug);
-    if (bySlug?.kind === parsed.kind) {
-      return bySlug;
-    }
-
-    return this.repository.createInternalOrFindWinner({
-      id: this.credentials.generateProjectId(),
-      name: naming.name,
-      slug,
-      apiKey: this.credentials.generateApiKey(),
-      teamId,
-      kind: parsed.kind,
-      framework: naming.framework,
-    });
+  ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
+    return this.internal.ensure(input);
   }
 
   isPresenceEnabled(input: { projectId: string }): Promise<boolean> {

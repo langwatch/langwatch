@@ -606,7 +606,7 @@ function gapAwareTooltip({
       border: `1px solid ${c.tooltipBorder}`,
       borderRadius: 6,
       padding: "6px 10px",
-      fontSize: 12,
+      fontSize: TYPE_PX.caption,
       color: c.text,
     };
     if (keys.every((key) => toNumber(row[key]) === null)) {
@@ -615,7 +615,7 @@ function gapAwareTooltip({
     return h(
       "div",
       { style: box },
-      h("div", { style: { fontSize: 11, color: c.axis, marginBottom: 2 } }, date),
+      h("div", { style: { fontSize: TYPE_PX.micro, color: c.axis, marginBottom: 2 } }, date),
       ...keys.map((key, index) => {
         const value = toNumber(row[key]);
         return h(

@@ -47,7 +47,7 @@ export function DashboardRefreshStatus({
   return (
     <HStack gap={1}>
       {updatedLabel && (
-        <Text fontSize="12px" color="fg.subtle" whiteSpace="nowrap">
+        <Text textStyle="caption" color="fg.subtle" whiteSpace="nowrap">
           {updatedLabel}
         </Text>
       )}

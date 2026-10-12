@@ -44,14 +44,7 @@ export function BoardHeader({
     <VStack align="stretch" gap={2} marginBottom={5}>
       <HStack gap={3}>
         <HStack columnGap={2.5} rowGap={1} flex={1} minWidth={0} flexWrap="wrap">
-          {/* The prototype's 19px board title, a step under the standard page heading. */}
-          <Heading
-            as="h1"
-            lineClamp={2}
-            fontSize="19px"
-            fontWeight="semibold"
-            letterSpacing="tight"
-          >
+          <Heading as="h1" lineClamp={2} textStyle="pageTitle">
             {name}
           </Heading>
           {isFromLangWatch && <FromLangWatchBadge />}
@@ -95,7 +88,7 @@ function FromLangWatchBadge() {
       paddingY={0.5}
       background="purple.50"
       color="purple.600"
-      fontSize="10.5px"
+      textStyle="micro"
       fontWeight="medium"
     >
       <Sparkles size={11} aria-hidden />
@@ -133,7 +126,7 @@ function BoardDescription({
   if (!onDescribe) {
     if (!description) return null;
     return (
-      <Text fontSize="12.5px" color="fg.muted" truncate minWidth={0}>
+      <Text textStyle="bodySm" color="fg.muted" truncate minWidth={0}>
         {description}
       </Text>
     );
@@ -146,7 +139,7 @@ function BoardDescription({
       height="auto"
       paddingX={0}
       fontWeight="normal"
-      fontSize="12.5px"
+      textStyle="bodySm"
       color="fg.muted"
       cursor="text"
       _hover={{ color: "fg" }}

@@ -29,16 +29,7 @@ export function StarredDashboardsSection(_props: StarredDashboardsProps) {
   const shown = links.slice(0, STARRED_ELSEWHERE_MAX);
   return (
     <VStack as="section" aria-label="Starred dashboards" align="stretch" gap={0.5} width="full">
-      <Text
-        paddingX={2}
-        marginTop={3}
-        marginBottom={0.5}
-        fontSize="9px"
-        fontWeight="semibold"
-        letterSpacing="0.09em"
-        textTransform="uppercase"
-        color="fg.subtle"
-      >
+      <Text paddingX={2} marginTop={3} marginBottom={0.5} textStyle="eyebrow" color="fg.subtle">
         Starred dashboards
       </Text>
       <VStack as="ul" align="stretch" gap={0.5} margin={0} padding={0}>
@@ -73,7 +64,7 @@ function StarredRow({ link, isAll = false }: { link: StarredLink; isAll?: boolea
         borderRadius="lg"
         paddingX={2}
         paddingY="4px"
-        fontSize="13px"
+        textStyle="bodySm"
         color="fg.subtle"
         textDecoration="none"
         _hover={{ color: "fg", background: "border/50" }}

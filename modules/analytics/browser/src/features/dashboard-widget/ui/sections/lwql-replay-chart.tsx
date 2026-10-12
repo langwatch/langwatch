@@ -47,7 +47,7 @@ export function LwqlReplayChart({
     return (
       <HStack gap={2} color="fg.muted" padding={4}>
         <Spinner size="sm" />
-        <Text fontSize="13px">Replaying the query</Text>
+        <Text textStyle="bodySm">Replaying the query</Text>
       </HStack>
     );
   }

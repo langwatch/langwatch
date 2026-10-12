@@ -11,7 +11,7 @@ import { Lock, Plug, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 export function WidgetNoTrafficFace({ unit }: { unit: string }) {
   return (
     <VStack height="full" justify="center" paddingX={4}>
-      <Text fontSize="12.5px" color="fg.muted">
+      <Text textStyle="bodySm" color="fg.muted">
         No {unit} in this period
       </Text>
     </VStack>
@@ -39,11 +39,9 @@ export function WidgetSetupFace({
         <Box display="flex" color="fg.subtle">
           <Plug size={13} aria-hidden />
         </Box>
-        <Text fontSize="12.5px" fontWeight="medium">
-          Needs {label}
-        </Text>
+        <Text textStyle="label">Needs {label}</Text>
       </HStack>
-      <Text fontSize="12px" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         None of the {unit} in this period have it.
       </Text>
       {onAskLangy && (
@@ -74,11 +72,9 @@ export function WidgetNoAccessFace({ what, ask }: { what: string; ask: string })
         <Box display="flex" color="fg.subtle">
           <Lock size={13} aria-hidden />
         </Box>
-        <Text fontSize="12.5px" fontWeight="medium">
-          {what}
-        </Text>
+        <Text textStyle="label">{what}</Text>
       </HStack>
-      <Text fontSize="12px" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         {ask}
       </Text>
     </VStack>
@@ -101,11 +97,9 @@ export function WidgetFailedFace({
       <Box display="flex" color="fg.error">
         <TriangleAlert size={18} aria-hidden />
       </Box>
-      <Text fontSize="13px" fontWeight="medium">
-        Couldn&apos;t load {name}
-      </Text>
+      <Text textStyle="label">Couldn&apos;t load {name}</Text>
       {message && (
-        <Text fontSize="11.5px" color="fg.muted" maxWidth="320px">
+        <Text textStyle="caption" color="fg.muted" maxWidth="320px">
           {message}
         </Text>
       )}

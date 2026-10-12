@@ -48,7 +48,7 @@ export function DailyInsightsDialog({
         <Dialog.Body>
           <VStack align="stretch" gap={5}>
             {offer && (
-              <Text fontSize="12.5px" lineHeight="relaxed" color="fg.muted">
+              <Text textStyle="bodySm" color="fg.muted">
                 Once a day, Langy reads the widgets on{" "}
                 <Text as="span" fontWeight="medium" color="fg">
                   {boardName}
@@ -59,7 +59,7 @@ export function DailyInsightsDialog({
             )}
             <Box>
               {offer && (
-                <Text marginBottom={1.5} fontSize="12.5px" fontWeight="semibold">
+                <Text marginBottom={1.5} textStyle="cardTitle">
                   The daily run
                 </Text>
               )}
@@ -69,11 +69,11 @@ export function DailyInsightsDialog({
                 now={now}
                 onChange={setDraft}
               />
-              <Text marginTop={1} fontSize="12px" lineHeight="relaxed" color="fg.muted">
+              <Text marginTop={1} textStyle="caption" color="fg.muted">
                 This is your own setting, and only you see the insights it files.
               </Text>
               {note && (
-                <Text marginTop={1} fontSize="12px" lineHeight="relaxed" color="fg.muted">
+                <Text marginTop={1} textStyle="caption" color="fg.muted">
                   {note}
                 </Text>
               )}
@@ -83,7 +83,7 @@ export function DailyInsightsDialog({
         <Dialog.Footer>
           <HStack width="full" gap={3} flexWrap="wrap">
             {offer && (
-              <Text flex={1} minWidth="13rem" fontSize="11.5px" color="fg.subtle">
+              <Text flex={1} minWidth="13rem" textStyle="caption" color="fg.subtle">
                 You can change this at any time from Daily insights on the board.
               </Text>
             )}

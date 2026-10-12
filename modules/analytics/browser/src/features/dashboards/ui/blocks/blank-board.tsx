@@ -53,10 +53,10 @@ export function AddBlockCard({ onClick }: { onClick: () => void }) {
       >
         <Plus size={18} aria-hidden />
       </Box>
-      <Text fontSize="14px" fontWeight="medium">
+      <Text textStyle="body" fontWeight="medium">
         Add a widget
       </Text>
-      <Text fontSize="12.5px" color="fg.subtle">
+      <Text textStyle="bodySm" color="fg.subtle">
         Start from the question you need answered.
       </Text>
     </Button>
@@ -100,7 +100,7 @@ export function EmptyBoard({
 }) {
   return (
     <VStack as="section" aria-label="Start from a template" align="stretch" gap={5}>
-      <Heading as="h2" fontSize="14px" fontWeight="semibold">
+      <Heading as="h2" textStyle="cardTitle">
         Or start from a template
       </Heading>
       <Grid
@@ -140,10 +140,10 @@ export function EmptyBoard({
             >
               <LayoutTemplate size={18} aria-hidden />
             </Box>
-            <Text fontSize="14px" fontWeight="medium">
+            <Text textStyle="body" fontWeight="medium">
               View all templates
             </Text>
-            <Text fontSize="12.5px">Find a dashboard by the question it answers.</Text>
+            <Text textStyle="bodySm">Find a dashboard by the question it answers.</Text>
           </VStack>
         </CardLink>
       </Grid>

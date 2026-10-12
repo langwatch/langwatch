@@ -92,7 +92,7 @@ export function InsightRow({
             <ToneBadge tone={entry.tone} />
             {entry.topic && (
               <Text
-                fontSize="9.5px"
+                textStyle="micro"
                 fontWeight="semibold"
                 letterSpacing="0.14em"
                 textTransform="uppercase"
@@ -101,7 +101,7 @@ export function InsightRow({
                 {entry.topic}
               </Text>
             )}
-            <Text marginLeft="auto" flexShrink={0} fontSize="10.5px" color="fg.subtle">
+            <Text marginLeft="auto" flexShrink={0} textStyle="micro" color="fg.subtle">
               {insightWhen({ entry, now })}
             </Text>
           </HStack>
@@ -109,9 +109,7 @@ export function InsightRow({
           <Text
             as="h3"
             marginTop={2}
-            fontSize="16.5px"
-            lineHeight="snug"
-            fontWeight="semibold"
+            textStyle="sectionTitle"
             color="fg"
             cursor={toggle ? "pointer" : undefined}
             onClick={toggle}
@@ -125,7 +123,7 @@ export function InsightRow({
             rowGap={0.5}
             flexWrap="wrap"
             minWidth={0}
-            fontSize="11px"
+            textStyle="micro"
             color="fg.muted"
             data-testid="insight-origin"
           >
@@ -145,7 +143,7 @@ export function InsightRow({
             </Text>
           </HStack>
 
-          <Text marginTop={1} fontSize="10.5px" color={VALIDITY_COLOR[validity.tone]}>
+          <Text marginTop={1} textStyle="micro" color={VALIDITY_COLOR[validity.tone]}>
             {validity.text}
           </Text>
 
@@ -159,8 +157,7 @@ export function InsightRow({
               marginTop={1.5}
               maxWidth="640px"
               lineClamp={2}
-              fontSize="12px"
-              lineHeight="tall"
+              textStyle="caption"
               color="fg.muted"
               cursor="pointer"
               onClick={toggle}
@@ -301,7 +298,7 @@ function SquareAction({
       _hover={{ borderColor: "accent.solid", color: "accent.fg", background: "accent.subtle" }}
     >
       <Icon size={15} strokeWidth={2} aria-hidden />
-      <Text as="span" fontSize="9px" fontWeight="semibold">
+      <Text as="span" textStyle="micro" fontWeight="semibold">
         {label}
       </Text>
     </chakra.button>

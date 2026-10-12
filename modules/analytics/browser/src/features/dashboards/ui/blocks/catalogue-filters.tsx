@@ -55,7 +55,7 @@ export function CatalogueSearch({
         placeholder={placeholder}
         height="40px"
         borderRadius="full"
-        fontSize="14px"
+        textStyle="body"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -118,7 +118,7 @@ function Chip({
       gap={1.5}
       paddingX={3}
       borderRadius="full"
-      fontSize="12.5px"
+      textStyle="label"
       fontWeight="medium"
       colorPalette={palette}
       {...look}

@@ -37,7 +37,8 @@ export function useBoardAccess(board: ScopedBoard & { ownerProject: { name: stri
   return {
     access: boardAccess({ board, reader }),
     names: {
-      // A guest board without an owner is from a project the reader cannot open; never name the reader's own.
+      // A guest board without an owner is from a project the reader cannot open;
+      // never name the reader's own.
       project:
         board.ownerProject?.name ??
         (board.projectId === reader.projectId ? reader.projectName : "another project"),

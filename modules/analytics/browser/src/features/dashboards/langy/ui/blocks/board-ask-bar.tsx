@@ -58,7 +58,7 @@ export function BoardAskBar({
                 background="bg.panel"
                 paddingX={2.5}
                 paddingY={1}
-                fontSize="12px"
+                textStyle="caption"
                 lineHeight="18px"
                 textAlign="center"
                 color="fg.muted"

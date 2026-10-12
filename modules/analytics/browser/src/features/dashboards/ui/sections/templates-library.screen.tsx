@@ -37,10 +37,10 @@ function FinderHeading({ trunk }: { trunk: Trunk | undefined }) {
   if (!trunk) {
     return (
       <VStack gap={1} textAlign="center">
-        <Heading as="h1" fontSize="19px" fontWeight="semibold" letterSpacing="tight">
+        <Heading as="h1" textStyle="pageTitle">
           Dashboard templates
         </Heading>
-        <Text maxWidth="560px" fontSize="13px" color="fg.muted">
+        <Text maxWidth="560px" textStyle="bodySm" color="fg.muted">
           Each template answers one job with a ready-made dashboard you can edit.
         </Text>
       </VStack>
@@ -54,7 +54,7 @@ function FinderHeading({ trunk }: { trunk: Trunk | undefined }) {
         display="inline-flex"
         alignItems="center"
         gap={1}
-        fontSize="12px"
+        textStyle="caption"
         fontWeight="semibold"
         colorPalette={TRUNK_PALETTES[trunk]}
         color="colorPalette.fg"
@@ -62,10 +62,10 @@ function FinderHeading({ trunk }: { trunk: Trunk | undefined }) {
         <Icon size={12} strokeWidth={2.2} aria-hidden />
         {trunk}
       </Text>
-      <Heading as="h1" fontSize="19px" fontWeight="semibold" letterSpacing="tight">
+      <Heading as="h1" textStyle="pageTitle">
         {TRUNK_QUESTIONS[trunk]}
       </Heading>
-      <Text maxWidth="560px" fontSize="13px" color="fg.muted">
+      <Text maxWidth="560px" textStyle="bodySm" color="fg.muted">
         {TRUNK_PITCHES[trunk]}
       </Text>
     </VStack>
@@ -96,10 +96,10 @@ function TrunkSection({
         >
           <Icon size={12} strokeWidth={2.2} aria-hidden />
         </Box>
-        <Heading as="h2" id={headingId} fontSize="13px" fontWeight="semibold" color="fg">
+        <Heading as="h2" id={headingId} textStyle="cardTitle" color="fg">
           {section.key}
         </Heading>
-        <Text fontSize="12px" color="fg.subtle" fontVariantNumeric="tabular-nums">
+        <Text textStyle="caption" color="fg.subtle" fontVariantNumeric="tabular-nums">
           {section.items.length}
         </Text>
       </Box>
@@ -185,7 +185,7 @@ function TemplatesLibrary() {
       </VStack>
       {shown.length === 0 ? (
         <VStack gap={3} paddingY={16}>
-          <Text fontSize="14px" color="fg.muted">
+          <Text textStyle="body" color="fg.muted">
             No template matches your search and filters.
           </Text>
           {isFiltered && (

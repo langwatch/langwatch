@@ -136,9 +136,7 @@ export function BlockPickerDialog({
       >
         <Dialog.Header borderBottomWidth="1px" paddingX={5} paddingY={3.5}>
           <HStack width="full" gap={2}>
-            <Dialog.Title fontSize="14px" fontWeight="semibold">
-              Add a widget
-            </Dialog.Title>
+            <Dialog.Title textStyle="cardTitle">Add a widget</Dialog.Title>
             <Button size="sm" variant="outline" marginStart="auto" onClick={onSkip}>
               {BUILD_IT_MYSELF}
             </Button>
@@ -182,7 +180,7 @@ export function BlockPickerDialog({
             ))}
             {!hasMatches && (
               <VStack align="start" gap={2} paddingX={3}>
-                <Text fontSize="13px" color="fg.muted">
+                <Text textStyle="bodySm" color="fg.muted">
                   {`No widget matches. Press "${BUILD_IT_MYSELF}" to write your own with Langy.`}
                 </Text>
                 <Button
@@ -200,7 +198,7 @@ export function BlockPickerDialog({
           // Langy's edge as the top line, and a trace of it through the panel behind the words.
           <Dialog.Footer padding={0} paddingTop="1px" {...LANGY_EDGE}>
             <HStack width="full" gap={3} paddingX={5} paddingY={3} background="bg.panel/85">
-              <Text flex={1} minWidth={0} truncate fontSize="13px" color="fg.muted">
+              <Text flex={1} minWidth={0} truncate textStyle="bodySm" color="fg.muted">
                 Can't find what you're looking for?
               </Text>
               <Button
@@ -236,10 +234,10 @@ function SectionHeading({ section }: { section: PickerSection }) {
       >
         <Icon size={13} strokeWidth={2.2} aria-hidden />
       </Box>
-      <Text as="h3" flexShrink={0} fontSize="12.5px" fontWeight="semibold" color="fg">
+      <Text as="h3" flexShrink={0} textStyle="cardTitle" color="fg">
         {section.title}
       </Text>
-      <Text minWidth={0} truncate fontSize="12px" color="fg.subtle">
+      <Text minWidth={0} truncate textStyle="caption" color="fg.subtle">
         {section.why}
       </Text>
     </HStack>
@@ -315,15 +313,15 @@ function PickerRow({
         <Icon size={14} strokeWidth={2.1} aria-hidden />
       </Box>
       <VStack align="stretch" gap={0} minWidth={0} flex={1} textAlign="start">
-        <Text fontSize="13px" lineHeight="20px" fontWeight="medium" color="fg" truncate>
+        <Text textStyle="label" color="fg" truncate>
           {question.question}
         </Text>
-        <Text fontSize="12px" lineHeight="18px" color="fg.muted" truncate>
+        <Text textStyle="caption" lineHeight="18px" color="fg.muted" truncate>
           {question.why}
         </Text>
       </VStack>
       {question.madeFor.length > 0 && (
-        <HStack flexShrink={0} gap={1} fontSize="12px" color="fg.muted">
+        <HStack flexShrink={0} gap={1} textStyle="caption" color="fg.muted">
           <Bot size={12} aria-hidden />
           {question.madeFor.map((kind) => AGENT_KIND_CHIP_LABELS[kind]).join(", ")}
         </HStack>

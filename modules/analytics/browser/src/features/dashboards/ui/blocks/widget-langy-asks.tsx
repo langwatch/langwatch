@@ -26,7 +26,7 @@ export function WidgetLangyAsks({
       padding={0}
       minWidth={0}
     >
-      <HStack gap={1} color="purple.600" fontSize="12px" fontWeight="medium">
+      <HStack gap={1} color="purple.600" textStyle="caption" fontWeight="medium">
         <Sparkles size={13} aria-hidden />
         <Text as="span">Ask Langy</Text>
       </HStack>

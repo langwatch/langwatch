@@ -49,11 +49,11 @@ export function TemplateCard({
       background="bg.panel"
     >
       <VStack align="stretch" gap={1} minWidth={0}>
-        <Text as="h3" fontSize="15px" lineHeight="20px" fontWeight="semibold" lineClamp={2}>
+        <Text as="h3" textStyle="cardTitle" lineClamp={2}>
           {board.name}
         </Text>
         {/* Two lines kept even for a short job, so previews line up across a row. */}
-        <Text fontSize="13px" lineHeight="20px" minHeight="40px" color="fg.muted" lineClamp={2}>
+        <Text textStyle="bodySm" minHeight="40px" color="fg.muted" lineClamp={2}>
           {board.summary ?? board.description}
         </Text>
       </VStack>
@@ -89,8 +89,7 @@ const PILL = {
   background: "bg.panel",
   paddingX: 2,
   paddingY: 0.5,
-  fontSize: "11px",
-  lineHeight: "16px",
+  textStyle: "micro",
   color: "fg.muted",
   boxShadow: "xs",
 } as const;
@@ -107,7 +106,7 @@ function TemplateBadges({
   onImage?: boolean;
 }) {
   return (
-    <HStack gap={2} minWidth={0} fontSize="12px" lineHeight="20px">
+    <HStack gap={2} minWidth={0} textStyle="caption" lineHeight="20px">
       {focusKind && (
         <HStack gap={1} minWidth={0} color="fg.muted" {...(onImage ? PILL : {})}>
           <Box as="span" flexShrink={0} color="fg.subtle" display="flex">
@@ -133,7 +132,7 @@ function TrunkBadge({ trunk }: { trunk: LibraryTemplate["trunk"] }) {
     <Tooltip
       showArrow
       content={
-        <Text as="span" fontSize="12px">
+        <Text as="span" textStyle="caption">
           <Text as="span" fontWeight="semibold">
             {trunk}
           </Text>

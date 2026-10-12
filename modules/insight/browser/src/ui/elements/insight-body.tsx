@@ -8,25 +8,11 @@ export function InsightBody({ body }: { body: string }) {
     <VStack align="stretch" gap={2} marginTop={2} maxWidth="640px">
       {insightBodyBlocks(body).map((block, index) =>
         block.kind === "header" ? (
-          <Text
-            key={index}
-            paddingTop={1.5}
-            fontSize="10.5px"
-            fontWeight="semibold"
-            letterSpacing="0.08em"
-            textTransform="uppercase"
-            color="fg.subtle"
-          >
+          <Text key={index} paddingTop={1.5} textStyle="eyebrow" color="fg.subtle">
             {block.text}
           </Text>
         ) : (
-          <Text
-            key={index}
-            fontSize="13px"
-            lineHeight="tall"
-            color="fg.muted"
-            whiteSpace="pre-wrap"
-          >
+          <Text key={index} textStyle="bodySm" color="fg.muted" whiteSpace="pre-wrap">
             {block.text}
           </Text>
         ),

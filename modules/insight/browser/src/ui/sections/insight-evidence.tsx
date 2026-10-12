@@ -44,7 +44,7 @@ export function InsightEvidence({ entry }: { entry: InsightEntry }) {
           />
         </Suspense>
       </Box>
-      <Text as="figcaption" paddingX={3} paddingBottom={2} fontSize="10.5px" color="fg.subtle">
+      <Text as="figcaption" paddingX={3} paddingBottom={2} textStyle="micro" color="fg.subtle">
         {replayCaption({ replay, fromBoard: Boolean(entry.board) })}
       </Text>
     </Box>

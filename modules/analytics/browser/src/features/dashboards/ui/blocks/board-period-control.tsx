@@ -33,7 +33,7 @@ function LiveDot() {
 
 function PeriodOption({ selected, children }: { selected: boolean; children: ReactNode }) {
   return (
-    <HStack width="full" gap={2} fontSize="12.5px">
+    <HStack width="full" gap={2} textStyle="bodySm">
       <HStack as="span" gap={2} fontFamily="mono">
         {children}
       </HStack>
@@ -89,7 +89,7 @@ export function BoardPeriodControl({
           borderRadius="lg"
           borderColor="border"
           background="bg.panel"
-          fontSize="12px"
+          textStyle="caption"
           fontWeight="normal"
           _hover={{ borderColor: "border.emphasized", background: "bg.panel" }}
         >
@@ -174,7 +174,7 @@ export function BoardPeriodControl({
         </HStack>
         <Box borderTopWidth="1px" borderColor="border" padding={1}>
           <Menu.Item value="refresh-now" onClick={onRefreshNow}>
-            <HStack gap={2} fontSize="12.5px">
+            <HStack gap={2} textStyle="bodySm">
               <Box as="span" display="flex" color="fg.muted">
                 <RefreshCw size={13} aria-hidden />
               </Box>

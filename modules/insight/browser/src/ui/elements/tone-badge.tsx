@@ -13,7 +13,7 @@ export function ToneBadge({ tone }: { tone: InsightTone }) {
       borderRadius="sm"
       paddingX="6px"
       paddingY="2px"
-      fontSize="9px"
+      textStyle="micro"
       fontWeight="bold"
       letterSpacing="0.08em"
       textTransform="uppercase"

@@ -62,7 +62,7 @@ function AddWidgetButton({ onClick }: { onClick: () => void }) {
       gap={1.5}
       borderRadius="lg"
       borderColor="border"
-      fontSize="13px"
+      textStyle="label"
       fontWeight="medium"
       _hover={{ borderColor: "border.emphasized", background: "bg.muted" }}
       onClick={onClick}
@@ -172,7 +172,7 @@ function OpenBoard({ board }: { board: SavedBoard }) {
         />
       )}
       {isEmpty && !canEdit && (
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           This dashboard has no widgets yet.
         </Text>
       )}

@@ -34,7 +34,7 @@ export function DailyRunSettings({
   return (
     <Box as="fieldset" aria-label="Daily run" minWidth={0} border={0} padding={0}>
       {/* Tall lines, so wrapped choices do not touch. A div, because a select's frame is one. */}
-      <Box fontSize="13px" lineHeight="2.3">
+      <Box textStyle="bodySm" lineHeight="2.3">
         <Box as="span" whiteSpace="nowrap">
           Run every day around{" "}
           <Choice
@@ -81,7 +81,7 @@ export function DailyRunSettings({
           {value.maxInsights === 1 ? "insight" : "insights"}.
         </Box>
       </Box>
-      <Text marginTop={1} fontSize="12px" lineHeight="relaxed" color="fg.muted">
+      <Text marginTop={1} textStyle="caption" color="fg.muted">
         On a quiet day Langy files nothing, and the board says so.
       </Text>
     </Box>

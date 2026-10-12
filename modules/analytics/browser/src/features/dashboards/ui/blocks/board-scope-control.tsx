@@ -41,16 +41,10 @@ export function ScopeChoices({
       }}
     >
       <Box paddingX={2} paddingTop={1} paddingBottom={1.5}>
-        <Text
-          fontSize="9.5px"
-          fontWeight="semibold"
-          letterSpacing="0.09em"
-          textTransform="uppercase"
-          color="fg.subtle"
-        >
+        <Text textStyle="eyebrow" color="fg.subtle">
           {SCOPE_MENU.title}
         </Text>
-        <Text fontSize="11.5px" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           {SCOPE_MENU.hint}
         </Text>
       </Box>
@@ -63,10 +57,8 @@ export function ScopeChoices({
                 <Icon size={14} aria-hidden />
               </Box>
               <VStack align="start" gap={0}>
-                <Text fontSize="12.5px" fontWeight="medium">
-                  {SCOPE_LABEL[choice]}
-                </Text>
-                <Text fontSize="11.5px" color="fg.muted">
+                <Text textStyle="label">{SCOPE_LABEL[choice]}</Text>
+                <Text textStyle="caption" color="fg.muted">
                   {scopeHint({ scope: choice, names })}
                 </Text>
               </VStack>
@@ -103,7 +95,7 @@ export function BoardScopeControl({
         paddingY={1}
         background="bg.muted"
         color="fg.muted"
-        fontSize="12px"
+        textStyle="caption"
         fontWeight="medium"
         cursor="help"
         title={scopeLockedTip({ scope, lock, names })}
@@ -126,7 +118,7 @@ export function BoardScopeControl({
           paddingX={2}
           gap={1.5}
           flexShrink={0}
-          fontSize="12px"
+          textStyle="caption"
           aria-label={`Scope: ${SCOPE_LABEL[scope]}`}
           data-scope={scope}
         >
