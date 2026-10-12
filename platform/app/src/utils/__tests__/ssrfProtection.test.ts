@@ -195,12 +195,136 @@ describe("createSSRFValidator (dependency injection)", () => {
   it("allowlisted host that is also a cloud domain pattern is still blocked", async () => {
     const validator = createSSRFValidator({
       blockLocal: true,
-      allowedHosts: ["myhost.local"],
+      allowedHosts: ["s3.amazonaws.com"],
     });
 
-    // myhost.local matches the .local cloud-domain block — that ALWAYS wins.
-    await expect(validator("http://myhost.local/api")).rejects.toThrow(
+    // Cloud internal domains are rejected before the allowlist is consulted.
+    await expect(validator("http://s3.amazonaws.com/bucket")).rejects.toThrow(
       "cloud provider internal domains",
+    );
+  });
+
+  it("allowlisted on-premise .local host is reachable", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["llm.corp.local"],
+    });
+
+    // .local names on-premise infrastructure, so an operator may re-enable a
+    // specific host through ALLOWED_PROXY_HOSTS.
+    const result = await validator("http://llm.corp.local/v1/chat");
+    expect(result.type).toBe("allowlisted");
+  });
+
+  it("non-allowlisted .local host stays blocked", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["llm.corp.local"],
+    });
+
+    // Deferring the cloud-domain check past the allowlist must not open up
+    // every .local host.
+    await expect(validator("http://other.corp.local/api")).rejects.toThrow(
+      "cloud provider internal domains",
+    );
+  });
+
+  it("cloud internal domain is not allowlistable via a .local suffix", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["metadata.google.internal.local"],
+    });
+
+    // Matches .internal as well, so the on-premise exemption does not apply.
+    await expect(
+      validator("http://metadata.google.internal.local/computeMetadata/v1/"),
+    ).rejects.toThrow("cloud provider internal domains");
+  });
+
+  it("cloud internal domain is not allowlistable via repeated .local suffixes", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["metadata.google.internal.local.local"],
+    });
+
+    // After every trailing on-premise label is gone, .internal is still
+    // there, so the on-premise exemption does not apply.
+    await expect(
+      validator(
+        "http://metadata.google.internal.local.local/computeMetadata/v1/",
+      ),
+    ).rejects.toThrow("cloud provider internal domains");
+  });
+
+  it("cloud internal domain is not allowlistable via mixed on-premise suffixes", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["s3.amazonaws.com.localhost.local"],
+    });
+
+    // Mixing .localhost and .local must not hide the amazonaws.com name.
+    await expect(
+      validator("http://s3.amazonaws.com.localhost.local/bucket"),
+    ).rejects.toThrow("cloud provider internal domains");
+  });
+
+  it("cloud internal domain is not allowlistable via mixed suffixes in reverse order", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: ["s3.amazonaws.com.local.localhost"],
+    });
+
+    // The stripping must not depend on suffix order. A single pass over the
+    // suffix list handled .localhost.local but let .local.localhost through.
+    await expect(
+      validator("http://s3.amazonaws.com.local.localhost/bucket"),
+    ).rejects.toThrow("cloud provider internal domains");
+  });
+
+  it("blocks a cloud internal domain spelled as a trailing-dot FQDN", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: [],
+    });
+
+    // DNS treats "s3.amazonaws.com." and "s3.amazonaws.com" as the same
+    // host. The suffix checks must not be fooled by the trailing dot.
+    await expect(validator("http://s3.amazonaws.com./bucket")).rejects.toThrow(
+      "cloud provider internal domains",
+    );
+  });
+
+  it("blocks the GCP metadata domain spelled as a trailing-dot FQDN", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: [],
+    });
+
+    await expect(
+      validator("http://metadata.google.internal./"),
+    ).rejects.toThrow("cloud provider internal domains");
+  });
+
+  it("blocks a .local cloud smuggle spelled as a trailing-dot FQDN", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: [],
+    });
+
+    // A trailing dot must not reopen the .local smuggling path.
+    await expect(
+      validator("http://metadata.google.internal.local./"),
+    ).rejects.toThrow("cloud provider internal domains");
+  });
+
+  it("blocks the bare metadata host spelled as a trailing-dot FQDN", async () => {
+    const validator = createSSRFValidator({
+      blockLocal: true,
+      allowedHosts: [],
+    });
+
+    await expect(validator("http://metadata./")).rejects.toThrow(
+      "cloud metadata endpoints",
     );
   });
 
