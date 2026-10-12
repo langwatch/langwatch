@@ -419,6 +419,14 @@ Feature: Running system migrations across organizations
     Then it does not read as failed
 
   @unit
+  Scenario: A paced pass leaves undrained queue work to the next pass but fails on a tenant fault
+    Given a paced migration whose pass runs on a queue list of its own
+    When the list's queue work stops draining
+    Then the pass completes and leaves the remaining tenants to the next pass
+    But when reading the next page of tenants fails
+    Then the pass fails with that error
+
+  @unit
   Scenario: A tenant whose queued work has not drained is held as pending
     Given a migration whose work for "org_acme" is queued but not drained
     When a pass runs

@@ -634,6 +634,51 @@ describe("SystemMigrationRunnerService", () => {
     });
   });
 
+  describe("when a paced pass runs on a queue list of its own", () => {
+    const stoppedDraining = new Error("Queue work stopped draining");
+
+    function pacedRunner({
+      tenants,
+      waitForRoom,
+    }: {
+      tenants: TenantSource;
+      waitForRoom: () => Promise<void>;
+    }): SystemMigrationRunnerService {
+      return new SystemMigrationRunnerService({
+        now: nowInstant,
+        state,
+        lease: new FakeLeaseRepository(),
+        tenants,
+        cohort: () => true,
+        migrations: [{ ...migrationOf("m1", async () => finalized), pauseWhileQueuedAbove: 10 }],
+        runListedWork: ({ work }) => work({ waitForRoom }),
+      });
+    }
+
+    /** @scenario "A paced pass leaves undrained queue work to the next pass but fails on a tenant fault" */
+    it("completes the pass when the list stops draining", async () => {
+      const runner = pacedRunner({
+        tenants: tenantSourceOf(["acme"]),
+        waitForRoom: () => Promise.reject(stoppedDraining),
+      });
+
+      const summary = await runner.runPass();
+
+      expect(summary.tenantsSeen).toBe(0);
+    });
+
+    /** @scenario "A paced pass leaves undrained queue work to the next pass but fails on a tenant fault" */
+    it("fails the pass when reading the next page of tenants fails", async () => {
+      const unreadable = new Error("tenant source unreachable");
+      const runner = pacedRunner({
+        tenants: { findTenantIdsAfter: () => Promise.reject(unreadable) },
+        waitForRoom: () => Promise.resolve(),
+      });
+
+      await expect(runner.runPass()).rejects.toBe(unreadable);
+    });
+  });
+
   describe("when the tenant source pages", () => {
     it("walks every page with the last id as the cursor", async () => {
       const ids = Array.from({ length: 250 }, (_, i) => `org-${String(i).padStart(3, "0")}`);

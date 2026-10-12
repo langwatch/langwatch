@@ -164,13 +164,31 @@ export class SystemMigrationRunnerService {
       return this.driveTenants(args);
     }
     const names = this.deps.migrations.map((migration) => migration.name).join(",");
+    // Only the queue's own refusals (its wait for room, its closing wait) leave the rest to the
+    // next pass; a failed tenant read or claim fails the pass as it does off the list.
+    let queueRefused = false;
+    let driveFailure: { error: unknown } | undefined;
+    const work = async (list?: PassQueueRun): Promise<void> => {
+      const watched: PassQueueRun | undefined = list && {
+        waitForRoom: (input) =>
+          list.waitForRoom(input).catch((error: unknown) => {
+            queueRefused = true;
+            throw error;
+          }),
+      };
+      await this.driveTenants({ ...args, list: watched }).catch((error: unknown) => {
+        if (!queueRefused) driveFailure = { error };
+        throw error;
+      });
+    };
     try {
       await runListedWork({
         name: `system-migrations:${names}:${crypto.randomUUID()}`,
         timeoutMs: PASS_QUEUE_WAIT_MS,
-        work: (list) => this.driveTenants({ ...args, list }),
+        work,
       });
     } catch (error) {
+      if (driveFailure) throw driveFailure.error;
       logger.warn(
         { error, migrations: names },
         "the pass's own queue work did not drain; the next pass picks up where it stopped",
