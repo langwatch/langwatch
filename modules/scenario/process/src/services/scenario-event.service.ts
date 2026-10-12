@@ -6,6 +6,7 @@ import {
   DEFAULT_SET_ID,
   encodeContent,
   encodeEnd,
+  encodeReset,
   encodeStart,
   scenarioEventSchema,
   SCENARIO_TAB_NAVIGATE_EVENT,
@@ -119,10 +120,8 @@ export class ScenarioEventService {
       return { scenarioSetId: null };
     }
 
-    if (
-      event.type === ScenarioEventType.TEXT_MESSAGE_START ||
-      event.type === ScenarioEventType.TEXT_MESSAGE_END
-    ) {
+    // START/END go to viewers at once; a stored snapshot tells them to drop previews.
+    if (isLiveFrameEvent(event.type)) {
       await this.#broadcastStreaming(input.projectId, event);
     }
 
@@ -329,6 +328,15 @@ function isStreamingEvent(type: string): boolean {
   );
 }
 
+/** Persisted events that also go to viewers at once, after dispatch. */
+function isLiveFrameEvent(type: string): boolean {
+  return (
+    type === ScenarioEventType.TEXT_MESSAGE_START ||
+    type === ScenarioEventType.TEXT_MESSAGE_END ||
+    type === ScenarioEventType.MESSAGE_SNAPSHOT
+  );
+}
+
 function streamingPayload(event: ScenarioEvent): string {
   if (event.type === ScenarioEventType.TEXT_MESSAGE_START) {
     return encodeStart({
@@ -354,6 +362,9 @@ function streamingPayload(event: ScenarioEvent): string {
       messageId: event.messageId,
       content: event.content,
     });
+  }
+  if (event.type === ScenarioEventType.MESSAGE_SNAPSHOT) {
+    return encodeReset({ scenarioRunId: event.scenarioRunId, batchRunId: event.batchRunId });
   }
   return JSON.stringify({ e: event.type, r: event.scenarioRunId, b: event.batchRunId });
 }
