@@ -37,4 +37,9 @@ export class MemoryIdentityMigrationRepository extends IdentityMigrationReposito
     }
     return reopened.length;
   }
+
+  /** The twin keeps one finalized set the latch reads, so there is no older table to copy. */
+  async carryOverSignInSwitch(_args: { dryRun: boolean }): Promise<number> {
+    return 0;
+  }
 }

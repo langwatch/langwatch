@@ -7,6 +7,7 @@ import type {
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
+import type { TenantStepStateRow } from "@langwatch/upgrade/step/tenant-state";
 
 /**
  * The statuses a tenant may be rolled back from. What `migrated` means is each migration's own
@@ -61,16 +62,17 @@ export interface SystemMigrationEnrollmentStore {
   delete(args: { organizationId: string; migrationName: string }): Promise<void>;
 }
 
+/** The declared tenant steps' state, the framework's table beside the ledger. */
 export interface SystemMigrationStateReader {
   findStatusCounts(args: { migrationName: string }): Promise<Record<TenantMigrationStatus, number>>;
 
-  /** Newest movement first; no `migrationName` reads every migration's rows. */
+  /** Newest movement first; no `migrationName` reads every step's rows. */
   findRecordsByStatus(args: {
     migrationName?: string | undefined;
     statuses: TenantMigrationStatus[];
     limit: number;
     offset?: number;
-  }): Promise<OpsMigrationOverview["attention"]>;
+  }): Promise<TenantStepStateRow[]>;
 
   getRecord(args: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;
 
@@ -128,6 +130,13 @@ export type SystemMigrationsServiceDependencies = {
   }) => Promise<MigrationPassSummary>;
   /** Checks if report means WAITED vs held; only migration composition can distinguish. */
   waitingReports?: Record<string, (report: unknown) => boolean>;
+  /** Records the rollback as ops' fact for the step's owner, after the pin (Alex, 2026-10-12). */
+  recordRolledBack?: (args: {
+    migrationName: string;
+    tenantId: string;
+    actorUserId: string;
+    decidedAt: string;
+  }) => Promise<void>;
   /**
    * What else a rollback has to DO, per migration name. The generic rollback is a state write; a
    * migration whose finalization changed how the running fleet behaves needs that undone too, and

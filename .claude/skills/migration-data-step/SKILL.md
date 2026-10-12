@@ -160,10 +160,9 @@ jobs); `migrateTenant` receives `waitForRoom` to await between pages of commands
 `candidateTenants` so a pass walks only tenants with work (three boot loops came from passes over
 every user: #8244, #8247, #8249).
 
-`migratedIsSteady` (a step that reports `migrated` by design) and `pauseWhileQueuedAbove` are fields
-of the `SystemMigration` interface only; a flat tenant declaration does not carry them yet.
-`SystemMigration` classes answered through `registeredMigrations()` (identity, authz) are
-transitional: convert them to this declaration, and copy never move their old state rows.
+A tenant declaration also carries `migratedIsSteady` (a step that reports `migrated` by design) and
+`pauseWhileQueuedAbove`. No module answers `registeredMigrations()` any more; a moved migration's
+old state rows are copied, never moved, by an ops step (`identity.module.ts`, `authz.module.ts`).
 
 An operator-started job with arguments is not a release step: it stays a named task outside the
 ledger, safe to run again (object-storage move: `modules/stored-object/process/src/tasks/object-storage-migrate.task.ts`,

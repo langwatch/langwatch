@@ -1,4 +1,3 @@
-import type { MigrationTenantStatus } from "@langwatch/authz-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 import { Counter, register } from "prom-client";
@@ -15,8 +14,6 @@ export const authzEngineGateReadFailuresTotal =
     name: "authz_engine_gate_read_failures_total",
     help: "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
   });
-
-const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
 
 type AuthzCutoverGateOptions = {
   repository: AuthzCutoverRepository;
@@ -48,8 +45,8 @@ export class AuthzCutoverGateService {
   }
 
   async readUncached({ organizationId }: { organizationId: string }): Promise<boolean> {
-    const row = await this.options.repository.findCutover({ organizationId });
-    return row !== null && (ON_ENGINE_STATUSES as readonly string[]).includes(row.status);
+    const engineSwitch = await this.options.repository.getEngineSwitch({ organizationId });
+    return engineSwitch.onEngine;
   }
 
   async query({ organizationId }: { organizationId: string }): Promise<boolean> {
@@ -70,14 +67,26 @@ export class AuthzCutoverGateService {
 
   async findFinalizedAt({ organizationId }: { organizationId: string }): Promise<Instant | null> {
     try {
-      const row = await this.options.repository.findCutover({ organizationId });
-      return row && (ON_ENGINE_STATUSES as readonly string[]).includes(row.status)
-        ? (row.occurredAt ?? null)
-        : null;
+      const engineSwitch = await this.options.repository.getEngineSwitch({ organizationId });
+      return engineSwitch.onEngine ? engineSwitch.switchedAt : null;
     } catch (error) {
       this.report({ organizationId, error });
       return null;
     }
+  }
+
+  /** An operator's rollback, from ops' fact: the organization leaves the engine for good. */
+  async pin({
+    organizationId,
+    at,
+    eventId,
+  }: {
+    organizationId: string;
+    at: Instant;
+    eventId: string;
+  }): Promise<void> {
+    await this.options.repository.pinEngineSwitch({ organizationId, at, eventId });
+    this.invalidate({ organizationId });
   }
 
   invalidate({ organizationId }: { organizationId: string }): void {

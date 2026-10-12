@@ -85,12 +85,13 @@ A migration that sends many commands must not flood the queue ahead of live work
 
 ## The legacy path
 
-Older tenant migrations are class instances returned by a module's `registeredMigrations()` or `userMigrations()` and
-collected by Ops' pass (`modules/identity/process/src/app/identity.app.ts:1194,1204`,
-`modules/authz/process/src/app/authz.app.ts:567`, `modules/authz/process/src/migrations/legacy-import.authz-grant.migration.ts`,
-`modules/ops/.../system-migration-pass.service.ts`). That is the registration being converted: a new tenant migration uses
-`.withMigrations` and does not add a `registeredMigrations()` operation to an `*Api`. When you touch a legacy one,
-convert it in the same change if its owner agrees, keeping its `name` as the step id's stored name so no state is orphaned.
+No module answers `registeredMigrations()` or `userMigrations()` any more: identity, authz and
+automation declare their tenant steps with `.withMigrations`, and Ops' pass drives declared steps
+only. A `SystemMigration` class may still do a step's work, handed to `defineMigrationStep` by an
+app method (`authz.module.ts`, `identity.module.ts`, `automation.module.ts`). A migration that
+moves to a new step id has its `finalized` and `rolled_back` rows and enrolments copied, never
+moved, by an ops background step, and copied again once no older image writes the old table
+(`ops:copy-identity-authz-migration-state`, `ops:recopy-identity-authz-migration-state-after-rollout`).
 
 ## Testing
 

@@ -6,7 +6,7 @@ The server half of [ops](../README.md). Platform administration for every deploy
 
 ## Installation
 
-`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…)`, `src/ops.module.ts:39`.
+`defineProcessModule("ops").withRepositories(opsRepositories).withChannels(opsChannels).withApi(OpsModule).withTransports(adminRest, opsBugReportRest, opsClickHouseExplainRest, opsTrpcTransport, opsUpgradeTrpcTransport, opsBugReportTrpcTransport, checkupTrpcTransport, checkupRest).provideMiddlewareBindings(…).provideMiddlewareContext(…).withEventing(usageReportEventing).withEventing(anomalyDetectionEventing).withEventing(storageStatsEventing).withEventing(groupQueueReaperEventing).withEventing(upgradeAlertsEventing).withEventing(projectionReplayEventing).withEventing(systemMigrationsEventing).withEventing(platformOperatorSeedEventing).withTasks(…).withMigrations(…)`, `src/ops.module.ts:48`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -2491,12 +2491,13 @@ Declared at `src/eventing/ops-storage-stats.pipeline.ts:27`.
 
 ### Pipeline `ops_system_migrations` (aggregate `system_migration_pass`)
 
-Declared at `src/eventing/ops-system-migrations.pipeline.ts:57`. Events: `systemMigrationPassRequestedEventSchema`.
+Declared at `src/eventing/ops-system-migrations.pipeline.ts:65`. Events: `systemMigrationPassRequestedEventSchema`, `tenantMigrationRolledBackEventSchema`.
 
-| Kind            | Name                         | Handles                                                                                      | Declared at                                         |
-| --------------- | ---------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| command         | `requestSystemMigrationPass` | –                                                                                            | `src/eventing/ops-system-migrations.pipeline.ts:62` |
-| process manager | `systemMigrationPass`        | every 1 h (`SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS = 60 * 60_000`); intents `runPass` (outbox) | `src/eventing/ops-system-migrations.pipeline.ts:63` |
+| Kind            | Name                              | Handles                                                                                      | Declared at                                         |
+| --------------- | --------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| command         | `requestSystemMigrationPass`      | –                                                                                            | `src/eventing/ops-system-migrations.pipeline.ts:70` |
+| command         | `recordTenantMigrationRolledBack` | –                                                                                            | `src/eventing/ops-system-migrations.pipeline.ts:71` |
+| process manager | `systemMigrationPass`             | every 1 h (`SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS = 60 * 60_000`); intents `runPass` (outbox) | `src/eventing/ops-system-migrations.pipeline.ts:72` |
 
 ### Pipeline `ops_usage_report` (aggregate `global`)
 
@@ -2530,11 +2531,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                | Declared at                        |
 | ------ | -------------------------------- | ----------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:794`           |
-| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:795`           |
-| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:797`           |
-| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:798`           |
-| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:799`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:801`           |
+| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:802`           |
+| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:804`           |
+| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:805`           |
+| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:806`           |
 | config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:30` |
 | config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:32` |
 | config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:34` |

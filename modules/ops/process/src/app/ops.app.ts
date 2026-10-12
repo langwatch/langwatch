@@ -272,6 +272,7 @@ import type {
 } from "@langwatch/system-migrations";
 import { type Instant, nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
+import { SERVING_ROSTER_TIMING } from "@langwatch/upgrade/gate";
 import { isTenantMigrationStep } from "@langwatch/upgrade/step";
 import { TenantStepSettleService } from "@langwatch/upgrade/step/tenant-state";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
@@ -305,6 +306,10 @@ import {
   SystemMigrationPassRequestsService,
 } from "../features/system-migrations/services/system-migration-pass-requests.service.ts";
 import { SystemMigrationPassService } from "../features/system-migrations/services/system-migration-pass.service.ts";
+import {
+  SystemMigrationRollbackFactsService,
+  type TenantMigrationRolledBackSender,
+} from "../features/system-migrations/services/system-migration-rollback-facts.service.ts";
 import { OpsClickHouseRuntime } from "../repositories/clickhouse/clickhouse.ops-explain.repository.ts";
 import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metrics-source.repository.ts";
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
@@ -664,6 +669,7 @@ export interface OpsAppInfrastructure {
   createSystemMigrations(input: {
     dependencies: OpsAppDependencies;
     passRequests: SystemMigrationPassRequestsService;
+    rollbackFacts: SystemMigrationRollbackFactsService;
   }): OpsSystemMigrationRunner;
   bugReportNotifier: BugReportNotifier;
   /** The ClickHouse account an operator EXPLAIN runs as. */
@@ -700,6 +706,7 @@ type OpsRuntimeDependencies = Readonly<{
   grafana: OpsGrafanaLinks;
   systemMigrations: OpsSystemMigrationRunner;
   systemMigrationPassRequests: SystemMigrationPassRequestsService;
+  systemMigrationRollbackFacts: SystemMigrationRollbackFactsService;
   inbox: BugReportInboxService;
   intake: BugReportIntakeService;
   explain: OpsExplainService;
@@ -930,6 +937,7 @@ export class OpsModule implements OpsApi {
 
     const inbox = BugReportInboxService.create({ reports: repositories.bugReports });
     const systemMigrationPassRequests = SystemMigrationPassRequestsService.create();
+    const systemMigrationRollbackFacts = SystemMigrationRollbackFactsService.create();
 
     return new OpsModule({
       ops: members.createCapability(dependencies),
@@ -951,8 +959,10 @@ export class OpsModule implements OpsApi {
       systemMigrations: members.createSystemMigrations({
         dependencies,
         passRequests: systemMigrationPassRequests,
+        rollbackFacts: systemMigrationRollbackFacts,
       }),
       systemMigrationPassRequests,
+      systemMigrationRollbackFacts,
       explain: OpsExplainService.create({
         repository: OpsExplainClickHouseRepository.create({
           resolver: members.explainClients,
@@ -1714,8 +1724,12 @@ export class OpsModule implements OpsApi {
   /** Opens the kick's command once `ops_system_migrations` has registered and answered. */
   connectSystemMigrationCommands(commands: {
     requestSystemMigrationPass: SystemMigrationPassRequestSender;
+    recordTenantMigrationRolledBack: TenantMigrationRolledBackSender;
   }): void {
     this.#dependencies.systemMigrationPassRequests.connect(commands.requestSystemMigrationPass);
+    this.#dependencies.systemMigrationRollbackFacts.connect(
+      commands.recordTenantMigrationRolledBack,
+    );
   }
 
   async assertSystemMigrationLegacyWritersDrained(input: {
@@ -2430,8 +2444,9 @@ function buildOpsInfrastructure(input: {
       }),
     },
     grafana: { findLinkConfig: () => grafanaLinkConfigOf(config.grafana) },
-    createSystemMigrations: ({ dependencies, passRequests }) =>
+    createSystemMigrations: ({ dependencies, passRequests, rollbackFacts }) =>
       SystemMigrationPassService.runner({
+        rollbackFacts,
         repositories,
         isSaaS: () => config.isSaas,
         routes: () => repositories.clickhouseRoutes.findPrivateRoutes(),
@@ -2445,6 +2460,13 @@ function buildOpsInfrastructure(input: {
             state: repositories.tenantStepState,
             ledger: repositories.tenantStepLedger,
           }),
+          // As credentials-reseal reads it: gone once every live process ships the step.
+          oldWritersGoneFor: async ({ stepId }) =>
+            (
+              await repositories.upgradeLedger.findLiveRoster({
+                staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs,
+              })
+            ).every((row) => row.steps.includes(stepId)),
         },
       }),
     bugReportNotifier: input.bugReportNotifier,

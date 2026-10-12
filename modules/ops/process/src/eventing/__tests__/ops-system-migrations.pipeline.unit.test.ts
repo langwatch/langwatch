@@ -211,7 +211,10 @@ describe("given ops's system-migrations declaration", () => {
 
       const registered = eventing.register(built(async () => undefined).definition);
 
-      expect(Object.keys(registered.commands)).toEqual(["requestSystemMigrationPass"]);
+      expect(Object.keys(registered.commands)).toEqual([
+        "requestSystemMigrationPass",
+        "recordTenantMigrationRolledBack",
+      ]);
       expect(() => eventing.processRuntime).toThrow(/producer-only/);
     });
   });

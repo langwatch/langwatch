@@ -120,7 +120,7 @@ function mount({
       createSystemMigrations: () =>
         SystemMigrationsService.create(
           createApiFixture<SystemMigrationsServiceDependencies>({
-            state: repositories.migrationState,
+            state: repositories.tenantStepState,
           }),
         ),
     },
@@ -356,7 +356,7 @@ describe("ops.upgrade.listTenants", () => {
         { migrationName: "ops:second", tenantId: "org_a", status: "parked" },
       ] as const;
       for (const tenant of tenants) {
-        await mounted.repositories.migrationState.upsertRecord({ ...tenant, report: null });
+        await mounted.repositories.tenantStepState.upsertRecord({ ...tenant, report: null });
       }
       return mounted;
     }

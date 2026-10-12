@@ -1507,10 +1507,10 @@ raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a
 `needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
 migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
-process package. Until their owners move, identity, authz and automation still answer
-`registeredMigrations()` (identity's `userMigrations()` beside it) over ops' `SystemMigration*` tables;
-before an owner moves, its `finalized` and `rolled_back` rows are copied, never moved, into the
-framework table by a one-time expand step. The api serves the page and awaits a targeted run
+process package. Identity, authz and automation have moved: each declares its tenant steps, and ops
+reads its old `SystemMigration*` tables only to copy them; when an owner moved, its `finalized` and
+`rolled_back` rows and enrolments were copied, never moved, into the framework table by a background
+step, and copied again once no older image writes the old table (Alex, 2026-10-12). The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { MemoryIdentityLatchRepository } from "../../repositories/memory/memory.identity-latch.repository.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../system-migration-identity-identifier-backfill.service.ts";
 
@@ -13,6 +15,7 @@ describe("the identifier backfill migration", () => {
         report: { kind: "parity" as const, diffs: [] },
       }));
       const migration = IdentityIdentifierBackfillMigrationService.create({
+        latch: MemoryIdentityLatchRepository.create(MemoryIdentityStore.create()),
         backfill: { migrateUser },
         maxQueuedJobs: 5_000,
       });
@@ -32,6 +35,7 @@ describe("the identifier backfill migration", () => {
     /** @scenario "The identifier backfill waits for enrollment and migrates one user per tenant" */
     it("registers under the name the write gate reads, operator-free and run automatically", () => {
       const migration = IdentityIdentifierBackfillMigrationService.create({
+        latch: MemoryIdentityLatchRepository.create(MemoryIdentityStore.create()),
         backfill: { migrateUser: vi.fn() },
         maxQueuedJobs: 5_000,
       });

@@ -5,6 +5,7 @@
  */
 
 import type { GrantFact, RoleFact } from "@langwatch/authz-contract";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -21,6 +22,8 @@ import type {
   ShareLinkFactRow,
   AuthzMigrationRepository,
 } from "../../repositories/authz-migration.repository.ts";
+import { AuthzMemoryStore } from "../../repositories/memory/authz-memory.store.ts";
+import { MemoryAuthzCutoverRepository } from "../../repositories/memory/memory.authz.repositories.ts";
 import { PRINCIPAL_TO_DB } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
 import {
   AUTHZ_ENGINE_ACTOR_ID,
@@ -119,12 +122,14 @@ function harness(data: Data = {}) {
     revokeGrant: record("revokeGrant"),
     deleteRole: record("deleteRole"),
   };
+  const switches = AuthzMemoryStore.create();
   const migration = LegacyImportAuthzGrantMigration.create({
     store,
     ledger: data.wrapLedger ? data.wrapLedger(recording) : recording,
+    engineSwitch: MemoryAuthzCutoverRepository.create({ memory: switches }),
     now: () => NOW,
   });
-  return { migration, sent, seeded, reads };
+  return { migration, sent, seeded, reads, switches };
 }
 
 function attachedFacts(sent: Sent[]): GrantFact[] {
@@ -546,6 +551,80 @@ describe("given an organization with legacy access rows", () => {
       const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
 
       expect(outcome.status).toBe("finalized");
+    });
+
+    /** @scenario "Finalizing the engine migration turns authz's own switch on" */
+    it("turns authz's engine switch on as it finalizes", async () => {
+      const row = binding();
+      const fact: GrantFact = {
+        grantId: row.id,
+        principal: { type: "user", id: "user_1" },
+        roleKey: "member",
+        scope: { type: "PROJECT", id: "project_1" },
+        source: "migration",
+        occurredAtMs: CREATED,
+      };
+      const { migration, switches } = harness({
+        members: [member({ userId: "user_1" })],
+        bindings: [row],
+        organizationCreatedAtMs: null,
+        grantHeads: [foldedHead(fact)],
+      });
+
+      await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(switches.cutovers.get(ORG_ID)).toMatchObject({ onEngine: true });
+    });
+
+    /** @scenario "A rollback pinned while the migration ran keeps the organization off the engine" */
+    it("stays held when an operator pinned the switch off", async () => {
+      const row = binding();
+      const fact: GrantFact = {
+        grantId: row.id,
+        principal: { type: "user", id: "user_1" },
+        roleKey: "member",
+        scope: { type: "PROJECT", id: "project_1" },
+        source: "migration",
+        occurredAtMs: CREATED,
+      };
+      const { migration, switches } = harness({
+        members: [member({ userId: "user_1" })],
+        bindings: [row],
+        organizationCreatedAtMs: null,
+        grantHeads: [foldedHead(fact)],
+      });
+      switches.cutovers.set(ORG_ID, {
+        organizationId: ORG_ID,
+        onEngine: false,
+        pinned: true,
+        switchedAt: Temporal.Instant.fromEpochMilliseconds(CREATED),
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("migrated");
+      expect(switches.cutovers.get(ORG_ID)).toMatchObject({ onEngine: false, pinned: true });
+    });
+  });
+
+  describe("when the organization is already on the engine", () => {
+    /** @scenario "An organization already on the engine finalizes at once" */
+    it("answers finalized without reading or sending anything", async () => {
+      const { migration, sent, switches } = harness({
+        members: [member({ userId: "user_1" })],
+        bindings: [binding()],
+        organizationCreatedAtMs: null,
+      });
+      switches.cutovers.set(ORG_ID, {
+        organizationId: ORG_ID,
+        onEngine: true,
+        switchedAt: Temporal.Instant.fromEpochMilliseconds(CREATED),
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+
+      expect(outcome.status).toBe("finalized");
+      expect(sent).toEqual([]);
     });
   });
 
@@ -1525,6 +1604,7 @@ describe("given a self-hosted installation", () => {
         LegacyImportAuthzGrantMigration.create({
           store: {} as never,
           ledger: {} as never,
+          engineSwitch: {} as never,
           now: () => 0,
         }).runsAutomaticallyOnSelfHosted,
       ).toBe(true);
@@ -1544,6 +1624,7 @@ describe("given a cloud installation", () => {
         LegacyImportAuthzGrantMigration.create({
           store: {} as never,
           ledger: {} as never,
+          engineSwitch: {} as never,
           now: () => 0,
         }).enrolledAutomatically,
       ).toBe(true);

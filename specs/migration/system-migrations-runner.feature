@@ -534,8 +534,8 @@ Feature: Running system migrations across organizations
   @unit
   Scenario: The D04 connection grandfather migration is declared in the shared registry
     Given an organization has a staff-configured legacy SSO domain
-    When any system migration entry point reads the registry
-    Then the D04 connection grandfather migration is declared alongside the authorization engine migration
+    When a worker collects identity's declared steps
+    Then identity:connection-grandfather is declared beside identity's other tenant steps
     And the legacy SSO route is recorded without being treated as proof of ownership
 
   # ═══ Automatic enrollment ═════════════════════════════════════════════
@@ -891,25 +891,25 @@ Feature: Running system migrations across organizations
     When an operator opens the tenant migrations tab
     Then the migration is listed with that title and description
 
-  # Authz answers its grant import through AuthzApi, as identity answers D04; ops composes both in
-  # main's registry order and never imports either process package (Alex, 2026-09-28).
+  # Authz and identity declare their tenant steps (Alex, 2026-10-12); ops lists them in installation
+  # order, authz first as on main, and never imports either process package.
   @unit
   Scenario: The authorization engine answers the migration it registers
     Given a process that installed authz
-    When the migrations runner asks authz for its registered migrations
-    Then the grant import is answered under its existing name
+    When ops collects the declared tenant steps
+    Then authz declares the grant import as the authz:engine step
 
   @unit
   Scenario: An authorization app composed without its migration refuses to answer one
     Given an authz app composed from already-built services
-    When the migrations runner asks it for its registered migrations
-    Then it refuses by name rather than answering an empty registry
+    When its engine migration is asked for
+    Then it refuses by name rather than declaring an empty step
 
   @unit
   Scenario: The authorization engine's migration runs ahead of identity's, as on main
-    Given authz registers the grant import and identity registers D04
+    Given authz declares authz:engine and identity declares its SSO steps
     When an operator opens the tenant migrations tab
-    Then the grant import is listed first and D04 second
+    Then authz:engine is listed first and identity's steps after it
 
   # The exclusion list is the ClickHouse member's own routing table, parsed once at boot from the
   # CLICKHOUSE_URL__* family (ARCHITECTURE §7), never a second declaration of it.

@@ -625,15 +625,16 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `identity_maintenance` (aggregate `global`)
 
-Declared at `src/eventing/identity.pipeline.ts:51`.
+Declared at `src/eventing/identity.pipeline.ts:61`.
 
-| Kind            | Name                        | Handles                                                                                           | Declared at                            |
-| --------------- | --------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| process manager | `breakGlassExpiryWarn`      | every 1 h (`BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS = 60 * 60 * 1000`); intents `warn` (outbox)       | `src/eventing/identity.pipeline.ts:71` |
-| process manager | `ssoDomainReproofSweep`     | every 8 h (`SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS = 8 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/identity.pipeline.ts:87` |
-| peer subscriber | `userRegistered`            | `lw.user.registered` from [user](../../user/README.md)                                            | `src/eventing/identity.pipeline.ts:58` |
-| peer subscriber | `joinRequestInviteAccepted` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:63` |
-| peer subscriber | `joinRequestMembersInvited` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:67` |
+| Kind            | Name                           | Handles                                                                                           | Declared at                             |
+| --------------- | ------------------------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| process manager | `breakGlassExpiryWarn`         | every 1 h (`BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS = 60 * 60 * 1000`); intents `warn` (outbox)       | `src/eventing/identity.pipeline.ts:93`  |
+| process manager | `ssoDomainReproofSweep`        | every 8 h (`SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS = 8 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/identity.pipeline.ts:109` |
+| peer subscriber | `userRegistered`               | `lw.user.registered` from [user](../../user/README.md)                                            | `src/eventing/identity.pipeline.ts:68`  |
+| peer subscriber | `identifierBackfillRolledBack` | `lw.ops.tenant_migration.rolled_back` from [ops](../../ops/README.md)                             | `src/eventing/identity.pipeline.ts:74`  |
+| peer subscriber | `joinRequestInviteAccepted`    | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:85`  |
+| peer subscriber | `joinRequestMembersInvited`    | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:89`  |
 
 ### Pipeline `identity` (aggregate `user_identity`)
 
@@ -721,7 +722,7 @@ Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:185
 
 | Kind   | Leaf                              | Environment variable                | Declared at                             |
 | ------ | --------------------------------- | ----------------------------------- | --------------------------------------- |
-| secret | `internalSlackSignupsWebhook`     | `SLACK_CHANNEL_SIGNUPS`             | `src/app/identity.app.ts:461`           |
+| secret | `internalSlackSignupsWebhook`     | `SLACK_CHANNEL_SIGNUPS`             | `src/app/identity.app.ts:463`           |
 | config | `ssoDomainProofDnsServers`        | `SSO_DOMAIN_PROOF_DNS_SERVERS`      | `../contract/src/identity.config.ts:28` |
 | config | `isSaas`                          | `IS_SAAS`                           | `../contract/src/identity.config.ts:30` |
 | config | `publicBaseUrl`                   | `BASE_HOST`                         | `../contract/src/identity.config.ts:32` |

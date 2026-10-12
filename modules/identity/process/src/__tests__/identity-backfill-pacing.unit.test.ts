@@ -9,6 +9,8 @@ import {
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryIdentityLatchRepository } from "../repositories/memory/memory.identity-latch.repository.ts";
+import { MemoryIdentityStore } from "../repositories/memory/memory.identity.store.ts";
 import { IdentityIdentifierBackfillMigrationService } from "../services/system-migration-identity-identifier-backfill.service.ts";
 
 const LIMIT = 5_000;
@@ -86,6 +88,7 @@ function pass({
     cohort: () => true,
     migrations: [
       IdentityIdentifierBackfillMigrationService.create({
+        latch: MemoryIdentityLatchRepository.create(MemoryIdentityStore.create()),
         backfill: {
           migrateUser: async ({ userId }) => {
             migrated.push({ userId, lastRead: lastRead.value });

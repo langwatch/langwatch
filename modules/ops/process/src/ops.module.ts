@@ -35,6 +35,15 @@ const MOVED_TO_AUTOMATION = {
   "automations-slack-connections": "automation:import-slack-connections",
 } as const satisfies Record<string, CodeStepId>;
 
+/** The identity and authz migrations ops held, now their owners' steps. Never edit (S6-COPY). */
+const MOVED_TO_OWNERS = {
+  "authz-engine": "authz:engine",
+  "identity-d01-identifier-backfill": "identity:identifier-backfill",
+  "identity-d01-secret-heal": "identity:secret-heal",
+  "identity-d04-connection-grandfather": "identity:connection-grandfather",
+  "identity-sso-domain-ownership-backfill": "identity:sso-domain-ownership-backfill",
+} as const satisfies Record<string, CodeStepId>;
+
 export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerConfig> =
   defineProcessModule("ops")
     .withRepositories(opsRepositories)
@@ -98,6 +107,55 @@ export const opsProcessModule: PublishedProcessModule<"ops", OpsApi, OpsServerCo
           });
           const enrolmentsCopied = await repositories.migration.copyEnrolments({
             moves: MOVED_TO_AUTOMATION,
+            dryRun,
+          });
+          return dryRun
+            ? { wouldCopy: copied, wouldCopyEnrolments: enrolmentsCopied }
+            : { copied, enrolmentsCopied };
+        },
+      }),
+      // Background, as the older tables predate this release (upgrade-sign-in-tables); it runs as
+      // the new worker starts, while the five owner steps still wait for old writers to go.
+      defineMigrationStep({
+        id: "ops:copy-identity-authz-migration-state",
+        kind: "data",
+        mode: "background",
+        description:
+          "Carries users and organizations that finished, were rolled back in or were enrolled in the sign-in, credential repair, SSO and authorization engine migrations over to their new steps, so none runs for them again.",
+        run: async ({ dryRun }) => {
+          const copied = await repositories.migration.copyTenantState({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
+          const enrolmentsCopied = await repositories.migration.copyEnrolments({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
+          return dryRun
+            ? { wouldCopy: copied, wouldCopyEnrolments: enrolmentsCopied }
+            : { copied, enrolmentsCopied };
+        },
+      }),
+      // An older image keeps finishing, rolling back and enrolling under the old names until it
+      // is gone, and identity reopens unproven accounts there first; this carries that over.
+      defineMigrationStep({
+        id: "ops:recopy-identity-authz-migration-state-after-rollout",
+        kind: "data",
+        mode: "background",
+        description:
+          "Carries over what an older image changed in the sign-in, credential repair, SSO and authorization engine migrations during the rollout, once no older image is running.",
+        needsOldWritersGone: true,
+        after: [
+          "ops:copy-identity-authz-migration-state",
+          "identity:reopen-unproven-accounts-after-rollout",
+        ],
+        run: async ({ dryRun }) => {
+          const copied = await repositories.migration.recopyTenantStateAfterRollout({
+            moves: MOVED_TO_OWNERS,
+            dryRun,
+          });
+          const enrolmentsCopied = await repositories.migration.copyEnrolments({
+            moves: MOVED_TO_OWNERS,
             dryRun,
           });
           return dryRun

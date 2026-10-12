@@ -15,7 +15,9 @@ import {
   type RoleFact,
 } from "@langwatch/authz-contract";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+import { Temporal } from "@langwatch/time";
 
+import type { AuthzCutoverRepository } from "../repositories/authz-cutover.repository.ts";
 import type {
   AuthzMigrationRepository,
   ExternalMemberFact,
@@ -142,6 +144,8 @@ export interface AuthzEngineLedger {
 
 type LegacyImportAuthzGrantMigrationOptions = {
   store: AuthzMigrationRepository;
+  /** Authz's own switch: the migration answers from it and turns it on once proven. */
+  engineSwitch: Pick<AuthzCutoverRepository, "getEngineSwitch" | "switchOnEngine">;
   ledger: AuthzEngineLedger;
   now: () => number;
 };
@@ -177,6 +181,10 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     waitForRoom?: () => Promise<void>;
   }): Promise<TenantMigrationOutcome> {
     const organizationId = tenantId;
+    // Already on the engine (proven by an earlier pass, an older image or the carry-over): done.
+    if ((await this.deps.engineSwitch.getEngineSwitch({ organizationId })).onEngine) {
+      return { status: "finalized", report: { kind: "authz_engine_already_on" } };
+    }
     const inventory = await this.readInventory(organizationId);
     const expected = assemble({
       organizationId,
@@ -235,6 +243,11 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
           diffs: diffs.slice(0, MAX_REPORTED),
         },
       };
+    }
+    const at = Temporal.Instant.fromEpochMilliseconds(this.deps.now());
+    if (!(await this.deps.engineSwitch.switchOnEngine({ organizationId, at }))) {
+      // An operator pinned it off while this pass ran; the pin wins and the tenant stays held.
+      return { status: "migrated", report: { kind: "authz_engine_pinned", ...counts } };
     }
     return { status: "finalized", report: { kind: "authz_engine", ...counts } };
   }
