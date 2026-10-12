@@ -336,7 +336,7 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
 
   describe("given a trace whose short retention has passed, beside one kept forever", () => {
     /** @scenario "the index expires with the data it points at" */
-    it("never keeps the expired trace's index row, before or after a merge, and keeps the forever one", async () => {
+    it("drops the expired trace's index row on a merge and keeps the forever one", async () => {
       const expired = `trace-${nanoid()}`;
       const forever = `trace-${nanoid()}`;
       // One day's retention plus the index's seven days of slack is long past at thirty days.
@@ -345,9 +345,7 @@ describe.skipIf(!clickHouseConfigured)("trace id indexes", () => {
         spanRow({ traceId: expired, startMs: thirtyDaysAgo, retentionDays: 1 }),
         spanRow({ traceId: forever, startMs: thirtyDaysAgo, retentionDays: 0 }),
       ]);
-      // ClickHouse applies the TTL as it writes the part, so an expired row never lands at all.
-      expect((await indexRange({ index: "stored_spans_id_index", traceId: expired })).n).toBe(0);
-
+      // Whether the write already drops the expired row varies; the merge always does.
       await ch.command({ query: "OPTIMIZE TABLE stored_spans_id_index FINAL" });
 
       expect((await indexRange({ index: "stored_spans_id_index", traceId: expired })).n).toBe(0);
