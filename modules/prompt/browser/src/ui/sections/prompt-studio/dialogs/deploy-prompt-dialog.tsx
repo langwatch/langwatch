@@ -1,3 +1,4 @@
+import { CopyButton } from "@langwatch/design-system/copy-button";
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
@@ -16,8 +17,6 @@ import { Trash2, UnplugIcon, Info } from "lucide-react";
 import { useMemo } from "react";
 
 import { useDeployTags } from "../../../../behavior/use-deploy-tags.ts";
-import { usePromptHost } from "../../../../model/prompt-host.ts";
-import { CopyButton } from "../../../elements/copy-button.tsx";
 import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog.tsx";
 
 interface DeployPromptDialogProps {
@@ -65,7 +64,6 @@ function VersionLabel({ version, commitMessage }: { version: number; commitMessa
 }
 
 function SlugChip({ handle }: { handle: string }) {
-  const host = usePromptHost();
   return (
     <HStack gap={2}>
       <Box borderWidth="1px" borderColor="border" borderRadius="full" paddingX={3} paddingY={1}>
@@ -76,17 +74,7 @@ function SlugChip({ handle }: { handle: string }) {
           <Text fontSize="sm" fontWeight="medium">
             {handle}
           </Text>
-          <CopyButton
-            value={handle}
-            label="Prompt slug"
-            onCopied={(label) => host.succeeded({ title: `${label} copied` })}
-            onRefused={() =>
-              host.failed({
-                error: new Error("Clipboard unavailable"),
-                fallbackTitle: "Couldn't copy the prompt slug",
-              })
-            }
-          />
+          <CopyButton value={handle} label="Prompt slug" aria-label="Copy prompt slug" />
         </HStack>
       </Box>
     </HStack>

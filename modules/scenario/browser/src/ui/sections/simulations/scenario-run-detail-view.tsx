@@ -5,6 +5,7 @@
 
 import { Chip } from "@langwatch/design-system/chip";
 import { ConversationExpandContext } from "@langwatch/design-system/conversation-expand-context";
+import { CopyButton } from "@langwatch/design-system/copy-button";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
 import {
   Accordion,
@@ -32,7 +33,6 @@ import { SimulationConsole } from "../../elements/simulation-console/simulation-
 import { isHumanCallerRun } from "../agent-testing/results/caller-display.ts";
 import { RunScenarioModal } from "../scenarios/run-scenario-modal.tsx";
 import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
-import { CopyButton } from "../workflow/copy-button.tsx";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
 import type { ScenarioRunDetail } from "./use-scenario-run-detail.ts";
 

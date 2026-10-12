@@ -6,7 +6,7 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -132,39 +132,29 @@ export function WorkflowPushToCopiesDialog({
   const rows = copies.data ?? [];
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
-      <Dialog.Content onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Push to Replicas</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} align="start">
-            <Text fontSize="sm" color="fg.muted">
-              Select which replicas to push the latest version to:
-            </Text>
-            <ReplicaPicker
-              isLoading={copies.isLoading}
-              onToggle={toggle}
-              rows={rows}
-              selected={selected}
-            />
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={() => void push()}
-            loading={pushToCopies.isPending}
-            disabled={selected.size === 0 || copies.isLoading}
-          >
-            Push to {selected.size} replica{selected.size !== 1 ? "s" : ""}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Push to Replicas"
+      primaryAction={{
+        label: `Push to ${selected.size} replica${selected.size !== 1 ? "s" : ""}`,
+        onClick: () => void push(),
+        loading: pushToCopies.isPending,
+        disabledReason:
+          selected.size === 0 || copies.isLoading ? "Select at least one replica" : undefined,
+      }}
+    >
+      <VStack gap={4} align="start">
+        <Text fontSize="sm" color="fg.muted">
+          Select which replicas to push the latest version to:
+        </Text>
+        <ReplicaPicker
+          isLoading={copies.isLoading}
+          onToggle={toggle}
+          rows={rows}
+          selected={selected}
+        />
+      </VStack>
+    </Dialog>
   );
 }

@@ -1,6 +1,4 @@
-import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button } from "@langwatch/design-system/primitives";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
@@ -16,30 +14,29 @@ export function UpgradeStepDrawer({ stepId, onClose }: { stepId: string; onClose
   const step = api.ops.upgrade.getStep.useQuery({ id: stepId });
   const canManage = useOpsHost().isOpsAdmin();
   const { retryStep, retryingStepId } = useRetryUpgradeStep();
+  const retryable = canManage && step.data?.status === "failed";
   return (
-    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => onClose()}>
-      <Drawer.Content>
-        <Drawer.Header>
-          <DetailDrawerHeader kind="Upgrade step" title={stepId} />
-        </Drawer.Header>
-        <Drawer.Body>
-          <UpgradeReadState read={step} failedTitle="The step could not load">
-            {(detail) => <UpgradeStepDetail step={detail} />}
-          </UpgradeReadState>
-        </Drawer.Body>
-        {canManage && step.data?.status === "failed" && (
-          <Drawer.Footer>
-            <Button
-              loading={retryingStepId === stepId}
-              onClick={() => retryStep(stepId)}
-              data-testid="upgrade-step-retry"
-            >
-              Retry
-            </Button>
-          </Drawer.Footer>
-        )}
-        <Drawer.CloseTrigger />
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer
+      title={stepId}
+      eyebrow={{ label: "Upgrade step" }}
+      size="lg"
+      onClose={onClose}
+      footer={
+        retryable
+          ? {
+              primaryAction: {
+                label: "Retry",
+                loading: retryingStepId === stepId,
+                onClick: () => retryStep(stepId),
+                "data-testid": "upgrade-step-retry",
+              },
+            }
+          : undefined
+      }
+    >
+      <UpgradeReadState read={step} failedTitle="The step could not load">
+        {(detail) => <UpgradeStepDetail step={detail} />}
+      </UpgradeReadState>
+    </Drawer>
   );
 }

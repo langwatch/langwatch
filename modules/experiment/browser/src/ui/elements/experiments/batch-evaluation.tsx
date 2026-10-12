@@ -1,11 +1,11 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
+import { Card } from "@langwatch/design-system/card";
 import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
-  Card,
   Container,
   Heading,
   HStack,
@@ -123,51 +123,47 @@ const EvaluationSummaryCard = ({
 }) => {
   const score = averageOf(group, metric);
   return (
-    <Card.Root>
-      <Card.Body>
-        <VStack align="start" justify="center" height="full" gap={2}>
-          <Text color="fg" textStyle="body" fontWeight="medium">
-            {name}
+    <Card padding="lg">
+      <VStack align="start" justify="center" height="full" gap={2}>
+        <Text color="fg" textStyle="body" fontWeight="medium">
+          {name}
+        </Text>
+        <HStack align="end" color={score < 0.5 ? "red.fg" : "green.fg"}>
+          <Text textStyle="metric">
+            {numeral(score).format(metric === "score" ? "0.00" : "0%")}
           </Text>
-          <HStack align="end" color={score < 0.5 ? "red.fg" : "green.fg"}>
-            <Text textStyle="metric">
-              {numeral(score).format(metric === "score" ? "0.00" : "0%")}
+          <Text textStyle="label" marginBottom="1" opacity={0.8}>
+            {metric === "score" ? "avg score" : "pass rate"}
+          </Text>
+        </HStack>
+        <HStack textStyle="eyebrow" color="fg.muted">
+          {group.skipped.length && (
+            <Text>
+              <StatusDot color="yellow.fg" />
+              {group.skipped.length} skipped
             </Text>
-            <Text textStyle="label" marginBottom="1" opacity={0.8}>
-              {metric === "score" ? "avg score" : "pass rate"}
+          )}
+          {group.error.length && (
+            <Text>
+              <StatusDot color="red.fg" />
+              {group.error.length} error
             </Text>
-          </HStack>
-          <HStack textStyle="eyebrow" color="fg.muted">
-            {group.skipped.length && (
-              <Text>
-                <StatusDot color="yellow.fg" />
-                {group.skipped.length} skipped
-              </Text>
-            )}
-            {group.error.length && (
-              <Text>
-                <StatusDot color="red.fg" />
-                {group.error.length} error
-              </Text>
-            )}
-          </HStack>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+          )}
+        </HStack>
+      </VStack>
+    </Card>
   );
 };
 
 const StatCard = ({ title, value }: { title: string; value: string }) => (
-  <Card.Root>
-    <Card.Body>
-      <VStack align="start" justify="center" height="full" gap={2}>
-        <Text color="fg" textStyle="body" fontWeight="medium">
-          {title}
-        </Text>
-        <Text textStyle="metric">{value}</Text>
-      </VStack>
-    </Card.Body>
-  </Card.Root>
+  <Card padding="lg">
+    <VStack align="start" justify="center" height="full" gap={2}>
+      <Text color="fg" textStyle="body" fontWeight="medium">
+        {title}
+      </Text>
+      <Text textStyle="metric">{value}</Text>
+    </VStack>
+  </Card>
 );
 
 const LoadingTable = () => (

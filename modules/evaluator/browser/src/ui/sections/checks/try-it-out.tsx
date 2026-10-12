@@ -27,6 +27,7 @@ import {
   type SingleEvaluationResult,
   findEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
+import { createLogger } from "@langwatch/observability/browser";
 import { readableDate } from "@langwatch/time";
 import type { CheckPreconditions, ElasticSearchTrace } from "@langwatch/trace-contract";
 import numeral from "numeral";
@@ -47,6 +48,8 @@ import {
 import { FilterToggle } from "../analytics/filters/filter-toggle.tsx";
 import { useFilterParams } from "../analytics/use-filter-params.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
+
+const logger = createLogger("langwatch:evaluator:try-it-out");
 
 type RunRequestState = "idle" | "paused" | "running";
 
@@ -542,7 +545,7 @@ function parseRunSettings({
       description: "Please check your settings and try again.",
       type: "error",
     });
-    console.error(e);
+    logger.error({ error: e }, "Try-it-out evaluation failed");
     return { ok: false };
   }
 }

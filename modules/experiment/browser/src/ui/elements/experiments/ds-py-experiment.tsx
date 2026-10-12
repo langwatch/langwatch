@@ -1,6 +1,7 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Card } from "@langwatch/design-system/card";
 import { formatCurrency } from "@langwatch/design-system/format-currency";
 import { Money } from "@langwatch/design-system/money";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -8,7 +9,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
   Center,
   Field,
   Heading,
@@ -182,35 +182,26 @@ export function DSPyExperiment({
           {runsView === "empty" && <Text>Waiting for the first completed step to arrive...</Text>}
           {runsView === "ready" && dspyRuns.data && (
             <>
-              <Card.Root width="100%">
-                <Card.Header>
-                  <Heading as="h2" size="sm">
-                    {optimizerHeading(optimizerNames)}
-                  </Heading>
-                </Card.Header>
-                <Card.Body>
-                  <DSPyRunsScoresChart
-                    dspyRuns={dspyRuns.data}
-                    selectedPoint={selectedPoint}
-                    setSelectedPoint={setSelectedPoint}
-                    highlightedRun={highlightedRun}
-                    selectedRuns={selectedRuns}
-                    stepToDisplay={stepToDisplay}
-                    labelNames={labelNames}
-                  />
-                </Card.Body>
-              </Card.Root>
+              <Card padding="lg" title={optimizerHeading(optimizerNames)}>
+                <DSPyRunsScoresChart
+                  dspyRuns={dspyRuns.data}
+                  selectedPoint={selectedPoint}
+                  setSelectedPoint={setSelectedPoint}
+                  highlightedRun={highlightedRun}
+                  selectedRuns={selectedRuns}
+                  stepToDisplay={stepToDisplay}
+                  labelNames={labelNames}
+                />
+              </Card>
               {stepToDisplay && (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
-                <Card.Root width="100%">
-                  <Card.Body padding={0}>
-                    <RunDetails
-                      project={project}
-                      experiment={experiment}
-                      dspyStepSummary={stepToDisplay}
-                      workflowVersion={runsById?.[stepToDisplay.run_id]?.workflow_version}
-                    />
-                  </Card.Body>
-                </Card.Root>
+                <Card padding="none">
+                  <RunDetails
+                    project={project}
+                    experiment={experiment}
+                    dspyStepSummary={stepToDisplay}
+                    workflowVersion={runsById?.[stepToDisplay.run_id]?.workflow_version}
+                  />
+                </Card>
               )}
             </>
           )}

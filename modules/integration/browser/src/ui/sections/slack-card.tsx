@@ -8,10 +8,11 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { describeError } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
-import { SettingItem, SettingList, SettingsCard } from "@langwatch/design-system/settings-card";
+import { SettingItem, SettingList } from "@langwatch/design-system/settings-card";
 import {
   maskedSecret,
   slackConnectionKindLabel,
@@ -78,11 +79,11 @@ export function SlackCard() {
 
   return (
     <Box id="slack" width="full">
-      <SettingsCard
+      <Card
         title="Slack"
-        leading={<FaSlack size={18} />}
-        hint="The Slack bot tokens and incoming webhooks your automations post through. Each one is shared by the whole organization or kept to one project."
-        actions={
+        icon={<FaSlack size={18} />}
+        description="The Slack bot tokens and incoming webhooks your automations post through. Each one is shared by the whole organization or kept to one project."
+        footer={
           canAdd ? (
             <Button size="sm" variant="outline" onClick={() => openDrawer("slackConnection", {})}>
               <LuPlus size={14} /> Add Slack connection
@@ -90,8 +91,10 @@ export function SlackCard() {
           ) : null
         }
       >
-        {renderConnections()}
-      </SettingsCard>
+        <VStack align="stretch" gap={2}>
+          {renderConnections()}
+        </VStack>
+      </Card>
     </Box>
   );
 }

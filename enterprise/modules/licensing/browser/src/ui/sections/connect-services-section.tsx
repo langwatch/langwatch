@@ -1,5 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { SettingsCard, StatusChip } from "@langwatch/design-system/settings-card";
+import { StatusChip } from "@langwatch/design-system/settings-card";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { Switch } from "@langwatch/design-system/switch";
 import { Cloud } from "lucide-react";
@@ -69,9 +70,9 @@ function ServiceRow({
   onToggle: (next: boolean) => void;
 }) {
   return (
-    <SettingsCard
+    <Card
       title={service.name}
-      hint={service.description}
+      description={service.description}
       badge={
         <HStack gap={3}>
           <ServiceBadge isOn={isOn} isEntitled={isEntitled} />
@@ -86,14 +87,16 @@ function ServiceRow({
       }
       data-testid={`connect-service-${service.id}`}
     >
-      <VStack align="start" gap={0.5}>
-        {service.dataStatements.map((statement) => (
-          <Text key={statement} fontSize="sm" color="fg.muted">
-            {statement}
-          </Text>
-        ))}
+      <VStack align="stretch" gap={2}>
+        <VStack align="start" gap={0.5}>
+          {service.dataStatements.map((statement) => (
+            <Text key={statement} fontSize="sm" color="fg.muted">
+              {statement}
+            </Text>
+          ))}
+        </VStack>
       </VStack>
-    </SettingsCard>
+    </Card>
   );
 }
 

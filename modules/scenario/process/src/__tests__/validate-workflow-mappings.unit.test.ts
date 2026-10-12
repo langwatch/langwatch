@@ -12,7 +12,7 @@ const mappings = ScenarioWorkflowMappingService.create();
 describe("validateWorkflowAgentMappings", () => {
   describe("when the workflow has multiple inputs and no mappings are configured", () => {
     /** @scenario Returns actionable error for multi-input workflow agent without mappings */
-    it("throws a BAD_REQUEST TRPCError with an actionable message", () => {
+    it("throws a scenario_run_rejected HandledError with an actionable message", () => {
       expect(() =>
         mappings.validate({
           agentId: "agent-abc",
@@ -24,7 +24,7 @@ describe("validateWorkflowAgentMappings", () => {
         }),
       ).toThrowError(
         expect.objectContaining({
-          code: "BAD_REQUEST",
+          code: "scenario_run_rejected",
           message:
             "Workflow agent 'agent-abc' has 2 inputs but no scenario mappings configured. Open the agent editor to configure how scenario data maps to the workflow's inputs.",
         }),
@@ -41,7 +41,7 @@ describe("validateWorkflowAgentMappings", () => {
           ],
           scenarioMappings: {},
         }),
-      ).toThrowError(expect.objectContaining({ code: "BAD_REQUEST" }));
+      ).toThrowError(expect.objectContaining({ code: "scenario_run_rejected" }));
     });
   });
 

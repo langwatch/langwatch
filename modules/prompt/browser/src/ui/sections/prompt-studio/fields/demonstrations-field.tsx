@@ -1,11 +1,11 @@
 import { HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { VerticalFormControl } from "@langwatch/design-system/vertical-form-control";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { Info } from "lucide-react";
 import { useFormContext } from "react-hook-form";
 
-import { VerticalFormControl } from "../../../elements/vertical-form-control.tsx";
 import { DatasetPreview } from "./dataset-preview.tsx";
 
 /**

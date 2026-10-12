@@ -672,7 +672,7 @@ export function usePromptTabsStore<T>(
   // — and the environment read this used to guard on is not a package's to
   // make. See `environment-boundaries`.
   if (!projectId) {
-    console.warn(
+    capabilities.logger.warn(
       `usePromptTabsStore called without projectId.
         This should not happen if used within DashboardLayout, guarantees projectId is available.`,
     );

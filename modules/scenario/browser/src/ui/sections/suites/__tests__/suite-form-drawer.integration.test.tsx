@@ -162,20 +162,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getFlowCallbacks: vi.fn(() => undefined),
 }));
 
-vi.mock("@langwatch/design-system/studio-drawer", () => ({
-  Drawer: {
-    Root: ({ children, open }: { children: React.ReactNode; open?: boolean }) =>
-      open ? <div data-testid="drawer">{children}</div> : null,
-    Backdrop: () => null,
-    Content: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Title: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    CloseTrigger: () => null,
-    Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  },
-}));
-
 vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
@@ -459,7 +445,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("renders the drawer shell", () => {
         renderWithDesignSystem(<SuiteFormDrawer />);
 
-        expect(screen.getByTestId("drawer")).toBeInTheDocument();
+        expect(screen.getByRole("dialog", { name: /run plan/i })).toBeInTheDocument();
       });
     });
 
@@ -469,7 +455,7 @@ describe("<SuiteFormDrawer/>", () => {
 
         renderWithDesignSystem(<SuiteFormDrawer />);
 
-        expect(screen.queryByTestId("drawer")).not.toBeInTheDocument();
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       });
     });
   });
