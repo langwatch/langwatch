@@ -8,7 +8,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/upgradelab/snapshot"
@@ -24,12 +23,13 @@ const TaskDrillKillMidStep = "kill-mid-step"
 type midStepOptions struct {
 	step          string // a background step that saves a checkpoint per page
 	checkpointKey string // the checkpoint's cursor field
-	countKey      string // the report's row count for this run
+	countKey      string // the report's row count, a total across attempts
+	pageSize      int    // rows the step counts between two checkpoints
 	plantUsers    int    // accounts planted on main before head runs
 	factEvent     string // the event the step records, one per row
 }
 
-var defaultMidStep = midStepOptions{step: "user:record-created-facts", checkpointKey: "afterUserId", countKey: "users", plantUsers: 40000, factEvent: "lw.user.created"}
+var defaultMidStep = midStepOptions{step: "user:record-created-facts", checkpointKey: "afterUserId", countKey: "users", pageSize: 500, plantUsers: 40000, factEvent: "lw.user.created"}
 
 // stepRow is one ledger row's status and report, read straight from Postgres.
 type stepRow struct {
@@ -65,6 +65,69 @@ type killMoment struct {
 	at, after  stepRow
 	firstAfter stepRow // the first checkpoint the restarted worker saved
 	missed     bool    // the step finished before a running row with a checkpoint was seen
+	death      deathProof
+}
+
+// deathProof is what shows the killed worker really ended: no signalled pid survives and its log
+// names only pids that were signalled, with no line stamped after the kill.
+type deathProof struct {
+	killedAt   time.Time
+	killed     []int // the leader and every descendant, signalled with SIGKILL
+	survivors  []int // signalled pids still running once the wait ended
+	loggedPids []int // pids the killed worker's log lines carry
+	linesAfter int   // log lines stamped after the kill
+}
+
+func (proof deathProof) died() bool {
+	if len(proof.killed) == 0 || len(proof.survivors) > 0 || len(proof.loggedPids) == 0 || proof.linesAfter > 0 {
+		return false
+	}
+	for _, pid := range proof.loggedPids {
+		if !slices.Contains(proof.killed, pid) {
+			return false
+		}
+	}
+	return true
+}
+
+func (proof deathProof) String() string {
+	return fmt.Sprintf("signalled pids %v, still running %v, pids in its log %v, log lines after the kill %d", proof.killed, proof.survivors, proof.loggedPids, proof.linesAfter)
+}
+
+// readWorkerLog lists the pids a worker's JSON log lines carry and counts the lines stamped after killedAt.
+func readWorkerLog(text string, killedAt time.Time) (pids []int, linesAfter int) {
+	for _, line := range strings.Split(text, "\n") {
+		var entry struct {
+			Pid  int    `json:"pid"`
+			Time string `json:"time"`
+		}
+		if json.Unmarshal([]byte(line), &entry) != nil || entry.Pid == 0 {
+			continue
+		}
+		if !slices.Contains(pids, entry.Pid) {
+			pids = append(pids, entry.Pid)
+		}
+		if at, err := time.Parse(time.RFC3339Nano, entry.Time); err == nil && at.After(killedAt) {
+			linesAfter++
+		}
+	}
+	return pids, linesAfter
+}
+
+// pollLedger is waitFor at a tenth of a second: a page of the step takes about a second.
+func pollLedger(ctx context.Context, within time.Duration, done func() bool) error {
+	deadline := time.Now().Add(within)
+	for !done() {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("not reached within %s", within)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	return nil
 }
 
 // killMayLand: the step is running and has saved a checkpoint, so a kill now lands mid-step.
@@ -166,11 +229,11 @@ func resumedSuffix(line string) string {
 	return ""
 }
 
-// killWhenMidStep polls the ledger every 100 ms and kills head's worker the first time the step is
-// running with a checkpoint saved.
+// killWhenMidStep polls the ledger every 100 ms and kills head's worker, node included, the first
+// time the step is running with a checkpoint saved, then waits for every signalled pid to end.
 func (cell *run) killWhenMidStep(ctx context.Context, options midStepOptions) (killMoment, error) {
 	var moment killMoment
-	err := waitFor(ctx, 25*time.Minute, func() bool {
+	err := pollLedger(ctx, 25*time.Minute, func() bool {
 		row, err := cell.readStep(ctx, options.step)
 		if err != nil {
 			return false
@@ -182,7 +245,8 @@ func (cell *run) killWhenMidStep(ctx context.Context, options midStepOptions) (k
 		if !killMayLand(row, options.checkpointKey) {
 			return false
 		}
-		cell.proc("head-worker").Signal(syscall.SIGKILL)
+		moment.death.killed = cell.proc("head-worker").Kill()
+		moment.death.killedAt = time.Now()
 		moment.at = row
 		return true
 	})
@@ -192,6 +256,8 @@ func (cell *run) killWhenMidStep(ctx context.Context, options midStepOptions) (k
 	waitCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	_ = cell.proc("head-worker").Wait(waitCtx)
+	_ = pollLedger(waitCtx, 10*time.Second, func() bool { return len(alive(moment.death.killed)) == 0 })
+	moment.death.survivors = alive(moment.death.killed)
 	moment.after, _ = cell.readStep(ctx, options.step)
 	return moment, nil
 }
@@ -203,10 +269,11 @@ func (cell *run) killAndRestart(ctx context.Context, options midStepOptions, nam
 		return moment, err
 	}
 	cell.stopWorkerAs(name + "-worker-killed")
+	moment.death.loggedPids, moment.death.linesAfter = readWorkerLog(readText(cell.logPath(name+"-worker-killed")), moment.death.killedAt)
 	if err := cell.startHeadWorker(); err != nil {
 		return moment, err
 	}
-	_ = waitFor(ctx, 10*time.Minute, func() bool { // the restarted worker's first saved checkpoint
+	_ = pollLedger(ctx, 10*time.Minute, func() bool { // the restarted worker's first saved checkpoint
 		row, err := cell.readStep(ctx, options.step)
 		moment.firstAfter = row
 		return err == nil && (row.status == "done" || row.cursor(options.checkpointKey) != moment.after.cursor(options.checkpointKey))
@@ -239,26 +306,39 @@ func countsOnly(fingerprint snapshot.Fingerprint) snapshot.Fingerprint {
 	return kept
 }
 
-// midStepVerdict judges UD-1: the kill landed mid-step, the rerun resumed from the checkpoint and
-// converged on what a clean run leaves.
+// midStepVerdict judges UD-1: the kill landed mid-step and really ended the worker, the restarted
+// worker resumed from the checkpoint, and the run converged on what a clean run leaves. The report's
+// count is a total across attempts, so each attempt's share comes from the checkpoints.
 func midStepVerdict(options midStepOptions, drilled, clean midStepRun) Verdict {
-	key := options.checkpointKey
-	landed := killMayLand(drilled.kill.at, key) && drilled.kill.after.status == "running" && drilled.kill.after.cursor(key) != ""
-	atKill, rerun, whole := drilled.kill.after.count(options.countKey), drilled.final.count(options.countKey), clean.final.count(options.countKey)
-	fromCheckpoint := rerun > 0 && rerun < whole && atKill+rerun >= whole
+	key, kill := options.checkpointKey, drilled.kill
+	landed := killMayLand(kill.at, key) && kill.after.status == "running" && kill.after.cursor(key) != ""
+	died := kill.death.died()
+	atKill, firstAfter := kill.after.count(options.countKey), kill.firstAfter.count(options.countKey)
+	total, whole := drilled.final.count(options.countKey), clean.final.count(options.countKey)
+	resumed := kill.firstAfter.cursor(key) != "" && firstAfter > atKill && firstAfter-atKill <= options.pageSize
+	counted := whole > 0 && total == whole
 	postgresDiffs, otherDiffs := splitDiffs(countsOnly(drilled.state.fingerprint).Diff(countsOnly(clean.state.fingerprint)))
 	stepDiffs := compareUpgraded(upgraded{steps: drilled.state.steps}, upgraded{steps: clean.state.steps})
 	converged := drilled.facts != "" && drilled.facts == clean.facts && drilled.final.status == "done" && len(postgresDiffs) == 0 && len(stepDiffs) == 0
 	return Verdict{ID: "UD-1", Name: "a worker killed mid-step resumes from the checkpoint and converges with a clean run",
-		Result: passText(landed && fromCheckpoint && converged),
-		Detail: fmt.Sprintf("step %s, %s accounts after planting; killed while %q with checkpoint %s=%q (%d rows), ledger after the kill %q %s=%q; first checkpoint the restarted worker saved %q %v; runner lines (it logs warnings only): %v; rerun counted %d rows, clean run %d; final checkpoint %s=%q; events (count, distinct, hash) drilled %q clean %q, written twice before merging drilled %s clean %s; Postgres count differences %v, step status differences %v, ClickHouse count differences (not judged) %v",
-			options.step, drilled.planted, drilled.kill.at.status, key, drilled.kill.at.cursor(key), drilled.kill.at.count(options.countKey), drilled.kill.after.status, key, drilled.kill.after.cursor(key),
-			drilled.kill.firstAfter.status, drilled.kill.firstAfter.report, drilled.resumeLines, rerun, whole, key, drilled.final.cursor(key), drilled.facts, clean.facts, drilled.duplicates, clean.duplicates, postgresDiffs, stepDiffs, otherDiffs)}
+		Result: passText(landed && died && resumed && counted && converged),
+		Detail: fmt.Sprintf("step %s, %s accounts after planting; killed while %q with checkpoint %s=%q (%d rows), ledger after the kill %q %s=%q (%d rows); worker died %t (%s); first checkpoint the restarted worker saved %q %s=%q (%d rows, %d past the kill's; a page is %d); runner lines (it logs warnings only): %v; the killed attempt counted %d rows, the resumed one %d; report total %d, clean run %d; final checkpoint %s=%q; events (count, distinct, hash) drilled %q clean %q, written twice before merging drilled %s clean %s; Postgres count differences %v (ignored, written on the worker's own timing: %v), step status differences %v, ClickHouse count differences (not judged) %v",
+			options.step, drilled.planted, kill.at.status, key, kill.at.cursor(key), kill.at.count(options.countKey), kill.after.status, key, kill.after.cursor(key), atKill,
+			died, kill.death, kill.firstAfter.status, key, kill.firstAfter.cursor(key), firstAfter, firstAfter-atKill, options.pageSize,
+			drilled.resumeLines, atKill, total-atKill, total, whole, key, drilled.final.cursor(key), drilled.facts, clean.facts, drilled.duplicates, clean.duplicates, postgresDiffs, workerTimedTables, stepDiffs, otherDiffs)}
 }
 
-// splitDiffs separates Postgres differences from every other store's.
+// workerTimedTables hold rows the worker writes on its own timing (process manager sends, tenant
+// migration sweeps), so a killed and restarted worker leaves a different count with nothing wrong.
+var workerTimedTables = []string{"ProcessManagerOutbox", "SystemMigrationTenantState"}
+
+// splitDiffs separates Postgres differences, less the worker-timed tables, from every other store's.
 func splitDiffs(diffs []string) (postgres, other []string) {
 	for _, diff := range diffs {
+		table, _, _ := strings.Cut(strings.TrimPrefix(diff, "postgres/"), ":")
+		if slices.Contains(workerTimedTables, table) {
+			continue
+		}
 		if strings.HasPrefix(diff, "postgres") {
 			postgres = append(postgres, diff)
 		} else {

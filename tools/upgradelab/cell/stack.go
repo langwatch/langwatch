@@ -243,6 +243,17 @@ func (proc *Proc) Signal(sig syscall.Signal) {
 	_ = syscall.Kill(-proc.command.Process.Pid, sig)
 }
 
+// Kill sends SIGKILL to the group and to every descendant (pnpm starts node in a group of its own)
+// and returns every pid it signalled, the leader first.
+func (proc *Proc) Kill() []int {
+	pids := append([]int{proc.command.Process.Pid}, proc.descendants()...)
+	proc.Signal(syscall.SIGKILL)
+	for _, pid := range pids[1:] {
+		_ = syscall.Kill(pid, syscall.SIGKILL)
+	}
+	return pids
+}
+
 // Exited answers whether the process ended, and how.
 func (proc *Proc) Exited() (bool, error) {
 	select {
