@@ -100,7 +100,9 @@ async function openPage() {
     if (response.status() < 400) return;
     const text =
       response.status() === 503 || response.status() === 400
-        ? (await response.text().catch((error) => `${unreadBody}: ${error?.message ?? error}`)).slice(0, 300)
+        ? (
+            await response.text().catch((error) => `${unreadBody}: ${error?.message ?? error}`)
+          ).slice(0, 300)
         : "";
     log({
       kind: "http",

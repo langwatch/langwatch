@@ -115,7 +115,7 @@ Kinds and modes are `upgradeStepKindSchema` and `upgradeStepModeSchema` in
 | Piece                                                                      | State                                                                                                                 |
 | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | Ledger, runner, `upgrade` / `upgrade status` / `upgrade plan`              | landed (`packages/upgrade/src/runner/upgrade-runner.ts`, `apps/tasks/src/upgrade.ts`)                                 |
-| Stepping applier (one release's schema at a time) for multi-release jumps  | landed (`releaseSteppingApplier`, `packages/upgrade/src/runner/release-stepping-applier.ts`)                                                        |
+| Stepping applier (one release's schema at a time) for multi-release jumps  | landed (`releaseSteppingApplier`, `packages/upgrade/src/runner/release-stepping-applier.ts`)                          |
 | Serving gate, first-install upgrade, roster 15 s / 60 s, rollback reopen   | landed (`packages/upgrade/src/gate/serving-upgrade-gate.ts`, `SERVING_ROSTER_TIMING`)                                 |
 | No ClickHouse configured refuses to serve                                  | landed (`NO_CLICKHOUSE_REFUSAL`, `packages/upgrade/src/gate/serving-upgrade-gate.ts`)                                 |
 | Prisma and ClickHouse guard scanners, retirement note, lock-heavy refusals | landed (`packages/{prisma-client,clickhouse-migrations}/src/__tests__/migration-safety.rules.ts`)                     |

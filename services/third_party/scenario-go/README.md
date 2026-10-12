@@ -97,14 +97,14 @@ Script: []scenario.ScriptStep{
 },
 ```
 
-| Step | Meaning |
-|------|---------|
-| `User(text...)` / `Agent(text...)` | add a fixed message, or let the simulator / your agent produce one |
-| `MessageStep(msg)` | inject any message (tool calls, tool results, system) |
-| `Judge(opts...)` | verdict now; `WithCriteria` makes it a checkpoint, `WithAdditionalContext` adds evidence |
-| `Proceed(Turns(n), OnTurn(f), OnStep(f))` | let the agents converse |
-| `Succeed(reason)` / `Fail(reason)` | end the scenario |
-| `StepFunc(fn)` | your own step; return `scenario.Assert(...)` for checks |
+| Step                                      | Meaning                                                                                  |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `User(text...)` / `Agent(text...)`        | add a fixed message, or let the simulator / your agent produce one                       |
+| `MessageStep(msg)`                        | inject any message (tool calls, tool results, system)                                    |
+| `Judge(opts...)`                          | verdict now; `WithCriteria` makes it a checkpoint, `WithAdditionalContext` adds evidence |
+| `Proceed(Turns(n), OnTurn(f), OnStep(f))` | let the agents converse                                                                  |
+| `Succeed(reason)` / `Fail(reason)`        | end the scenario                                                                         |
+| `StepFunc(fn)`                            | your own step; return `scenario.Assert(...)` for checks                                  |
 
 `ScriptStep` is an interface (`Run(ctx, *Executor) error`), so packages can
 add their own steps.
@@ -155,12 +155,12 @@ with `First`, `Last`, `Inputs`, `Outputs`), `Turns()`, `Traces()`, `Spans()`,
 
 ## Providers
 
-| Module | Client |
-|--------|--------|
-| `providers/openai` | `github.com/openai/openai-go/v3` |
-| `providers/anthropic` | `github.com/anthropics/anthropic-sdk-go` |
-| `providers/gemini` | `google.golang.org/genai` |
-| `providers/bedrock` | `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` |
+| Module                | Client                                                |
+| --------------------- | ----------------------------------------------------- |
+| `providers/openai`    | `github.com/openai/openai-go/v3`                      |
+| `providers/anthropic` | `github.com/anthropics/anthropic-sdk-go`              |
+| `providers/gemini`    | `google.golang.org/genai`                             |
+| `providers/bedrock`   | `github.com/aws/aws-sdk-go-v2/service/bedrockruntime` |
 
 Each exposes `NewProvider(client)` plus message converters for your own
 adapters. Any type with `Inference(ctx, InferenceParams) (*InferenceResult, error)`

@@ -5,9 +5,16 @@
 import { createRequire } from "node:module";
 
 const { chromium } = createRequire(`${process.cwd()}/package.json`)("@playwright/test");
-const { url, email, password, out, signIn, path = "/ops/upgrades", open, expect } = JSON.parse(
-  process.argv[2],
-);
+const {
+  url,
+  email,
+  password,
+  out,
+  signIn,
+  path = "/ops/upgrades",
+  open,
+  expect,
+} = JSON.parse(process.argv[2]);
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });

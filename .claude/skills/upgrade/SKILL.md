@@ -45,30 +45,30 @@ worker as a sidecar (metrics on 9465, so it never clashes with the api's 9464). 
 
 ## Where it lives
 
-| Piece                                                           | File                                                                                                                                                 |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Task (run-once worker), `status`, `plan`, `steps`               | `apps/tasks/src/upgrade.ts`; the run-once mode is `apps/worker/src/main.ts` (`upgradeOnce`)                                                           |
-| The composed runner: Prisma, goose, reconcilers, hints          | `packages/upgrade/src/runner/image-upgrade.ts`, `release-stepping-applier.ts`                                                                        |
-| The worker's in-process run and its modules                     | `packages/upgrade/src/gate/in-process-upgrade.ts`; `bootModules` from `packages/process/src/preamble.ts`                                            |
-| Runner, phases, outcome codes and exit codes                    | `packages/upgrade/src/runner/upgrade-runner.ts`, `upgrade-outcome.ts`, `run-phases.ts`                                                               |
-| Lease (ttl 60 s, heartbeat 15 s, wait 10 min)                   | `packages/upgrade/src/runner/runner-lease.ts` (`DEFAULT_LEASE_TIMING`)                                                                               |
-| Ledger kinds, modes, statuses                                   | `packages/upgrade/src/ledger.ts`                                                                                                                     |
-| Ledger schema and tables                                        | `packages/upgrade/src/ledger-tables.ts`                                                                                                              |
-| Plan, `after` ordering                                          | `packages/upgrade/src/plan/plan-upgrade.ts`                                                                                                          |
-| Installed release inferred from the ledger                      | `packages/upgrade/src/runner/installed-release.ts`                                                                                                   |
-| One release at a time                                           | `packages/upgrade/src/stepping/` (`apply-release.ts`, `rerunnable-migrations.ts`)                                                                    |
-| Manifests                                                       | `packages/upgrade/releases/*.json`, `packages/upgrade/src/manifest/`                                                                                 |
-| Step declaration                                                | `packages/upgrade/src/step/migration-step.ts`, `projection-replay-step.ts`                                                                           |
-| Collection over the installed list                              | `packages/process/src/migration/migration-steps.ts`                                                                                                  |
-| Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`                                               |
-| Liveness door and the token console                             | `packages/process/src/lifecycle/liveness-thread.ts`                                                                                                  |
-| `upgrade_in_progress` mapping (all transports)                  | `packages/api/src/errors.ts` (`promoteStoreFailure`)                                                                                                 |
-| Defensive ClickHouse reads                                      | `packages/clickhouse-client/src/present-columns.ts` (`ClickHouseColumns`)                                                                            |
-| Roster and rollback                                             | `packages/upgrade/src/serving-roster/` (`rollback.ts`)                                                                                               |
-| Background steps on the worker                                  | `packages/upgrade/src/background/background-steps.service.ts`                                                                                        |
-| Status reader (CLI, Ops, Checkup)                               | `packages/upgrade/src/reader/`                                                                                                                       |
-| Ops console                                                     | `modules/ops/process/src/services/ops-upgrade.service.ts`, `transport/ops-upgrade.trpc.ts`, `modules/ops/browser/src/features/upgrades/`             |
-| Tenant (system) migrations                                      | `modules/ops/process/src/features/system-migrations/`, `tasks/system-migrations-pass.task.ts`                                                        |
+| Piece                                                           | File                                                                                                                                     |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Task (run-once worker), `status`, `plan`, `steps`               | `apps/tasks/src/upgrade.ts`; the run-once mode is `apps/worker/src/main.ts` (`upgradeOnce`)                                              |
+| The composed runner: Prisma, goose, reconcilers, hints          | `packages/upgrade/src/runner/image-upgrade.ts`, `release-stepping-applier.ts`                                                            |
+| The worker's in-process run and its modules                     | `packages/upgrade/src/gate/in-process-upgrade.ts`; `bootModules` from `packages/process/src/preamble.ts`                                 |
+| Runner, phases, outcome codes and exit codes                    | `packages/upgrade/src/runner/upgrade-runner.ts`, `upgrade-outcome.ts`, `run-phases.ts`                                                   |
+| Lease (ttl 60 s, heartbeat 15 s, wait 10 min)                   | `packages/upgrade/src/runner/runner-lease.ts` (`DEFAULT_LEASE_TIMING`)                                                                   |
+| Ledger kinds, modes, statuses                                   | `packages/upgrade/src/ledger.ts`                                                                                                         |
+| Ledger schema and tables                                        | `packages/upgrade/src/ledger-tables.ts`                                                                                                  |
+| Plan, `after` ordering                                          | `packages/upgrade/src/plan/plan-upgrade.ts`                                                                                              |
+| Installed release inferred from the ledger                      | `packages/upgrade/src/runner/installed-release.ts`                                                                                       |
+| One release at a time                                           | `packages/upgrade/src/stepping/` (`apply-release.ts`, `rerunnable-migrations.ts`)                                                        |
+| Manifests                                                       | `packages/upgrade/releases/*.json`, `packages/upgrade/src/manifest/`                                                                     |
+| Step declaration                                                | `packages/upgrade/src/step/migration-step.ts`, `projection-replay-step.ts`                                                               |
+| Collection over the installed list                              | `packages/process/src/migration/migration-steps.ts`                                                                                      |
+| Serving gate; the worker's wait loop (`admitAfterFirstInstall`) | `packages/process/src/migration/upgrade-gate.ts` → `packages/upgrade/src/gate/serving-upgrade-gate.ts`                                   |
+| Liveness door and the token console                             | `packages/process/src/lifecycle/liveness-thread.ts`                                                                                      |
+| `upgrade_in_progress` mapping (all transports)                  | `packages/api/src/errors.ts` (`promoteStoreFailure`)                                                                                     |
+| Defensive ClickHouse reads                                      | `packages/clickhouse-client/src/present-columns.ts` (`ClickHouseColumns`)                                                                |
+| Roster and rollback                                             | `packages/upgrade/src/serving-roster/` (`rollback.ts`)                                                                                   |
+| Background steps on the worker                                  | `packages/upgrade/src/background/background-steps.service.ts`                                                                            |
+| Status reader (CLI, Ops, Checkup)                               | `packages/upgrade/src/reader/`                                                                                                           |
+| Ops console                                                     | `modules/ops/process/src/services/ops-upgrade.service.ts`, `transport/ops-upgrade.trpc.ts`, `modules/ops/browser/src/features/upgrades/` |
+| Tenant (system) migrations                                      | `modules/ops/process/src/features/system-migrations/`, `tasks/system-migrations-pass.task.ts`                                            |
 
 ## The ledger
 
