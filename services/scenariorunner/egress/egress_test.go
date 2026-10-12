@@ -106,7 +106,7 @@ func serverPort(t *testing.T, srv *httptest.Server) string {
 	return u.Port()
 }
 
-// @scenario "The judged address is dialled and the name is never resolved again"
+// @scenario "The judged address is the one connected to and the name is never resolved again"
 func TestClientDialsTheJudgedAddressAndKeepsTheHostHeader(t *testing.T) {
 	var gotHost string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -21,6 +21,31 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 go build -o /out/devscripts ./cmd/devscripts
 
+# ── Stage 0b: the Go scenario runner ────────────────────────────────
+# services/scenariorunner, the Go drop-in for the Node scenario child. Its own
+# binary, never a cmd/service subcommand: that refuses to boot with
+# LANGWATCH_API_KEY set, and a run's key arrives in exactly that variable.
+# Cross-compiled on the build host, like Dockerfile.go_service.
+FROM --platform=$BUILDPLATFORM golang:1.27.1-alpine AS scenariorunner
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY go.work go.work.sum ./
+COPY cmd/go.* cmd/
+COPY pkg/go.* pkg/
+COPY services/go.* services/
+COPY tools/go.* tools/
+COPY sdks/go/go.* sdks/go/
+COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
+COPY pkg ./pkg
+COPY sdks/go ./sdks/go
+COPY services/scenariorunner ./services/scenariorunner
+COPY services/third_party ./services/third_party
+RUN --mount=type=cache,target=/go/pkg/mod,id=go-mod-${TARGETARCH} \
+    --mount=type=cache,target=/root/.cache/go-build,id=go-build-${TARGETARCH} \
+    cd services && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+      -trimpath -ldflags="-s -w" -o /out/scenariorunner ./scenariorunner/cmd/scenariorunner
+
 # ── Stage 1: workspace manifests ───────────────────────────────────
 # Every member's package.json and nothing else. This stage re-runs on any
 # source edit, but its output changes only when a manifest does, so the
@@ -253,6 +278,10 @@ COPY --from=builder /app/enterprise ./enterprise
 # child it spawns is its own app, built into apps/scenario-child/dist.
 COPY --from=builder /app/apps/worker ./apps/worker
 COPY --from=builder /app/apps/scenario-child ./apps/scenario-child
+# The Go scenario runner; the worker spawns it in place of the Node child for a
+# project whose release_scenario_go_runner_enabled flag is on.
+COPY --from=scenariorunner /out/scenariorunner /usr/local/bin/scenariorunner
+ENV SCENARIO_GO_RUNNER_PATH=/usr/local/bin/scenariorunner
 # The task runner. Runs from source through node, like apps/api and apps/worker.
 COPY --from=builder /app/apps/tasks ./apps/tasks
 # Same: run from source through node. The boot command below runs both schema

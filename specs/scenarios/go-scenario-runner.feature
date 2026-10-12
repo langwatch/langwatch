@@ -95,13 +95,21 @@ Feature: The Go scenario runner honours the child execution contract
       And cloud metadata is refused even where local addresses are allowed or the host is allowlisted
 
     @unit
+    Scenario: A host is read as the Node child's URL parser reads it
+      Given a target URL that spells an address in decimal, octal or hex, with full-width digits, or with a zone identifier
+      When the fence reads its host
+      Then a numeric spelling is judged as the IPv4 address it names
+      And a zone identifier or an impossible number is refused as an invalid URL
+      And no spelling reaches loopback, a private address or cloud metadata the canonical form would be refused for
+
+    @unit
     Scenario: An allowlisted host passes and is pinned to its resolved address
       Given a policy that blocks local addresses and allowlists one host
       When a target names that host
       Then it passes and the address it resolved to is the one dialled
 
     @unit
-    Scenario: The judged address is dialled and the name is never resolved again
+    Scenario: The judged address is the one connected to and the name is never resolved again
       Given a target whose name resolves once
       When the runner calls it
       Then the connection goes to the judged address with the original Host header
@@ -119,7 +127,7 @@ Feature: The Go scenario runner honours the child execution contract
       Then the first two are refused and the allowed hop is followed without the credential header
 
     @unit
-    Scenario: An HTTP target behind the fence is refused before it is dialled
+    Scenario: An HTTP target behind the fence is refused before any connection is made
       Given an agent-test turn whose HTTP target is on a loopback address
       And a policy that blocks local addresses
       When the runner runs it
