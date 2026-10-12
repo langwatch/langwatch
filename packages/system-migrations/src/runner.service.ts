@@ -33,7 +33,7 @@ const DEFAULT_PACING_WAIT_MS = 5_000;
 /** On a queue list, a migration declaring no `pauseWhileQueuedAbove` waits at this many jobs. */
 export const DEFAULT_PAUSE_WHILE_QUEUED_ABOVE = 5_000;
 /** How long a paced pass's own queue work may stand still before the pass stops waiting on it. */
-const PASS_QUEUE_WAIT_MS = 60_000;
+const PASS_QUEUE_WAIT_MS = 5 * 60_000;
 
 /** A listed queue run as a paced pass sees it: room for its own jobs, never the whole queue's. */
 export type PassQueueRun = Readonly<{

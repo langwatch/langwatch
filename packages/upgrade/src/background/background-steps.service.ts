@@ -106,7 +106,7 @@ export interface BackgroundStepsQueue {
 }
 
 /** How long a step waits for its queue work unless it declares `queueWaitMs`. */
-export const BACKGROUND_STEP_QUEUE_WAIT_MS = 60_000;
+export const BACKGROUND_STEP_QUEUE_WAIT_MS = 5 * 60_000;
 
 /**
  * A step's own jobs left waiting or running before its next checkpoint saves: the page it sent

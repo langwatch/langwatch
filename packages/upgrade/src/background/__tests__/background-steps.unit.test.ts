@@ -772,7 +772,7 @@ class ListedRunsDouble implements BackgroundStepsQueue {
 describe("BackgroundStepsService queue work", () => {
   describe("given a step whose queue work all runs", () => {
     /** @scenario "A background step is done only once the queue work it sent has run" */
-    it("runs the step on a list of its own, waiting 60 s by default, and records it done", async () => {
+    it("runs the step on a list of its own, waiting 5 minutes by default, and records it done", async () => {
       const ledger = new MemoryBackgroundLedger();
       const queue = new ListedRunsDouble();
       const service = serviceOver({ ledger, queue, run: async () => ({ sent: 2 }) });
@@ -780,7 +780,7 @@ describe("BackgroundStepsService queue work", () => {
       expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
 
       expect(queue.runs).toEqual([
-        { name: expect.stringMatching(`^upgrade-step:${STEP}:`), timeoutMs: 60_000 },
+        { name: expect.stringMatching(`^upgrade-step:${STEP}:`), timeoutMs: 5 * 60_000 },
       ]);
       expect(ledger.row).toMatchObject({ status: "done", report: { sent: 2 } });
     });

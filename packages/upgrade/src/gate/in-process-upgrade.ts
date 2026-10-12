@@ -60,7 +60,7 @@ export type BootUpgradeModules = <Result>(
 export const PASS_REQUEST_TASK = "request-system-migrations-pass";
 
 /** How long the run waits for the pass request's queue jobs, which run ahead of any backlog. */
-export const PASS_REQUEST_WAIT_MS = 60_000;
+export const PASS_REQUEST_WAIT_MS = 5 * 60_000;
 
 /**
  * The pass request with its queue jobs on a list ahead of any backlog (T6), which a consuming
