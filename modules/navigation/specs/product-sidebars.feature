@@ -26,13 +26,20 @@ Feature: Product sidebars
   while they move around the product, and it brings the open page's entry
   to the top only when that entry would otherwise be out of view. A page
   near the start of the menu opens with the first group heading on screen.
-  Quick Search stays in place regardless of menu scroll. The top bar has
-  no second search trigger; Cmd/Ctrl+K also works on full-screen tools.
+  Quick Search stays in place regardless of menu scroll. On a project page
+  the top bar also carries a Search pill with the shortcut hint; Cmd/Ctrl+K
+  also works on full-screen tools.
 
   @integration
   Scenario: Quick Search sits first and opens the command bar
     Given a product sidebar
     When I use the Quick Search entry
+    Then the command bar opens
+
+  @integration
+  Scenario: The top bar's Search pill opens the command bar
+    Given a project page
+    When I use the Search pill in the top bar
     Then the command bar opens
 
   @integration

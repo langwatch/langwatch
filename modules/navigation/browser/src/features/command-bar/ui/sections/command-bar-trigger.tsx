@@ -2,15 +2,14 @@ import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Button, Text } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 
-import { useCommandBar } from "../../behavior/command-bar-context.ts";
+import { openCommandBar } from "../../behavior/command-bar-control.ts";
 import { getCommandBarShortcut } from "../../model/command-platform.ts";
 
 /**
- * Button to trigger opening the command bar.
- * Shows a search icon, "Search" text, and keyboard shortcut hint.
+ * The top bar's "Search" pill with its shortcut hint. Opens the mounted palette
+ * through the module-scope control, so it works outside the provider too.
  */
 export function CommandBarTrigger() {
-  const { open } = useCommandBar();
   const shortcut = getCommandBarShortcut();
 
   return (
@@ -26,7 +25,7 @@ export function CommandBarTrigger() {
       color="fg.muted"
       fontWeight="normal"
       gap={2}
-      onClick={open}
+      onClick={openCommandBar}
       _hover={{ backgroundColor: "bg.inputHover" }}
     >
       <Search size={14} aria-hidden />

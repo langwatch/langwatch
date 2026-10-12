@@ -971,14 +971,14 @@ describe("a later navigation that makes the workspace read again", () => {
   });
 });
 
-describe("one search entry in the shell", () => {
-  it("keeps the sidebar search and removes the top-bar trigger", () => {
+describe("search entries in the shell", () => {
+  it("keeps the sidebar search and draws the top-bar Search pill on a project page", () => {
     renderShell({
       readings: {
         commandBar: { shortcut: "⌘K", open: vi.fn(), trigger: <button>Top bar search</button> },
       },
     });
     expect(screen.getAllByRole("button", { name: "Quick Search" })).toHaveLength(1);
-    expect(screen.queryByRole("button", { name: "Top bar search" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Top bar search" })).toHaveLength(1);
   });
 });
