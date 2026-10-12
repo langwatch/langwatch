@@ -78,7 +78,8 @@ try {
       .waitForFunction(() => document.body.innerText.trim() !== "", null, { timeout: 30_000 })
       .catch(() => undefined);
   }
-  await page.screenshot({ path: out, fullPage: true });
+  // A busy host can hold the fonts back; the shot is evidence, not the verdict.
+  await page.screenshot({ path: out, fullPage: true, timeout: 60_000 }).catch(() => undefined);
   const text = await page.innerText("body").catch(() => "");
   const selectedTab = await page
     .locator('[role="tab"][aria-selected="true"]')
