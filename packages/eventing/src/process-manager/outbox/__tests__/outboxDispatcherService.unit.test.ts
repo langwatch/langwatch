@@ -1,5 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as metricsModule from "../../../metrics.ts";
 import {
@@ -11,7 +11,11 @@ import {
 } from "../../__tests__/helpers/pilotProcess.fixture.ts";
 import { ProcessManagerService } from "../../processManagerService.ts";
 import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore.ts";
-import { type DispatchableMessage, OutboxDispatcherService } from "../outboxDispatcherService.ts";
+import {
+  type DispatchableMessage,
+  type DispatchReport,
+  OutboxDispatcherService,
+} from "../outboxDispatcherService.ts";
 
 const { observeDispatchLag } = vi.hoisted(() => ({
   observeDispatchLag: vi.fn(),
@@ -20,6 +24,16 @@ vi.mock("../../../metrics.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof metricsModule>()),
   observeEsProcessOutboxDispatchLag: observeDispatchLag,
 }));
+
+/** A store whose lease renewals never land: the worker holding the lease is gone. */
+function withoutRenewals(store: InMemoryProcessStore): InMemoryProcessStore {
+  return new Proxy(store, {
+    get(target, property, receiver) {
+      if (property === "renewLease") return () => new Promise(() => undefined);
+      return Reflect.get(target, property, receiver);
+    },
+  });
+}
 
 describe("OutboxDispatcherService", () => {
   let store: InMemoryProcessStore;
@@ -711,7 +725,8 @@ describe("OutboxDispatcherService", () => {
         // The crash: the first delivery starts, charging attempt one and
         // observing the commit-to-dispatch lag, and never acknowledges.
         const crashed = new OutboxDispatcherService({
-          store,
+          // A dead worker sends no renewals, so its lease lapses on time.
+          store: withoutRenewals(store),
           handlers: {
             "worker-dispatch": vi.fn().mockReturnValue(new Promise<void>(() => undefined)),
           },
@@ -738,6 +753,170 @@ describe("OutboxDispatcherService", () => {
         expect(message.attempt).toBe(2);
         expect(observeDispatchLag).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  describe("given a delivery that runs for many lease lengths", () => {
+    beforeEach(async () => {
+      vi.useFakeTimers({ now: T0 + 1 });
+      await commitStartedTurn();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A long-running intent keeps its lease while it runs" */
+    it("renews the lease so no other dispatcher takes the message for the whole hour", async () => {
+      let finish: () => void = () => undefined;
+      const handler = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+      const holder = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": handler },
+      });
+      const rivalHandler = vi.fn().mockResolvedValue(undefined);
+      const rival = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": rivalHandler },
+      });
+
+      const run = holder.runOnce({ now: Date.now() });
+      for (let minute = 0; minute < 60; minute += 1) {
+        await vi.advanceTimersByTimeAsync(60_000);
+        await rival.runOnce({ now: Date.now() });
+      }
+      finish();
+      const report = await run;
+
+      expect(rivalHandler).not.toHaveBeenCalled();
+      expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
+      expect(await store.findMessagesByRef({ ref: pilotRef })).toEqual([
+        expect.objectContaining({ status: "dispatched", attempts: 1 }),
+      ]);
+    });
+  });
+
+  describe("given a worker that leased a message and died", () => {
+    beforeEach(commitStartedTurn);
+
+    /** @scenario "A crashed worker's intent is taken again within one short lease" */
+    it("is leasable again one lease later, charged a further attempt", async () => {
+      const leaseDurationMs = 120_000;
+      await store.leaseDueMessages({ now: T0 + 1, limit: 1, leaseDurationMs });
+      const handler = vi.fn().mockResolvedValue(undefined);
+      const dispatcher = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": handler },
+        leaseDurationMs,
+      });
+
+      const early = await dispatcher.runOnce({ now: T0 + leaseDurationMs });
+      const onTime = await dispatcher.runOnce({ now: T0 + 1 + leaseDurationMs });
+
+      expect(early.dispatched).toEqual([]);
+      expect(onTime.dispatched).toEqual(["dispatch:turn_1:1"]);
+      const { message } = handler.mock.calls[0]![0] as { message: DispatchableMessage };
+      expect(message.attempt).toBe(2);
+    });
+
+    /** @scenario "A crashed worker's intent is taken again within one short lease" */
+    it("retires the message once crashes have used every attempt", async () => {
+      const leaseDurationMs = 120_000;
+      for (let crash = 0; crash < 3; crash += 1) {
+        await store.leaseDueMessages({
+          now: T0 + 1 + crash * leaseDurationMs,
+          limit: 1,
+          leaseDurationMs,
+        });
+      }
+      const handler = vi.fn().mockResolvedValue(undefined);
+      const dispatcher = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": handler },
+        leaseDurationMs,
+        maxAttempts: 3,
+      });
+
+      const report = await dispatcher.runOnce({ now: T0 + 1 + 3 * leaseDurationMs });
+
+      expect(report.dead).toEqual(["dispatch:turn_1:1"]);
+      expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a worker whose lease was taken over mid-delivery", () => {
+    const leaseDurationMs = 3_000;
+    let blip: boolean;
+    let finish: { resolve: () => void; reject: (error: Error) => void };
+    let holder: OutboxDispatcherService;
+    let run: Promise<DispatchReport>;
+    let rivalToken: string;
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ now: T0 + 1 });
+      await commitStartedTurn();
+      blip = true;
+      // Renewals fail while the database blips, long enough for the lease to lapse.
+      const blippingStore = new Proxy(store, {
+        get(target, property, receiver) {
+          if (property !== "renewLease") return Reflect.get(target, property, receiver);
+          return (params: Parameters<typeof store.renewLease>[0]) =>
+            blip ? Promise.reject(new Error("connection reset")) : target.renewLease(params);
+        },
+      });
+      holder = new OutboxDispatcherService({
+        store: blippingStore,
+        handlers: {
+          "worker-dispatch": () =>
+            new Promise<void>((resolve, reject) => (finish = { resolve, reject })),
+        },
+        leaseDurationMs,
+      });
+    });
+    beforeEach(async () => {
+      run = holder.runOnce({ now: Date.now() });
+      await vi.advanceTimersByTimeAsync(leaseDurationMs + 1);
+      rivalToken = await takeOver();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function takeOver(): Promise<string> {
+      const rival = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": vi.fn(() => new Promise<void>(() => undefined)) },
+        leaseDurationMs,
+      });
+      void rival.runOnce({ now: Date.now() });
+      await vi.advanceTimersByTimeAsync(0);
+      const [row] = await store.findMessagesByRef({ ref: pilotRef });
+      blip = false;
+      await vi.advanceTimersByTimeAsync(leaseDurationMs);
+      return row!.leaseToken!;
+    }
+
+    /** @scenario "A worker whose lease was taken over does not record its result" */
+    it("drops the handler's success and reports the delivery as fenced", async () => {
+      finish.resolve();
+      const report = await run;
+
+      expect(report.fenced).toEqual(["dispatch:turn_1:1"]);
+      expect(report.dispatched).toEqual([]);
+      expect(await store.findMessagesByRef({ ref: pilotRef })).toEqual([
+        expect.objectContaining({ status: "pending", attempts: 2, leaseToken: rivalToken }),
+      ]);
+    });
+
+    /** @scenario "A worker whose lease was taken over does not record its result" */
+    it("drops the handler's failure instead of scheduling a retry", async () => {
+      finish.reject(new Error("handler failed"));
+      const report = await run;
+
+      expect(report.fenced).toEqual(["dispatch:turn_1:1"]);
+      expect(report.retried).toEqual([]);
+      expect(await store.findMessagesByRef({ ref: pilotRef })).toEqual([
+        expect.objectContaining({ status: "pending", attempts: 2, leaseToken: rivalToken }),
+      ]);
     });
   });
 });

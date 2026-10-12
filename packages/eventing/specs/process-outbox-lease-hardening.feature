@@ -74,6 +74,37 @@ Feature: Process outbox lease hardening
     And no interactive transaction is opened for it
     And a poll cannot fail for want of a transaction slot while the pool has connections
 
+  @unit @lease-renewal
+  Scenario: A long-running intent keeps its lease while it runs
+    Given a dispatcher delivering a message whose handler runs for an hour on a short lease
+    When other dispatchers poll while the handler runs
+    Then the holder renews its lease every third of the lease length
+    And no other dispatcher leases the message while the handler runs
+    And the delivery is acknowledged as dispatched once the handler finishes
+
+  @unit @lease-renewal
+  Scenario: A crashed worker's intent is taken again within one short lease
+    Given a worker that leased a message and died without renewing it
+    When one lease length has passed
+    Then another dispatcher leases and delivers the message
+    And the new delivery is charged a further attempt
+    And a message whose crashes used every attempt retires as dead
+
+  @unit @lease-renewal
+  Scenario: A worker whose lease was taken over does not record its result
+    Given a worker whose renewals failed until another dispatcher leased its message
+    When its next renewal is refused
+    Then it stops renewing
+    And neither its handler's success nor its failure is written to the message
+    And the delivery is reported as fenced
+
+  @integration @lease-renewal
+  Scenario: Renewing a lease is fenced on the lease token
+    Given a leased outbox message in Postgres
+    When its holder renews the lease
+    Then the message stays leased one more lease length from the renewal
+    And a renewal by a holder whose lease was taken over is refused and changes nothing
+
   # outboxDispatcherService.ts, processOutboxWorker.ts, processWakeWorker.ts,
   # failureDiagnostic.ts, commandDispatcher.ts, process-manager-maintenance.pipeline.ts
 

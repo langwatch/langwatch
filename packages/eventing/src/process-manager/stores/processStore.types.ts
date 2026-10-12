@@ -226,6 +226,17 @@ export interface ProcessStore {
     now: number;
   }): Promise<{ applied: boolean }>;
 
+  /**
+   * Push a held lease out to `now + leaseDurationMs` while its delivery runs. Fenced on the
+   * token like the acknowledgements: `applied: false` means another dispatcher took the message.
+   */
+  renewLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+    leaseDurationMs: number;
+  }): Promise<{ applied: boolean }>;
+
   /** Record a failed attempt; `dead: true` retires the message permanently. */
   markFailed(params: {
     identity: OutboxMessageIdentity;

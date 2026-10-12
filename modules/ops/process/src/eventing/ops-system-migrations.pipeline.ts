@@ -75,13 +75,9 @@ export function buildSystemMigrations({
           }),
         )
         .on(systemMigrationPassRequestedEventSchema, systemMigrationPassRequested)
-        // One pass at a time; a lease as long as the cadence, since a pass can sweep the fleet.
-        .outbox({
-          leaseDurationMs: SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS,
-          maxAttempts: 3,
-          concurrency: 1,
-          batchSize: 1,
-        }),
+        // One pass at a time on the dispatcher's short lease, renewed while a long pass runs,
+        // so a pass whose worker died is taken again within one lease.
+        .outbox({ maxAttempts: 3, concurrency: 1, batchSize: 1 }),
     )
     .build();
 }

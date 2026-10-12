@@ -117,6 +117,15 @@ describe("given ops's system-migrations declaration", () => {
     expect(process.config.schedule?.everyMs).toBe(HOUR);
   });
 
+  /** @scenario "A pass whose worker died is taken again within one short lease" */
+  it("runs its pass on the outbox's short renewed lease instead of an hour-long one", () => {
+    const { process } = built(async () => undefined);
+
+    // No override: the dispatcher's default lease, renewed while the pass runs.
+    expect(process.config.outbox?.leaseDurationMs).toBeUndefined();
+    expect(process.config.outbox?.maxAttempts).toBe(3);
+  });
+
   /** @scenario "The hourly re-drive runs as a scheduled process once across the fleet" */
   it("asks for one gated pass per wake, keyed by the wake", () => {
     const wake = (at: number) =>

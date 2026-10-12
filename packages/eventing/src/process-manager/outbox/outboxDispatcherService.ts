@@ -40,8 +40,9 @@ export interface DispatchableMessage {
   /** 1-based delivery attempt. */
   attempt: number;
   /**
-   * When this delivery's lease lapses, in the dispatcher's clock: past it
-   * another dispatcher may lease the message, so paid work bounds itself by it.
+   * When this delivery's first lease lapses, in the dispatcher's clock. The
+   * dispatcher renews the lease while the handler runs, so this is the
+   * earliest it can lapse; paid work may still bound itself by it.
    */
   leaseExpiresAt: number;
 }
@@ -61,7 +62,11 @@ export interface OutboxDispatcherServiceOptions {
   maxAttempts?: number;
   /** Backoff for the attempt that just failed. Default: exponential, capped. */
   retryDelayMs?: (params: { attempt: number }) => number;
-  /** How long a leased message stays invisible to other loops. Default 30s. */
+  /**
+   * How long a leased message stays invisible to other loops. Renewed every
+   * third of it while the handler runs, so a crashed worker's message is
+   * leasable again within one lease. Default 2 minutes.
+   */
   leaseDurationMs?: number;
   /**
    * Which processNames this dispatcher serves. The outbox table is shared
@@ -92,7 +97,9 @@ export interface DispatchReport {
 }
 
 const DEFAULT_MAX_ATTEMPTS = 10;
-export const DEFAULT_LEASE_DURATION_MS = 30_000;
+export const DEFAULT_LEASE_DURATION_MS = 2 * 60_000;
+/** Renewals per lease length: two in a row can fail before the lease lapses. */
+const LEASE_RENEWALS_PER_LEASE = 3;
 const SLOW_OUTBOX_DELIVERY_MS = 10_000;
 /**
  * Fraction of the lease held back as the budget a delivery needs before it
@@ -100,6 +107,12 @@ const SLOW_OUTBOX_DELIVERY_MS = 10_000;
  * deliveries start on too little budget and fence anyway.
  */
 const LEASE_SAFETY_MARGIN_FRACTION = 0.2;
+
+/** One delivery's lease renewal; `isLost` once a renewal was refused. */
+interface LeaseRenewal {
+  isLost: () => boolean;
+  stop: () => Promise<void>;
+}
 
 function identityOf(message: LeasedOutboxMessageRecord): OutboxMessageIdentity {
   return {
@@ -159,6 +172,7 @@ export class OutboxDispatcherService {
   private readonly maxAttempts: number;
   private readonly retryDelayMs: (params: { attempt: number }) => number;
   private readonly leaseDurationMs: number;
+  private readonly leaseRenewalIntervalMs: number;
   private readonly processNames: readonly string[] | undefined;
   private readonly concurrency: number;
   private readonly clock: () => number;
@@ -172,6 +186,10 @@ export class OutboxDispatcherService {
     this.maxAttempts = options.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.retryDelayMs = options.retryDelayMs ?? defaultRetryDelayMs;
     this.leaseDurationMs = options.leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS;
+    this.leaseRenewalIntervalMs = Math.max(
+      1,
+      Math.floor(this.leaseDurationMs / LEASE_RENEWALS_PER_LEASE),
+    );
     this.processNames = options.processNames;
     this.concurrency = Math.max(1, options.concurrency ?? 1);
     this.clock = options.clock ?? Date.now;
@@ -386,7 +404,7 @@ export class OutboxDispatcherService {
   private countFenced(params: {
     message: LeasedOutboxMessageRecord;
     report: DispatchReport;
-    phase: "dispatched" | "failed" | "retirement";
+    phase: "dispatched" | "failed" | "retirement" | "renewal";
     durationMs?: number;
   }): void {
     const { message, report, phase, durationMs } = params;
@@ -487,22 +505,37 @@ export class OutboxDispatcherService {
       if (!handler) {
         throw new Error(`No handler registered for intent type "${message.intentType}"`);
       }
-      await handler({
-        message: {
-          processName: message.processName,
-          projectId: message.projectId,
-          processKey: message.processKey,
-          tenantId: message.tenantId,
-          userId: message.userId,
-          messageKey: message.messageKey,
-          intentType: message.intentType,
-          payload: message.payload,
-          sourceEventId: message.sourceEventId,
-          attempt,
-          // The store anchored the lease at this drain's `now`.
-          leaseExpiresAt: now + this.leaseDurationMs,
-        },
+      const { leaseLost } = await this.runHoldingLease({
+        message,
+        now,
+        run: () =>
+          handler({
+            message: {
+              processName: message.processName,
+              projectId: message.projectId,
+              processKey: message.processKey,
+              tenantId: message.tenantId,
+              userId: message.userId,
+              messageKey: message.messageKey,
+              intentType: message.intentType,
+              payload: message.payload,
+              sourceEventId: message.sourceEventId,
+              attempt,
+              // The store anchored the lease at this drain's `now`.
+              leaseExpiresAt: now + this.leaseDurationMs,
+            },
+          }),
       });
+      if (leaseLost) {
+        // Another dispatcher holds the message now: its outcome, not this one, is recorded.
+        this.countFenced({
+          message,
+          report,
+          phase: "renewal",
+          durationMs: performance.now() - startedAt,
+        });
+        return;
+      }
       const { applied } = await this.store.markDispatched({
         identity,
         leaseToken: message.leaseToken,
@@ -537,6 +570,93 @@ export class OutboxDispatcherService {
     } finally {
       this.finishDispatchSpan({ message, attempt, span, startedAt });
     }
+  }
+
+  /**
+   * Runs one handler while renewing its lease. A refused renewal means another
+   * dispatcher leased the message, so this run's outcome, success or error, is dropped.
+   */
+  private async runHoldingLease({
+    message,
+    now,
+    run,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    now: number;
+    run: () => Promise<void>;
+  }): Promise<{ leaseLost: boolean }> {
+    const renewal = this.startLeaseRenewal({ message, now });
+    let failure: { error: unknown } | null = null;
+    try {
+      await run();
+    } catch (error) {
+      failure = { error };
+    } finally {
+      await renewal.stop();
+    }
+    if (renewal.isLost()) return { leaseLost: true };
+    if (failure) throw failure.error;
+    return { leaseLost: false };
+  }
+
+  /** Renewals stay in the store's frame: the drain's `now` advanced by the wall clock since. */
+  private startLeaseRenewal({
+    message,
+    now,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    now: number;
+  }): LeaseRenewal {
+    const startedAt = this.clock();
+    let lost = false;
+    let stopped = false;
+    let timer: NodeJS.Timeout | null = null;
+    let renewing: Promise<void> = Promise.resolve();
+    const fields = {
+      processName: message.processName,
+      messageKey: message.messageKey,
+      intentType: message.intentType,
+      attempt: message.attempts,
+    };
+    const renew = async (): Promise<void> => {
+      try {
+        const { applied } = await this.store.renewLease({
+          identity: identityOf(message),
+          leaseToken: message.leaseToken,
+          now: now + (this.clock() - startedAt),
+          leaseDurationMs: this.leaseDurationMs,
+        });
+        if (applied) return;
+        lost = true;
+        this.logger.warn(
+          fields,
+          "Outbox lease renewal refused; another dispatcher took the message",
+        );
+      } catch (error) {
+        // A failed renewal is retried on the next tick, which still lands before the lease lapses.
+        this.logger.warn(
+          { ...fields, ...toSafeFailureDiagnostic(error) },
+          "Outbox lease renewal failed; retrying on the next tick",
+        );
+      }
+    };
+    const arm = (): void => {
+      if (stopped || lost) return;
+      timer = setTimeout(() => {
+        timer = null;
+        renewing = renew().then(arm);
+      }, this.leaseRenewalIntervalMs);
+      timer.unref();
+    };
+    arm();
+    return {
+      isLost: () => lost,
+      stop: async () => {
+        stopped = true;
+        if (timer) clearTimeout(timer);
+        await renewing;
+      },
+    };
   }
 
   private async handleDispatchFailure({

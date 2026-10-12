@@ -488,6 +488,13 @@ Feature: Running system migrations across organizations
     Then one scheduled process wakes on one of them
     And it asks for exactly one re-drive pass for that wake
 
+  @unit
+  Scenario: A pass whose worker died is taken again within one short lease
+    Given a pass running on a worker
+    When that worker dies mid-pass
+    Then another worker takes the pass within the outbox's short lease, not an hour later
+    And a pass that runs for an hour keeps its lease while it runs
+
   # D04 records the configured legacy route WITHOUT treating the old domain
   # string as ownership evidence, which is what let it join the shared
   # registry: existing sign-in stays compatible, while activation, linking and
