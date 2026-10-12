@@ -11,7 +11,9 @@ import type { PromptStudioSpanResult } from "./types";
  * columns, with its attributes exactly as stored. Both reads build these
  * rows, the legacy one straight from `stored_spans` and the one fenced by the
  * proof from the span store's stored read, so the playground sees the same
- * values whichever read loaded the trace.
+ * values whichever read loaded the trace. The one exception is offloaded IO:
+ * the legacy read restores the llm row's full content before extraction, and
+ * the read fenced by the proof still loads the stored preview.
  */
 export interface PromptStudioSpanRow {
   SpanId: string;
@@ -61,6 +63,25 @@ export function promptStudioSpanFromTrace({
   rows: PromptStudioSpanRow[];
   spanId: string;
 }): PromptStudioSpanResult | null {
+  const row = promptStudioLlmRowFromTrace({ rows, spanId });
+  if (!row) {
+    return null;
+  }
+  return promptStudioSpanFromLlmRow({ row, rows });
+}
+
+/**
+ * The llm row the playground loads for a requested span: the span itself when
+ * it is an llm span, else the nearest llm span in the trace. Returns null when
+ * the span is not in the trace, or when no llm row can be loaded in its place.
+ */
+export function promptStudioLlmRowFromTrace({
+  rows,
+  spanId,
+}: {
+  rows: PromptStudioSpanRow[];
+  spanId: string;
+}): PromptStudioSpanRow | null {
   const requestedRow = rows.find((r) => r.SpanId === spanId);
   if (!requestedRow) {
     return null;
@@ -74,13 +95,24 @@ export function promptStudioSpanFromTrace({
   // sibling that started at or after the requested span. The
   // playground form needs an llm span's messages + llm config,
   // anything else lands as "No prompts open".
-  const row = isLlmRow(requestedRow)
+  return isLlmRow(requestedRow)
     ? requestedRow
     : findNearestLlm(rows, requestedRow);
-  if (!row) {
-    return null;
-  }
+}
 
+/**
+ * The playground's view of one llm row, given every span of its trace. Kept
+ * apart from the row selection so a read can restore the llm row's offloaded
+ * content before it is extracted, while the ancestor walk still reads the
+ * stored rows.
+ */
+export function promptStudioSpanFromLlmRow({
+  row,
+  rows,
+}: {
+  row: PromptStudioSpanRow;
+  rows: PromptStudioSpanRow[];
+}): PromptStudioSpanResult {
   const result = extractPromptStudioData(row);
 
   // If the LLM span itself doesn't have a prompt reference,

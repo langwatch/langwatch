@@ -31,7 +31,10 @@ import type {
   ExtractedIO,
   TraceIOExtractionService,
 } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type {
+  NormalizedAttributes,
+  NormalizedSpan,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
@@ -59,6 +62,168 @@ export interface ResolvedTraceSpans {
    * stored in trace_summaries should remain in effect.
    */
   anyResolved: boolean;
+}
+
+/**
+ * Records one eventref that could not be resolved, splitting the expected case
+ * (the event_log row is gone) from the unexpected one so a stale ref does not
+ * read like an outage in the logs. Purely reporting: the caller keeps the
+ * preview either way.
+ */
+function logEventRefFailure({
+  reason,
+  projectId,
+  traceId,
+  spanId,
+  attrKey,
+  logger,
+}: {
+  reason: unknown;
+  projectId: string;
+  traceId: string;
+  spanId: string;
+  attrKey: string;
+  logger: WarnLogger;
+}): void {
+  const rowIsGone =
+    reason instanceof BlobNotFoundError ||
+    reason instanceof BlobFieldNotFoundError;
+  logger.warn(
+    {
+      projectId,
+      spanId,
+      traceId,
+      attrKey,
+      error: reason instanceof Error ? reason.message : String(reason),
+    },
+    rowIsGone
+      ? "event_log row not found for eventref — keeping preview value"
+      : "Failed to resolve eventref from event_log — keeping preview value",
+  );
+}
+
+/**
+ * Result of resolving one span's offloaded attribute values.
+ */
+export interface ResolvedSpanAttributes {
+  /**
+   * The span's attributes with full values restored and reserved eventref
+   * keys stripped. This is the SAME object reference that was passed in when
+   * the span carries no eventref at all, so a caller can tell "nothing to do"
+   * from "rewritten" without comparing maps.
+   */
+  attributes: NormalizedAttributes;
+  /** How many attribute values were replaced with their full event_log value. */
+  resolvedCount: number;
+}
+
+/**
+ * Resolves the offloaded event refs on a SINGLE span's attribute map.
+ *
+ * This is the unit of ADR-022 read-time resolution. {@link resolveOffloadedTraces}
+ * runs it across a trace's spans and recomputes trace-level IO from the result;
+ * reads that want one span's full values and nothing else call it directly,
+ * without having to fabricate a {@link NormalizedSpan} around the attributes
+ * they hold. `getSpanForPromptStudio` is the second kind: it reads raw
+ * ClickHouse rows and needs the llm span's full messages, not a recomputed
+ * trace input/output.
+ *
+ * Error policy, unchanged from the caller that used to inline this: a field
+ * that cannot be fetched keeps its preview value and is logged at warn level.
+ * Nothing here throws on a stale or missing ref, because a read must not fail
+ * over content that is merely unavailable.
+ *
+ * @param projectId - Tenant scope for the event_log read. Resolution never
+ *   crosses tenants: this is passed as `tenantId` on every fetch.
+ * @param traceId - The span's trace, which IS the event_log aggregateId for the
+ *   trace-processing pipeline (ADR-022).
+ * @param spanId - Only used to identify the span in warn logs.
+ * @param attributes - The span's raw attribute map, eventref keys included.
+ * @param blobStore - BlobStore providing getFromEventLog.
+ * @param aggregateType - Aggregate type for event_log lookup (default: "trace").
+ * @param logger - Logger for missing-ref warnings.
+ */
+export async function resolveOffloadedSpanAttributes({
+  projectId,
+  traceId,
+  spanId,
+  attributes,
+  blobStore,
+  logger,
+  aggregateType = "trace",
+}: {
+  projectId: string;
+  traceId: string;
+  spanId: string;
+  attributes: NormalizedAttributes;
+  blobStore: BlobStore;
+  logger: WarnLogger;
+  aggregateType?: string;
+}): Promise<ResolvedSpanAttributes> {
+  if (!hasEventRefs(attributes)) {
+    return { attributes, resolvedCount: 0 };
+  }
+
+  // Separate eventref keys from regular attributes (shared decoder).
+  const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
+    parseSpanEventRefs(attributes);
+
+  // Eventref missing the embedded eventId can't resolve. The reserved
+  // key is already stripped (kept out of cleanedAttrs) so the UI never
+  // sees the namespace; the preview under the plain IO key stays in place.
+  for (const attrKey of missingEventIdKeys) {
+    logger.warn(
+      { projectId, spanId, traceId, attrKey },
+      "eventref missing eventId — keeping preview value",
+    );
+  }
+
+  if (eventrefEntries.length === 0) {
+    // All ref keys were malformed JSON or missing eventId. Strip the
+    // reserved keys anyway so the UI never sees the namespace.
+    return { attributes: cleanedAttrs, resolvedCount: 0 };
+  }
+
+  // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
+  // The eventref carries the eventId, written by leanForProjection from
+  // event.id at lean time (see lean-for-projection.ts:120).
+  const aggregateId = traceId;
+
+  const resolvedAttrs = { ...cleanedAttrs };
+
+  // Parallelize independent event_log fetches for each eventref in this span.
+  const fieldResults = await Promise.allSettled(
+    eventrefEntries.map(async ({ attrKey, field, eventId }) => {
+      const fullValue = await blobStore.getFromEventLog({
+        eventId,
+        field,
+        tenantId: projectId,
+        aggregateType,
+        aggregateId,
+      });
+      return { attrKey, fullValue };
+    }),
+  );
+
+  let resolvedCount = 0;
+  for (const [idx, result] of fieldResults.entries()) {
+    if (result.status === "fulfilled") {
+      resolvedAttrs[result.value.attrKey] = result.value.fullValue;
+      resolvedCount++;
+    } else {
+      // Log and keep preview for this field; other fields are not affected.
+      logEventRefFailure({
+        reason: result.reason,
+        projectId,
+        traceId,
+        spanId,
+        attrKey: eventrefEntries[idx]?.attrKey ?? "unknown",
+        logger,
+      });
+    }
+  }
+
+  return { attributes: resolvedAttrs, resolvedCount };
 }
 
 /**
@@ -118,100 +283,26 @@ export async function resolveOffloadedTraces({
   // returned even when a span's resolver throws an unexpected uncaught error.
   const spanSettlements = await Promise.allSettled(
     normalizedSpans.map(async (span) => {
-      const attrs = span.spanAttributes;
-      if (!hasEventRefs(attrs)) {
-        return { span, resolvedCount: 0 };
-      }
+      const { attributes, resolvedCount } =
+        await resolveOffloadedSpanAttributes({
+          projectId,
+          traceId: span.traceId,
+          spanId: span.spanId,
+          attributes: span.spanAttributes,
+          blobStore,
+          logger,
+          aggregateType,
+        });
 
-      // Separate eventref keys from regular attributes (shared decoder).
-      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-        parseSpanEventRefs(attrs);
-
-      // Eventref missing the embedded eventId can't resolve. The reserved
-      // key is already stripped (kept out of cleanedAttrs) so the UI never
-      // sees the namespace; the preview under the plain IO key stays in place.
-      for (const attrKey of missingEventIdKeys) {
-        logger.warn(
-          {
-            projectId,
-            spanId: span.spanId,
-            traceId: span.traceId,
-            attrKey,
-          },
-          "eventref missing eventId — keeping preview value",
-        );
-      }
-
-      if (eventrefEntries.length === 0) {
-        // All ref keys were malformed JSON or missing eventId — strip
-        // reserved keys anyway so the UI never sees the namespace.
-        return {
-          span: { ...span, spanAttributes: cleanedAttrs },
-          resolvedCount: 0,
-        };
-      }
-
-      // ADR-022: aggregateId for the trace-processing pipeline IS the traceId.
-      // The eventref carries the eventId, written by leanForProjection from
-      // event.id at lean time — see lean-for-projection.ts:120.
-      const aggregateId = span.traceId;
-
-      const resolvedAttrs = { ...cleanedAttrs };
-
-      // Parallelize independent event_log fetches for each eventref in this span.
-      const fieldResults = await Promise.allSettled(
-        eventrefEntries.map(async ({ attrKey, field, eventId }) => {
-          const fullValue = await blobStore.getFromEventLog({
-            eventId,
-            field,
-            tenantId: projectId,
-            aggregateType,
-            aggregateId,
-          });
-          return { attrKey, fullValue };
-        }),
-      );
-
-      let resolvedCount = 0;
-      for (const [idx, result] of fieldResults.entries()) {
-        if (result.status === "fulfilled") {
-          resolvedAttrs[result.value.attrKey] = result.value.fullValue;
-          resolvedCount++;
-        } else {
-          // Log and keep preview for this field; other fields are not affected.
-          const err = result.reason;
-          const attrKey = eventrefEntries[idx]?.attrKey ?? "unknown";
-          if (
-            err instanceof BlobNotFoundError ||
-            err instanceof BlobFieldNotFoundError
-          ) {
-            logger.warn(
-              {
-                projectId,
-                spanId: span.spanId,
-                traceId: span.traceId,
-                attrKey,
-                error: (err as Error).message,
-              },
-              "event_log row not found for eventref — keeping preview value",
-            );
-          } else {
-            logger.warn(
-              {
-                projectId,
-                spanId: span.spanId,
-                traceId: span.traceId,
-                attrKey,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              "Failed to resolve eventref from event_log — keeping preview value",
-            );
-          }
-        }
-      }
-
+      // Identity, not a copy, when nothing was rewritten: callers of the
+      // no-eventref fast path above already rely on getting their own span
+      // objects back, and a span whose refs were all unusable is rewritten
+      // exactly once, inside the resolver.
       return {
-        span: { ...span, spanAttributes: resolvedAttrs },
+        span:
+          attributes === span.spanAttributes
+            ? span
+            : { ...span, spanAttributes: attributes },
         resolvedCount,
       };
     }),
