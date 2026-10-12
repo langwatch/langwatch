@@ -177,7 +177,7 @@ Feature: The worker runs declared background steps
   Scenario: A background step is done only once the queue work it sent has run
     Given a worker running a pending background step that sends a command
     When the step's run returns
-    Then the step waits until the command and the jobs it caused have run, 60 seconds unless it declares longer
+    Then the step waits until the command and the jobs it caused have run
     And only then is it recorded done, and its list is removed
 
   @integration
@@ -187,13 +187,29 @@ Feature: The worker runs declared background steps
     Then the first step's run fails naming that group
     And the second step finishes and is recorded done
 
+  # A large step's work drains for longer than any fixed wait: the wait (60 seconds unless the step
+  # declares longer) only runs out once no fewer jobs are outstanding for that long. The run's
+  # deadline still bounds the whole attempt.
+  @integration
+  Scenario: A step whose queue work keeps draining waits for it past its wait
+    Given a background step whose queue work takes longer than its wait to run
+    And fewer of its jobs are outstanding at each look
+    When the wait would have run out
+    Then the step keeps waiting, and returns once every job has run
+
   @integration
   @unit
-  Scenario: A step whose queue work does not run in time fails that attempt and stays resumable
-    Given a background step whose queue work has not all run when its wait runs out
-    When the wait runs out
+  Scenario: A step whose queue work stops draining fails that attempt and stays resumable
+    Given a background step whose queue work has not all run
+    When its wait passes with no fewer jobs outstanding
     Then the attempt fails naming the groups still waiting, and its list is removed
     And the step is pending again with its checkpoint kept, to retry after its backoff
+
+  @integration
+  Scenario: A step retried after a failed attempt resumes from its last saved checkpoint
+    Given a background step whose attempt saved a checkpoint and then failed
+    When the worker retries it after its backoff
+    Then the run resumes from the checkpoint the failed attempt saved
 
   @unit
   Scenario: The upgrade-step consumer leaves the queue's wake-up signal to the main consumer

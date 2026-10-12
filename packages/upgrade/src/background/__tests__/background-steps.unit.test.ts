@@ -810,7 +810,7 @@ describe("BackgroundStepsService queue work", () => {
   });
 
   describe("given a step whose queue work failed or did not run in time", () => {
-    /** @scenario "A step whose queue work does not run in time fails that attempt and stays resumable" */
+    /** @scenario "A step whose queue work stops draining fails that attempt and stays resumable" */
     it("is not recorded done: pending again with the refusal and its checkpoint kept", async () => {
       const ledger = new MemoryBackgroundLedger();
       const queue = new ListedRunsDouble();

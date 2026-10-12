@@ -5,12 +5,17 @@ import {
   GroupQueueConsumer,
   GroupQueueError,
   GroupQueueProducer,
+  HandBackGroupQueueError,
   NonRetryableGroupQueueError,
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
 
-import { classifyClickHouseError, ErrorCategory } from "../services/errorHandling.ts";
+import {
+  classifyClickHouseError,
+  ErrorCategory,
+  UnroutableQueuedJobError,
+} from "../services/errorHandling.ts";
 import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types.ts";
 
 export interface EventingGroupQueueFactoryOptions {
@@ -36,6 +41,16 @@ export async function refuseInvalidValueOnce<T>({
       `Queue ${queueName} refused a value that fails its schema: ${error.message}`,
       { cause: error },
     );
+  }
+}
+
+/** A job this worker has no handler for goes back to the queue without using an attempt. */
+export async function handBackUnroutable<T>({ run }: { run: () => Promise<T> }): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if (!(error instanceof UnroutableQueuedJobError)) throw error;
+    throw new HandBackGroupQueueError(error.message, { cause: error });
   }
 }
 
@@ -131,7 +146,9 @@ export function createEventingGroupQueueFactory({
     });
 
     const refuse = <T>(run: () => Promise<T>) =>
-      refuseInvalidValueOnce({ queueName: eventingDefinition.name, run });
+      handBackUnroutable({
+        run: () => refuseInvalidValueOnce({ queueName: eventingDefinition.name, run }),
+      });
     const producer = new GroupQueueProducer(queueDefinition, dependencies);
     let consumers: RunningGroupQueueConsumer<Record<string, unknown>>[] = [];
     // Claiming starts on `start()`, never at construction: a job claimed before

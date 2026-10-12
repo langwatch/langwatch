@@ -49,6 +49,17 @@ export class NonRetryableGroupQueueError extends Error {
   }
 }
 
+/**
+ * The worker has no handler for this job (mid rolling deploy, a newer release's kind): the queue
+ * hands it back unspent, no attempt used and no failure counted, so a worker that knows it runs it.
+ */
+export class HandBackGroupQueueError extends Error {
+  constructor(message: string, options: { cause?: unknown } = {}) {
+    super(message, options);
+    this.name = "HandBackGroupQueueError";
+  }
+}
+
 export function defaultFailureDecision(error: unknown): {
   retryable: boolean;
   retryAfterMs?: number;

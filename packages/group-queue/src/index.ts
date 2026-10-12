@@ -29,6 +29,7 @@ export {
 export {
   GroupQueueConfigurationError,
   GroupQueueError,
+  HandBackGroupQueueError,
   NonRetryableGroupQueueError,
 } from "./errors.ts";
 export type { MintStorageUri, ObjectStore } from "./storage.ts";

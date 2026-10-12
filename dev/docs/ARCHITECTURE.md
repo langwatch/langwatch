@@ -2304,7 +2304,9 @@ the type; a job with no type is still refused (`packages/eventing/specs/undeclar
 **A spent trace job dead-letters instead of blocking its group** (Alex, 2026-09-30): order within
 a trace is not load-bearing, so trace registrations set `onExhausted: "dead-letter"`; every other
 registration blocks. A queued job no registration or alias routes is dead-lettered once its
-attempts run out (Alex, 2026-10-10). The group queue owns and writes the dead-letter layout; ops lists, redrives
+attempts run out (Alex, 2026-10-10). A worker with no handler for a job hands it back without
+using an attempt or counting a group failure; handed back for over 30 minutes it spends attempts
+and surfaces at error (Alex, 2026-10-12, G1-F1). The group queue owns and writes the dead-letter layout; ops lists, redrives
 and discards it through the queue's exported helpers. A span that cannot be scrubbed is never
 stored unredacted, and disabled DLP never skips redaction: it fails and, on a trace pipeline,
 dead-letters, redrivable once analysis is back.

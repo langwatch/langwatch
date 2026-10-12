@@ -943,12 +943,12 @@ export class EventSourcing {
     };
   }
 
-  /** Refuses a job this worker cannot route: retried, then dead-lettered once spent. */
+  /** Refuses a job this worker cannot route; the queue hands it back unspent (Alex, 2026-10-12). */
   private rejectUnroutableJob(payload: Record<string, unknown>, queueName: string): never {
     const identity = EventSourcing.jobIdentity(payload);
-    logger.error(
+    logger.warn(
       identity,
-      "No handler registered for this job in this worker; rejecting it for retry rather than dropping it",
+      "No handler registered for this job in this worker; handing it back for a worker that has one",
     );
     throw new UnroutableQueuedJobError({
       queueName,

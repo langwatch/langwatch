@@ -135,6 +135,7 @@ describe("user's created fact", () => {
         dryRun: false,
         signal: never,
         afterUserId: null,
+        countedBefore: 0,
         onPageDone: async (page) => void saved.push(page),
       });
 
@@ -149,17 +150,38 @@ describe("user's created fact", () => {
     });
 
     /** @scenario "The seed step records a created fact for every existing account" */
-    it("resumes after its checkpoint and records nothing before it", async () => {
+    /** @scenario "A resumed seed step reports every account its attempts counted" */
+    it("resumes after its checkpoint, records nothing before it and counts on from it", async () => {
       const { app, lifecycle, ids } = await storedAccounts();
+      const saved: unknown[] = [];
 
-      await app.recordExistingCreatedFacts({
+      const report = await app.recordExistingCreatedFacts({
         dryRun: false,
         signal: never,
         afterUserId: ids[1] ?? null,
-        onPageDone: async () => undefined,
+        countedBefore: 2,
+        onPageDone: async (page) => void saved.push(page),
       });
 
       expect(lifecycle.recorded.map(({ data }) => data.userId)).toEqual([ids[2]]);
+      expect(saved).toEqual([{ afterUserId: ids[2], report: { users: 3 } }]);
+      expect(report).toEqual({ users: 3 });
+    });
+
+    /** @scenario "A resumed seed step reports every account its attempts counted" */
+    it("reports the count it resumed with when no account is left after the checkpoint", async () => {
+      const { app, lifecycle, ids } = await storedAccounts();
+
+      const report = await app.recordExistingCreatedFacts({
+        dryRun: false,
+        signal: never,
+        afterUserId: ids.at(-1) ?? null,
+        countedBefore: 3,
+        onPageDone: async () => undefined,
+      });
+
+      expect(lifecycle.recorded).toEqual([]);
+      expect(report).toEqual({ users: 3 });
     });
 
     /** @scenario "The seed step's dry run records nothing" */
@@ -171,6 +193,7 @@ describe("user's created fact", () => {
         dryRun: true,
         signal: never,
         afterUserId: null,
+        countedBefore: 0,
         onPageDone: async (page) => void saved.push(page),
       });
 
