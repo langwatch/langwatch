@@ -58,6 +58,10 @@ async function checkCookie(browser, member) {
     .goto(`${url}/${member.project ?? project}`, { timeout: 30_000, waitUntil: "domcontentloaded" })
     .catch(() => undefined);
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+  // The boot screen stays over the page until the app draws; judge the app, not the boot screen.
+  await page
+    .waitForSelector("#lw-boot", { state: "detached", timeout: 30_000 })
+    .catch(() => undefined);
   const at = new URL(page.url());
   const blank = (await page.innerText("body").catch(() => "")).trim() === "";
   let outcome = "neither";
