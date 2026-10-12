@@ -241,6 +241,7 @@ func (ex *Executor) ClearPendingMessages(agent AgentAdapter) {
 	for i, a := range ex.cfg.Agents {
 		if a == agent {
 			ex.pendingMessages[i] = nil
+			ex.pendingSeqs[i] = nil
 		}
 	}
 }

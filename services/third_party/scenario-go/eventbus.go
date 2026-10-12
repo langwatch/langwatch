@@ -10,17 +10,25 @@ import (
 // goroutine. Publishing never blocks and never drops: the queue is
 // unbounded, and drain waits for every queued event to be delivered (or for
 // the drain timeout).
+//
+// Delivery runs under the bus's context, which lives until the drain ends:
+// when the drain times out it is cancelled, so an in-flight post and its
+// retries stop and the events still queued are dropped instead of being
+// posted for minutes after the run returned.
 type eventBus struct {
 	mu      sync.Mutex
 	cond    sync.Cond
 	queue   []Event
 	closed  bool
 	done    chan struct{}
-	deliver func(Event)
+	deliver func(context.Context, Event)
+	ctx     context.Context
+	cancel  context.CancelFunc
 }
 
-func newEventBus(deliver func(Event)) *eventBus {
-	b := &eventBus{done: make(chan struct{}), deliver: deliver}
+func newEventBus(deliver func(context.Context, Event)) *eventBus {
+	ctx, cancel := context.WithCancel(context.Background())
+	b := &eventBus{done: make(chan struct{}), deliver: deliver, ctx: ctx, cancel: cancel}
 	b.cond.L = &b.mu
 	go b.loop()
 	return b
@@ -53,7 +61,9 @@ func (b *eventBus) loop() {
 		batch, b.queue = b.queue, batch[:0]
 		b.mu.Unlock()
 		for i := range batch {
-			b.deliver(batch[i])
+			if b.ctx.Err() == nil {
+				b.deliver(b.ctx, batch[i])
+			}
 			batch[i] = Event{}
 		}
 	}
@@ -68,10 +78,14 @@ func (b *eventBus) drain(timeout time.Duration) {
 	b.cond.Broadcast()
 	t := time.NewTimer(timeout)
 	defer t.Stop()
+	defer b.cancel()
 	select {
 	case <-b.done:
 	case <-t.C:
-		logger().Warn("timed out draining scenario events", "timeout", timeout.String())
+		b.mu.Lock()
+		left := len(b.queue)
+		b.mu.Unlock()
+		logger().Warn("timed out draining scenario events; dropping the undelivered ones", "timeout", timeout.String(), "queued", left)
 	}
 }
 
@@ -85,15 +99,15 @@ type eventDelivery struct {
 	lw       LangWatchConfig
 }
 
-func (d *eventDelivery) deliver(ev Event) {
+func (d *eventDelivery) deliver(ctx context.Context, ev Event) {
 	if d.listener != nil {
 		d.listener(ev)
 	}
 	if d.reporter == nil || !d.reporter.enabled() {
 		return
 	}
-	setURL := d.reporter.postWithRetry(context.Background(), ev)
+	setURL := d.reporter.postWithRetry(ctx, ev)
 	if ev.Type == EventRunStarted && setURL != "" {
-		d.alerts.watchMessage(context.Background(), d.setID, setURL, d.lw)
+		d.alerts.watchMessage(ctx, d.setID, setURL, d.lw)
 	}
 }

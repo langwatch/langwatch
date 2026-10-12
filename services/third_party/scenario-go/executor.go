@@ -38,9 +38,16 @@ type Executor struct {
 	pendingRoles    []AgentRole
 	pendingAgents   []bool
 	pendingMessages [][]Message
-	agentTimes      []time.Duration
-	result          *ScenarioResult
-	checkpoints     []checkpoint
+	// pendingSeqs holds, per queue, the broadcast sequence number of each
+	// pending message (same order as pendingMessages), so an agent call
+	// drops exactly what it delivered even when the queue was rolled back,
+	// cleared or appended to during the call.
+	pendingSeqs [][]uint64
+	// broadcastSeq numbers the broadcasts; the last one handed out.
+	broadcastSeq uint64
+	agentTimes   []time.Duration
+	result       *ScenarioResult
+	checkpoints  []checkpoint
 	// merged is set when the result already holds the checkpoint criteria.
 	merged      bool
 	pendingTurn *TurnHandle
@@ -71,6 +78,7 @@ func newExecutor(cfg ScenarioConfig, runID, batchID string, publish func(Event),
 		batchID:         batchID,
 		pendingAgents:   make([]bool, n),
 		pendingMessages: make([][]Message, n),
+		pendingSeqs:     make([][]uint64, n),
 		agentTimes:      make([]time.Duration, n),
 		pendingRoles:    make([]AgentRole, 0, len(turnRoleOrder)),
 	}

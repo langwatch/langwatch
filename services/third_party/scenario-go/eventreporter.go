@@ -22,6 +22,9 @@ const (
 	eventLogMaxChars  = 2000
 	eventsAPIPath     = "/api/scenario-events"
 	httpClientTimeout = 30 * time.Second
+	// eventAttemptTimeout bounds one delivery attempt, also with a caller
+	// HTTP client that sets no timeout of its own.
+	eventAttemptTimeout = httpClientTimeout
 )
 
 // eventReporter posts events to LangWatch.
@@ -113,14 +116,21 @@ func (e *httpStatusError) permanent() bool {
 
 // postWithRetry delivers one event, retrying transient failures, and returns
 // the set URL of a RUN_STARTED response. An event that keeps failing is
-// logged and dropped so it never blocks the events behind it.
+// logged and dropped so it never blocks the events behind it. Every retry
+// posts the same payload, so the event keeps its original timestamp.
+//
+// ctx is the delivery's lifetime (the event bus cancels it once its drain
+// gave up): when it ends, the attempt in flight and the retries stop.
 func (r *eventReporter) postWithRetry(ctx context.Context, ev Event) string {
 	var err error
 	for attempt := 1; attempt <= eventMaxAttempts; attempt++ {
 		var setURL string
-		setURL, err = r.post(ctx, ev)
+		setURL, err = r.attempt(ctx, ev)
 		if err == nil {
 			return setURL
+		}
+		if ctx.Err() != nil {
+			break
 		}
 		var se *httpStatusError
 		if errors.As(err, &se) && se.permanent() {
@@ -128,11 +138,26 @@ func (r *eventReporter) postWithRetry(ctx context.Context, ev Event) string {
 		}
 		if attempt < eventMaxAttempts {
 			logger().Warn("event delivery failed, retrying", "type", string(ev.Type), "attempt", attempt, "error", err.Error())
-			time.Sleep(r.retryBase << (attempt - 1))
+			t := time.NewTimer(r.retryBase << (attempt - 1))
+			select {
+			case <-t.C:
+			case <-ctx.Done():
+				t.Stop()
+			}
+			if ctx.Err() != nil {
+				break
+			}
 		}
 	}
 	logger().Error("dropping event after failed delivery", "type", string(ev.Type), "scenarioRunId", ev.ScenarioRunID, "error", err.Error(), "event", redactedEventSummary(ev.Payload))
 	return ""
+}
+
+// attempt is one post, bounded by eventAttemptTimeout.
+func (r *eventReporter) attempt(ctx context.Context, ev Event) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, eventAttemptTimeout)
+	defer cancel()
+	return r.post(ctx, ev)
 }
 
 func (r *eventReporter) post(ctx context.Context, ev Event) (string, error) {

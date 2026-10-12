@@ -19,6 +19,15 @@ const threadIDKey = "langwatch.thread.id"
 // without bound.
 const maxUnthreadedSpans = 10_000
 
+// maxIdleTraces bounds the traces whose process-span ids are kept after all
+// their spans ended without any tying them to a thread (traces of
+// unrelated instrumentation, which ClearThread never releases). The oldest
+// past the bound are forgotten.
+const maxIdleTraces = 4096
+
+// idleTracesPerShard is maxIdleTraces split over the trace shards.
+const idleTracesPerShard = maxIdleTraces / collectorShards
+
 // SpanCollector is a span processor that keeps ended spans per scenario
 // thread for the judge and the state views. A span belongs to a thread when
 // it or an ancestor carries langwatch.thread.id; the thread is resolved when
@@ -54,8 +63,29 @@ type spanShard struct {
 // traceShard holds every span id started, by trace id.
 type traceShard struct {
 	mu           sync.Mutex
-	processSpans map[trace.TraceID]map[trace.SpanID]struct{}
+	processSpans map[trace.TraceID]*processTrace
+	// idle lists, oldest first, the traces that went idle (see
+	// processTrace.idle); past idleTracesPerShard the oldest are forgotten.
+	idle []trace.TraceID
 }
+
+// processTrace is what the collector keeps of a trace this process started
+// spans in.
+type processTrace struct {
+	ids map[trace.SpanID]struct{}
+	// live counts the started spans not ended yet.
+	live int
+	// owned is set once a span of the trace was tied to a thread or a
+	// fetcher claimed it: ClearThread releases the trace then, it never
+	// goes idle.
+	owned bool
+	// queued is set while the trace is listed in traceShard.idle.
+	queued bool
+}
+
+// idle reports whether nothing will release the trace: none of its spans
+// is live and no thread owns it.
+func (t *processTrace) idle() bool { return t.live == 0 && !t.owned }
 
 // threadShard holds what is kept per thread.
 type threadShard struct {
@@ -145,24 +175,69 @@ func (c *SpanCollector) keep(thread string, s sdktrace.ReadOnlySpan) {
 func (c *SpanCollector) OnStart(_ context.Context, s sdktrace.ReadWriteSpan) {
 	sc := s.SpanContext()
 	ts := c.traceShard(sc.TraceID())
-	ts.mu.Lock()
-	if ts.processSpans == nil {
-		ts.processSpans = map[trace.TraceID]map[trace.SpanID]struct{}{}
-	}
-	ids := ts.processSpans[sc.TraceID()]
-	if ids == nil {
-		ids = map[trace.SpanID]struct{}{}
-		ts.processSpans[sc.TraceID()] = ids
-	}
-	ids[sc.SpanID()] = struct{}{}
-	ts.mu.Unlock()
-
 	thread := threadAttribute(s)
 	if thread == "" {
 		thread = c.threadOf(s.Parent().SpanID())
 	}
+
+	ts.mu.Lock()
+	if ts.processSpans == nil {
+		ts.processSpans = map[trace.TraceID]*processTrace{}
+	}
+	pt := ts.processSpans[sc.TraceID()]
+	if pt == nil {
+		pt = &processTrace{ids: map[trace.SpanID]struct{}{}}
+		ts.processSpans[sc.TraceID()] = pt
+	}
+	if _, dup := pt.ids[sc.SpanID()]; !dup {
+		pt.ids[sc.SpanID()] = struct{}{}
+		pt.live++
+	}
+	if thread != "" {
+		pt.owned = true
+	}
+	ts.mu.Unlock()
+
 	if thread != "" {
 		c.tie(sc.SpanID(), thread)
+	}
+}
+
+// processSpanEnded records that a span this process started ended, tied to
+// a thread or not. A trace left idle (nothing live, no thread owning it) is
+// listed for eviction, so traces of unrelated instrumentation do not grow
+// the collector without bound.
+func (c *SpanCollector) processSpanEnded(traceID trace.TraceID, spanID trace.SpanID, threaded bool) {
+	ts := c.traceShard(traceID)
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	pt := ts.processSpans[traceID]
+	if pt == nil {
+		return
+	}
+	if _, ok := pt.ids[spanID]; !ok {
+		return // a span added after the fact, never started here
+	}
+	if threaded {
+		pt.owned = true
+	}
+	if pt.live > 0 {
+		pt.live--
+	}
+	if !pt.idle() || pt.queued {
+		return
+	}
+	pt.queued = true
+	ts.idle = append(ts.idle, traceID)
+	for len(ts.idle) > idleTracesPerShard {
+		oldest := ts.idle[0]
+		ts.idle = ts.idle[1:]
+		if old := ts.processSpans[oldest]; old != nil {
+			old.queued = false
+			if old.idle() {
+				delete(ts.processSpans, oldest)
+			}
+		}
 	}
 }
 
@@ -176,6 +251,7 @@ func (c *SpanCollector) OnEnd(s sdktrace.ReadOnlySpan) {
 	if thread == "" {
 		thread = c.threadOf(s.Parent().SpanID())
 	}
+	c.processSpanEnded(s.SpanContext().TraceID(), id, thread != "")
 	if thread == "" {
 		c.unthreadedMu.Lock()
 		if len(c.unthreaded) >= maxUnthreadedSpans {
@@ -217,7 +293,7 @@ func (c *SpanCollector) Shutdown(context.Context) error {
 	for i := range c.traces {
 		sh := &c.traces[i]
 		sh.mu.Lock()
-		sh.processSpans = nil
+		sh.processSpans, sh.idle = nil, nil
 		sh.mu.Unlock()
 	}
 	for i := range c.threads {
@@ -277,7 +353,6 @@ func (c *SpanCollector) adoptUnthreaded() {
 func (c *SpanCollector) ClaimTraces(threadID string, traceIDs []trace.TraceID) {
 	th := c.threadShard(threadID)
 	th.mu.Lock()
-	defer th.mu.Unlock()
 	if th.claims == nil {
 		th.claims = map[string]map[trace.TraceID]struct{}{}
 	}
@@ -289,6 +364,16 @@ func (c *SpanCollector) ClaimTraces(threadID string, traceIDs []trace.TraceID) {
 	for _, id := range traceIDs {
 		owned[id] = struct{}{}
 	}
+	th.mu.Unlock()
+	// A claimed trace is released by ClearThread, never evicted as idle.
+	for _, id := range traceIDs {
+		ts := c.traceShard(id)
+		ts.mu.Lock()
+		if pt := ts.processSpans[id]; pt != nil {
+			pt.owned = true
+		}
+		ts.mu.Unlock()
+	}
 }
 
 // IsProcessSpan reports whether this process started the span itself.
@@ -296,7 +381,11 @@ func (c *SpanCollector) IsProcessSpan(traceID trace.TraceID, spanID trace.SpanID
 	ts := c.traceShard(traceID)
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
-	_, ok := ts.processSpans[traceID][spanID]
+	pt := ts.processSpans[traceID]
+	if pt == nil {
+		return false
+	}
+	_, ok := pt.ids[spanID]
 	return ok
 }
 

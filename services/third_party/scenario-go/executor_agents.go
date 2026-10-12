@@ -43,6 +43,9 @@ func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req 
 	// Clipped, so an agent appending to it cannot write into the queue's
 	// spare capacity, where the next broadcast lands.
 	newMessages := slices.Clip(ex.pendingMessages[idx])
+	// Every message broadcast so far has a sequence number up to delivered;
+	// later broadcasts get higher ones.
+	delivered := ex.broadcastSeq
 	ex.mu.Unlock()
 
 	var stream *MessageStream
@@ -72,13 +75,7 @@ func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req 
 
 	ex.mu.Lock()
 	ex.agentTimes[idx] += elapsed
-	// Drop the messages the agent received; later broadcasts stay queued.
-	if q := ex.pendingMessages[idx]; len(q) >= len(newMessages) {
-		ex.pendingMessages[idx] = q[len(newMessages):]
-		if len(ex.pendingMessages[idx]) == 0 {
-			ex.pendingMessages[idx] = nil
-		}
-	}
+	ex.dropDeliveredLocked(idx, delivered)
 	ex.mu.Unlock()
 
 	if err != nil {
@@ -177,20 +174,43 @@ func (ex *Executor) addMessage(m Message, id string, from int, stream *MessageSt
 func (ex *Executor) addEncodedMessage(m Message, id string, from int, stream *MessageStream, model []byte) Message {
 	stored := ex.emitter.messageAdded(func() (Message, int) { return ex.state.addEncoded(m, id, model) }, stream)
 	ex.mu.Lock()
+	ex.broadcastSeq++
+	seq := ex.broadcastSeq
 	for i := range ex.pendingMessages {
 		if i == from {
 			continue
 		}
-		q := ex.pendingMessages[i]
+		q, seqs := ex.pendingMessages[i], ex.pendingSeqs[i]
 		if q == nil {
 			// A turn usually queues one or two messages per agent (the judge
 			// hears both the user and the agent): size for two at once.
 			q = make([]Message, 0, 2)
+			seqs = make([]uint64, 0, 2)
 		}
 		ex.pendingMessages[i] = append(q, stored)
+		ex.pendingSeqs[i] = append(seqs, seq)
 	}
 	ex.mu.Unlock()
 	return stored
+}
+
+// dropDeliveredLocked drops from agent idx's queue the messages it was
+// handed, those broadcast up to sequence number delivered. The queue is in
+// broadcast order, and what was rolled back or cleared during the call is
+// already gone, so they are its leading entries with a number up to
+// delivered; later broadcasts stay queued.
+func (ex *Executor) dropDeliveredLocked(idx int, delivered uint64) {
+	seqs := ex.pendingSeqs[idx]
+	n := 0
+	for n < len(seqs) && seqs[n] <= delivered {
+		n++
+	}
+	if n == len(seqs) {
+		ex.pendingMessages[idx], ex.pendingSeqs[idx] = nil, nil
+		return
+	}
+	ex.pendingMessages[idx] = ex.pendingMessages[idx][n:]
+	ex.pendingSeqs[idx] = seqs[n:]
 }
 
 // onRollback drops removed messages from the pending queues and reconciles
@@ -198,13 +218,15 @@ func (ex *Executor) addEncodedMessage(m Message, id string, from int, stream *Me
 func (ex *Executor) onRollback(removed map[string]bool) {
 	ex.mu.Lock()
 	for i, q := range ex.pendingMessages {
-		kept := q[:0:0]
-		for _, m := range q {
+		seqs := ex.pendingSeqs[i]
+		kept, keptSeqs := q[:0:0], seqs[:0:0]
+		for j, m := range q {
 			if !removed[m.ID] {
 				kept = append(kept, m)
+				keptSeqs = append(keptSeqs, seqs[j])
 			}
 		}
-		ex.pendingMessages[i] = kept
+		ex.pendingMessages[i], ex.pendingSeqs[i] = kept, keptSeqs
 	}
 	ex.mu.Unlock()
 	ex.emitter.rolledBack()
