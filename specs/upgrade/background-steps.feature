@@ -173,6 +173,23 @@ Feature: The worker runs declared background steps
     Then it runs the command and then the job the command caused
     And it takes no job from the backlog
 
+  # A run's list stays open an hour past its last staged job, not an hour past its opening, so a
+  # step that runs for hours keeps its follow-on jobs ahead of the backlog.
+  @integration
+  Scenario: A listed run's follow-on jobs run ahead of a backlog for as long as the run lasts
+    Given a job queue holding a large backlog of older work
+    And a listed run whose commands each cause a chain of more jobs
+    And the run has lasted as long as its list was first opened for
+    When the worker's upgrade-step consumer runs
+    Then every command and every job they caused runs
+    And it takes no job from the backlog
+
+  @integration
+  Scenario: Two listed runs at once each have their jobs run in turn
+    Given a listed run with thousands of jobs waiting
+    When a second listed run sends a command whose handling sends one more job
+    Then the second run's command and the job it caused run while most of the first run's jobs still wait
+
   @integration
   @unit
   Scenario: A background step is done only once the queue work it sent has run
@@ -236,6 +253,12 @@ Feature: The worker runs declared background steps
     Given the worker runs the upgrade-step consumer beside its main consumer
     When the upgrade-step consumer waits for listed work
     Then it claims from each open list in turn, polling, and never takes or clears the queue's shared wake-up signal
+
+  @unit
+  Scenario: The upgrade-step consumer claims again as soon as one of its own jobs finishes
+    Given the upgrade-step consumer has every slot busy with its own jobs
+    When one of those jobs finishes
+    Then it claims its next job at once instead of waiting for its next poll
 
   @unit
   Scenario: Independent background steps run side by side, a few at a time

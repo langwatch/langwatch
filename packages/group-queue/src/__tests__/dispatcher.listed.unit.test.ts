@@ -50,4 +50,52 @@ describe("GroupQueueDispatcher with an allow-list", () => {
       }
     });
   });
+
+  describe("given every slot is busy with its own job", () => {
+    /** @scenario "The upgrade-step consumer claims again as soon as one of its own jobs finishes" */
+    it("claims its next job when that job finishes, not at its next poll", async () => {
+      let claimed = 0;
+      const dispatchBatch = vi.fn(async (): Promise<DispatchResult[]> => {
+        if (claimed >= 3) return [];
+        claimed += 1;
+        return [
+          {
+            stagedJobId: `job-${claimed}`,
+            groupId: `tenant/listed/${claimed}`,
+            jobDataJson: "{}",
+            originalScore: 0,
+            claimToken: `token-${claimed}`,
+          },
+        ];
+      });
+      const ran: string[] = [];
+      const dispatcher = new GroupQueueDispatcher({
+        scripts: {
+          getSignalKey: () => "{test}:gq:signal",
+          getEarliestReadyScore: async () => null,
+          dispatchBatch,
+        },
+        processingQueue: fastq.promise(async (job: DispatchResult) => {
+          await new Promise((resolve) => setTimeout(resolve, 60));
+          ran.push(job.stagedJobId);
+        }, 1),
+        blockingConnection: { brpop: vi.fn(async () => null), del: vi.fn(async () => 0) },
+        queueName: "{test}",
+        globalConcurrency: 1,
+        activeTtlSec: 300,
+        // A one-second poll: three 60 ms jobs take about three seconds if each waits for one.
+        signalTimeoutSec: 1,
+        logger: createTestLogger().logger,
+        listedGroupsKeys: async () => ["{test}:gq:listed:a"],
+      });
+
+      dispatcher.start();
+      await vi.waitFor(() => expect(ran).toEqual(["job-1", "job-2", "job-3"]), {
+        timeout: 2_500,
+        interval: 10,
+      });
+      dispatcher.requestShutdown();
+      await dispatcher.waitUntilStopped();
+    });
+  });
 });

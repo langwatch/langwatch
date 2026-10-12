@@ -1813,10 +1813,12 @@ local blockedKey = KEYS[4]
 local baselineKey = KEYS[5]
 local registrationsKey = KEYS[6]
 local liveKey = KEYS[7]
+local openListsKey = KEYS[8]
 local keyPrefix = ARGV[1]
 local ttlSec = tonumber(ARGV[2])
 local scoreBase = tonumber(ARGV[3])
-for index = 4, #ARGV do
+local openUntilMs = tonumber(ARGV[4])
+for index = 5, #ARGV do
   local groupId = ARGV[index]
   redis.call("SADD", targetKey, groupId)
   -- The groups that may still hold work, pruned as they settle, so pacing counts only those.
@@ -1824,7 +1826,7 @@ for index = 4, #ARGV do
   -- Registration puts a target ahead of the dispatch loop's wall-clock
   -- rotation scores. This also re-activates a target when an older worker
   -- stages it without knowing the preflight protocol.
-  redis.call("ZADD", candidatesKey, scoreBase + index - 3, groupId)
+  redis.call("ZADD", candidatesKey, scoreBase + index - 4, groupId)
   -- HSETNX: only the first registration may say what was already wedged here.
   redis.call("HSETNX", baselineKey, groupId, gqPreflightGroupState(keyPrefix, blockedKey, groupId))
 end
@@ -1836,9 +1838,12 @@ redis.call("EXPIRE", candidatesKey, ttlSec)
 redis.call("EXPIRE", baselineKey, ttlSec)
 redis.call("EXPIRE", registrationsKey, ttlSec)
 redis.call("EXPIRE", liveKey, ttlSec)
+-- An open list lapses with its groups, an hour after its last registration, not its opening;
+-- XX never reopens a closed list, nor lists a preflight's allow-list.
+redis.call("ZADD", openListsKey, "XX", "GT", openUntilMs, targetKey)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
-return #ARGV - 3
+return #ARGV - 4
 `;
 const registerPreflightTargetsScript = new CachedLuaScript(REGISTER_PREFLIGHT_TARGETS_LUA);
 
@@ -2831,7 +2836,7 @@ export class GroupStagingScripts {
     for (let start = 0; start < groupIds.length; start += PREFLIGHT_GROUPS_PER_CALL) {
       await registerPreflightTargetsScript.run(
         this.redis,
-        7,
+        8,
         targetKey,
         `${targetKey}:candidates`,
         this.getSignalKey(),
@@ -2839,15 +2844,17 @@ export class GroupStagingScripts {
         `${targetKey}:baseline`,
         `${targetKey}:registrations`,
         `${targetKey}:live`,
+        this.openGroupListsKey(),
         this.keyPrefix,
         String(LISTED_GROUPS_TTL_SEC),
         String(start),
+        String(nowInstant().epochMilliseconds + LISTED_GROUPS_TTL_SEC * 1000),
         ...groupIds.slice(start, start + PREFLIGHT_GROUPS_PER_CALL),
       );
     }
   }
 
-  /** Opens a list for a `dispatchListed` consumer; it lapses with its groups' own expiry. */
+  /** Opens a list for a `dispatchListed` consumer; every registration keeps it open. */
   async openGroupList({ listKey, nowMs }: { listKey: string; nowMs: number }): Promise<void> {
     await this.redis.zadd(this.openGroupListsKey(), nowMs + LISTED_GROUPS_TTL_SEC * 1000, listKey);
   }

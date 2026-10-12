@@ -6,7 +6,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import IORedis, { type Redis } from "ioredis";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueContext, GroupQueueContextMetadata } from "../contracts.ts";
 import { GroupQueueError, NonRetryableGroupQueueError } from "../errors.ts";
@@ -144,6 +144,87 @@ describe("GroupQueueProcessor - listed runs beside a backlog", () => {
       expect(await redis.zcard(`${queueName}:gq:ready`)).toBeGreaterThanOrEqual(BACKLOG);
       expect(await redis.keys(`${queueName}:gq:listed*`)).toEqual([]);
     }, 30_000);
+  });
+
+  describe("given a run whose follow-on jobs are staged after its list's open entry would lapse", () => {
+    /** @scenario "A listed run's follow-on jobs run ahead of a backlog for as long as the run lasts" */
+    it("stays open while its jobs register follow-on jobs, and runs every one ahead of the backlog", async () => {
+      const sender = await withBacklog();
+      await createQueue({ listed: true }).waitUntilReady();
+      const name = "upgrade-step:user:record-created-facts:run-2";
+
+      const report = await sender.runListedWork({
+        name,
+        timeoutMs: 3_000,
+        work: async () => {
+          await sender.sendBatch(
+            Array.from({ length: 10 }, (_, index) => ({
+              id: `command-${index}`,
+              groupId: `user-${index}/command/${index}`,
+              takesMs: 100,
+              chain: 4,
+            })),
+          );
+          await vi.waitFor(() => expect(processed).toHaveLength(10), { timeout: 10_000 });
+          // As if the run opened its list an hour ago: only its follow-ons can keep it open now.
+          const listKey = `${queueName}:gq:listed:${name}`;
+          await redis.zadd(`${queueName}:gq:listed`, Date.now() + 150, listKey);
+          return { sent: 10 };
+        },
+      });
+
+      expect(report).toEqual({ sent: 10 });
+      expect(processed).toHaveLength(10 * 5);
+      expect(processed.filter((id) => id.startsWith("backlog-"))).toEqual([]);
+      expect(await redis.zcard(`${queueName}:gq:ready`)).toBeGreaterThanOrEqual(BACKLOG);
+    }, 30_000);
+  });
+
+  describe("given a run with a large amount of work open when a second run starts", () => {
+    /** @scenario "Two listed runs at once each have their jobs run in turn" */
+    it("runs the second run's command and the job it caused while the first run's work still waits", async () => {
+      const sender = await withBacklog();
+      await createQueue({ listed: true }).waitUntilReady();
+      const busyJobs = 3_000;
+      let busyRunWhenSecondReturned = -1;
+      const busy = () => processed.filter((id) => id.startsWith("busy-")).length;
+
+      let busySent: () => void = () => {};
+      const sent = new Promise<void>((resolve) => {
+        busySent = resolve;
+      });
+
+      await Promise.all([
+        sender.runListedWork({
+          name: "upgrade-step:a:busy",
+          timeoutMs: 20_000,
+          work: async () => {
+            await sender.sendBatch(
+              Array.from({ length: busyJobs }, (_, index) => ({
+                id: `busy-${index}`,
+                groupId: `busy-${index}/work`,
+                takesMs: 100,
+              })),
+            );
+            busySent();
+          },
+        }),
+        sent.then(async () => {
+          await sender.runListedWork({
+            name: "upgrade-step:b:second",
+            timeoutMs: 20_000,
+            work: () =>
+              sender.send({ id: "command", groupId: "user-1/command/b", followUp: "reaction" }),
+          });
+          busyRunWhenSecondReturned = busy();
+        }),
+      ]);
+
+      expect(processed).toEqual(expect.arrayContaining(["command", "reaction"]));
+      expect(busyRunWhenSecondReturned).toBeGreaterThanOrEqual(0);
+      expect(busyRunWhenSecondReturned).toBeLessThan(busyJobs / 2);
+      expect(busy()).toBe(busyJobs);
+    }, 60_000);
   });
 
   describe("given two runs at once, one of whose commands fails", () => {
