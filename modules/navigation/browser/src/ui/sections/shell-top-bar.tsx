@@ -60,7 +60,8 @@ export function ShellTopBar({ state, shouldShowProductCluster }: ShellTopBarProp
         <>
           {showDevelopmentIndicator && <DevBadge label={host.deployment().devIndicatorLabel} />}
           {accountMenu?.headerBanner}
-          {state.project && commandBar?.trigger}
+          {/* Home already has its own search and the sidebar's Quick Search. */}
+          {state.project && state.currentRoute?.title !== "Home" && commandBar?.trigger}
           <AppHeaderUserMenu />
         </>
       }

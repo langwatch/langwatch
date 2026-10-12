@@ -38,7 +38,16 @@ afterEach(() => {
   cleanup();
 });
 
-function renderTopBar({ project }: { project: typeof PROJECT | undefined }) {
+const HOME = { path: "/[project]", title: "Home" };
+const TRACES = { path: "/[project]/traces", title: "Traces" };
+
+function renderTopBar({
+  project,
+  currentRoute = TRACES,
+}: {
+  project: typeof PROJECT | undefined;
+  currentRoute?: { path: string; title: string };
+}) {
   renderWithDesignSystem(
     <NavigationHostProvider
       value={StubNavigationHost.create({
@@ -53,7 +62,7 @@ function renderTopBar({ project }: { project: typeof PROJECT | undefined }) {
           status: "ready",
           user: USER,
           project,
-          currentRoute: undefined,
+          currentRoute,
           activeProductId: null,
           isSettingsRoute: false,
           seatRefusal: null,
@@ -79,6 +88,13 @@ describe("the shell top bar's Search pill", () => {
 
     expect(open).toHaveBeenCalledOnce();
     withdraw();
+  });
+
+  /** @scenario The Home page shows no Search pill in the top bar */
+  it("is not drawn on the Home page", () => {
+    renderTopBar({ project: PROJECT, currentRoute: HOME });
+
+    expect(screen.queryByRole("button", { name: "Open command bar" })).toBeNull();
   });
 
   it("is not drawn without a project in scope", () => {

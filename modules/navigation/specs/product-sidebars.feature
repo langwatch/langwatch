@@ -27,8 +27,8 @@ Feature: Product sidebars
   to the top only when that entry would otherwise be out of view. A page
   near the start of the menu opens with the first group heading on screen.
   Quick Search stays in place regardless of menu scroll. On a project page
-  the top bar also carries a Search pill with the shortcut hint; Cmd/Ctrl+K
-  also works on full-screen tools.
+  other than Home, which has its own search, the top bar also carries a Search
+  pill with the shortcut hint; Cmd/Ctrl+K also works on full-screen tools.
 
   @integration
   Scenario: Quick Search sits first and opens the command bar
@@ -41,6 +41,11 @@ Feature: Product sidebars
     Given a project page
     When I use the Search pill in the top bar
     Then the command bar opens
+
+  @integration
+  Scenario: The Home page shows no Search pill in the top bar
+    Given the project's Home page
+    Then the top bar shows no Search pill
 
   @integration
   Scenario: The LLM Ops sidebar keeps the project sections without the Govern group

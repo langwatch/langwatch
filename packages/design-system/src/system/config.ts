@@ -638,10 +638,14 @@ export const designSystemConfig = defineConfig({
           devBadge: { value: "{colors.blackAlpha.600}" },
         },
         // Guided onboarding takeover: the warm glow it stands on, its card shadows and the white-on
-        // pick-order badge (4.5:1). Fixed values, the same on both grounds, as the brand cut them.
+        // pick-order badge (4.5:1). Fixed brand values; the two wide glows deepen on a dark ground.
         takeover: {
-          glowPeach: { value: "rgba(255, 232, 204, 0.9)" },
-          glowApricot: { value: "rgba(253, 214, 166, 0.75)" },
+          glowPeach: {
+            value: { _light: "rgba(255, 232, 204, 0.9)", _dark: "rgba(101, 43, 25, 0.9)" },
+          },
+          glowApricot: {
+            value: { _light: "rgba(253, 214, 166, 0.75)", _dark: "rgba(123, 52, 30, 0.75)" },
+          },
           glowOrange: { value: "rgba(237, 137, 38, 0.10)" },
           glowSoft: { value: "rgba(237, 137, 38, 0.06)" },
           glowFaint: { value: "rgba(237, 137, 38, 0.02)" },
