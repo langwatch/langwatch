@@ -130,6 +130,11 @@ async function checkCookie(browser, member) {
       detail: "the boot screen never left within 30 s",
     });
   }
+  // Releases before the boot screen's fix drop it when the theme's <style> lands, a moment before
+  // the page itself: give the page the same 30 s to draw.
+  await page
+    .waitForFunction(() => document.body.innerText.trim() !== "", undefined, { timeout: 30_000 })
+    .catch(() => undefined);
   const at = new URL(page.url());
   const blank = (await page.innerText("body").catch(() => "")).trim() === "";
   let outcome = "neither";
