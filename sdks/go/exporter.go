@@ -7,8 +7,9 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/langwatch/langwatch/sdks/go/internal/otlpjson"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/langwatch/langwatch/sdks/go/internal/otlpjson"
 )
 
 const (

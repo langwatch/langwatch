@@ -177,12 +177,14 @@ func spanKind(kind trace.SpanKind) int {
 }
 
 func spanStatus(s sdktrace.Status) status {
-	code := statusUnset
+	var code int
 	switch s.Code {
 	case codes.Ok:
 		code = statusOk
 	case codes.Error:
 		code = statusError
+	default:
+		code = statusUnset
 	}
 	return status{Code: code, Message: s.Description}
 }
@@ -215,44 +217,31 @@ func value(v attribute.Value) anyValue {
 		s := base64.StdEncoding.EncodeToString(v.AsByteSlice())
 		return anyValue{StringValue: &s}
 	case attribute.BOOLSLICE:
-		bs := v.AsBoolSlice()
-		vals := make([]anyValue, len(bs))
-		for i := range bs {
-			vals[i] = anyValue{BoolValue: &bs[i]}
-		}
-		return anyValue{ArrayValue: &arrayValue{Values: vals}}
+		return array(v.AsBoolSlice(), func(b *bool) anyValue { return anyValue{BoolValue: b} })
 	case attribute.INT64SLICE:
-		is := v.AsInt64Slice()
-		vals := make([]anyValue, len(is))
-		for i, n := range is {
-			vals[i] = intValue(n)
-		}
-		return anyValue{ArrayValue: &arrayValue{Values: vals}}
+		return array(v.AsInt64Slice(), func(n *int64) anyValue { return intValue(*n) })
 	case attribute.FLOAT64SLICE:
-		fs := v.AsFloat64Slice()
-		vals := make([]anyValue, len(fs))
-		for i, f := range fs {
-			d := double(f)
-			vals[i] = anyValue{DoubleValue: &d}
-		}
-		return anyValue{ArrayValue: &arrayValue{Values: vals}}
+		return array(v.AsFloat64Slice(), func(f *float64) anyValue {
+			d := double(*f)
+			return anyValue{DoubleValue: &d}
+		})
 	case attribute.STRINGSLICE:
-		ss := v.AsStringSlice()
-		vals := make([]anyValue, len(ss))
-		for i := range ss {
-			vals[i] = anyValue{StringValue: &ss[i]}
-		}
-		return anyValue{ArrayValue: &arrayValue{Values: vals}}
+		return array(v.AsStringSlice(), func(s *string) anyValue { return anyValue{StringValue: s} })
 	case attribute.SLICE:
-		items := v.AsSlice()
-		vals := make([]anyValue, len(items))
-		for i, item := range items {
-			vals[i] = value(item)
-		}
-		return anyValue{ArrayValue: &arrayValue{Values: vals}}
+		return array(v.AsSlice(), func(item *attribute.Value) anyValue { return value(*item) })
 	default:
 		return anyValue{}
 	}
+}
+
+// array converts each element of items, which the caller owns, to an
+// ArrayValue.
+func array[T any](items []T, conv func(*T) anyValue) anyValue {
+	vals := make([]anyValue, len(items))
+	for i := range items {
+		vals[i] = conv(&items[i])
+	}
+	return anyValue{ArrayValue: &arrayValue{Values: vals}}
 }
 
 // intValue encodes an int64 as OTLP/JSON's decimal string.
