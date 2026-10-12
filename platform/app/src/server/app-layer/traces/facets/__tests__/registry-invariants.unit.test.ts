@@ -144,10 +144,11 @@ describe("FACET_REGISTRY shape", () => {
 
     it("flattens through the keys subcolumn, never the Map itself", () => {
       // `Events.Attributes` is Array(Map(LowCardinality(String), String)), so
-      // it takes a double arrayJoin: outer for events, inner for the keys of
-      // each event's map. Without both, distinct keys would collapse onto the
-      // first event only. Reading the Map to list keys materialises the String values beside
-      // them, which is MEMORY_LIMIT_EXCEEDED on a tenant with busy events.
+      // it takes a double arrayJoin: the inner one flattens the array of
+      // events, the outer one each event's array of keys. Without both,
+      // distinct keys would collapse onto the first event only. Reading the
+      // Map to list keys materialises the String values beside them, which
+      // is MEMORY_LIMIT_EXCEEDED on a tenant with busy events.
       // `.keys` is Array(Array(LowCardinality(String))) and never opens the
       // values column. Same invariant span-attribute-keys and metadata-keys
       // already hold for their flat Maps. Behavioural coverage lives in
