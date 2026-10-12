@@ -222,4 +222,34 @@ describe("GroupQueueProcessor - listed runs beside a backlog", () => {
       expect(await redis.keys(`${queueName}:gq:listed*`)).toEqual([]);
     });
   });
+
+  describe("given a run that sends many pages, waiting for room for its own jobs", () => {
+    /** @scenario "A listed run waits for room counting only its own jobs" */
+    it("never has more than a page and the bound of its own jobs outstanding, whatever the backlog", async () => {
+      const sender = await withBacklog();
+      await createQueue({ listed: true }).waitUntilReady();
+      const pages = 6;
+      const pageSize = 100;
+      let peak = 0;
+
+      await sender.runListedWork({
+        name: "upgrade-step:user:record-created-facts:run-1",
+        timeoutMs: 20_000,
+        work: async (list) => {
+          for (let page = 0; page < pages; page++) {
+            for (let row = 0; row < pageSize; row++) {
+              const id = `row-${page}-${row}`;
+              await sender.send({ id, groupId: `tenant-9/command/${id}` });
+              peak = Math.max(peak, page * pageSize + row + 1 - processed.length);
+            }
+            await list?.waitForRoom({ maxOutstanding: pageSize });
+          }
+        },
+      });
+
+      expect(peak).toBeLessThanOrEqual(2 * pageSize);
+      expect(processed).toHaveLength(pages * pageSize);
+      expect(await redis.zcard(`${queueName}:gq:ready`)).toBeGreaterThanOrEqual(BACKLOG);
+    }, 60_000);
+  });
 });

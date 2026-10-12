@@ -60,8 +60,8 @@ export interface SystemMigration {
   readonly migratedIsSteady?: boolean;
 
   /**
-   * Pacing: a pass starts no new page of tenants while the group queues hold more waiting jobs than
-   * this, and an unreadable count reads as over it (Alex, 2026-10-12). Omitted means unpaced.
+   * Pacing: a pass starts no new page of tenants while more than this many of its own jobs wait or
+   * run; without a queue list, of the whole queue's (Alex, 2026-10-12). Omitted means unpaced.
    */
   readonly pauseWhileQueuedAbove?: number;
 

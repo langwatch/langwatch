@@ -29,6 +29,13 @@ const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
  *  large import from holding the rest of the fleet behind it. */
 const DEFAULT_TENANT_CONCURRENCY = 25;
 const DEFAULT_PACING_WAIT_MS = 5_000;
+/** How long a paced pass's own queue work may stand still before the pass stops waiting on it. */
+const PASS_QUEUE_WAIT_MS = 60_000;
+
+/** A listed queue run as a paced pass sees it: room for its own jobs, never the whole queue's. */
+export type PassQueueRun = Readonly<{
+  waitForRoom: (input: { maxOutstanding: number; signal?: AbortSignal }) => Promise<void>;
+}>;
 
 /** A page's terminal statuses: tenant id, then migration name. */
 type FinishedOnPage = Map<string, Map<string, TenantMigrationRecord["status"]>>;
@@ -67,6 +74,15 @@ export type SystemMigrationRunnerDeps = {
   queuedJobs?: () => Promise<number>;
   /** How long a paced page waits before reading the count again. Defaults to five seconds. */
   pacingWaitMs?: number;
+  /**
+   * Runs a paced pass on a queue list of its own: its jobs run ahead of any backlog, and each page
+   * waits only for the pass's own outstanding jobs, never the queue's total (Alex, 2026-10-12).
+   */
+  runListedWork?: <Result>(input: {
+    name: string;
+    timeoutMs: number;
+    work: (list?: PassQueueRun) => Promise<Result>;
+  }) => Promise<Result>;
 };
 
 /**
@@ -95,7 +111,7 @@ export class SystemMigrationRunnerService {
     };
     if (this.deps.migrations.length === 0) return summary;
 
-    await this.driveTenants({ summary, signal });
+    await this.driveOnOwnList({ summary, signal });
     if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
       // Every organization read as claimed. Genuine when another pass is
       // sweeping the same page at the same moment - but it is also the only
@@ -135,10 +151,46 @@ export class SystemMigrationRunnerService {
     }
   }
 
+  /**
+   * A paced pass with a queue runs on a list of its own; one whose work stops draining keeps what
+   * it recorded and leaves the rest to the next pass, which is level-triggered.
+   */
+  private async driveOnOwnList(args: {
+    summary: MigrationPassSummary;
+    signal?: AbortSignal;
+  }): Promise<void> {
+    const { runListedWork } = this.deps;
+    if (this.pacingLimit() === undefined || runListedWork === undefined) {
+      return this.driveTenants(args);
+    }
+    const names = this.deps.migrations.map((migration) => migration.name).join(",");
+    try {
+      await runListedWork({
+        name: `system-migrations:${names}:${crypto.randomUUID()}`,
+        timeoutMs: PASS_QUEUE_WAIT_MS,
+        work: (list) => this.driveTenants({ ...args, list }),
+      });
+    } catch (error) {
+      logger.warn(
+        { error, migrations: names },
+        "the pass's own queue work did not drain; the next pass picks up where it stopped",
+      );
+    }
+  }
+
+  /** The strictest pacing limit among the pass's migrations; undefined when none is paced. */
+  private pacingLimit(): number | undefined {
+    const limits = this.deps.migrations.flatMap((migration) =>
+      migration.pauseWhileQueuedAbove === undefined ? [] : [migration.pauseWhileQueuedAbove],
+    );
+    return limits.length === 0 ? undefined : Math.min(...limits);
+  }
+
   /** Every cohort tenant, a page at a time, until abort. */
   private async driveTenants(args: {
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    list?: PassQueueRun;
   }): Promise<void> {
     let cursor: string | null = null;
     for (;;) {
@@ -148,22 +200,29 @@ export class SystemMigrationRunnerService {
       });
       if (page.length === 0) return;
       cursor = page[page.length - 1] ?? null;
-      if (!(await this.waitForQueueRoom({ signal: args.signal }))) return;
+      if (!(await this.waitForQueueRoom({ signal: args.signal, list: args.list }))) return;
       if (!(await this.drivePage({ ...args, page }))) return;
     }
   }
 
   /**
-   * Holds the next page while the queues hold more waiting jobs than the strictest paced migration
-   * allows, so a backfill never outruns the worker. False means the pass was aborted meanwhile.
+   * Holds the next page while more of the pass's own jobs wait than the strictest paced migration
+   * allows; with no list, while the whole queue holds that many. False means it was aborted.
    */
-  private async waitForQueueRoom({ signal }: { signal?: AbortSignal }): Promise<boolean> {
-    const limits = this.deps.migrations.flatMap((migration) =>
-      migration.pauseWhileQueuedAbove === undefined ? [] : [migration.pauseWhileQueuedAbove],
-    );
+  private async waitForQueueRoom({
+    signal,
+    list,
+  }: {
+    signal?: AbortSignal;
+    list?: PassQueueRun;
+  }): Promise<boolean> {
+    const limit = this.pacingLimit();
+    if (limit !== undefined && list) {
+      await list.waitForRoom({ maxOutstanding: limit, ...(signal ? { signal } : {}) });
+      return !signal?.aborted;
+    }
     const { queuedJobs } = this.deps;
-    if (limits.length === 0 || queuedJobs === undefined) return !signal?.aborted;
-    const limit = Math.min(...limits);
+    if (limit === undefined || queuedJobs === undefined) return !signal?.aborted;
     for (;;) {
       if (signal?.aborted) return false;
       const queued = await queuedJobs().catch((error: unknown) => {

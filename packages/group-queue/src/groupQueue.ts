@@ -55,6 +55,7 @@ import type {
   GroupQueuePolicy,
   GroupQueueRuntimeDefinition,
   JobDelivery,
+  ListedRun,
   QueueAuditAdapter,
   QueueSendOptions,
 } from "./contracts.ts";
@@ -212,6 +213,9 @@ export function handBackOutcome({
 
 /** What a refusal over a list's groups names: the operation, and whose work it was. */
 type TargetsFault = Readonly<{ operation: string; work: string }>;
+
+/** How often a listed run waiting for room counts its outstanding jobs, at least. */
+const LIST_ROOM_POLL_MS = 250;
 
 const PREFLIGHT_FAULT: TargetsFault = {
   operation: "waitUntilPreflightIdle",
@@ -3028,14 +3032,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   }: {
     name: string;
     timeoutMs: number;
-    work: () => Promise<Result>;
+    work: (list?: ListedRun) => Promise<Result>;
   }): Promise<Result> {
     const listKey = `${this.queueName}:gq:listed:${name}`;
     await this.scripts.openGroupList({ listKey, nowMs: nowInstant().epochMilliseconds });
     try {
       const scope = { ...this.captureContext(), queueDispatchScopeKey: listKey };
-      const result = await this.runInContext(scope, work);
       const fault = { operation: "runListedWork", work: `Queue work of ${name}` };
+      const list: ListedRun = {
+        waitForRoom: ({ maxOutstanding, signal }) =>
+          this.waitForListRoom({ name, listKey, timeoutMs, fault, maxOutstanding, signal }),
+      };
+      const result = await this.runInContext(scope, () => work(list));
       const unsettled = await this.waitForTargets({
         key: listKey,
         timeoutMs,
@@ -3046,6 +3054,46 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       return result;
     } finally {
       await this.scripts.closeGroupList(listKey);
+    }
+  }
+
+  /**
+   * Holds a listed run's work until at most `maxOutstanding` of its jobs wait or run, so a step
+   * sends its next page only once its last has mostly run. Fails as the closing wait does when the
+   * count stands still for `timeoutMs`. Spec: specs/upgrade/background-steps.feature.
+   */
+  private async waitForListRoom({
+    name,
+    listKey,
+    timeoutMs,
+    fault,
+    maxOutstanding,
+    signal,
+  }: {
+    name: string;
+    listKey: string;
+    timeoutMs: number;
+    fault: TargetsFault;
+    maxOutstanding: number;
+    signal?: AbortSignal;
+  }): Promise<void> {
+    let deadline = nowInstant().epochMilliseconds + timeoutMs;
+    let lastLook: number | undefined;
+    while (!signal?.aborted) {
+      const lookStartedMs = nowInstant().epochMilliseconds;
+      const outstanding = await this.scripts.countListedOutstanding(listKey);
+      if (outstanding <= maxOutstanding) return;
+      const nowMs = nowInstant().epochMilliseconds;
+      if (outstanding !== lastLook) {
+        lastLook = outstanding;
+        deadline = nowMs + timeoutMs;
+      } else if (nowMs >= deadline) {
+        const state = await this.scripts.inspectPreflightTargets(listKey);
+        this.refuseUnsettledList({ name, timeoutMs, state, fault });
+      }
+      await new Promise<void>((resolve) =>
+        setTimeout(resolve, Math.max(LIST_ROOM_POLL_MS, nowMs - lookStartedMs)),
+      );
     }
   }
 

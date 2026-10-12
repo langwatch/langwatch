@@ -552,6 +552,7 @@ export class ApplicationBuilder<
           role,
           replayer,
           declaredMigrationSteps,
+          ...listedWorkOf(eventing),
           resolve: (token) => resolveInstallToken({ token, provided, apis }),
         });
         featureServices.push(...resources.sealServices());
@@ -1002,4 +1003,11 @@ function unavailable(feature: string, role: ServerRole, contribution: string): (
   return () => {
     throw new RoleContributionError(feature, role, `${contribution} (unavailable)`);
   };
+}
+
+/** The eventing host's listed queue runs, handed to each install; nothing where none runs. */
+function listedWorkOf(
+  eventing: { runListedWork?<Result>(input: ListedWork<Result>): Promise<Result> } | undefined,
+): { runListedWork?: <Result>(input: ListedWork<Result>) => Promise<Result> } {
+  return eventing?.runListedWork ? { runListedWork: eventing.runListedWork.bind(eventing) } : {};
 }

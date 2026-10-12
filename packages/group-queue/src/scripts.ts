@@ -25,6 +25,9 @@ export const PARK_RECONCILE_MAX_DRAIN = 1000;
 /** Reconcile cadence (ms); defines dynamic-cap TTL and claimant window multiples. */
 export const RECONCILE_INTERVAL_MS = 2000;
 
+/** How far back a listed run's settled group goes in its candidates, behind every waiting one. */
+const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
+
 /** Dynamic cap TTL (5x RECONCILE_INTERVAL_MS); fails safe to static cap if stale. */
 export const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
 
@@ -830,6 +833,14 @@ const DISPATCH_BATCH_LUA =
   ROUTING_META_HELPER_LUA +
   CLAIMED_RECORD_HELPER_LUA +
   `
+local function gqCandidateScore(keyPrefix, groupId, readyScore, nowMs)
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  if redis.call("EXISTS", groupPrefix .. ":active") == 1 then return nowMs end
+  if redis.call("ZCARD", groupPrefix .. ":jobs") == 0 then return nowMs + ${SETTLED_CANDIDATE_DELAY_MS} end
+  if readyScore and tonumber(readyScore) > nowMs then return tonumber(readyScore) end
+  return nowMs
+end
+
 local readyKey         = KEYS[1]
 local blockedKey       = KEYS[2]
 local pausedJobKey     = KEYS[3]
@@ -942,16 +953,15 @@ local function scanBatch(effCap, bypassPark, dispatched)
       -- an older worker may enqueue a downstream job without knowing how to add
       -- it back. Moving examined targets to the tail gives pending targets a
       -- bounded path through a set that also contains not-yet-enqueued groups.
-      if restrictedDispatch then
-        redis.call("ZADD", allowedGroupsKey, nowMs, groupId)
-        removedAllowed = removedAllowed + 1
-      end
-
       local readyScore = nil
       local groupDue = true
       if restrictedDispatch then
         readyScore = redis.call("ZSCORE", readyKey, groupId)
         groupDue = readyScore and tonumber(readyScore) <= nowMs
+        -- Re-queued by when it can next run: a waiting group at its due time, a settled one an
+        -- hour back, so a retried job is not stuck behind every group the run already finished.
+        redis.call("ZADD", allowedGroupsKey, gqCandidateScore(keyPrefix, groupId, readyScore, nowMs), groupId)
+        removedAllowed = removedAllowed + 1
       end
       if groupDue then
 
@@ -1766,12 +1776,15 @@ local signalKey = KEYS[3]
 local blockedKey = KEYS[4]
 local baselineKey = KEYS[5]
 local registrationsKey = KEYS[6]
+local liveKey = KEYS[7]
 local keyPrefix = ARGV[1]
 local ttlSec = tonumber(ARGV[2])
 local scoreBase = tonumber(ARGV[3])
 for index = 4, #ARGV do
   local groupId = ARGV[index]
   redis.call("SADD", targetKey, groupId)
+  -- The groups that may still hold work, pruned as they settle, so pacing counts only those.
+  redis.call("SADD", liveKey, groupId)
   -- Registration puts a target ahead of the dispatch loop's wall-clock
   -- rotation scores. This also re-activates a target when an older worker
   -- stages it without knowing the preflight protocol.
@@ -1786,6 +1799,7 @@ redis.call("EXPIRE", targetKey, ttlSec)
 redis.call("EXPIRE", candidatesKey, ttlSec)
 redis.call("EXPIRE", baselineKey, ttlSec)
 redis.call("EXPIRE", registrationsKey, ttlSec)
+redis.call("EXPIRE", liveKey, ttlSec)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 return #ARGV - 3
@@ -1860,6 +1874,27 @@ end
 return {pending, active, failed, blocked, #groups, held, pendingGroups, failedIds, blockedIds, pendingIds, heldIds}
 `;
 const inspectPreflightPageScript = new CachedLuaScript(INSPECT_PREFLIGHT_PAGE_LUA);
+
+/** One slice of a list's live groups: their waiting and running jobs; settled groups leave. */
+const COUNT_LISTED_OUTSTANDING_LUA = `
+local liveKey = KEYS[1]
+local blockedKey = KEYS[2]
+local keyPrefix = ARGV[1]
+local outstanding = 0
+for index = 2, #ARGV do
+  local groupId = ARGV[index]
+  local groupPrefix = keyPrefix .. "group:" .. groupId
+  local pending = redis.call("ZCARD", groupPrefix .. ":jobs")
+  local active = redis.call("EXISTS", groupPrefix .. ":active")
+  if pending == 0 and active == 0 then
+    redis.call("SREM", liveKey, groupId)
+  elseif redis.call("SISMEMBER", blockedKey, groupId) == 0 then
+    outstanding = outstanding + pending + active
+  end
+end
+return outstanding
+`;
+const countListedOutstandingScript = new CachedLuaScript(COUNT_LISTED_OUTSTANDING_LUA);
 
 /** The most target groups one inspection or registration script call touches. */
 export const PREFLIGHT_GROUPS_PER_CALL = 500;
@@ -2745,13 +2780,14 @@ export class GroupStagingScripts {
     for (let start = 0; start < groupIds.length; start += PREFLIGHT_GROUPS_PER_CALL) {
       await registerPreflightTargetsScript.run(
         this.redis,
-        6,
+        7,
         targetKey,
         `${targetKey}:candidates`,
         this.getSignalKey(),
         `${this.keyPrefix}blocked`,
         `${targetKey}:baseline`,
         `${targetKey}:registrations`,
+        `${targetKey}:live`,
         this.keyPrefix,
         String(LISTED_GROUPS_TTL_SEC),
         String(start),
@@ -2781,7 +2817,39 @@ export class GroupStagingScripts {
       `${listKey}:candidates`,
       `${listKey}:baseline`,
       `${listKey}:registrations`,
+      `${listKey}:live`,
     );
+  }
+
+  /**
+   * The jobs a list's groups still hold, waiting or running, blocked groups aside (they never
+   * drain on their own; the run's closing wait names them). Prunes the groups that settled.
+   */
+  async countListedOutstanding(listKey: string): Promise<number> {
+    const liveKey = `${listKey}:live`;
+    let outstanding = 0;
+    let cursor = "0";
+    do {
+      const [next, members] = await this.redis.sscan(
+        liveKey,
+        cursor,
+        "COUNT",
+        PREFLIGHT_GROUPS_PER_CALL,
+      );
+      cursor = next;
+      for (let start = 0; start < members.length; start += PREFLIGHT_GROUPS_PER_CALL) {
+        const reply: unknown = await countListedOutstandingScript.run(
+          this.redis,
+          2,
+          liveKey,
+          `${this.keyPrefix}blocked`,
+          this.keyPrefix,
+          ...members.slice(start, start + PREFLIGHT_GROUPS_PER_CALL),
+        );
+        outstanding += Number(reply) || 0;
+      }
+    } while (cursor !== "0");
+    return outstanding;
   }
 
   private openGroupListsKey(): string {

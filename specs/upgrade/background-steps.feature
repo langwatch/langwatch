@@ -206,6 +206,25 @@ Feature: The worker runs declared background steps
     Then the attempt fails naming the groups still waiting, and its list is removed
     And the step is pending again with its checkpoint kept, to retry after its backoff
 
+  # Background work never starves live traffic (Alex, 2026-10-12): a step's checkpoint saves only
+  # once at most 1,000 of its own jobs wait or run, so it sends its next page only after its last
+  # has mostly run, and the queue holds about a page and that bound per running step.
+  @unit
+  Scenario: A step over many rows keeps at most a page and a small bound of its own jobs outstanding
+    Given a background step over 10,000 rows that sends one job per row, 500 rows a page
+    When the worker runs it
+    Then each page's checkpoint saves only once at most 1,000 of its jobs wait or run
+    And no more than 1,500 of its jobs are ever outstanding
+    And it finishes with every row's job run
+
+  @integration
+  Scenario: A listed run waits for room counting only its own jobs
+    Given a job queue holding a large backlog of other work
+    And a listed run that sends its jobs a page at a time
+    When it waits for room for at most a page of its own jobs before each next page
+    Then no more than two pages of its jobs are ever outstanding, whatever the backlog holds
+    And every job it sent runs
+
   @integration
   Scenario: A step retried after a failed attempt resumes from its last saved checkpoint
     Given a background step whose attempt saved a checkpoint and then failed

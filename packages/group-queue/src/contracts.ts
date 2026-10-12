@@ -159,3 +159,9 @@ export interface GroupQueueRuntimeDefinition<Payload extends Record<string, unkn
   score?: (payload: Payload) => number;
   auditAdapter?: QueueAuditAdapter<Payload>;
 }
+
+/** A listed run, as its work sees it: the work may wait for its own jobs before sending more. */
+export interface ListedRun {
+  /** Returns once at most `maxOutstanding` of this run's jobs wait or run; `signal` ends it. */
+  waitForRoom(input: { maxOutstanding: number; signal?: AbortSignal }): Promise<void>;
+}

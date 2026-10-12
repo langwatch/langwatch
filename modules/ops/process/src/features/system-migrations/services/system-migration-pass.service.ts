@@ -3,6 +3,7 @@ import {
   type MigrationCohort,
   type MigrationPassSummary,
   type SystemMigration,
+  type SystemMigrationRunnerDeps,
   SystemMigrationRunnerService,
   type SystemMigrationStateRepository,
   groupByTenantSource,
@@ -76,6 +77,8 @@ type SystemMigrationPassOptions = Readonly<{
    * The tenant steps modules declare with `.withMigrations`, over the framework's one state table
    * (Alex, 2026-10-09, S6-2, S6-3); beside the registered migrations until their owners move.
    */
+  /** The worker's listed queue runs, which pace a paced pass by its own jobs (Alex, 2026-10-12). */
+  runListedWork?: SystemMigrationRunnerDeps["runListedWork"];
   declared?: Readonly<{
     steps: () => readonly TenantMigrationStep[];
     state: SystemMigrationStateRepository & TenantStepSettleState;
@@ -98,6 +101,11 @@ export class SystemMigrationPassService {
   #pendingDeclaredSteps: readonly string[] = [];
   /** The waiting-job count a paced migration holds its next page behind (Alex, 2026-10-12). */
   readonly #queuedJobs = (): Promise<number> => this.options.repositories.queues.countWaitingJobs();
+  /** A paced pass counts its own jobs where the worker runs listed work, else the whole queue's. */
+  get #pacing(): Pick<SystemMigrationRunnerDeps, "queuedJobs" | "runListedWork"> {
+    const { runListedWork } = this.options;
+    return { queuedJobs: this.#queuedJobs, ...(runListedWork ? { runListedWork } : {}) };
+  }
 
   private constructor(private readonly options: SystemMigrationPassOptions) {
     this.#cohorts = SystemMigrationPassCohortService.create({
@@ -171,7 +179,7 @@ export class SystemMigrationPassService {
       for (const bucket of groupByTenantSource({ migrations, everyTenant: sources[axis] })) {
         const runner = new SystemMigrationRunnerService({
           now: nowInstant,
-          queuedJobs: this.#queuedJobs,
+          ...this.#pacing,
           state: declared.state,
           lease: migrationLease,
           tenants: bucket.tenants,
@@ -209,7 +217,7 @@ export class SystemMigrationPassService {
     if (userMigration) {
       return new SystemMigrationRunnerService({
         now: nowInstant,
-        queuedJobs: this.#queuedJobs,
+        ...this.#pacing,
         state,
         lease,
         tenants: this.options.repositories.organizationMemberTenants.membersOf({ organizationId }),
@@ -223,7 +231,7 @@ export class SystemMigrationPassService {
     );
     return new SystemMigrationRunnerService({
       now: nowInstant,
-      queuedJobs: this.#queuedJobs,
+      ...this.#pacing,
       state,
       lease,
       tenants: {
@@ -319,7 +327,7 @@ export class SystemMigrationPassService {
         merged,
         await new SystemMigrationRunnerService({
           now: nowInstant,
-          queuedJobs: this.#queuedJobs,
+          ...this.#pacing,
           state,
           lease,
           tenants,
@@ -375,7 +383,7 @@ export class SystemMigrationPassService {
         cohort,
         migrations,
         now: nowInstant,
-        queuedJobs: this.#queuedJobs,
+        ...this.#pacing,
       }),
     };
   }
@@ -424,7 +432,8 @@ export class SystemMigrationPassService {
     dependencies,
     passRequests,
     declared,
-  }: Pick<SystemMigrationPassOptions, "repositories" | "isSaaS" | "declared"> & {
+    runListedWork,
+  }: Pick<SystemMigrationPassOptions, "repositories" | "isSaaS" | "declared" | "runListedWork"> & {
     /** The clickhouse store's private routes (§7), read when a cohort or pass asks, not at boot. */
     routes: () => ReadonlyMap<string, string>;
     dependencies: Pick<OpsAppDependencies, "identity" | "authz" | "automations" | "auditLog">;
@@ -440,6 +449,7 @@ export class SystemMigrationPassService {
       repositories,
       isSaaS,
       ...(declared ? { declared } : {}),
+      ...(runListedWork ? { runListedWork } : {}),
       migrations: organizationMigrations,
       userMigrations: () => identity.userMigrations(),
       newbornSweep: () => identity.newbornSweep().runPass(),

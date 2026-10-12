@@ -1,6 +1,7 @@
 import {
   type MigrationLeaseRepository,
   SystemMigrationRecordNotFoundError,
+  type SystemMigrationRunnerDeps,
   SystemMigrationRunnerService,
   type SystemMigrationStateRepository,
   type TenantMigrationRecord,
@@ -62,7 +63,13 @@ function slowQueue({ waiting, drainPerRead }: { waiting: number; drainPerRead: n
   return { queue, read };
 }
 
-function pass({ read }: { read: () => Promise<number> }) {
+function pass({
+  read,
+  runListedWork,
+}: {
+  read: () => Promise<number>;
+  runListedWork?: SystemMigrationRunnerDeps["runListedWork"];
+}) {
   const userIds = Array.from({ length: USERS }, (_, n) => `user_${String(n).padStart(4, "0")}`);
   const migrated: { userId: string; lastRead: number | undefined }[] = [];
   const lastRead = { value: undefined as number | undefined };
@@ -93,6 +100,7 @@ function pass({ read }: { read: () => Promise<number> }) {
       return lastRead.value;
     },
     pacingWaitMs: 1,
+    ...(runListedWork ? { runListedWork } : {}),
   });
   return { runner, migrated };
 }
@@ -133,5 +141,23 @@ describe("the identifier backfill's pacing", () => {
     await runner.runPass({ signal: abort.signal });
 
     expect(migrated).toHaveLength(0);
+  });
+
+  /** @scenario "A large unrelated backlog does not hold the identifier backfill" */
+  it("on its own queue list, waits only for its own jobs, whatever the whole queue holds", async () => {
+    const { queue, read } = slowQueue({ waiting: 1_000_000, drainPerRead: 0 });
+    const rooms: number[] = [];
+    const { runner, migrated } = pass({
+      read,
+      runListedWork: async ({ work }) =>
+        work({ waitForRoom: async ({ maxOutstanding }) => void rooms.push(maxOutstanding) }),
+    });
+
+    await runner.runPass();
+
+    expect(migrated).toHaveLength(USERS);
+    expect(queue.reads).toEqual([]);
+    expect(rooms.length).toBeGreaterThan(0);
+    expect(rooms.every((room) => room === LIMIT)).toBe(true);
   });
 });

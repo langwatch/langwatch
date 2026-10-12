@@ -1,3 +1,4 @@
+import type { ListedWork } from "@langwatch/eventing";
 /**
  * A paused worker runs nothing; a stopped or failing step stays resumable; the lease renews on a
  * timer. Spec: specs/upgrade/background-steps.feature.
@@ -833,6 +834,68 @@ describe("BackgroundStepsService queue work", () => {
         report: { sent: 1 },
         lastError: expect.stringContaining("still waiting: t/command/a"),
       });
+    });
+  });
+});
+
+/** A queue whose worker runs a step's jobs as the step waits for room, counting the outstanding. */
+class PacedRunsDouble implements BackgroundStepsQueue {
+  outstanding = 0;
+  peak = 0;
+  ran = 0;
+  readonly rooms: number[] = [];
+
+  send(): void {
+    this.outstanding += 1;
+    this.peak = Math.max(this.peak, this.outstanding);
+  }
+
+  private runDownTo(bound: number): void {
+    const running = Math.max(0, this.outstanding - bound);
+    this.outstanding -= running;
+    this.ran += running;
+  }
+
+  async runListedWork<Result>({ work }: ListedWork<Result>): Promise<Result> {
+    const result = await work({
+      waitForRoom: async ({ maxOutstanding }) => {
+        this.rooms.push(maxOutstanding);
+        this.runDownTo(maxOutstanding);
+      },
+    });
+    this.runDownTo(0);
+    return result;
+  }
+}
+
+describe("BackgroundStepsService pacing", () => {
+  describe("given a step over 10,000 rows that sends a job per row, 500 rows a page", () => {
+    /** @scenario "A step over many rows keeps at most a page and a small bound of its own jobs outstanding" */
+    it("saves each page only once at most 1,000 of its jobs are outstanding, and finishes every row", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new PacedRunsDouble();
+      const rows = 10_000;
+      const page = 500;
+      const service = serviceOver({
+        ledger,
+        queue,
+        run: async ({ checkpoint }) => {
+          let sent = 0;
+          while (sent < rows) {
+            for (let row = 0; row < page; row++) queue.send();
+            sent += page;
+            await checkpoint.save({ report: { sent } });
+          }
+          return { sent };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+
+      expect(queue.rooms).toEqual(Array.from({ length: rows / page }, () => 1_000));
+      expect(queue.peak).toBeLessThanOrEqual(1_000 + page);
+      expect(queue.ran).toBe(rows);
+      expect(ledger.row).toMatchObject({ status: "done", report: { sent: rows } });
     });
   });
 });

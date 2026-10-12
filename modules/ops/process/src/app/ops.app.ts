@@ -265,7 +265,11 @@ import {
 } from "@langwatch/secrets/shared-secrets";
 import { ShareApi, type ShareApi as ShareApiContract } from "@langwatch/share-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import type { MigrationPassSummary, SystemMigrationPass } from "@langwatch/system-migrations";
+import type {
+  MigrationPassSummary,
+  SystemMigrationPass,
+  SystemMigrationRunnerDeps,
+} from "@langwatch/system-migrations";
 import { type Instant, nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { isTenantMigrationStep } from "@langwatch/upgrade/step";
@@ -815,6 +819,8 @@ export class OpsModule implements OpsApi {
     const infrastructure = buildOpsInfrastructure({
       bugReportNotifier: setup.channels.bugReportNotifier,
       declaredMigrationSteps: setup.declaredMigrationSteps,
+      // Only the worker runs listed work; a tasks pass keeps reading the whole queue's depth.
+      runListedWork: setup.role === "worker" ? setup.runListedWork : undefined,
       logger,
       config: setup.config,
       resources: setup.resources,
@@ -2324,6 +2330,7 @@ function buildOpsInfrastructure(input: {
   cloudOps: boolean;
   /** The kernel's feed (S6-FEED); ops keeps only the tenant steps. */
   declaredMigrationSteps: (() => readonly unknown[]) | undefined;
+  runListedWork: SystemMigrationRunnerDeps["runListedWork"];
 }): OpsAppInfrastructure {
   const { logger, config, resources, repositories } = input;
   const introspection = EventingIntrospectionService.create(() =>
@@ -2430,6 +2437,7 @@ function buildOpsInfrastructure(input: {
         routes: () => repositories.clickhouseRoutes.findPrivateRoutes(),
         dependencies,
         passRequests,
+        ...(input.runListedWork ? { runListedWork: input.runListedWork } : {}),
         declared: {
           steps: () => (input.declaredMigrationSteps?.() ?? []).filter(isTenantMigrationStep),
           state: repositories.tenantStepState,
