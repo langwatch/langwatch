@@ -15,7 +15,9 @@ const {
   open,
   expect,
 } = JSON.parse(process.argv[2]);
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--no-sandbox"],
+});
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds

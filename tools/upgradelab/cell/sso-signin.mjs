@@ -289,7 +289,9 @@ async function signIn(browser, member) {
   await context.close();
 }
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--no-sandbox"],
+});
 try {
   for (const member of members) {
     if (phase === "test-login") {

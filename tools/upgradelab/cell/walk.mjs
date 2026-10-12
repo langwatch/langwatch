@@ -59,12 +59,16 @@ async function signIn(page) {
   await dismissNudge(page);
 }
 
-let browser = await chromium.launch();
+// No GPU and no sandbox: the headless shell otherwise takes several cores on a loaded host.
+const launchOptions = {
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--no-sandbox"],
+};
+let browser = await chromium.launch(launchOptions);
 let page;
 let step = "start";
 // Opens the walker's one tab, relaunching Chromium first when it died, so a crash costs one round.
 async function openPage() {
-  if (!browser.isConnected()) browser = await chromium.launch();
+  if (!browser.isConnected()) browser = await chromium.launch(launchOptions);
   page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   // The lab has no internet: web fonts answer empty CSS, so a stalled DNS lookup never holds
   // the page.
