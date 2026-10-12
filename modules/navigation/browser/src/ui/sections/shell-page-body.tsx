@@ -85,7 +85,7 @@ const MEASURED_OPS_PAGES = [...instanceGroup().items, ...cloudAdminGroup().items
 
 /** Every page's header and body share this one edge; the design system reads it. */
 const PAGE_INSET = "var(--chakra-spacing-6)";
-/** Settings-style pages read in one centred column of this width, title included. */
+/** Settings-style page bodies read in one centred column this wide, under a full-width header. */
 const SETTINGS_MEASURE = "1248px";
 
 /**
@@ -105,15 +105,13 @@ function PageMeasure({ pathname, children }: { pathname: string; children: React
       minHeight={0}
       overflowY="auto"
       paddingBottom={16}
-      // Header and body share one centred column; the header's own inset is dropped so
-      // the title lines up with the body. The assistant's floating launcher is a fixed button.
+      // The header spans the full width like every page; the body below it reads in one
+      // centred column. The assistant's floating launcher is a fixed button, so it is skipped.
       css={{
-        "& [data-page-header], & [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)":
-          {
-            width: `min(${SETTINGS_MEASURE}, calc(100% - 2 * var(--page-inset)))`,
-            marginInline: "auto",
-          },
-        "& [data-page-header]": { paddingInline: 0 },
+        "& [data-page-header] ~ :not(button), &:not(:has([data-page-header])) > :not(button)": {
+          width: `min(${SETTINGS_MEASURE}, calc(100% - 2 * var(--page-inset)))`,
+          marginInline: "auto",
+        },
         "& [data-page-container]": { paddingInline: 0 },
       }}
     >

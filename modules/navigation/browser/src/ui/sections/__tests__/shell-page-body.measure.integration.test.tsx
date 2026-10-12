@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Settings pages read in one centred column, title included, forms and tables alike.
+ * Settings page bodies read in one centred column under a full-width header, forms and
+ * tables alike.
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
