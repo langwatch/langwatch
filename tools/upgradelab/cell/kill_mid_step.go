@@ -184,7 +184,8 @@ func (cell *run) runMidStep(ctx context.Context, options midStepOptions, pass mi
 			return result, err
 		}
 	}
-	if err := waitFor(ctx, 25*time.Minute, func() bool {
+	// An attempt may pass the step's 15-minute deadline on a loaded machine and retry after a backoff.
+	if err := waitFor(ctx, 60*time.Minute, func() bool {
 		row, err := cell.readStep(ctx, options.step)
 		return err == nil && row.status == "done"
 	}); err != nil {
