@@ -1,9 +1,9 @@
-Feature: Sticky glass page titles
-  Page titles share the content ground. Content scrolls beneath their glass.
+Feature: Sticky page titles
+  Page titles share the content ground. The sticky header paints the page surface
+  opaquely across its full width, so content scrolling beneath it never shows through.
   A bordered header always draws its bottom rule, at the top of the page too,
   so the title row reads as the page's header. The header still reports
   whether the page has scrolled under it, for pages that react to it.
-  Reduced graphics removes blur and restores opacity.
 
   @integration
   Scenario: The bottom rule is drawn whether or not the page has scrolled
@@ -11,6 +11,7 @@ Feature: Sticky glass page titles
     Then the bottom rule is visible at the top of the page
     When content scrolls beneath the title
     Then the header reports that it is scrolled and the rule keeps its width
+    And the header paints the opaque page surface, so the content does not show through
     When the content returns to the top
     Then the header reports that it is not scrolled
 

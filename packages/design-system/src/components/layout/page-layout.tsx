@@ -176,8 +176,8 @@ function Header({
         position="sticky"
         top={0}
         zIndex={10}
-        background="color-mix(in srgb, var(--chakra-colors-bg-surface) var(--lw-panel-alpha, 65%), transparent)"
-        backdropFilter="var(--lw-backdrop-blur, blur(16px))"
+        // Opaque, so content scrolling under the sticky header never shows through it.
+        background="bg.surface"
         {...props}
         // Actions wrap under the title when they do not fit, so the header grows to hold them.
         height="auto"

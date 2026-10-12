@@ -52,6 +52,8 @@ describe("sticky page header", () => {
     expect(header.getAttribute("data-scrolled")).toBe("true");
     expect(getComputedStyle(header).borderBottomWidth).toBe(initialWidth);
     expect(getComputedStyle(header).borderBottomColor).toBe("var(--chakra-colors-border)");
+    expect(getComputedStyle(header).background).toBe("var(--chakra-colors-bg-surface)");
+    expect(getComputedStyle(header).backdropFilter).not.toContain("blur");
     scrollPage(0);
     expect(header.getAttribute("data-scrolled")).toBe("false");
   });
