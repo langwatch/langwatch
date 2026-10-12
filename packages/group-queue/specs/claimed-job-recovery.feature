@@ -43,6 +43,13 @@ Feature: GroupQueue brings back a job whose worker died while running it
     And the second worker's active key and claimed record survive
     And the second worker's completion frees the group, counted once
 
+  @unit
+  Scenario: A former owner that dead-letters or parks a recovered job leaves the group alone
+    Given a worker whose claim was recovered by another worker
+    When it dead-letters its job after exhausted retries, or parks its group as poison
+    Then it neither clears the group's failure streak nor its attempt count
+    And it releases no claim marker and counts no exhausted job or parked group
+
   @integration
   Scenario: A worker that still owns its claim completes it after its active key lapsed
     Given a worker whose active key lapsed but whose job nobody has recovered yet

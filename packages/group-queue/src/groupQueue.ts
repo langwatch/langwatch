@@ -2062,13 +2062,25 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         jobDataJson: freshValue,
       });
     }
-    await this.scripts.complete({
+    const payloads = job.batchPayloads ?? [payload];
+    const deadPayloads = payloads.filter((_, index) =>
+      deadJobIds.includes(batchJobIds[index] ?? stagedJobId),
+    );
+    const completed = await this.scripts.complete({
       groupId,
       stagedJobId,
       jobName,
       dropped: true,
       claimToken: job.claimToken,
     });
+    if (!completed) {
+      // The recovering worker now owns the group's chain, its failures and its attempt count.
+      this.logger.warn(
+        { queueName: this.queueName, groupId, stagedJobId, deadJobIds, error: lastError },
+        "Job dead-lettered after its claim was recovered by another worker; leaving the group to that worker",
+      );
+      return deadPayloads;
+    }
     // The chain is over for this group: the next job starts with a fresh budget and streak.
     await this.scripts.clearGroupFailures(groupId).catch(() => {});
     await this.clearGroupAttempt(groupId);
@@ -2085,8 +2097,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       },
       "Job dead-lettered after exhausted retries; its group drains on",
     );
-    const payloads = job.batchPayloads ?? [payload];
-    return payloads.filter((_, index) => deadJobIds.includes(batchJobIds[index] ?? stagedJobId));
+    return deadPayloads;
   }
 
   /**
@@ -2761,7 +2772,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Same reasoning as handleExhaustedRetries: keep the original score when it
     // is a real timestamp, otherwise the parked group reads as decades old.
     const score = this.restageScore(originalScore);
-    await this.scripts.restageAndBlock({
+    const parked = await this.scripts.restageAndBlock({
       groupId,
       // Parked under the id it was dispatched under (ADR-080). This used to
       // append a wall-clock marker, which made a parked job impossible to find
@@ -2772,6 +2783,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       errorMessage,
       claimToken,
     });
+    if (!parked) {
+      this.logger.warn(
+        { queueName: this.queueName, groupId, stagedJobId, reason },
+        "Poison guard could not park the group: its claim was recovered by another worker",
+      );
+      return;
+    }
     // Release the marker as the group is parked: leaving it would let the death
     // count survive, so an operator who unblocked inside the marker's TTL would
     // see it re-park on the very next claim. Unconditional here, unlike the
