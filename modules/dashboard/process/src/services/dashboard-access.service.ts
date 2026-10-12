@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   dashboardsListedFor,
   dashboardStanding,
@@ -41,21 +42,25 @@ export class DashboardAccessService {
   #repository: DashboardRepository;
   #projects: ProjectApi;
   #rollout: DashboardsRollout;
+  #authz: Pick<AuthzApi, "canBatchByIds">;
 
   private constructor(options: {
     repository: DashboardRepository;
     projects: ProjectApi;
     rollout: DashboardsRollout;
+    authz: Pick<AuthzApi, "canBatchByIds">;
   }) {
     this.#repository = options.repository;
     this.#projects = options.projects;
     this.#rollout = options.rollout;
+    this.#authz = options.authz;
   }
 
   static create(options: {
     repository: DashboardRepository;
     projects: ProjectApi;
     rollout: DashboardsRollout;
+    authz: Pick<AuthzApi, "canBatchByIds">;
   }): DashboardAccessService {
     return new DashboardAccessService(options);
   }
@@ -155,11 +160,31 @@ export class DashboardAccessService {
     return new Set(hidden.map((board) => board.id));
   }
 
-  /** The projects that own these boards, as a list names them. */
-  async findProjects({ projectIds }: { projectIds: string[] }): Promise<DashboardProject[]> {
-    if (projectIds.length === 0) return [];
+  /**
+   * The projects of the organization that own these boards, as a list names them: only those
+   * where the viewer holds `analytics:view`. A project credential is named none.
+   */
+  async findProjects({
+    organizationId,
+    projectIds,
+    viewer,
+  }: {
+    organizationId: string | null;
+    projectIds: string[];
+    viewer?: DashboardViewer;
+  }): Promise<DashboardProject[]> {
+    if (projectIds.length === 0 || organizationId === null || !viewer) return [];
     const projects = await this.#projects.listNamesByIds({ projectIds });
-    return projects.map(({ id, name, slug }) => ({ id, name, slug }));
+    const decision = await this.#authz.canBatchByIds({
+      principal: { type: "user", id: viewer.userId },
+      permission: "analytics:view",
+      organizationId,
+      teams: [],
+      projects: projects.map(({ id, teamId }) => ({ projectId: id, teamId })),
+    });
+    return projects
+      .filter(({ id }) => decision.projects.get(id) === true)
+      .map(({ id, name, slug }) => ({ id, name, slug }));
   }
 
   /** Read without asking the project peer: most reads and every write are of an own board. */

@@ -206,6 +206,18 @@ describe("given a person who may not have a run", () => {
     expect(await insightsOf()).toEqual([]);
   });
 
+  /** @scenario "A member without langy:create gets no run and Langy is never called" */
+  it("skips a member without langy:create as langy_off, calls no Langy and files nothing", async () => {
+    installed.world.askers.delete(MEMBER);
+
+    await run();
+
+    expect(await lastRunOf()).toMatchObject({ outcome: "skipped", reason: "langy_off" });
+    expect(installed.langy.starts).toEqual([]);
+    expect(installed.boardReads).toEqual([]);
+    expect(await insightsOf()).toEqual([]);
+  });
+
   /** @scenario "A person who no longer exists gets no run" */
   it("skips a user id no user has", async () => {
     await run({ userId: "user-gone" });

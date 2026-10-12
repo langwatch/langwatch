@@ -100,10 +100,16 @@ export class DashboardService {
     const listed = await this.#access.listBoards({ projectId, viewer: input.viewer, graphKinds });
     const guests = input.includeOrganization === true ? listed.guests : [];
     const sharedProjectIds = [...new Set(guests.map((board) => board.projectId))];
+    // Every guest is a board of the reader's own organization.
+    const organizationId = guests[0]?.organizationId ?? null;
 
     const [starred, owners] = await Promise.all([
       this.#starredIds({ projectId, viewer: input.viewer, sharedProjectIds }),
-      this.#access.findProjects({ projectIds: sharedProjectIds }),
+      this.#access.findProjects({
+        organizationId,
+        projectIds: sharedProjectIds,
+        viewer: input.viewer,
+      }),
     ]);
     const ownerById = new Map(owners.map((owner) => [owner.id, owner]));
 

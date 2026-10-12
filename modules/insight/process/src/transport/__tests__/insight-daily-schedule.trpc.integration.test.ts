@@ -29,6 +29,7 @@ type TestContext = { actor: { id: string } };
 
 const { CONFIGURED, TURNED_OFF } = INSIGHT_DAILY_RUN_EVENT_TYPES;
 const VIEW = ["analytics:view"];
+const VIEW_AND_ASK = ["analytics:view", "langy:create"];
 const SCOPE = { projectId: PROJECT, board: { kind: BOARD.kind, id: BOARD.id } };
 const ON = { projectId: PROJECT, board: BOARD, hour: 9, timezone: "Europe/Amsterdam" };
 const OFF = { projectId: PROJECT, board: BOARD };
@@ -64,7 +65,7 @@ async function project({ isEnabled = true }: { isEnabled?: boolean } = {}) {
 
   const as = ({
     userId,
-    held = VIEW,
+    held = VIEW_AND_ASK,
     isOnAggregate = false,
   }: {
     userId: string;
@@ -337,5 +338,21 @@ describe("given a member without analytics:view", () => {
     }
     expect(daily.gateAsks).toEqual([]);
     expect(await daily.runEventsOf()).toEqual([]);
+  });
+});
+
+describe("given a member with analytics:view and without langy:create", () => {
+  /** @scenario "A member without langy:create cannot turn a daily run on" */
+  it("refuses turning it on as forbidden, and still answers the read and turning it off", async () => {
+    const { as, daily } = await project();
+    const viewer = as({ userId: MEMBER, held: VIEW });
+
+    await expect(viewer.configureBoardDailyRun({ ...ON, maxInsights: 3 })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect(await viewer.getBoardDailyRun(SCOPE)).toEqual(UNDECIDED);
+    await viewer.turnOffBoardDailyRun(OFF);
+    expect(await viewer.getBoardDailyRun(SCOPE)).toMatchObject({ state: "off" });
+    expect(await daily.runEventsOf()).toEqual([TURNED_OFF]);
   });
 });

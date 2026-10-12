@@ -27,6 +27,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
   createDashboardTestAnalytics,
+  createDashboardTestAuthz,
   createDashboardTestProjects,
   DASHBOARDS_ROLLED_OUT,
 } from "../../app/__tests__/dashboard.fixture.ts";
@@ -121,6 +122,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
         repository: PrismaDashboardRepository.create({ prisma: database() }),
         projects: createDashboardTestProjects(),
         rollout: DASHBOARDS_ROLLED_OUT,
+        authz: createDashboardTestAuthz(),
       }),
     });
     organization = await database().organization.create({

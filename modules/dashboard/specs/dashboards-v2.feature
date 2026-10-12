@@ -786,6 +786,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Given a board its author set to Organization
     When a member with analytics:view lists the boards of another project of the same organization
     Then the board is listed there, marked as owned by the other project
+    And a member who cannot open the owning project sees it listed with no project named
     And it opens there by its id, with its widgets, for a member and for a project credential
     And a project of another organization neither lists it nor opens it
 

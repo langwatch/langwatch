@@ -15,6 +15,8 @@ import type { InsightRolloutService } from "./insight-rollout.service.ts";
 
 /** What reading a board needs to be allowed: the permission its screen asks for. */
 const BOARD_READ_PERMISSION = "analytics:view";
+/** What asking Langy needs: each run is a turn paid for in LLM calls. */
+const LANGY_ASK_PERMISSION = "langy:create";
 
 type Viewer = Readonly<{ userId: string }>;
 
@@ -132,7 +134,13 @@ export class InsightRunGateService {
       projectId,
       permission: BOARD_READ_PERMISSION,
     });
-    return mayRead ? void 0 : "no_access";
+    if (!mayRead) return "no_access";
+    const mayAsk = await authz.hasProjectPermission({
+      userId,
+      projectId,
+      permission: LANGY_ASK_PERMISSION,
+    });
+    return mayAsk ? void 0 : "langy_off";
   }
 
   private async readBoard({

@@ -11,6 +11,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
+  createDashboardTestAuthz,
   createDashboardTestProjects,
   DASHBOARDS_ROLLED_OUT,
 } from "../../app/__tests__/dashboard.fixture.ts";
@@ -34,6 +35,7 @@ function serviceWith(workbenchEnabled = true) {
     repository,
     projects: createDashboardTestProjects(),
     rollout: DASHBOARDS_ROLLED_OUT,
+    authz: createDashboardTestAuthz(),
   });
 
   return {

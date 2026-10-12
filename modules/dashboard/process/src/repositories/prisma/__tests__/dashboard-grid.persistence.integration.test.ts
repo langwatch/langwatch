@@ -16,6 +16,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   createDashboardTestAnalytics,
+  createDashboardTestAuthz,
   createDashboardTestProjects,
   DASHBOARDS_ROLLED_OUT,
 } from "../../../app/__tests__/dashboard.fixture.ts";
@@ -67,6 +68,7 @@ function graphs(): DashboardService {
       repository,
       projects: createDashboardTestProjects(),
       rollout: DASHBOARDS_ROLLED_OUT,
+      authz: createDashboardTestAuthz(),
     }),
   });
 }

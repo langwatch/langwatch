@@ -214,7 +214,7 @@ export class DashboardModule implements DashboardApi {
     const repository = setup.repositories.dashboards;
     const { projects, authz } = setup.dependencies;
     const rollout = new AnalyticsDashboardsRollout(analytics);
-    const access = DashboardAccessService.create({ repository, projects, rollout });
+    const access = DashboardAccessService.create({ repository, projects, rollout, authz });
 
     return new DashboardModule({
       services: {

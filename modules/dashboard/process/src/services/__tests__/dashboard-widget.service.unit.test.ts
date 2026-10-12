@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDashboardTestAnalytics,
+  createDashboardTestAuthz,
   createDashboardTestProjects,
   DASHBOARDS_ROLLED_OUT,
 } from "../../app/__tests__/dashboard.fixture.ts";
@@ -29,6 +30,7 @@ function setUp() {
       repository: MemoryDashboardRepository.create(),
       projects: createDashboardTestProjects(),
       rollout: DASHBOARDS_ROLLED_OUT,
+      authz: createDashboardTestAuthz(),
     }),
   });
   return { repository, service };

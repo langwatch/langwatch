@@ -443,6 +443,20 @@ describe("board scope on the server", () => {
     });
 
     /** @scenario "AC172 Scope: an Organization board is listed in every project of its organization" */
+    it("names no owner project to a member who cannot open that project", async () => {
+      const { app, target } = await boardAt("ORGANIZATION", { openProjectIds: [SIBLING] });
+
+      const listed = await app.getAll({
+        projectId: SIBLING,
+        graphCountScope: "builder",
+        viewer: TEAMMATE,
+        includeOrganization: true,
+      });
+
+      expect(listed).toMatchObject([{ id: target.dashboardId, ownerProject: null }]);
+    });
+
+    /** @scenario "AC172 Scope: an Organization board is listed in every project of its organization" */
     it("names no owner project where it is at home", async () => {
       const { app } = await boardAt("ORGANIZATION");
 

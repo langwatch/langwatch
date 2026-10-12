@@ -30,6 +30,13 @@ Feature: The daily insights run
       And Langy is never called and no insight is filed
 
     @unit
+    Scenario: A member without langy:create gets no run and Langy is never called
+      Given a member with analytics:view and without langy:create on the project
+      When a run is requested for them
+      Then the run is recorded as skipped with the reason langy_off
+      And Langy is never called and no insight is filed
+
+    @unit
     Scenario: A member removed after the run was requested gets no run
       Given a run that filed insights for a member
       And the member was then removed from the project
@@ -775,6 +782,13 @@ Feature: The daily insights run
       Given a member without analytics:view on the project
       When they read, turn on or turn off a board's daily run
       Then each is refused as forbidden before the handler runs
+
+    @integration
+    Scenario: A member without langy:create cannot turn a daily run on
+      Given a member with analytics:view and without langy:create on the project
+      When they turn on a board's daily run
+      Then it is refused as forbidden before the handler runs
+      And they can still read and turn off their daily run
 
     @integration
     Scenario: A daily run setting is stored per person and board in the project

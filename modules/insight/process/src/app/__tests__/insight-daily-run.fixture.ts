@@ -260,6 +260,8 @@ export function runWorld() {
     ]),
     /** Who holds analytics:view in the project. */
     readers: new Set<string>([MEMBER, OTHER_MEMBER]),
+    /** Who holds langy:create in the project. */
+    askers: new Set<string>([MEMBER, OTHER_MEMBER]),
     boards: new Map<string, ScriptedBoard>([
       [
         BOARD.id,
@@ -455,7 +457,8 @@ function scriptedPeers(world: RunWorld) {
   });
   const authz = createApiFixture<AuthzApi>({
     hasProjectPermission: async ({ userId, permission }) =>
-      permission === "analytics:view" && world.readers.has(userId),
+      (permission === "analytics:view" && world.readers.has(userId)) ||
+      (permission === "langy:create" && world.askers.has(userId)),
   });
   return { user, authz };
 }

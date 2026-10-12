@@ -37,7 +37,8 @@ export function useBoardAccess(board: ScopedBoard & { ownerProject: { name: stri
   return {
     access: boardAccess({ board, reader }),
     names: {
-      project: board.ownerProject?.name ?? reader.projectName,
+      // No owner means the board's project is one the reader cannot open; never name the reader's own.
+      project: board.ownerProject?.name ?? "another project",
       organization: reader.organizationName,
     },
   };
