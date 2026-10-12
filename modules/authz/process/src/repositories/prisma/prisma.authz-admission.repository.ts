@@ -103,10 +103,6 @@ export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
     grantId,
   }: AuthzResolveAdmissionInput): Promise<boolean> {
     const updated = await this.database.$executeRaw`
-      ${skipTenantCheck({
-        // Organization-scoped atomic SSO admission completion.
-        SKIP_TENANT_CHECK: true,
-      })}
       UPDATE "OrganizationUser" AS membership
       SET "pendingSsoGrantId" = NULL,
           "updatedAt" = NOW()
@@ -145,10 +141,6 @@ export class PrismaAuthzAdmissionRepository extends AuthzAdmissionRepository {
     grantId,
   }: AuthzResolveAdmissionInput): Promise<boolean> {
     const updated = await this.database.$executeRaw`
-      ${skipTenantCheck({
-        // Organization-scoped revoked SSO admission cleanup.
-        SKIP_TENANT_CHECK: true,
-      })}
       UPDATE "OrganizationUser"
       SET "pendingSsoGrantId" = NULL,
           "updatedAt" = NOW()
