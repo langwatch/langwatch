@@ -174,6 +174,10 @@ function bootRecoveryTook(): boolean {
 
 const RELOAD_COOLDOWN_MS = 10_000;
 export const RELOAD_AT_KEY = "chunk-reload-at";
+/** At most this many chunk reloads in one window, however far apart. */
+const RELOAD_LIMIT = 2;
+const RELOAD_WINDOW_MS = 10 * 60_000;
+export const RELOAD_LOG_KEY = "chunk-reloads";
 
 /** The waits before each retry of a chunk that did not load. */
 export const CHUNK_RETRY_DELAYS_MS: readonly number[] = [500, 1_000, 2_000];
@@ -220,12 +224,26 @@ export function chunkUrlOf(err: unknown): string | undefined {
 export function forceReloadOnce(): boolean {
   if (typeof window === "undefined") return false;
 
-  const lastReloadAt = Number(sessionStorage.getItem(RELOAD_AT_KEY) ?? "0");
-  if (nowInstant().epochMilliseconds - lastReloadAt <= RELOAD_COOLDOWN_MS) return false;
-
-  sessionStorage.setItem(RELOAD_AT_KEY, String(nowInstant().epochMilliseconds));
+  const now = nowInstant().epochMilliseconds;
+  try {
+    const lastReloadAt = Number(sessionStorage.getItem(RELOAD_AT_KEY) ?? "0");
+    if (now - lastReloadAt <= RELOAD_COOLDOWN_MS) return false;
+    // A chunk still missing after a reload (a stale index.html) would reload each page; cap it.
+    const recent = recentReloads(now);
+    if (recent.length >= RELOAD_LIMIT) return false;
+    sessionStorage.setItem(RELOAD_LOG_KEY, JSON.stringify([...recent, now]));
+    sessionStorage.setItem(RELOAD_AT_KEY, String(now));
+  } catch {
+    return false; // No storage means no memory of past reloads, so never reload.
+  }
   window.location.reload();
   return true;
+}
+
+function recentReloads(now: number): number[] {
+  const parsed: unknown = JSON.parse(sessionStorage.getItem(RELOAD_LOG_KEY) ?? "[]");
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter((at): at is number => typeof at === "number" && now - at < RELOAD_WINDOW_MS);
 }
 
 /**

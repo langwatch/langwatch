@@ -93,6 +93,39 @@ describe("forceReloadOnce", () => {
       expect(forceReloadOnce()).toBe(true);
     });
   });
+
+  describe("when two reloads already happened within ten minutes", () => {
+    it("does not reload a third time, so a chunk that stays missing cannot loop", () => {
+      forceReloadOnce();
+      vi.advanceTimersByTime(30_000);
+      forceReloadOnce();
+      vi.advanceTimersByTime(30_000);
+
+      expect(forceReloadOnce()).toBe(false);
+    });
+  });
+
+  describe("when ten minutes have passed since the earlier reloads", () => {
+    it("reloads again", () => {
+      forceReloadOnce();
+      vi.advanceTimersByTime(30_000);
+      forceReloadOnce();
+      vi.advanceTimersByTime(10 * 60_000);
+
+      expect(forceReloadOnce()).toBe(true);
+    });
+  });
+
+  describe("when session storage throws", () => {
+    it("does not reload", () => {
+      vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+        throw new Error("blocked");
+      });
+
+      expect(forceReloadOnce()).toBe(false);
+      vi.restoreAllMocks();
+    });
+  });
 });
 
 describe("given a failure that never reached the server", () => {

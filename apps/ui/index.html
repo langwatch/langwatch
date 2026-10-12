@@ -18,7 +18,8 @@
         // HTTP cache keeps every file that arrived (assets are immutable).
         var MAX_STUCK = 6;
         var MAX_TRIES = 20;
-        var STALL_MS = 30000;
+        // A 1 MB entry on a slow link takes well over 30 s; reloading would cancel it.
+        var STALL_MS = 120000;
         var saved = String(read() || "0,0").split(",");
         var stuck = Number(saved[0]) || 0;
         var tries = Number(saved[1]) || 0;
@@ -72,8 +73,10 @@
         function fetchedSomething() {
           var entries = performance.getEntriesByType("resource");
           for (var i = 0; i < entries.length; i++) {
-            if (entries[i].transferSize > 0 && entries[i].name.indexOf("/assets/") !== -1)
-              return true;
+            var entry = entries[i];
+            // An error answer has a body too, but it is no progress.
+            if (entry.responseStatus >= 400) continue;
+            if (entry.transferSize > 0 && entry.name.indexOf("/assets/") !== -1) return true;
           }
           return false;
         }
@@ -119,10 +122,10 @@
           retry();
         });
         addEventListener("ui:mounted", function () {
+          if (note) note.remove(); // A late download can mount the app after giving up.
           if (done) return;
           standDown();
           write(null);
-          if (note) note.remove();
         });
         // A request that hangs never fails; nothing finishing for this long counts as one.
         try {

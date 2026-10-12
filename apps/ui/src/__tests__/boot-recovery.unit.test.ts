@@ -14,7 +14,7 @@ const INDEX_HTML = readFileSync(path.resolve(import.meta.dirname, "../../index.h
 const SCRIPT = /<script id="ui-boot-recovery">([\s\S]*?)<\/script>/.exec(INDEX_HTML)?.[1] ?? "";
 const KEY = "ui-boot-attempt";
 
-type Resource = { name: string; transferSize: number };
+type Resource = { name: string; transferSize: number; responseStatus?: number };
 
 /** One page load: the script runs with its own window events, storage and timing. */
 function bootPage({
@@ -102,6 +102,9 @@ function addTag(html: string): Element {
 const CODE_FETCHED: Resource[] = [
   { name: "https://app.example/assets/core-x.js", transferSize: 9 },
 ];
+const CODE_ERRORED: Resource[] = [
+  { name: "https://app.example/assets/core-x.js", transferSize: 9, responseStatus: 404 },
+];
 const ONLY_API_FETCHED: Resource[] = [{ name: "https://app.example/api/session", transferSize: 9 }];
 
 beforeEach(() => {
@@ -162,17 +165,17 @@ describe("given the page has not shown yet", () => {
     });
   });
 
-  describe("when nothing finishes loading for 30 seconds", () => {
+  describe("when nothing finishes loading for 2 minutes", () => {
     /** @scenario "A request that hangs counts as dropped" */
     it("reloads, and not while files keep arriving", () => {
       const page = bootPage();
 
-      vi.advanceTimersByTime(20_000);
+      vi.advanceTimersByTime(100_000);
       page.resourceFinished();
-      vi.advanceTimersByTime(20_000);
+      vi.advanceTimersByTime(100_000);
       expect(page.location.reload).not.toHaveBeenCalled();
 
-      vi.advanceTimersByTime(11_000);
+      vi.advanceTimersByTime(21_000);
       expect(page.location.reload).toHaveBeenCalledTimes(1);
     });
   });
@@ -188,6 +191,17 @@ describe("given earlier reloads", () => {
 
       expect(page.saved()).toBe("0,8");
       expect(page.location.reload).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the code files came back as errors", () => {
+    /** @scenario "An error answer is no progress" */
+    it("goes on counting tries without progress", () => {
+      const page = bootPage({ saved: "2,2", resources: CODE_ERRORED });
+
+      page.chunkFailed();
+
+      expect(page.saved()).toBe("3,3");
     });
   });
 

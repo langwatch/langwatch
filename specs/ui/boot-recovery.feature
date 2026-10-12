@@ -28,7 +28,7 @@ Feature: The application recovers from files a lossy link dropped while it boots
     @unit
     Scenario: A request that hangs counts as dropped
       Given the page has not shown yet
-      When nothing finishes loading for 30 seconds
+      When nothing finishes loading for 2 minutes
       Then the page reloads
 
     @unit
@@ -36,6 +36,12 @@ Feature: The application recovers from files a lossy link dropped while it boots
       Given a reload that fetched files the cache did not have
       When the next load still fails
       Then the count of tries without progress starts again
+
+    @unit
+    Scenario: An error answer is no progress
+      Given a reload whose code files came back as errors
+      When the next load still fails
+      Then the count of tries without progress goes on
 
     @unit
     Scenario: Six reloads in a row that fetch nothing new give up
