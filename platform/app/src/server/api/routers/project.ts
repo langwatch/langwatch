@@ -32,6 +32,8 @@ import {
 import { assertProjectAcceptsWrites } from "~/server/app-layer/projects/project-write-guard";
 import { mintProjectSlug } from "~/server/app-layer/projects/projectSlug";
 import type { Session } from "~/server/auth";
+import { isComponentDisabled } from "~/server/event-sourcing/utils/killSwitch";
+import { featureFlagService } from "~/server/featureFlag";
 import { TeamService } from "~/server/teams/team.service";
 import { encrypt } from "~/utils/encryption";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -667,6 +669,19 @@ export const projectRouter = createTRPCRouter({
             started: false as const,
             reason: "already_running" as const,
           };
+        }
+        // This is a project-scoped preflight, not an acknowledgement from the
+        // dispatcher. A switch changed after this check can still discard it.
+        if (
+          await isComponentDisabled({
+            featureFlagService,
+            aggregateType: "topic_clustering",
+            componentType: "command",
+            componentName: "requestClustering",
+            tenantId: input.projectId,
+          })
+        ) {
+          return { started: false as const, reason: "disabled" as const };
         }
         await app.topicClustering.requestClustering({
           tenantId: input.projectId,
