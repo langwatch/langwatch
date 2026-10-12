@@ -5,7 +5,7 @@
 // standard library so that importing it does not link gRPC and the generated
 // OTLP protobuf packages, which otlptracehttp pulls in. Use this package when
 // those are already in your binary, or when you depend on otlptracehttp's own
-// behaviour, such as the OTEL_EXPORTER_OTLP_* environment variables (TLS
+// behavior, such as the OTEL_EXPORTER_OTLP_* environment variables (TLS
 // certificates, timeout, compression) or its retry policy.
 //
 //	exporter, err := otlp.NewExporter(ctx, langwatch.WithFilters(langwatch.ExcludeHTTPRequests()))

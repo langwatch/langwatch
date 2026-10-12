@@ -147,7 +147,7 @@ func (e *Exporter) Shutdown(ctx context.Context) error {
 }
 
 // send performs one HTTP attempt. A retryable failure is returned as a
-// *retryableError so the retry loop can honour Retry-After.
+// *retryableError so the retry loop can honor Retry-After.
 func (e *Exporter) send(ctx context.Context, payload []byte, encoding string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, e.url, bytes.NewReader(payload))
 	if err != nil {
