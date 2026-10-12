@@ -212,8 +212,9 @@ export function isChunkLoadFailure(err: unknown): boolean {
 
 /** The script a chunk failure names, when the engine names one (Chrome and Firefox do). */
 export function chunkUrlOf(err: unknown): string | undefined {
-  const named = /(\S+\.m?js)(?:\?\S*)?$/.exec(chunkErrorMessageOf(err).trim())?.[1];
-  if (named === undefined) return void 0;
+  // The last word, without its query; a regex over the whole message backtracks on long input.
+  const named = chunkErrorMessageOf(err).trim().split(/\s+/).at(-1)?.split("?")[0];
+  if (named === undefined || !/\.m?js$/.test(named)) return void 0;
   try {
     return new URL(named, window.location.href).href;
   } catch {
