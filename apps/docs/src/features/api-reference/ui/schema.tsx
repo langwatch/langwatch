@@ -8,7 +8,8 @@ const MAX_DEPTH = 4;
 export function typeLabel({ schema }: { schema: Schema }): string {
   if (schema.$recursive) return schema.$recursive;
   const options = schema.oneOf ?? schema.anyOf;
-  if (options) return options.map((option) => typeLabel({ schema: option })).join(" | ");
+  if (options)
+    return [...new Set(options.map((option) => typeLabel({ schema: option })))].join(" | ");
   if (schema.allOf) return "object";
   const base = Array.isArray(schema.type)
     ? schema.type.join(" | ")
@@ -31,8 +32,8 @@ function mergeAllOf({ schema }: { schema: Schema }): Schema {
 function constraints({ schema }: { schema: Schema }): string[] {
   const out: string[] = [];
 
-  if (schema.minLength !== undefined) out.push(`Schema minimum length: ${schema.minLength}`);
-  if (schema.maxLength !== undefined) out.push(`Schema maximum length: ${schema.maxLength}`);
+  if (schema.minLength !== undefined) out.push(`At least ${schema.minLength} characters`);
+  if (schema.maxLength !== undefined) out.push(`Up to ${schema.maxLength} characters`);
   if (schema.minimum !== undefined) out.push(`Minimum ${schema.minimum}`);
   if (schema.maximum !== undefined) out.push(`Maximum ${schema.maximum}`);
   if (schema.pattern) out.push(`Pattern ${schema.pattern}`);
@@ -130,6 +131,7 @@ export function SchemaFields({ schema, depth = 0 }: { schema: Schema; depth?: nu
           location=""
           required={merged.required?.includes(name)}
           deprecated={child.deprecated}
+          default={child.default === void 0 ? void 0 : JSON.stringify(child.default)}
         >
           {child.description ? <p>{child.description}</p> : null}
           {child.enum ? (
@@ -151,6 +153,7 @@ export function SchemaFields({ schema, depth = 0 }: { schema: Schema; depth?: nu
           </Flex>
           {hasChildren({ schema: child }) ? (
             <Expandable
+              defaultOpen={depth === 0}
               title={`${Object.keys(child.properties ?? child.items?.properties ?? {}).length || "nested"} child attributes`}
             >
               <Children schema={child} depth={depth} />

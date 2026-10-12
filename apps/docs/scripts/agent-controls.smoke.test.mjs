@@ -106,9 +106,27 @@ await it("makes API data, skill actions and selection movement readable", async 
         try {
           await page.addInitScript((value) => localStorage.setItem("theme", value), theme);
           await page.goto(base + "api-reference/traces/discover-what-the-trace-filter-fields-ho");
-          assert.ok(
-            await page.locator("header").getByText("Examples", { exact: true }).isVisible(),
+          assert.equal(
+            await page.getByRole("combobox", { name: "Preferred code language" }).count(),
+            0,
           );
+          assert.equal(await page.locator("#content [data-docs-toc]").count(), 0);
+          assert.equal(
+            await page
+              .locator(".docs-layout")
+              .evaluate((node) => node.getBoundingClientRect().width),
+            1440,
+          );
+          const example = page.locator("[data-docs-playground] .docs-code-region").first();
+          assert.ok(await example.evaluate((node) => node.scrollHeight <= node.clientHeight + 1));
+          await example.hover();
+          await page.mouse.wheel(0, 500);
+          await page.waitForFunction(() => scrollY > 0);
+          const scrolled = await page.evaluate(() => scrollY);
+          await page.mouse.wheel(0, -400);
+          await page.waitForFunction((previous) => scrollY < previous, scrolled);
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.screenshot({ path: path.join(shots, `docs-api-full-width-${theme}.png`) });
           assert.ok((await page.locator(".docs-json-key:visible").count()) > 0);
           assert.ok(
             await page

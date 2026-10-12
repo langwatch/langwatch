@@ -1,14 +1,6 @@
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { Kbd } from "@langwatch/design-system/kbd";
-import {
-  Box,
-  Button,
-  Flex,
-  IconButton,
-  Link,
-  NativeSelect,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, Flex, IconButton, Link, Text } from "@langwatch/design-system/primitives";
 import { ArrowUpRight, Command, Menu as MenuIcon, Search } from "lucide-react";
 
 import { pagePath } from "../../../lib/site-path.ts";
@@ -92,36 +84,6 @@ export function Header({ kind, onMenu }: { kind: PageKind; onMenu: () => void })
           >
             Docs
           </Text>
-          <Box
-            display="flex"
-            alignItems="center"
-            gap="2"
-            title="Preferred language for code examples"
-          >
-            <Text
-              as="span"
-              fontSize="12px"
-              color="docs.body"
-              display={{ base: "none", xl: "inline" }}
-            >
-              Examples
-            </Text>
-            <NativeSelect.Root size="sm" width={{ base: "7rem", lg: "8rem" }} disabled>
-              <NativeSelect.Field
-                fontSize={{ base: "12px", lg: "14px" }}
-                aria-label="Preferred code language"
-                data-docs-language-preference=""
-                defaultValue="Python"
-              >
-                {["Python", "TypeScript", "JavaScript", "Go", "Java", "curl"].map((language) => (
-                  <option key={language} value={language}>
-                    {language}
-                  </option>
-                ))}
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-          </Box>
         </Flex>
         <Button
           type="button"

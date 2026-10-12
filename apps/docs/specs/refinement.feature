@@ -32,9 +32,9 @@ Feature: Actionable documentation and restrained reading surfaces
     Then that tab is visible in the tab strip
     And the document does not scroll vertically
   @e2e
-  Scenario: Choose and remember a code language from the header
+  Scenario: Choose and remember a code language from code tabs
     Given a guide contains equivalent Python and TypeScript examples
-    When I pick TypeScript in a code switcher or the header
+    When I pick TypeScript in a code switcher
     Then matching examples show their TypeScript filename and source
     And copying copies the selected source
     And the preference survives reloads and navigation
@@ -42,9 +42,9 @@ Feature: Actionable documentation and restrained reading surfaces
   @e2e
   Scenario: Switch code languages when preference storage is unavailable
     Given preference storage is denied
-    When I pick a language in the header on a compact screen
+    When I pick a language in a code switcher on a compact screen
     Then matching examples change on the current page
-    And the header fits without horizontal document scrolling
+    And the page fits without horizontal document scrolling
   @e2e
   Scenario: Read code filenames and source without JavaScript
     Given JavaScript is disabled
@@ -91,7 +91,7 @@ Feature: Actionable documentation and restrained reading surfaces
     And request parameters fit a compact two-column layout where space permits
     And full skill prompts can be viewed and copied
     And sidebar selection moves between pages with reduced motion respected
-    And the language preference is visibly labelled on desktop
+    And language choices appear alongside code examples
   @unit
   Scenario: Read skill prompts as Markdown while preserving the copied source
     Given a skill prompt includes headings, emphasis, code and HTML-like text

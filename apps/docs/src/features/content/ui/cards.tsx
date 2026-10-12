@@ -1,5 +1,5 @@
-import type { SystemStyleObject } from "@langwatch/design-system/primitives";
-import { Box, Flex, Link, Text } from "@langwatch/design-system/primitives";
+import { Card as SurfaceCard } from "@langwatch/design-system/card";
+import { Box, Link } from "@langwatch/design-system/primitives";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { Children, isValidElement } from "react";
 import type { ReactNode } from "react";
@@ -26,148 +26,37 @@ type CardProps = {
   children?: ReactNode;
 };
 
-const STRETCH = {
-  "&::after": { content: '""', position: "absolute", inset: "-1px", borderRadius: "2xl" },
-  "&:focus-visible": { outline: "none" },
-  "&:focus-visible::after": {
-    outline: "2px solid",
-    outlineColor: "blue.focusRing",
-    outlineOffset: "2px",
-  },
-} satisfies SystemStyleObject;
-
-function CardHeading({
-  title,
-  href,
-  external,
-  showArrow,
-}: {
-  title?: string;
-  href?: string;
-  external: boolean;
-  showArrow: boolean;
-}) {
-  const Direction = external ? ArrowUpRight : ArrowRight;
-  return (
-    <Flex
-      alignItems="center"
-      gap="3"
-      minWidth="0"
-      width="100%"
-      fontSize="16px"
-      lineHeight="24px"
-      fontWeight="600"
-      color="fg"
-    >
-      <Text as="span" flex="1" minWidth="0">
-        {title}
-      </Text>
-      {href && showArrow ? (
-        <Flex
-          as="span"
-          className="docs-card-action"
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-          width="28px"
-          height="28px"
-          borderRadius="full"
-          bg="accent.subtle"
-          color="accent.fg"
-        >
-          <Direction className="docs-card-arrow" size={18} aria-hidden="true" />
-        </Flex>
-      ) : null}
-    </Flex>
-  );
-}
-
-/** An asset path is a third-party logo; it sits on a light chip so dark marks stay visible. */
-function isLogo(icon: string) {
-  return /^(\/|https?:)/.test(icon);
-}
-
-/** Authored links inside a card keep their own targets. */
-export function Card({
-  title,
-  description,
-  icon,
-  href,
-  horizontal: _horizontal,
-  arrow,
-  children,
-}: CardProps) {
-  const external = Boolean(href && /^https?:/.test(href));
-  const stretch = Boolean(href) && !containsLink({ node: children });
+/** MDX supplies content and destinations; the shared card owns its surface and interaction. */
+export function Card({ title, description, icon, href, arrow, children }: CardProps) {
   const compact = Boolean(icon && !description && !Children.toArray(children).length);
-  const showArrow = Boolean(href) && arrow !== false && arrow !== "false";
-  const logo = Boolean(icon && isLogo(icon));
-  const heading = (
-    <CardHeading title={title} href={href} external={external} showArrow={showArrow} />
-  );
+  const linked = Boolean(href && title && !containsLink({ node: children }));
+  const Direction = href && /^https?:/.test(href) ? ArrowUpRight : ArrowRight;
   return (
-    <Box
-      className="docs-card"
-      data-compact={compact}
-      data-linked={Boolean(href) || void 0}
-      position="relative"
-      display="flex"
-      flexDirection="row"
-      alignItems={compact ? "center" : "flex-start"}
-      gap={compact ? "3" : "4"}
-      padding={compact ? "3" : "5"}
-      minHeight={compact ? "64px" : void 0}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="2xl"
-      bg="bg.surface"
-      minWidth="0"
-    >
-      {icon ? (
-        <Flex
-          className={logo ? "docs-card-logo" : "docs-card-icon"}
-          alignItems="center"
-          justifyContent="center"
-          flexShrink={0}
-          width="2.5rem"
-          height="2.5rem"
-          borderRadius="lg"
-          borderWidth="1px"
-          color="accent.fg"
-        >
-          <Icon icon={icon} size={logo ? 24 : 20} />
-        </Flex>
-      ) : null}
-      <Flex direction="column" gap="1.5" minWidth="0" flex="1">
-        {title && href ? (
-          <Link
-            href={sitePath({ path: href })}
-            color="fg"
-            textDecoration="none"
-            _hover={{ textDecoration: "none" }}
-            css={stretch ? STRETCH : void 0}
-          >
-            {heading}
-          </Link>
-        ) : null}
-        {title && !href ? heading : null}
-        {description ? (
-          <Text fontSize="14px" lineHeight="24px" color="docs.body" margin="0">
-            {description}
-          </Text>
-        ) : null}
+    <Box className="docs-card" data-compact={compact} display="grid" minWidth="0">
+      <SurfaceCard
+        variant="panel-fill"
+        padding={compact ? "sm" : "lg"}
+        titleLevel={3}
+        title={
+          title && href && !linked ? <Link href={sitePath({ path: href })}>{title}</Link> : title
+        }
+        description={description}
+        badge={
+          href && arrow !== false && arrow !== "false" ? (
+            <Direction size={16} aria-hidden="true" />
+          ) : (
+            void 0
+          )
+        }
+        icon={icon ? <Icon icon={icon} size={20} /> : void 0}
+        opener={linked && href ? <a href={sitePath({ path: href })} aria-label={title} /> : void 0}
+      >
         {children ? (
-          <Box
-            className="docs-card-body"
-            fontSize="14px"
-            lineHeight="24px"
-            color="docs.body"
-            minWidth="0"
-          >
+          <Box className="docs-card-body" minWidth="0">
             {children}
           </Box>
         ) : null}
-      </Flex>
+      </SurfaceCard>
     </Box>
   );
 }
@@ -187,6 +76,7 @@ export function CardGroup({
         className="docs-card-grid"
         display="grid"
         alignItems="stretch"
+        gridAutoRows="1fr"
         gap="3"
         css={{
           gridTemplateColumns: "minmax(0, 1fr)",

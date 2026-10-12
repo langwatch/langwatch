@@ -16,7 +16,7 @@ import { SiteFooter } from "./site-footer.tsx";
 import { TocDisclosure, TocRail } from "./toc.tsx";
 import type { TocEntry } from "./toc.tsx";
 
-const ENDPOINT_QUERY = "@media (min-width: 90rem)";
+const ENDPOINT_QUERY = "@media (min-width: 80rem)";
 
 type ShellProps = {
   slug: string;
@@ -80,8 +80,7 @@ export function DocsShell({
       kind={kind}
     />
   );
-  const contents =
-    toc.length >= 2 ? <TocDisclosure entries={toc} always={kind === "endpoint"} /> : null;
+  const contents = kind !== "endpoint" && toc.length >= 2 ? <TocDisclosure entries={toc} /> : null;
   const footer = slug === "404" ? null : <PageFooter slug={slug} previous={previous} next={next} />;
 
   return (
@@ -196,12 +195,7 @@ export function DocsShell({
         )}
         {showRail ? (
           <Box gridArea="toc" paddingTop="0" display={{ base: "none", xl: "block" }}>
-            <Box
-              className="docs-toc-container"
-              data-docs-rail=""
-              paddingTop="10"
-              maxHeight="calc(100vh - var(--docs-header-h) - 3rem)"
-            >
+            <Box className="docs-toc-container" data-docs-rail="" paddingTop="10" paddingBottom="6">
               <TocRail entries={toc} />
             </Box>
           </Box>

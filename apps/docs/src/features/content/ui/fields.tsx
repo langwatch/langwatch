@@ -45,7 +45,11 @@ export function DocsField({
     >
       <Flex alignItems="center" gap="2" wrap="wrap" rowGap="1">
         <DocsInlineCode>{name}</DocsInlineCode>
-        {props.type ? <DocsInlineCode>{props.type}</DocsInlineCode> : null}
+        {props.type ? (
+          <Box as="span" fontSize="13px" fontFamily="mono" color="fg.muted">
+            {props.type}
+          </Box>
+        ) : null}
         {kind === "param" && location ? (
           <Badge size="sm" variant="subtle" colorPalette="gray">
             {location}

@@ -22,16 +22,6 @@ function applyPreference(group: string, value: string) {
     );
     if (button) selectTab({ button, remember: false });
   });
-  if (group === "sdk-language") {
-    document
-      .querySelectorAll<HTMLSelectElement>("[data-docs-language-preference]")
-      .forEach((picker) => {
-        const option = [...picker.options].find(
-          (item) => item.value.toLowerCase() === value.toLowerCase(),
-        );
-        if (option) picker.value = option.value;
-      });
-  }
 }
 
 function savePreference(group: string, value: string) {
@@ -137,12 +127,6 @@ function measureTabLists() {
 
 function restoreTabs() {
   measureTabLists();
-  document
-    .querySelectorAll<HTMLSelectElement>("[data-docs-language-preference]")
-    .forEach((picker) => {
-      picker.disabled = false;
-      picker.parentElement?.querySelector("[data-disabled]")?.removeAttribute("data-disabled");
-    });
   for (const group of ["sdk-language", "api-language", "package-manager"]) {
     const stored = preference(group);
     if (stored) applyPreference(group, stored);
@@ -152,11 +136,6 @@ function restoreTabs() {
 export function installTabs() {
   restoreTabs();
   document.addEventListener("docs:navigated", restoreTabs);
-  document.addEventListener("change", (event) => {
-    const picker = event.target;
-    if (picker instanceof HTMLSelectElement && picker.matches("[data-docs-language-preference]"))
-      choosePreference("sdk-language", picker.value);
-  });
   window.addEventListener("resize", measureTabLists);
   document.addEventListener("scroll", measureTabLists, { capture: true, passive: true });
   void document.fonts.ready.then(measureTabLists);

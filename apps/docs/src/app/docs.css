@@ -82,7 +82,7 @@ body {
 .docs-prose > :first-child {
   margin-top: 0;
 }
-.docs-prose p {
+.docs-prose p:not([data-card-variant] p) {
   margin: 0 0 20px;
   max-inline-size: none;
 }
@@ -283,26 +283,6 @@ body {
     ),
     var(--chakra-colors-docs-canvas);
 }
-.docs-prose .docs-callout {
-  font-size: 15px;
-  line-height: 24px;
-}
-/* A solid semantic rule on the leading edge tells callout kinds apart at a glance. */
-.docs-shell .docs-callout[role="note"] {
-  border-inline-start: 4px solid var(--docs-callout-rule);
-}
-.docs-callout[data-palette="gray"] {
-  --docs-callout-rule: var(--chakra-colors-border-emphasized);
-}
-.docs-callout[data-palette="blue"] {
-  --docs-callout-rule: var(--chakra-colors-blue-solid);
-}
-.docs-callout[data-palette="green"] {
-  --docs-callout-rule: var(--chakra-colors-green-solid);
-}
-.docs-callout[data-palette="yellow"] {
-  --docs-callout-rule: var(--chakra-colors-yellow-solid);
-}
 .docs-callout a {
   color: inherit;
   text-decoration-color: currentColor;
@@ -378,10 +358,10 @@ body {
     column-gap: 32px;
   }
 }
-@media (min-width: 90rem) {
+@media (min-width: 80rem) {
   .docs-layout[data-kind="endpoint"] {
     padding-inline-end: 32px;
-    grid-template-columns: 280px minmax(0, 1fr) 384px;
+    grid-template-columns: 248px minmax(0, 1.1fr) minmax(0, 1fr);
     grid-template-areas: "nav top play" "nav ref play";
     grid-template-rows: auto 1fr;
     column-gap: 32px;
@@ -652,58 +632,6 @@ body {
 .docs-card-grid > .docs-card:has(ul) {
   grid-column: 1 / -1;
 }
-.docs-card {
-  transition:
-    border-color 160ms,
-    box-shadow 160ms,
-    transform 160ms;
-}
-.docs-card[data-linked]:hover,
-.docs-card[data-linked]:focus-within {
-  border-color: color-mix(
-    in srgb,
-    var(--chakra-colors-accent-solid) 55%,
-    var(--chakra-colors-border)
-  );
-  box-shadow: 0 6px 20px var(--chakra-colors-docs-shadow-strong);
-  transform: translateY(-1px);
-}
-.docs-card a::after {
-  transform: none;
-}
-.docs-card-arrow {
-  flex-shrink: 0;
-  color: var(--chakra-colors-accent-fg);
-  transition:
-    transform 160ms,
-    color 160ms;
-}
-.docs-card[data-linked]:hover .docs-card-arrow {
-  color: var(--chakra-colors-accent-fg);
-  transform: translateX(2px);
-}
-.docs-card-icon {
-  background: transparent;
-  border-color: transparent;
-}
-/* Third-party marks are drawn for light backgrounds: one light chip in both themes. */
-.docs-card-logo {
-  background: #ffffff;
-  border-color: var(--chakra-colors-border);
-}
-.dark .docs-card-logo {
-  background: var(--chakra-colors-fg);
-  border-color: transparent;
-}
-/* The chip is light, so marks inverted for dark paper elsewhere keep their own colours here. */
-.dark .docs-card .docs-card-logo img {
-  filter: none;
-}
-.docs-card[data-compact="true"] .docs-card-logo,
-.docs-card[data-compact="true"] .docs-card-icon {
-  width: 2.25rem;
-  height: 2.25rem;
-}
 .docs-examples > summary {
   font-size: 14px;
   padding: 12px 16px;
@@ -773,16 +701,6 @@ body {
   [data-docs-rail][data-fits-viewport] {
     position: sticky;
     top: var(--docs-header-h);
-  }
-  /* The navigation rail scrolls on its own, so changing page never moves it. */
-  .docs-left-rail[data-docs-rail] {
-    position: sticky;
-    top: var(--docs-header-h);
-    max-height: calc(100dvh - var(--docs-header-h));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: var(--chakra-colors-border) transparent;
   }
 }
 .docs-prose .docs-agent-start p {
@@ -1324,7 +1242,7 @@ body {
 }
 
 [data-docs-playground] .docs-code-region {
-  max-height: 28rem;
+  max-height: none;
   font-size: 14px;
 }
 
@@ -1338,4 +1256,13 @@ body {
 }
 .docs-skill-body p {
   overflow-wrap: anywhere;
+}
+
+.docs-layout[data-kind="endpoint"] {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  border-radius: 0;
+  border-inline: 0;
+  box-shadow: none;
 }

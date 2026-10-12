@@ -31,7 +31,7 @@ describe("when API responses use root arrays and composed schemas", () => {
                   allOf: [
                     {
                       type: "object",
-                      properties: { promptVersion: { type: "integer" } },
+                      properties: { promptVersion: { type: "integer", default: 1, minimum: 1 } },
                       required: ["promptVersion"],
                     },
                     { type: "object", properties: { promptHandle: { type: "string" } } },
@@ -58,6 +58,8 @@ describe("when API responses use root arrays and composed schemas", () => {
       </DesignSystemTestProvider>,
     );
     expect(html).toContain("promptVersion");
+    expect(html).toContain("Default:");
+    expect(html).toContain("Minimum 1");
     expect(html).toContain("promptHandle");
     expect(html).toContain("required");
     expect(html).toContain("retryAfter");

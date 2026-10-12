@@ -15,7 +15,7 @@ const screenshots = path.resolve(
 );
 await mkdir(screenshots, { recursive: true });
 
-/** @scenario "Choose and remember a code language from the header" */
+/** @scenario "Choose and remember a code language from code tabs" */
 await it("switches filenames and copied code together and remembers the language", async () => {
   await withPreviewBrowser({
     outDir,
@@ -38,8 +38,8 @@ await it("switches filenames and copied code together and remembers the language
             ).length === 2,
         );
         assert.equal(
-          await page.getByRole("combobox", { name: "Preferred code language" }).inputValue(),
-          "TypeScript",
+          await page.getByRole("combobox", { name: "Preferred code language" }).count(),
+          0,
         );
         const frame = groups
           .filter({ has: page.locator("[data-docs-code-title]", { hasText: "chat.ts" }) })
@@ -63,24 +63,20 @@ await it("switches filenames and copied code together and remembers the language
               (n) => n.textContent === "chat.ts",
             ).length === 2,
         );
-        await page
-          .getByRole("combobox", { name: "Preferred code language" })
-          .selectOption("Python");
+        await groups.first().getByRole("tab", { name: "Python", exact: true }).click();
         await page.waitForFunction(
           () =>
             [...document.querySelectorAll("[data-docs-code-title]")].filter(
               (n) => n.textContent === "chat.py",
             ).length === 2,
         );
-        await page.getByRole("combobox", { name: "Preferred code language" }).selectOption("Go");
-        assert.equal(await groups.getByRole("tab", { name: "Python", selected: true }).count(), 2);
-        await page
-          .getByRole("combobox", { name: "Preferred code language" })
-          .selectOption("TypeScript");
+        await groups.first().getByRole("tab", { name: "TypeScript", exact: true }).click();
         await page.goto(base + "ai-gateway/quickstart");
-        await page.waitForFunction(
-          () => document.querySelector("[data-docs-language-preference]")?.value === "TypeScript",
-        );
+        await page
+          .locator('[data-docs-preference="api-language"]')
+          .getByRole("tab", { name: "TypeScript", selected: true })
+          .first()
+          .waitFor();
         assert.ok(
           (await page
             .locator('[data-docs-preference="api-language"]')
@@ -110,10 +106,11 @@ await it("keeps the page choice usable when storage is denied", async () => {
       try {
         const page = await context.newPage();
         await page.goto(base + "integration/mcp");
-        await page.getByRole("combobox", { name: "Preferred code language" }).waitFor();
         await page
-          .getByRole("combobox", { name: "Preferred code language" })
-          .selectOption("TypeScript");
+          .locator('[data-docs-preference="sdk-language"]')
+          .first()
+          .getByRole("tab", { name: "TypeScript", exact: true })
+          .click();
         await page.waitForFunction(
           () =>
             [...document.querySelectorAll("[data-docs-code-title]")].filter(
@@ -221,8 +218,10 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
           });
           await page.goto(base + "integration/mcp");
           await page
-            .getByRole("combobox", { name: "Preferred code language" })
-            .selectOption("TypeScript");
+            .locator('[data-docs-preference="sdk-language"]')
+            .first()
+            .getByRole("tab", { name: "TypeScript", exact: true })
+            .click();
           const example = page.locator('[data-docs-preference="sdk-language"]').first();
           await page.waitForFunction(
             () =>
@@ -243,7 +242,9 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
           });
           await page.setViewportSize({ width: 1440, height: 1000 });
           await page.goto(base + "integration/typescript/tutorials/manual-instrumentation");
-          const card = page.locator(".docs-card[data-linked]").first();
+          const card = page
+            .locator(".docs-card [data-card-variant]:has([data-card-opener])")
+            .first();
           const edges = await card.evaluate((node) => {
             const style = getComputedStyle(node);
             return [
@@ -257,9 +258,9 @@ await it("shows one diagram variant, explicit matrix values and clear navigation
           assert.ok(
             (await card.evaluate((node) =>
               Number.parseFloat(getComputedStyle(node).borderTopLeftRadius),
-            )) >= 12,
+            )) >= 8,
           );
-          assert.equal(await card.locator(".docs-card-action").count(), 1);
+          assert.equal(await card.locator("[data-card-opener] a").count(), 1);
           await card.locator("a").first().focus();
           assert.equal(
             await card
@@ -309,6 +310,23 @@ await it("draws the contents path through subsection indents without animation u
           "0s",
         );
         assert.match(await page.locator("#preparing-for-321").textContent(), /3.21/);
+        await page.setViewportSize({ width: 1440, height: 600 });
+        await page.goto(base + "self-hosting/overview");
+        const rail = page.locator(".docs-toc-container");
+        await rail.locator("a").last().scrollIntoViewIfNeeded();
+        assert.equal(await rail.evaluate((node) => node.scrollTop), 0);
+        await page.evaluate(() => window.scrollTo(0, 500));
+        await rail.locator("a").last().hover();
+        const scrollYBefore = await page.evaluate(() => scrollY);
+        assert.ok(scrollYBefore > 0);
+        await page.mouse.wheel(0, -600);
+        await page.waitForFunction((previous) => scrollY < previous, scrollYBefore);
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+        const ends = await page.evaluate(() => ({
+          rail: document.querySelector(".docs-toc-container").getBoundingClientRect().bottom,
+          panel: document.querySelector(".docs-layout").getBoundingClientRect().bottom,
+        }));
+        assert.ok(ends.rail <= ends.panel + 1);
       } finally {
         await page.close();
       }
