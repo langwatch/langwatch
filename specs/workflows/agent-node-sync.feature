@@ -41,6 +41,14 @@ Feature: Agent node sync between the workflow DSL and the agent library
     Then the agent record's inputs match the node's inputs
 
   @integration
+  Scenario: Saving adopts the record the server stored
+    Given the agent drawer is open
+    And the server normalizes the code it is sent
+    When I edit the code and click Save
+    Then the node's DSL parameters carry the stored code, not what I submitted
+    And the agent record shown carries the stored code
+
+  @integration
   Scenario: The drawer never shows the starter template for a saved agent
     Given the agent record fetch is still loading
     When I open the agent node drawer
