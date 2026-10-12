@@ -188,7 +188,7 @@ Feature: The worker runs declared background steps
     Then the first step's run fails naming that group
     And the second step finishes and is recorded done
 
-  # A large step's work drains for longer than any fixed wait: the wait (60 seconds unless the step
+  # A large step's work drains for longer than any fixed wait: the wait (5 minutes unless the step
   # declares longer) only runs out once no fewer jobs are outstanding for that long. The run's
   # deadline still bounds the whole attempt.
   @integration

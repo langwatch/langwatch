@@ -519,7 +519,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     this.consumerEnabled = options?.consumerEnabled ?? true;
     this.dispatchGroupAllowListKey = options?.dispatchGroupAllowListKey;
     this.dispatchListed = options?.dispatchListed ?? false;
-    this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 60_000;
+    this.preflightDrainTimeoutMs = options?.preflightDrainTimeoutMs ?? 300_000;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
     // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
