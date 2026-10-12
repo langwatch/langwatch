@@ -88,6 +88,7 @@ function createModelProvider(
     customKeys: null,
     customModels: null,
     customEmbeddingsModels: null,
+    lastListedModelIds: null,
     deploymentMapping: null,
     extraHeaders: [],
     rateLimitRpm: null,

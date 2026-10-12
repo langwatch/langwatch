@@ -272,6 +272,8 @@ export class ModelProviderRepository {
       customKeys?: Record<string, unknown> | null;
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
+      /** Ids the provider's model listing carried on this save. */
+      lastListedModelIds?: string[];
       extraHeaders?: { key: string; value: string }[];
       /**
        * Scope grants for this credential. Every row must be accessible to
@@ -323,6 +325,7 @@ export class ModelProviderRepository {
         customEmbeddingsModels: data.customEmbeddingsModels as
           | Prisma.InputJsonValue
           | undefined,
+        lastListedModelIds: data.lastListedModelIds,
         extraHeaders: data.extraHeaders ?? [],
         ...routingHandleWrite({ routingHandle: data.routingHandle }),
         ...(data.rateLimitRpm !== undefined && {
@@ -370,6 +373,8 @@ export class ModelProviderRepository {
       customKeys?: Record<string, unknown>;
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
+      /** Ids the provider's model listing carried on this save. */
+      lastListedModelIds?: string[];
       extraHeaders?: { key: string; value: string }[];
       /**
        * Replace the scope set atomically. When provided, all existing

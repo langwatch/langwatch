@@ -715,4 +715,88 @@ describe("useProviderFormSubmit()", () => {
       expect(payload).not.toHaveProperty("providerConfig");
     });
   });
+
+  describe("given a save that imported models from the provider listing", () => {
+    /** @scenario The drawer tells the user what the save imported */
+    it("toasts how many models were imported and from which provider", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "imported", added: 3, total: 3 },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({
+          name: "My Endpoint",
+          useAsDefaultProvider: false,
+        }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Imported 3 models from My Endpoint",
+          type: "success",
+        }),
+      );
+    });
+
+    it("shows a warning when the provider could not list its models", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "failed" },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Could not list models from this provider",
+          type: "warning",
+        }),
+      );
+    });
+
+    it("tells the user to save again when the import was skipped", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "skipped" },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Models were not imported this time",
+          type: "info",
+        }),
+      );
+    });
+
+    it("shows no import toast when nothing new was imported", async () => {
+      mockUpdateMutateAsync.mockResolvedValueOnce({
+        modelImport: { status: "imported", added: 0, total: 3 },
+      });
+      const { result } = renderSubmitHook({
+        snapshot: buildSnapshot({ useAsDefaultProvider: false }),
+      });
+
+      await act(async () => {
+        await result.current.submit();
+      });
+
+      expect(mockToasterCreate).toHaveBeenCalledTimes(1);
+      expect(mockToasterCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Model Provider Updated" }),
+      );
+    });
+  });
 });

@@ -2688,6 +2688,10 @@ model ModelProvider {
   extraHeaders           Json?
   customModels           Json?
   customEmbeddingsModels Json?
+  // Model ids the provider's /v1/models listing carried on the last save
+  // that imported from it. An id in here that is missing from the custom
+  // model lists was removed by the user, so the next import skips it.
+  lastListedModelIds     Json?
   deploymentMapping      Json?
 
   // Gateway rate-limits (advanced). Optional caps applied per MP.
