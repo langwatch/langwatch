@@ -1476,9 +1476,9 @@ Declared at `src/eventing/simulation-processing.pipeline.ts:116`. Events: `Simul
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
 | ------ | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:272`            |
-| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:273`            |
-| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:275`            |
+| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:271`            |
+| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:272`            |
+| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:274`            |
 | config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:95`  |
 | config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:97`  |
 | config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:99`  |
