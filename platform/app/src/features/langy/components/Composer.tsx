@@ -291,7 +291,7 @@ function ComposerImpl({
       // read as tighter or more squashed than the floating one.
       paddingX={hero ? 0 : 3.5}
       paddingTop={hero ? 0 : 3}
-      paddingBottom={hero ? 0 : floating ? 2 : 3.5}
+      paddingBottom={hero ? 0 : floating ? 3 : 3.5}
       // Transparent in BOTH layouts: the footer is a sibling BELOW the scroller
       // (its content can't bleed past it), so a solid backing bought nothing and
       // only painted a grey box around the card. Transparent lets the panel
@@ -505,33 +505,34 @@ function ComposerImpl({
           </HStack>
         </Box>
       </Box>
-      {floating ? (
+      {floating || chatsImproveLangy ? (
+        // One caption line, not two stacked whispers: the floating panel's
+        // "you review and apply" and the Cloud data use note share a row.
         <Text
-          marginTop={1.5}
+          marginTop={2.5}
+          paddingX={2}
           textStyle="2xs"
           color="fg.subtle"
           textAlign="center"
           letterSpacing="0.01em"
-          lineHeight="1.2"
-          css={{
-            "@media (max-height: 520px)": { display: "none" },
-          }}
+          lineHeight="1.4"
         >
-          {/* House style rules out the em dash anywhere in user-facing copy
-              (dev/docs/best_practices/copywriting.md). */}
-          Langy proposes, you review and apply.
-        </Text>
-      ) : null}
-      {chatsImproveLangy ? (
-        <Text
-          marginTop={1.5}
-          textStyle="2xs"
-          color="fg.subtle"
-          textAlign="center"
-          letterSpacing="0.01em"
-          lineHeight="1.2"
-        >
-          {COMPOSER_DATA_USE_NOTICE}
+          {floating ? (
+            <Box
+              as="span"
+              css={{
+                "@media (max-height: 520px)": { display: "none" },
+              }}
+            >
+              {/* House style rules out the em dash anywhere in user-facing copy
+                  (dev/docs/best_practices/copywriting.md). */}
+              Langy proposes, you review and apply.
+              {chatsImproveLangy ? " " : null}
+            </Box>
+          ) : null}
+          {chatsImproveLangy ? (
+            <span>{COMPOSER_DATA_USE_NOTICE}</span>
+          ) : null}
         </Text>
       ) : null}
     </Box>

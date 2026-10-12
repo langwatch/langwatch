@@ -3305,18 +3305,18 @@ function LangyPanel({
                   maxHeight: FLOATING_MAX_HEIGHT,
                   // Floating reads as glass: a touch translucent over a blur of the
                   // page behind it. (Sidebar stays fully opaque — it's docked, not
-                  // floating over content.) Light uses the platform's standard
-                  // glass recipe (surface at alpha over an 8px blur); dark keeps
-                  // the heavier ink glass, whose ground needs the stronger blur
-                  // to stay legible.
-                  background: "bg.surface/85",
+                  // floating over content.) Nearly opaque: at 85% the page's own
+                  // text (a table's numbers, a heading) read through the composer
+                  // footer as if it were part of the panel. Dark keeps the
+                  // stronger blur its ink ground needs to stay legible.
+                  background: "bg.surface/95",
                   backdropFilter: "blur(8px)",
                   borderWidth: "1px",
                   borderRadius: "20px",
                   boxShadow:
                     "0 1px 2px rgba(20,20,23,0.04), 0 12px 28px rgba(20,20,23,0.10), 0 32px 64px rgba(20,20,23,0.10)",
                   _dark: {
-                    background: "bg.surface/88",
+                    background: "bg.surface/95",
                     backdropFilter: "blur(16px) saturate(1.1)",
                     // The stacked drop shadows give depth from OUTSIDE; the inset
                     // hairline gives the top edge a lit rim from INSIDE, so the panel
