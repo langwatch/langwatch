@@ -145,7 +145,8 @@ describe("given the governance section navigation data", () => {
 
   describe("when the governance layout renders with the billed-cost flag on", () => {
     /** @scenario With the billed-cost flag on, Costs appears without the unfinished Billed destination */
-    it("lists Costs without Billed and keeps the Platform entries after People", () => {
+    /** @scenario "The page is listed in the governance rail next to Costs" */
+    it("lists Costs and Dashboards without Billed and keeps the Platform entries after People", () => {
       harness.enabledFlags = ["release_ui_governance_billed_cost_enabled"];
       render(<GovernanceLayout>x</GovernanceLayout>);
 
@@ -154,6 +155,7 @@ describe("given the governance section navigation data", () => {
       ).toEqual([
         { label: "Overview", href: "/governance" },
         { label: "Costs", href: "/governance/costs" },
+        { label: "Dashboards", href: "/governance/dashboards" },
         { label: "Inventory", href: "/governance/inventory" },
         { label: "Agents", href: "/governance/agents" },
         { label: "People", href: "/governance/people" },

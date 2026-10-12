@@ -76,6 +76,7 @@ const ROUTE_PATTERNS = [
   "/governance/inventory",
   "/governance/people",
   "/governance/costs",
+  "/governance/dashboards",
   "/governance/billed",
   "/governance/insights",
   "/governance/analytics",
