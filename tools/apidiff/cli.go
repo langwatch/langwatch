@@ -364,6 +364,43 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	flags.SetOutput(out.stderr)
 	boot := BootConfig{}
 	probe := &probeFlags{specSettle: specSettleTimeout}
+	var steer bootSteering
+	registerBootFlags(flags, &boot, &steer)
+	registerProbeFlags(flags, probe)
+	registerScenarioFlags(flags, &probe.scenarios)
+	flags.BoolVar(&probe.scenarios.skip, "skip-scenarios", false, "skip the scenario phase after the main pass")
+	flags.BoolVar(&probe.parityOnly, "parity-only", false, "stop after the parity phase: both worktrees prepared, tRPC inventoried, parity.json and per-module packets written, no stack booted")
+	if err := flags.Parse(args); err != nil {
+		return boot, probe, exitError, true
+	}
+	external, err := externalInfra(boot)
+	if err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return boot, probe, exitError, true
+	}
+	boot.UseHaven = havenSelected(havenOnPath(), steer.noHaven, external)
+	if boot.UseHaven && steer.envFile != "" {
+		fmt.Fprintln(out.stderr, "-env-file and the haven path are exclusive: -env-file points the instances at the servers that dotenv names, which is the developer's own stack, and haven exists so a run never reaches it. Pass -no-haven to boot on those servers.")
+		return boot, probe, exitError, true
+	}
+	if boot.DryRun {
+		return boot, probe, writeDryRunPlanOrError(boot, out), true
+	}
+	if steer.envFile != "" {
+		applyEnvFile(steer.envFile, &boot)
+	}
+	return boot, probe, exitEqual, false
+}
+
+// bootSteering holds the run flags that only steer how the boot is settled.
+type bootSteering struct {
+	noHaven bool
+	envFile string
+}
+
+// registerBootFlags declares the flags that fill the boot configuration, plus
+// -no-haven and -env-file, which only steer how it is settled.
+func registerBootFlags(flags *flag.FlagSet, boot *BootConfig, steer *bootSteering) {
 	flags.StringVar(&boot.MainRef, "main-ref", "origin/main", "git ref to boot as the base instance; the remote ref by default, since a local main falls behind without anyone noticing")
 	flags.StringVar(&boot.BranchDir, "branch-dir", ".", "checkout to diff (haven path: its HEAD is checked out into its own worktree; the checkout itself is never booted)")
 	flags.StringVar(&boot.WorkRoot, "work-root", "", "log, parity and probe root (default <repo>/.apidiff/<timestamp>); the worktrees persist under <repo>/.apidiff/worktrees")
@@ -379,34 +416,8 @@ func parseRunFlags(args []string, out streams) (BootConfig, *probeFlags, int, bo
 	flags.BoolVar(&boot.ComposePostgres, "compose-postgres", os.Getenv("CI") != "", "-no-haven: run Postgres in the compose project too, for full isolation (default on CI, which has no host Postgres); otherwise each side gets its own run-scoped database on haven's host Postgres at 127.0.0.1:5432")
 	flags.IntVar(&boot.SweepDays, "sweep-days", defaultSweepDays, "at the start of a run, drop apidiff_* databases older than this many days that no live run owns (0 = never)")
 	flags.BoolVar(&boot.DryRun, "dry-run", false, "print the plan (refs, worktree paths, slugs, commands) and start nothing")
-	noHaven := false
-	flags.BoolVar(&noHaven, "no-haven", false, "do not boot the instances as haven stacks; provision compose or the -pg-url/-ch-url/-redis-url servers instead")
-	envFile := ""
-	flags.StringVar(&envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed); not usable with the haven path")
-	registerProbeFlags(flags, probe)
-	registerScenarioFlags(flags, &probe.scenarios)
-	flags.BoolVar(&probe.scenarios.skip, "skip-scenarios", false, "skip the scenario phase after the main pass")
-	flags.BoolVar(&probe.parityOnly, "parity-only", false, "stop after the parity phase: both worktrees prepared, tRPC inventoried, parity.json and per-module packets written, no stack booted")
-	if err := flags.Parse(args); err != nil {
-		return boot, probe, exitError, true
-	}
-	external, err := externalInfra(boot)
-	if err != nil {
-		fmt.Fprintln(out.stderr, err)
-		return boot, probe, exitError, true
-	}
-	boot.UseHaven = havenSelected(havenOnPath(), noHaven, external)
-	if boot.UseHaven && envFile != "" {
-		fmt.Fprintln(out.stderr, "-env-file and the haven path are exclusive: -env-file points the instances at the servers that dotenv names, which is the developer's own stack, and haven exists so a run never reaches it. Pass -no-haven to boot on those servers.")
-		return boot, probe, exitError, true
-	}
-	if boot.DryRun {
-		return boot, probe, writeDryRunPlanOrError(boot, out), true
-	}
-	if envFile != "" {
-		applyEnvFile(envFile, &boot)
-	}
-	return boot, probe, exitEqual, false
+	flags.BoolVar(&steer.noHaven, "no-haven", false, "do not boot the instances as haven stacks; provision compose or the -pg-url/-ch-url/-redis-url servers instead")
+	flags.StringVar(&steer.envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed); not usable with the haven path")
 }
 
 // writeDryRunPlanOrError computes and prints -dry-run's plan, returning the
