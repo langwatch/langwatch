@@ -1,5 +1,6 @@
+-- The weekly digest's tables (enterprise/modules/digest); all new, so no lock on anything existing.
 -- CreateTable
-CREATE TABLE "DigestCohortOrganization" (
+CREATE TABLE IF NOT EXISTS "DigestCohortOrganization" (
     "organizationId" TEXT NOT NULL,
     "enrolledBy" TEXT NOT NULL,
     "enrolledAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -8,7 +9,7 @@ CREATE TABLE "DigestCohortOrganization" (
 );
 
 -- CreateTable
-CREATE TABLE "DigestSubscription" (
+CREATE TABLE IF NOT EXISTS "DigestSubscription" (
     "userId" TEXT NOT NULL,
     "unsubscribedAt" TIMESTAMP(3),
     "unsubscribedFromSendId" TEXT,
@@ -18,7 +19,7 @@ CREATE TABLE "DigestSubscription" (
 );
 
 -- CreateTable
-CREATE TABLE "DigestProjectWeek" (
+CREATE TABLE IF NOT EXISTS "DigestProjectWeek" (
     "id" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
@@ -35,7 +36,7 @@ CREATE TABLE "DigestProjectWeek" (
 );
 
 -- CreateTable
-CREATE TABLE "DigestUserWeek" (
+CREATE TABLE IF NOT EXISTS "DigestUserWeek" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
@@ -52,7 +53,7 @@ CREATE TABLE "DigestUserWeek" (
 );
 
 -- CreateTable
-CREATE TABLE "DigestSend" (
+CREATE TABLE IF NOT EXISTS "DigestSend" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
@@ -67,7 +68,7 @@ CREATE TABLE "DigestSend" (
 );
 
 -- CreateTable
-CREATE TABLE "DigestClick" (
+CREATE TABLE IF NOT EXISTS "DigestClick" (
     "id" TEXT NOT NULL,
     "sendId" TEXT NOT NULL,
     "linkKey" TEXT NOT NULL,
@@ -77,7 +78,7 @@ CREATE TABLE "DigestClick" (
 );
 
 -- CreateTable
-CREATE TABLE "DigestUpdate" (
+CREATE TABLE IF NOT EXISTS "DigestUpdate" (
     "isoWeek" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "body" TEXT NOT NULL,
@@ -91,7 +92,7 @@ CREATE TABLE "DigestUpdate" (
 );
 
 -- CreateTable
-CREATE TABLE "DigestSettings" (
+CREATE TABLE IF NOT EXISTS "DigestSettings" (
     "id" TEXT NOT NULL DEFAULT 'singleton',
     "armed" BOOLEAN NOT NULL DEFAULT false,
     "lastPlannedWeek" TEXT,
@@ -101,22 +102,22 @@ CREATE TABLE "DigestSettings" (
 );
 
 -- CreateIndex
-CREATE INDEX "DigestProjectWeek_organizationId_isoWeek_idx" ON "DigestProjectWeek"("organizationId", "isoWeek");
+CREATE INDEX IF NOT EXISTS "DigestProjectWeek_organizationId_isoWeek_idx" ON "DigestProjectWeek"("organizationId", "isoWeek");
 
 -- CreateIndex
-CREATE INDEX "DigestProjectWeek_isoWeek_idx" ON "DigestProjectWeek"("isoWeek");
+CREATE INDEX IF NOT EXISTS "DigestProjectWeek_isoWeek_idx" ON "DigestProjectWeek"("isoWeek");
 
 -- CreateIndex
-CREATE INDEX "DigestUserWeek_organizationId_isoWeek_idx" ON "DigestUserWeek"("organizationId", "isoWeek");
+CREATE INDEX IF NOT EXISTS "DigestUserWeek_organizationId_isoWeek_idx" ON "DigestUserWeek"("organizationId", "isoWeek");
 
 -- CreateIndex
-CREATE INDEX "DigestUserWeek_isoWeek_idx" ON "DigestUserWeek"("isoWeek");
+CREATE INDEX IF NOT EXISTS "DigestUserWeek_isoWeek_idx" ON "DigestUserWeek"("isoWeek");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "DigestSend_userId_isoWeek_key" ON "DigestSend"("userId", "isoWeek");
+CREATE UNIQUE INDEX IF NOT EXISTS "DigestSend_userId_isoWeek_key" ON "DigestSend"("userId", "isoWeek");
 
 -- CreateIndex
-CREATE INDEX "DigestSend_isoWeek_templateId_idx" ON "DigestSend"("isoWeek", "templateId");
+CREATE INDEX IF NOT EXISTS "DigestSend_isoWeek_templateId_idx" ON "DigestSend"("isoWeek", "templateId");
 
 -- CreateIndex
-CREATE INDEX "DigestClick_sendId_idx" ON "DigestClick"("sendId");
+CREATE INDEX IF NOT EXISTS "DigestClick_sendId_idx" ON "DigestClick"("sendId");
