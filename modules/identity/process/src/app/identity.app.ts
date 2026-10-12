@@ -547,10 +547,18 @@ export class IdentityModule
     const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
     const signUpIdentifiers = SignUpIdentifierService.create({ identity });
     const secrets = IdentitySecretCarryService.create(setup.repositories.secretCarry);
+    // The backfill stages without the read-your-writes wait: its proof, or the next pass, sees
+    // the fold (modules/identity/specs/identifier-backfill-throughput.feature).
+    const backfillLedger = IdentityLedgerStore.create({
+      projectionStore: setup.repositories.identityProjection,
+      heads: setup.repositories.heads,
+      eventing: identityEventing,
+      convergence: null,
+    });
     const backfill = IdentityBackfillService.create({
       reads: setup.repositories.backfill,
       users: setup.repositories.users,
-      identity,
+      identity: IdentityService.create(identityGuards, backfillLedger),
       secrets,
       plan: IdentityBackfillPlanService.create(CryptoIdentifierIdentityService.create()),
       userApi: setup.dependencies.users,
