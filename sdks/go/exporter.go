@@ -45,14 +45,10 @@ type exporterConfig struct {
 }
 
 // ExporterTransport builds the span exporter that carries spans to LangWatch,
-// given the resolved traces URL (endpoint + TracesPath) and the auth and SDK
-// headers every request must send. The LangWatch exporter wraps whatever it
-// returns with its filters and data-capture policy.
-//
-// The default transport posts gzipped OTLP/JSON. The
-// github.com/langwatch/langwatch/sdks/go/exporter/otlp package provides one
-// built on the official otlptracehttp exporter (OTLP/protobuf), for programs
-// that already link gRPC or rely on the OTEL_EXPORTER_OTLP_* variables.
+// given the traces URL (endpoint + TracesPath) and the auth and SDK headers.
+// Its result is wrapped with the filters and data-capture policy. The default
+// posts gzipped OTLP/JSON; the separate .../sdks/go/exporter/otlp module
+// provides one built on otlptracehttp (OTLP/protobuf).
 type ExporterTransport func(ctx context.Context, endpointURL string, headers map[string]string) (sdktrace.SpanExporter, error)
 
 // ExporterOption configures the LangWatchExporter.
@@ -165,14 +161,10 @@ func buildHeaders(apiKey, projectID string) map[string]string {
 	return headers
 }
 
-// NewExporter creates a LangWatch exporter with auto-configuration.
-// It reads LANGWATCH_API_KEY, LANGWATCH_PROJECT_ID and LANGWATCH_ENDPOINT from
-// environment variables if not provided via options.
-//
-// Spans are sent as gzipped OTLP/JSON to endpoint + TracesPath, retrying
-// throttled (429) and unavailable (502/503/504) requests with exponential
-// backoff for up to a minute, bounded by the export context. Wrap the
-// exporter in sdktrace.NewBatchSpanProcessor to batch spans.
+// NewExporter creates a LangWatch exporter, reading LANGWATCH_API_KEY,
+// LANGWATCH_PROJECT_ID and LANGWATCH_ENDPOINT when options do not set them.
+// Spans go as gzipped OTLP/JSON to endpoint + TracesPath, retried as the
+// README describes. Wrap it in sdktrace.NewBatchSpanProcessor to batch spans.
 func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporter, error) {
 	cfg := resolveConfig(opts...)
 
