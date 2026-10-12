@@ -42,6 +42,20 @@ export function aggregateReadStart({
   return window === "full-history" ? FULL_HISTORY_FROM : now;
 }
 
+type HeldReadCondition = { type: string; from?: string; until?: string; where?: string };
+
+/**
+ * Whether a held read is the plain trace read an aggregate writes: a span read, or a read
+ * with an end or a filter, is attached again whatever its start.
+ */
+export function isAggregateTraceRead(
+  condition: HeldReadCondition | null,
+): condition is HeldReadCondition {
+  return (
+    condition?.type === "trace" && condition.until === undefined && condition.where === undefined
+  );
+}
+
 /** Any attach-time start is right for a since-attach read, so a correct one is never rewritten. */
 function startsRight({ from, window }: { from: string | null; window: AggregateReadWindow }) {
   if (from === null) return false;

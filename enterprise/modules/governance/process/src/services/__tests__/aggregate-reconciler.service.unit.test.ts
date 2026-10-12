@@ -21,6 +21,10 @@ const NOW = "2026-10-09T03:17:00Z";
 const ACTOR = { type: "system", id: SYSTEM_ACTORS.aggregateReconciler };
 const JOINED = "2026-09-01T10:00:00Z";
 
+type HeldCondition = Awaited<
+  ReturnType<AuthzApi["findLiveSharedProjectGrants"]>
+>[number]["condition"];
+
 const allPersonal = (): StoredAggregateProject => ({
   id: AGG,
   organizationId: ORG,
@@ -43,6 +47,7 @@ function setup({
   desired = [],
   held = [],
   heldFrom = FULL_HISTORY_FROM,
+  heldCondition = heldFrom === null ? null : { type: "trace", from: heldFrom },
   refused = [],
   departmentMembers = [{ userId: "u_owner", departmentId: null }],
   liveAggregateIds = [AGG],
@@ -52,6 +57,8 @@ function setup({
   held?: string[];
   /** The start of every held read's window; null for a window that no longer parses. */
   heldFrom?: string | null;
+  /** Every held read's whole stored condition; defaults to a trace read from `heldFrom`. */
+  heldCondition?: HeldCondition;
   refused?: string[];
   departmentMembers?: {
     userId: string;
@@ -72,7 +79,7 @@ function setup({
       held.map((memberProjectId) => ({
         memberProjectId,
         grantId: `grant_${memberProjectId}`,
-        condition: heldFrom === null ? null : { type: "trace", from: heldFrom },
+        condition: heldCondition,
       })),
     ),
     attachSharedProjectGrant: vi.fn<AuthzApi["attachSharedProjectGrant"]>(
@@ -316,6 +323,29 @@ describe("AggregateReconcilerService", () => {
       expect(result.reattached).toEqual(["p_a"]);
       expect(grants.revokeSharedProjectGrants).toHaveBeenCalledWith(
         expect.objectContaining({ reason: AGGREGATE_READ_WINDOW_CHANGED }),
+      );
+    });
+  });
+
+  describe("given a held read from the epoch that is not the plain trace read an aggregate writes", () => {
+    it.each<{ name: string; heldCondition: HeldCondition }>([
+      { name: "a span read", heldCondition: { type: "span", from: FULL_HISTORY_FROM } },
+      {
+        name: "a read with an end",
+        heldCondition: { type: "trace", from: FULL_HISTORY_FROM, until: JOINED },
+      },
+      {
+        name: "a filtered read",
+        heldCondition: { type: "trace", from: FULL_HISTORY_FROM, where: "attributes.x = 1" },
+      },
+    ])("attaches $name again as a full-history trace read", async ({ heldCondition }) => {
+      const { reconciler, grants } = setup({ desired: ["p_a"], held: ["p_a"], heldCondition });
+
+      const result = await reconciler.reconcile({ aggregateProjectId: AGG });
+
+      expect(result.reattached).toEqual(["p_a"]);
+      expect(grants.attachSharedProjectGrant).toHaveBeenCalledWith(
+        expect.objectContaining({ condition: { type: "trace", from: FULL_HISTORY_FROM } }),
       );
     });
   });

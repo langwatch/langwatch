@@ -17,6 +17,7 @@ import {
   aggregateReadStart,
   aggregateReadWindowOf,
   decideAggregateMembership,
+  isAggregateTraceRead,
 } from "../rules/aggregate-membership.rules.ts";
 
 const logger = createLogger("langwatch:governance:aggregate-reconciler");
@@ -148,7 +149,7 @@ export class AggregateReconcilerService {
       desired,
       held: live.map((row) => ({
         memberProjectId: row.memberProjectId,
-        from: row.condition?.from ?? null,
+        from: isAggregateTraceRead(row.condition) ? (row.condition.from ?? null) : null,
       })),
       window,
     });
