@@ -12,7 +12,11 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DSPyStepSummary } from "~/server/experiments/types";
 
-const LONG_PROMPT = "You are a helpful assistant. ".repeat(20);
+// Must clear RenderInputOutput's own 1000-char collapseStringsAfterLength
+// default (see src/components/traces/RenderInputOutput.tsx), or the dialog
+// would show the full prompt even without this PR's collapseStrings={false}
+// fix — the test would pass for the wrong reason.
+const LONG_PROMPT = "You are a helpful assistant. ".repeat(40);
 
 vi.mock("~/utils/api", () => ({
   api: {
