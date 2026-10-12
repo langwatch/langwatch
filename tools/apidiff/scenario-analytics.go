@@ -126,3 +126,58 @@ func (exec *scenarioExec) analyticsRecords(label, base string, query url.Values)
 	}
 	return answer.Records, nil
 }
+
+// hasAnalytics is true for a scenario with an analytics step.
+func hasAnalytics(item *scenario) bool {
+	for _, steps := range [][]scenarioStep{item.Setup, item.Verify} {
+		for index := range steps {
+			if steps[index].Analytics != nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// analyticsSimUp is true when the side serves an analyticssim: its sibling
+// route exists and lists records. A stack run without +analytics, or old main
+// before the sim existed, answers 404 there.
+func (runner *scenarioRunner) analyticsSimUp(side *scenarioSide) bool {
+	base := analyticsURL(side.baseURL)
+	if base == "" {
+		return false
+	}
+	answer := runner.engine.executeOnce(probeRequest{baseURL: base, method: http.MethodGet, path: "/_sim/api/records"}, nil)
+	return answer.Error == "" && answer.Status == http.StatusOK
+}
+
+// deferAnalyticsScenarios splits off the analytics scenarios when any side
+// has no analyticssim: with one side blind the comparison is not made, so
+// they are deferred rather than errored.
+func (runner *scenarioRunner) deferAnalyticsScenarios(items []scenario) (kept []scenario, deferred []string) {
+	wanted := false
+	for index := range items {
+		wanted = wanted || hasAnalytics(&items[index])
+	}
+	if !wanted {
+		return items, nil
+	}
+	var absent []string
+	for _, side := range runner.sides {
+		if !runner.analyticsSimUp(side) {
+			absent = append(absent, side.name)
+		}
+	}
+	if len(absent) == 0 {
+		return items, nil
+	}
+	fmt.Fprintf(runner.options.Progress, "scenarios: no analyticssim on %s: analytics scenarios are deferred\n", strings.Join(absent, " and "))
+	for index := range items {
+		if hasAnalytics(&items[index]) {
+			deferred = append(deferred, items[index].ID)
+		} else {
+			kept = append(kept, items[index])
+		}
+	}
+	return kept, deferred
+}

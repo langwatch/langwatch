@@ -101,8 +101,12 @@ func havenEnv(inherit []string, slug string) []string {
 
 // havenUpArgs brings one instance's stack up and returns. --agent is plain,
 // token-free output; --detach backgrounds the stack instead of attaching the
-// log viewer, which is what makes this a call rather than a session.
-func havenUpArgs() []string { return havenrun.UpArgs() }
+// log viewer, which is what makes this a call rather than a session. +analytics
+// selects analyticssim, which the analytics scenarios read.
+func havenUpArgs() []string { return havenrun.UpArgs(havenAnalyticsSelection) }
+
+// havenAnalyticsSelection is haven's sticky choice of the PostHog and Customer.io stand-in.
+const havenAnalyticsSelection = "+analytics"
 
 // havenStatusArgs asks for the machine-readable one-shot report.
 func havenStatusArgs() []string { return havenrun.StatusArgs() }

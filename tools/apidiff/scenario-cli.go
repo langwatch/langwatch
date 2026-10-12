@@ -161,6 +161,8 @@ func runScenarioPhase(ctx context.Context, phase scenarioPhase) int {
 	defer runner.cancel()
 	runner.probeAdminKey()
 	items, deferred := runner.deferAdminScenarios(items)
+	items, noSim := runner.deferAnalyticsScenarios(items)
+	deferred = append(deferred, noSim...)
 	if len(items) == 0 {
 		phase.reportDeferred(deferred)
 		return exitEqual

@@ -120,7 +120,7 @@ func writeDeferred(out io.Writer, deferred []string) {
 	if len(deferred) == 0 {
 		return
 	}
-	fmt.Fprintf(out, "scenarios: %d deferred: self-hosted pass (needs the instance-admin key or an Enterprise organization, which SaaS lacks): %s\n", len(deferred), strings.Join(deferred, ", "))
+	fmt.Fprintf(out, "scenarios: %d deferred: self-hosted pass (needs the instance-admin key, an Enterprise organization or an analyticssim, which this stack lacks): %s\n", len(deferred), strings.Join(deferred, ", "))
 }
 
 // deferredFile is where a run keeps its deferred ids, one per line, for the
