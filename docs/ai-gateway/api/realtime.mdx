@@ -263,9 +263,9 @@ A relay waits `LW_GATEWAY_VOICE_PENDING_TTL_SECONDS` (default 150) for Twilio to
 
 Twilio may land on a different pod from the one that opened the relay. That pod dials the owner on `GATEWAY_RELAY_HOP_ADDR` (default `:5564`), signed with the internal secret, and answers `403` if the owner refuses or does not reply within `LW_GATEWAY_VOICE_HOP_TIMEOUT_SECONDS` (default 3). Without `GATEWAY_POD_IP`, every id is local.
 
-Only the gateway's own pods may reach the hop port. Do not publish it in a Service. `LW_GATEWAY_VOICE_MAX_HOP_DIALS` (default 64) caps the dials in flight on one pod.
+The hop is plain ws inside the pod network, signed but unencrypted. The Helm chart limits the hop port to gateway pods only when `networkPolicy.enabled` is true, which is off by default, so turn it on. Do not publish the port in a Service. `LW_GATEWAY_VOICE_MAX_HOP_DIALS` (default 64) caps the dials in flight on one pod.
 
-`LW_GATEWAY_VOICE_RELAY_ID_KEY` (at least 32 bytes) keys the relay ids on its own. Unset, the internal secret keys them, and anything that holds it can mint an id. Set it when workers share the internal secret.
+`LW_GATEWAY_VOICE_RELAY_ID_KEY` (at least 32 bytes) keys the relay ids on its own. Unset, the internal secret keys them, and anything that holds it can mint an id. Set it when workers share the internal secret. In the Helm chart, set `secrets.relayIdKey` to its key name inside `secrets.existingSecretName`.
 
 ## WebSocket relay
 

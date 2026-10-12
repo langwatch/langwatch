@@ -1,6 +1,7 @@
 package aigateway
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/http"
@@ -142,9 +143,10 @@ func addManagedServices(g *lifecycle.Group, deps *Deps, own ownServices) {
 }
 
 // hopServer is the listener for the owner side of a cross-pod relay hop. It
-// exists only with a media relay, which is what a hop reaches.
+// exists only with a media relay, which is what a hop reaches, and a pod
+// address, without which no id names this pod and no hop can arrive.
 func hopServer(deps *Deps, cfg Config) *http.Server {
-	if deps.MediaRelay == nil {
+	if deps.MediaRelay == nil || cfg.PodIP == "" {
 		return nil
 	}
 	handler := httpapi.NewHopRouter(httpapi.HopRouterDeps{
@@ -152,7 +154,7 @@ func hopServer(deps *Deps, cfg Config) *http.Server {
 		InternalSecret: cfg.ControlPlane.InternalSecret,
 		MediaRelay:     deps.MediaRelay,
 	})
-	return &http.Server{Handler: handler, Addr: cfg.RelayHopAddr, ReadHeaderTimeout: 10 * time.Second}
+	return &http.Server{Handler: handler, Addr: cmp.Or(cfg.RelayHopAddr, defaultConfig().RelayHopAddr), ReadHeaderTimeout: 10 * time.Second}
 }
 
 // metricsDoor is the pull door on its own listener (ADR-175 point 3), opened

@@ -28,6 +28,9 @@ const (
 	OutcomeRefusedReplay   = "refused_replay"
 	OutcomeRefusedUnpaired = "refused_unpaired"
 	OutcomeExpiredUnpaired = "expired_unpaired"
+	// OutcomeDrainedUnpaired is a relay still waiting for Twilio when the
+	// drain budget ran out.
+	OutcomeDrainedUnpaired = "drained_unpaired"
 	OutcomeDropped         = "dropped"
 	OutcomeCompleted       = "completed"
 
@@ -122,8 +125,10 @@ type Hub struct {
 	bootID   string
 	hopPort  int
 	hopSlots chan struct{}
-	logger   *zap.Logger
-	metrics  Metrics
+	// hopClient dials owners; one per hub.
+	hopClient *http.Client
+	logger    *zap.Logger
+	metrics   Metrics
 
 	pendingTTL, maxDuration, pingInterval, drainBudget, hopTimeout time.Duration
 	maxRelays, maxPending, maxRelaysPerScope                       int
@@ -140,6 +145,9 @@ type Hub struct {
 	drainOver chan struct{}
 	endDrain  sync.Once
 	wg        sync.WaitGroup
+	// pumps counts hopped sockets; stopped refuses new ones once Stop begins.
+	pumps   sync.WaitGroup
+	stopped bool
 }
 
 // NewHub builds a Hub.
@@ -151,6 +159,7 @@ func NewHub(opts Options) *Hub {
 		bootID:            opts.BootID,
 		hopPort:           orInt(opts.HopPort, defaultHopPort),
 		hopTimeout:        orDuration(opts.HopTimeout, defaultHopTimeout),
+		hopClient:         newHopClient(),
 		hopSlots:          make(chan struct{}, orInt(opts.MaxHopDials, defaultMaxHopDials)),
 		logger:            opts.Logger,
 		metrics:           opts.Metrics,
@@ -223,9 +232,13 @@ func (h *Hub) StopBudget() time.Duration { return h.drainBudget + stopAllowance 
 // running, so a Stop that outlives it returns with nothing held.
 func (h *Hub) Stop(ctx context.Context) error {
 	h.BeginDrain()
+	h.mu.Lock()
+	h.stopped = true
+	h.mu.Unlock()
 	idle := make(chan struct{})
 	go func() {
 		h.wg.Wait()
+		h.pumps.Wait()
 		close(idle)
 	}()
 	select {

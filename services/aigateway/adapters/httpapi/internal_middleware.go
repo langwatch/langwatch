@@ -3,8 +3,6 @@ package httpapi
 import (
 	"bytes"
 	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
@@ -17,6 +15,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/controlplane"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -127,26 +126,10 @@ func InternalAuthMiddleware(secret string) func(http.Handler) http.Handler {
 	}
 }
 
-// computeSignature returns hex(hmac_sha256(secret, METHOD\nPATH\nTS\nhex(sha256(body)))).
-// The body hash is hex-encoded inside the canonical string so it
-// matches the TS verifier byte-for-byte (which uses
-// `createHash('sha256').digest('hex')`).
+// computeSignature is controlplane.Signature, the one canonical string both
+// ends of the channel use.
 func computeSignature(secret, method, path, ts string, body []byte) string {
-	bodyHash := sha256.Sum256(body)
-	bodyHashHex := make([]byte, hex.EncodedLen(len(bodyHash)))
-	hex.Encode(bodyHashHex, bodyHash[:])
-
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(method))
-	mac.Write([]byte{'\n'})
-	mac.Write([]byte(path))
-	mac.Write([]byte{'\n'})
-	mac.Write([]byte(ts))
-	mac.Write([]byte{'\n'})
-	mac.Write(bodyHashHex)
-
-	sig := mac.Sum(nil)
-	return hex.EncodeToString(sig)
+	return controlplane.Signature(secret, controlplane.Canonical{Method: method, Path: path, Timestamp: ts, Body: body})
 }
 
 // constantTimeHexEqual compares two hex strings in constant time.

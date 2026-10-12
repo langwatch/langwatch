@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Renders the gateway chart and asserts what the pod and the cluster receive
-# for the cross-pod Twilio relay hop (langwatch#8397, slice 2): the pod's own
+# for the cross-pod Twilio relay hop (langwatch#8397): the pod's own
 # address in GATEWAY_POD_IP, the hop container port, a NetworkPolicy that opens
 # that port to the gateway's own pods and to nobody else, and no Service that
 # publishes it.
@@ -200,9 +200,73 @@ test_the_hop_port_is_not_published_by_a_service() {
   fi
 }
 
+# @scenario "The relay id key reaches the container from a secret"
+test_the_relay_id_key_reaches_the_container_from_a_secret() {
+  local default_render keyed deployment configmap
+  default_render=$(render "")
+  if [ -z "$default_render" ]; then
+    fail "render" "the chart did not render"
+    return
+  fi
+
+  if grep -q 'LW_GATEWAY_VOICE_RELAY_ID_KEY' <<<"$default_render"; then
+    fail "relay id key default" "LW_GATEWAY_VOICE_RELAY_ID_KEY renders although secrets.relayIdKey is unset"
+  else
+    pass "relay id key default" "nothing renders for the relay id key while secrets.relayIdKey is unset"
+  fi
+
+  keyed="--set secrets.relayIdKey=RELAY_ID_KEY --set secrets.existingSecretName=my-gateway-secrets"
+  deployment=$(doc_of "$keyed" "deployment.yaml")
+  configmap=$(doc_of "$keyed" "configmap.yaml")
+  if ! grep -A6 'name: LW_GATEWAY_VOICE_RELAY_ID_KEY' <<<"$deployment" | grep -q 'secretKeyRef:'; then
+    fail "relay id key" "LW_GATEWAY_VOICE_RELAY_ID_KEY is not a secretKeyRef when secrets.relayIdKey is set"
+  elif ! grep -A6 'name: LW_GATEWAY_VOICE_RELAY_ID_KEY' <<<"$deployment" | grep -q 'name: my-gateway-secrets'; then
+    fail "relay id key" "the secretKeyRef does not name secrets.existingSecretName"
+  elif ! grep -A6 'name: LW_GATEWAY_VOICE_RELAY_ID_KEY' <<<"$deployment" | grep -q 'key: RELAY_ID_KEY'; then
+    fail "relay id key" "the secretKeyRef does not use the key in secrets.relayIdKey"
+  else
+    pass "relay id key" "secrets.relayIdKey renders a secretKeyRef on the existing secret"
+  fi
+
+  if grep -q 'LW_GATEWAY_VOICE_RELAY_ID_KEY' <<<"$configmap"; then
+    fail "relay id key" "the key is also in the ConfigMap, where it would be plain text"
+  else
+    pass "relay id key" "the key is not in the ConfigMap"
+  fi
+}
+
+# @scenario "The docs say who may reach the hop port"
+test_the_docs_say_who_may_reach_the_hop_port() {
+  local docs="../../docs/ai-gateway/api/realtime.mdx"
+  if [ ! -f "$docs" ]; then
+    fail "docs" "$docs is missing"
+    return
+  fi
+
+  if ! grep -q 'networkPolicy.enabled' "$docs"; then
+    fail "docs network policy" "realtime.mdx does not say the hop port is limited to gateway pods only with networkPolicy.enabled=true"
+  else
+    pass "docs network policy" "realtime.mdx names networkPolicy.enabled"
+  fi
+
+  if ! grep -qiE 'plain (ws|websocket)|unencrypted' "$docs"; then
+    fail "docs plain ws" "realtime.mdx does not say the hop is plain ws inside the pod network"
+  else
+    pass "docs plain ws" "realtime.mdx says the hop is not encrypted"
+  fi
+
+  if ! grep -q 'secrets.relayIdKey' "$docs"; then
+    fail "docs relay id key" "realtime.mdx does not name the chart value secrets.relayIdKey"
+  else
+    pass "docs relay id key" "realtime.mdx names secrets.relayIdKey"
+  fi
+}
+
 test_the_pod_address_and_the_hop_port_reach_the_container
 test_the_hop_port_is_open_only_to_the_gateways_own_pods
 test_the_hop_port_is_not_published_by_a_service
+test_the_relay_id_key_reaches_the_container_from_a_secret
+test_the_docs_say_who_may_reach_the_hop_port
 
 if [ "$failures" -gt 0 ]; then
   echo

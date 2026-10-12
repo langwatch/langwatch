@@ -212,24 +212,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 
 	var mediaRelay *mediarelay.Hub
 	if cfg.ControlPlane.InternalSecret != "" {
-		// LoadConfig validated the address; zero takes the hub's default.
-		hopPort, _ := relayHopPort(cfg.RelayHopAddr)
-		mediaRelay = mediarelay.NewHub(mediarelay.Options{
-			Secret:             cfg.ControlPlane.InternalSecret,
-			IDKey:              cfg.Voice.RelayIDKey,
-			PodIP:              cfg.PodIP,
-			HopPort:            hopPort,
-			HopTimeout:         time.Duration(cfg.Voice.HopTimeoutSeconds) * time.Second,
-			MaxHopDials:        cfg.Voice.MaxHopDials,
-			PendingTTL:         time.Duration(cfg.Voice.PendingTTLSeconds) * time.Second,
-			MaxRelayDuration:   time.Duration(cfg.Voice.MaxRelaySeconds) * time.Second,
-			DrainBudget:        time.Duration(cfg.Voice.DrainSeconds) * time.Second,
-			MaxRelays:          cfg.Voice.MaxMediaRelays,
-			MaxPendingPerScope: cfg.Voice.MaxPendingRelaysPerScope,
-			MaxRelaysPerScope:  cfg.Voice.MaxRelaysPerScope,
-			Logger:             logger,
-			Metrics:            metrics,
-		})
+		mediaRelay = mediarelay.NewHub(mediaRelayOptions(cfg, logger, metrics))
 	} else {
 		logger.Warn("voice media relay disabled: LW_GATEWAY_INTERNAL_SECRET unset")
 	}
@@ -374,4 +357,26 @@ func (a changePollerAdapter) PollChanges(ctx context.Context, organizationID, si
 		}
 	}
 	return out, next, nil
+}
+
+// mediaRelayOptions is where configuration becomes hub options.
+func mediaRelayOptions(cfg Config, logger *zap.Logger, metrics mediarelay.Metrics) mediarelay.Options {
+	// LoadConfig validated the address; zero takes the hub's default.
+	hopPort, _ := relayHopPort(cfg.RelayHopAddr)
+	return mediarelay.Options{
+		Secret:             cfg.ControlPlane.InternalSecret,
+		IDKey:              cfg.Voice.RelayIDKey,
+		PodIP:              cfg.PodIP,
+		HopPort:            hopPort,
+		HopTimeout:         time.Duration(cfg.Voice.HopTimeoutSeconds) * time.Second,
+		MaxHopDials:        cfg.Voice.MaxHopDials,
+		PendingTTL:         time.Duration(cfg.Voice.PendingTTLSeconds) * time.Second,
+		MaxRelayDuration:   time.Duration(cfg.Voice.MaxRelaySeconds) * time.Second,
+		DrainBudget:        time.Duration(cfg.Voice.DrainSeconds) * time.Second,
+		MaxRelays:          cfg.Voice.MaxMediaRelays,
+		MaxPendingPerScope: cfg.Voice.MaxPendingRelaysPerScope,
+		MaxRelaysPerScope:  cfg.Voice.MaxRelaysPerScope,
+		Logger:             logger,
+		Metrics:            metrics,
+	}
 }

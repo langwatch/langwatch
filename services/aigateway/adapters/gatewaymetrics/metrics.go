@@ -244,7 +244,7 @@ func New() *Recorder {
 
 	r.mediaRelays = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "gateway_voice_media_relay_total",
-		Help: "Twilio media relay outcomes (opened, paired, refused_auth, refused_unknown, refused_expired, refused_replay, refused_unpaired, expired_unpaired, dropped, completed; across pods: hop_joined, refused_owner_unreachable, refused_owner_invalid, refused_hop_busy). A hop the owner pod refuses counts as refused_unknown on the pod Twilio reached. The relay id is a credential and never a label.",
+		Help: "Twilio media relay outcomes (opened, paired, refused_auth, refused_unknown, refused_expired, refused_replay, refused_unpaired, expired_unpaired, drained_unpaired, dropped, completed; across pods: hop_joined, refused_owner_unreachable, refused_owner_invalid, refused_hop_busy). A hopped call counts hop_joined on the pod Twilio reached and paired on the owner. A hop the owner pod refuses counts as refused_unknown on the pod Twilio reached. The relay id is a credential and never a label.",
 	}, []string{"outcome"})
 
 	r.cacheHits = prometheus.NewCounterVec(prometheus.CounterOpts{

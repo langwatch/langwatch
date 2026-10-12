@@ -469,6 +469,11 @@ Feature: Twilio media relay on the AI Gateway
       Then it is rejected as invalid
 
     @unit
+    Scenario: A relay id with a byte outside the base64url alphabet is rejected
+      When a genuine id has a newline, a carriage return, a space, a tab or a NUL inserted
+      Then it is rejected as invalid
+
+    @unit
     Scenario: An expired relay id is reported as expired
       When an id is unsealed at or after its expiry
       Then it is rejected as expired
@@ -547,7 +552,69 @@ Feature: Twilio media relay on the AI Gateway
       Given a relay on pod A joined by a Twilio socket that landed on pod B
       When the maximum relay duration passes
       Then the relay is closed with 4409
-      And Twilio's socket gets a close frame
+      And Twilio's socket is closed with 1000
+
+    @integration
+    Scenario: A drain on the pod Twilio reached waits for the hop and closes it with 1012
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When pod B is stopped with a drain budget of 700 milliseconds
+      Then Stop waits for the hop through the budget and returns without an error
+      And Twilio's socket is closed with 1012
+
+    @integration
+    Scenario: A hopped socket is bounded by the maximum relay duration
+      Given an owner that accepts the hop and never ends it
+      And a maximum relay duration of 300 milliseconds on pod B
+      When Twilio lands on pod B with an id naming that owner
+      Then Twilio's socket is closed
+      And the hop socket to the owner is closed
+
+    @integration
+    Scenario: A hopped Twilio socket is closed when the owner vanishes
+      Given a Twilio socket hopped to an owner
+      When the owner's hop socket drops
+      Then Twilio's socket is closed
+
+    @integration
+    Scenario: A hopped owner socket is closed when Twilio vanishes
+      Given a Twilio socket hopped to an owner
+      When Twilio's socket drops
+      Then the owner's hop socket is closed
+
+    @integration
+    Scenario: An owner whose drain budget ends closes the hopped relay with 1012
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When pod A drains and its budget ends
+      Then the relay is closed with 1012 and the reason relay_drain
+      And Twilio's socket is closed with 1000
+
+    @integration
+    Scenario: A frame over 64 KiB from Twilio through the hop closes Twilio's socket with 1009
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When Twilio sends a frame of 64 KiB plus one byte
+      Then Twilio's socket is closed with 1009
+      And the relay is closed with 4502
+
+    @integration
+    Scenario: A frame over 64 KiB from the worker through the hop closes the relay with 1009
+      Given a relay on pod A joined by a Twilio socket that landed on pod B
+      When the worker sends a frame of 64 KiB plus one byte
+      Then the relay is closed with 1009
+      And Twilio's socket is closed with 1000
+
+    @integration
+    Scenario: A relay waiting for Twilio that ends in the drain is counted as drained_unpaired
+      Given a relay waiting for Twilio on a pod that begins to drain
+      When the drain budget ends
+      Then the worker is closed with 1012
+      And gateway_voice_media_relay_total{outcome="drained_unpaired"} rises by one
+      And the voice_media_relay_ended log names the outcome drained_unpaired
+      And no other outcome is counted for the end
+
+    @unit
+    Scenario: The drained_unpaired outcome is documented
+      Then the counter's help text names drained_unpaired
+      And the observability page lists drained_unpaired
 
   # ============================================================
   Rule: The owner decides whether a hop is joined
@@ -628,7 +695,7 @@ Feature: Twilio media relay on the AI Gateway
         | owner                     |
         | 8.8.8.8                   |
         | 169.254.169.254           |
-        | 100.64.0.1                |
+        | 100.128.0.1               |
         | 0.0.0.0                   |
         | ::                        |
         | localhost                 |
@@ -641,7 +708,7 @@ Feature: Twilio media relay on the AI Gateway
     @unit
     Scenario: Only private addresses are dialed as owners
       When an owner address is checked
-      Then 10/8, 172.16/12, 192.168/16, 127/8 and fc00::/7 literals are accepted
+      Then 10/8, 172.16/12, 192.168/16, 100.64/10, 127/8 and fc00::/7 literals are accepted
       And every other IP literal is refused, at and beside each range edge
       And a host name, a port, a path, a zone, a space, brackets, userinfo or a leading zero is refused
       And an IPv4-mapped public address is refused
@@ -656,6 +723,39 @@ Feature: Twilio media relay on the AI Gateway
       And gateway_voice_media_relay_total{outcome="refused_hop_busy"} rises by one
       And the dial that held the cap ends as an unreachable owner
       And a later hop dials the owner again
+
+    @integration
+    Scenario: A hop owner that answers with a redirect refuses Twilio
+      Given an owner that answers the hop with a 307 redirect to another host
+      When Twilio lands on pod B with an id naming that owner
+      Then Twilio gets HTTP 403 voice_relay_forbidden and no WebSocket
+      And the redirect target receives no request
+      And the signature headers never reach the redirect target
+
+    @unit
+    Scenario: The hop client follows no redirect and uses no proxy
+      When the hop client of a relay hub is read
+      Then its transport has no proxy function
+      And its redirect policy returns the last response
+      And the same client serves every dial of the hub
+
+    @integration
+    Scenario: Twilio giving up during the hop dial is not counted as an unreachable owner
+      Given an owner that accepts TCP on the hop port and never answers
+      And a hop dial cap of 1
+      When Twilio cancels its request while pod B dials the owner
+      Then the log does not carry "relay_owner_unreachable"
+      And gateway_voice_media_relay_total{outcome="refused_owner_unreachable"} does not rise
+      And a later hop dials the owner
+
+    @integration
+    Scenario: A relay id with a line break inserted is refused without a dial
+      Given a genuine id that names pod A
+      When Twilio lands on pod B with a newline, a carriage return or both inserted into the id
+      Then Twilio gets HTTP 403 voice_relay_forbidden and no WebSocket
+      And gateway_voice_media_relay_total{outcome="refused_unknown"} rises for each
+      And refused_owner_unreachable is not counted
+      And no connection is made to the hop port
 
     @integration
     Scenario: A pod without an address refuses an id that names an owner
@@ -735,6 +835,22 @@ Feature: Twilio media relay on the AI Gateway
     Scenario: A gateway without a hop listener registers none
       Given the managed services of a gateway without a hop listener
       Then no relay-hop service is registered
+
+    @unit
+    Scenario: A gateway without a pod address registers no hop listener
+      Given a gateway with a media relay and no pod address
+      Then no hop server is built
+      And no relay-hop service is registered
+
+    @unit
+    Scenario: A gateway with a pod address serves the hop on the hop address
+      Given a gateway with a media relay and a pod address
+      Then the hop server listens on the configured hop address
+
+    @unit
+    Scenario: The hop listener never has an empty address
+      Then the default configuration sets the hop address to ":5564"
+      And a hop server built from a configuration without an address does not have an empty one
 
     @integration
     Scenario: A draining owner still accepts a hop for its pending relay
@@ -826,6 +942,20 @@ Feature: Twilio media relay on the AI Gateway
       Then the error text does not contain the key
 
     @unit
+    Scenario: A pod address outside the private ranges is refused at start
+      When the pod address is public, a host name, has a port, is link-local or is an IPv4-mapped public address
+      Then the gateway refuses to start and names GATEWAY_POD_IP
+      And 10/8, 172.16/12, 192.168/16, 100.64/10 and fc00::/7 addresses are accepted
+      And an unset pod address is accepted
+
+    @unit
+    Scenario: The media relay hub is built from the configuration
+      When the hub options are built from a configuration
+      Then they carry the internal secret, the pod address and the hop port read from the hop address
+      And they carry the hop timeout, the maximum hop dials and the relay id key
+      And they carry the relay limits
+
+    @unit
     Scenario: The hop port is read from the hop address
       When the hop address is ":5564", "0.0.0.0:6000", "[::]:7000" or "127.0.0.1:5570"
       Then the port is 5564, 6000, 7000 or 5570
@@ -854,3 +984,17 @@ Feature: Twilio media relay on the AI Gateway
       When the gateway chart is rendered with the internal Service enabled
       Then no Service has port 5564
       And no Service targets the relay-hop port
+
+    @unit
+    Scenario: The relay id key reaches the container from a secret
+      When the gateway chart is rendered with secrets.relayIdKey set
+      Then LW_GATEWAY_VOICE_RELAY_ID_KEY is a secretKeyRef on secrets.existingSecretName with that key
+      And the key is not in the ConfigMap
+      And nothing renders for it while secrets.relayIdKey is unset
+
+    @unit
+    Scenario: The docs say who may reach the hop port
+      When the realtime docs are read
+      Then they say the hop port is limited to the gateway's pods only when networkPolicy.enabled is true
+      And they say the hop is plain ws inside the pod network
+      And they name the chart value secrets.relayIdKey

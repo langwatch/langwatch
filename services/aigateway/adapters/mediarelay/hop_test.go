@@ -7,9 +7,11 @@ package mediarelay_test
 // Binds specs/ai-gateway/voice-media-relay.feature.
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/services/aigateway/adapters/mediarelay"
 )
@@ -23,6 +25,8 @@ func TestPrivateOwnerIP_AcceptsTheRangesOfAPodNetwork(t *testing.T) {
 		"192.168.0.1", "192.168.255.255",
 		"127.0.0.1", "127.0.0.2", "127.255.255.254",
 		"fc00::1", "fd12:3456:789a::1",
+		// Shared address space (RFC 6598): the pod range of EKS custom networking.
+		"100.64.0.0", "100.64.0.1", "100.100.100.100", "100.127.255.255",
 	} {
 		t.Run(ip, func(t *testing.T) {
 			t.Parallel()
@@ -43,7 +47,8 @@ func TestPrivateOwnerIP_RefusesEverythingElse(t *testing.T) {
 		"just above 192.168/16":        "192.169.0.1",
 		"a public address":             "8.8.8.8",
 		"a link-local address":         "169.254.169.254",
-		"a shared address space one":   "100.64.0.1",
+		"just below 100.64/10":         "100.63.255.255",
+		"just above 100.64/10":         "100.128.0.0",
 		"the unspecified address":      "0.0.0.0",
 		"a broadcast address":          "255.255.255.255",
 		"an IPv6 link-local address":   "fe80::1",
@@ -66,4 +71,42 @@ func TestPrivateOwnerIP_RefusesEverythingElse(t *testing.T) {
 			assert.False(t, mediarelay.PrivateOwnerIP(ip), "%q must not be dialed", ip)
 		})
 	}
+}
+
+// The hop client carries a signed request to a pod address read from an id.
+// It must neither follow a redirect, which would send the signature to a host
+// the owner address did not name, nor route through an environment proxy. The
+// proxy half is asserted on the transport: Go never proxies a loopback
+// address, so a proxy-env test against a local owner would pass with the bug.
+//
+// @scenario "The hop client follows no redirect and uses no proxy"
+func TestHopHTTPClient_UsesNoProxy(t *testing.T) {
+	t.Parallel()
+	client := mediarelay.NewHub(mediarelay.Options{Secret: "hop-client-secret"}).HopHTTPClient()
+
+	require.NotNil(t, client)
+	transport, ok := client.Transport.(*http.Transport)
+	require.True(t, ok, "the hop client needs its own *http.Transport, got %T", client.Transport)
+	assert.Nil(t, transport.Proxy, "the hop dial must not read HTTP_PROXY or HTTPS_PROXY")
+}
+
+// @scenario "The hop client follows no redirect and uses no proxy"
+func TestHopHTTPClient_FollowsNoRedirect(t *testing.T) {
+	t.Parallel()
+	client := mediarelay.NewHub(mediarelay.Options{Secret: "hop-client-secret"}).HopHTTPClient()
+
+	require.NotNil(t, client)
+	require.NotNil(t, client.CheckRedirect)
+	assert.ErrorIs(t, client.CheckRedirect(&http.Request{}, nil), http.ErrUseLastResponse)
+}
+
+// One client per hub, so its connections are not rebuilt per dial.
+//
+// @scenario "The hop client follows no redirect and uses no proxy"
+func TestHopHTTPClient_IsOnePerHub(t *testing.T) {
+	t.Parallel()
+	hub := mediarelay.NewHub(mediarelay.Options{Secret: "hop-client-secret"})
+
+	//nolint:testifylint // two calls returning one pointer is the property under test.
+	assert.Same(t, hub.HopHTTPClient(), hub.HopHTTPClient())
 }

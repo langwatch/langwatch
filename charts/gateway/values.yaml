@@ -98,6 +98,10 @@ secrets:
   # Opt-in previous-key accept for the rotation window. Leave empty to
   # disable (strict single-key mode; production steady state).
   jwtSecretPreviousKey: ""
+  # Optional key in the same Secret holding LW_GATEWAY_VOICE_RELAY_ID_KEY
+  # (32 bytes or more). It keys Twilio relay ids apart from the internal
+  # secret, so a worker that holds the internal secret cannot mint an id.
+  relayIdKey: ""
 
 cache:
   lruSize: 50000

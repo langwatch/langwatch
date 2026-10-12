@@ -42,3 +42,55 @@ func TestServe_ManagedServices_NoHopListenerWhenNoneIsGiven(t *testing.T) {
 
 	assert.NotContains(t, g.ServiceNames(), "relay-hop")
 }
+
+// Without GATEWAY_POD_IP there is no pod address to put in an id, so no peer
+// can hop here. Binding :5564 anyway would take a port that npx langwatch
+// hands to another service, for nothing.
+//
+// @scenario "A gateway without a pod address registers no hop listener"
+func TestServe_HopServer_NoPodAddressMeansNoHopListener(t *testing.T) {
+	hub := mediarelay.NewHub(mediarelay.Options{Secret: "serve-test-secret"})
+
+	srv := hopServer(&Deps{MediaRelay: hub}, Config{RelayHopAddr: ":5564"})
+
+	t.Run("no server is built", func(t *testing.T) { assert.Nil(t, srv) })
+	t.Run("no relay-hop service is registered", func(t *testing.T) {
+		g := lifecycle.New()
+		addManagedServices(g, &Deps{MediaRelay: hub}, ownServices{HTTP: unstartedServer(), Hop: srv})
+
+		assert.NotContains(t, g.ServiceNames(), "relay-hop")
+	})
+}
+
+// @scenario "A gateway with a pod address serves the hop on the hop address"
+func TestServe_HopServer_PodAddressMeansAHopListenerOnTheHopAddress(t *testing.T) {
+	hub := mediarelay.NewHub(mediarelay.Options{Secret: "serve-test-secret", PodIP: "10.1.2.3"})
+
+	srv := hopServer(&Deps{MediaRelay: hub}, Config{PodIP: "10.1.2.3", RelayHopAddr: "0.0.0.0:6000"})
+
+	require.NotNil(t, srv)
+	assert.Equal(t, "0.0.0.0:6000", srv.Addr)
+}
+
+// @scenario "The hop listener never has an empty address"
+func TestServe_HopServer_NeverHasAnEmptyAddress(t *testing.T) {
+	hub := mediarelay.NewHub(mediarelay.Options{Secret: "serve-test-secret", PodIP: "10.1.2.3"})
+
+	srv := hopServer(&Deps{MediaRelay: hub}, Config{PodIP: "10.1.2.3"})
+
+	if srv != nil {
+		assert.NotEmpty(t, srv.Addr, "an empty address would bind a random port")
+	}
+}
+
+// @scenario "The hop listener never has an empty address"
+func TestDefaultConfig_HopAddressIsSetHere(t *testing.T) {
+	assert.Equal(t, ":5564", defaultConfig().RelayHopAddr)
+}
+
+// A gateway without a media relay has nothing for a hop to reach.
+//
+// @scenario "A gateway without a hop listener registers none"
+func TestServe_HopServer_NoMediaRelayMeansNoHopListener(t *testing.T) {
+	assert.Nil(t, hopServer(&Deps{}, Config{PodIP: "10.1.2.3", RelayHopAddr: ":5564"}))
+}

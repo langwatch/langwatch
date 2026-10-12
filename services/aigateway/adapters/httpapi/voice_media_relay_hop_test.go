@@ -1,6 +1,6 @@
 package httpapi
 
-// The cross-pod hop of the Twilio media relay (langwatch#8397, slice 2).
+// The cross-pod hop of the Twilio media relay (langwatch#8397).
 // Twilio dials the gateway through an L4 load balancer, so its socket can land
 // on a pod that does not hold the relay. That pod dials the owner's hop
 // listener, claims the relay there, and pumps Twilio's frames over the hop.
@@ -420,8 +420,8 @@ func TestHoppedRelayOlderThanItsMaximumDurationIsClosedWith4409(t *testing.T) {
 	t.Run("the relay is closed with 4409", func(t *testing.T) {
 		assert.Equal(t, mrCloseMaxDuration, relayCode)
 	})
-	t.Run("Twilio's socket gets a close frame", func(t *testing.T) {
-		assert.NotEqual(t, websocket.StatusCode(-1), twilioCode, "the socket was dropped without a close frame")
+	t.Run("Twilio's socket is closed with 1000", func(t *testing.T) {
+		assert.Equal(t, websocket.StatusNormalClosure, twilioCode)
 	})
 }
 
@@ -746,7 +746,7 @@ func TestOwnerAddressOutsideThePrivateRangesIsRefusedWithoutADial(t *testing.T) 
 	for name, owner := range map[string]string{
 		"a public address":          "8.8.8.8",
 		"a link-local address":      "169.254.169.254",
-		"a shared address space":    "100.64.0.1",
+		"just above shared space":   "100.128.0.1",
 		"the unspecified address":   "0.0.0.0",
 		"the unspecified IPv6":      "::",
 		"a host name":               "localhost",

@@ -85,6 +85,13 @@ spec:
                   name: {{ .Values.secrets.existingSecretName }}
                   key: {{ .Values.secrets.jwtSecretPreviousKey }}
             {{- end }}
+            {{- if .Values.secrets.relayIdKey }}
+            - name: LW_GATEWAY_VOICE_RELAY_ID_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: {{ .Values.secrets.relayIdKey }}
+            {{- end }}
             {{- /*
               GATEWAY_ADMIN_AUTH_TOKEN and GATEWAY_OTEL_DEFAULT_AUTH_TOKEN
               are intentionally NOT injected. The Go gateway

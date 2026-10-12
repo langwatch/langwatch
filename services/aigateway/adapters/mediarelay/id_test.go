@@ -210,3 +210,32 @@ func TestCodecWithoutASecretFails(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+// Go's base64 decoder skips \r and \n, so a genuine id with a line break in it
+// decodes to the same bytes and would open. The id is a credential and a log
+// and path component: any byte outside the alphabet is refused first.
+//
+// @scenario "A relay id with a byte outside the base64url alphabet is rejected"
+func TestIDWithAByteOutsideTheAlphabetIsInvalid(t *testing.T) {
+	t.Parallel()
+	codec := NewIDCodec(idTestSecret)
+	valid := sealOrFail(t, codec, idClaims)
+	middle := len(valid) / 2
+
+	for name, id := range map[string]string{
+		"a newline in the middle":      valid[:middle] + "\n" + valid[middle:],
+		"a carriage return in front":   "\r" + valid,
+		"a carriage return and a feed": valid[:middle] + "\r\n" + valid[middle:],
+		"a newline at the end":         valid + "\n",
+		"a space in the middle":        valid[:middle] + " " + valid[middle:],
+		"a tab at the end":             valid + "\t",
+		"a NUL in the middle":          valid[:middle] + "\x00" + valid[middle:],
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := codec.Unseal(id, idEpoch)
+
+			assert.ErrorIs(t, err, ErrIDInvalid)
+		})
+	}
+}

@@ -112,6 +112,12 @@ func (c *IDCodec) Unseal(id string, now time.Time) (IDClaims, error) {
 	if id == "" || len(id) > maxIDLength {
 		return IDClaims{}, ErrIDInvalid
 	}
+	// The decoder skips CR and LF, so a genuine id with one inserted would open.
+	for i := 0; i < len(id); i++ {
+		if !isBase64URL(id[i]) {
+			return IDClaims{}, ErrIDInvalid
+		}
+	}
 	raw, err := base64.RawURLEncoding.DecodeString(id)
 	if err != nil || len(raw) <= c.aead.NonceSize() {
 		return IDClaims{}, ErrIDInvalid
@@ -177,4 +183,8 @@ func parseClaims(plain []byte) (IDClaims, bool) {
 	}
 	claims.ExpiresAt = time.Unix(int64(binary.BigEndian.Uint64(expiry)), 0)
 	return claims, true
+}
+
+func isBase64URL(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_'
 }

@@ -156,7 +156,7 @@ func (rl *relay) awaitTwilio() (*websocket.Conn, ending, bool) {
 			}
 			return nil, ending{}, false
 		case <-h.drainOver:
-			return nil, ending{worker: closeFrame{CloseDrain, "relay_drain"}}, false
+			return nil, ending{outcome: OutcomeDrainedUnpaired, worker: closeFrame{CloseDrain, "relay_drain"}}, false
 		}
 	}
 }

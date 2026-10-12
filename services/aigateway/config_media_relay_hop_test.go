@@ -12,6 +12,7 @@ import (
 )
 
 var mediaRelayHopEnv = []string{
+	"GATEWAY_POD_IP",
 	"GATEWAY_RELAY_HOP_ADDR",
 	"LW_GATEWAY_VOICE_HOP_TIMEOUT_SECONDS",
 	"LW_GATEWAY_VOICE_MAX_HOP_DIALS",
@@ -130,6 +131,46 @@ func TestRelayHopPort(t *testing.T) {
 			_, err := relayHopPort(addr)
 
 			assert.Error(t, err)
+		})
+	}
+}
+
+// The pod address goes into every id and is dialed by peers, so an address the
+// hop would refuse at the other end is a mistake to catch at start.
+//
+// @scenario "A pod address outside the private ranges is refused at start"
+func TestLoadConfig_PodAddressOutsideThePrivateRangesIsRefused(t *testing.T) {
+	for name, ip := range map[string]string{
+		"a public address":         "8.8.8.8",
+		"a host name":              "gateway-0",
+		"an address with a port":   "10.1.2.3:5564",
+		"a link-local address":     "169.254.1.1",
+		"just above shared space":  "100.128.0.1",
+		"an IPv4-mapped public ip": "::ffff:8.8.8.8",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := loadWithHopEnv(t, map[string]string{"GATEWAY_POD_IP": ip})
+
+			assert.ErrorContains(t, err, "GATEWAY_POD_IP")
+		})
+	}
+}
+
+// @scenario "A pod address outside the private ranges is refused at start"
+func TestLoadConfig_PodAddressInThePrivateRangesIsAccepted(t *testing.T) {
+	for name, ip := range map[string]string{
+		"a ten address":          "10.1.2.3",
+		"a 172.16 address":       "172.20.0.4",
+		"a 192.168 address":      "192.168.1.9",
+		"a shared address space": "100.64.7.8",
+		"a unique local address": "fd00::7",
+		"unset":                  "",
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := loadWithHopEnv(t, map[string]string{"GATEWAY_POD_IP": ip})
+
+			require.NoError(t, err)
+			assert.Equal(t, ip, cfg.PodIP)
 		})
 	}
 }

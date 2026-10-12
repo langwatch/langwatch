@@ -13,7 +13,11 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/httpapi"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/mediarelay"
 )
+
+// minRelayIDKeyBytes is the shortest LW_GATEWAY_VOICE_RELAY_ID_KEY accepted.
+const minRelayIDKeyBytes = 32
 
 // Config is the top-level service configuration.
 type Config struct {
@@ -241,6 +245,7 @@ func defaultConfig() Config {
 			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
 		},
 		NonStreamingHeartbeatIntervalSeconds: int64(config.DefaultNonStreamingHeartbeatInterval / time.Second),
+		RelayHopAddr:                         ":5564",
 		Circuit: CircuitConfig{
 			WindowS:   30,
 			Threshold: 10,
@@ -306,11 +311,11 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := validateMediaRelayLimits(cfg.Voice); err != nil {
 		return Config{}, err
 	}
-	if cfg.RelayHopAddr == "" {
-		cfg.RelayHopAddr = ":5564"
-	}
 	if _, err := relayHopPort(cfg.RelayHopAddr); err != nil {
 		return Config{}, fmt.Errorf("GATEWAY_RELAY_HOP_ADDR: %w", err)
+	}
+	if cfg.PodIP != "" && !mediarelay.PrivateOwnerIP(cfg.PodIP) {
+		return Config{}, fmt.Errorf("GATEWAY_POD_IP %q is not a private pod-network address", cfg.PodIP)
 	}
 	if err := validateCodexAPIBase(cfg.CodexAPIBase); err != nil {
 		return Config{}, err
@@ -401,9 +406,8 @@ func validateSecondsFields(cfg Config) error {
 	return nil
 }
 
-const minRelayIDKeyBytes = 32
-
-// relayHopPort is the port of a listen address.
+// relayHopPort is the port of a listen address. It errors on a missing or
+// out-of-range port.
 func relayHopPort(addr string) (int, error) {
 	_, portText, err := net.SplitHostPort(addr)
 	if err != nil {
