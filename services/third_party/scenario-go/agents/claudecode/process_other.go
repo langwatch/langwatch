@@ -18,6 +18,9 @@ func terminateGroup(p *os.Process) { _ = p.Kill() }
 
 func killGroup(p *os.Process) { _ = p.Kill() }
 
+// groupAlive is false: without process groups, only the CLI is tracked.
+func groupAlive(*os.Process) bool { return false }
+
 func startWatchdog(string, int) {}
 
 func exitStatus(st *os.ProcessState) (int, string) { return st.ExitCode(), "" }

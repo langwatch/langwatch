@@ -78,7 +78,11 @@ func (ex *Executor) compiledCheckpointsLocked() checkpoint {
 // then RUN_FINISHED.
 func (ex *Executor) finish(ctx context.Context, r *ScenarioResult) *ScenarioResult {
 	if len(ex.cfg.Evaluators) > 0 {
-		ex.runEvaluators(ctx, r)
+		// Like the finalizers, evaluators still run once the run was
+		// cancelled.
+		evalCtx, cancel := cleanupContext(ctx)
+		ex.runEvaluators(evalCtx, r)
+		cancel()
 	}
 	ex.finalize(ctx, r)
 	status := RunStatusFailed

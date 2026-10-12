@@ -75,17 +75,27 @@ type processTrace struct {
 	ids map[trace.SpanID]struct{}
 	// live counts the started spans not ended yet.
 	live int
-	// owned is set once a span of the trace was tied to a thread or a
-	// fetcher claimed it: ClearThread releases the trace then, it never
-	// goes idle.
-	owned bool
+	// threads holds the threads a span of the trace was tied to or a
+	// fetcher claimed it for. A trace with one never goes idle: ClearThread
+	// of each releases its spans, and the last one the trace. Parallel runs
+	// under one caller span share a trace, so one run ending must not
+	// forget the spans of another.
+	threads map[string]struct{}
 	// queued is set while the trace is listed in traceShard.idle.
 	queued bool
 }
 
 // idle reports whether nothing will release the trace: none of its spans
 // is live and no thread owns it.
-func (t *processTrace) idle() bool { return t.live == 0 && !t.owned }
+func (t *processTrace) idle() bool { return t.live == 0 && len(t.threads) == 0 }
+
+// own records that thread owns the trace.
+func (t *processTrace) own(thread string) {
+	if t.threads == nil {
+		t.threads = map[string]struct{}{}
+	}
+	t.threads[thread] = struct{}{}
+}
 
 // threadShard holds what is kept per thread.
 type threadShard struct {
@@ -194,7 +204,7 @@ func (c *SpanCollector) OnStart(_ context.Context, s sdktrace.ReadWriteSpan) {
 		pt.live++
 	}
 	if thread != "" {
-		pt.owned = true
+		pt.own(thread)
 	}
 	ts.mu.Unlock()
 
@@ -207,7 +217,7 @@ func (c *SpanCollector) OnStart(_ context.Context, s sdktrace.ReadWriteSpan) {
 // a thread or not. A trace left idle (nothing live, no thread owning it) is
 // listed for eviction, so traces of unrelated instrumentation do not grow
 // the collector without bound.
-func (c *SpanCollector) processSpanEnded(traceID trace.TraceID, spanID trace.SpanID, threaded bool) {
+func (c *SpanCollector) processSpanEnded(traceID trace.TraceID, spanID trace.SpanID, thread string) {
 	ts := c.traceShard(traceID)
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
@@ -218,8 +228,8 @@ func (c *SpanCollector) processSpanEnded(traceID trace.TraceID, spanID trace.Spa
 	if _, ok := pt.ids[spanID]; !ok {
 		return // a span added after the fact, never started here
 	}
-	if threaded {
-		pt.owned = true
+	if thread != "" {
+		pt.own(thread)
 	}
 	if pt.live > 0 {
 		pt.live--
@@ -251,7 +261,7 @@ func (c *SpanCollector) OnEnd(s sdktrace.ReadOnlySpan) {
 	if thread == "" {
 		thread = c.threadOf(s.Parent().SpanID())
 	}
-	c.processSpanEnded(s.SpanContext().TraceID(), id, thread != "")
+	c.processSpanEnded(s.SpanContext().TraceID(), id, thread)
 	if thread == "" {
 		c.unthreadedMu.Lock()
 		if len(c.unthreaded) >= maxUnthreadedSpans {
@@ -370,7 +380,7 @@ func (c *SpanCollector) ClaimTraces(threadID string, traceIDs []trace.TraceID) {
 		ts := c.traceShard(id)
 		ts.mu.Lock()
 		if pt := ts.processSpans[id]; pt != nil {
-			pt.owned = true
+			pt.own(threadID)
 		}
 		ts.mu.Unlock()
 	}
@@ -421,11 +431,15 @@ func (c *SpanCollector) ClearThread(threadID string) {
 	delete(th.claims, threadID)
 	th.mu.Unlock()
 
+	traces := map[trace.TraceID]struct{}{}
 	for _, s := range spans {
-		c.forgetTrace(s.SpanContext().TraceID())
+		traces[s.SpanContext().TraceID()] = struct{}{}
 	}
 	for id := range claims {
-		c.forgetTrace(id)
+		traces[id] = struct{}{}
+	}
+	for id := range traces {
+		c.releaseTrace(id, threadID, members)
 	}
 	for _, id := range members {
 		sh := c.spanShard(id)
@@ -437,9 +451,22 @@ func (c *SpanCollector) ClearThread(threadID string) {
 	}
 }
 
-func (c *SpanCollector) forgetTrace(id trace.TraceID) {
+// releaseTrace releases a trace of a thread: the thread's spans are
+// forgotten, and the whole trace once no other thread owns it.
+func (c *SpanCollector) releaseTrace(id trace.TraceID, threadID string, members []trace.SpanID) {
 	ts := c.traceShard(id)
 	ts.mu.Lock()
-	delete(ts.processSpans, id)
-	ts.mu.Unlock()
+	defer ts.mu.Unlock()
+	pt := ts.processSpans[id]
+	if pt == nil {
+		return
+	}
+	delete(pt.threads, threadID)
+	if len(pt.threads) == 0 {
+		delete(ts.processSpans, id)
+		return
+	}
+	for _, sid := range members {
+		delete(pt.ids, sid)
+	}
 }

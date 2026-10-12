@@ -20,8 +20,32 @@ func messageRoleFor(role AgentRole) Role {
 
 // callAgent runs one agent call inside its span: builds the input, calls
 // the agent, records time, and adds the returned messages (stamped with the
-// call's trace id) or the verdict.
-func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req *JudgmentRequest) error {
+// call's trace id) or the verdict. It returns the result the call's verdict
+// set, nil when the agent returned messages.
+func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req *JudgmentRequest) (*ScenarioResult, error) {
+	return ex.prepareAgentCall(ctx, idx, role, req).run()
+}
+
+// agentCall is an agent call whose span and input are taken, waiting to
+// call the agent.
+type agentCall struct {
+	ex        *Executor
+	idx       int
+	role      AgentRole
+	agent     AgentAdapter
+	spanCtx   context.Context
+	span      trace.Span
+	stream    *MessageStream
+	input     AgentInput
+	delivered uint64
+}
+
+// prepareAgentCall starts the call's span under the current turn and takes
+// the agent's input, the part of a call that runs before the agent does. A
+// non-blocking turn prepares synchronously, as JS does before its first
+// await, so a later script step neither leaks into the input nor moves the
+// call to its turn.
+func (ex *Executor) prepareAgentCall(ctx context.Context, idx int, role AgentRole, req *JudgmentRequest) *agentCall {
 	agent := ex.cfg.Agents[idx]
 	parent := ex.TurnContext(ctx)
 	// The span starts with its whole attribute list. The input is encoded
@@ -34,7 +58,6 @@ func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req 
 		input = ex.state.chatMessagesInput()
 	}
 	spanCtx, span := ex.spans.start(parent, ex.spanNames[idx], agentSpanAttributes(ex.cfg.ThreadID, role, input, inputFirst))
-	defer span.End()
 	if !inputFirst && span.IsRecording() {
 		span.SetAttributes(langwatch.AttributeLangWatchInput.String(ex.state.chatMessagesInput()))
 	}
@@ -68,9 +91,17 @@ func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req 
 		Executor:           ex,
 		Stream:             stream,
 	}
+	return &agentCall{ex: ex, idx: idx, role: role, agent: agent, spanCtx: spanCtx, span: span,
+		stream: stream, input: agentInput, delivered: delivered}
+}
+
+// run calls the agent and records what it returned.
+func (c *agentCall) run() (*ScenarioResult, error) {
+	ex, idx, role, agent, spanCtx, span, stream, delivered := c.ex, c.idx, c.role, c.agent, c.spanCtx, c.span, c.stream, c.delivered
+	defer span.End()
 
 	started := time.Now()
-	ret, err := agent.Call(spanCtx, agentInput)
+	ret, err := agent.Call(spanCtx, c.input)
 	elapsed := time.Since(started)
 
 	ex.mu.Lock()
@@ -86,12 +117,11 @@ func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req 
 		if name == "" {
 			name = "Agent"
 		}
-		return fmt.Errorf("[%s] %w", name, err)
+		return nil, fmt.Errorf("[%s] %w", name, err)
 	}
 	if verdict, ok := ret.Verdict(); ok {
 		ex.emitter.streamFinished(stream)
-		ex.setResult(verdictResult(verdict))
-		return nil
+		return ex.setResult(verdictResult(verdict)), nil
 	}
 
 	msgs := ret.Messages(messageRoleFor(role))
@@ -106,7 +136,7 @@ func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req 
 		encoded = nil // the transformers may change the messages
 		if msgs, err = ex.transformUserTurn(spanCtx, agent, msgs); err != nil {
 			ex.emitter.streamFinished(stream)
-			return fmt.Errorf("[%s] %w", agentName(agent), err)
+			return nil, fmt.Errorf("[%s] %w", agentName(agent), err)
 		}
 	}
 	traceID := ""
@@ -131,11 +161,11 @@ func (ex *Executor) callAgent(ctx context.Context, idx int, role AgentRole, req 
 	if role == AgentRoleUser && len(msgs) > 0 {
 		for _, h := range ex.hooks.generatedUser {
 			if err := h.AfterGeneratedUserTurn(spanCtx, ex, last); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 // readsHistoryOnly reports whether the agent is one of the built-in agents

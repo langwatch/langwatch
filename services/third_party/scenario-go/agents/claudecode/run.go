@@ -82,7 +82,9 @@ func (a *ClaudeCodeAgentAdapter) runTurn(ctx context.Context, promptMessages, hi
 
 // wait waits for the CLI. When ctx ends first it terminates the CLI's
 // process group, kills it after the grace period, and still waits for it,
-// so the CLI never outlives the turn; stopped then reports true.
+// so the CLI never outlives the turn; stopped then reports true. The group
+// is killed even when the CLI exits within the grace period, since its
+// children may ignore the termination and would outlive it otherwise.
 func (a *ClaudeCodeAgentAdapter) wait(ctx context.Context, cmd *exec.Cmd) (stopped bool, err error) {
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()
@@ -98,10 +100,24 @@ func (a *ClaudeCodeAgentAdapter) wait(ctx context.Context, cmd *exec.Cmd) (stopp
 	case err = <-done:
 	case <-grace.C:
 		killGroup(cmd.Process)
-		err = <-done
+		return true, <-done
+	}
+	// The CLI is gone; give what it spawned the rest of the grace period.
+	poll := time.NewTicker(groupPollInterval)
+	defer poll.Stop()
+	for groupAlive(cmd.Process) {
+		select {
+		case <-poll.C:
+		case <-grace.C:
+			killGroup(cmd.Process)
+			return true, err
+		}
 	}
 	return true, err
 }
+
+// groupPollInterval is how often wait checks for leftovers of a stopped CLI.
+const groupPollInterval = 20 * time.Millisecond
 
 // startError explains a CLI that could not be started.
 func startError(bin, dir string, err error) error {

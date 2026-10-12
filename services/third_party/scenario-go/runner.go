@@ -143,6 +143,12 @@ func Run(ctx context.Context, cfg ScenarioConfig, opts ...RunOption) (*ScenarioR
 		if f := defaultFetcher.Load(); f != nil {
 			f.ClearThread(cfg.ThreadID)
 		}
+		// A judge's own collector or fetcher keeps per-thread state too.
+		for _, a := range cfg.Agents {
+			if j, ok := a.(interface{ clearThread(string) }); ok {
+				j.clearThread(cfg.ThreadID)
+			}
+		}
 	}()
 	result, err := ex.execute(ctx)
 

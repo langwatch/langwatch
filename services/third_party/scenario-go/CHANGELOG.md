@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.0](https://github.com/langwatch/scenario/tree/go/v0.1.0) (2026-04-09)
+## 0.1.0 (never tagged; the first published version is 0.1.1)
 
 ### Features
 

@@ -100,7 +100,8 @@ func (ex *Executor) step(ctx context.Context, goToNextTurn bool, onTurn StateCal
 		}
 		ex.pendingAgents[idx] = false
 		ex.mu.Unlock()
-		return ex.callAgent(ctx, idx, role, nil)
+		_, err := ex.callAgent(ctx, idx, role, nil)
+		return err
 	}
 }
 
@@ -250,6 +251,20 @@ func (ex *Executor) ClearPendingMessages(agent AgentAdapter) {
 // of role on this turn (starting a new turn when none is left), then add
 // content or call the agent.
 func (ex *Executor) scriptCallAgent(ctx context.Context, role AgentRole, content []Message, req *JudgmentRequest) (*ScenarioResult, error) {
+	idx, err := ex.routeAgent(role, content)
+	if err != nil || len(content) > 0 {
+		return nil, err
+	}
+	produced, err := ex.callAgent(ctx, idx, role, req)
+	if err != nil {
+		return nil, err
+	}
+	return ex.handleVerdict(produced, req), nil
+}
+
+// routeAgent consumes the next agent of role on this turn, starting a new
+// turn when none is left, and adds content as its turn.
+func (ex *Executor) routeAgent(role AgentRole, content []Message) (int, error) {
 	ex.mu.Lock()
 	ex.consumeUntilRoleLocked(role)
 	idx := ex.nextAgentLocked(role)
@@ -262,27 +277,30 @@ func (ex *Executor) scriptCallAgent(ctx context.Context, role AgentRole, content
 		ex.mu.Unlock()
 	}
 	if idx < 0 {
-		return nil, noAgentError(role, content)
+		return -1, noAgentError(role, content)
 	}
 	ex.mu.Lock()
 	ex.pendingAgents[idx] = false
 	ex.mu.Unlock()
 
-	if len(content) > 0 {
-		for _, m := range content {
-			ex.addMessage(m, "", idx, nil)
-		}
-		return nil, nil
+	for _, m := range content {
+		ex.addMessage(m, "", idx, nil)
 	}
-	if err := ex.callAgent(ctx, idx, role, req); err != nil {
-		return nil, err
-	}
+	return idx, nil
+}
 
+// handleVerdict applies the checkpoint semantics to the result a script
+// call produced: a passing inline-criteria checkpoint is recorded and
+// cleared, a failing one or a final verdict gets the checkpoint criteria.
+// Only the call whose verdict set the result handles it, so a non-blocking
+// turn ending meanwhile neither merges the criteria again nor races the
+// judge's checkpoint.
+func (ex *Executor) handleVerdict(produced *ScenarioResult, req *JudgmentRequest) *ScenarioResult {
 	ex.mu.Lock()
 	defer ex.mu.Unlock()
 	r := ex.result
-	if r == nil {
-		return nil, nil
+	if produced == nil || r != produced {
+		return nil
 	}
 	if req != nil && req.Criteria != nil {
 		ex.checkpoints = append(ex.checkpoints, checkpoint{
@@ -290,20 +308,22 @@ func (ex *Executor) scriptCallAgent(ctx context.Context, role AgentRole, content
 		})
 		if r.Success {
 			ex.result = nil
-			return nil, nil
+			return nil
 		}
 		cp := ex.compiledCheckpointsLocked()
 		r.MetCriteria, r.UnmetCriteria, r.InconclusiveCriteria, r.Criteria = cp.met, cp.unmet, cp.inconclusive, cp.criteria
 		ex.merged = true
-		return r, nil
+		return r
 	}
-	cp := ex.compiledCheckpointsLocked()
-	r.MetCriteria = concat(cp.met, r.MetCriteria)
-	if len(cp.criteria) > 0 {
-		r.Criteria = append(cp.criteria, r.Criteria...)
+	if !ex.merged {
+		cp := ex.compiledCheckpointsLocked()
+		r.MetCriteria = concat(cp.met, r.MetCriteria)
+		if len(cp.criteria) > 0 {
+			r.Criteria = append(cp.criteria, r.Criteria...)
+		}
+		ex.merged = true
 	}
-	ex.merged = true
-	return r, nil
+	return r
 }
 
 func noAgentError(role AgentRole, content []Message) error {
@@ -384,9 +404,21 @@ func (ex *Executor) startTurn(run func() error) *TurnHandle {
 // agent responds; the run waits for the turn before it ends, and its error
 // fails the run. With content, the messages are the agent's turn instead of
 // a response of the agent under test, as with AgentMessage.
+//
+// The turn is routed, and the agent's input taken, before AgentNonBlocking
+// returns, as JS does before its first await: a step that follows (a
+// barge-in) lands after the turn and is not part of the agent's input.
 func (ex *Executor) AgentNonBlocking(ctx context.Context, content ...Message) *TurnHandle {
+	idx, err := ex.routeAgent(AgentRoleAgent, content)
+	if err != nil || len(content) > 0 {
+		return ex.startTurn(func() error { return err })
+	}
+	call := ex.prepareAgentCall(ctx, idx, AgentRoleAgent, nil)
 	return ex.startTurn(func() error {
-		_, err := ex.scriptCallAgent(ctx, AgentRoleAgent, content, nil)
+		produced, err := call.run()
+		if err == nil {
+			ex.handleVerdict(produced, nil)
+		}
 		return err
 	})
 }
@@ -415,7 +447,11 @@ func (ex *Executor) ScheduleAgentTurnNonBlocking(ctx context.Context) (*TurnHand
 		ex.pendingRoles = ex.pendingRoles[1:]
 	}
 	ex.mu.Unlock()
-	return ex.startTurn(func() error { return ex.callAgent(ctx, idx, AgentRoleAgent, nil) }), true
+	call := ex.prepareAgentCall(ctx, idx, AgentRoleAgent, nil)
+	return ex.startTurn(func() error {
+		_, err := call.run()
+		return err
+	}), true
 }
 
 // PendingAgentTurn returns the last non-blocking agent turn, or nil.

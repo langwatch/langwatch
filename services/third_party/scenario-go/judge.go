@@ -121,6 +121,17 @@ func (j *JudgeAgent) collector() *SpanCollector {
 	return DefaultSpanCollector()
 }
 
+// clearThread drops what the judge's own collector and fetcher kept for a
+// thread; the runner clears the default ones itself.
+func (j *JudgeAgent) clearThread(threadID string) {
+	if c := j.cfg.SpanCollector; c != nil {
+		c.ClearThread(threadID)
+	}
+	if f := j.cfg.TraceFetcher; f != nil {
+		f.ClearThread(threadID)
+	}
+}
+
 // judgeCall carries what both phases of one judge call share.
 type judgeCall struct {
 	in         AgentInput

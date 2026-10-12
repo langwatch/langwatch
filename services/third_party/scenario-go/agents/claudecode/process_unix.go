@@ -59,6 +59,9 @@ func terminateGroup(p *os.Process) { signalGroup(p, syscall.SIGTERM) }
 
 func killGroup(p *os.Process) { signalGroup(p, syscall.SIGKILL) }
 
+// groupAlive reports whether any process is left in the CLI's group.
+func groupAlive(p *os.Process) bool { return syscall.Kill(-p.Pid, 0) == nil }
+
 // watchdogCommand is the watchdog for the CLI childPID of harnessPID. It
 // runs in a session of its own, so it neither dies with the harness's
 // process group nor keeps the harness's terminal.
