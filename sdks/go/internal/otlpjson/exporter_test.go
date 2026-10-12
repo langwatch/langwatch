@@ -162,7 +162,7 @@ func TestExporter_DoesNotRetryOtherStatuses(t *testing.T) {
 	}
 }
 
-func TestExporter_HonoursRetryAfter(t *testing.T) {
+func TestExporter_HonorsRetryAfter(t *testing.T) {
 	rec := &recorder{
 		statuses: []int{http.StatusTooManyRequests},
 		headers:  []map[string]string{{"Retry-After": "1"}},
