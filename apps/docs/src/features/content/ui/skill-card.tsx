@@ -55,10 +55,10 @@ export function SkillCard({
     <Box
       className="docs-skill-card"
       borderWidth="1px"
-      borderColor="border.emphasized"
+      borderColor="border"
       borderRadius="xl"
       padding="4"
-      bg="docs.raised"
+      bg="bg.surface"
       marginY="4"
     >
       <Text

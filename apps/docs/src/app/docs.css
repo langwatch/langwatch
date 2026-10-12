@@ -652,9 +652,7 @@ body {
 .docs-card-grid > .docs-card:has(ul) {
   grid-column: 1 / -1;
 }
-/* Cards are cards at rest: raised surface, full border, soft shadow. Links only add lift. */
 .docs-card {
-  box-shadow: 0 1px 2px var(--chakra-colors-docs-shadow);
   transition:
     border-color 160ms,
     box-shadow 160ms,
@@ -1077,13 +1075,15 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 4px 6px 10px;
-  border: 1px solid var(--chakra-colors-border-emphasized);
-  border-radius: var(--chakra-radii-xl);
-  background: var(--chakra-colors-bg-subtle);
+  padding: 0;
   font-family: var(--chakra-fonts-mono);
   font-size: 12px;
   line-height: 20px;
+}
+.docs-agent-line > svg {
+  flex-shrink: 0;
+  margin-right: 4px;
+  color: var(--chakra-colors-accent-fg);
 }
 .docs-agent-command {
   white-space: nowrap;

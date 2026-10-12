@@ -6,13 +6,7 @@ import { pagePath } from "../../../lib/site-path.ts";
 export function AgentActions() {
   return (
     <Flex gap="3" wrap="wrap" marginY="5">
-      <Button
-        asChild
-        bg="docs.primary"
-        color="docs.primaryText"
-        minHeight="44px"
-        _hover={{ bg: "docs.primaryHover" }}
-      >
+      <Button asChild variant="outline" colorPalette="gray" minHeight="44px">
         <a href="#getting-started">
           <Terminal size={16} aria-hidden="true" />
           Launch your agent

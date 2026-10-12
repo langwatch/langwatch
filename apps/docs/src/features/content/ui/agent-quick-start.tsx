@@ -111,10 +111,10 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
               disabled={!ready}
               aria-pressed={agent === name}
               onClick={() => setAgent(name)}
-              bg={agent === name ? "fg" : "transparent"}
-              color={agent === name ? "bg.surface" : "fg"}
-              borderColor={agent === name ? "fg" : "border"}
-              _hover={{ bg: agent === name ? "docs.body" : "bg.hover" }}
+              bg={agent === name ? "accent.subtle" : "transparent"}
+              color={agent === name ? "accent.fg" : "fg"}
+              borderColor={agent === name ? "accent.fg" : "border"}
+              _hover={{ bg: "bg.hover" }}
             >
               <img
                 src={sitePath({ path: `/images/logos/${logo}.svg` })}
@@ -134,9 +134,8 @@ export function AgentQuickStart({ prompt }: { prompt: string }) {
             <Button
               size="sm"
               minHeight="40px"
-              bg="docs.primary"
-              color="docs.primaryText"
-              _hover={{ bg: "docs.primaryHover" }}
+              variant="outline"
+              colorPalette="gray"
               disabled={!ready}
               data-docs-prompt=""
               onClick={() => copy({ text: prompt })}

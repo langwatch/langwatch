@@ -1,5 +1,5 @@
 import { IconButton, Link } from "@langwatch/design-system/primitives";
-import { ChevronDown, Copy } from "lucide-react";
+import { ChevronDown, Copy, Terminal } from "lucide-react";
 
 import { pagePath } from "../../../lib/site-path.ts";
 
@@ -9,6 +9,7 @@ export function AgentLauncher() {
   return (
     <div className="docs-agent-launcher">
       <div className="docs-agent-line">
+        <Terminal size={16} aria-hidden="true" />
         <code className="docs-agent-command">npx langwatch</code>
         <span className="docs-agent-pick">
           <span className="docs-agent-name" aria-hidden="true">

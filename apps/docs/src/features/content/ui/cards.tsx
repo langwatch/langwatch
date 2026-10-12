@@ -87,7 +87,7 @@ function isLogo(icon: string) {
   return /^(\/|https?:)/.test(icon);
 }
 
-/** A bordered card at rest; a link adds a hover lift and accent edge, never the card itself. */
+/** Authored links inside a card keep their own targets. */
 export function Card({
   title,
   description,
@@ -118,9 +118,9 @@ export function Card({
       padding={compact ? "3" : "5"}
       minHeight={compact ? "64px" : void 0}
       borderWidth="1px"
-      borderColor="border.emphasized"
+      borderColor="border"
       borderRadius="2xl"
-      bg="docs.raised"
+      bg="bg.surface"
       minWidth="0"
     >
       {icon ? (
